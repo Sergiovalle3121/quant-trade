@@ -32,6 +32,7 @@ _PREFIXES: dict[str, str] = {
     "trades": "operaciones",
     "benchmark": "benchmark",
     "optimization": "optimización",
+    "variants": "variantes",
     "live": "cuenta real",
 }
 
@@ -365,9 +366,9 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
     ),
     (
         "{n} Balance cell(s) do not equal the previous balance plus the row's money; the "
-        "reported Balance was kept",
+        "row amounts were used for returns",
         "{n} celda(s) de Balance no son el balance anterior más el dinero de la fila; se "
-        "mantuvo el Balance del informe",
+        "usaron los importes de las filas para los retornos",
     ),
     (
         "deposits or withdrawals were removed: the curve is a flow-adjusted index that starts "
@@ -2010,6 +2011,89 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
         "calendar days from the uploaded equity curve; months from each month's last point",
         "días naturales de la curva de equity aportada; meses con el último punto de cada mes",
     ),
+    # audit/engine.py: monetary reconciliation and provenance notes
+    ("build commit SHA was not embedded", "no se incorporó el SHA del commit de compilación"),
+    ("no closed-trade ledger supplied", "no se aportó un registro de operaciones cerradas"),
+    ("uploaded returns are not money", "los retornos subidos no son importes monetarios"),
+    (
+        "trade currency not stated; monetary P&L and costs use the file's units",
+        "no se indica la moneda de las operaciones; el P/L y los costes monetarios "
+        "usan las unidades del archivo",
+    ),
+    (
+        "matrix has no timestamps; row alignment is unverified",
+        "la matriz no tiene fechas; no se verificó la alineación de las filas",
+    ),
+    (
+        "no selected-variant identifier supplied",
+        "no se aportó un identificador de la variante seleccionada",
+    ),
+    (
+        "rebuilt from the platform deal rows",
+        "reconstruida a partir de las filas de operaciones de la plataforma",
+    ),
+    ("separate upload", "archivo aportado por separado"),
+    ("listed by platform", "registrados por la plataforma"),
+    ("not supplied", "no aportado"),
+    ("not itemised", "sin desglose"),
+    ("not valued separately", "sin valoración por separado"),
+    ("not stated; same units assumed", "sin especificar; se suponen las mismas unidades"),
+    ("no separate valuation supplied", "no se aportó una valoración independiente"),
+    (
+        "0.011 per closed trade plus 1 bp of capital",
+        "0.011 por operación cerrada más 1 punto básico del capital",
+    ),
+    ("trades extend outside the curve dates", "hay operaciones fuera de las fechas de la curva"),
+    (
+        "closed trades do not cover the final part of the curve",
+        "las operaciones cerradas no cubren el tramo final de la curva",
+    ),
+    (
+        "closed-trade ledger agrees within tolerance; this does not authenticate the history",
+        "el registro de operaciones cerradas coincide dentro de la tolerancia; "
+        "esto no autentica el historial",
+    ),
+    (
+        "printed balance contradicts deal amounts",
+        "el balance impreso contradice los importes de las operaciones",
+    ),
+    (
+        "open positions or closes missing from the trade list could explain the difference",
+        "las posiciones abiertas o los cierres que faltan en la lista de operaciones "
+        "podrían explicar la diferencia",
+    ),
+    (
+        "printed final balance differs from initial balance plus flows and net closed "
+        "P&L by {difference} {currency}; the return was rebuilt from deal amounts",
+        "el balance final impreso difiere del balance inicial más los flujos y el P/L "
+        "neto de operaciones cerradas en {difference} {currency}; el retorno se "
+        "reconstruyó con los importes de las operaciones",
+    ),
+    (
+        "separate curve and closed trades differ by {difference} {currency}; provide "
+        "cash flows, currency conversion and open-position valuation to reconcile them",
+        "la curva independiente y las operaciones cerradas difieren en {difference} "
+        "{currency}; aporta flujos de dinero, conversión de divisas y valoración "
+        "de posiciones abiertas para conciliarlas",
+    ),
+    (
+        "flows, currency conversion or open positions could explain the difference",
+        "los flujos, la conversión de divisas o las posiciones abiertas podrían "
+        "explicar la diferencia",
+    ),
+    (
+        "a calibrated heuristic found balance-chain inconsistencies; this alone "
+        "does not establish alteration",
+        "una heurística calibrada encontró inconsistencias en la cadena de "
+        "balances; esto por sí solo no demuestra una alteración",
+    ),
+    # forensics evidence identifiers kept stable in the JSON record
+    ("no_declared_totals", "sin_totales_declarados"),
+    ("format_not_covered", "formato_sin_cobertura"),
+    ("no_column", "sin_columna"),
+    ("no_qualifying_row", "sin_fila_aplicable"),
+    ("variable_precision_format", "formato_de_precision_variable"),
+    ("no_listed_symbol", "sin_símbolo_registrado"),
 )
 
 #: The same sentences when their count ``{n}`` is 1: English template ->
@@ -2183,11 +2267,11 @@ _SINGULAR: dict[str, tuple[str, str]] = {
         "se ignoró {n} movimiento de dinero posterior a la última operación",
     ),
     "{n} Balance cell(s) do not equal the previous balance plus the row's money; the "
-    "reported Balance was kept": (
+    "row amounts were used for returns": (
         "{n} Balance cell does not equal the previous balance plus the row's money; the "
-        "reported Balance was kept",
+        "row amounts were used for returns",
         "{n} celda de Balance no es el balance anterior más el dinero de la fila; se "
-        "mantuvo el Balance del informe",
+        "usaron los importes de las filas para los retornos",
     ),
     "{n} repeated pass number(s) counted once": (
         "{n} repeated pass number counted once",

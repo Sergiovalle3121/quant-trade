@@ -19,7 +19,13 @@ from quant_trade.audit.pages import _e, _field, _page, _page_hero
 
 if TYPE_CHECKING:
     from quant_trade.audit.funnel import Funnel, FunnelCounts
-    from quant_trade.audit.store import AccessCodeRecord, RefusedPayment
+    from quant_trade.audit.store import (
+        AccessCodeRecord,
+        CheckoutOrder,
+        EmailDeliveryIssue,
+        RefusedPayment,
+        StripeRefundRecord,
+    )
 
 PANEL_PATH = "/panel"
 MAX_CREDITS = 100
@@ -57,6 +63,34 @@ TEXT: dict[str, str] = {
     "refused_lead": "Stripe cobró estos pagos, pero Rigor no abrió ningún informe. Búscalo "
     "en Stripe por el id de sesión y reembolsa, o crea un código para el cliente.",
     "refused_cols": "Fecha|Sesión de Stripe|Informe|Motivo",
+    "orders_title": "Compras con tarjeta registradas",
+    "orders_lead": (
+        "Una fila es una sesión pagada, no un informe ni un crédito. Un duplicado es otro cobro "
+        "que requiere revisión de reembolso. Un cobro retenido no entregó el informe y también "
+        "requiere revisión; registrar la revisión no ejecuta el reembolso. "
+        "Solo cobros con entorno live confirmado entran en el embudo comercial."
+    ),
+    "orders_cols": "Fecha|Sesión|Informe|Plan|Entorno|Cobro registrado USD|Entrega|Resolución",
+    "refunds_title": "Devoluciones observadas en Stripe",
+    "refunds_lead": (
+        "Cada fila es un reembolso, incluso parcial. Solo los vinculados a una orden de Rigor, "
+        "en USD y con último estado conocido succeeded entran en la cifra del embudo. "
+        "Un succeeded puede fallar después; revisa Stripe antes de informar ingresos finales."
+    ),
+    "refunds_cols": "Observado|Reembolso|Orden|Importe y moneda|Estado|Conciliación",
+    "mail_title": "Avisos de compra por correo pendientes de atención",
+    "mail_lead": (
+        "Solo se muestran identificadores y estado, nunca direcciones ni contenido. "
+        "Comprueba el transporte SMTP antes de reintentar. Un aviso puede haberse enviado "
+        "antes de que un fallo impidiera registrar la entrega."
+    ),
+    "mail_counts": "Fallidos: {dead}. Atrasados más de 15 minutos: {overdue}.",
+    "mail_cols": "Creado|Id de orden|Tipo|Estado|Intentos|Próximo intento|Acción",
+    "mail_requeue": "Reintentar aviso",
+    "mail_requeued": "Aviso reencolado. El trabajador intentará enviarlo.",
+    "mail_not_requeued": (
+        "No se reencoló: exige aviso fallido, orden live compatible y correo actual confirmado."
+    ),
     "reset_title": "Restablecer la contraseña de un cliente",
     "reset_lead": (
         "Crea un enlace de un solo uso (caduca en 24 horas) para un cliente que olvidó su "
@@ -75,20 +109,72 @@ TEXT: dict[str, str] = {
         "etiqueta»."
     ),
     "funnel_by_ref": "Por etiqueta",
+    "funnel_by_ref_locale": "Por canal e idioma",
     "funnel_by_day": "Por día e idioma",
+    "funnel_country": "Por país del comprador",
+    "funnel_country_missing": (
+        "Sólo las compras nuevas con dirección de facturación comprobada por Stripe tienen "
+        "país observado. Las compras anteriores figuran NOT_MEASURED. Visitas, registros y "
+        "cargas por país siguen NOT_MEASURED: no se deduce el país del idioma ni la IP."
+    ),
+    "funnel_country_cols": "País facturado|Compras live|Entregas|Cobro bruto USD",
+    "funnel_contribution": (
+        "Contribución = cobro bruto confirmado − devoluciones − comisiones de pago y cambio "
+        "− impuestos sobre esas comisiones − coste variable de informes gratis y pagados "
+        "− infraestructura − soporte − adquisición. NOT_MEASURED hasta registrar esos costes "
+        "observados por cohorte; el saldo tras devoluciones no es beneficio ni ingreso neto."
+    ),
     "funnel_empty": "Todavía no hay nada que contar en estos días.",
-    "funnel_ref_cols": "Etiqueta|Qué es|Visitas|Cuentas|Informe gratis|Vistas previas|Pagos",
-    "funnel_day_cols": "Día|Idioma|Visitas|Cuentas|Informe gratis|Vistas previas|Pagos",
+    "funnel_ref_cols": (
+        "Etiqueta|Qué es|Visitas estimadas|Cuentas|Correos confirmados|Cargas guardadas|"
+        "Informe gratis|Vistas previas|Invitaciones aceptadas|Sesiones Checkout creadas|"
+        "Compras confirmadas|Cuentas con primera compra|Más compras de la cuenta|"
+        "Compras live entregadas|Derechos vendidos|"
+        "Créditos regalados|Créditos canjeados|Cobro bruto USD|Devoluciones USD registradas|"
+        "Saldo de cobros USD tras devoluciones registradas|Contribución USD"
+    ),
+    "funnel_day_cols": (
+        "Día|Idioma|Visitas estimadas|Cuentas|Correos confirmados|Cargas guardadas|"
+        "Informe gratis|Vistas previas|Invitaciones aceptadas|Sesiones Checkout creadas|"
+        "Compras confirmadas|Cuentas con primera compra|Más compras de la cuenta|"
+        "Compras live entregadas|Derechos vendidos|"
+        "Créditos regalados|Créditos canjeados|Cobro bruto USD|Devoluciones USD registradas|"
+        "Saldo de cobros USD tras devoluciones registradas|Contribución USD"
+    ),
+    "funnel_ref_locale_cols": (
+        "Etiqueta|Idioma|Visitas estimadas|Cuentas|Correos confirmados|Cargas guardadas|"
+        "Informe gratis|Vistas previas|Invitaciones aceptadas|Sesiones Checkout creadas|"
+        "Compras confirmadas|Cuentas con primera compra|Más compras de la cuenta|"
+        "Compras live entregadas|Derechos vendidos|"
+        "Créditos regalados|Créditos canjeados|Cobro bruto USD|Devoluciones USD registradas|"
+        "Saldo de cobros USD tras devoluciones registradas|Contribución USD"
+    ),
     "funnel_total": "Total",
     "funnel_direct": "sin etiqueta",
-    "funnel_paid": "{code} con código, {card} con tarjeta",
     "funnel_tags": "Etiquetas que cuentan",
     "funnel_limits": (
         "Las visitas son de la página principal y de las páginas de cada caso, sin robots ni "
         "vistas previas de enlaces; solo se guarda un contador por día, idioma y etiqueta, sin "
-        "dirección ni cookie. La etiqueta se recuerda {ref_days} días en el navegador y queda "
+        "dirección ni identificador de navegador en la base de visitas. La etiqueta se recuerda "
+        "{ref_days} días en el navegador y queda "
         "en la cuenta si se crea. Los pagos e informes se cuentan por el idioma de la cuenta; "
-        "sin cuenta aparecen con «-». Un informe borrado por la retención deja de contar."
+        "sin cuenta aparecen con «-». Las visitas son navegadores observados, no personas únicas. "
+        "El cobro bruto proviene de sesiones live confirmadas en USD antes de devoluciones, "
+        "comisiones e impuestos; no es ingreso neto ni dinero recibido en el banco. "
+        "Las devoluciones son sólo reembolsos enlazados y en USD cuyo último estado conocido "
+        "es succeeded, fechados cuando Rigor los observó; un fallo posterior puede corregirlos. "
+        "El saldo mostrado es la resta de estas dos cifras, no dinero recibido en el banco "
+        "ni beneficio. No incluye reembolsos sin enlace, otras monedas, comisiones, FX, "
+        "impuestos ni pagos a cuenta bancaria; las devoluciones anteriores a este registro "
+        "también requieren conciliación en Stripe. Sesiones test o de modo desconocido "
+        "se muestran arriba para revisión pero se excluyen del embudo. "
+        "La cuenta asociada pertenece al informe y no identifica al titular de la tarjeta. "
+        "Los códigos manuales no cuentan como compras sin cobro verificado. "
+        "Los correos confirmados son los que aún coinciden con la cuenta; las cargas son informes "
+        "importados y guardados, no intentos fallidos. Una invitación aceptada es una cuenta "
+        "creada con enlace válido, no un premio. Checkout cuenta sesiones con URL creada, "
+        "no visitas a Stripe ni cargos; incluye test y live. Las entregas son órdenes live "
+        "marcadas entregadas, no todos los informes gratuitos ni canjes."
     ),
 }
 
@@ -98,12 +184,15 @@ LOCALE_NAMES: dict[str, str] = {"es": "español", "en": "inglés", "pt": "portug
 REFUSAL_REASONS: dict[str, str] = {
     "no Checkout session or no audit id": "sin sesión de Stripe o sin informe",
     "test payment for an audit not listed for testing": "pago de prueba",
+    "payment mode mismatch": "entorno de pago incorrecto",
     "unknown audit": "el informe no existe",
     "unknown plan": "plan desconocido",
     "no Rigor marker": "no es un enlace de Rigor (falta app=rigor)",
     "not USD": "no se cobró en dólares",
     "no amount": "sin monto",
     "below the plan price": "pagó menos que el precio",
+    "unknown order": "la orden no existe",
+    "order mismatch": "la sesión no coincide con la orden",
 }
 
 
@@ -186,12 +275,145 @@ def _refused_table(refused: Sequence[RefusedPayment]) -> str:
     )
 
 
+def _orders_table(orders: Sequence[CheckoutOrder]) -> str:
+    if not orders:
+        return ""
+    rows: list[list[str]] = []
+    for order in orders:
+        if order.status not in ("delivered", "duplicate", "paid_review"):
+            continue
+        cells = (
+            order.confirmed_at[:16].replace("T", " "),
+            order.session_id,
+            order.audit_id,
+            order.plan,
+            (
+                "live"
+                if order.livemode is True
+                else "test"
+                if order.livemode is False
+                else "no medido"
+            ),
+            f"{order.paid_amount_cents / 100:.2f}",
+            (
+                "entregado"
+                if order.status == "delivered"
+                else "cargo duplicado"
+                if order.status == "duplicate"
+                else "cobrado; entrega retenida"
+            ),
+            (
+                "revisar reembolso manualmente"
+                if order.resolution == "manual_refund_review"
+                else "sesión original conciliada"
+                if order.resolution == "legacy_reconciled"
+                else order.resolution or "-"
+            ),
+        )
+        rows.append(list(cells))
+    if not rows:
+        return ""
+    return (
+        f"<h2 style='margin-top:32px'>{_e(TEXT['orders_title'])}</h2>"
+        f"<p class='muted'>{_e(TEXT['orders_lead'])}</p>" + _table(TEXT["orders_cols"], rows)
+    )
+
+
+def _refunds_table(refunds: Sequence[StripeRefundRecord]) -> str:
+    if not refunds:
+        return ""
+    rows: list[list[str]] = []
+    for refund in refunds:
+        amount = (
+            f"{refund.amount_minor / 100:.2f} USD"
+            if refund.currency == "usd"
+            else f"{refund.amount_minor} unidades menores {refund.currency.upper()}"
+        )
+        rows.append(
+            [
+                refund.last_seen_at[:16].replace("T", " "),
+                refund.refund_id,
+                refund.order_id or "-",
+                amount,
+                refund.status,
+                "enlazado" if refund.order_id else "sin enlace; revisar",
+            ]
+        )
+    return (
+        f"<h2 style='margin-top:32px'>{_e(TEXT['refunds_title'])}</h2>"
+        f"<p class='muted'>{_e(TEXT['refunds_lead'])}</p>" + _table(TEXT["refunds_cols"], rows)
+    )
+
+
+def _mail_issues_table(
+    key: str, issues: Sequence[EmailDeliveryIssue], counts: dict[str, int]
+) -> str:
+    rows = []
+    for issue in issues:
+        action = "-"
+        if issue.status == "dead":
+            action = (
+                f"<form method='post' action='{PANEL_PATH}'>{_key_field(key)}"
+                "<input type='hidden' name='action' value='mail_requeue'>"
+                f"<input type='hidden' name='mail_id' value='{_e(issue.id)}'>"
+                f"<button class='btn btn-ghost' type='submit'>{_e(TEXT['mail_requeue'])}</button>"
+                "</form>"
+            )
+        rows.append(
+            "<tr>"
+            + "".join(
+                f"<td>{_e(value)}</td>"
+                for value in (
+                    issue.created_at[:16].replace("T", " "),
+                    issue.id,
+                    issue.kind,
+                    issue.status,
+                    str(issue.attempts),
+                    issue.next_attempt_at[:16].replace("T", " "),
+                )
+            )
+            + f"<td>{action}</td></tr>"
+        )
+    head = "".join(f"<th>{_e(col)}</th>" for col in TEXT["mail_cols"].split("|"))
+    table = (
+        "<div style='overflow-x:auto'><table><thead><tr>"
+        + head
+        + "</tr></thead><tbody>"
+        + "".join(rows)
+        + "</tbody></table></div>"
+        if rows
+        else ""
+    )
+    return (
+        f"<h2 style='margin-top:32px'>{_e(TEXT['mail_title'])}</h2>"
+        f"<p class='muted'>{_e(TEXT['mail_lead'])}</p>"
+        f"<p>{_e(TEXT['mail_counts'].format(**counts))}</p>" + table
+    )
+
+
 def _counts_cells(counts: FunnelCounts) -> list[str]:
     c = counts.counts
-    paid = str(counts.paid)
-    if counts.paid:
-        paid += " (" + TEXT["funnel_paid"].format(code=c["paid_code"], card=c["paid_card"]) + ")"
-    return [str(c["visits"]), str(c["signups"]), str(c["welcome"]), str(c["previews"]), paid]
+    return [
+        str(c["visits"]),
+        str(c["signups"]),
+        str(c["email_verified"]),
+        str(c["uploads"]),
+        str(c["welcome"]),
+        str(c["previews"]),
+        str(c["referrals_accepted"]),
+        str(c["checkout_started"]),
+        str(c["purchases"]),
+        str(c["buyers"]),
+        str(c["repeat_purchases"]),
+        str(c["deliveries"]),
+        str(c["rights_sold"]),
+        str(c["gift_credits"]),
+        str(c["credit_used"]),
+        f"{c['gross_usd_cents'] / 100:.2f}",
+        f"{c['refund_usd_cents'] / 100:.2f}",
+        f"{(c['gross_usd_cents'] - c['refund_usd_cents']) / 100:.2f}",
+        "NOT_MEASURED",
+    ]
 
 
 def _table(cols: str, rows: list[list[str]]) -> str:
@@ -203,7 +425,13 @@ def _table(cols: str, rows: list[list[str]]) -> str:
     )
 
 
-def funnel_section(funnel: Funnel, *, days: int, example: str) -> str:
+def funnel_section(
+    funnel: Funnel,
+    *,
+    days: int,
+    example: str,
+    country_rows: Sequence[tuple[str, int, int, int]] = (),
+) -> str:
     """Visits, accounts, free reports, previews and payments by tag and by day."""
     title = TEXT["funnel_title"].format(days=days)
     lead = TEXT["funnel_lead"].format(example=example)
@@ -229,6 +457,22 @@ def funnel_section(funnel: Funnel, *, days: int, example: str) -> str:
             for ref, counts in ordered
         ]
         ref_rows.append([TEXT["funnel_total"], "", *_counts_cells(funnel.total)])
+        ref_locale_rows = [
+            [
+                TEXT["funnel_direct"] if ref == DIRECT else ref,
+                LOCALE_NAMES.get(locale, locale),
+                *_counts_cells(counts),
+            ]
+            for (ref, locale), counts in sorted(
+                funnel.by_ref_locale.items(),
+                key=lambda item: (
+                    -item[1].paid,
+                    -item[1].counts["signups"],
+                    -item[1].counts["visits"],
+                    item[0],
+                ),
+            )
+        ]
         day_rows = [
             [day, LOCALE_NAMES.get(locale, locale), *_counts_cells(counts)]
             for (day, locale), counts in sorted(
@@ -238,11 +482,28 @@ def funnel_section(funnel: Funnel, *, days: int, example: str) -> str:
         out += (
             f"<h3>{_e(TEXT['funnel_by_ref'])}</h3>"
             + _table(TEXT["funnel_ref_cols"], ref_rows)
+            + f"<h3>{_e(TEXT['funnel_by_ref_locale'])}</h3>"
+            + _table(TEXT["funnel_ref_locale_cols"], ref_locale_rows)
             + f"<h3>{_e(TEXT['funnel_by_day'])}</h3>"
             + _table(TEXT["funnel_day_cols"], day_rows)
         )
     tags = ", ".join(f"{tag} ({label})" for tag, label in REF_TAGS.items())
+    country_table = (
+        _table(
+            TEXT["funnel_country_cols"],
+            [
+                [country, str(purchases), str(deliveries), f"{gross / 100:.2f}"]
+                for country, purchases, deliveries, gross in country_rows
+            ],
+        )
+        if country_rows
+        else ""
+    )
     out += (
+        f"<h3>{_e(TEXT['funnel_country'])}</h3>"
+        f"<p class='muted'>{_e(TEXT['funnel_country_missing'])}</p>"
+        + country_table
+        + f"<p class='muted'>{_e(TEXT['funnel_contribution'])}</p>"
         f"<details><summary>{_e(TEXT['funnel_tags'])}</summary><p class='muted'>{_e(tags)}</p>"
         "</details>"
         f"<p class='muted'>{_e(TEXT['funnel_limits'].format(ref_days=REF_DAYS))}</p>"
@@ -255,6 +516,10 @@ def panel_page(
     key: str,
     codes: Sequence[AccessCodeRecord],
     refused: Sequence[RefusedPayment] = (),
+    orders: Sequence[CheckoutOrder] = (),
+    refunds: Sequence[StripeRefundRecord] = (),
+    mail_issues: Sequence[EmailDeliveryIssue] = (),
+    mail_warning_counts: dict[str, int] | None = None,
     new_code: str = "",
     flash: str = "",
     error: str = "",
@@ -311,7 +576,17 @@ def panel_page(
         + f"<button class='btn btn-dark' type='submit'>{_e(TEXT['reset_create'])}</button></form>"
     )
     return _shell(
-        err + shown + notice + _refused_table(refused) + funnel + create + listing + reset
+        err
+        + shown
+        + notice
+        + _refused_table(refused)
+        + _orders_table(orders)
+        + _refunds_table(refunds)
+        + _mail_issues_table(key, mail_issues, mail_warning_counts or {"dead": 0, "overdue": 0})
+        + funnel
+        + create
+        + listing
+        + reset
     )
 
 

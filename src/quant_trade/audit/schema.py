@@ -108,7 +108,13 @@ TRADE_QUANTITY = ("quantity", "qty", "size", "volume", "units", "cantidad", "lot
 TRADE_ENTRY_PRICE = ("entry_price", "open_price", "price_in", "precio_entrada")
 TRADE_EXIT_PRICE = ("exit_price", "close_price", "price_out", "precio_salida")
 TRADE_SIDE = ("side", "direction", "type", "lado")
-TRADE_PNL = ("pnl", "profit", "net_profit", "p&l", "resultado")
+TRADE_PNL = ("pnl", "profit", "p&l", "resultado")
+TRADE_NET_PNL = ("net_pnl", "net_profit", "net_result", "resultado_neto")
+TRADE_GROSS_PNL = ("gross_pnl", "gross_profit", "gross_result", "resultado_bruto")
+TRADE_COMMISSION = ("commission", "commissions", "comision", "comisión", "broker_commission")
+TRADE_SWAP = ("swap", "swaps", "financing", "rollover")
+TRADE_FEE = ("fee", "fees", "tax", "taxes", "exchange_fee", "other_cost")
+TRADE_CURRENCY = ("currency", "account_currency", "ccy", "moneda")
 
 LONG_SIDES = {"long", "buy", "compra", "b", "l"}
 SHORT_SIDES = {"short", "sell", "venta", "s"}
@@ -278,6 +284,9 @@ class ParsedTrades:
     #: positive is a cost), aligned with ``trades``. ``None`` when the file
     #: does not itemise them.
     fees: list[float] | None = None
+    #: How a supplied P&L column should be compared with price-derived gross.
+    client_pnl_basis: Literal["gross", "net", "ambiguous"] = "gross"
+    currency: str | None = None
 
     @property
     def reports_fees(self) -> bool:
@@ -771,10 +780,48 @@ def parse_trades_csv(data: bytes) -> ParsedTrades:
             code="missing_trade_columns",
         )
     side_col = _pick(raw, TRADE_SIDE)
-    pnl_col = _pick(raw, TRADE_PNL)
+    net_col = _pick(raw, TRADE_NET_PNL)
+    gross_col = _pick(raw, TRADE_GROSS_PNL)
+    generic_col = _pick(raw, TRADE_PNL)
+    pnl_col = net_col or gross_col or generic_col
+    pnl_basis: Literal["gross", "net", "ambiguous"] = (
+        "net" if net_col else "gross" if gross_col else "ambiguous" if generic_col else "gross"
+    )
+    cost_columns = {
+        "commission": _pick(raw, TRADE_COMMISSION),
+        "swap": _pick(raw, TRADE_SWAP),
+        "fee": _pick(raw, TRADE_FEE),
+    }
+    currency_col = _pick(raw, TRADE_CURRENCY)
     warnings: list[str] = []
     if side_col is None:
         warnings.append("no side column; every trade treated as long")
+    if generic_col and any(cost_columns.values()) and not (net_col or gross_col):
+        warnings.append(
+            f"{generic_col}: P&L basis is ambiguous with itemised costs; compare both gross and net"
+        )
+    if net_col and gross_col:
+        warnings.append(f"{gross_col}: gross P&L column was not cross-checked; using {net_col}")
+    used_columns = {
+        *(column for column in columns.values() if column),
+        *(column for column in (side_col, pnl_col, net_col, gross_col, currency_col) if column),
+        *(column for column in cost_columns.values() if column),
+    }
+    money_words = (
+        "commission",
+        "comision",
+        "comisión",
+        "swap",
+        "fee",
+        "cost",
+        "tax",
+        "pnl",
+        "profit",
+        "rebate",
+    )
+    for column in raw.columns:
+        if column not in used_columns and any(word in column for word in money_words):
+            warnings.append(f"monetary column {column!r} was not used; map or remove it")
 
     entry_time = _to_timestamps(raw[columns["entry_time"]])
     exit_time = _to_timestamps(raw[columns["exit_time"]])
@@ -782,10 +829,36 @@ def parse_trades_csv(data: bytes) -> ParsedTrades:
     entry_price, _ = _to_numeric(raw[columns["entry_price"]])
     exit_price, _ = _to_numeric(raw[columns["exit_price"]])
     client_pnl_series = _to_numeric(raw[pnl_col])[0] if pnl_col else None
+    cost_series = {
+        name: _to_numeric(raw[column])[0] if column else None
+        for name, column in cost_columns.items()
+    }
+    currency_values = (
+        {
+            str(value).strip().upper()
+            for value in raw[currency_col]
+            if pd.notna(value) and str(value).strip()
+        }
+        if currency_col
+        else set()
+    )
+    if len(currency_values) > 1:
+        raise ParseError(
+            "the trades file mixes currencies; convert amounts to one account currency first",
+            message_es=(
+                "El archivo de operaciones mezcla monedas; convierte los importes "
+                "a una sola moneda de cuenta."
+            ),
+            code="mixed_trade_currencies",
+        )
+    currency = next(iter(currency_values), None)
+    if not currency:
+        warnings.append("trade currency not stated; monetary P&L and costs use the file's units")
 
     trades: list[Trade] = []
     sides: list[str] = []
     client_pnl: list[float | None] = []
+    fees: list[float] = []
     invalid = 0
     for index in range(len(raw)):
         side = _side(raw[side_col].iloc[index]) if side_col else "long"
@@ -803,6 +876,28 @@ def parse_trades_csv(data: bytes) -> ParsedTrades:
         ):
             invalid += 1
             continue
+        components: dict[str, float] = {}
+        for name, series in cost_series.items():
+            if series is not None:
+                amount = float(series.iloc[index])
+                if not math.isfinite(amount):
+                    raise ParseError(
+                        f"trade row {index + 2} has an unreadable {name}; "
+                        "correct or map that column",
+                        message_es=(
+                            f"La fila {index + 2} tiene un {name} ilegible; "
+                            "corrige o asigna esa columna."
+                        ),
+                        code="invalid_trade_cost",
+                    )
+                components[name] = amount
+        # Commissions and fees may be exported as either positive charges or
+        # negative account entries. Swap keeps its sign: positive is a credit.
+        itemised_cost = (
+            abs(components.get("commission", 0.0))
+            + abs(components.get("fee", 0.0))
+            - components.get("swap", 0.0)
+        )
         qty = abs(qty)
         sign = 1.0 if side == "long" else -1.0
         pnl = sign * (price_out - price_in) * qty
@@ -827,6 +922,7 @@ def parse_trades_csv(data: bytes) -> ParsedTrades:
         else:
             reported = float(client_pnl_series.iloc[index])
             client_pnl.append(reported if math.isfinite(reported) else None)
+        fees.append(itemised_cost)
     if invalid:
         warnings.append(f"{invalid} trade row(s) with unreadable or non-positive fields dropped")
     if not trades:
@@ -841,10 +937,15 @@ def parse_trades_csv(data: bytes) -> ParsedTrades:
         client_pnl=client_pnl,
         invalid_rows=invalid,
         warnings=warnings,
+        fees=fees if any(cost_columns.values()) else None,
+        client_pnl_basis=pnl_basis,
+        currency=currency,
     )
 
 
-def parse_variants_csv(data: bytes) -> np.ndarray:
+def _parse_variants_csv(
+    data: bytes, expected_timestamps: pd.Series | None = None
+) -> tuple[np.ndarray, dict[str, Any]]:
     """Parse an observations-by-variants return matrix for CSCV.
 
     A leading timestamp column is dropped; every remaining column must be a
@@ -852,7 +953,47 @@ def parse_variants_csv(data: bytes) -> np.ndarray:
     """
     raw = _read_csv(data, what="variants")
     ts_col = _pick(raw, TIMESTAMP_ALIASES)
+    validation: dict[str, Any] = {
+        "status": "NOT_MEASURED",
+        "reason": "matrix has no timestamps; row alignment is unverified",
+        "selected_variant": not_measured("no selected-variant identifier supplied"),
+    }
     if ts_col is not None:
+        stamps = _to_timestamps(raw[ts_col])
+        if stamps.isna().any() or stamps.duplicated().any() or not stamps.is_monotonic_increasing:
+            raise ParseError(
+                "the variants timestamps must be readable, unique and chronological",
+                message_es=(
+                    "Las fechas de variantes deben ser legibles, únicas y estar "
+                    "en orden cronológico."
+                ),
+                code="invalid_variant_timestamps",
+            )
+        if expected_timestamps is not None:
+            expected = pd.to_datetime(expected_timestamps, utc=True).reset_index(drop=True)
+            aligned = (
+                len(stamps) == len(expected) and stamps.reset_index(drop=True).equals(expected)
+            ) or (
+                len(stamps) == len(expected) - 1
+                and stamps.reset_index(drop=True).equals(expected.iloc[1:].reset_index(drop=True))
+            )
+            if not aligned:
+                raise ParseError(
+                    "the variants dates do not align with the audited return period",
+                    message_es=(
+                        "Las fechas de variantes no coinciden con el periodo de retornos auditado."
+                    ),
+                    code="variant_period_mismatch",
+                )
+            validation = {
+                "status": "MEASURED",
+                "reason": "variant dates are unique, ordered and aligned to the audited curve",
+                "first_timestamp": measured(stamps.iloc[0].isoformat()),
+                "last_timestamp": measured(stamps.iloc[-1].isoformat()),
+                "selected_variant": not_measured("no selected-variant identifier supplied"),
+            }
+        else:
+            validation["reason"] = "dates are valid; alignment to an audited curve was not supplied"
         raw = raw.drop(columns=[ts_col])
     numeric = raw.apply(lambda column: _to_numeric(column)[0])
     numeric = numeric.dropna(axis=1, how="all")
@@ -886,7 +1027,12 @@ def parse_variants_csv(data: bytes) -> np.ndarray:
             message_es="El archivo de variantes necesita al menos 16 filas.",
             code="too_few_variant_rows",
         )
-    return matrix
+    return matrix, validation
+
+
+def parse_variants_csv(data: bytes) -> np.ndarray:
+    """Parse a variants matrix, validating any timestamp column it carries."""
+    return _parse_variants_csv(data)[0]
 
 
 FREQUENCY_LABELS: tuple[tuple[float, str], ...] = (
@@ -918,6 +1064,7 @@ class AuditInputs:
     trades: ParsedTrades | None = None
     benchmark: IngestedSeries | None = None
     variants: np.ndarray | None = None
+    variant_validation: dict[str, Any] | None = None
     warnings: list[str] = field(default_factory=list)
     #: ``csv`` for hand-made uploads, else the importer's format name.
     source_format: str = "csv"
@@ -952,6 +1099,8 @@ class AuditInputs:
     live_cash_flows: list[tuple[datetime, float]] = field(default_factory=list)
     live_metadata: dict[str, str] = field(default_factory=dict)
     live_equity_csv: bytes | None = None
+    #: Read-only checks over the original report bytes; no raw bytes persist.
+    forensics: dict[str, Any] | None = None
 
 
 def report_digest_name(filename: str | None, stem: str = "report") -> str:
@@ -1091,6 +1240,14 @@ def build_inputs(
             "cash_flows": list(imported.cash_flows),
             "account_currency": (imported.currency or "")[:MAX_CURRENCY_CHARS] or None,
         }
+        from quant_trade.audit.forensics import review as forensic_review
+
+        extra["forensics"] = forensic_review(
+            report_bytes,
+            source_format=imported.source_format,
+            imported_warnings=imported.warnings,
+            currency=imported.currency,
+        ).as_dict()
         variants_in_report = imported.metadata.get("variants", "")
         if variants_in_report.isdigit() and int(variants_in_report) > 1:
             extra["report_variants"] = int(variants_in_report)
@@ -1117,6 +1274,10 @@ def build_inputs(
         trades = parse_trades_csv(trades_bytes)
         digests["trades.csv"] = sha256_of_bytes(trades_bytes)
         warnings.extend(f"trades: {w}" for w in trades.warnings)
+        if trades.currency:
+            extra["account_currency"] = trades.currency[:MAX_CURRENCY_CHARS]
+        if trades.fees is not None:
+            extra["reported_fees"] = {"itemised_costs": -sum(trades.fees)}
     benchmark = None
     if benchmark_bytes:
         benchmark = parse_equity_csv(benchmark_bytes, what="benchmark")
@@ -1124,8 +1285,11 @@ def build_inputs(
         warnings.extend(f"benchmark: {w}" for w in benchmark.warnings)
     variants = None
     if variants_bytes:
-        variants = parse_variants_csv(variants_bytes)
+        variants, validation = _parse_variants_csv(variants_bytes, equity.frame["timestamp"])
         digests["variants.csv"] = sha256_of_bytes(variants_bytes)
+        extra["variant_validation"] = validation
+        if validation["status"] == "NOT_MEASURED":
+            warnings.append(f"variants: {validation['reason']}")
     if optimization_bytes:
         summary = parse_optimization(optimization_bytes)
         # Checked against an MT5 tester report only: that is the file the
@@ -1253,6 +1417,10 @@ class AuditResult(BaseModel):
     client_text_findings: list[dict[str, Any]]
     seal: dict[str, Any]
     verdict: Verdict
+    #: Monetary equation and source coverage; optional for stored older reports.
+    reconciliation: dict[str, Any] | None = None
+    #: Heuristic file-consistency checks, with calibration and method version.
+    forensics: dict[str, Any] | None = None
     # Schema 2. Optional so that results stored under schema 1 still load.
     series: dict[str, Any] | None = None
     trade_stats: dict[str, Any] | None = None

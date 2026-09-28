@@ -96,6 +96,13 @@ def footer_text(audit_id: str, locale: str) -> str:
     return f"{BRAND} · {word} {audit_id}"
 
 
+def _expand_details_for_pdf(page_html: str) -> str:
+    """Include every technical section regardless of the browser's open state."""
+    return page_html.replace(
+        "<details class='detail report-detail", "<details open class='detail report-detail"
+    )
+
+
 def report_pdf(
     page_html: str,
     *,
@@ -124,6 +131,9 @@ def report_pdf(
         footer = (footer or footer_text(audit_id, locale)).replace("\\", "").replace('"', "")
         # Inside the page, after its own styles, so these rules win the cascade.
         style = "<style>" + PDF_CSS.replace("__FOOTER__", footer) + "</style>"
+        # Browser reports fold secondary analyses; every section belongs in
+        # the downloaded PDF, including sections the buyer left closed.
+        page_html = _expand_details_for_pdf(page_html)
         page_html = page_html.replace("</head>", style + "</head>", 1)
         document = HTML(string=page_html, base_url=f"https://{_BASE_HOST}/", url_fetcher=_fetcher())
         return bytes(document.write_pdf())

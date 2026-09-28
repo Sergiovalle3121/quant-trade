@@ -974,6 +974,7 @@ REPORT: dict[str, Any] = {
         "plan_locked": "passos concretos, com os números do seu arquivo, no relatório completo",
         "kpis": "Resumo executivo",
         "toc": "Seções do relatório",
+        "report_languages": "Idioma do relatório",
         "toc_unlock": "Relatório completo",
         "kpis_locked": "Os números-chave do seu arquivo aparecem no relatório completo.",
         "kpi_return": "Retorno total",
@@ -1598,6 +1599,8 @@ REPORT: dict[str, Any] = {
         "floor": "Mínimo por erro de amostragem",
         "observed_across_variants": "Observado nas variantes",
         "sharpe_variance_used": "Variância do Sharpe usada",
+        "dependence_ratio": "Aumento da variância por dependência",
+        "effective_observations": "Observações efetivas após dependência",
         "sharpe_per_period": "Sharpe por período",
         "break_even_bps": "Custo de equilíbrio (pb por lado)",
         "break_even_pips": "Custo de equilíbrio (pips por lado)",
@@ -2008,6 +2011,11 @@ REDFLAGS: dict[str, Any] = {
         "PROFIT_CONCENTRATION": "Resultado concentrado em poucas operações",
         "TRADES_OUTSIDE_EQUITY": "Operações fora das datas da curva",
         "TRADES_EQUITY_UNRELATED": "Operações que não se movem com a curva",
+        "MONETARY_RECONCILIATION_MISMATCH": ("O saldo final impresso não confere com as operações"),
+        "MONETARY_RECONCILIATION_UNEXPLAINED": (
+            "A curva e as operações têm uma diferença sem explicação"
+        ),
+        "FORENSIC_BALANCE_CHAIN_SIGNAL": "Sinal heurístico na cadeia de saldos",
         "GAIN_INFLATED_BY_FLOWS": "O % de ganho não reflete o dinheiro",
         "DEPOSIT_DURING_DRAWDOWN": "Depósitos em plena perda",
         "FLOATING_LOSS_AT_END": "Perda aberta que o saldo não mostra",
@@ -2110,6 +2118,18 @@ PLAN: dict[str, Any] = {
         "TRADES_EQUITY_UNRELATED": (
             "As operações não explicam a curva: envie os dois arquivos da mesma conta."
         ),
+        "MONETARY_RECONCILIATION_MISMATCH": (
+            "Peça uma exportação original do mesmo período e compare saldo inicial, depósitos, "
+            "saques, resultado líquido e saldo final; esclareça moeda e posições abertas."
+        ),
+        "MONETARY_RECONCILIATION_UNEXPLAINED": (
+            "Envie curva e operações da mesma conta e período, com fluxos de caixa, custos e "
+            "valor das posições abertas; a causa ainda não pode ser medida."
+        ),
+        "FORENSIC_BALANCE_CHAIN_SIGNAL": (
+            "Compare o relatório original e o registro de operações da mesma execução; este "
+            "sinal heurístico não prova que o histórico foi alterado."
+        ),
         "GAIN_INFLATED_BY_FLOWS": (
             "A porcentagem sai de descontar depósitos e saques: julgue a conta também pelo "
             "dinheiro que ganhou ou perdeu ao operar."
@@ -2200,6 +2220,7 @@ PREFIXES: dict[str, str] = {
     "trades": "operações",
     "benchmark": "benchmark",
     "optimization": "otimização",
+    "variants": "variantes",
     "live": "conta real",
 }
 
@@ -2469,15 +2490,15 @@ SINGULAR: dict[str, tuple[str, str]] = {
     ),
     (
         "{n} Balance cell(s) do not equal the previous balance plus the row's money; the "
-        "reported Balance was kept"
+        "row amounts were used for returns"
     ): (
         (
             "{n} Balance cell does not equal the previous balance plus the row's money; the "
-            "reported Balance was kept"
+            "row amounts were used for returns"
         ),
         (
             "{n} célula de Balance (saldo) não é o saldo anterior mais o dinheiro da linha; o "
-            "Balance do relatório foi mantido"
+            "retorno foi calculado pelos valores das linhas"
         ),
     ),
     "{n} repeated pass number(s) counted once": (
@@ -2913,11 +2934,11 @@ RULES: tuple[tuple[str, str], ...] = (
     (
         (
             "{n} Balance cell(s) do not equal the previous balance plus the row's money; the "
-            "reported Balance was kept"
+            "row amounts were used for returns"
         ),
         (
             "{n} célula(s) de Balance não são o saldo anterior mais o dinheiro da linha; "
-            "manteve-se o Balance do relatório"
+            "os retornos foram calculados pelos valores das linhas"
         ),
     ),
     (
@@ -5619,6 +5640,85 @@ RULES: tuple[tuple[str, str], ...] = (
         "It measures the history's losses; it is not a forecast.",
         "Mede as perdas do histórico; não é uma previsão.",
     ),
+    ("build commit SHA was not embedded", "o SHA do commit da compilação não foi incluído"),
+    ("no closed-trade ledger supplied", "não foi enviado um registro de operações fechadas"),
+    ("uploaded returns are not money", "os retornos enviados não são valores monetários"),
+    (
+        "trade currency not stated; monetary P&L and costs use the file's units",
+        "a moeda das operações não foi informada; o resultado e os custos monetários "
+        "usam as unidades do arquivo",
+    ),
+    (
+        "matrix has no timestamps; row alignment is unverified",
+        "a matriz não tem datas; o alinhamento das linhas não foi verificado",
+    ),
+    (
+        "no selected-variant identifier supplied",
+        "não foi informado o identificador da variante selecionada",
+    ),
+    (
+        "rebuilt from the platform deal rows",
+        "reconstruída a partir das linhas de operações da plataforma",
+    ),
+    ("separate upload", "arquivo enviado separadamente"),
+    ("listed by platform", "registrados pela plataforma"),
+    ("not supplied", "não fornecido"),
+    ("not itemised", "sem detalhamento"),
+    ("not valued separately", "sem avaliação separada"),
+    ("not stated; same units assumed", "não informada; mesmas unidades presumidas"),
+    ("no separate valuation supplied", "não foi enviada uma avaliação independente"),
+    (
+        "0.011 per closed trade plus 1 bp of capital",
+        "0,011 por operação fechada mais 1 ponto-base do capital",
+    ),
+    ("trades extend outside the curve dates", "há operações fora das datas da curva"),
+    (
+        "closed trades do not cover the final part of the curve",
+        "as operações fechadas não cobrem o trecho final da curva",
+    ),
+    (
+        "closed-trade ledger agrees within tolerance; this does not authenticate the history",
+        "o registro de operações fechadas confere dentro da tolerância; isso não "
+        "autentica o histórico",
+    ),
+    (
+        "printed balance contradicts deal amounts",
+        "o saldo impresso contradiz os valores das operações",
+    ),
+    (
+        "open positions or closes missing from the trade list could explain the difference",
+        "posições abertas ou fechamentos ausentes da lista de operações podem explicar a diferença",
+    ),
+    (
+        "printed final balance differs from initial balance plus flows and net closed P&L by "
+        "{difference} {currency}; the return was rebuilt from deal amounts",
+        "o saldo final impresso difere do saldo inicial mais os fluxos e o resultado líquido "
+        "das operações fechadas em {difference} {currency}; o retorno foi reconstruído "
+        "com os valores das operações",
+    ),
+    (
+        "separate curve and closed trades differ by {difference} {currency}; provide cash "
+        "flows, currency conversion and open-position valuation to reconcile them",
+        "a curva separada e as operações fechadas diferem em {difference} {currency}; "
+        "envie fluxos de caixa, conversão cambial e avaliação das posições abertas "
+        "para conciliá-las",
+    ),
+    (
+        "flows, currency conversion or open positions could explain the difference",
+        "fluxos, conversão cambial ou posições abertas podem explicar a diferença",
+    ),
+    (
+        "a calibrated heuristic found balance-chain inconsistencies; this alone does not "
+        "establish alteration",
+        "uma heurística calibrada encontrou inconsistências na cadeia de saldos; "
+        "isso por si só não comprova alteração",
+    ),
+    ("no_declared_totals", "sem_totais_declarados"),
+    ("format_not_covered", "formato_sem_cobertura"),
+    ("no_column", "sem_coluna"),
+    ("no_qualifying_row", "sem_linha_aplicável"),
+    ("variable_precision_format", "formato_de_precisão_variável"),
+    ("no_listed_symbol", "sem_símbolo_listado"),
 )
 
 #: (English template, Portuguese) for the verdict's reasons, one "; "-separated part

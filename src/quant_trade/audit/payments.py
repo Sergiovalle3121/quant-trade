@@ -29,6 +29,7 @@ import logging
 from collections.abc import Mapping
 from datetime import datetime
 from typing import Any
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from quant_trade.audit.seo import BRAND
 from quant_trade.audit.settings import PACK_CREDITS, AuditSettings
@@ -60,6 +61,10 @@ CURRENCY = "usd"
 CARD_LOOKUPS_PER_HOUR = 10
 #: Stripe Checkout session ids start with this; code-paid audits carry ``code:``.
 SESSION_PREFIX = "cs_"
+#: The lowest advertised price before the order ledger existed. Historical
+#: sessions have no frozen order id, so their paid amount is checked against
+#: this floor when today's configured price has increased.
+LEGACY_PRICE_FLOOR_CENTS = {PLAN_SINGLE: 2900, PLAN_PACK: 6900}
 
 PRODUCT_NAMES = {
     "es": {
@@ -70,7 +75,17 @@ PRODUCT_NAMES = {
         PLAN_SINGLE: f"{BRAND} · full report",
         PLAN_PACK: f"{BRAND} · pack of {PACK_CREDITS} reports",
     },
+    "pt": {
+        PLAN_SINGLE: f"{BRAND} · relatório completo",
+        PLAN_PACK: f"{BRAND} · pacote de {PACK_CREDITS} relatórios",
+    },
 }
+
+
+def _payment_locales(locale: str) -> tuple[str, str]:
+    """Return the app language and the corresponding Stripe locale."""
+    lang = locale if locale in PRODUCT_NAMES else "es"
+    return lang, "pt-BR" if lang == "pt" else lang
 
 
 def card_mode(settings: AuditSettings) -> str:
@@ -93,11 +108,23 @@ def payment_link_urls(settings: AuditSettings, audit_id: str, locale: str) -> tu
     ``client_reference_id`` is how the webhook knows which audit was paid;
     the pack link is empty when the pack is not on sale or has no link.
     """
-    lang = "en" if locale == "en" else "es"
-    query = f"?client_reference_id={audit_id}&locale={lang}"
-    single = settings.stripe_link_single + query if settings.stripe_link_single else ""
+    _, stripe_locale = _payment_locales(locale)
+
+    def tagged(url: str) -> str:
+        if not url:
+            return ""
+        parts = urlsplit(url)
+        query = [
+            pair
+            for pair in parse_qsl(parts.query, keep_blank_values=True)
+            if pair[0] not in ("client_reference_id", "locale")
+        ]
+        query.extend((("client_reference_id", audit_id), ("locale", stripe_locale)))
+        return urlunsplit((parts.scheme, parts.netloc, parts.path, urlencode(query), ""))
+
+    single = tagged(settings.stripe_link_single)
     pack = (
-        settings.stripe_link_pack + query
+        tagged(settings.stripe_link_pack)
         if settings.stripe_link_pack and settings.pack_price_usd
         else ""
     )
@@ -126,27 +153,42 @@ def plan_price_cents(settings: AuditSettings, plan: str) -> int:
     return settings.pack_price_usd_cents if plan == PLAN_PACK else settings.price_usd_cents
 
 
+def legacy_price_cents(settings: AuditSettings, plan: str) -> int:
+    current = plan_price_cents(settings, plan)
+    floor = LEGACY_PRICE_FLOOR_CENTS[plan]
+    return min(current, floor) if current > 0 else floor
+
+
 def checkout_params(
-    settings: AuditSettings, audit_id: str, token: str, *, plan: str, locale: str
+    settings: AuditSettings,
+    audit_id: str,
+    token: str,
+    *,
+    plan: str,
+    locale: str,
+    order_id: str = "",
+    amount_cents: int | None = None,
 ) -> dict[str, Any]:
     """The Checkout session Stripe is asked to create; pure, so it is tested."""
     if plan not in PLANS:
         raise ValueError(f"unknown plan {plan!r}")
-    lang = "en" if locale == "en" else "es"
+    lang, stripe_locale = _payment_locales(locale)
     back = f"{settings.base_url}/audits/{audit_id}?token={token}&lang={lang}"
-    if plan == PLAN_SINGLE and settings.stripe_price_id:
+    if plan == PLAN_SINGLE and settings.stripe_price_id and amount_cents is None:
         line: dict[str, Any] = {"price": settings.stripe_price_id, "quantity": 1}
     else:
         line = {
             "price_data": {
                 "currency": "usd",
-                "unit_amount": plan_price_cents(settings, plan),
+                "unit_amount": amount_cents or plan_price_cents(settings, plan),
                 "product_data": {"name": PRODUCT_NAMES[lang][plan]},
             },
             "quantity": 1,
         }
     metadata = {"audit_id": audit_id, "plan": plan, APP_KEY: APP_MARKER}
-    return {
+    if order_id:
+        metadata["order_id"] = order_id
+    params = {
         "mode": "payment",
         "line_items": [line],
         # Stripe fills in {CHECKOUT_SESSION_ID}; the return page confirms it.
@@ -155,8 +197,11 @@ def checkout_params(
         "metadata": metadata,
         "payment_intent_data": {"metadata": metadata},
         "client_reference_id": audit_id,
-        "locale": lang,
+        "locale": stripe_locale,
     }
+    if not settings.card_test_mode and settings.approved_markets:
+        params["billing_address_collection"] = "required"
+    return params
 
 
 def _plain(value: Any) -> dict[str, Any]:
@@ -165,14 +210,32 @@ def _plain(value: Any) -> dict[str, Any]:
 
 
 def stripe_checkout(
-    settings: AuditSettings, audit_id: str, token: str, *, plan: str, locale: str
-) -> str:
-    """Create a Stripe Checkout session and return its URL (needs the SDK)."""
+    settings: AuditSettings,
+    audit_id: str,
+    token: str,
+    *,
+    plan: str,
+    locale: str,
+    order_id: str = "",
+    amount_cents: int | None = None,
+) -> dict[str, Any]:
+    """Create/retrieve a Checkout session with the persistent order as idempotency key."""
     import stripe
 
-    params = checkout_params(settings, audit_id, token, plan=plan, locale=locale)
-    session = stripe.checkout.Session.create(api_key=settings.stripe_secret_key, **params)
-    return str(session.url)
+    params = checkout_params(
+        settings,
+        audit_id,
+        token,
+        plan=plan,
+        locale=locale,
+        order_id=order_id,
+        amount_cents=amount_cents,
+    )
+    options = {"api_key": settings.stripe_secret_key}
+    if order_id:
+        options["idempotency_key"] = f"rigor-checkout-{order_id}"
+    session = stripe.checkout.Session.create(**options, **params)
+    return _plain(session)
 
 
 def stripe_session(settings: AuditSettings, session_id: str) -> dict[str, Any]:
@@ -183,7 +246,13 @@ def stripe_session(settings: AuditSettings, session_id: str) -> dict[str, Any]:
     return _plain(session)
 
 
-def refusal(settings: AuditSettings, session: Mapping[str, Any], plan: str) -> str | None:
+def refusal(
+    settings: AuditSettings,
+    session: Mapping[str, Any],
+    plan: str,
+    *,
+    expected_cents: int | None = None,
+) -> str | None:
     """Why a paid session is not Rigor's own full payment for ``plan``; ``None`` if it is.
 
     The buyer controls ``client_reference_id`` through the link URL, so the
@@ -207,7 +276,7 @@ def refusal(settings: AuditSettings, session: Mapping[str, Any], plan: str) -> s
     amount = source.get("amount_total")
     if isinstance(amount, bool) or not isinstance(amount, int):
         return "no amount"
-    if not amount >= plan_price_cents(settings, plan) > 0:
+    if not amount >= (expected_cents or plan_price_cents(settings, plan)) > 0:
         return "below the plan price"
     return None
 
@@ -238,17 +307,36 @@ def fulfil(
     # metadata; a Payment Link carries it as ``client_reference_id``.
     audit_id = str(metadata.get("audit_id") or session.get("client_reference_id") or "")
     plan = str(metadata.get("plan") or PLAN_SINGLE)
+    order_id = str(metadata.get("order_id") or "")
+    order = store.get_checkout_order(order_id) if order_id else None
     reason: str | None
     if not session_id.startswith(SESSION_PREFIX) or not audit_id:
         reason = "no Checkout session or no audit id"
+    elif session.get("livemode") is not (not settings.card_test_mode):
+        reason = "payment mode mismatch"
     # Anyone can pay a test-mode checkout with Stripe's public test card, so
     # a test payment unlocks only an audit listed for testing.
     elif session.get("livemode") is not True and audit_id not in settings.stripe_test_audits:
         reason = "test payment for an audit not listed for testing"
     elif store.get_audit(audit_id) is None:
         reason = "unknown audit"
+    elif order_id and order is None:
+        reason = "unknown order"
+    elif order is not None and (order.audit_id != audit_id or order.plan != plan):
+        reason = "order mismatch"
     else:
-        reason = refusal(settings, session, plan)
+        reason = refusal(
+            settings,
+            session,
+            plan,
+            expected_cents=(
+                order.amount_cents
+                if order
+                else legacy_price_cents(settings, plan)
+                if plan in PLANS
+                else None
+            ),
+        )
     if reason is not None:
         # A charged buyer who stays locked must leave a trace; ids only, never
         # an amount, an email or a card detail.
@@ -272,20 +360,95 @@ def fulfil(
                 session_id=_safe(session_id), audit_id=_safe(audit_id), reason=reason, at=at
             )
         return None
-    store.mark_paid(audit_id, stripe_session_id=session_id, at=at)
-    if plan == PLAN_PACK and settings.stripe_webhook_secret:
-        code = pack_code(settings.stripe_webhook_secret, session_id)
-        store.ensure_access_code(
-            code,
-            credits=PACK_CREDITS - 1,
-            note=f"Paquete pagado con tarjeta desde el informe {audit_id}",
+    source = session.get("currency_conversion") or session
+    amount = source.get("amount_total")
+    if not isinstance(amount, int) or isinstance(amount, bool):
+        return None  # refusal already checked it; defensive for Mapping implementations
+    payment_intent = session.get("payment_intent")
+    if isinstance(payment_intent, Mapping):
+        payment_intent = payment_intent.get("id")
+    declared_country = ""
+    billing_country = ""
+    if order is not None and session.get("livemode") is True:
+        market = store.checkout_market(order.id)
+        if market is not None:
+            declared_country, _ = market
+            customer_details = session.get("customer_details") or {}
+            address = (
+                customer_details.get("address") or {}
+                if isinstance(customer_details, Mapping)
+                else {}
+            )
+            billing_country = (
+                str(address.get("country") or "").upper() if isinstance(address, Mapping) else ""
+            )
+            if (
+                billing_country != declared_country
+                or billing_country not in settings.approved_markets
+            ):
+                store.record_market_review(
+                    order_id=order.id,
+                    session_id=session_id,
+                    audit_id=audit_id,
+                    billing_country=billing_country,
+                    paid_cents=amount,
+                    payment_intent_id=str(payment_intent or ""),
+                    reason="billing country mismatch or unavailable",
+                    at=at,
+                    queue_receipt=settings.email_delivery_ready,
+                )
+                logger.warning(
+                    "paid Stripe session %s held for market review on audit %s",
+                    _safe(session_id),
+                    _safe(audit_id),
+                )
+                return None
+    try:
+        outcome = store.settle_card_payment(
+            order_id=order_id,
+            session_id=session_id,
+            audit_id=audit_id,
+            plan=plan,
+            expected_cents=order.amount_cents if order else amount,
+            paid_cents=amount,
+            currency=CURRENCY,
+            pack_code=(
+                pack_code(settings.stripe_webhook_secret, session_id)
+                if plan == PLAN_PACK and settings.stripe_webhook_secret
+                else ""
+            ),
+            at=at,
+            payment_intent_id=str(payment_intent or ""),
+            payment_livemode=session.get("livemode"),
+            queue_receipt=settings.email_delivery_ready and session.get("livemode") is True,
+        )
+    except ValueError:
+        logger.warning(
+            "paid Stripe session %s disagrees with order %s",
+            _safe(session_id),
+            _safe(order_id),
+        )
+        if session.get("livemode") is True:
+            store.record_refused_payment(
+                session_id=_safe(session_id),
+                audit_id=_safe(audit_id),
+                reason="order mismatch",
+                at=at,
+            )
+        return None
+    if declared_country:
+        store.record_checkout_market(
+            outcome.order_id,
+            billing_country,
+            declared_country=declared_country,
             at=at,
         )
-        # A pack bought from a report on an account puts its credits on that account.
-        owner = store.account_for_audit(audit_id)
-        code_id = store.code_id(code) if owner else None
-        if owner and code_id:
-            store.link_code(owner, code_id, at=at)
+    if outcome.status == "duplicate":
+        logger.warning(
+            "paid Stripe session %s is a second charge for audit %s; manual refund review",
+            _safe(session_id),
+            _safe(audit_id),
+        )
     return audit_id
 
 

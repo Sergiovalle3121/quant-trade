@@ -19,7 +19,9 @@ def test_defaults_are_free_sqlite_and_secretless() -> None:
     assert settings.stripe_enabled is False
     assert settings.database_kind == "sqlite"
     assert settings.stripe_secret_key == ""
-    assert settings.price_usd == 49.0
+    assert settings.price_usd == 29.0
+    assert settings.pack_price_usd_cents == 6900
+    assert settings.pack_price_usd == 0.0  # free mode cannot sell a pack
 
 
 def test_free_mode_is_forced_without_every_stripe_variable() -> None:
@@ -48,6 +50,19 @@ def test_database_url_normalisation_and_base_url() -> None:
     )
     assert settings.database_kind == "postgresql"
     assert settings.base_url == "https://audit.example"
+
+
+def test_empty_smtp_port_and_referral_cap_use_their_defaults() -> None:
+    """A variable left blank in a hosting panel means unset, not a crash."""
+    blank = AuditSettings.from_env(
+        {"AUDIT_SMTP_PORT": "", "AUDIT_REFERRAL_GLOBAL_MONTHLY_CAP": "  "}
+    )
+    assert blank.smtp_port == 587
+    assert blank.referral_global_monthly_cap == 100
+    given = AuditSettings.from_env(
+        {"AUDIT_SMTP_PORT": "465", "AUDIT_REFERRAL_GLOBAL_MONTHLY_CAP": "7"}
+    )
+    assert (given.smtp_port, given.referral_global_monthly_cap) == (465, 7)
 
 
 def test_trusted_proxy_hops_defaults_to_zero_and_reads_the_environment() -> None:

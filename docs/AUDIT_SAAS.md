@@ -325,7 +325,10 @@ it is never matched to a known platform, the upload is answered with
 `pdf_columns` and the screen shows the rows with a notice (ES, EN, PT) that
 they were rebuilt from a PDF and should be checked; a saved column choice is
 never applied to a PDF without showing it. The audit read from it carries
-`PDF_ROWS_WARNING`. The extraction runs in a child process killed after
+`PDF_ROWS_WARNING`. The report, public verification details and comparison
+cards label these PDF uploads as PDF even when their rows were mapped through
+CSV columns; the public page receives only a PDF-origin flag, not parser
+warnings. The extraction runs in a child process killed after
 10 s, with 1 GB of memory and 10 s of CPU; at most 30 pages, 20,000
 characters per page and 200,000 table cells in all. The table's pieces are joined across pages only when
 they all have the same columns (a header repeated on each page is dropped);
@@ -2023,13 +2026,19 @@ with an empty value):
 | `AUDIT_BASE_URL` | `http://localhost:8000` | Public URL used in Stripe success and cancel links, canonical and Open Graph links, the badge snippet, `robots.txt` and `sitemap.xml`. While it is left at the default, those links use the address the request reached (`https` when `AUDIT_TRUSTED_PROXY_HOPS` > 0). Set it to your domain in production. |
 | `AUDIT_FREE_MODE` | `true` | Serve watermarked reports with nothing locked. Forced `true` unless both Stripe secrets are set or `AUDIT_ACCESS_CODES=true`. |
 | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` | empty | Both are needed for card payments: a secret (`sk_…`) or restricted (`rk_…`) key and the webhook signing secret (`whsec_…`). A publishable key (`pk_…`) leaves card payments off. `/health` shows `card_mode` (`off`, `test`, `live`) from the key's prefix, never the key. |
-| `STRIPE_PAYMENT_LINK_SINGLE`, `STRIPE_PAYMENT_LINK_PACK` | empty | Payment Links (`https://buy.stripe.com/…`) for one audit and for the pack. With `STRIPE_WEBHOOK_SECRET` they turn card payment on without any secret key on the service; ignored when `STRIPE_SECRET_KEY` is set. A link with `/test_` is test mode. `/health` shows `card_via` (`checkout`, `links`, `off`). |
+| `STRIPE_PAYMENT_LINK_SINGLE`, `STRIPE_PAYMENT_LINK_PACK` | empty | Historical Payment Links (`https://buy.stripe.com/…`) for one audit and the pack. They do not create a frozen database order before payment. This branch no longer presents live links as a new buying path because they bypass country admission; signed webhooks for historical paid links remain accepted. |
+| `AUDIT_LEGACY_PAYMENT_LINKS_ENABLED` | `false` | Compatibility switch for old link configuration; it does **not** deactivate externally accessible links in Stripe. Disable those links in Stripe Dashboard before opening live charges, then reconcile delayed historical paid sessions. |
+| `AUDIT_APPROVED_MARKETS` | empty | Comma-separated reviewed ISO buyer countries among `MX,US,BR,ES`. Empty keeps live Checkout closed. The buyer selects a billing country before an order is reserved; it is frozen with the order in additive table `checkout_order_markets`. Checkout requires a billing address. A paid session with missing, unsupported or different Stripe billing country is recorded as `paid_review`/`manual_refund_review`, shown to the owner and **does not deliver**. This is a best-effort precharge gate: a false declaration can still result in a charge before Stripe reveals the billing country, so support/refund handling remains mandatory. Do not infer country from IP or language. |
 | `AUDIT_STRIPE_TEST_AUDITS` | empty | Comma-separated audit ids that a test-mode payment may unlock. In test mode the card button shows only on these audits, and a test payment for any other audit is ignored, so Stripe's public test card never unlocks a real report. Leave empty in normal operation. |
-| `STRIPE_PRICE_ID` | empty | Optional. Without it Checkout charges `AUDIT_PRICE_USD_CENTS` (and the pack `AUDIT_PACK_PRICE_USD_CENTS`) in USD with no Stripe product to create. |
-| `AUDIT_ACCESS_CODES` | `false` | Sell with access codes. With `AUDIT_FREE_MODE=false` it turns on paid mode without Stripe. |
+| `STRIPE_PRICE_ID` | empty | Legacy direct-call option. The web Checkout now freezes the configured amount on a persisted order and sends an inline USD price, so this id cannot silently override the amount the buyer saw. |
+| `AUDIT_ACCESS_CODES` | `false` | Offer manual access-code sales and typed-code redemption. With `AUDIT_FREE_MODE=false` it turns on paid mode without Stripe. Credits already on an account remain spendable when this is `false`. |
+| `AUDIT_REFERRAL_REWARDS` | `true` | Set `false` to stop new invite rewards and hide the reward promise during an incident. Previously granted credits remain usable. |
+| `AUDIT_REFERRAL_GLOBAL_MONTHLY_CAP` | `100` | Maximum rewarded invites across the whole service per UTC month, reserved transactionally in `referral_global_slots`. At one credit per invite this caps the new monthly credit obligation. `0` stops new rewards. |
+| `AUDIT_EMAIL_VERIFICATION_REQUIRED` | `false` | Migration default. When `true`, both addresses must be confirmed before an invite reward and a buyer's address before a new Checkout. Sign-up and the first free report still work. **Public paid launch requires `true` and SMTP verified end to end.** |
+| `AUDIT_EMAIL_TOKEN_SECRET`, `AUDIT_SMTP_HOST`, `AUDIT_SMTP_PORT`, `AUDIT_SMTP_USERNAME`, `AUDIT_SMTP_PASSWORD`, `AUDIT_SMTP_FROM`, `AUDIT_SMTP_SECURITY` | empty / `587` / `starttls` | Stable secret of at least 32 characters shared by replicas and encrypted SMTP transport. `/ready` fails when verification is required but delivery is not configured. Test real delivery, retries and legacy account confirmation before launch. No usable token or link is stored in the outbox. |
 | `AUDIT_CONTACT_URL` | empty | Where a client asks for a code (for example a `https://wa.me/…` link or a `mailto:`). Only `https://` and `mailto:` are shown. |
-| `AUDIT_PRICE_USD_CENTS` | `4900` | The price shown on the landing and on the pay button; with Stripe, the Stripe price object decides what is charged. |
-| `AUDIT_PACK_PRICE_USD_CENTS` | `6900` | A 3-credit access code (`PACK_CREDITS`), shown on the pricing card, the locked report and the terms only when codes are sold and it costs less than three single audits; `0` hides it. Create the code with 3 credits on `/panel` or `audit codes create --credits 3`. |
+| `AUDIT_PRICE_USD_CENTS` | `2900` | New single-report Checkout price in USD cents; each order freezes this amount. Existing paid reports and credits are unchanged. |
+| `AUDIT_PACK_PRICE_USD_CENTS` | `6900` | One Checkout for a three-report pack: the selected report plus two credits. It is offered when card payments or manual codes are enabled and the amount is below three singles; `0` hides it. An owner-created code with three credits is a separate, unverified manual issue until its payment is reconciled. |
 | `AUDIT_MAX_UPLOAD_BYTES` | `5000000` | Per file. A whole request over six files' worth plus 1 MiB (`UPLOAD_FIELDS`, `FORM_OVERHEAD_BYTES`) is refused with 413 before it is written to disk. |
 | `AUDIT_MAX_UPLOADS_PER_HOUR_PER_IP` | `10` | 429 above it. Attempts that fail to parse count too, up to three times this number (`UPLOAD_ATTEMPTS_PER_UPLOAD`); waitlist sign-ups are limited to 5 per hour per address (`WAITLIST_PER_HOUR_PER_IP`). |
 | `AUDIT_MAX_CONCURRENT_AUDITS` | `2` | Uploads parsed and audited at the same time. Each one can use a few hundred MB on a long intraday curve. |
@@ -2043,6 +2052,58 @@ with an empty value):
 | `AUDIT_JURISDICTION` | empty | Governing law and courts, for example "Leyes de México; tribunales de la Ciudad de México". |
 | `AUDIT_ADMIN_KEY` | empty | Secret for the owner panel at `/panel` (create, list and disable codes from a phone). Shorter than 32 characters or empty turns the panel off (404). |
 | `AUDIT_TRUSTED_PROXY_HOPS` | `0` | Reverse proxies in front of the service. `0` ignores `X-Forwarded-For` (it is client-controlled) and rate-limits the socket address; `N` takes the N-th entry from the right. Railway needs `1`. |
+
+Checkout creates a database order before calling Stripe. The order freezes the
+plan, USD amount and report id, and its id is the Stripe idempotency key. A
+second click or a retry after restart reuses the same valid order and Checkout
+URL. The signed paid webhook and the paid return path both settle through one
+transaction: one `checkout_orders` row per paid session, one report delivery,
+and, for a pack, two credits. If two distinct sessions were paid for one
+report, the second row has `status=duplicate` and
+`resolution=manual_refund_review`; it grants no second pack. The owner panel
+shows that row for action. This status **does not issue a refund**.
+
+`credit_grants.origin` records `purchase`, `referral`, or `unknown` for new
+codes. A manually created code has `unknown` origin until its outside payment
+is verified; its redemption is not counted as a card sale. The funnel counts
+confirmed live paid sessions as purchases and pack rights separately. Its USD
+gross amount is before refunds, payment fees and taxes, and is not a payout
+balance. Signed Stripe refund events are kept by refund id; linked,
+`succeeded`, live USD amounts (including partial refunds) appear separately
+from gross. A later `failed` event removes that refund from the confirmed
+total. Refunds without a confirmed link, in another currency or without
+subscribed/delivered events are **NOT_MEASURED** in that USD figure. The
+displayed gross minus observed USD refunds is only a ledger subtotal, not
+net revenue, profit or payout. Disputes, provider fees, FX, taxes and bank
+receipts still require manual reconciliation in Stripe and the bank.
+The account outbox also queues a purchase/entitlement notice in the same
+transaction as settlement when encrypted SMTP is configured and the buyer's
+current address is verified. A second paid session queues a separate manual
+review notice and no second right. The outbox id is the frozen order id, so
+webhook replay cannot queue another notice. The message contains only the
+order reference, charged amount, currency and plan, never a report token or
+result. Delivery is at least once: monitor dead/retrying rows and verify real
+SMTP in staging before promising an email to buyers.
+`/ready` reports numeric `warnings.purchase_mail_dead`,
+`warnings.purchase_mail_overdue` and `warnings.purchase_mail_probe_failed`
+without turning an SMTP delivery failure into a service restart. Monitor
+these fields externally. The owner panel lists only outbox id, kind, status,
+attempts and timestamps (no address or report) and can requeue a dead buyer
+notice. Requeue works only while the live order still has the matching
+delivered/duplicate status and the account's current email remains verified;
+it does not resend a sent row or create a new right. Investigate the SMTP
+cause and the Stripe order before requeueing; a previously accepted SMTP
+message can have been lost before the worker marked it sent.
+First and repeat purchase counts use the account linked to the
+report when there is one; that account is not verified as the cardholder.
+Visits estimate browsers observed, not unique people. Older card
+unlocks predating `checkout_orders` need a reconciliation import from Stripe
+before they can be included in purchase totals. Legacy Payment Links only
+create their order when their paid webhook arrives, so they do not provide
+pre-Checkout order reuse. Their historical USD 29/69 floor remains accepted
+for paid callbacks after a price rise, so **retire active old links in the
+Stripe Dashboard before changing prices**; do not claim the new price applies
+to all buyers until old sessions are reconciled.
 
 ### Deploying on Railway
 
@@ -2129,9 +2190,12 @@ with an empty value):
    in the service variables as `STRIPE_SECRET_KEY`. Never paste it anywhere
    else.
 2. Developers > Webhooks > Add endpoint: `https://<domain>/webhooks/stripe`,
-   events `checkout.session.completed` and
-   `checkout.session.async_payment_succeeded`. Copy its signing secret into
-   `STRIPE_WEBHOOK_SECRET`.
+   events `checkout.session.completed`,
+   `checkout.session.async_payment_succeeded`, `refund.created`,
+   `refund.updated` and `refund.failed` in the matching test/live environment.
+   Copy its signing secret into `STRIPE_WEBHOOK_SECRET`. A refund count of zero
+   has no meaning until those events and their delivery are confirmed; test
+   a signed partial refund event in staging without issuing a real refund.
 3. Keep `AUDIT_FREE_MODE=false`. `AUDIT_ACCESS_CODES=true` can stay on: the
    card button becomes the main action and WhatsApp plus the code field
    stay under it as the alternative.
@@ -2148,21 +2212,34 @@ the legal pages do not mention them; list the audits you will pay in
 `AUDIT_STRIPE_TEST_AUDITS`, pay them, then empty the variable. A payment
 Stripe reports with `livemode: false` never unlocks any other audit.
 
-#### Without a secret key: Payment Links
+#### Without a secret key: Payment Links (NO-GO for public launch)
 
-1. Create two Payment Links in Stripe: one for a report (USD 29) with
-   metadata `app=rigor` and one for the pack (USD 69) with metadata
-   `app=rigor` and `plan=pack`, card only and no promotion codes. Leave the confirmation
-   page as Stripe's own; the buyer comes back to the report tab.
-2. Create the webhook endpoint as above and put its signing secret in
+Keep `STRIPE_PAYMENT_LINK_SINGLE` and `STRIPE_PAYMENT_LINK_PACK` empty in
+production. A Payment Link cannot reserve a local order before redirecting
+to Stripe, so this path does not meet the launch requirement for durable
+pre-payment order tracking and Checkout retry reuse. The instructions below
+describe legacy compatibility only. Public card sales require the secret-key
+Checkout flow above. The service no longer presents **live** Payment Links as a
+new buying path, even with the compatibility switch, because they bypass
+market admission. A historical paid webhook is still fulfilled with the
+switch off. Disable the links in Stripe **before opening live charges**: an
+active old link remains externally accessible and can still charge its old
+amount, while the service accepts its signed callback to protect that buyer.
+
+1. For historical reconciliation, inspect existing Payment Links and retain
+   their metadata (`app=rigor`, `plan=pack` where relevant) in the private
+   Stripe record. Do not create new public Payment Links for this launch.
+2. Keep the webhook endpoint as above and put its signing secret in
    `STRIPE_WEBHOOK_SECRET`.
-3. Set `STRIPE_PAYMENT_LINK_SINGLE` and `STRIPE_PAYMENT_LINK_PACK`, and leave
-   `STRIPE_SECRET_KEY` empty.
+3. For an isolated legacy migration test only, set
+   `STRIPE_PAYMENT_LINK_SINGLE`, `STRIPE_PAYMENT_LINK_PACK`, and
+   `AUDIT_LEGACY_PAYMENT_LINKS_ENABLED=true`, and leave `STRIPE_SECRET_KEY`
+   empty. Turn the switch off and retire the links in Stripe before public launch.
 
-The locked report links to them with `client_reference_id=<audit id>` in a
-new tab. The signed webhook is the only confirmation (the service has no key
-to ask Stripe), and "Ya pagué: ver mi informe" reloads the report. The pack
-code works as below, keyed by the Checkout session the link created.
+Historically the locked report linked to them with
+`client_reference_id=<audit id>` in a new tab. For an existing link payment,
+the signed webhook remains the confirmation (the service has no key to ask
+Stripe). The pack code remains keyed by the Checkout session the link created.
 
 How it works: the checkout carries `metadata.audit_id` and `metadata.plan`.
 The payment is confirmed by the signed webhook and, when the buyer comes
@@ -2254,10 +2331,10 @@ changes what a report says.
   in the form that still has credits pays the upload with no account, as
   before. "Mi cuenta" shows the free previews left this month. The
   address in `free_previews` is cleared by the retention purge.
-  What it does not stop: without e-mail verification, someone can open
-  several accounts with made-up addresses; the per-network cap and the
-  5 sign-ups per hour per address only slow that down. E-mail confirmation
-  (needs a mail provider) would close it.
+  What it does not stop while `AUDIT_EMAIL_VERIFICATION_REQUIRED=false`:
+  someone can open several accounts with made-up addresses; the per-network
+  cap and the 5 sign-ups per hour per address only slow that down. Enabling
+  SMTP and verified-email gating closes the reward and new-Checkout paths.
 - **Free first full report** (`accounts.WELCOME_FULL_REPORT = True`,
   `WELCOME_REPORTS_PER_IP_PER_MONTH = 3`; not in free mode). A signed-in
   account's first upload comes out as a full report with PDF and a
@@ -2266,20 +2343,22 @@ changes what a report says.
   use a monthly preview. It is refused (the upload falls back to the
   free-preview rules) when the account already had it, when this browser
   already gave one (a `rigor_device` cookie holding a random id, stored as
-  its SHA-256), when the same file (SHA-256 of the upload) already got one
-  on any account, or when the network address reached the monthly cap. The
+  its SHA-256), or when the network address reached the monthly cap. Two
+  real users may examine the same file from the same network, within its
+  monthly cap. The
   `welcome_reports` row outlives the account, so deleting and signing up
   again does not repeat it. The purge clears the address; the device and
-  file hashes stay. "Mi cuenta" shows it as Disponible/Usado. The "file" is
+  file hashes stay for audit evidence, not a cross-account refusal. "Mi cuenta"
+  shows it as Disponible/Usado. The "file" is
   a fingerprint of what it says (`accounts.content_fingerprint`: timestamps
   and returns rounded to 5 decimals), so a trailing newline, other line
   endings or renamed columns do not make a new file. When the account's
   free report is unused but an upload becomes a preview for one of these
-  reasons (file, browser, network), the preview says why
+  reasons (browser, network), the preview says why
   (`account_pages.COPY["welcome_refused_*"]`).
 - **Networks** (`accounts.network_address`): every free-tier limit that
-  counts an address (free reports and previews per network, their claim
-  keys, and the invite self-check) counts an IPv6 address as its /64, since
+  counts an address (free reports and previews per network, and their claim
+  keys) counts an IPv6 address as its /64, since
   a customer can rotate addresses inside it at will; an IPv4 address (or an
   IPv4-mapped IPv6 one) counts as itself. The hourly sign-up limit and the
   hourly upload and code-redeem limit count the same network. The free-tier
@@ -2287,7 +2366,7 @@ changes what a report says.
 - **Limits under simultaneous uploads** (`free_claims` table). The checks
   above are a first look that answers at once; after parsing, the upload
   takes its claims in one transaction, all or nothing: the free report takes
-  `welcome:account:`, `welcome:device:`, `welcome:file:` and one numbered
+  `welcome:account:`, `welcome:device:` and one numbered
   per-network slot of the month; a free preview takes one of the account's
   3 numbered slots of the month and one of the network's 10. A claim that
   is taken sends the upload down the next rule (preview, credit, 402 with
@@ -2334,7 +2413,8 @@ changes what a report says.
 - **Invita a un colega** (`store.invite_*`, `record_referral`,
   `reward_referral`; tables `invite_links` and `referrals`): "Mi cuenta"
   shows a personal link `/registro?invita=<token>` (EN `/signup`, PT
-  `/pt/cadastro`) with a WhatsApp share, how many joined, how many wait for
+  `/pt/cadastro`) with copy, native share, WhatsApp, Telegram and Reddit
+  actions, how many joined, how many wait for
   their first report and the credits received (this month out of the cap).
   A sign-up through the link is noted unless the token is unknown, the
   inviter is still signed in in that browser, or the browser carries the
@@ -2342,15 +2422,34 @@ changes what a report says.
   `accounts.REFERRAL_CREDITS` (1) full-report credit, as an access code no
   one sees linked to the inviter, only when the new account's free first
   report is granted, so the free tier's browser, file and address limits
-  already held; it is refused as `self` when that upload's browser mark or
-  address is one the inviter used (its free report, previews, own uploads),
-  and as `cap` past `accounts.REFERRAL_MONTHLY_CAP` (5) credited invites in
-  the calendar month (unique slots, so simultaneous rewards cannot pass it).
+  already held; it is refused as `self` when that upload's browser mark
+  is one the inviter used (its free report, previews, own uploads),
+  as `cap` past `accounts.REFERRAL_MONTHLY_CAP` (5) credited invites for that
+  inviter in the calendar month, and as `budget` after the service-wide
+  `AUDIT_REFERRAL_GLOBAL_MONTHLY_CAP` is spent. Both caps reserve unique slots
+  in the same transaction, so simultaneous rewards cannot pass them.
   The inviter never sees who joined. Rows go with the inviter's account; an
   invitee's deletion drops a pending row and keeps a decided one (dates,
   outcome, slot) under a random id with no browser mark, so deleting
-  credited invitees never frees the cap. They show in "Descargar mis datos". Off in free mode or without the free first
-  report.
+  credited invitees never frees the cap. They show in "Descargar mis datos".
+  Set `AUDIT_REFERRAL_REWARDS=false` to stop new rewards; already earned
+  credits remain usable. Off in free mode or without the free first report.
+- **Email ownership and recovery** (`verified_emails`, `email_outbox`): new
+  accounts and legacy accounts are unverified until they explicitly POST a
+  confirmation form opened from their email. GET only renders the form, so
+  mail-link previews do not consume it. A new address stays pending while the
+  old address remains the account login; confirmation atomically changes it.
+  Unknown and known addresses receive the same reset-request response; reset
+  is one-use, valid for one hour and revokes sessions. The durable outbox keeps
+  recipient, purpose, locale, state, attempts and expiry, but derives the
+  usable link from a random id plus a stable HMAC secret only during sending.
+  Failed SMTP attempts are retried after a lease; the retention purge removes
+  expired rows after a 30-day cleanup window when the scheduled purge is
+  enabled or the operator runs it. No real messages are sent by the test suite.
+  With `AUDIT_EMAIL_VERIFICATION_REQUIRED=false`, the older immediate email
+  change remains for migration compatibility and is **not a verified flow**.
+  Do not launch paid sales with this switch off; configure and test SMTP,
+  enable the switch, and get existing accounts confirmed first.
 - **Pages** (Spanish default, English paths): `/registro` `/signup`,
   `/entrar` `/login`, `/cuenta` `/account` ("Mis informes"), `/olvide`
   `/forgot`, `/restablecer` `/reset`; sign-out is a POST to `/salir` `/logout`.
@@ -2400,15 +2499,17 @@ changes what a report says.
   site); without it, the Origin (else Referer) must be this service. Our
   pages send `Referrer-Policy: no-referrer`, so a real form post carries
   `Origin: null`; that, like no header at all (scripts), is no signal.
-- **No e-mail service yet**. Nothing sends e-mail and addresses are not
-  confirmed. A customer who forgets the password writes to the owner
-  (WhatsApp link on `/olvide`); after checking the request comes from the
-  account's address, the owner creates a one-time reset link (24 hours) in
-  `/panel` or with `quant-trade audit account-reset EMAIL`. To add e-mail
-  confirmation and reset by e-mail later, the owner needs a transactional
-  mail provider (for example Resend, Postmark or Amazon SES), a verified
-  sending domain, and its API key as a Railway variable; the hooks are listed
-  in `accounts.EMAIL_HOOKS`.
+- **E-mail configurable**. With `AUDIT_EMAIL_VERIFICATION_REQUIRED=true`,
+  encrypted SMTP and a stable token secret, new and existing accounts confirm
+  their addresses through one-use links; an unknown and a known address get
+  the same reset-request response. The SMTP worker retries from a database
+  outbox after restart. This migration switch defaults to false, so legacy
+  immediate address changes remain possible until the operator explicitly
+  enables confirmation. A customer can still use a recovery key or request
+  an owner-issued one-time reset link through `/panel` or
+  `quant-trade audit account-reset EMAIL`. A verified sending domain,
+  transport credentials and delivery monitoring are operator requirements;
+  no provider is configured or contacted by the tests.
 - **Recovery key** (`recovery_keys` table, `/cuenta/recuperacion`, `POST
   /olvide`): so a customer who forgets the password needs no one, "Mi
   cuenta" makes a recovery key after the current password: 20 characters
@@ -2499,14 +2600,14 @@ changes what a report says.
   go with the account and the export lists device and time as
   `account_page_seen` (never the browser hash).
 - **Cambiar correo** (`POST /cuenta/correo`): on Mi cuenta, the new
-  sign-in e-mail typed twice plus the current password. No e-mail service
-  confirms the address yet, so the second copy is what catches a typo; an
-  address another account uses is refused without saying whose it is. The
-  other sessions are signed out, as on a password change, and "Actividad
-  reciente" gets an "E-mail changed" line (never either address). Passkeys
-  keep working (they are bound to the account, not the e-mail), though a
-  device may keep showing the old address as the passkey's name. When an
-  e-mail service arrives, this should confirm the new address first.
+  sign-in e-mail typed twice plus the current password. With verification
+  enabled, the old address remains active until a one-use link sent to the
+  new address is explicitly confirmed by POST; GET only previews the action.
+  In legacy mode the change remains immediate. An address another account
+  uses is refused without saying whose it is. The other sessions are signed
+  out when the change completes, and "Actividad reciente" gets an
+  "E-mail changed" line (never either address). Passkeys stay bound to the
+  account, though a device may show the former address as their name.
 - **Protección de tu cuenta**: atop Mi cuenta, a card lists the recovery
   key, two-step sign-in and a passkey (only where passkeys work), each as
   on or with a link to its card, and counts how many are on. Two-step
@@ -2668,8 +2769,9 @@ variables above; no default looks like a real person or company.
 **Have a lawyer in the jurisdiction where the service is sold review both
 texts before charging anyone.** They are an honest description of what the
 code does, not legal advice. Points to check in particular: the refund
-policy (a report already unlocked is not refunded unless the law says
-otherwise), the 30-day answer to privacy requests, the liability cap,
+policy (an unlocked report is not refunded for a change of mind, but a
+material error that cannot be corrected or failed delivery is remedied, as
+are statutory rights), the 30-day answer to privacy requests, the liability cap,
 international hosting, and whether consumer or data-protection law in the
 client's country requires more (for example a data-processing register or a
 named representative).
@@ -3266,7 +3368,10 @@ How the report shows them (ES, EN and PT):
   ten times the history's length is not printed, only that ten times would
   not reach 95 %, and one within it says the history already reaches it),
   or one line saying
-  dependence does not change it. The class never reads either.
+  dependence does not change it. The statistical dimension now uses the lower
+  of the plain and dependence-adjusted PSR when the latter is measurable;
+  the DSR floor and effective observation count are widened by the same
+  dependence ratio. This rule is versioned in `engine.verdict_policy_version`.
 - Under the benchmark table and in the fund-versus-index block, Jensen's
   alpha with beta, t and the periods, saying which cash it subtracted from
   each side (the account currency's own rate is named) or that it subtracts
@@ -3280,3 +3385,113 @@ How the report shows them (ES, EN and PT):
   (losses rarely follow losses; the file's fall may understate the risk) or
   `DEEPER` (losses came in streaks). It says it is not the one-year fall
   above. Nothing shows when it is `NOT_MEASURED`.
+
+## Monetary integrity and selection inputs (2026-09-27)
+
+`reconciliation` records the equation in the report's account currency or
+states that currency was not supplied: opening capital + post-opening cash
+flows + gross closed-trade P&L − itemised costs = expected closing capital.
+It prints the reported closing balance or independent uploaded curve's last
+value, difference, and tolerance. Tolerance is the larger of 0.02 units,
+0.011 units per closed trade plus one, and one basis point of the larger of
+opening or expected capital. The equation does **not** prove the source was
+authentic. Its `coverage` states whether a curve was rebuilt or uploaded,
+how many trades were covered, and whether cash flows, currency and open
+positions were supplied. A platform withdrawal after the last closed deal is
+excluded from this observation window, matching the return curve. For a
+separate CSV curve, its currency is shown as unknown even when the trade file
+states USD; same units are an assumption, not verified conversion. Trades
+outside the curve or an uncovered last 1 %
+of its time span make the comparison `NOT_MEASURED`.
+
+A platform Balance cell which differs materially from the deal-money chain
+produces `MONETARY_RECONCILIATION_MISMATCH` (`FAIL` for data quality), and
+the return uses the reconstructed deal amounts. When the importer reports a
+position still open at the end, or a close whose money is in the balance but
+not in the trade list, a gap against closed trades is `NOT_MEASURED` only if
+the printed balance still agrees with the complete row-money chain. A broken
+Balance cell remains a contradiction. For an independently uploaded
+curve, an unexplained difference produces
+`MONETARY_RECONCILIATION_UNEXPLAINED` (`WARN`) and the equation stays
+`NOT_MEASURED` because unreported deposits, open positions or conversion
+could explain it. Neither alert claims fraud. The calibrated forensic battery
+is also run over the original platform bytes; a `BALANCE_CHAIN SIGNAL` adds
+`FORENSIC_BALANCE_CHAIN_SIGNAL` (`WARN`) with method version and calibration,
+without treating a heuristic as proof of alteration. The committed MT5 tester
+fixture has one altered Balance cell; its clean control is rebuilt in memory.
+A 519-trade
+curve scaled only in its variation, are covered in `tests/test_audit_monetary_integrity.py` and through
+the persisted web report in `tests/test_audit_money_web.py`.
+
+The generic trades CSV accepts commission/fee as charges with either sign,
+and a signed swap (positive credits the account). Its zero-extra-cost row
+already includes these amounts; a declared `net_pnl` is compared with net,
+`gross_pnl` with gross, and an ambiguous `pnl` with both while warning the
+reader. Mixed currencies or unreadable costs are refused; other monetary
+looking columns receive an explicit unused-column warning. No conversion
+rate is invented. This is tested against a +1 gross, −9 net example.
+
+Variant dates, when present, must parse, be unique, chronological, and match
+the audited curve or its return rows before CSCV/PBO. A date-less matrix is
+still accepted by row position but is labelled `NOT_MEASURED` for temporal
+alignment and selected-variant provenance. A declared OOS start remains
+`selection_verified=false`; the upload cannot prove it was chosen in advance.
+`run_audit` accepts an optional 40-hex `source_commit_sha` from its caller;
+the web layer uses Railway's `RAILWAY_GIT_COMMIT_SHA` when a GitHub-triggered
+deployment supplies it. The result labels it `DECLARED` rather than claiming
+that a PDF hash authenticates the source code. Missing or malformed values
+remain `NOT_MEASURED`; the local synthetic sample intentionally has no build
+commit SHA.
+
+## Operator probes and incident admission
+
+`GET /live` checks only that the web process can answer. The legacy `GET
+/health` exposes non-secret configuration and also remains a liveness probe;
+it does **not** query storage. Route new traffic using `GET /ready`: it runs
+`SELECT 1 FROM audits LIMIT 1` on the configured database and checks that WeasyPrint loaded with
+its native PDF libraries. It returns 503 with only boolean check results when
+either fails, never a connection string or error text. A deliberate incident
+pause appears in the readiness JSON but does not make existing report and
+webhook traffic unready.
+When `AUDIT_EMAIL_VERIFICATION_REQUIRED=true`, readiness also checks that
+HTTPS, the token secret, and encrypted SMTP delivery are configured. This is
+a configuration check; it does not send a message or prove SMTP reachability.
+Railway's `healthcheckPath` is `/ready`; the Docker build workflow probes
+both `/live` and `/ready`. The Docker image installs Pango and HarfBuzz for
+WeasyPrint, so a PDF dependency failure prevents a new deployment from being
+marked ready.
+Unsigned requests to the Stripe webhook are limited to 256 KiB before body
+parsing; an oversized request returns 413.
+On Windows, the local Python library also needs native Pango. Follow the
+[WeasyPrint Windows installation guide](https://doc.courtbouillon.org/weasyprint/stable/first_steps.html#installation):
+install the MSYS2 UCRT64 `mingw-w64-ucrt-x86_64-pango` package and set
+`WEASYPRINT_DLL_DIRECTORIES` to that installation's `ucrt64\bin` before
+starting the service or running PDF tests; `pip install weasyprint` alone is
+not sufficient there.
+
+Set `AUDIT_PAUSE_NEW_AUDITS=true` on **every** service replica and restart to
+stop `POST /audits` before multipart parsing. This stops free audits and also
+temporarily stops paid-credit/code uploads; existing reports and balances
+remain available and a rejected upload consumes no free claim or credit. Set
+`AUDIT_PAUSE_NEW_CHECKOUT=true` and restart to stop new card Checkout
+sessions. Already created Checkout sessions, signed webhooks, paid-report
+access, and payment reconciliation continue. Restore either flag to `false`
+only after the incident is resolved. The values are read at process start,
+so editing an environment variable without restarting has no effect.
+
+At most `AUDIT_MAX_CONCURRENT_AUDITS + 1` audit request bodies can be in
+multipart parsing or later audit processing per process. Additional requests
+get a 503 before their bodies are read. An admitted body is still bounded by
+the existing total request limit and by each field's size limit. This is an
+admission guard, not a durable job queue; an upload rejected with 503 must be
+sent again. Limits and attempt counters are per process, so adding replicas
+requires shared admission and quota design before claiming greater capacity.
+The controls and DB/PDF failure probes are exercised in
+`tests/test_audit_ops.py`. That test also backs up and restores a synthetic
+SQLite database and compares the account count, usable credits, frozen paid
+order and report bytes. A PostgreSQL staging restore and a recovery drill
+under live traffic still need their own environment and evidence. No
+production load capacity follows from these functional tests.
+Never replace a production database with an older snapshot without first
+listing and reconciling card sessions and webhook deliveries that happened
+after the snapshot; a database rollback alone can discard paid entitlements.

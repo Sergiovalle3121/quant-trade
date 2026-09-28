@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -166,11 +167,23 @@ def test_accounts_reports_and_payments_follow_their_tag(tmp_path: Path) -> None:
     assert f6 == {
         "visits": 1,
         "signups": 1,
+        "email_verified": 0,
+        "uploads": 2,
         "welcome": 1,
         "previews": 1,
-        "paid_code": 1,
-        "paid_card": 0,
+        "referrals_accepted": 0,
+        "checkout_started": 0,
+        "credit_used": 1,
+        "gift_credits": 0,
+        "purchases": 0,
+        "buyers": 0,
+        "repeat_purchases": 0,
+        "deliveries": 0,
+        "rights_sold": 0,
+        "gross_usd_cents": 0,
+        "refund_usd_cents": 0,
     }
+    assert built.by_ref["f6"].paid == 0  # a code without verified payment is no sale
     assert built.by_ref[funnel.DIRECT].counts["signups"] == 1
     assert built.by_day[(_today(), "es")].counts["signups"] == 2
 
@@ -178,6 +191,126 @@ def test_accounts_reports_and_payments_follow_their_tag(tmp_path: Path) -> None:
     store.delete_account(account.id)  # type: ignore[attr-defined]
     left = store.funnel_events(_today())["signups"]  # type: ignore[attr-defined]
     assert all(ref != "f6" for _, _, ref, _ in left)
+
+
+def test_observed_funnel_stages_keep_checkout_distinct_from_charge(tmp_path: Path) -> None:
+    client, store = _client(tmp_path)
+    now = datetime.now(UTC)
+    client.get("/?ref=f4")
+    _signup(client, "buyer@example.com")
+    buyer = store.find_account("buyer@example.com")  # type: ignore[attr-defined]
+    assert buyer is not None
+    with store.engine.begin() as conn:  # type: ignore[attr-defined]
+        conn.execute(
+            store.verified_emails.insert().values(  # type: ignore[attr-defined]
+                account_id=buyer.id, email=buyer.email, verified_at=now.isoformat()
+            )
+        )
+    _upload(client)  # full welcome report
+    audit_id = _upload(client)  # persisted preview, not a paid delivery
+
+    invitee = store.create_account(  # type: ignore[attr-defined]
+        email="invitee@example.com", password_hash="unused", locale="es", at=now
+    )
+    assert invitee is not None
+    assert store.record_referral(invitee.id, buyer.id, device_sha256="", at=now)  # type: ignore[attr-defined]
+
+    order = store.reserve_checkout(  # type: ignore[attr-defined]
+        audit_id, account_id=buyer.id, plan="single", amount_cents=2900, currency="usd", at=now
+    )
+    before = funnel.build(store.funnel_events(_today())).total.counts  # type: ignore[attr-defined]
+    assert before["email_verified"] == 1
+    assert before["uploads"] == 2
+    assert before["referrals_accepted"] == 1
+    assert before["checkout_started"] == 0  # reservation alone never reached Checkout
+    assert before["deliveries"] == before["purchases"] == 0
+
+    store.attach_checkout_session(  # type: ignore[attr-defined]
+        order.id,
+        session_id="cs_live_funnel",
+        checkout_url="https://checkout.stripe.test/funnel",
+        expires_at=None,
+    )
+    opened = funnel.build(store.funnel_events(_today())).total.counts  # type: ignore[attr-defined]
+    assert opened["checkout_started"] == 1
+    assert opened["purchases"] == opened["deliveries"] == 0
+
+    store.settle_card_payment(  # type: ignore[attr-defined]
+        order_id=order.id,
+        session_id="cs_live_funnel",
+        audit_id=audit_id,
+        plan="single",
+        expected_cents=2900,
+        paid_cents=2900,
+        currency="usd",
+        pack_code="",
+        at=now,
+        payment_livemode=True,
+    )
+    paid = funnel.build(store.funnel_events(_today()))  # type: ignore[attr-defined]
+    assert paid.total.counts["checkout_started"] == 1
+    assert paid.total.counts["purchases"] == paid.total.counts["deliveries"] == 1
+    assert paid.total.counts["gross_usd_cents"] == 2900
+    assert paid.by_ref["f4"].counts["email_verified"] == 1
+    assert paid.by_ref["f4"].counts["uploads"] == 2
+    assert paid.by_ref_locale[("f4", "es")].counts["purchases"] == 1
+    assert paid.by_ref[funnel.DIRECT].counts["referrals_accepted"] == 1
+
+
+def test_one_invitee_can_grant_only_one_credit_under_concurrent_settlement(tmp_path: Path) -> None:
+    store = make_store(f"sqlite:///{tmp_path}/referrals.db")
+    now = datetime.now(UTC)
+    inviter = store.create_account(
+        email="inviter@example.com", password_hash="unused", locale="es", at=now
+    )
+    invitee = store.create_account(
+        email="invitee@example.com", password_hash="unused", locale="es", at=now
+    )
+    assert inviter is not None and invitee is not None
+    assert store.record_referral(invitee.id, inviter.id, device_sha256="", at=now)
+
+    def settle(_: int) -> str:
+        return store.reward_referral(
+            invitee.id, device_sha256="", client_ip="", at=now, credits=1, monthly_cap=5
+        )
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        outcomes = list(pool.map(settle, (1, 2)))
+    assert sorted(outcomes) == ["", "credited"]
+    assert store.account_credits(inviter.id, now) == 1
+    with store.engine.connect() as conn:
+        grants = conn.execute(store.credit_grants.select()).mappings().all()
+    assert len(grants) == 1 and grants[0]["origin"] == "referral"
+
+
+def test_reward_switch_hides_new_invites_but_keeps_earned_credits(tmp_path: Path) -> None:
+    client, store = _client(tmp_path)
+    _signup(client, "ana@example.com")
+    now = datetime.now(UTC)
+    inviter = store.find_account("ana@example.com")
+    invitee = store.create_account(
+        email="bea@example.com", password_hash="unused", locale="es", at=now
+    )
+    assert inviter is not None and invitee is not None
+    assert store.record_referral(invitee.id, inviter.id, device_sha256="", at=now)
+    assert (
+        store.reward_referral(
+            invitee.id, device_sha256="", client_ip="", at=now, credits=1, monthly_cap=5
+        )
+        == "credited"
+    )
+    disabled = AuditSettings(
+        database_url=f"sqlite:///{tmp_path}/audit.db",
+        bootstrap_samples=100,
+        free_mode=False,
+        access_codes=True,
+        referral_rewards=False,
+    )
+    after = TestClient(create_app(disabled, store), headers=BROWSER)
+    after.cookies.update(client.cookies)
+    page = after.get("/cuenta").text
+    assert "Invita a un colega" not in page
+    assert store.account_credits(inviter.id, now) == 1
 
 
 def test_the_panel_shows_the_funnel_behind_the_key(tmp_path: Path) -> None:
@@ -188,6 +321,32 @@ def test_the_panel_shows_the_funnel_behind_the_key(tmp_path: Path) -> None:
     page = client.post("/panel", data={"key": KEY}).text
     assert "Embudo de ventas: últimos 30 días" in page
     assert "<td>f4</td><td>F4 · Sharpe por pura suerte</td><td>1</td><td>1</td>" in page
+    for label in (
+        "Correos confirmados",
+        "Cargas guardadas",
+        "Invitaciones aceptadas",
+        "Sesiones Checkout creadas",
+        "Compras live entregadas",
+        "Contribución USD",
+        "Por canal e idioma",
+        "Por país del comprador",
+    ):
+        assert label in page
+    assert "NOT_MEASURED" in page
+    assert "no se deduce el país del idioma" in page.lower()
+    assert "Contribución = cobro bruto confirmado" in page
+    assert "no es beneficio ni ingreso neto" in page
+    cohort_tables = [
+        table
+        for table in re.findall(r"<table>.*?</table>", page, re.S)
+        if "Contribución USD" in table
+    ]
+    assert len(cohort_tables) == 3
+    for table in cohort_tables:
+        head = re.search(r"<thead><tr>(.*?)</tr></thead>", table, re.S)
+        first_row = re.search(r"<tbody><tr>(.*?)</tr>", table, re.S)
+        assert head is not None and first_row is not None
+        assert head.group(1).count("<th>") == first_row.group(1).count("<td>")
     assert "?ref=f6" in page
     assert "ana@example.com" not in page
     assert find_claims(page) == []

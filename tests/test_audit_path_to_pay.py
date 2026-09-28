@@ -60,6 +60,43 @@ def test_the_landing_sells_what_the_full_report_now_measures(locale: str) -> Non
     assert find_claims(text) == []
 
 
+@pytest.mark.parametrize(
+    ("locale", "own_inflation", "available", "official", "obsolete"),
+    [
+        (
+            "es",
+            "propia inflación",
+            "índices de precios disponibles",
+            "fuentes estadísticas oficiales",
+            "inflación de EE. UU.",
+        ),
+        (
+            "en",
+            "own inflation",
+            "price indexes are available",
+            "official statistical sources",
+            "after US inflation",
+        ),
+        (
+            "pt",
+            "própria inflação",
+            "índices de preços disponíveis",
+            "fontes estatísticas oficiais",
+            "inflação dos EUA",
+        ),
+    ],
+)
+def test_landing_names_each_currency_inflation_and_its_data_limit(
+    locale: str, own_inflation: str, available: str, official: str, obsolete: str
+) -> None:
+    text = _text(landing(locale=locale, free_mode=False, signed_in=False))
+    assert own_inflation in text
+    assert available in text
+    assert official in text and "FRED" in text
+    assert obsolete not in text
+    assert find_claims(text) == []
+
+
 def test_on_a_phone_the_price_comes_before_the_list_of_locked_sections() -> None:
     # The lockbox is a column on phones: heading, then every paybox except the code
     # form, then the list.
@@ -84,13 +121,14 @@ def test_a_portuguese_report_fits_its_two_language_links_on_a_narrow_phone() -> 
     page = render_html(
         sample_result("pt"), watermark=False, locale="pt", switch_url="/audits/x?lang=es"
     )
-    assert "hreflang='es' data-short='ES'>Español</a>" in page
-    assert "hreflang='en' data-short='EN'>English</a>" in page
-    assert ".nav-end>.lang-switch[data-short]::before{content:attr(data-short)" in REPORT
+    assert re.search(r"<a\b[^>]*hreflang='es'[^>]*data-short='ES'>Español</a>", page)
+    assert re.search(r"<a\b[^>]*hreflang='en'[^>]*data-short='EN'>English</a>", page)
+    assert ".report-languages .lang-switch[data-short]::before{content:attr(data-short)" in REPORT
     spanish = render_html(
         sample_result("es"), watermark=False, locale="es", switch_url="/audits/x?lang=en"
     )
-    assert "data-short=" not in spanish
+    assert re.search(r"<a\b[^>]*hreflang='en'[^>]*data-short='EN'>English</a>", spanish)
+    assert re.search(r"<a\b[^>]*hreflang='pt'[^>]*data-short='PT'>Português</a>", spanish)
 
 
 @pytest.mark.parametrize("locale", sorted(SIGNUP))

@@ -18,7 +18,7 @@ import math
 import re
 from collections.abc import Callable
 from typing import Any
-from urllib.parse import quote, urlsplit, urlunsplit
+from urllib.parse import parse_qsl, quote, urlencode, urlsplit, urlunsplit
 
 from quant_trade.audit import charts, report_pt
 from quant_trade.audit.account import is_account_history
@@ -28,7 +28,12 @@ from quant_trade.audit.decay import signed_amount as _signed_amount
 from quant_trade.audit.guard import assert_report_clean
 from quant_trade.audit.holding import EDGE_SE
 from quant_trade.audit.i18n import localize
-from quant_trade.audit.importers import NEAR_EMPTY_DAYS, NEAR_EMPTY_FIRST, lead_number
+from quant_trade.audit.importers import (
+    NEAR_EMPTY_DAYS,
+    NEAR_EMPTY_FIRST,
+    PDF_ROWS_WARNING,
+    lead_number,
+)
 from quant_trade.audit.instruments import MIN_EACH as _INSTRUMENTS_MIN
 from quant_trade.audit.instruments import OTHER as _INSTRUMENTS_OTHER
 from quant_trade.audit.legal import LINK_TEXT, legal_url
@@ -91,7 +96,218 @@ DISCLAIMER = {
 LUCK_YEARS_SHOWN = 100
 
 #: The full sample report, linked from a locked preview.
-SAMPLE_PATHS: dict[str, str] = {"es": "/ejemplo", "en": "/sample"}
+SAMPLE_PATHS: dict[str, str] = {"es": "/ejemplo", "en": "/sample", "pt": "/pt/exemplo"}
+
+#: Short, fixed explanations for the two integrity checks. These are shown in
+#: the free report as well as a purchased report: paying does not turn a
+#: missing monetary flow or an uncalibrated heuristic into evidence.
+INTEGRITY_TEXT: dict[str, dict[str, str]] = {
+    "es": {
+        "recon_title": "Conciliación monetaria",
+        "recon_intro": (
+            "Comparamos el capital inicial, los flujos conocidos y el resultado neto de "
+            "operaciones cerradas con el saldo final. Una coincidencia no autentica el historial."
+        ),
+        "recon_match": "Cuadra dentro de la tolerancia",
+        "recon_contradiction": "El saldo final contradice las operaciones",
+        "recon_unmeasured": "No se pudo cerrar la conciliación",
+        "recon_net_equation": "Bruto − costes detallados = neto de operaciones cerradas",
+        "recon_final_equation": "Capital inicial + flujos conocidos + neto = saldo esperado",
+        "recon_unknown": "Sin dato",
+        "recon_coverage": "Cobertura y límites",
+        "recon_initial": "Capital inicial",
+        "recon_flows": "Flujos después del inicio",
+        "recon_gross": "Resultado bruto cerrado",
+        "recon_costs": "Costes detallados",
+        "recon_net": "Resultado neto cerrado",
+        "recon_open": "Valor de posiciones abiertas",
+        "recon_expected": "Saldo final esperado",
+        "recon_observed": "Saldo final observado",
+        "recon_difference": "Diferencia (observado − esperado)",
+        "recon_tolerance": "Tolerancia",
+        "recon_currency_unknown": "unidades del archivo; moneda no declarada",
+        "recon_currency_assumed": (
+            "{currency} según las operaciones; moneda de la curva no indicada"
+        ),
+        "recon_curve": "Curva",
+        "recon_trades": "Operaciones cerradas",
+        "recon_outside": "Operaciones fuera del periodo de la curva",
+        "recon_flow_coverage": "Depósitos y retiros",
+        "recon_open_coverage": "Posiciones abiertas",
+        "recon_currency_coverage": "Moneda",
+        "recon_trade_currency": "Moneda indicada en operaciones",
+        "recon_curve_currency": "Moneda indicada en la curva",
+        "recon_currency_not_supplied": "no indicada",
+        "forensic_title": "Coherencia interna del archivo",
+        "forensic_intro": (
+            "Comprobaciones heurísticas de las filas del archivo; no comparan dos archivos "
+            "independientes ni autentican quién creó el historial."
+        ),
+        "forensic_signal": "Señal que requiere revisión",
+        "forensic_none": "No apareció una señal calibrada en estas comprobaciones.",
+        "forensic_caveat": (
+            "Una señal no demuestra falsificación; la ausencia de señales no prueba autenticidad."
+        ),
+        "forensic_version": "Versión del método",
+        "forensic_family": "Familia del archivo",
+        "forensic_rows": "Filas leídas",
+        "forensic_checks": "Todas las comprobaciones y su estado",
+        "forensic_check": "Comprobación",
+        "forensic_status": "Estado",
+        "forensic_calibration": "Calibración",
+        "forensic_calibrated": "Calibrada para esta familia",
+        "forensic_uncalibrated": "Sin calibración aplicable",
+        "forensic_cal_line": (
+            "Calibración congelada {date}: {files} archivos, {groups} cuentas o estrategias, "
+            "{reserved} archivos reservados, {unexplained} casos sin explicar; "
+            "límite superior 95 %: {upper} %."
+        ),
+        "forensic_truncated": (
+            "Se alcanzó un límite de lectura; algunas pruebas no pudieron medirse."
+        ),
+        "check_signal": "Señal",
+        "check_clean": "Sin hallazgo",
+        "check_info": "Dato",
+        "check_unmeasured": "No medido",
+        "balance_chain": "Cadena de saldos",
+    },
+    "en": {
+        "recon_title": "Money reconciliation",
+        "recon_intro": (
+            "We compare starting capital, known flows and net closed-trade P&L with the "
+            "closing balance. A match does not authenticate the history."
+        ),
+        "recon_match": "Matches within tolerance",
+        "recon_contradiction": "The closing balance contradicts the trades",
+        "recon_unmeasured": "The reconciliation could not be completed",
+        "recon_net_equation": "Gross − itemised costs = net closed-trade P&L",
+        "recon_final_equation": (
+            "Starting capital + known flows + net P&L = expected closing balance"
+        ),
+        "recon_unknown": "No data",
+        "recon_coverage": "Coverage and limits",
+        "recon_initial": "Starting capital",
+        "recon_flows": "Flows after the start",
+        "recon_gross": "Gross closed-trade P&L",
+        "recon_costs": "Itemised costs",
+        "recon_net": "Net closed-trade P&L",
+        "recon_open": "Open-position value",
+        "recon_expected": "Expected closing balance",
+        "recon_observed": "Observed closing balance",
+        "recon_difference": "Difference (observed − expected)",
+        "recon_tolerance": "Tolerance",
+        "recon_currency_unknown": "file units; currency not declared",
+        "recon_currency_assumed": ("{currency} according to trades; curve currency not stated"),
+        "recon_curve": "Curve",
+        "recon_trades": "Closed trades",
+        "recon_outside": "Trades outside the curve period",
+        "recon_flow_coverage": "Deposits and withdrawals",
+        "recon_open_coverage": "Open positions",
+        "recon_currency_coverage": "Currency",
+        "recon_trade_currency": "Currency stated by trades",
+        "recon_curve_currency": "Currency stated by the curve",
+        "recon_currency_not_supplied": "not stated",
+        "forensic_title": "Internal file consistency",
+        "forensic_intro": (
+            "Heuristic checks of rows within this file; they do not compare two independent "
+            "files or authenticate who created the history."
+        ),
+        "forensic_signal": "Signal requiring review",
+        "forensic_none": "No calibrated signal appeared in these checks.",
+        "forensic_caveat": (
+            "A signal does not prove forgery; no signal does not prove authenticity."
+        ),
+        "forensic_version": "Method version",
+        "forensic_family": "File family",
+        "forensic_rows": "Rows read",
+        "forensic_checks": "All checks and their status",
+        "forensic_check": "Check",
+        "forensic_status": "Status",
+        "forensic_calibration": "Calibration",
+        "forensic_calibrated": "Calibrated for this family",
+        "forensic_uncalibrated": "No applicable calibration",
+        "forensic_cal_line": (
+            "Calibration frozen {date}: {files} files, {groups} accounts or strategies, "
+            "{reserved} reserved files, {unexplained} unexplained cases; "
+            "95 % upper bound: {upper} %."
+        ),
+        "forensic_truncated": "A reading limit was reached; some checks could not be measured.",
+        "check_signal": "Signal",
+        "check_clean": "No finding",
+        "check_info": "Data point",
+        "check_unmeasured": "Not measured",
+        "balance_chain": "Balance chain",
+    },
+    "pt": {
+        "recon_title": "Conciliação monetária",
+        "recon_intro": (
+            "Comparamos o capital inicial, os fluxos conhecidos e o resultado líquido das "
+            "operações fechadas com o saldo final. Uma coincidência não autentica o histórico."
+        ),
+        "recon_match": "Confere dentro da tolerância",
+        "recon_contradiction": "O saldo final contradiz as operações",
+        "recon_unmeasured": "Não foi possível concluir a conciliação",
+        "recon_net_equation": "Bruto − custos detalhados = líquido das operações fechadas",
+        "recon_final_equation": "Capital inicial + fluxos conhecidos + líquido = saldo esperado",
+        "recon_unknown": "Sem dado",
+        "recon_coverage": "Cobertura e limites",
+        "recon_initial": "Capital inicial",
+        "recon_flows": "Fluxos após o início",
+        "recon_gross": "Resultado bruto fechado",
+        "recon_costs": "Custos detalhados",
+        "recon_net": "Resultado líquido fechado",
+        "recon_open": "Valor das posições abertas",
+        "recon_expected": "Saldo final esperado",
+        "recon_observed": "Saldo final observado",
+        "recon_difference": "Diferença (observado − esperado)",
+        "recon_tolerance": "Tolerância",
+        "recon_currency_unknown": "unidades do arquivo; moeda não declarada",
+        "recon_currency_assumed": (
+            "{currency} conforme as operações; moeda da curva não informada"
+        ),
+        "recon_curve": "Curva",
+        "recon_trades": "Operações fechadas",
+        "recon_outside": "Operações fora do período da curva",
+        "recon_flow_coverage": "Depósitos e retiradas",
+        "recon_open_coverage": "Posições abertas",
+        "recon_currency_coverage": "Moeda",
+        "recon_trade_currency": "Moeda informada nas operações",
+        "recon_curve_currency": "Moeda informada na curva",
+        "recon_currency_not_supplied": "não informada",
+        "forensic_title": "Coerência interna do arquivo",
+        "forensic_intro": (
+            "Verificações heurísticas das linhas deste arquivo; elas não comparam dois arquivos "
+            "independentes nem autenticam quem criou o histórico."
+        ),
+        "forensic_signal": "Sinal que exige revisão",
+        "forensic_none": "Nenhum sinal calibrado apareceu nessas verificações.",
+        "forensic_caveat": (
+            "Um sinal não comprova falsificação; a ausência de sinais não prova autenticidade."
+        ),
+        "forensic_version": "Versão do método",
+        "forensic_family": "Família do arquivo",
+        "forensic_rows": "Linhas lidas",
+        "forensic_checks": "Todas as verificações e seus estados",
+        "forensic_check": "Verificação",
+        "forensic_status": "Estado",
+        "forensic_calibration": "Calibração",
+        "forensic_calibrated": "Calibrada para esta família",
+        "forensic_uncalibrated": "Sem calibração aplicável",
+        "forensic_cal_line": (
+            "Calibração congelada {date}: {files} arquivos, {groups} contas ou estratégias, "
+            "{reserved} arquivos reservados, {unexplained} casos sem explicação; "
+            "limite superior de 95 %: {upper} %."
+        ),
+        "forensic_truncated": (
+            "Um limite de leitura foi atingido; alguns testes não puderam ser medidos."
+        ),
+        "check_signal": "Sinal",
+        "check_clean": "Sem achado",
+        "check_info": "Dado",
+        "check_unmeasured": "Não medido",
+        "balance_chain": "Cadeia de saldos",
+    },
+}
 
 #: What each locked section tells the buyer, in plain words: the lockbox lists
 #: these instead of the sections' technical titles, which stay in the report.
@@ -1422,6 +1638,7 @@ LABELS: dict[str, dict[str, str]] = {
         "plan_locked": "pasos concretos, con las cifras de tu archivo, en el informe completo",
         "kpis": "Resumen ejecutivo",
         "toc": "Secciones del informe",
+        "report_languages": "Idioma del informe",
         "toc_unlock": "Informe completo",
         "kpis_locked": "Las cifras clave de tu archivo se muestran en el informe completo.",
         "kpi_return": "Retorno total",
@@ -2700,6 +2917,7 @@ LABELS: dict[str, dict[str, str]] = {
         "plan_locked": "concrete steps, with your file's figures, in the full report",
         "kpis": "Executive summary",
         "toc": "Report sections",
+        "report_languages": "Report language",
         "toc_unlock": "Full report",
         "kpis_locked": "Your file's key figures are shown in the full report.",
         "kpi_return": "Total return",
@@ -2910,6 +3128,8 @@ KEY_LABELS: dict[str, dict[str, str]] = {
         "floor": "Mínimo por error de muestreo",
         "observed_across_variants": "Observado en las variantes",
         "sharpe_variance_used": "Varianza del Sharpe usada",
+        "dependence_ratio": "Aumento de la varianza por dependencia",
+        "effective_observations": "Observaciones efectivas tras dependencia",
         "sharpe_per_period": "Sharpe por periodo",
         "break_even_bps": "Coste de equilibrio (pb por lado)",
         "break_even_pips": "Coste de equilibrio (pips por lado)",
@@ -3015,6 +3235,8 @@ KEY_LABELS: dict[str, dict[str, str]] = {
         "floor": "Sampling-error floor",
         "observed_across_variants": "Observed across variants",
         "sharpe_variance_used": "Sharpe variance used",
+        "dependence_ratio": "Variance increase from dependence",
+        "effective_observations": "Effective observations after dependence",
         "sharpe_per_period": "Sharpe per period",
         "break_even_bps": "Break-even cost (bps per side)",
         "break_even_pips": "Break-even cost (pips per side)",
@@ -3356,6 +3578,16 @@ SOURCE_NAMES: dict[str, str] = {
     "universal_trades_csv": "CSV / Excel",
     "universal_fills_csv": "CSV / Excel (fills / ejecuciones)",
 }
+
+
+def source_name(inputs: dict[str, Any], default: str = "") -> str:
+    """Name the uploaded file format, even when PDF rows used CSV columns."""
+    if inputs.get("source_is_pdf") or any(
+        str(warning).endswith(PDF_ROWS_WARNING) for warning in inputs.get("parse_warnings") or []
+    ):
+        return "PDF"
+    source_format = inputs.get("source_format")
+    return SOURCE_NAMES.get(str(source_format), str(source_format or default))
 
 
 #: How often the uploaded series is sampled, as ``schema.infer_frequency`` labels it.
@@ -4488,7 +4720,7 @@ def _source_html(data: dict[str, Any], labels: dict[str, str]) -> str:
     out = ""
     source_format = inputs.get("source_format")
     if source_format and source_format != "csv":
-        shown = SOURCE_NAMES.get(source_format, source_format)
+        shown = source_name(inputs)
         out += f"<p>{_e(labels['report_source'])}: {_e(shown)}</p>"
     optimization = inputs.get("optimization")
     if optimization:
@@ -4540,8 +4772,281 @@ def _column_map_html(metadata: dict[str, Any], labels: dict[str, str]) -> str:
     )
 
 
-def _other(locale: str) -> str:
-    return "en" if locale == "es" else "es"
+def _report_language_url(switch_url: str, target: str) -> str:
+    """Keep a private report's token while changing only its language.
+
+    The public synthetic sample has a canonical path for each language.
+    """
+    parts = urlsplit(switch_url)
+    if parts.path in SAMPLE_PATHS.values():
+        return SAMPLE_PATHS[target]
+    query = [
+        (name, value)
+        for name, value in parse_qsl(parts.query, keep_blank_values=True)
+        if name != "lang"
+    ]
+    query.append(("lang", target))
+    return urlunsplit((parts.scheme, parts.netloc, parts.path, urlencode(query), parts.fragment))
+
+
+def _report_language_links(locale: str, switch_url: str | None, label: str) -> str:
+    if not switch_url:
+        return ""
+    names = {"es": ("Español", "ES"), "en": ("English", "EN"), "pt": ("Português", "PT")}
+    links = "".join(
+        f"<a class='lang-switch' href='{_e(_report_language_url(switch_url, target))}' "
+        f"hreflang='{target}' lang='{target}' aria-label='{_e(name)}' "
+        f"data-short='{short}'>{name}</a>"
+        for target, (name, short) in names.items()
+        if target != locale
+    )
+    return f"<nav class='report-languages' aria-label='{_e(label)}'>{links}</nav>"
+
+
+RECON_REASONS: dict[str, tuple[str, str, str]] = {
+    "no closed-trade ledger supplied": (
+        "No se aportó una lista de operaciones cerradas.",
+        "No closed-trade list was supplied.",
+        "Não foi enviada uma lista de operações fechadas.",
+    ),
+    "uploaded returns are not money": (
+        "La serie de retornos no representa importes monetarios.",
+        "The uploaded return series is not a monetary balance.",
+        "A série de retornos enviada não representa valores monetários.",
+    ),
+    "trades extend outside the curve dates": (
+        "Hay operaciones fuera de las fechas cubiertas por la curva.",
+        "Some trades fall outside the curve dates.",
+        "Há operações fora das datas cobertas pela curva.",
+    ),
+    "closed-trade ledger agrees within tolerance; this does not authenticate the history": (
+        "Las operaciones cerradas cuadran dentro de la tolerancia; esto no autentica el historial.",
+        "Closed trades agree within tolerance; this does not authenticate the history.",
+        "As operações fechadas conferem dentro da tolerância; isso não autentica o histórico.",
+    ),
+    "printed balance contradicts deal amounts": (
+        "El saldo impreso contradice los importes de las operaciones.",
+        "The printed balance contradicts the deal amounts.",
+        "O saldo impresso contradiz os valores das operações.",
+    ),
+    "open positions or closes missing from the trade list could explain the difference": (
+        "Las posiciones abiertas o los cierres que faltan en la lista de operaciones "
+        "podrían explicar la diferencia.",
+        "Open positions or closes missing from the trade list could explain the difference.",
+        "Posições abertas ou fechamentos ausentes da lista de operações podem explicar "
+        "a diferença.",
+    ),
+    "flows, currency conversion or open positions could explain the difference": (
+        "Los flujos, el cambio de moneda o las posiciones abiertas podrían explicar la diferencia.",
+        "Flows, currency conversion or open positions could explain the difference.",
+        "Fluxos, conversão cambial ou posições abertas podem explicar a diferença.",
+    ),
+}
+
+RECON_COVERAGE_VALUES: dict[str, tuple[str, str, str]] = {
+    "rebuilt from the platform deal rows": (
+        "reconstruida desde las operaciones de la plataforma",
+        "rebuilt from the platform deal rows",
+        "reconstruída a partir das operações da plataforma",
+    ),
+    "separate upload": ("archivo separado", "separate upload", "arquivo separado"),
+    "listed by platform": (
+        "enumerados por la plataforma",
+        "listed by the platform",
+        "listados pela plataforma",
+    ),
+    "not supplied": ("no aportados", "not supplied", "não enviados"),
+    "not valued separately": (
+        "sin valoración separada",
+        "not valued separately",
+        "sem avaliação separada",
+    ),
+    "not stated; same units assumed": (
+        "no indicada; se supusieron las mismas unidades",
+        "not stated; same units assumed",
+        "não informada; mesmas unidades presumidas",
+    ),
+}
+
+
+def _recon_text(value: str, locale: str, table: dict[str, tuple[str, str, str]]) -> str:
+    translated = table.get(value)
+    return translated[{"es": 0, "en": 1, "pt": 2}[locale]] if translated else value
+
+
+def _reconciliation_html(recon: dict[str, Any] | None, locale: str) -> str:
+    if not recon:
+        return ""
+    copy = INTEGRITY_TEXT[locale]
+    status = str(recon.get("status", "NOT_MEASURED"))
+    status_key = {
+        "MATCH": "recon_match",
+        "CONTRADICTION": "recon_contradiction",
+    }.get(status, "recon_unmeasured")
+    reason = _recon_text(str(recon.get("reason", "")), locale, RECON_REASONS)
+    currency = str(recon.get("currency", "UNKNOWN"))
+    currency_label = currency if currency != "UNKNOWN" else copy["recon_currency_unknown"]
+    coverage = recon.get("coverage") or {}
+    if isinstance(coverage, dict) and coverage.get("currency") == "not stated; same units assumed":
+        trade_currency = str(coverage.get("trade_currency") or "")
+        if trade_currency and trade_currency not in ("UNKNOWN", "not supplied"):
+            currency_label = copy["recon_currency_assumed"].format(currency=trade_currency)
+
+    def amount(key: str) -> str:
+        item = recon.get(key)
+        if not isinstance(item, dict) or item.get("evidence") == "NOT_MEASURED":
+            return "—"
+        value = item.get("value")
+        if not isinstance(value, int | float) or not math.isfinite(value):
+            return "—"
+        return _table_money(float(value))
+
+    rows = []
+    for key, label_key in (
+        ("initial_capital", "recon_initial"),
+        ("cash_flows_after_start", "recon_flows"),
+        ("gross_closed_pnl", "recon_gross"),
+        ("itemised_costs", "recon_costs"),
+        ("net_closed_pnl", "recon_net"),
+        ("open_position_value", "recon_open"),
+        ("expected_final", "recon_expected"),
+        ("observed_final", "recon_observed"),
+        ("difference", "recon_difference"),
+        ("tolerance", "recon_tolerance"),
+    ):
+        item = recon.get(key)
+        evidence = (
+            str(item.get("evidence", "NOT_MEASURED")) if isinstance(item, dict) else "NOT_MEASURED"
+        )
+        rows.append(
+            f"<tr><th scope='row'>{_e(copy[label_key])}</th>"
+            f"<td class='val'>{_e(amount(key))}</td><td>{_badge(evidence)}</td></tr>"
+        )
+
+    coverage_items = []
+    if isinstance(coverage, dict):
+        for key, label_key in (
+            ("curve", "recon_curve"),
+            ("closed_trades", "recon_trades"),
+            ("trades_outside_curve", "recon_outside"),
+            ("flows", "recon_flow_coverage"),
+            ("open_positions", "recon_open_coverage"),
+            ("currency", "recon_currency_coverage"),
+            ("trade_currency", "recon_trade_currency"),
+            ("curve_currency", "recon_curve_currency"),
+        ):
+            if key in coverage:
+                value = str(coverage[key])
+                if key in ("trade_currency", "curve_currency") and value == "not supplied":
+                    value = copy["recon_currency_not_supplied"]
+                else:
+                    value = _recon_text(value, locale, RECON_COVERAGE_VALUES)
+                coverage_items.append(f"<li><b>{_e(copy[label_key])}:</b> {_e(value)}</li>")
+
+    return (
+        f"<p class='muted'>{_e(copy['recon_intro'])}</p>"
+        f"<p class='integrity-status {'bad' if status == 'CONTRADICTION' else 'neutral'}'>"
+        f"<strong>{_e(copy[status_key])}</strong> {_e(reason)}</p>"
+        f"<div class='recon-formulas'><p>{_e(copy['recon_net_equation'])}: "
+        f"{_e(amount('gross_closed_pnl'))} − {_e(amount('itemised_costs'))} = "
+        f"{_e(amount('net_closed_pnl'))}</p>"
+        f"<p>{_e(copy['recon_final_equation'])}: "
+        f"{_e(amount('initial_capital'))} + {_e(amount('cash_flows_after_start'))} + "
+        f"{_e(amount('net_closed_pnl'))} = {_e(amount('expected_final'))}</p>"
+        f"<small>{_e(currency_label)}</small></div>"
+        "<div class='tscroll'><table class='recon-table'><tbody>"
+        + "".join(rows)
+        + "</tbody></table></div>"
+        + (
+            f"<h3>{_e(copy['recon_coverage'])}</h3><ul class='recon-coverage'>"
+            + "".join(coverage_items)
+            + "</ul>"
+            if coverage_items
+            else ""
+        )
+    )
+
+
+def _forensics_html(forensics: dict[str, Any] | None, locale: str) -> str:
+    if not forensics:
+        return ""
+    copy = INTEGRITY_TEXT[locale]
+    checks = [check for check in forensics.get("checks", []) if isinstance(check, dict)]
+    signals = [check for check in checks if check.get("status") == "SIGNAL"]
+
+    def check_name(check: dict[str, Any]) -> str:
+        code = str(check.get("id", ""))
+        return copy["balance_chain"] if code == "BALANCE_CHAIN" else code.replace("_", " ").title()
+
+    signal_cards = []
+    for check in signals:
+        figures = "".join(
+            f"<li><b>{_e(str(figure[0]).replace('_', ' '))}:</b> {_e(figure[1])} "
+            f"{_badge(str(figure[2]))}</li>"
+            for figure in check.get("figures", [])
+            if isinstance(figure, list | tuple) and len(figure) == 3
+        )
+        calibration = dict(
+            (str(item[0]), str(item[1]))
+            for item in check.get("calibration", [])
+            if isinstance(item, list | tuple) and len(item) == 2
+        )
+        if calibration:
+            cal_line = copy["forensic_cal_line"].format(
+                date=calibration.get("frozen", "—"),
+                files=calibration.get("n", "—"),
+                groups=calibration.get("groups", "—"),
+                reserved=calibration.get("n_reserved", "—"),
+                unexplained=calibration.get("unexplained", "—"),
+                upper=calibration.get("cp95_upper_pct", "—"),
+            )
+        else:
+            cal_line = copy["forensic_uncalibrated"]
+        signal_cards.append(
+            f"<div class='forensic-signal'><h3>{_e(copy['forensic_signal'])}: "
+            f"{_e(check_name(check))} <code>{_e(check.get('id', ''))}</code></h3>"
+            + (f"<ul>{figures}</ul>" if figures else "")
+            + f"<p class='muted'>{_e(cal_line)}</p></div>"
+        )
+
+    all_rows = ""
+    for check in checks:
+        status = copy.get("check_" + str(check.get("status", "")).lower(), copy["check_info"])
+        calibration_state = (
+            copy["forensic_calibrated"]
+            if check.get("calibration")
+            else copy["forensic_uncalibrated"]
+        )
+        all_rows += (
+            f"<tr><th scope='row'><code>{_e(check.get('id', ''))}</code></th>"
+            f"<td>{_e(status)}</td><td>{_e(calibration_state)}</td></tr>"
+        )
+    checks_html = (
+        f"<details open class='detail report-detail forensic-all'><summary><h2>"
+        f"{_e(copy['forensic_checks'])}</h2></summary><div class='detail-body'>"
+        f"<div class='tscroll'><table><thead><tr><th>{_e(copy['forensic_check'])}</th>"
+        f"<th>{_e(copy['forensic_status'])}</th>"
+        f"<th>{_e(copy['forensic_calibration'])}</th></tr></thead>"
+        f"<tbody>{all_rows}</tbody></table></div></div></details>"
+        if checks
+        else ""
+    )
+    return (
+        f"<p class='muted'>{_e(copy['forensic_intro'])}</p>"
+        f"<p class='forensic-meta'>{_e(copy['forensic_version'])}: "
+        f"<code>{_e(forensics.get('method_version', '—'))}</code> · "
+        f"{_e(copy['forensic_family'])}: <code>{_e(forensics.get('family', '—'))}</code> · "
+        f"{_e(copy['forensic_rows'])}: {_e(forensics.get('rows_read', '—'))} "
+        f"{_badge('MEASURED')}</p>"
+        + (
+            f"<p class='integrity-status bad'>{_e(copy['forensic_truncated'])}</p>"
+            if forensics.get("truncated")
+            else ""
+        )
+        + ("".join(signal_cards) if signals else f"<p>{_e(copy['forensic_none'])}</p>")
+        + f"<p class='forensic-caveat'>{_e(copy['forensic_caveat'])}</p>"
+        + checks_html
+    )
 
 
 def _summary_in(data: dict[str, Any], locale: str) -> str:
@@ -6611,6 +7116,7 @@ def render_html(
     free_mode: bool = True,
     price_usd: float | None = None,
     checkout_url: str | None = None,
+    market_choices: tuple[str, ...] = (),
     redeem_url: str | None = None,
     publish_url: str | None = None,
     notice: str | None = None,
@@ -6634,7 +7140,8 @@ def render_html(
     ``locale`` shows the page in a language other than the one chosen at
     upload: the verdict sentence is rebuilt from its fixed templates and the
     engine's English notes are translated; the result itself is unchanged.
-    ``switch_url`` is the same page in the other language. ``head_meta`` is
+    ``switch_url`` identifies the same report in another language; it is used
+    to build links for all three supported languages. ``head_meta`` is
     the page's search and preview tags; without it the page is ``noindex``,
     as every client report is.
 
@@ -6695,6 +7202,35 @@ def render_html(
         )
     if locked and checkout_url:
         # Card payment is the main way to pay; the pack is the second button.
+        market_caption = {
+            "es": "País de facturación",
+            "en": "Billing country",
+            "pt": "País de cobrança",
+        }
+        market_prompt = {
+            "es": "Elige tu país",
+            "en": "Choose your country",
+            "pt": "Escolha seu país",
+        }
+        market_names = {
+            "MX": {"es": "México", "en": "Mexico", "pt": "México"},
+            "US": {"es": "Estados Unidos", "en": "United States", "pt": "Estados Unidos"},
+            "BR": {"es": "Brasil", "en": "Brazil", "pt": "Brasil"},
+            "ES": {"es": "España", "en": "Spain", "pt": "Espanha"},
+        }
+        market_select = (
+            "<label for='billing-country'>"
+            f"{_e(market_caption[locale])}</label>"
+            "<select id='billing-country' name='billing_country' required>"
+            f"<option value='' selected disabled>{_e(market_prompt[locale])}</option>"
+            + "".join(
+                f"<option value='{country}'>{_e(market_names[country][locale])}</option>"
+                for country in market_choices
+            )
+            + "</select>"
+            if market_choices
+            else ""
+        )
         pack_button = (
             "<button class='btn btn-ghost btn-lg' type='submit' name='plan' value='pack'>"
             f"{_e(labels['pay_pack'].format(price=pack_price_usd))}</button>"
@@ -6704,6 +7240,7 @@ def render_html(
         paybox = (
             f"<form class='paybox buy' method='post' action='{_e(checkout_url)}'>"
             + price_html
+            + market_select
             + "<div><div class='inline-form'>"
             "<button class='btn btn-primary btn-lg' type='submit' name='plan' value='single'>"
             f"{icon('card')}{_e(labels['pay'])}</button>{pack_button}</div>"
@@ -7255,8 +7792,31 @@ def render_html(
             f"{_e(labels['sample_full'])}</a></p>{paybox}</div>"
         )
     else:
+        # The verdict, urgent findings, costs, risk and missing-data notices
+        # stay visible. Long secondary analyses can be opened individually.
+        visible_detail = {
+            labels[key]
+            for key in (
+                "plan",
+                "live",
+                "account",
+                "test_data",
+                "risk",
+                "reasons_detail",
+                "costs",
+                "red_flags",
+            )
+        }
         detail_html = "".join(
-            f"<section class='detail' id='r-d{i}'><h2>{_e(title)}</h2>{body}</section>"
+            (
+                f"<section class='detail' id='r-d{i}'><h2>{_e(title)}</h2>{body}</section>"
+                if title in visible_detail
+                else (
+                    f"<details open class='detail report-detail' id='r-d{i}'>"
+                    f"<summary><h2>{_e(title)}</h2></summary>"
+                    f"<div class='detail-body'>{body}</div></details>"
+                )
+            )
             for i, (title, body) in enumerate(detail, 1)
         )
 
@@ -7275,33 +7835,22 @@ def render_html(
     elif pdf_url and not locked:
         print_html = (
             f"<a class='print-btn' href='{_e(pdf_url)}' download "
-            f"data-busy='{_e(labels['pdf_busy'])}'>{_e(labels['pdf'])}</a>"
+            f"data-busy='{_e(labels['pdf_busy'])}' aria-label='{_e(labels['pdf'])}'>"
+            f"<span class='print-long'>{_e(labels['pdf'])}</span>"
+            "<span class='print-short' aria-hidden='true'>PDF</span></a>"
         )
     else:
         print_html = (
-            "<button type='button' class='print-btn' "
-            f"onclick='window.print()'>{_e(labels['print'])}</button>"
+            f"<button type='button' class='print-btn' aria-label='{_e(labels['print'])}' "
+            f"onclick='window.print()'><span class='print-long'>{_e(labels['print'])}</span>"
+            "<span class='print-short' aria-hidden='true'>PDF</span></button>"
         )
     account_href = {"es": "/cuenta", "pt": "/pt/conta"}.get(locale, "/account")
-    en_url = (switch_url or "").replace("lang=es", "lang=en")
-    two_switches = locale == "pt" and "lang=es" in (switch_url or "")
-    short_es = " data-short='ES'" if two_switches else ""
     toolbar = (
         "<div class='nav-end no-print'>"
         + f"<a class='nav-account' href='{account_href}'>{_e(labels['my_account'])}</a> "
         + print_html
-        + (
-            f" <a class='lang-switch' href='{_e(switch_url)}' hreflang='{_e(_other(locale))}'"
-            # Two languages on a narrow phone read as ES and EN (theme.py).
-            f"{short_es}>{_e(labels['switch'])}</a>"
-            if switch_url
-            else ""
-        )
-        + (
-            f" <a class='lang-switch' href='{_e(en_url)}' hreflang='en' data-short='EN'>English</a>"
-            if two_switches
-            else ""
-        )
+        + _report_language_links(locale, switch_url, labels["report_languages"])
         + "</div>"
     )
     home = {"en": "/en", "pt": "/pt"}.get(locale, "/")
@@ -7391,8 +7940,13 @@ def render_html(
     )
     kpis_html = _kpis_html(data, labels, locked=locked)
     reading_html = _reading_html(data, labels)
+    recon_html = _reconciliation_html(data.get("reconciliation"), locale)
+    forensics_html = _forensics_html(data.get("forensics"), locale)
     sections = [
         section(labels["reading"], reading_html, "r-reading") if reading_html else "",
+        section(INTEGRITY_TEXT[locale]["recon_title"], recon_html, "r-reconciliation")
+        if recon_html
+        else "",
         section(labels["kpis"], kpis_html, "r-kpis") if kpis_html else "",
         section(
             labels["meaning"],
@@ -7416,6 +7970,9 @@ def render_html(
         section(
             labels["flags_free"], _flags_free_html(data["red_flags"], locale, labels), "r-flags"
         ),
+        section(INTEGRITY_TEXT[locale]["forensic_title"], forensics_html, "r-forensics")
+        if forensics_html
+        else "",
         section(labels["plan"], _plan_html(data, locale, labels, locked=True), "r-plan")
         if locked
         else "",
@@ -7629,6 +8186,7 @@ def render(
     free_mode: bool = True,
     price_usd: float | None = None,
     checkout_url: str | None = None,
+    market_choices: tuple[str, ...] = (),
     redeem_url: str | None = None,
     publish_url: str | None = None,
     notice: str | None = None,
@@ -7654,6 +8212,7 @@ def render(
         free_mode=free_mode,
         price_usd=price_usd,
         checkout_url=checkout_url,
+        market_choices=market_choices,
         redeem_url=redeem_url,
         publish_url=publish_url,
         notice=notice,

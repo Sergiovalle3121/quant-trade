@@ -8,6 +8,7 @@ import json
 from pathlib import Path
 
 import pytest
+from audit_fixtures import clean_mt5_tester_bytes
 
 from quant_trade.audit import importers
 from quant_trade.audit.forensics import families, rows
@@ -34,8 +35,13 @@ def _bytes(name: str) -> bytes:
     return (FIXTURES / name).read_bytes()
 
 
-def _edit(name: str, old: str, new: str) -> bytes:
+def _control_bytes(name: str) -> bytes:
     data = _bytes(name)
+    return clean_mt5_tester_bytes(data) if name == "mt5_tester.html" else data
+
+
+def _edit(name: str, old: str, new: str) -> bytes:
+    data = _control_bytes(name)
     assert data.count(old.encode("utf-8")) == 1, (name, old)
     return data.replace(old.encode("utf-8"), new.encode("utf-8"))
 
@@ -79,7 +85,7 @@ def _assert_well_formed(outcome: RawOutcome) -> None:
 
 @pytest.mark.parametrize("name", HTML_FIXTURES + CSV_FIXTURES)
 def test_totals_fixture_is_clean(name: str) -> None:
-    table, ctx = _load(_bytes(name), name)
+    table, ctx = _load(_control_bytes(name), name)
     outcome = totals.run_TOTALS_VS_ROWS(table, ctx)
     _assert_well_formed(outcome)
     assert not outcome.not_measured
@@ -175,7 +181,9 @@ def test_totals_reports_the_importers_balance_breaks_without_a_hit() -> None:
     outcome = totals.run_TOTALS_VS_ROWS(table, ctx)
     assert outcome.hits == 0
     assert not outcome.not_measured
-    assert _figures(outcome)["importer_balance_breaks"] == ("2", MEASURED)
+    # Reconstruction uses row P&L, so one bad printed cell is one break and
+    # cannot propagate a false break into the following row.
+    assert _figures(outcome)["importer_balance_breaks"] == ("1", MEASURED)
 
 
 def test_totals_parses_prefixed_lines_with_thousands_commas() -> None:
@@ -313,7 +321,7 @@ def test_totals_without_any_warning_is_clean_when_the_format_declares_totals() -
 def test_identities_fixture_is_clean(
     name: str, evaluated: str, measured: dict[str, tuple[str, str]], skipped: tuple[str, ...]
 ) -> None:
-    table, ctx = _load(_bytes(name), name)
+    table, ctx = _load(_control_bytes(name), name)
     outcome = totals.run_SUMMARY_IDENTITIES(table, ctx)
     _assert_well_formed(outcome)
     assert not outcome.not_measured
@@ -592,7 +600,7 @@ def test_identities_no_declared_totals_when_no_identity_can_run() -> None:
 
 @pytest.mark.parametrize("name", HTML_FIXTURES)
 def test_review_runs_both_checks_clean(name: str) -> None:
-    data = _bytes(name)
+    data = _control_bytes(name)
     source_format = importers.detect_format(data, name)
     report = importers.import_report(data, name)
     result = review(data, source_format=source_format, imported_warnings=report.warnings)

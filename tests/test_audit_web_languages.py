@@ -62,8 +62,8 @@ def test_every_public_page_exists_in_both_languages(tmp_path: Path) -> None:
     # Spanish stays the default on the addresses already shared.
     assert "Sube tu backtest" in client.get("/").text
     assert "Upload your backtest" in client.get("/en").text
-    assert "/sample?lang=en" in client.get("/ejemplo").text
-    assert "/ejemplo?lang=es" in client.get("/sample").text
+    assert "href='/sample' hreflang='en'" in client.get("/ejemplo").text
+    assert "href='/ejemplo' hreflang='es'" in client.get("/sample").text
 
 
 def test_the_report_opens_in_its_upload_language_and_switches(tmp_path: Path) -> None:

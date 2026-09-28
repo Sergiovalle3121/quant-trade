@@ -66,7 +66,7 @@ def _upload(client: TestClient) -> tuple[str, str]:
 
 
 @pytest.mark.parametrize("ctx", CONTEXTS)
-@pytest.mark.parametrize("locale", ["es", "en"])
+@pytest.mark.parametrize("locale", ["es", "en", "pt"])
 def test_both_texts_pass_the_guard_in_every_mode(ctx: LegalContext, locale: str) -> None:
     for text in (terms_text(ctx, locale), privacy_text(ctx, locale)):
         page = legal_page(text, locale=locale)
@@ -75,7 +75,11 @@ def test_both_texts_pass_the_guard_in_every_mode(ctx: LegalContext, locale: str)
 
 
 def test_unconfigured_operator_shows_a_placeholder_and_a_warning() -> None:
-    for locale, placeholder in (("es", "[sin configurar]"), ("en", "[not configured]")):
+    for locale, placeholder in (
+        ("es", "[sin configurar]"),
+        ("en", "[not configured]"),
+        ("pt", "[não configurado]"),
+    ):
         text = terms_text(LegalContext(), locale)
         assert text.warning
         page = legal_page(text, locale=locale)
@@ -85,6 +89,9 @@ def test_unconfigured_operator_shows_a_placeholder_and_a_warning() -> None:
     page = legal_page(configured, locale="es")
     for value in OPERATOR.values():
         assert value in page
+    assert "pendente de revisão jurídica local" in legal_page(
+        terms_text(LegalContext(**OPERATOR), "pt"), locale="pt"
+    )
 
 
 def test_privacy_describes_what_the_store_keeps() -> None:
@@ -93,12 +100,50 @@ def test_privacy_describes_what_the_store_keeps() -> None:
     )
     es = legal_page(privacy_text(ctx, "es"), locale="es")
     en = legal_page(privacy_text(ctx, "en"), locale="en")
+    pt = legal_page(privacy_text(ctx, "pt"), locale="pt")
     for needle in ("21 días", "IP", "7 subidas", "Stripe", "hash", "verificación", "bróker"):
         assert needle in es
     for needle in ("21 days", "IP", "7 uploads", "Stripe", "hash", "verification", "broker"):
         assert needle in en
+    for needle in ("21 dias", "IP", "7 envios", "Stripe", "hash", "verificação", "corretora"):
+        assert needle in pt
     assert "https://stripe.com/privacy" in es
     assert OPERATOR["operator_contact"] in es
+
+
+@pytest.mark.parametrize(
+    ("locale", "declared", "observed", "order"),
+    [
+        (
+            "es",
+            "país de facturación que declaras",
+            "país de facturación observado por Stripe",
+            "asociados al pedido",
+        ),
+        (
+            "en",
+            "billing country you declare",
+            "billing country observed by Stripe",
+            "linked to the order",
+        ),
+        (
+            "pt",
+            "país de cobrança que você declara",
+            "país de cobrança observado pelo Stripe",
+            "associados ao pedido",
+        ),
+    ],
+)
+def test_privacy_discloses_both_checkout_billing_countries(
+    locale: str, declared: str, observed: str, order: str
+) -> None:
+    enabled = legal_page(
+        privacy_text(LegalContext(**OPERATOR, card_payments=True), locale), locale=locale
+    )
+    assert declared in enabled and observed in enabled and order in enabled
+
+    disabled = legal_page(privacy_text(LegalContext(**OPERATOR), locale), locale=locale)
+    assert declared not in disabled and observed not in disabled
 
 
 def test_terms_price_follows_the_payment_mode() -> None:
@@ -108,6 +153,56 @@ def test_terms_price_follows_the_payment_mode() -> None:
     assert "USD 19.00" in card and "Stripe" in card and "access code" not in card
     codes = legal_page(terms_text(CONTEXTS[3], "es"), locale="es")
     assert "código de acceso" in codes and "Stripe" not in codes
+    pt = legal_page(terms_text(CONTEXTS[2], "pt"), locale="pt")
+    assert "USD 19.00" in pt and "Stripe" in pt and "código de acesso" not in pt
+
+
+def test_email_legal_copy_follows_delivery_and_checkout_flag() -> None:
+    on = LegalContext(
+        **OPERATOR,
+        free_mode=False,
+        price_usd=29,
+        card_payments=True,
+        email_delivery_ready=True,
+        email_verification_required=True,
+    )
+    for locale, checkout in (
+        ("es", "Para pagar con tarjeta debes confirmar el correo"),
+        ("en", "To pay by card, confirm your account e-mail"),
+        ("pt", "Para pagar com cartão, confirme o e-mail"),
+    ):
+        terms = legal_page(terms_text(on, locale), locale=locale)
+        privacy = legal_page(privacy_text(on, locale), locale=locale)
+        assert checkout in terms
+        assert "24" in privacy and "30" in privacy
+        assert "Stripe" in privacy
+        assert find_claims(terms) == [] and find_claims(privacy) == []
+
+
+def test_legal_copy_matches_shared_file_and_purchase_notice_rules() -> None:
+    ctx = LegalContext(
+        **OPERATOR,
+        free_mode=False,
+        price_usd=29,
+        card_payments=True,
+        email_delivery_ready=True,
+        email_verification_required=True,
+    )
+    for locale, shared, notice, exception in (
+        ("es", "mismo archivo en otra cuenta elegible", "avisos de compra", "cambio de opinión"),
+        (
+            "en",
+            "same file on another eligible account",
+            "purchase or additional-charge",
+            "change of mind",
+        ),
+        ("pt", "mesmo arquivo em outra conta elegível", "avisos de compra", "mudança de ideia"),
+    ):
+        terms = legal_page(terms_text(ctx, locale), locale=locale)
+        privacy = legal_page(privacy_text(ctx, locale), locale=locale)
+        assert shared in terms and shared in privacy
+        assert notice in privacy
+        assert exception in terms
 
 
 def test_operator_values_are_escaped() -> None:
@@ -130,7 +225,7 @@ def test_settings_read_operator_details_without_defaults() -> None:
     assert settings.legal_configured
 
 
-def test_pages_are_served_in_both_languages_and_linked_everywhere(tmp_path: Path) -> None:
+def test_pages_are_served_in_three_languages_and_linked_everywhere(tmp_path: Path) -> None:
     client, _ = _client(tmp_path, **OPERATOR)
     for locale, paths in LEGAL_PATHS.items():
         for path in paths.values():
@@ -139,12 +234,20 @@ def test_pages_are_served_in_both_languages_and_linked_everywhere(tmp_path: Path
             assert f"lang='{locale}'" in response.text
             assert find_claims(response.text) == []
     assert "lang='en'" in client.get("/terminos?lang=en").text
+    assert "lang='pt'" in client.get("/terms?lang=pt").text
+    terms_pt = client.get("/pt/termos").text
+    privacy_pt = client.get("/pt/privacidade").text
+    assert "Termos do serviço" in terms_pt and "Política de privacidade" in privacy_pt
+    assert "/terminos?lang=es" in terms_pt and "/terms?lang=en" in terms_pt
+    assert "/pt/termos?lang=pt" in client.get("/pt/cadastro").text
     assert client.get("/health").json()["legal_configured"] is True
 
     audit_id, token = _upload(client)
     pages = {
         "landing": client.get("/").text,
         "landing_en": client.get("/?lang=en").text,
+        "landing_pt": client.get("/pt").text,
+        "signup_pt": client.get("/pt/cadastro").text,
         "report": client.get(f"/audits/{audit_id}?token={token}").text,
         "sample": client.get("/ejemplo").text,
         "error": client.get("/audits/nope?token=x").text,
@@ -152,8 +255,10 @@ def test_pages_are_served_in_both_languages_and_linked_everywhere(tmp_path: Path
     public = client.post(f"/audits/{audit_id}/publish?token={token}", follow_redirects=False)
     pages["verification"] = client.get(public.headers["location"]).text
     for name, page in pages.items():
-        assert "/terminos?lang=es" in page or "/terms?lang=en" in page, name
-        assert "/privacidad?lang=es" in page or "/privacy?lang=en" in page, name
+        terms = ("/terminos?lang=es", "/terms?lang=en", "/pt/termos?lang=pt")
+        privacy = ("/privacidad?lang=es", "/privacy?lang=en", "/pt/privacidade?lang=pt")
+        assert any(path in page for path in terms), name
+        assert any(path in page for path in privacy), name
     # Next to the upload form, not only in the footer.
     form = pages["landing"].split("action='/audits'")[1].split("</form>")[0]
     assert "/terminos?lang=es" in form and "/privacidad?lang=es" in form
@@ -165,6 +270,9 @@ def test_consent_uses_the_configured_retention() -> None:
     # Every page links both legal pages from its footer.
     foot = error_page("x", locale="en").split("<footer", 1)[1]
     assert "href='/terms?lang=en'" in foot and "href='/privacy?lang=en'" in foot
+    foot_pt = error_page("x", locale="pt").split("<footer", 1)[1]
+    assert "href='/pt/termos?lang=pt'" in foot_pt
+    assert "href='/pt/privacidade?lang=pt'" in foot_pt
 
 
 def test_health_reports_missing_operator_details(tmp_path: Path) -> None:
@@ -336,7 +444,7 @@ def test_card_payment_wording_appears_only_while_cards_are_on() -> None:
         card_payments=True,
         pack_price_usd=69,
     )
-    for locale in ("es", "en"):
+    for locale in ("es", "en", "pt"):
         for text in (terms_text(off, locale), privacy_text(off, locale)):
             page = legal_page(text, locale=locale)
             assert "Stripe" not in page and find_claims(page) == []
@@ -350,5 +458,13 @@ def test_card_payment_wording_appears_only_while_cards_are_on() -> None:
     assert "hash de su código de acceso" in privacy_es
     privacy_en = legal_page(privacy_text(on, "en"), locale="en")
     assert "e-mail address you type on its checkout" in privacy_en
-    for page in (terms_es, terms_en, privacy_es, privacy_en):
+    terms_pt = legal_page(terms_text(on, "pt"), locale="pt")
+    assert "mesmo cartão pelo Stripe" in terms_pt and "USD 23.00" in terms_pt
+    assert "USD 29.00" in terms_pt and "USD 69.00" in terms_pt
+    assert "cobrança duplicada" in terms_pt
+    assert "até 5 créditos por mês civil" in terms_pt
+    privacy_pt = legal_page(privacy_text(on, "pt"), locale="pt")
+    assert "e-mail digitado em sua página de pagamento" in privacy_pt
+    assert "hash do código de acesso" in privacy_pt
+    for page in (terms_es, terms_en, terms_pt, privacy_es, privacy_en, privacy_pt):
         assert find_claims(page) == []

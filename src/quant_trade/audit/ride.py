@@ -130,11 +130,15 @@ def ride_review(frame: pd.DataFrame) -> dict[str, Any]:
     else:
         review["worst_day"] = not_measured("the curve has no point on most days")
 
-    monthly = series.groupby(series.index.tz_localize(None).to_period("M")).last()
+    by_month = series.groupby(series.index.tz_localize(None).to_period("M"))
+    monthly = by_month.last()
+    if len(monthly) > 1 and int(by_month.size().iloc[0]) == 1:
+        # The first observation is the base, not a zero-return month.
+        monthly = monthly.iloc[1:]
+    periods = monthly.index
     # The first month is measured from the first point of the file.
     monthly = pd.concat([pd.Series([float(equity.iloc[0])]), monthly.reset_index(drop=True)])
     month_returns = monthly.pct_change().dropna().reset_index(drop=True)
-    periods = series.index.tz_localize(None).to_period("M").unique()
     if len(month_returns) >= MIN_MONTHS:
         worst = int(month_returns.idxmin())
         review["months"] = measured(len(month_returns))

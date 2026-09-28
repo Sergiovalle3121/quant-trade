@@ -317,11 +317,21 @@ def scan(
                 )
             )
         if recomputed_pnl is not None:
-            reported = [
-                (client, ours)
-                for client, ours in zip(trades.client_pnl, recomputed_pnl, strict=True)
-                if client is not None
-            ]
+            charged = trades.fees if trades.fees is not None else [0.0] * len(recomputed_pnl)
+            reported = []
+            for client, gross_value, fee in zip(
+                trades.client_pnl, recomputed_pnl, charged, strict=True
+            ):
+                if client is None:
+                    continue
+                net_value = gross_value - fee
+                if trades.client_pnl_basis == "net":
+                    expected = net_value
+                elif trades.client_pnl_basis == "ambiguous":
+                    expected = min((gross_value, net_value), key=lambda value: abs(client - value))
+                else:
+                    expected = gross_value
+                reported.append((client, expected))
             if reported:
                 gross = sum(abs(ours) for _, ours in reported)
                 # A difference within half the file's printed precision is rounding.
@@ -788,6 +798,18 @@ FLAG_TITLES: dict[str, dict[str, str]] = {
     "TRADES_EQUITY_UNRELATED": {
         "es": "Operaciones que no se mueven con la curva",
         "en": "Trades that do not move with the curve",
+    },
+    "MONETARY_RECONCILIATION_MISMATCH": {
+        "es": "El balance final impreso no cuadra con las operaciones",
+        "en": "Printed final balance does not match the trade ledger",
+    },
+    "MONETARY_RECONCILIATION_UNEXPLAINED": {
+        "es": "La curva y las operaciones tienen una diferencia sin explicar",
+        "en": "Curve and trades have an unexplained difference",
+    },
+    "FORENSIC_BALANCE_CHAIN_SIGNAL": {
+        "es": "Señal heurística en la cadena de balances",
+        "en": "Heuristic balance-chain signal",
     },
     "GAIN_INFLATED_BY_FLOWS": {
         "es": "El % de ganancia no refleja el dinero",

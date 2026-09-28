@@ -8,6 +8,7 @@ import importlib
 from pathlib import Path
 
 import pytest
+from audit_fixtures import clean_mt5_tester_bytes
 
 from quant_trade.audit import importers
 from quant_trade.audit.forensics import (
@@ -43,6 +44,8 @@ ALL_FIXTURES = sorted(path.name for path in FIXTURES.iterdir() if path.suffix !=
 
 def _review(name: str):
     data = (FIXTURES / name).read_bytes()
+    if name == "mt5_tester.html":
+        data = clean_mt5_tester_bytes(data)
     return review(data, source_format=importers.detect_format(data))
 
 

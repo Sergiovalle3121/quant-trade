@@ -136,7 +136,9 @@ def test_the_report_shows_both_sections_in_both_languages() -> None:
     es = render_html(result, watermark=False)
     assert "¿Cuánto queda al descontar la suerte?</h2>" in es
     assert "Supera a la suerte, sin margen" in es
-    assert "la confianza de que no sea suerte (DSR) es del 91%" in es
+    dsr = data["multiplicity"]["dsr_at_trials_used"]["value"]
+    assert 0.90 <= dsr < 0.95
+    assert f"la confianza de que no sea suerte (DSR) es del {dsr:.0%}" in es
     assert "Sharpe que darían 120 configuraciones sin habilidad" in es
     assert "Cómo se vivió este historial</h2>" in es
     assert "Tiempo más largo sin un nuevo máximo" in es

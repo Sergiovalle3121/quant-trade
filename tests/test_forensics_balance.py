@@ -13,6 +13,7 @@ import re
 from pathlib import Path
 
 import pytest
+from audit_fixtures import clean_mt5_tester_bytes
 from test_audit_importers import _as_workbook_rows, xlsx
 
 from quant_trade.audit import importers
@@ -63,7 +64,17 @@ HISTORY_COST_ROW = (
 
 
 def _fixture(name: str) -> bytes:
-    return (FIXTURES / name).read_bytes()
+    data = (FIXTURES / name).read_bytes()
+    return clean_mt5_tester_bytes(data) if name == "mt5_tester.html" else data
+
+
+def test_committed_mt5_tester_balance_tamper_is_detected() -> None:
+    raw = (FIXTURES / "mt5_tester.html").read_bytes()
+    outcome = _run("BALANCE_CHAIN", raw)
+    assert outcome.hits == 1
+    assert outcome.examples == (32,)
+    assert _figures(outcome)["largest_gap"] == "1000.00"
+    assert _importer_breaks(raw, "mt5_tester.html") == 1
 
 
 def _load(data: bytes, source_format: str | None = "") -> tuple[rows.RawTable, Context]:
@@ -456,15 +467,16 @@ def test_balance_chain_unknown_format() -> None:
         ("mt4_tester.htm", "<td class=mspt>10069.60</td>", "<td class=mspt>10060.60</td>"),
     ],
 )
-def test_balance_chain_agrees_with_the_importer_on_a_seeded_break(
+def test_balance_chain_and_importer_count_the_distinct_effects_of_a_seeded_break(
     name: str, old: str, new: str
 ) -> None:
-    """One edited trade balance, followed by another trade: the importer
-    counts the edited row and its successor, as the chain does."""
+    """A chained printed balance breaks twice; P&L reconstruction finds its
+    edited cell once, without propagating the error to the next row."""
     clean = _fixture(name)
     assert _run("BALANCE_CHAIN", clean).hits == _importer_breaks(clean, name) == 0
     seeded = _altered(clean, old, new)
-    assert _run("BALANCE_CHAIN", seeded).hits == _importer_breaks(seeded, name) == 2
+    assert _run("BALANCE_CHAIN", seeded).hits == 2
+    assert _importer_breaks(seeded, name) == 1
 
 
 def test_balance_chain_chains_flows_the_importer_ignores() -> None:

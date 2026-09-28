@@ -12,7 +12,7 @@ import pytest
 from quant_trade.audit import analytics, charts, plan, redflags, report, report_pt, sizing, verdict
 from quant_trade.audit.guard import find_claims
 from quant_trade.audit.i18n import localize, untranslated
-from quant_trade.audit.pdf import footer_text
+from quant_trade.audit.pdf import available, footer_text
 from quant_trade.audit.report import render_html
 from quant_trade.audit.sample import sample_result
 from quant_trade.audit.schema import AuditResult
@@ -257,6 +257,18 @@ def test_an_upload_in_portuguese_opens_a_portuguese_report(tmp_path: Any) -> Non
     # The same report opens in Spanish and English on request, and back in Portuguese.
     assert "<html lang='es'>" in client.get(f"{location}&lang=es").text
     assert "<html lang='pt'>" in client.get(f"{location}&lang=pt").text
+    # Navigation works in both directions without dropping the private token.
+    for source in ("es", "en", "pt"):
+        source_page = client.get(f"{location}&lang={source}").text
+        for target in {"es", "en", "pt"} - {source}:
+            link = re.search(
+                rf"<a class='lang-switch' href='([^']+)' hreflang='{target}'",
+                source_page,
+            )
+            assert link is not None
+            translated = client.get(html.unescape(link.group(1)))
+            assert translated.status_code == 200
+            assert f"<html lang='{target}'>" in translated.text
     # A language no report has falls back to the one chosen at upload.
     assert "<html lang='pt'>" in client.get(f"{location}&lang=fr").text
 
@@ -267,11 +279,21 @@ def test_the_sample_report_has_a_portuguese_address(tmp_path: Any) -> None:
     assert page.status_code == 200
     assert page.text.startswith("<!doctype html><html lang='pt'>")
     assert "dados sintéticos" in page.text
-    assert "href='/pt/exemplo.pdf'" in page.text or "pdf" not in page.text.lower()
+    assert ("href='/pt/exemplo.pdf'" in page.text) == available()
     assert find_claims(page.text) == []
     # The Portuguese landing links it, and search engines see all three languages.
     assert "href='/pt/exemplo'" in client.get("/pt").text
     assert "/pt/exemplo" in client.get("/sitemap.xml").text
+    for source in ("es", "en", "pt"):
+        source_path = {"es": "/ejemplo", "en": "/sample", "pt": "/pt/exemplo"}[source]
+        source_page = client.get(source_path).text
+        for target in {"es", "en", "pt"} - {source}:
+            link = re.search(
+                rf"<a class='lang-switch' href='([^']+)' hreflang='{target}'",
+                source_page,
+            )
+            assert link is not None
+            assert f"<html lang='{target}'>" in client.get(html.unescape(link.group(1))).text
 
 
 def test_a_portuguese_report_speaks_of_the_account_in_portuguese(tmp_path: Any) -> None:

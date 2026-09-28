@@ -2,8 +2,8 @@
 
 Sign-up, sign-in, "Minha conta", password recovery, the upload gates and
 "Minhas estratégias" read in Portuguese at ``/pt/cadastro``, ``/pt/entrar``
-and ``/pt/conta``. The report itself, its PDF and the compare page still open
-in English from here, as ``portuguese.link_locale`` says. Every sentence
+and ``/pt/conta``. The report, legal pages and comparison also exist in
+Portuguese. Every sentence
 keeps the limits of the Spanish and English text and passes the
 profit-claim guard.
 """
@@ -166,8 +166,9 @@ COPY_PT: dict[str, str] = {
         "O endereço IP de cada envio, para os limites de uso; apagamos após {days} dias.|"
         "Seus códigos e compras, com data. Nunca vemos nem guardamos os dados do seu cartão: "
         "o pagamento com cartão é processado pela Stripe.|"
-        "Uma marca aleatória do seu navegador e a impressão digital do arquivo, só para dar o "
-        "relatório grátis uma vez. Elas ficam mesmo se você apagar a conta, sem o seu e-mail.|"
+        "Uma marca aleatória do navegador para limitar a oferta gratuita e a impressão "
+        "digital do arquivo para revisar seu uso. Um arquivo idêntico não bloqueia por si "
+        "só outra conta elegível. Elas ficam sem seu e-mail mesmo se você apagar a conta.|"
         "Se você entrou pelo link de um colega ou alguém entra pelo seu: a data, se já houve o "
         "primeiro relatório e uma marca aleatória do navegador (um hash), para evitar "
         "autoconvites. Ninguém vê quem entrou. É apagado com a conta de quem convida; se quem "
@@ -235,17 +236,24 @@ COPY_PT: dict[str, str] = {
     "invite_unit_many": "créditos",
     "invite_label": "Seu link pessoal",
     "invite_share": "Enviar pelo WhatsApp",
+    "invite_telegram": "Compartilhar no Telegram",
+    "invite_reddit": "Preparar link no Reddit",
+    "invite_copy": "Copiar link",
+    "invite_copied": "Link copiado",
+    "invite_native": "Compartilhar…",
     "invite_share_text": (
         "Conheça o Rigor: você envia seu backtest ou histórico e recebe uma auditoria "
-        "independente. O primeiro relatório completo é grátis:"
+        "independente. O primeiro relatório completo é grátis. Se você concluí-lo pelo meu "
+        "link, eu recebo um crédito:"
     ),
     "invite_joined": "Entraram com seu link",
     "invite_waiting": "Aguardam o primeiro relatório",
     "invite_credited": "Créditos recebidos",
     "invite_month": "Este mês: {n} de {cap}",
     "invite_rules": (
-        "Só contam contas novas de outras pessoas: não do seu mesmo navegador nem da sua "
-        "mesma rede. O crédito aparece em «Seus códigos de acesso» e é usado como qualquer "
+        "Só contam contas novas de outras pessoas: não do seu mesmo navegador. Compartilhar "
+        "uma rede não prova que sejam a mesma pessoa. O crédito aparece em «Seus códigos de "
+        "acesso» e é usado como qualquer "
         "outro. Nunca mostramos quem entrou."
     ),
     "invited_banner": (
@@ -253,12 +261,46 @@ COPY_PT: dict[str, str] = {
     ),
     "change_password": "Trocar senha",
     "change_email": "Trocar e-mail",
+    "email_status_title": "E-mail da sua conta",
+    "email_verified_status": "E-mail confirmado.",
+    "email_unverified_status": (
+        "Seu e-mail ainda não foi confirmado. Seu primeiro relatório completo gratuito "
+        "continua disponível; confirme o e-mail para comprar relatórios ou receber créditos "
+        "por indicações."
+    ),
+    "email_delivery_unavailable": (
+        "O envio de e-mails não está disponível agora. Você pode usar seu primeiro relatório "
+        "gratuito; compras e créditos por indicações exigem confirmação."
+    ),
+    "email_request_button": "Enviar link de confirmação",
+    "email_pending_note": (
+        "Troca pendente para {email}. Continue entrando com o e-mail atual até abrir o "
+        "link enviado ao novo."
+    ),
+    "email_verification_sent": (
+        "Se pudermos enviar para este endereço, você receberá um link para confirmá-lo."
+    ),
+    "email_pending": ("A troca está pendente. Abra o link enviado ao novo e-mail para concluí-la."),
+    "email_verified": "E-mail confirmado. Você já pode usar compras e recompensas disponíveis.",
+    "email_checkout_required": (
+        "Confirme seu e-mail em Minha conta antes de pagar. Seu primeiro relatório "
+        "completo gratuito continua disponível."
+    ),
     "email_now": "Você entra com {email}. Depois da troca, você entra com o e-mail novo.",
     "email_new": "E-mail novo",
     "email_again": "Repita o e-mail novo",
     "email_help": (
         "Ainda não enviamos e-mails para confirmá-lo: confira se está bem escrito. Encerramos "
         "suas outras sessões."
+    ),
+    "email_help_pending": (
+        "O e-mail atual continua ativo até você abrir o link enviado ao novo. Depois disso, "
+        "as outras sessões serão encerradas."
+    ),
+    "email_change_request": "Enviar confirmação ao e-mail novo",
+    "email_change_unavailable": (
+        "A troca de e-mail precisa esperar o envio de mensagens voltar. O e-mail atual "
+        "continua ativo."
     ),
     "email_passkey_note": (
         "Suas chaves de acesso continuam funcionando; seu celular ou computador pode continuar "
@@ -284,6 +326,19 @@ COPY_PT: dict[str, str] = {
     "delete_button": "Apagar minha conta",
     "deleted": "Sua conta foi apagada.",
     "forgot_title": "Recuperar sua senha",
+    "forgot_email_title": "Receber um link por e-mail",
+    "forgot_email_help": (
+        "Digite o e-mail da sua conta. Se ela existir e pudermos enviar mensagens, você "
+        "receberá um link de uso único. Não mostramos se há uma conta com esse e-mail."
+    ),
+    "forgot_email_button": "Solicitar link",
+    "forgot_email_lead": (
+        "Você também pode usar a chave de recuperação. Se o link não chegar, escreva para nós."
+    ),
+    "email_reset_requested": (
+        "Se houver uma conta com esse endereço e o envio estiver disponível, chegará "
+        "um link para trocar a senha."
+    ),
     "forgot_lead": (
         "Ainda não enviamos e-mails. Escreva para nós a partir do e-mail da sua conta e "
         "enviamos um link de uso único para criar uma nova senha."
@@ -500,6 +555,13 @@ COPY_PT: dict[str, str] = {
     "two_step_expired": "A etapa do código expirou. Entre de novo com sua senha.",
     "reset_title": "Criar uma nova senha",
     "reset_lead": "Este link funciona uma vez e expira em 24 horas.",
+    "reset_email_lead": "Este link funciona uma vez e expira em uma hora.",
+    "email_confirm_title": "Confirme este link de e-mail",
+    "email_confirm_lead": (
+        "A confirmação acontece quando você aperta o botão. Se não pediu para "
+        "verificar ou mudar seu e-mail, feche esta página."
+    ),
+    "email_confirm_button": "Confirmar e-mail",
     "reset_button": "Salvar senha",
     "reset_bad": "Este link já foi usado ou expirou. Peça um novo.",
     "reset_done": "Senha salva. Entre com ela.",

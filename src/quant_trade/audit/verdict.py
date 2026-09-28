@@ -116,13 +116,21 @@ def _dimension(
 def assess_statistical(
     *,
     psr: float | None,
+    unadjusted_psr: float | None = None,
     bootstrap_p5_sharpe: float | None,
     observations: int,
     thresholds: Thresholds = DEFAULT_THRESHOLDS,
     not_measured_reason: str | None = None,
 ) -> Dimension:
     inputs = {
-        "psr": measured(psr) if psr is not None else not_measured("not computed"),
+        "psr": (
+            measured(psr, "serial-dependence adjusted when measurable")
+            if psr is not None
+            else not_measured("not computed")
+        ),
+        "psr_unadjusted": (
+            measured(unadjusted_psr) if unadjusted_psr is not None else not_measured("not computed")
+        ),
         "bootstrap_p5_sharpe_per_period": (
             measured(bootstrap_p5_sharpe)
             if bootstrap_p5_sharpe is not None
