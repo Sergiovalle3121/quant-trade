@@ -1315,3 +1315,67 @@ def test_mt5_symbols_keep_the_file_s_case() -> None:
     ]
     report = import_report(_mt5_deals_report(deals))
     assert report.symbols == ["EURUSD.m"]
+
+
+def _mt4_tester_with_rounding_drift(trades: int, edit_row: int | None = None) -> bytes:
+    """An MT4 tester report whose Profit cells are rounded to the cent while
+    the tester's Balance runs on the unrounded profit (1.004 a trade), so the
+    sum of printed profits falls a further 0.004 behind every trade."""
+    clean = (FIXTURES / "mt4_tester.htm").read_text()
+    head, _, rest = clean.partition("<tr align=right><td>1</td>")
+    _, _, tail = rest.partition("</table>")
+    rows: list[str] = []
+    balance = 10000.0
+    start = date(2024, 1, 2)
+    for trade in range(trades):
+        day = start + timedelta(days=trade // 4 + 2 * (trade // 20))
+        hour = 8 + 2 * (trade % 4)
+        balance += 1.004
+        printed = round(balance, 2) + (1000.0 if trade == edit_row else 0.0)
+        for number, kind, when, money in (
+            (2 * trade + 1, "buy", hour, ""),
+            (
+                2 * trade + 2,
+                "close",
+                hour + 1,
+                f"<td class=mspt>1.00</td><td class=mspt>{printed:.2f}</td>",
+            ),
+        ):
+            rows.append(
+                f"<tr align=right><td>{number}</td><td class=msdate>"
+                f"{day:%Y.%m.%d} {when:02d}:00</td><td>{kind}</td><td>{trade + 1}</td>"
+                "<td class=mspt>0.10</td><td>1.10000</td><td align=right>0.00000</td>"
+                f"<td align=right>0.00000</td>{money or '<td colspan=2></td>'}</tr>"
+            )
+    body = head + "\n".join(rows) + "\n</table>" + tail
+    return body.replace(
+        "<td align=right>95.10</td>", f"<td align=right>{trades * 1.004:.2f}</td>"
+    ).encode()
+
+
+def _balance_breaks(report: ImportedReport) -> int:
+    counts = [
+        int(match.group(1))
+        for warning in report.warnings
+        if (match := re.search(r"(\d+) Balance cell\(s\) do not equal", warning))
+    ]
+    return counts[0] if counts else 0
+
+
+def test_mt4_tester_rounding_drift_is_not_a_balance_break() -> None:
+    """Sub-cent rounding of the row amounts adds up to more than 0.30 over
+    100 trades; the chain restarts from each printed cell within rounding, so
+    it never counts a break, while one edited cell is still counted once."""
+    trades = 100
+    data = _mt4_tester_with_rounding_drift(trades)
+    report = import_report(data, "tester.htm")
+    assert report.source_format == MT4_TESTER_HTML
+    assert len(report.trades.trades) == trades
+    assert sum(trade.pnl for trade in report.trades.trades) == pytest.approx(100.0)
+    assert float(report.metadata["reported_final_balance"]) == pytest.approx(10100.40)
+    assert _balance_breaks(report) == 0
+    assert report.metadata["balance_chain_breaks"] == "0"
+
+    edited = import_report(_mt4_tester_with_rounding_drift(trades, edit_row=50), "tester.htm")
+    assert _balance_breaks(edited) == 1
+    assert edited.metadata["balance_chain_breaks"] == "1"

@@ -3399,6 +3399,14 @@ states USD; same units are an assumption, not verified conversion. Trades
 outside the curve or an uncovered last 1 %
 of its time span make the comparison `NOT_MEASURED`.
 
+The importer counts a printed Balance cell as a break only when it differs
+from the previous balance plus the row's money by more than printing rounding:
+the larger of 0.011 units (a cent plus float slack) and one part per million of
+the printed balance (`importers.balance_rounding`). Within that rounding the
+chain restarts from the printed cell, so sub-cent rounding of row amounts
+(0.33 over thousands of MT4 tester rows) cannot add up to false breaks; an
+edited cell is outside it, is counted once and is never adopted.
+
 A platform Balance cell which differs materially from the deal-money chain
 produces `MONETARY_RECONCILIATION_MISMATCH` (`FAIL` for data quality), and
 the return uses the reconstructed deal amounts. When the importer reports a
