@@ -59,6 +59,10 @@ COPY_PT: dict[str, str] = {
         "Esse e-mail é de um serviço de caixas temporárias. Use um e-mail que você mantenha: "
         "a confirmação e a recuperação da conta chegam nele."
     ),
+    "email_no_domain": (
+        "Não encontramos esse domínio de e-mail. Confira se está bem escrito: a confirmação "
+        "e a recuperação da conta chegam nele."
+    ),
     "password_short": f"A senha precisa de pelo menos {MIN_PASSWORD_CHARS} caracteres.",
     "password_long": "A senha é longa demais (no máximo 256 caracteres).",
     "password_bad": "A senha tem um caractere que não pode ser usado.",

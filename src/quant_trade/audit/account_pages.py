@@ -99,6 +99,10 @@ COPY: dict[str, dict[str, str]] = {
             "Ese correo es de un servicio de buzones temporales. Usa un correo que conserves: "
             "ahí te llegan la confirmación y la recuperación de tu cuenta."
         ),
+        "email_no_domain": (
+            "No encontramos ese dominio de correo. Revisa que esté bien escrito: ahí te llegan "
+            "la confirmación y la recuperación de tu cuenta."
+        ),
         "password_short": f"La contraseña necesita al menos {MIN_PASSWORD_CHARS} caracteres.",
         "password_long": "La contraseña es demasiado larga (máximo 256 caracteres).",
         "password_bad": "La contraseña tiene un carácter que no se puede usar.",
@@ -744,6 +748,10 @@ COPY: dict[str, dict[str, str]] = {
         "email_disposable": (
             "That address belongs to a temporary-inbox service. Use an address you keep: "
             "your account's confirmation and recovery go there."
+        ),
+        "email_no_domain": (
+            "We could not find that e-mail domain. Check the spelling: your account's "
+            "confirmation and recovery go there."
         ),
         "password_short": f"The password needs at least {MIN_PASSWORD_CHARS} characters.",
         "password_long": "The password is too long (256 characters at most).",

@@ -419,11 +419,6 @@ def terms_text(ctx: LegalContext, locale: str = "es") -> LegalText:
                         f"After it, the free preview needs an account: {FREE_PREVIEWS_PER_MONTH} "
                         "a calendar month per account, also counted per network address. Past "
                         "that, each file is a paid report. "
-                        + (
-                            "A report paid with an access code works without an account. "
-                            if ctx.access_codes
-                            else ""
-                        )
                         + "Each report's private link works without an account."
                         if not ctx.free_mode
                         else "The account is optional while the service is in free mode."
@@ -542,11 +537,6 @@ def terms_text(ctx: LegalContext, locale: str = "es") -> LegalText:
                     f"{FREE_PREVIEWS_PER_MONTH} por mes calendario y por cuenta, "
                     "contadas también por dirección de red. "
                     "Pasado ese número, cada archivo es un informe de pago. "
-                    + (
-                        "Un informe pagado con código de acceso funciona sin cuenta. "
-                        if ctx.access_codes
-                        else ""
-                    )
                     + "El enlace privado de cada informe funciona sin cuenta."
                     if not ctx.free_mode
                     else "La cuenta es opcional mientras el servicio está en modo gratuito."
@@ -638,11 +628,6 @@ def _terms_pt(
             "o acesso. Depois disso, a prévia gratuita exige uma conta: "
             f"{FREE_PREVIEWS_PER_MONTH} por mês civil por conta, também sujeitas aos limites "
             "por rede. Após esses limites, cada arquivo exige pagamento. "
-            + (
-                "Um relatório pago com código de acesso funciona sem conta. "
-                if ctx.access_codes
-                else ""
-            )
             + "O link privado de cada relatório funciona sem conta."
         )
         if not ctx.free_mode

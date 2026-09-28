@@ -1050,6 +1050,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     app.state.checkout_factory = payments.stripe_checkout
     app.state.account_checkout_factory = payments.stripe_account_checkout
     app.state.session_lookup = payments.stripe_session
+    app.state.mail_domain_check = inbox.domain_takes_mail
     app.state.pause_new_audits = pause_new_audits
     app.state.pause_new_checkout = pause_new_checkout
     upload_attempts = AttemptLog()
@@ -1772,6 +1773,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         "buy_review",
         "email_bad",
         "email_disposable",
+        "email_no_domain",
         "email_mismatch",
         "email_same",
         "email_taken",
@@ -1795,8 +1797,14 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     )
 
     def _referrals_on() -> bool:
-        # The reward is paid when the invitee's free first report exists.
-        return not cfg.free_mode and acct.WELCOME_FULL_REPORT and cfg.referral_rewards
+        # The reward is paid when the invitee's free first report exists and
+        # both addresses are confirmed, so without mail nothing is offered.
+        return (
+            not cfg.free_mode
+            and acct.WELCOME_FULL_REPORT
+            and cfg.referral_rewards
+            and cfg.email_delivery_ready
+        )
 
     def _note_invite(request: Request, account_id: str, token: str, now: datetime) -> None:
         """Note who invited a new account; a failure never breaks the sign-up."""
@@ -1921,6 +1929,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 return again("email_bad", 400)
             if inbox.is_disposable(clean):
                 return again("email_disposable", 400)
+            if cfg.check_email_domains and not app.state.mail_domain_check(clean):
+                return again("email_no_domain", 400)
             problem = acct.password_problem(password, email=clean)
             if problem:
                 return again(problem, 400)
@@ -3040,6 +3050,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 return refused("email_bad")
             if inbox.is_disposable(clean):
                 return refused("email_disposable")
+            if cfg.check_email_domains and not app.state.mail_domain_check(clean):
+                return refused("email_no_domain")
             if clean != acct.normalise_email(email_again):
                 return refused("email_mismatch")
             if clean == account.email:
@@ -3758,12 +3770,13 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         if not (0 < len(device) <= 128):
             device = new_device = acct.new_secret()
         if not cfg.free_mode:
+            session = _session(request)
+            # Account first: every upload, code or not, belongs to an account.
+            if session is None:
+                return _gate(request, report_loc, "signin", 401)
             typed = access_code.strip()[:_CODE_MAX] if cfg.access_codes_enabled else ""
             usable = bool(typed) and await run_in_threadpool(db.code_usable, typed, now)
-            session = _session(request)
-            if not usable and session is None:
-                return _gate(request, report_loc, "code" if typed else "signin", 401)
-            if not usable and session is not None:
+            if not usable:
                 gate_account = session[0]
         try:
             uploads = {
@@ -4633,6 +4646,9 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         location = f"/audits/{audit_id}?token={token or ''}&lang={locale}"
         if record.paid:
             return RedirectResponse(location, status_code=303)
+        if not cfg.free_mode and _session(request) is None:
+            # A code is redeemed from an account, so the report lands on its list.
+            return _signin_redirect(locale, next_path=location)
         # Each attempt counts toward the hourly per-IP limit, like an upload.
         ip = acct.network_address(_client_ip(request, cfg.trusted_proxy_hops))
         now = datetime.now(UTC)
