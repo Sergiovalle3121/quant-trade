@@ -32,7 +32,7 @@ import re
 import secrets
 from datetime import UTC, datetime
 from typing import Any
-from urllib.parse import urlsplit
+from urllib.parse import parse_qsl, urlencode, urlsplit
 
 #: scrypt cost: about 16 MB and a few tens of milliseconds per hash.
 SCRYPT_N = 2**14
@@ -118,6 +118,35 @@ def valid_email(value: str) -> bool:
     if any(not char.isprintable() for char in clean):
         return False
     return bool(_EMAIL.match(clean))
+
+
+#: A new address (sign-up, e-mail change) must be a plain one: what goes into
+#: the ``To`` header is then one recipient and nothing else. Sign-in, recovery
+#: and reset keep :func:`valid_email`, so an older account is never locked out.
+_SIMPLE_LOCAL = re.compile(r"[A-Za-z0-9._%+-]{1,64}")
+_SIMPLE_LABEL = re.compile(r"[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?")
+_SIMPLE_LAST_LABEL = re.compile(r"[A-Za-z]{2,63}")
+
+
+def simple_email(value: str) -> bool:
+    """Whether ``value`` is a plain ``name@domain.tld`` address, ASCII only.
+
+    No quotes, brackets, commas, spaces or other separators; the name has no
+    leading, trailing or doubled dot; the domain has two labels or more, none
+    starting or ending with a hyphen, and ends in letters (never an IP address).
+    """
+    clean = normalise_email(value)
+    if not 3 <= len(clean) <= MAX_EMAIL_CHARS or clean.count("@") != 1:
+        return False
+    local, domain = clean.split("@")
+    if not _SIMPLE_LOCAL.fullmatch(local):
+        return False
+    if local.startswith(".") or local.endswith(".") or ".." in local:
+        return False
+    labels = domain.split(".")
+    if len(labels) < 2 or not all(_SIMPLE_LABEL.fullmatch(label) for label in labels):
+        return False
+    return bool(_SIMPLE_LAST_LABEL.fullmatch(labels[-1]))
 
 
 def password_problem(password: str, *, email: str = "") -> str:
@@ -498,6 +527,8 @@ _NEXT_HOMES = ("/", "/en", "/pt")
 #: The upload page in each language: a visitor who signs up to audit lands
 #: back on the form.
 _NEXT_PAGES = ("/auditar", "/en/audit", "/pt/auditar")
+#: The one query an upload page keeps through sign-up: its extra boxes open.
+NEXT_EXTRAS_QUERY = "extras=1"
 
 
 def safe_next(value: str | None) -> str:
@@ -516,9 +547,58 @@ def safe_next(value: str | None) -> str:
     # The home page only as itself (with the upload form's anchor), never
     # as a prefix: "/" would otherwise allow every path.
     home = parts.path in _NEXT_HOMES + _NEXT_PAGES and not parts.query
-    if not (home or parts.path.startswith(_NEXT_PREFIXES)):
+    # The upload pages with their extra boxes open: that exact query, no other.
+    extras = parts.path in _NEXT_PAGES and parts.query == NEXT_EXTRAS_QUERY and not parts.fragment
+    if not (home or extras or parts.path.startswith(_NEXT_PREFIXES)):
         return ""
     return value
+
+
+#: A report's private key never travels inside ``next``: while the visitor
+#: signs up or in, it waits in this cookie (HttpOnly, SameSite=Lax) and
+#: ``next`` names the report only. The cookie can add the key to that very
+#: report's address and nothing else, so it cannot change where ``next`` goes.
+REPORT_KEY_COOKIE = "rigor_report"
+REPORT_KEY_MINUTES = 60
+_REPORT_PATH = re.compile(r"/audits/([A-Za-z0-9_-]{1,64})(?:[./][A-Za-z0-9_.-]{0,40})?")
+_REPORT_KEY = re.compile(r"([A-Za-z0-9_-]{1,64})\.([A-Za-z0-9_-]{20,128})")
+
+
+def split_report_key(next_path: str) -> tuple[str, str]:
+    """``next_path`` without a report's ``token``, and the cookie value that keeps it.
+
+    The value is ``""`` when there was no token, or one that no report has.
+    """
+    parts = urlsplit(next_path)
+    match = _REPORT_PATH.fullmatch(parts.path)
+    pairs = parse_qsl(parts.query, keep_blank_values=True)
+    if match is None or not any(name.lower() == "token" for name, _ in pairs):
+        return next_path, ""
+    token = next(value for name, value in pairs if name.lower() == "token")
+    rest = urlencode([(name, value) for name, value in pairs if name.lower() != "token"])
+    clean = parts.path + (f"?{rest}" if rest else "")
+    if parts.fragment:
+        clean += f"#{parts.fragment}"
+    key = f"{match.group(1)}.{token}"
+    return clean, key if _REPORT_KEY.fullmatch(key) else ""
+
+
+def join_report_key(next_path: str, cookie: str | None) -> str:
+    """``next_path`` with the key the cookie keeps, when both name the same report."""
+    kept = _REPORT_KEY.fullmatch(cookie or "")
+    if not next_path or kept is None:
+        return next_path
+    parts = urlsplit(next_path)
+    match = _REPORT_PATH.fullmatch(parts.path)
+    pairs = parse_qsl(parts.query, keep_blank_values=True)
+    if match is None or match.group(1) != kept.group(1):
+        return next_path
+    if any(name.lower() == "token" for name, _ in pairs):
+        return next_path
+    target = parts.path + "?" + urlencode([("token", kept.group(2)), *pairs])
+    if parts.fragment:
+        target += f"#{parts.fragment}"
+    return target
 
 
 __all__ = [
@@ -534,9 +614,12 @@ __all__ = [
     "MAX_ACCOUNT_ACTIONS_PER_HOUR",
     "MAX_SIGNUPS_PER_HOUR",
     "MIN_PASSWORD_CHARS",
+    "NEXT_EXTRAS_QUERY",
     "INVITE_PARAM",
     "REFERRAL_CREDITS",
     "REFERRAL_MONTHLY_CAP",
+    "REPORT_KEY_COOKIE",
+    "REPORT_KEY_MINUTES",
     "RESET_HOURS",
     "SESSION_COOKIE",
     "SIGNIN_TRIES_PAST_EMAIL_CEILING",
@@ -551,6 +634,7 @@ __all__ = [
     "content_fingerprint",
     "hash_password",
     "hash_secret",
+    "join_report_key",
     "month_start",
     "network_address",
     "network_cap",
@@ -560,6 +644,8 @@ __all__ = [
     "password_problem",
     "safe_next",
     "same_secret",
+    "simple_email",
+    "split_report_key",
     "valid_email",
     "verify_password",
 ]

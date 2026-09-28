@@ -2049,7 +2049,7 @@ Routes:
 | Route | What it does |
 |---|---|
 | `GET /` | Landing (how it works, prices, FAQ, link to the sample); `?lang=en`. `GET /en` is the English landing, a short address to share. Its `#subir` band and every start button link to the upload page; old `?extras=1` links redirect there. |
-| `GET /auditar` | The upload form on its own page (`/en/audit`, `/pt/auditar`; `?extras=1` opens the extra files). Outside free mode a visitor without an account gets a 303 to sign-up with `next` back here (`/registro?next=/auditar`, `/signup?next=/en/audit`, `/pt/cadastro?next=/pt/auditar`), so nobody fills the form and loses it. |
+| `GET /auditar` | The upload form on its own page (`/en/audit`, `/pt/auditar`; `?extras=1` opens the extra files). Outside free mode a visitor without an account gets a 303 to sign-up with `next` back here (`/registro?next=/auditar`, `/signup?next=/en/audit`, `/pt/cadastro?next=/pt/auditar`), so nobody fills the form and loses it. A visitor who came with `?extras=1` keeps it (`next=/auditar%3Fextras%3D1`) and lands on the form with the extra files open after signing up or in; the language switch of the form and the "account first" answer to an upload that used an extra box keep it too. |
 | `GET /precios` | 301 to the landing's prices (`/#pricing`); `/pricing` and `/en/pricing` go to `/en#pricing`, `/pt/precos` to `/pt#pricing`. |
 | `GET /contacto` | Contact page (`/en/contact`, `/pt/contato`; `/soporte`, `/contact`, `/support`, `/en/support`, `/pt/suporte` redirect there), linked from every footer. It shows only what the operator set: `AUDIT_OPERATOR_CONTACT` as a mail link and `AUDIT_CONTACT_URL` as the chat link; with neither it says no channel is published yet. It also says never to send a password, recovery key or card details. |
 | `POST /audits` | Upload. An optional `access_code` field redeems a code (paid mode with codes on). |
@@ -2057,6 +2057,7 @@ Routes:
 | `POST /audits/{id}/checkout?token=…` | Stripe Checkout (503 without Stripe). Form field `plan=single` (default) or `plan=pack`; the return link `?session_id=…` is confirmed with Stripe before anything unlocks. Needs a signed-in account: a visitor is sent to sign in and back to the report, a report on another account is refused (403), and the order is recorded on the buyer's account (`tests/test_audit_card_payments.py::test_checkout_needs_the_signed_in_account_that_owns_the_report`). |
 | `POST /cuenta/comprar` (`/account/comprar`, `/pt/conta/comprar`) | Buy credits by card from "My account": `plan=single` (1 credit, the report price) or `plan=pack` (3 credits, the pack price), with `billing_country` from `AUDIT_APPROVED_MARKETS` and the required `final_sale=yes` box. Live Stripe only (no button and `?error=buy_off` in test mode, without markets or while new checkouts are paused). The order is a `checkout_orders` row whose `audit_id` is `account:<account id>`; the signed webhook puts the credits on an access code linked to the account and unlocks no report. A test-mode payment, another account, amount, plan or billing country grants nothing (`tests/test_audit_account_credit_purchase.py`). |
 | `POST /audits/{id}/redeem?token=…` | Unlock an existing preview with an access code. |
+| `POST /audits/{id}/account?token=…` | The account box of a report opened by its link, for a visitor without a session. Form field `go=signup` or `go=signin`; 404 without a valid token, 403 to a post from another site. It keeps the report's key in the cookie `rigor_report` (1 hour) and answers 303 to sign-up or sign-in with a `next` that names the report without its token. |
 | `POST /audits/{id}/publish?token=…` | Create (or return) the public verification page. Paid audits, or any audit in free mode; 402 otherwise. |
 | `POST /audits/{id}/unpublish?token=…` | Remove the public page. |
 | `GET /v/{public_id}` | Public verification page. `GET /v/{public_id}/badge.svg` its badge. Survives the retention purge (only the shown fields are kept); 404 once unpublished. |
@@ -2494,7 +2495,22 @@ an account never changes what a report says.
   The claim stays after the account is deleted (hash only). While
   `AUDIT_EMAIL_VERIFICATION_REQUIRED=true`, an account with an unconfirmed
   address gets a preview with reason `unverified` and keeps its free
-  report for after confirming. Sign-up and e-mail change refuse addresses
+  report for after confirming. The account notice and the checkout refusal
+  say so plainly (confirming unlocks the first free full report and
+  purchases), and the notice after sign-up says a confirmation link was sent
+  and to check spam (`welcome_confirm`, only while delivery is configured).
+  A sign-up that returns to the upload page or to a report shows the same
+  notice there (`?done=welcome_confirm`, `?acct=welcome_confirm`), only to a
+  signed-in account whose address is still unconfirmed; a sign-up that
+  returns anywhere else shows it on the account page only.
+  Sign-up and e-mail change accept plain addresses only
+  (`accounts.simple_email`, error `email_simple`): ASCII, one `@`, a name of
+  1 to 64 characters from letters, digits and `._%+-` with no leading,
+  trailing or doubled dot, and a domain of two labels or more (letters,
+  digits, inner hyphens, 1 to 63 characters each) that ends in letters; no
+  quotes, brackets, commas, spaces or IP addresses, 254 characters at most.
+  Sign-in, recovery and the reset request keep the older, wider check, so an
+  account made before the rule is never locked out. Sign-up and e-mail change refuse addresses
   on a short list of well-known temporary-inbox services
   (`inbox.DISPOSABLE_DOMAINS`, exact or parent domain; error
   `email_disposable`); the list is not exhaustive.
@@ -2638,7 +2654,14 @@ an account never changes what a report says.
   is one-use, valid for one hour and revokes sessions. The durable outbox keeps
   recipient, purpose, locale, state, attempts and expiry, but derives the
   usable link from a random id plus a stable HMAC secret only during sending.
-  Failed SMTP attempts are retried after a lease; the retention purge removes
+  Failed SMTP attempts are retried after a lease, under one Message-ID (which
+  is also the provider's idempotency key), so a retry is never delivered
+  twice. A resend the customer asks for (at most one every ten minutes per
+  challenge) keeps the challenge, its link and its expiry, starts its own
+  eight tries and gets its own Message-ID (`mail.message_key`: the outbox id
+  plus a mark made from the last delivery's time), so the provider delivers
+  it. The same request revives a message whose tries ran out while it was
+  still `queued`, or `sending` with its lease expired. The retention purge removes
   expired rows after a 30-day cleanup window when the scheduled purge is
   enabled or the operator runs it. No real messages are sent by the test suite.
   With `AUDIT_EMAIL_VERIFICATION_REQUIRED=false`, the older immediate email
@@ -2687,7 +2710,18 @@ an account never changes what a report says.
   `attempts` table (keys hashed, rows older than the hour deleted), so a
   deploy does not reset them. A password change or reset signs out the other
   sessions; `next` only returns to `/audits/`, `/cuenta` paths or exactly
-  `/` and `/en` (with an anchor). POST `/audits` answers 403 to a browser
+  `/` and `/en` (with an anchor), or an upload page, alone or with exactly
+  `?extras=1`. A report's private key is never written inside `next`: a
+  signed-out visitor leaves a report through `POST /audits/{id}/account`
+  (or any report form), which names the report in `next` and keeps the key
+  for up to an hour in the cookie `rigor_report` (HttpOnly, SameSite=Lax,
+  Secure on https). After sign-in (password, second step or passkey) the
+  cookie gives the key back to that same report only and is cleared; an
+  older link with the key inside `next` is redirected to the clean address
+  (sign-in, sign-up and second-step pages; the passkey page moves it to the
+  cookie too). `POST /audits/{id}/account` answers 403 to a post from
+  another site, like the upload.
+  POST `/audits` answers 403 to a browser
   post from another site, a second layer beside the `SameSite=Lax` cookie:
   `Sec-Fetch-Site` decides when present (only `same-origin` and `none` pass;
   `same-site` is refused, as other apps on the parent domain count as same
