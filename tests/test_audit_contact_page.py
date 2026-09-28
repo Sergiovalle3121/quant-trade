@@ -79,3 +79,17 @@ def test_other_names_for_the_page_redirect_and_every_footer_links_it(tmp_path: P
     for path, target in (("/", "/contacto"), ("/en", "/en/contact"), ("/pt", "/pt/contato")):
         foot = client.get(path).text.split("<footer", 1)[1]
         assert f"href='{target}'" in foot
+
+
+def test_public_pages_show_evidence_labels_in_their_own_language(tmp_path: Path) -> None:
+    client = _client(tmp_path)
+    for path, words in (
+        ("/", ("Medido", "Declarado", "No medido")),
+        ("/en", ("Measured", "Declared", "Not measured")),
+        ("/pt", ("Medido", "Declarado", "Não medido")),
+    ):
+        text = _text(client.get(path).text.split("</head>", 1)[1])
+        for word in words:
+            assert word in text, (path, word)
+        # The codes stay in classes; the reader sees words.
+        assert "MEASURED" not in text and "DECLARED" not in text, path

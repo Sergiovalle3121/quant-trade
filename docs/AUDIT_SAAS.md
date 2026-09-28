@@ -729,6 +729,12 @@ Every leaf value in the JSON carries an evidence tag:
 - `NOT_MEASURED`: could not be computed from what was supplied; the reason
   is stated next to it.
 
+On the site's pages (landing, upload form, guides, methodology, verification,
+contact) a reader sees these tags as words in the page's language: Medido /
+Declarado / No medido, Measured / Declared / Not measured, Medido / Declarado
+/ Não medido (`pages.EVIDENCE_LABELS`). The codes stay in the JSON, the badge
+CSS classes and the reports.
+
 | Section | Estimator | Source module |
 |---|---|---|
 | Performance | annualised return, volatility, Sharpe, Sortino, max drawdown | `metrics/performance.py` |

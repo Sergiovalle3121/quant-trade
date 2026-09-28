@@ -204,10 +204,9 @@ _COPY: dict[str, dict[str, Any]] = {
         "variants_help": "Una columna de retornos por variante probada; habilita el PBO.",
         "trials": "¿Cuántas configuraciones o versiones se probaron antes de elegir esta?",
         "trials_help": (
-            "Rigor solo puede descontar la suerte de haber probado muchas si le dices cuántas. "
-            "Si subes el XML de optimización de MT5 se cuentan solas. En un "
-            "historial de cuenta o de fondo, pon cuántas estrategias o fondos lleva el mismo "
-            "gestor. Si no lo sabes, déjalo vacío."
+            "Configuraciones probadas antes de elegir esta. Si lo dejas vacío, el informe usa 1 "
+            "(el caso más favorable) y la clase queda como máximo en B. Si subes el XML de "
+            "optimización de MT5 se cuentan solas."
         ),
         "cost_bps": (
             "Coste extra por lado en puntos básicos, además del que ya detalla tu informe "
@@ -512,10 +511,9 @@ _COPY: dict[str, dict[str, Any]] = {
         "variants_help": "One return column per variant tried; enables the PBO.",
         "trials": "How many configurations or versions were tried before choosing this one?",
         "trials_help": (
-            "Rigor can only discount the luck of trying many if you tell it how many. If you "
-            "upload the MT5 optimisation XML they are counted for you. For an account or fund "
-            "history, enter how many strategies or funds the same manager runs. If you do not "
-            "know, leave it blank."
+            "Configurations tried before choosing this one. Left blank, the report uses 1 (the "
+            "most favourable case) and the class is at most B. If you upload the MT5 "
+            "optimisation XML they are counted for you."
         ),
         "cost_bps": (
             "Extra cost per side in basis points, on top of what your report already itemises "
@@ -1320,8 +1318,32 @@ def _class_text(overall: str, locale: str) -> str:
     return CLASS_B_PT if locale == "pt" and overall == "B" else class_text(overall, locale)
 
 
+#: Evidence tags as a reader sees them on the site; the codes stay in data, CSS classes
+#: and reports' machine-readable parts.
+EVIDENCE_LABELS: dict[str, dict[str, str]] = {
+    "es": {"MEASURED": "Medido", "DECLARED": "Declarado", "NOT_MEASURED": "No medido"},
+    "en": {"MEASURED": "Measured", "DECLARED": "Declared", "NOT_MEASURED": "Not measured"},
+    "pt": {"MEASURED": "Medido", "DECLARED": "Declarado", "NOT_MEASURED": "Não medido"},
+}
+
+
+def evidence_label(tag: str, locale: str) -> str:
+    return EVIDENCE_LABELS.get(locale, EVIDENCE_LABELS["en"]).get(tag, tag)
+
+
+def _localize_tags(text: str, locale: str) -> str:
+    """Replace the tag codes in a sentence by their labels (NOT_MEASURED first)."""
+    for tag in ("NOT_MEASURED", "MEASURED", "DECLARED"):
+        text = re.sub(rf"\b{tag}\b", evidence_label(tag, locale), text)
+    return text
+
+
+def _badge(tag: str, locale: str) -> str:
+    return f"<span class='badge {_e(tag)}'>{_e(evidence_label(tag, locale))}</span>"
+
+
 def _disclaimer(locale: str) -> str:
-    return DISCLAIMER_PT if locale == "pt" else DISCLAIMER[locale]
+    return _localize_tags(DISCLAIMER_PT if locale == "pt" else DISCLAIMER[locale], locale)
 
 
 def _method_title(locale: str) -> str:
@@ -1462,10 +1484,17 @@ def _page(
         _head(title, locale, meta_html)
         + f"<body><a class='skip' href='#main'>{_e(ui['skip'])}</a>"
         + _nav(locale, switch_href, solid=solid_nav, alternates=alternates)
-        + f"<main id='main'>{body}</main>"
+        + f"<main id='main'>{_localize_text_nodes(body, locale)}</main>"
         + _footer(locale)
         + "</body></html>"
     )
+
+
+def _localize_text_nodes(markup: str, locale: str) -> str:
+    """Show the evidence codes as words in the page's language, in text only.
+
+    Attributes (the badge CSS classes, links) keep the codes."""
+    return re.sub(r">([^<]+)<", lambda m: f">{_localize_tags(m.group(1), locale)}<", markup)
 
 
 def _public_meta(
@@ -1611,9 +1640,8 @@ def _mock(locale: str) -> str:
         f"<text class='spark-lbl' x='6' y='12'>{_e(ui['mock_is'])}</text>"
         f"<text class='spark-lbl' x='{split + 6}' y='12'>{_e(ui['mock_oos'])}</text></svg>"
         f"<div class='mock-kpis'>{kpis}</div>"
-        "<div class='mock-tags'><span class='badge MEASURED'>MEASURED</span>"
-        "<span class='badge DECLARED'>DECLARED</span>"
-        "<span class='badge NOT_MEASURED'>NOT_MEASURED</span></div></div></div></div>"
+        f"<div class='mock-tags'>{_badge('MEASURED', locale)}{_badge('DECLARED', locale)}"
+        f"{_badge('NOT_MEASURED', locale)}</div></div></div></div>"
         f"<div class='mock-cap'>{_e(ui['mock_cap'])}</div></div>"
     )
 
@@ -1865,9 +1893,7 @@ def _dimensions(locale: str, copy: dict[str, Any]) -> str:
         for i, (name, text) in enumerate(zip(DIMENSION_ORDER, copy["measure"], strict=False))
     )
     # Where each number comes from, in one line under the cards.
-    legend = "".join(
-        f"<li><span class='badge {tag}'>{tag}</span>{_e(text)}</li>" for tag, text in ui["evidence"]
-    )
+    legend = "".join(f"<li>{_badge(tag, locale)}{_e(text)}</li>" for tag, text in ui["evidence"])
     return (
         "<section class='section dark' id='measure'><div class='wrap'>"
         + _section_head(copy["measure_title"], _title_pair(ui["dims_title"]))
@@ -2547,14 +2573,14 @@ def upload_page(
     )
 
 
-def _evidence_value(item: Any) -> str:
+def _evidence_value(item: Any, locale: str = "es") -> str:
     """A figure and its evidence tag as HTML: "120" then the DECLARED badge."""
     if isinstance(item, dict) and "value" in item:
         value = item.get("value")
         shown = "—" if value is None else _e(f"{value:,}" if isinstance(value, int) else value)
         evidence = str(item.get("evidence", ""))
         tag = (
-            f" <span class='badge {_e(evidence)}'>{_e(evidence)}</span>"
+            f" {_badge(evidence, locale)}"
             if evidence in ("MEASURED", "DECLARED", "NOT_MEASURED")
             else ""
         )
@@ -2667,7 +2693,7 @@ def verification_page(
     detail_rows = (
         "".join(f"<tr><td>{_e(label)}</td><td>{_e(value)}</td></tr>" for label, value in details)
         + "".join(
-            f"<tr><td>{_e(label)}</td><td>{_evidence_value(item)}</td></tr>"
+            f"<tr><td>{_e(label)}</td><td>{_evidence_value(item, locale)}</td></tr>"
             for label, item in (
                 (copy["v_trials_declared"], declared.get("trials")),
                 (copy["v_trials_used"], trials_used),
@@ -3139,8 +3165,7 @@ def method_page(*, locale: str = "es", base_url: str = "") -> str:
         for cls, text in CLASS_LADDER[locale]
     )
     evidence = "".join(
-        f"<li><span class='badge {_e(tag)}'>{_e(tag)}</span><span>{_e(text)}</span></li>"
-        for tag, text in words["evidence"]
+        f"<li>{_badge(tag, locale)}<span>{_e(text)}</span></li>" for tag, text in words["evidence"]
     )
     flags = "".join(
         f"<li>{_e(titles.get(locale, titles['en']))}</li>" for titles in FLAG_TITLES.values()
