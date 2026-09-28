@@ -398,8 +398,7 @@ REPORT: dict[str, Any] = {
             "Meses no positivo ({k} de {n}); maior sequência de meses no negativo: {run}"
         ),
         "ride_calmar": (
-            "Índice Calmar em {years} anos: retorno anual composto dividido pela maior "
-            "queda"
+            "Índice Calmar em {years} anos: retorno anual composto dividido pela maior queda"
         ),
         "ride_tail_day": "Rentabilidade média por dia nos piores 5 % dos dias ({k} de {n})",
         "ride_tail_month": "Rentabilidade média por mês nos piores 5 % dos meses ({k} de {n})",

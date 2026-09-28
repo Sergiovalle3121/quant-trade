@@ -764,8 +764,7 @@ LABELS: dict[str, dict[str, str]] = {
             "Meses en positivo ({k} de {n}); racha más larga de meses en negativo: {run}"
         ),
         "ride_calmar": (
-            "Ratio Calmar sobre {years} años: retorno anual compuesto dividido entre la peor "
-            "caída"
+            "Ratio Calmar sobre {years} años: retorno anual compuesto dividido entre la peor caída"
         ),
         "ride_tail_day": "Rentabilidad media por día en el peor 5 % de los días ({k} de {n})",
         "ride_tail_month": "Rentabilidad media por mes en el peor 5 % de los meses ({k} de {n})",
@@ -2107,8 +2106,7 @@ LABELS: dict[str, dict[str, str]] = {
         "ride_worst_month": "Worst month ({month})",
         "ride_positive": "Months that ended up ({k} of {n}); longest run of losing months: {run}",
         "ride_calmar": (
-            "Calmar ratio over {years} years: compound annual return divided by the deepest "
-            "fall"
+            "Calmar ratio over {years} years: compound annual return divided by the deepest fall"
         ),
         "ride_tail_day": "Average return per day in the worst 5 % of days ({k} of {n})",
         "ride_tail_month": "Average return per month in the worst 5 % of months ({k} of {n})",
@@ -6309,10 +6307,14 @@ def _falls_html(
             ("", back),
             (" val", total),
         )
-        rows += "<tr>" + "".join(
-            f"<td class='{cls.strip()}' data-l='{_e(head)}'>{_e(text)}</td>"
-            for (cls, text), head in zip(cells, heads, strict=True)
-        ) + "</tr>"
+        rows += (
+            "<tr>"
+            + "".join(
+                f"<td class='{cls.strip()}' data-l='{_e(head)}'>{_e(text)}</td>"
+                for (cls, text), head in zip(cells, heads, strict=True)
+            )
+            + "</tr>"
+        )
     head_row = "".join(f"<th>{_e(head)}</th>" for head in heads)
     return (
         f"<h3>{_e(labels['falls_title'])} {_badge('MEASURED')}</h3>"
