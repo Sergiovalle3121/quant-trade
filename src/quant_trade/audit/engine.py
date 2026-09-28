@@ -588,6 +588,11 @@ def _bootstrap(returns: pd.Series, *, samples: int, seed: int) -> dict[str, Any]
 
 def _subperiods(frame: pd.DataFrame) -> list[dict[str, Any]]:
     table = subperiod_analysis(frame[["timestamp", "equity"]])
+    years = pd.to_datetime(frame["timestamp"], utc=True).dt.year
+    if len(table) > 1 and int((years == int(table["year"].iloc[0])).sum()) == 1:
+        # An opening value alone has no return; the following year already
+        # measures its return from that value.
+        table = table.iloc[1:]
     return [
         {
             "year": int(row["year"]),
