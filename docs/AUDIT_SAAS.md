@@ -2204,8 +2204,10 @@ to all buyers until old sessions are reconciled.
    Keep the Railway address attached after the move: while `AUDIT_BASE_URL`
    is an `https` custom domain, a GET or HEAD on any `*.up.railway.app`
    host answers 308 to the same path and query on `AUDIT_BASE_URL`, so old
-   report, verification and badge links keep working. POSTs (the Stripe
-   webhook, forms) and `/health`, `/ready` are served where they arrive.
+   report, verification and badge links keep working. The `www` name of
+   that domain moves the same way, so a visitor keeps one address and one
+   session. POSTs (the Stripe webhook, forms) and `/health`, `/ready` are
+   served where they arrive.
 4. Leave `AUDIT_FREE_MODE=true` until the first paid audit is wanted. To
    sell with access codes only (no Stripe), set `AUDIT_ACCESS_CODES=true`,
    `AUDIT_FREE_MODE=false`, `AUDIT_PRICE_USD_CENTS` and optionally
