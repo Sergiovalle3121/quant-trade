@@ -4700,6 +4700,15 @@ class Store:
             return failed
         return ""
 
+    def free_claim_taken(self, key: str) -> bool:
+        """Whether :meth:`claim_free` already holds ``key``."""
+        table = self.free_claims
+        with self.engine.connect() as conn:
+            row = conn.execute(
+                self._sa.select(table.c.claim_key).where(table.c.claim_key == key[:200])
+            ).first()
+        return row is not None
+
     def release_free(self, reservation: str) -> None:
         """Give back what :meth:`claim_free` took for an upload that failed."""
         with self.engine.begin() as conn:

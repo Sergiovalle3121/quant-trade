@@ -184,7 +184,8 @@ def test_signup_outbox_survives_restart_and_checkout_waits_for_post(tmp_path: Pa
     account = store.find_account("buyer@example.com")
     assert account is not None and not store.email_verified(account.id)
     first_id, _ = _upload(client, 301)
-    assert store.get_audit(first_id).paid  # first full report before verification
+    # The free first report waits for a confirmed address: one per person.
+    assert not store.get_audit(first_id).paid
     second_id, token = _upload(client, 302)
     denied = client.post(f"/audits/{second_id}/checkout?token={token}", follow_redirects=False)
     assert denied.status_code == 403
@@ -326,10 +327,11 @@ def test_referral_waits_until_both_addresses_are_confirmed(tmp_path: Path) -> No
     friend = TestClient(app, base_url=cfg.base_url)
     _signup(friend, "friend@example.com", invite)
     friend_link = _mail_link(store, cfg, "friend@example.com")
-    first_id, _ = _upload(friend, 411)
-    assert store.get_audit(first_id).paid
-    assert store.account_credits(account.id, datetime.now(UTC)) == 0
+    first_id, _ = _upload(friend, 410)
+    assert not store.get_audit(first_id).paid  # unconfirmed: a preview
     _confirm(friend, friend_link)
+    welcome_id, _ = _upload(friend, 411)
+    assert store.get_audit(welcome_id).paid
     assert store.account_credits(account.id, datetime.now(UTC)) == 0
     _confirm(inviter, inviter_link)
     assert store.account_credits(account.id, datetime.now(UTC)) == 1

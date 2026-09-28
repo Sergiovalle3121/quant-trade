@@ -12,11 +12,13 @@ from __future__ import annotations
 import base64
 import hashlib
 import hmac
+import json
 import logging
 import re
 import smtplib
 import ssl
 import threading
+import urllib.request
 from collections.abc import Callable, Mapping
 from datetime import UTC, datetime
 from email.message import EmailMessage
@@ -29,6 +31,7 @@ from quant_trade.audit.store import Store
 logger = logging.getLogger("quant_trade.audit.mail")
 TOKEN_RE = re.compile(r"^([0-9a-f]{32})\.([A-Za-z0-9_-]{43})$")
 MAIL_POLL_SECONDS = 10
+RESEND_URL = "https://api.resend.com/emails"
 
 PATHS = {
     "es": {"verify": "/confirmar-correo", "change": "/confirmar-correo", "reset": "/restablecer"},
@@ -102,13 +105,13 @@ PURCHASE_WORDS = {
         "charge_review": (
             "Cargo adicional en revisión en Rigor",
             "Registramos otro cargo para un informe ya habilitado. "
-            "Revisaremos este cargo manualmente; este mensaje no confirma un reembolso.",
+            "Revisaremos este cargo manualmente y te escribiremos con la solución.",
         ),
         "market_review": (
             "Pago de Rigor retenido para revisión",
             "Registramos este pago, pero este cargo no habilitó una compra porque "
-            "debemos revisar el país de facturación. Revisaremos el cargo manualmente; "
-            "este mensaje no confirma un reembolso.",
+            "debemos revisar el país de facturación. Revisaremos el cargo manualmente y "
+            "te escribiremos con la solución.",
         ),
         "single": "Informe individual",
         "pack": "Paquete de tres informes",
@@ -123,13 +126,13 @@ PURCHASE_WORDS = {
         "charge_review": (
             "Additional Rigor charge under review",
             "We recorded another charge for an already unlocked report. "
-            "We will review this charge manually; this message does not confirm a refund.",
+            "We will review this charge manually and write to you with the solution.",
         ),
         "market_review": (
             "Rigor payment held for review",
             "We recorded this payment, but this charge did not unlock a purchase "
-            "because the billing country needs review. We will review the charge manually; "
-            "this message does not confirm a refund.",
+            "because the billing country needs review. We will review the charge manually "
+            "and write to you with the solution.",
         ),
         "single": "Single report",
         "pack": "Three-report pack",
@@ -144,13 +147,13 @@ PURCHASE_WORDS = {
         "charge_review": (
             "Cobrança adicional em análise no Rigor",
             "Registramos outra cobrança para um relatório já liberado. "
-            "Analisaremos esta cobrança manualmente; esta mensagem não confirma um reembolso.",
+            "Analisaremos esta cobrança manualmente e escreveremos com a solução.",
         ),
         "market_review": (
             "Pagamento do Rigor retido para análise",
             "Registramos este pagamento, mas esta cobrança não liberou uma compra "
-            "porque precisamos analisar o país de cobrança. Analisaremos a cobrança manualmente; "
-            "esta mensagem não confirma um reembolso.",
+            "porque precisamos analisar o país de cobrança. Analisaremos a cobrança manualmente "
+            "e escreveremos com a solução.",
         ),
         "single": "Relatório individual",
         "pack": "Pacote de três relatórios",
@@ -217,7 +220,7 @@ def compose(
 
 def send_smtp(message: EmailMessage, settings: AuditSettings) -> None:
     """Send one message over TLS; callers can inject a fake sender in tests."""
-    if not settings.email_delivery_ready:
+    if not settings.email_delivery_ready or not settings.smtp_ready:
         raise RuntimeError("email transport is not configured")
     context = ssl.create_default_context()
     if settings.smtp_security == "ssl":
@@ -236,11 +239,61 @@ def send_smtp(message: EmailMessage, settings: AuditSettings) -> None:
         smtp.send_message(message)
 
 
+def resend_payload(message: EmailMessage) -> dict[str, Any]:
+    """The Resend API body for one plain-text message."""
+    body = message.get_content()
+    return {
+        "from": str(message["From"]),
+        "to": [str(message["To"])],
+        "subject": str(message["Subject"]),
+        "text": body,
+        "headers": {"Message-ID": str(message["Message-ID"])},
+    }
+
+
+def send_resend(
+    message: EmailMessage,
+    settings: AuditSettings,
+    *,
+    opener: Callable[..., Any] = urllib.request.urlopen,
+) -> None:
+    """Send one message through Resend's HTTPS API.
+
+    The Message-ID doubles as the idempotency key, so a retry after a lost
+    reply is not delivered twice within Resend's 24-hour window.
+    """
+    if not settings.email_delivery_ready or not settings.resend_ready:
+        raise RuntimeError("Resend is not configured")
+    request = urllib.request.Request(
+        RESEND_URL,
+        data=json.dumps(resend_payload(message)).encode(),
+        method="POST",
+        headers={
+            "Authorization": f"Bearer {settings.resend_api_key}",
+            "Content-Type": "application/json",
+            "Idempotency-Key": str(message["Message-ID"]).strip("<>"),
+            "User-Agent": "rigor-mail/1",
+        },
+    )
+    with opener(request, timeout=15, context=ssl.create_default_context()) as response:
+        status = getattr(response, "status", 200)
+        if not 200 <= int(status) < 300:
+            raise RuntimeError(f"Resend answered {status}")
+
+
+def send_email(message: EmailMessage, settings: AuditSettings) -> None:
+    """Resend when its key is set, else SMTP."""
+    if settings.resend_ready:
+        send_resend(message, settings)
+    else:
+        send_smtp(message, settings)
+
+
 def deliver_pending(
     store: Store,
     settings: AuditSettings,
     *,
-    sender: Callable[[EmailMessage, AuditSettings], None] = send_smtp,
+    sender: Callable[[EmailMessage, AuditSettings], None] = send_email,
     limit: int = 10,
     now: datetime | None = None,
 ) -> int:

@@ -78,6 +78,9 @@ WELCOME_REPORTS_PER_IP_PER_MONTH = 3
 #: The same for an IPv4 address: a new customer on a phone in Mexico or
 #: Brazil shares it with many others and must still get the free report.
 WELCOME_REPORTS_PER_IPV4_PER_MONTH = 10
+#: While e-mail confirmation is off nothing else tells made-up accounts on
+#: one connection apart, so the IPv4 cap stays at the IPv6 one.
+WELCOME_REPORTS_PER_IPV4_UNVERIFIED = 3
 #: "Invita a un colega": an account whose invite link brings a new account
 #: gets this many full-report credits once the new account's free first
 #: report exists (so the free tier's browser, file and address limits
@@ -492,6 +495,9 @@ def same_secret(a: str | None, b: str | None) -> bool:
 #: Where a form may send the customer back after signing in.
 _NEXT_PREFIXES = ("/audits/", "/cuenta", "/account", "/pt/conta")
 _NEXT_HOMES = ("/", "/en", "/pt")
+#: The upload page in each language: a visitor who signs up to audit lands
+#: back on the form.
+_NEXT_PAGES = ("/auditar", "/en/audit", "/pt/auditar")
 
 
 def safe_next(value: str | None) -> str:
@@ -509,7 +515,7 @@ def safe_next(value: str | None) -> str:
         return ""
     # The home page only as itself (with the upload form's anchor), never
     # as a prefix: "/" would otherwise allow every path.
-    home = parts.path in _NEXT_HOMES and not parts.query
+    home = parts.path in _NEXT_HOMES + _NEXT_PAGES and not parts.query
     if not (home or parts.path.startswith(_NEXT_PREFIXES)):
         return ""
     return value
@@ -537,6 +543,7 @@ __all__ = [
     "SESSION_DAYS",
     "WELCOME_FULL_REPORT",
     "WELCOME_REPORTS_PER_IPV4_PER_MONTH",
+    "WELCOME_REPORTS_PER_IPV4_UNVERIFIED",
     "WELCOME_REPORTS_PER_IP_PER_MONTH",
     "burn_time",
     "common_password",

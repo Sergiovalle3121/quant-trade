@@ -7230,8 +7230,9 @@ CLASS_LADDER: dict[str, tuple[tuple[str, str], ...]] = {
         ),
         (
             "B",
-            "La estadística y el número de intentos superan y nada falla, pero falta medir "
-            "o reforzar costes, fuera de muestra, benchmark o calidad de datos.",
+            "La estadística supera, el número de intentos supera o no se declaró y nada "
+            "falla, pero falta medir o reforzar costes, fuera de muestra, benchmark, calidad "
+            "de datos o el número de intentos.",
         ),
         (
             "C",
@@ -7250,8 +7251,9 @@ CLASS_LADDER: dict[str, tuple[tuple[str, str], ...]] = {
         ),
         (
             "B",
-            "Statistics and number of trials pass and nothing fails, but costs, "
-            "out-of-sample, benchmark or data quality still need measuring or strengthening.",
+            "Statistics pass, the number of trials passes or was not declared and nothing "
+            "fails, but costs, out-of-sample, benchmark, data quality or the number of trials "
+            "still need measuring or strengthening.",
         ),
         ("C", "One dimension fails, or statistics or number of trials are weak."),
         ("D", "The data or the statistics fail, or two dimensions or more fail."),

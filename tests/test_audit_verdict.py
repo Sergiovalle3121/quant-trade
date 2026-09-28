@@ -22,8 +22,10 @@ from quant_trade.audit.verdict import (
     assess_multiplicity,
     assess_out_of_sample,
     assess_statistical,
+    class_text,
     overall_class,
     summary,
+    trials_undeclared_only,
 )
 
 
@@ -228,3 +230,61 @@ def test_a_pass_against_the_files_own_index_cannot_complete_an_a() -> None:
     assert overall_class(_dims(), own_index=True) == "B"
     assert overall_class(_dims(benchmark="NOT_APPLICABLE"), own_index=True) == "A"
     assert overall_class(_dims(benchmark="FAIL"), own_index=True) == "C"
+
+
+def _undeclared_dimensions(multiplicity_status: str = "NOT_MEASURED") -> list[Dimension]:
+    from quant_trade.audit.schema import measured
+
+    passing = [
+        Dimension(name=name, status="PASS")
+        for name in (STATISTICAL, COSTS, OUT_OF_SAMPLE, DATA_QUALITY, BENCHMARK)
+    ]
+    multiplicity = Dimension(
+        name=MULTIPLICITY,
+        status=multiplicity_status,  # type: ignore[arg-type]
+        inputs={
+            "dsr_at_trials_used": measured(0.99),
+            "trials_used": {"value": 1, "evidence": "NOT_MEASURED", "note": ""},
+        },
+    )
+    return [*passing, multiplicity]
+
+
+def test_undeclared_trials_cap_an_otherwise_clean_record_at_b() -> None:
+    dimensions = _undeclared_dimensions()
+    assert trials_undeclared_only(dimensions[-1])
+    assert overall_class(dimensions) == "B"
+
+
+def test_undeclared_trials_never_lift_a_weaker_record() -> None:
+    dimensions = _undeclared_dimensions()
+    weak_costs = [
+        d.model_copy(update={"status": "FAIL"}) if d.name == COSTS else d for d in dimensions
+    ]
+    assert overall_class(weak_costs) == "C"
+    weak_stats = [
+        d.model_copy(update={"status": "WEAK"}) if d.name == STATISTICAL else d for d in dimensions
+    ]
+    assert overall_class(weak_stats) == "C"
+
+
+def test_multiplicity_unmeasured_for_another_reason_stays_c() -> None:
+    dimensions = _undeclared_dimensions()
+    unmeasured = dimensions[-1].model_copy(
+        update={
+            "inputs": {
+                "dsr_at_trials_used": {"value": None, "evidence": "NOT_MEASURED", "note": ""},
+                "trials_used": {"value": 1, "evidence": "NOT_MEASURED", "note": ""},
+            }
+        }
+    )
+    assert not trials_undeclared_only(unmeasured)
+    assert overall_class([*dimensions[:-1], unmeasured]) == "C"
+
+
+def test_the_b_sentence_names_the_number_of_trials() -> None:
+    from quant_trade.audit.report_pt import VERDICT
+
+    assert "número de intentos" in class_text("B", "es")
+    assert "number of trials" in class_text("B", "en")
+    assert "número de tentativas" in VERDICT["_TEXT"]["B"]
