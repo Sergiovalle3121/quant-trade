@@ -70,7 +70,7 @@ from quant_trade.audit.engine import run_audit
 from quant_trade.audit.errors_pt import FILES_PT
 from quant_trade.audit.guides import GUIDES_BY_PATH, guide_url
 from quant_trade.audit.importers import detect_format
-from quant_trade.audit.legal import LegalContext, privacy_text, terms_text
+from quant_trade.audit.legal import LEGAL_UPDATED, LegalContext, privacy_text, terms_text
 from quant_trade.audit.market import MarketData
 from quant_trade.audit.owner import (
     MAX_CREDITS,
@@ -4953,11 +4953,14 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         lang: str | None = None,
         plan: Annotated[str, Form()] = payments.PLAN_SINGLE,
         billing_country: Annotated[str, Form()] = "",
+        final_sale: Annotated[str, Form(max_length=8)] = "",
     ) -> Response:
         record = _load(audit_id, token, request)
         if not (cfg.stripe_enabled and cfg.card_for(audit_id)):
             raise HTTPException(status_code=503, detail="payments_disabled")
         locale = _view_locale(record, lang)
+        if _cross_site(request):
+            return _html_error(request, 403, message("cross_site", locale), locale)
         if db.has_checkout_review(audit_id):
             review = {
                 "es": "Hay un cobro pendiente de revisión. No vuelvas a pagar; pide ayuda.",
@@ -4973,6 +4976,20 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             )
         if pause_new_checkout:
             return _html_error(request, 503, message("incident_paused", locale), locale)
+        # Every purchase belongs to a signed-in account: a visitor signs in (or
+        # creates the account) first and comes back to this report to pay.
+        buyer = _session(request)
+        if buyer is None:
+            return _signin_redirect(
+                locale, next_path=f"/audits/{audit_id}?token={token or ''}&lang={locale}"
+            )
+        if db.account_for_audit(audit_id) != buyer[0].id:
+            other_account = {
+                "es": "Este informe está en otra cuenta. Entra con esa cuenta para pagarlo.",
+                "en": "This report is on another account. Sign in with that account to pay.",
+                "pt": "Este relatório está em outra conta. Entre com essa conta para pagar.",
+            }
+            return _html_error(request, 403, other_account[locale], locale)
         declared_country = billing_country.strip().upper()
         if not cfg.card_test_mode and declared_country not in cfg.approved_markets:
             market_error = {
@@ -4996,6 +5013,13 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                     account_pages.COPY[locale]["email_checkout_required"],
                     locale,
                 )
+        if final_sale != "yes":
+            final_sale_needed = {
+                "es": "Marca la casilla de compra no reembolsable para pagar.",
+                "en": "Tick the non-refundable purchase box to pay.",
+                "pt": "Marque a caixa de compra não reembolsável para pagar.",
+            }
+            return _html_error(request, 400, final_sale_needed[locale], locale)
         # The pack is sold only while it is on sale; anything else is one audit.
         if plan != payments.PLAN_PACK or not cfg.pack_price_usd:
             plan = payments.PLAN_SINGLE
@@ -5021,6 +5045,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             return RedirectResponse(
                 f"/audits/{audit_id}?token={token}&lang={locale}", status_code=303
             )
+        db.record_final_sale(order.id, terms_version=LEGAL_UPDATED, at=now)
         if order.checkout_url and order.expires_at > now.isoformat().replace("+00:00", "Z"):
             return RedirectResponse(order.checkout_url, status_code=303)
         factory: CheckoutFactory = app.state.checkout_factory

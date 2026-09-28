@@ -21,7 +21,7 @@ The landing has a section for a first-time visitor, "Trabajo real, no humo"
 to the page that proves it: the full sample report, the methodology and its
 papers, the check page for a report's SHA-256, the privacy policy (a file is
 never published, is deleted after the retention days if unpaid, and an account
-can be deleted) and the terms (refund when the report misreads the file). One
+can be deleted) and the terms (a fix or a new credit when the report misreads the file). One
 point says Rigor sells no bots or signals and that the guard stops any text
 promising results. "Who is behind it" shows `AUDIT_OPERATOR_NAME` and
 `AUDIT_OPERATOR_ADDRESS` only when both are set, and the WhatsApp line only
@@ -1826,7 +1826,7 @@ opens with a table comparing them to what the audit re-counted from the rows
 "Coincide" or "No coincide". It is shown before payment too: these are the
 customer's own totals. The profit factor is left out because platforms treat
 commission and swap in it differently. A mismatch points to the reading notes
-and to the refund promise's contact route.
+and to the terms' contact route for a fix or a new credit.
 
 PDF download: an unlocked report (paid, or any report in free mode) offers
 "Descargar el informe en PDF" at `/audits/{id}/pdf?token=…`, a locked one
@@ -2045,7 +2045,7 @@ Routes:
 | `GET /` | Landing (how it works, prices, FAQ, link to the sample) and the form; `?lang=en`. `GET /en` is the English landing, a short address to share. |
 | `POST /audits` | Upload. An optional `access_code` field redeems a code (paid mode with codes on). |
 | `GET /audits/{id}?token=…` | The report, in the language chosen at upload; `&lang=en` or `&lang=es` shows it in the other one. `GET /audits/{id}.json?token=…` the record (402 while locked). |
-| `POST /audits/{id}/checkout?token=…` | Stripe Checkout (503 without Stripe). Form field `plan=single` (default) or `plan=pack`; the return link `?session_id=…` is confirmed with Stripe before anything unlocks. |
+| `POST /audits/{id}/checkout?token=…` | Stripe Checkout (503 without Stripe). Form field `plan=single` (default) or `plan=pack`; the return link `?session_id=…` is confirmed with Stripe before anything unlocks. Needs a signed-in account: a visitor is sent to sign in and back to the report, a report on another account is refused (403), and the order is recorded on the buyer's account (`tests/test_audit_card_payments.py::test_checkout_needs_the_signed_in_account_that_owns_the_report`). |
 | `POST /audits/{id}/redeem?token=…` | Unlock an existing preview with an access code. |
 | `POST /audits/{id}/publish?token=…` | Create (or return) the public verification page. Paid audits, or any audit in free mode; 402 otherwise. |
 | `POST /audits/{id}/unpublish?token=…` | Remove the public page. |
@@ -2874,11 +2874,20 @@ apps do not preview. Every new page must pass the guard in both languages
 
 ### Terms and privacy
 
-Refund promise (sergio's decision, 2026-09-24): in paid mode the pricing
-section and the terms say that a full report that misreads the file
-(trades, balance or dates that do not match the platform) and cannot be
-fixed is refunded or replaced by a new credit. The operator honours it by
-hand (`quant-trade audit codes create --credits 1` or a transfer back).
+No refunds (sergio's decision, 2026-09-28, replacing the 2026-09-24 refund
+promise): the terms and the buy box say all sales are final (the landing and
+audience pages lose their refund line in the redesign). Before Checkout the
+buyer must tick "the report is delivered at once and the purchase is not
+refundable" (`final_sale=yes`, ES/EN/PT); the acceptance and the terms
+version (`legal.LEGAL_UPDATED`) are kept per order in the additive table
+`checkout_order_terms`, as evidence for a chargeback. A full report that misreads the file (trades,
+balance or dates that do not match the platform) is fixed or replaced by a
+new credit (`quant-trade audit codes create --credits 1`). Only a duplicate
+charge or a charge that delivered no report (the `duplicate` and
+`paid_review` rows in the owner panel) is refunded, by hand from the Stripe
+dashboard; the terms keep one sentence that statutory rights are not
+limited. The refund webhook handling stays so those manual refunds are
+recorded.
 
 `/terminos` (`/terms`) and `/privacidad` (`/privacy`) are rendered by
 `audit/legal.py` from the running configuration: the price, whether card
@@ -2893,10 +2902,10 @@ variables above; no default looks like a real person or company.
 
 **Have a lawyer in the jurisdiction where the service is sold review both
 texts before charging anyone.** They are an honest description of what the
-code does, not legal advice. Points to check in particular: the refund
-policy (an unlocked report is not refunded for a change of mind, but a
-material error that cannot be corrected or failed delivery is remedied, as
-are statutory rights), the 30-day answer to privacy requests, the liability cap,
+code does, not legal advice. Points to check in particular: the no-refund
+policy (sales are final; a misread report gets a fix or a new credit; only
+a duplicate charge or one that delivered no report is refunded; statutory
+rights are not limited), the 30-day answer to privacy requests, the liability cap,
 international hosting, and whether consumer or data-protection law in the
 client's country requires more (for example a data-processing register or a
 named representative).
@@ -3046,7 +3055,7 @@ test-data review finds nothing, its closing line is a green-edged callout.
 
 Every buy box on a locked report, whether card payments are on or not, ends
 with four checks listing what the payment unlocks: every figure, the PDF, the
-public verification page and the refund when the report misreads the file.
+public verification page and a fix or a new credit when the report misreads the file.
 
 "Qué capital necesita y a qué tamaño" shows one card per loss limit (10, 20, 30
 and 50 %): the capital needed at the backtest's size, then the size fraction on
