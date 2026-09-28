@@ -246,10 +246,9 @@ _COPY: dict[str, dict[str, Any]] = {
         "disclaimer": "Aviso",
         "sample_link": "Ver un informe de ejemplo completo (datos sintéticos)",
         "meta_description": (
-            "Auditoría estadística de backtests e historiales de trading para forex, acciones, "
-            "futuros y cripto. Sube el informe de MetaTrader, TradingView, NinjaTrader, Python o "
-            "tu curva de equity y recibe un veredicto de A a D, con cada número etiquetado "
-            "según su evidencia."
+            "Sube el archivo que ya tienes (MetaTrader, TradingView, NinjaTrader, Python o tu "
+            "curva de equity) y Rigor te dice qué tanto de tu resultado aguanta con costes, "
+            "cuántas pruebas hubo detrás y si los datos cuadran. Clase de A a D."
         ),
         "sample_description": (
             "Informe completo de ejemplo de la auditoría de backtests, hecho con datos "
@@ -553,10 +552,9 @@ _COPY: dict[str, dict[str, Any]] = {
         "disclaimer": "Notice",
         "sample_link": "See a full sample report (synthetic data)",
         "meta_description": (
-            "Statistical audit of trading backtests and track records for forex, stocks, futures "
-            "and crypto. Upload your MetaTrader, TradingView, NinjaTrader or Python report or "
-            "your equity curve and get an A to D verdict, with every number tagged by its "
-            "evidence."
+            "Upload the file you already have (MetaTrader, TradingView, NinjaTrader, Python or "
+            "your equity curve) and Rigor shows how much of your result holds up under costs, "
+            "how many tests were behind it and whether the data adds up. Class A to D."
         ),
         "sample_description": (
             "A full sample report of the backtest audit, built from synthetic data: verdict, "
@@ -770,8 +768,8 @@ _UI: dict[str, dict[str, Any]] = {
         "hero_a": "Sube tu backtest o tu historial.",
         "hero_b": "Te decimos si es evidencia o suerte.",
         "trust": [
-            ("shield", "Sin conexión a tu bróker"),
-            ("hash", "Huella SHA-256 de cada archivo"),
+            ("shield", "No se conecta a tu bróker ni recomienda operaciones"),
+            ("hash", "Cada informe se puede comprobar"),
             ("globe", "Informe en español, inglés o portugués"),
             ("key", "Primer informe completo gratis con tu cuenta"),
         ],
@@ -779,10 +777,10 @@ _UI: dict[str, dict[str, Any]] = {
         "mock_k": "Veredicto",
         "cta_sample": "Ver un informe de ejemplo",
         "hero_lead": (
-            "Para traders de cualquier mercado, quien compra un robot, quien va a un reto de "
-            "prop firm y quien invierte con un gestor. Sube el archivo que ya tienes y recibe "
-            "en segundos un veredicto de A a D sobre sobreajuste, costes, fuera de muestra y "
-            "calidad de datos, con cada número etiquetado según su evidencia."
+            "Para quien opera en cualquier mercado, compra un robot, va a un reto de prop firm "
+            "o invierte con un gestor. Sube el archivo que ya tienes y ves una clase de A a D "
+            " que te dice si el resultado aguanta o si se explica por haber probado "
+            "muchas versiones, por costes que no se contaron o por datos con errores."
         ),
         "mock_cap": "Ilustración con datos sintéticos",
         "mock_is": "Dentro de muestra",
@@ -799,9 +797,26 @@ _UI: dict[str, dict[str, Any]] = {
         "problem_eyebrow": "El problema",
         "problem_title": ("Un backtest bonito", "no es evidencia."),
         "problem_lead": (
-            "Casi cualquier estrategia se ve bien en papel. Estas son las tres razones por las "
-            "que la mayoría no aguanta fuera del probador."
+            "Casi cualquier estrategia se ve bien en papel. Rigor está para que no te engañes con "
+            "una curva bonita antes de arriesgar tu dinero o pagar por un robot. Estas son las "
+            "tres razones por las que la mayoría no aguanta fuera del probador."
         ),
+        "example_case": {
+            "eyebrow": "Así lo detecta en el ejemplo",
+            "title": "Sharpe de 1,8 en el probador. Clase C en Rigor.",
+            "text": (
+                "El informe de ejemplo es un backtest de MT5 hecho con datos sintéticos. Rigor le "
+                "baja la clase por tres cosas que el probador no enseña:"
+            ),
+            "points": (
+                "Salió de 120 configuraciones probadas; al descontarlas, su Sharpe ya no llega "
+                "al umbral.",
+                "Con el doble del coste de referencia termina en pérdida.",
+                "Su cuenta real, de 180 operaciones, queda fuera de lo que su propio backtest "
+                "haría esperar.",
+            ),
+            "cta": "Ver el informe del ejemplo",
+        },
         "problems": [
             (
                 "Sobreajuste",
@@ -822,8 +837,9 @@ _UI: dict[str, dict[str, Any]] = {
         "dims_eyebrow": "Qué medimos",
         "dims_title": ("Seis dimensiones.", "Un veredicto de A\u00a0a\u00a0D."),
         "dims_lead": (
-            "Cada dimensión sale como Supera, Débil, No supera o No medido, con dos frases en "
-            "lenguaje llano sobre qué significa para ti."
+            "Rigor revisa tu archivo en seis puntos. Cada uno sale como Supera, Débil, No supera "
+            "o No medido, con dos frases en lenguaje llano sobre qué significa para ti. Los "
+            "métodos son públicos y están escritos en la metodología."
         ),
         "stats": [
             ("6", "dimensiones auditadas"),
@@ -997,8 +1013,8 @@ _UI: dict[str, dict[str, Any]] = {
         "hero_a": "Upload your backtest or track record.",
         "hero_b": "We tell you whether it is evidence or luck.",
         "trust": [
-            ("shield", "No connection to your broker"),
-            ("hash", "SHA-256 fingerprint of every file"),
+            ("shield", "Never connects to your broker or recommends trades"),
+            ("hash", "Every report can be checked"),
             ("globe", "Report in English, Spanish or Portuguese"),
             ("key", "First full report free with your account"),
         ],
@@ -1006,10 +1022,10 @@ _UI: dict[str, dict[str, Any]] = {
         "mock_k": "Verdict",
         "cta_sample": "See a sample report",
         "hero_lead": (
-            "For traders in any market, robot buyers, prop-firm traders and anyone investing "
-            "with a manager. Upload the file you already have and get, in seconds, a verdict "
-            "from A to D on overfitting, costs, out-of-sample and data quality, with every "
-            "number labelled by its evidence."
+            "For anyone who trades any market, buys a robot, takes a prop-firm challenge or "
+            "invests with a manager. Upload the file you already have and you see a class from "
+            "A to D that tells you whether the result holds up or is explained by "
+            "trying many versions, by costs nobody counted or by broken data."
         ),
         "mock_cap": "Illustration with synthetic data",
         "mock_is": "In sample",
@@ -1026,9 +1042,26 @@ _UI: dict[str, dict[str, Any]] = {
         "problem_eyebrow": "The problem",
         "problem_title": ("A good-looking backtest", "is not evidence."),
         "problem_lead": (
-            "Almost any strategy looks good on paper. These are the three reasons most of them "
-            "do not hold up outside the tester."
+            "Almost any strategy looks good on paper. Rigor is there so a pretty curve does not "
+            "fool you before you risk your money or pay for a robot. These are the three reasons "
+            "most of them do not hold up outside the tester."
         ),
+        "example_case": {
+            "eyebrow": "How it catches it in the sample",
+            "title": "A Sharpe of 1.8 in the tester. Class C in Rigor.",
+            "text": (
+                "The sample report is an MT5 backtest built from synthetic data. Rigor lowers its "
+                "class for three things the tester does not show:"
+            ),
+            "points": (
+                "It came out of 120 settings tried; once they are counted, its Sharpe no longer "
+                "reaches the threshold.",
+                "At twice the reference cost it ends in a loss.",
+                "Its live account, 180 trades, falls outside what its own backtest would lead "
+                "you to expect.",
+            ),
+            "cta": "See the sample report",
+        },
         "problems": [
             (
                 "Overfitting",
@@ -1048,8 +1081,9 @@ _UI: dict[str, dict[str, Any]] = {
         "dims_eyebrow": "What we measure",
         "dims_title": ("Six dimensions.", "One verdict from A\u00a0to\u00a0D."),
         "dims_lead": (
-            "Each dimension comes out as Pass, Weak, Fail or Not measured, with two plain "
-            "sentences on what it means for you."
+            "Rigor checks your file on six points. Each one comes out as Pass, Weak, Fail or Not "
+            "measured, with two plain sentences on what it means for you. The methods are "
+            "public and written down in the methodology."
         ),
         "stats": [
             ("6", "audited dimensions"),
@@ -1769,7 +1803,23 @@ def _problems(locale: str) -> str:
     return (
         "<section class='section light'><div class='wrap'>"
         + _section_head(ui["problem_eyebrow"], _title_pair(ui["problem_title"]), ui["problem_lead"])
-        + f"<div class='trio'>{items}</div></div></section>"
+        + f"<div class='trio'>{items}</div>"
+        + _example_case(locale)
+        + "</div></section>"
+    )
+
+
+def _example_case(locale: str) -> str:
+    """One real finding from the sample report, under the three problems."""
+    words = _UI[locale]["example_case"]
+    points = "".join(f"<li>{icon('check')}<span>{_e(p)}</span></li>" for p in words["points"])
+    return (
+        "<div class='investor' data-reveal style='margin-top:40px'>"
+        f"<div><span class='eyebrow'><span class='dot'></span>{_e(words['eyebrow'])}</span>"
+        f"<h3>{_e(words['title'])}</h3><p>{_e(words['text'])}</p>"
+        f"<a class='btn btn-dark' href='{_sample_url(locale)}'>"
+        f"{_e(words['cta'])}<span class='go'>{icon('arrow')}</span></a></div>"
+        f"<ul class='checks'>{points}</ul></div>"
     )
 
 
@@ -1785,7 +1835,7 @@ def _dimensions(locale: str, copy: dict[str, Any]) -> str:
     return (
         "<section class='section dark' id='measure'><div class='wrap'>"
         + _section_head(copy["measure_title"], _title_pair(ui["dims_title"]))
-        + f"<p class='statement'>{_e(copy['pitch'])}</p>"
+        + f"<p class='statement'>{_e(ui['dims_lead'])}</p>"
         + f"<div class='cards'>{cards}</div>"
         + "</div></section>"
     )

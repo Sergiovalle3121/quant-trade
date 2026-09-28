@@ -137,10 +137,9 @@ COPY_PT: dict[str, Any] = {
     "disclaimer": "Aviso",
     "sample_link": "Ver um relatório de exemplo completo (dados sintéticos)",
     "meta_description": (
-        "Auditoria estatística de backtests e históricos de trading para forex, ações, futuros "
-        "e cripto. Envie o relatório do MetaTrader, TradingView, NinjaTrader, Python ou a sua "
-        "curva de equity e receba um veredito de A a D, com cada número etiquetado segundo a "
-        "sua evidência."
+        "Envie o arquivo que você já tem (MetaTrader, TradingView, NinjaTrader, Python ou a sua "
+        "curva de equity) e o Rigor mostra quanto do seu resultado se sustenta com custos, "
+        "quantos testes houve por trás e se os dados fecham. Classe de A a D."
     ),
     "sample_description": (
         "Relatório completo de exemplo da auditoria de backtests, feito com dados sintéticos: "
@@ -360,8 +359,8 @@ UI_PT: dict[str, Any] = {
     "hero_a": "Envie seu backtest ou seu histórico.",
     "hero_b": "Dizemos se é evidência ou sorte.",
     "trust": [
-        ("shield", "Sem conexão com a sua corretora"),
-        ("hash", "Impressão SHA-256 de cada arquivo"),
+        ("shield", "Não se conecta à sua corretora nem recomenda operações"),
+        ("hash", "Todo relatório pode ser comprovado"),
         ("globe", "Relatório em português, inglês ou espanhol"),
         ("key", "Primeiro relatório completo grátis com a sua conta"),
     ],
@@ -369,10 +368,10 @@ UI_PT: dict[str, Any] = {
     "mock_k": "Veredito",
     "cta_sample": "Ver um relatório de exemplo",
     "hero_lead": (
-        "Para traders de qualquer mercado, quem compra um robô, quem vai fazer um desafio de "
-        "prop firm e quem investe com um gestor. Envie o arquivo que você já tem e receba em "
-        "segundos um veredito de A a D sobre sobreajuste, custos, fora da amostra e qualidade "
-        "dos dados, com cada número etiquetado segundo a sua evidência."
+        "Para quem opera em qualquer mercado, compra um robô, faz um desafio de prop firm ou "
+        "investe com um gestor. Envie o arquivo que você já tem e vê uma classe de A a D "
+        " que diz se o resultado se sustenta ou se é explicado por testar muitas versões, "
+        "por custos que ninguém contou ou por dados com erros."
     ),
     "mock_cap": "Ilustração com dados sintéticos",
     "mock_is": "Dentro da amostra",
@@ -389,9 +388,26 @@ UI_PT: dict[str, Any] = {
     "problem_eyebrow": "O problema",
     "problem_title": ("Um backtest bonito", "não é evidência."),
     "problem_lead": (
-        "Quase qualquer estratégia fica bonita no papel. Estes são os três motivos pelos quais "
-        "a maioria não se sustenta fora do testador."
+        "Quase qualquer estratégia fica bonita no papel. O Rigor existe para que uma curva "
+        "bonita não engane você antes de arriscar o seu dinheiro ou pagar por um robô. Estes "
+        "são os três motivos pelos quais a maioria não se sustenta fora do testador."
     ),
+    "example_case": {
+        "eyebrow": "Como ele detecta isso no exemplo",
+        "title": "Sharpe de 1,8 no testador. Classe C no Rigor.",
+        "text": (
+            "O relatório de exemplo é um backtest de MT5 feito com dados sintéticos. O Rigor "
+            "baixa a sua classe por três coisas que o testador não mostra:"
+        ),
+        "points": (
+            "Saiu de 120 configurações testadas; ao descontá-las, o seu Sharpe já não chega ao "
+            "limite.",
+            "Com o dobro do custo de referência termina em prejuízo.",
+            "A sua conta real, de 180 operações, fica fora do que o seu próprio backtest faria "
+            "esperar.",
+        ),
+        "cta": "Ver o relatório de exemplo",
+    },
     "problems": [
         (
             "Sobreajuste",
@@ -412,8 +428,9 @@ UI_PT: dict[str, Any] = {
     "dims_eyebrow": "O que medimos",
     "dims_title": ("Seis dimensões.", "Um veredito de A a D."),
     "dims_lead": (
-        "Cada dimensão sai como Passa, Fraca, Não passa ou Não medida, com duas frases em "
-        "linguagem simples sobre o que significa para você."
+        "O Rigor revisa o seu arquivo em seis pontos. Cada um sai como Passa, Fraca, Não passa "
+        "ou Não medida, com duas frases em linguagem simples sobre o que significa para você. "
+        "Os métodos são públicos e estão escritos na metodologia."
     ),
     "stats": [
         ("6", "dimensões auditadas"),
