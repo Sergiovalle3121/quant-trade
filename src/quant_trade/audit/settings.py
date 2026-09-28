@@ -10,6 +10,8 @@ outside the service and hands out a code, so nothing is charged online.
 
 from __future__ import annotations
 
+import hashlib
+import hmac
 import os
 from collections.abc import Mapping
 from dataclasses import dataclass, field
@@ -61,6 +63,31 @@ def stripe_keys_valid(secret_key: str, webhook_secret: str) -> bool:
 
 #: Stripe Payment Links live here; a test-mode link has ``/test_`` in its path.
 PAYMENT_LINK_PREFIX = "https://buy.stripe.com/"
+
+
+def resend_key_valid(key: str) -> bool:
+    """A Resend API key has the ``re_`` prefix and fits in one header line."""
+    return (
+        key.startswith("re_")
+        and len(key) >= 20
+        and key.isascii()
+        and not any(ch.isspace() for ch in key)
+    )
+
+
+def _email_token_secret(env: Mapping[str, str]) -> str:
+    """The explicit secret, else one derived from the Resend key.
+
+    Deriving it saves the owner a second secret variable. Rotating the Resend
+    key then only voids links still waiting in inboxes (24 h at most).
+    """
+    explicit = env.get("AUDIT_EMAIL_TOKEN_SECRET", "")
+    if explicit:
+        return explicit
+    key = env.get("AUDIT_RESEND_API_KEY", "").strip()
+    if not resend_key_valid(key):
+        return ""
+    return hmac.new(key.encode(), b"rigor-email-token-v1", hashlib.sha256).hexdigest()
 
 
 def payment_link_valid(url: str) -> bool:
@@ -130,6 +157,9 @@ class AuditSettings:
     smtp_password: str = field(default="", repr=False)
     smtp_from: str = ""
     smtp_security: str = "starttls"
+    #: Resend's HTTPS API key. Railway blocks outbound SMTP below the Pro
+    #: plan, so this transport works where SMTP cannot. It wins over SMTP.
+    resend_api_key: str = field(default="", repr=False)
     #: Where a client asks the owner for a code; shown on the landing page.
     contact_url: str = ""
     #: Run the retention purge inside the web service (at start, then daily).
@@ -170,16 +200,26 @@ class AuditSettings:
 
     @property
     def email_delivery_ready(self) -> bool:
-        """A configured encrypted SMTP transport and deterministic token key."""
+        """An encrypted transport (Resend's API or SMTP) and a token key."""
         return bool(
             self.base_url.startswith("https://")
-            and self.smtp_host
-            and "\n" not in self.smtp_host
-            and "\r" not in self.smtp_host
             and self.smtp_from.count("@") == 1
             and "\n" not in self.smtp_from
             and "\r" not in self.smtp_from
             and len(self.email_token_secret) >= 32
+            and (self.resend_ready or self.smtp_ready)
+        )
+
+    @property
+    def resend_ready(self) -> bool:
+        return resend_key_valid(self.resend_api_key)
+
+    @property
+    def smtp_ready(self) -> bool:
+        return bool(
+            self.smtp_host
+            and "\n" not in self.smtp_host
+            and "\r" not in self.smtp_host
             and (not self.smtp_username or self.smtp_password)
         )
 
@@ -336,13 +376,14 @@ class AuditSettings:
             .strip()
             .lower()
             in TRUE_VALUES,
-            email_token_secret=env.get("AUDIT_EMAIL_TOKEN_SECRET", ""),
+            email_token_secret=_email_token_secret(env),
             smtp_host=env.get("AUDIT_SMTP_HOST", "").strip(),
             smtp_port=int(env.get("AUDIT_SMTP_PORT", "").strip() or "587"),
             smtp_username=env.get("AUDIT_SMTP_USERNAME", "").strip(),
             smtp_password=env.get("AUDIT_SMTP_PASSWORD", ""),
-            smtp_from=env.get("AUDIT_SMTP_FROM", "").strip(),
+            smtp_from=(env.get("AUDIT_EMAIL_FROM", "") or env.get("AUDIT_SMTP_FROM", "")).strip(),
             smtp_security=env.get("AUDIT_SMTP_SECURITY", "starttls").strip().lower(),
+            resend_api_key=env.get("AUDIT_RESEND_API_KEY", "").strip(),
             contact_url=_safe_url(env.get("AUDIT_CONTACT_URL", "")),
             auto_purge=env.get("AUDIT_AUTO_PURGE", "").strip().lower() in TRUE_VALUES,
             operator_name=_text(env.get("AUDIT_OPERATOR_NAME", "")),

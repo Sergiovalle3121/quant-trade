@@ -486,3 +486,14 @@ def test_card_payment_wording_appears_only_while_cards_are_on() -> None:
     assert "hash do código de acesso" in privacy_pt
     for page in (terms_es, terms_en, terms_pt, privacy_es, privacy_en, privacy_pt):
         assert find_claims(page) == []
+
+
+def test_privacy_names_resend_only_when_it_carries_the_mail() -> None:
+    base = {**OPERATOR, "free_mode": False, "price_usd": 29, "email_delivery_ready": True}
+    with_resend = LegalContext(**base, email_via_resend=True)
+    without = LegalContext(**base)
+    for locale in ("es", "en", "pt"):
+        privacy = legal_page(privacy_text(with_resend, locale), locale=locale)
+        assert "Resend" in privacy and "resend.com/legal/privacy-policy" in privacy
+        assert find_claims(privacy) == []
+        assert "Resend" not in legal_page(privacy_text(without, locale), locale=locale)

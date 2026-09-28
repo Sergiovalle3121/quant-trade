@@ -4686,6 +4686,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             retention_days=cfg.retention_days,
             max_uploads_per_hour_per_ip=cfg.max_uploads_per_hour_per_ip,
             email_delivery_ready=cfg.email_delivery_ready,
+            email_via_resend=cfg.resend_ready,
             email_verification_required=cfg.email_verification_required,
         )
 

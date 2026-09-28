@@ -33,6 +33,7 @@ from quant_trade.audit.settings import PACK_CREDITS
 LEGAL_UPDATED = "2026-09-27"
 
 STRIPE_PRIVACY_URL = "https://stripe.com/privacy"
+RESEND_PRIVACY_URL = "https://resend.com/legal/privacy-policy"
 
 #: Paths of the two pages per locale; both answer either ``lang``.
 LEGAL_PATHS: dict[str, dict[str, str]] = {
@@ -81,6 +82,8 @@ class LegalContext:
     access_codes: bool = False
     pack_price_usd: float = 0.0
     email_delivery_ready: bool = False
+    #: True when account e-mail goes out through Resend's API.
+    email_via_resend: bool = False
     email_verification_required: bool = False
     retention_days: int = 30
     max_uploads_per_hour_per_ip: int = 10
@@ -869,6 +872,33 @@ def _stripe_keeps(ctx: LegalContext, locale: str) -> tuple[str, ...]:
 def _email_keeps(ctx: LegalContext, locale: str) -> tuple[str, ...]:
     if not (ctx.email_delivery_ready or ctx.email_verification_required):
         return ()
+    return _email_keeps_text(locale) + _email_provider(ctx, locale)
+
+
+def _email_provider(ctx: LegalContext, locale: str) -> tuple[str, ...]:
+    """Who carries the mail; only said when that provider is in use."""
+    if not (ctx.email_delivery_ready and ctx.email_via_resend):
+        return ()
+    return {
+        "es": (
+            "Los correos los entrega Resend, que recibe la dirección de destino, el asunto y "
+            "el texto de cada mensaje y los trata según su propia política: "
+            f"{RESEND_PRIVACY_URL}.",
+        ),
+        "en": (
+            "Resend delivers these e-mails. It receives the recipient address, subject and "
+            "text of each message and processes them under its own policy: "
+            f"{RESEND_PRIVACY_URL}.",
+        ),
+        "pt": (
+            "Os e-mails são entregues pela Resend, que recebe o endereço de destino, o assunto "
+            "e o texto de cada mensagem e os trata segundo a própria política: "
+            f"{RESEND_PRIVACY_URL}.",
+        ),
+    }[locale]
+
+
+def _email_keeps_text(locale: str) -> tuple[str, ...]:
     return {
         "es": (
             "Si confirmas tu correo: la dirección confirmada y la fecha, hasta que borres "
