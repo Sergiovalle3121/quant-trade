@@ -309,6 +309,10 @@ def test_an_account_deleted_before_the_webhook_gets_no_credits(tmp_path: Path) -
 
 def test_switching_language_opens_a_checkout_in_that_language(tmp_path: Path) -> None:
     client, calls = _client(tmp_path)
+    expired: list[str] = []
+    client.app.state.session_expirer = lambda cfg, sid: (
+        expired.append(sid) or {"id": sid, "status": "expired"}
+    )
     assert _buy(client).headers["location"] == "https://checkout.stripe.test/1"
     csrf = re.search(r"name='csrf' value='([^']+)'", client.get("/pt/conta").text)
     assert csrf
@@ -319,9 +323,10 @@ def test_switching_language_opens_a_checkout_in_that_language(tmp_path: Path) ->
     )
     assert pt.headers["location"] == "https://checkout.stripe.test/2"
     assert [call["locale"] for call in calls] == ["es", "pt"]
-    # Back in Spanish, the open Spanish session is reused.
-    assert _buy(client).headers["location"] == "https://checkout.stripe.test/1"
-    assert len(calls) == 2
+    # The Spanish session was expired at Stripe, so Spanish opens a new one.
+    assert expired == ["cs_live_1"]
+    assert _buy(client).headers["location"] == "https://checkout.stripe.test/3"
+    assert expired == ["cs_live_1", "cs_live_2"] and len(calls) == 3
 
 
 def test_an_open_order_is_reused_only_in_its_language(tmp_path: Path) -> None:

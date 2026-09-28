@@ -160,6 +160,38 @@ Every change below has an offline, deterministic test in
   four links are plain fragment links and the bar is CSS, so the Content
   Security Policy is as before. The page's message is still one of the fixed
   texts chosen by an allow-listed `done=` or `error=` code, never echoed.
+- Checkout sessions and the language switch (payments, 2026-09-28, local
+  review with Stripe simulated; `tests/test_audit_checkout_language.py`).
+  Before, a buyer who changed language left the first Checkout session
+  payable at Stripe for up to a day next to the new one, so the same purchase
+  could be paid twice. Now the session of the other language is expired at
+  Stripe after the redirect to the new one. What keeps it safe: only an
+  `open` order of the same report (or account) and plan is sent, never one
+  that is `paid_review`, `delivered` or `duplicate`; Stripe refuses to expire
+  a complete session, so a payment that won the race stays paid and its
+  webhook delivers; the local order is changed only after Stripe answers
+  `expired`, with a conditional update that leaves a paid order untouched,
+  and it keeps its session id, so a late paid webhook still settles once
+  (a second charge is a `duplicate` for manual refund review, as before).
+  The call is one attempt with a 10-second timeout in a background task, so
+  it cannot delay or fail the new checkout; failures are logged with the
+  session id and the error class only, never the key or Stripe's message.
+  No new route, form field or redirect target; the Stripe key is used for
+  one more endpoint. Limits: best effort (a failed expiry leaves the old
+  session open, as it was before); the no-charge card check is not covered
+  (no charge, no order); two switches at the same moment can expire each
+  other's session, which charges nothing. Review follow-up: because an
+  expired order is not reused, alternating languages would open one new
+  Stripe session per click on `POST /audits/{id}/checkout`, which has no
+  request limit of its own; expiry calls are now capped at 6 per purchase
+  and per account in an hour (in memory, per process), and past the cap the
+  old session stays open and is reused, so the sessions one report can open
+  stay bounded. An order made after the new one is never expired (a slow
+  older request cannot close the newer session), and a failed expiry reads
+  the session once and marks the order only when Stripe already holds it as
+  `expired`, never when it is `complete`. Also fixed: the two redirects of
+  `POST /audits/{id}/checkout` that wrote `token=None` when the signed-in
+  owner paid without the token in the URL now write an empty token.
 
 ## Launch basics (2026-09-28)
 
