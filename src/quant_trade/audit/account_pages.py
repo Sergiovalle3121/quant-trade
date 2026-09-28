@@ -99,6 +99,11 @@ COPY: dict[str, dict[str, str]] = {
             "Ese correo es de un servicio de buzones temporales. Usa un correo que conserves: "
             "ahí te llegan la confirmación y la recuperación de tu cuenta."
         ),
+        "email_typo": (
+            "¿Quisiste decir {email}? Lo corregimos abajo: ahí llegan la confirmación y la "
+            "recuperación de tu cuenta. Escribe otra vez tu contraseña para seguir."
+        ),
+        "email_typo_keep": "No, mi correo es {email} tal como lo escribí.",
         "email_no_domain": (
             "No encontramos ese dominio de correo. Revisa que esté bien escrito: ahí te llegan "
             "la confirmación y la recuperación de tu cuenta."
@@ -749,6 +754,11 @@ COPY: dict[str, dict[str, str]] = {
             "That address belongs to a temporary-inbox service. Use an address you keep: "
             "your account's confirmation and recovery go there."
         ),
+        "email_typo": (
+            "Did you mean {email}? We corrected it below: your account's confirmation and "
+            "recovery go there. Type your password again to continue."
+        ),
+        "email_typo_keep": "No, my address is {email}, as I typed it.",
         "email_no_domain": (
             "We could not find that e-mail domain. Check the spelling: your account's "
             "confirmation and recovery go there."
@@ -1360,6 +1370,8 @@ align-items:start}
 .acct-card{border:1px solid var(--border);border-radius:18px;padding:24px;
 background:#fff}
 .acct-perks{background:var(--surface-2)}
+.acct-check{display:flex;gap:10px;align-items:flex-start;margin:-4px 0 16px;font-size:.95rem}
+.acct-check input{margin-top:4px;width:auto}
 .acct-side{display:grid;gap:18px}
 .acct-stores{border-color:color-mix(in srgb,var(--ok) 32%,var(--border))}
 .acct-stores h3{display:flex;align-items:center;margin:0 0 12px;font-size:1rem}
@@ -1643,21 +1655,44 @@ def signup_page(
     next_path: str = "",
     retention_days: int = 30,
     invite: str = "",
+    typo_of: str = "",
+    typo_kept: bool = False,
 ) -> str:
+    """The sign-up form; ``typo_of`` asks whether that address was meant as ``email``.
+
+    ``typo_kept`` shows the "keep what I typed" box ticked, after another error.
+    """
     locale = _locale(locale)
     copy = COPY[locale]
     from quant_trade.audit.legal import legal_url
+
+    typo = ""
+    if typo_of and error == "email_typo":
+        typo = (
+            "<div class='error' role='alert'>"
+            + _e(copy["email_typo"].format(email=_safe_text(email)))
+            + "</div>"
+        )
+    keep = ""
+    if typo_of:
+        keep = (
+            "<label class='acct-check'><input type='checkbox' name='email_as_typed' "
+            f"value='{_e(_safe_text(typo_of))}'{' checked' if typo_kept else ''}> "
+            + _e(copy["email_typo_keep"].format(email=_safe_text(typo_of)))
+            + "</label>"
+        )
 
     signin = path("signin", locale) + (f"?next={_e(_q(next_path))}" if next_path else "")
     form = (
         _tabs("signup", locale, next_path)
         + (f"<div class='flash' role='status'>{_e(copy['invited_banner'])}</div>" if invite else "")
-        + _alert(copy, error)
+        + (typo or _alert(copy, error))
         + f"<form method='post' action='{path('signup', locale)}'>"
         + _hidden("csrf", csrf)
         + _hidden("next", next_path)
         + (_hidden("invite", invite) if invite else "")
         + _email_field(copy, email)
+        + keep
         + _field(
             copy["password"],
             f"<input type='password' name='password' required minlength='{MIN_PASSWORD_CHARS}' "
@@ -1866,10 +1901,11 @@ def gate_page(*, locale: str, reason: str, limit: int) -> str:
     locale = _locale(locale)
     copy = COPY[locale]
     reason = reason if reason in ("signin", "code", "quota", "network") else "signin"
-    home = _home(locale)
+    from quant_trade.audit.pages import AUDIT_PATHS
+
     if reason in ("signin", "code"):
-        # After signing up or in, back to the upload form: the file was not kept.
-        back = "?next=" + _e(_q(home + "#subir"))
+        # After signing up or in, back to the upload page: the file was not kept.
+        back = "?next=" + _e(_q(AUDIT_PATHS[locale]))
         buttons = (
             f"<a class='btn btn-primary btn-lg' href='{path('signup', locale)}{back}'>"
             f"{_e(copy['gate_signup'])}</a>"
@@ -1880,7 +1916,7 @@ def gate_page(*, locale: str, reason: str, limit: int) -> str:
         buttons = (
             f"<a class='btn btn-primary btn-lg' href='{path('account', locale)}'>"
             f"{_e(copy['gate_buy'])}</a>"
-            f"<a class='btn btn-ghost btn-lg' href='{home}'>{_e(copy['gate_back'])}</a>"
+            f"<a class='btn btn-ghost btn-lg' href='{_home(locale)}'>{_e(copy['gate_back'])}</a>"
         )
     body = (
         "<div class='wrap-narrow'><div class='acct-card acct-gate'>"
@@ -2442,7 +2478,8 @@ def account_page(
     """
     locale = _locale(locale)
     copy = COPY[locale]
-    home = _home(locale)
+    from quant_trade.audit.pages import AUDIT_PATHS
+
     signout = (
         f"<form method='post' action='{path('signout', locale)}'>{_hidden('csrf', csrf)}"
         f"<button class='btn btn-ghost btn-sm' type='submit'>{_e(copy['signout_button'])}"
@@ -2451,7 +2488,7 @@ def account_page(
     header = (
         "<div class='acct-head'>"
         f"<p class='muted'>{_e(copy['signed_in_as'])} <b>{_e(_safe_text(account.email))}</b></p>"
-        f"<div class='inline-form'><a class='btn btn-primary' href='{home}#subir'>"
+        f"<div class='inline-form'><a class='btn btn-primary' href='{AUDIT_PATHS[locale]}'>"
         f"{_e(copy['new_audit'] if audits else copy['first_audit'])}</a>{signout}</div></div>"
     )
     free_value = copy["free_left_value"].format(left=free_left, limit=free_limit)

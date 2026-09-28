@@ -31,7 +31,7 @@ Qué cambió respecto a la primera versión:
   públicos (MetaTrader en 7 idiomas, Myfxbook, señales de MQL5, FX Blue y
   TradingView): ver `docs/research/audit_iteration4/real_reports_check.md`,
   `mt_languages_check.md` y `tracking_exports_check.md`. Si un informe de pago
-  lee mal un archivo, se revisa la incidencia según `/terminos`.
+  lee mal un archivo, se corrige o se da un crédito nuevo; las ventas son finales (`/terminos`).
 - Los códigos se crean desde el navegador en `/panel`; ya no hace falta
   `railway ssh`.
 - Se añaden un canal (tus propios contactos) y dos plantillas: P1 y D2.
@@ -125,7 +125,7 @@ comprobar).
 | Vistas previas posteriores | 3 gratis por cuenta y mes, con límites por red | Clase, gráficas, banderas rojas, lectura del archivo y explicación de cada dimensión. |
 | Informe completo adicional | USD 29 (`AUDIT_PRICE_USD_CENTS=2900`) | Después del primer informe gratis. |
 | Paquete de 3 | USD 69 (`AUDIT_PACK_PRICE_USD_CENTS=6900`) | Con tarjeta: desbloquea el informe actual y deja 2 créditos; por venta manual: un código de 3 créditos tras verificar el pago. |
-| Incidencia de lectura | Revisión y resolución según `/terminos` | Si un informe de pago lee mal operaciones, saldo o fechas, el cliente puede contactar con soporte; se corrige o se emite un crédito nuevo; las ventas son finales. |
+| Incidencia de lectura | Corrección o crédito nuevo; ventas finales | Si un informe de pago lee mal operaciones, saldo o fechas, el cliente puede contactar con soporte; se corrige o se emite un crédito nuevo; las ventas son finales. |
 
 La cuenta nueva recibe su primer informe completo sin pagar. Después puede
 usar tres vistas previas gratis al mes y decidir si compra otros informes.
@@ -272,7 +272,7 @@ Lancé Rigor, un servicio que audita backtests e historiales de cuenta: subes el
 También compara un backtest con la cuenta real donde corre el robot y separa los depósitos del resultado de operar, que es donde más se maquilla un historial.
 
 Crea tu cuenta y recibe tu primer informe completo gratis: https://<dominio>
-Después tienes 3 vistas previas gratis al mes. Cada informe completo adicional cuesta USD 29, o USD 69 el paquete de 3. Si uno de pago lee mal tu archivo, escríbenos para revisar la incidencia según los términos.
+Después tienes 3 vistas previas gratis al mes. Cada informe completo adicional cuesta USD 29, o USD 69 el paquete de 3. Si uno de pago lee mal tu archivo, escríbenos: lo corregimos o te damos un crédito nuevo. Las ventas son finales.
 
 Ejemplo completo: https://<dominio>/ejemplo
 Si te sirve o conoces a alguien a quien le sirva, me ayudas mucho. Si no, no pasa nada.
@@ -288,7 +288,7 @@ I launched Rigor, a service that audits backtests and account histories: you upl
 It also compares a backtest with the live account the robot runs on, and separates deposits from trading results, which is where a history is most often dressed up.
 
 Create an account and get your first full report free: https://<domain>
-After that you have 3 free previews a month. Each additional full report is USD 29, or USD 69 for a pack of 3. If a paid report misreads your file, contact us so we can review it under the terms.
+After that you have 3 free previews a month. Each additional full report is USD 29, or USD 69 for a pack of 3. If a paid report misreads your file, contact us: we fix it or give you a new credit. All sales are final.
 
 Full sample: https://<domain>/ejemplo
 If it is useful to you or someone you know, that helps me a lot. If not, no problem.
@@ -373,7 +373,7 @@ Puedes pagar por:
 
 Cuando vea el pago te mando un código de acceso. Lo escribes en tu informe, en el recuadro "¿Tienes un código de acceso?", y se desbloquea completo: pruebas de estrés, riesgo y capital, simulador de reto, cuenta real frente al backtest si la subiste, preguntas para el vendedor y el PDF.
 
-Si el informe lee mal tu archivo, escríbenos para revisarlo y aplicar la solución prevista en los términos.
+Si el informe lee mal tu archivo, escríbenos: lo corregimos o te damos un crédito nuevo. Las ventas son finales.
 Términos del servicio: https://<dominio>/terminos
 ```
 
@@ -388,7 +388,7 @@ You can pay by:
 
 Once I see the payment I send you an access code. Type it in your report, in the "Have an access code?" box, and the full report unlocks: stress tests, risk and capital, the challenge simulator, the live account against the backtest if you uploaded it, questions for the vendor and the PDF.
 
-If the report misreads your file, contact us so we can review it and apply the remedy in the terms.
+If the report misreads your file, contact us: we fix it or give you a new credit. All sales are final.
 Terms of service: https://<domain>/terms
 ```
 
@@ -477,7 +477,7 @@ También: el resultado sin sus mejores operaciones, el modelo de ticks del proba
 
 Qué no hace: no se conecta a ningún bróker, no predice resultados y no recomienda comprar ningún robot.
 
-Con una cuenta gratis, el primer informe completo no se paga; después, 3 vistas previas gratis al mes y USD 29 por informe completo adicional. Los errores de lectura en informes de pago se revisan según los términos. Los vendedores pueden publicar una página de verificación con los hashes del archivo auditado.
+Con una cuenta gratis, el primer informe completo no se paga; después, 3 vistas previas gratis al mes y USD 29 por informe completo adicional. Si un informe de pago lee mal el archivo, se corrige o se da un crédito nuevo; las ventas son finales. Los vendedores pueden publicar una página de verificación con los hashes del archivo auditado.
 
 Informe de ejemplo con datos sintéticos: https://<dominio>/ejemplo
 Cómo audita, con cada umbral: https://<dominio>/metodologia
@@ -496,7 +496,7 @@ Also: the result without its best trades, the tester's tick model, whether the b
 
 What it does not do: it never connects to a broker, it does not predict results and it does not recommend buying any robot.
 
-A free account gets its first full report free; after that, 3 free previews a month and USD 29 per additional full report. We review paid reports that misread a file under the terms. Vendors can publish a verification page with the hashes of the audited file.
+A free account gets its first full report free; after that, 3 free previews a month and USD 29 per additional full report. A paid report that misreads a file is fixed or replaced by a new credit; all sales are final. Vendors can publish a verification page with the hashes of the audited file.
 
 Sample report built from synthetic data: https://<domain>/ejemplo
 How it audits, with every threshold: https://<domain>/methodology
@@ -990,7 +990,7 @@ de pagar.
 | 5. Paga | Confirma el pago en tu banco o Mercado Pago antes de nada. Luego, en `https://<dominio>/panel`, crea un código con 1 crédito (3 para el paquete) y en la nota pon nombre de pila y referencia del pago. El código se muestra una sola vez. | `/panel` |
 | 6. Entrega | Envía el código por WhatsApp y por ningún otro canal. | W4 |
 | 7. Canje | El cliente escribe el código en su informe y lo desbloquea; puede guardarlo en PDF. | — |
-| 8. Si falla | Si el archivo no se lee, no se crea auditoría y el código queda intacto. Si un informe de pago lee mal el archivo, registra y revisa la incidencia, corrige el importador y tramita manualmente la solución prevista en `/terminos`. | W6 |
+| 8. Si falla | Si el archivo no se lee, no se crea auditoría y el código queda intacto. Si un informe de pago lee mal el archivo, registra y revisa la incidencia, corrige el importador y corrige el informe o emite un crédito nuevo (`quant-trade audit codes create --credits 1`); las ventas son finales. | W6 |
 | 9. Vendedor | Si es vendedor, explica cómo publicar la verificación. | V2 |
 | 10. Seguimiento | A los tres días, pide opinión sobre el informe y que lo recomiende. | W5 |
 
