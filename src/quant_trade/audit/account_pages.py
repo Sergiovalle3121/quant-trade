@@ -1851,10 +1851,11 @@ def gate_page(*, locale: str, reason: str, limit: int) -> str:
     locale = _locale(locale)
     copy = COPY[locale]
     reason = reason if reason in ("signin", "code", "quota", "network") else "signin"
-    home = _home(locale)
+    from quant_trade.audit.pages import AUDIT_PATHS
+
     if reason in ("signin", "code"):
-        # After signing up or in, back to the upload form: the file was not kept.
-        back = "?next=" + _e(_q(home + "#subir"))
+        # After signing up or in, back to the upload page: the file was not kept.
+        back = "?next=" + _e(_q(AUDIT_PATHS[locale]))
         buttons = (
             f"<a class='btn btn-primary btn-lg' href='{path('signup', locale)}{back}'>"
             f"{_e(copy['gate_signup'])}</a>"
@@ -1865,7 +1866,7 @@ def gate_page(*, locale: str, reason: str, limit: int) -> str:
         buttons = (
             f"<a class='btn btn-primary btn-lg' href='{path('account', locale)}'>"
             f"{_e(copy['gate_buy'])}</a>"
-            f"<a class='btn btn-ghost btn-lg' href='{home}'>{_e(copy['gate_back'])}</a>"
+            f"<a class='btn btn-ghost btn-lg' href='{_home(locale)}'>{_e(copy['gate_back'])}</a>"
         )
     body = (
         "<div class='wrap-narrow'><div class='acct-card acct-gate'>"
@@ -2426,7 +2427,8 @@ def account_page(
     """
     locale = _locale(locale)
     copy = COPY[locale]
-    home = _home(locale)
+    from quant_trade.audit.pages import AUDIT_PATHS
+
     signout = (
         f"<form method='post' action='{path('signout', locale)}'>{_hidden('csrf', csrf)}"
         f"<button class='btn btn-ghost btn-sm' type='submit'>{_e(copy['signout_button'])}"
@@ -2435,7 +2437,7 @@ def account_page(
     header = (
         "<div class='acct-head'>"
         f"<p class='muted'>{_e(copy['signed_in_as'])} <b>{_e(_safe_text(account.email))}</b></p>"
-        f"<div class='inline-form'><a class='btn btn-primary' href='{home}#subir'>"
+        f"<div class='inline-form'><a class='btn btn-primary' href='{AUDIT_PATHS[locale]}'>"
         f"{_e(copy['new_audit'] if audits else copy['first_audit'])}</a>{signout}</div></div>"
     )
     free_value = copy["free_left_value"].format(left=free_left, limit=free_limit)

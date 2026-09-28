@@ -1262,21 +1262,23 @@ def test_the_sign_in_gate_says_the_file_was_not_kept_and_returns_to_the_form(
     refused = _upload(client)
     assert refused.status_code == 401
     assert "Tu archivo no se guardó" in refused.text
-    assert "href='/registro?next=/%23subir'" in refused.text
+    assert "href='/registro?next=/auditar'" in refused.text
     assert not find_claims(re.sub(r"<[^>]+>", " ", refused.text))
-    signup = client.get("/registro?next=/%23subir").text
-    assert "name='next' value='/#subir'" in signup
+    signup = client.get("/registro?next=/auditar").text
+    assert "name='next' value='/auditar'" in signup
     answer = client.post(
         "/registro",
         data={
             "email": "back@example.com",
             "password": PASSWORD,
             "csrf": _csrf(signup),
-            "next": "/#subir",
+            "next": "/auditar",
         },
         follow_redirects=False,
     )
-    assert answer.status_code == 303 and answer.headers["location"] == "/#subir"
+    assert answer.status_code == 303 and answer.headers["location"] == "/auditar"
+    # «Mi cuenta» sends the first upload straight to the upload page too.
+    assert "href='/auditar'" in client.get("/cuenta").text
 
 
 def test_the_account_buys_on_whatsapp_with_the_same_three_steps(tmp_path: Path) -> None:
