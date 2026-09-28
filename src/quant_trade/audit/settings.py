@@ -198,6 +198,12 @@ class AuditSettings:
     operator_contact: str = ""
     operator_address: str = ""
     jurisdiction: str = ""
+    #: Optional wording of the address and the jurisdiction for the English and
+    #: Portuguese pages. Empty means the base value above is shown as written.
+    operator_address_en: str = ""
+    operator_address_pt: str = ""
+    jurisdiction_en: str = ""
+    jurisdiction_pt: str = ""
     #: Secret for the owner panel where codes are created from a browser.
     #: No default: empty (or shorter than MIN_ADMIN_KEY_LENGTH) turns it off.
     admin_key: str = field(default="", repr=False)
@@ -331,6 +337,17 @@ class AuditSettings:
             and self.jurisdiction
         )
 
+    def operator_address_for(self, locale: str) -> str:
+        """The address as the pages of ``locale`` print it."""
+        override = {"en": self.operator_address_en, "pt": self.operator_address_pt}
+        # An override only rewords a value that is set: alone it shows nothing.
+        return (override.get(locale, "") or self.operator_address) if self.operator_address else ""
+
+    def jurisdiction_for(self, locale: str) -> str:
+        """The governing law and courts as the pages of ``locale`` print them."""
+        override = {"en": self.jurisdiction_en, "pt": self.jurisdiction_pt}
+        return (override.get(locale, "") or self.jurisdiction) if self.jurisdiction else ""
+
     @property
     def price_usd(self) -> float:
         return self.price_usd_cents / 100.0
@@ -429,6 +446,10 @@ class AuditSettings:
             operator_contact=_text(env.get("AUDIT_OPERATOR_CONTACT", "")),
             operator_address=_text(env.get("AUDIT_OPERATOR_ADDRESS", "")),
             jurisdiction=_text(env.get("AUDIT_JURISDICTION", "")),
+            operator_address_en=_text(env.get("AUDIT_OPERATOR_ADDRESS_EN", "")),
+            operator_address_pt=_text(env.get("AUDIT_OPERATOR_ADDRESS_PT", "")),
+            jurisdiction_en=_text(env.get("AUDIT_JURISDICTION_EN", "")),
+            jurisdiction_pt=_text(env.get("AUDIT_JURISDICTION_PT", "")),
             admin_key=env.get("AUDIT_ADMIN_KEY", "").strip(),
             panel_path=env.get("AUDIT_PANEL_PATH", "").strip() or DEFAULT_PANEL_PATH,
             public_data=env.get("AUDIT_PUBLIC_DATA", "true").strip().lower() in TRUE_VALUES,

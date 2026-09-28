@@ -972,8 +972,9 @@ def test_what_the_account_keeps_reads_as_a_security_card(tmp_path: Path) -> None
 
     page = _client(tmp_path).get("/registro").text
     stores = page.split("<div class='acct-card acct-stores'>", 1)[1].split("</div>", 1)[0]
-    assert stores.startswith("<h3><svg")
+    assert stores.startswith("<h2><svg")
     assert ".acct-stores h3 svg{flex:none;width:30px;height:30px" in ACCOUNT_CSS
+    assert ".acct-stores h2 svg{flex:none;width:30px;height:30px" in ACCOUNT_CSS
 
 
 def test_small_phones_keep_the_landing_and_timing_tables_inside_the_screen() -> None:

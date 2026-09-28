@@ -217,9 +217,13 @@ def head_meta(meta: PageMeta, *, base_url: str = "") -> str:
     return "".join(tags)
 
 
-def private_meta(title: str, locale: str) -> str:
-    """Tags for a page that must never be indexed or previewed with detail."""
-    return head_meta(PageMeta(title=title, description=title, locale=locale, index=False))
+def private_meta(title: str, locale: str, description: str = "") -> str:
+    """Tags for a page that must never be indexed or previewed with detail.
+
+    ``description`` is a fixed sentence about the page; without it the title is used."""
+    return head_meta(
+        PageMeta(title=title, description=description or title, locale=locale, index=False)
+    )
 
 
 def robots_txt(base_url: str) -> str:
@@ -254,6 +258,9 @@ def sitemap_xml(base_url: str) -> str:
             f"<xhtml:link rel='alternate' hreflang='{lang}' href='{base}{_e(pair[lang])}'/>"
             for lang in langs
         )
+        # The same default the pages declare in their head (``head_meta``).
+        default = _e(pair.get("es", pair[langs[0]]))
+        alternates += f"<xhtml:link rel='alternate' hreflang='x-default' href='{base}{default}'/>"
         for lang in langs:
             urls.append(f"<url><loc>{base}{_e(pair[lang])}</loc>{alternates}</url>")
     return (

@@ -127,7 +127,7 @@ def test_the_portuguese_newsletter_form_comes_back_to_the_portuguese_page(
     assert joined.headers["location"] == "/pt?joined=1#news"
     assert "Inscrito. Obrigado." in client.get("/pt?joined=1").text
     bad = client.post("/waitlist", data={"email": "nope", "lang": "pt"}, follow_redirects=False)
-    assert bad.headers["location"] == "/pt?error=email"
+    assert bad.headers["location"] == "/pt?error=email#news"
     assert "Esse endereço de e-mail não parece válido." in client.get("/pt?error=email").text
 
 

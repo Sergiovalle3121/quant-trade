@@ -8096,7 +8096,11 @@ def render_html(
         + "</div>"
     )
     home = {"en": "/en", "pt": "/pt"}.get(locale, "/")
+    skip = {"en": "Skip to content", "pt": "Pular para o conteúdo"}.get(
+        locale, "Saltar al contenido"
+    )
     header = (
+        f"<a class='skip no-print' href='#main'>{_e(skip)}</a>"
         f"<header class='nav nav-solid'><div class='wrap nav-in'>{logo(home)}{toolbar}</div>"
         "</header>"
     )
