@@ -1,6 +1,7 @@
 src/quant_trade/audit/account_pages.py
 src/quant_trade/audit/account_pt.py
 src/quant_trade/audit/accounts.py
+src/quant_trade/audit/compare.py
 src/quant_trade/audit/engine.py
 src/quant_trade/audit/errors_pt.py
 src/quant_trade/audit/funnel.py
@@ -43,6 +44,8 @@ tests/test_audit_monetary_integrity.py
 tests/test_audit_money_web.py
 tests/test_audit_ops.py
 tests/test_audit_path_to_pay.py
+tests/test_audit_pdf_origin_label.py
+tests/test_audit_pdf_statements.py
 tests/test_audit_plan.py
 tests/test_audit_portuguese_report.py
 tests/test_audit_public.py

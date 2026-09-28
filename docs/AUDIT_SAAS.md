@@ -325,7 +325,10 @@ it is never matched to a known platform, the upload is answered with
 `pdf_columns` and the screen shows the rows with a notice (ES, EN, PT) that
 they were rebuilt from a PDF and should be checked; a saved column choice is
 never applied to a PDF without showing it. The audit read from it carries
-`PDF_ROWS_WARNING`. The extraction runs in a child process killed after
+`PDF_ROWS_WARNING`. The report, public verification details and comparison
+cards label these PDF uploads as PDF even when their rows were mapped through
+CSV columns; the public page receives only a PDF-origin flag, not parser
+warnings. The extraction runs in a child process killed after
 10 s, with 1 GB of memory and 10 s of CPU; at most 30 pages, 20,000
 characters per page and 200,000 table cells in all. The table's pieces are joined across pages only when
 they all have the same columns (a header repeated on each page is dropped);
@@ -3411,8 +3414,9 @@ A platform Balance cell which differs materially from the deal-money chain
 produces `MONETARY_RECONCILIATION_MISMATCH` (`FAIL` for data quality), and
 the return uses the reconstructed deal amounts. When the importer reports a
 position still open at the end, or a close whose money is in the balance but
-not in the trade list, the gap is `NOT_MEASURED` instead: those deals move the
-balance without being closed trades. For an independently uploaded
+not in the trade list, a gap against closed trades is `NOT_MEASURED` only if
+the printed balance still agrees with the complete row-money chain; a broken
+Balance cell remains a contradiction, so an open position cannot hide it. For an independently uploaded
 curve, an unexplained difference leaves the equation `NOT_MEASURED` with the
 reason shown, and raises **no** red flag and no data-quality penalty:
 unreported deposits, floating P&L in the curve, conversion or a scaled index

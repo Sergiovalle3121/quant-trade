@@ -28,7 +28,12 @@ from quant_trade.audit.decay import signed_amount as _signed_amount
 from quant_trade.audit.guard import assert_report_clean
 from quant_trade.audit.holding import EDGE_SE
 from quant_trade.audit.i18n import localize
-from quant_trade.audit.importers import NEAR_EMPTY_DAYS, NEAR_EMPTY_FIRST, lead_number
+from quant_trade.audit.importers import (
+    NEAR_EMPTY_DAYS,
+    NEAR_EMPTY_FIRST,
+    PDF_ROWS_WARNING,
+    lead_number,
+)
 from quant_trade.audit.instruments import MIN_EACH as _INSTRUMENTS_MIN
 from quant_trade.audit.instruments import OTHER as _INSTRUMENTS_OTHER
 from quant_trade.audit.legal import LINK_TEXT, legal_url
@@ -3575,6 +3580,16 @@ SOURCE_NAMES: dict[str, str] = {
 }
 
 
+def source_name(inputs: dict[str, Any], default: str = "") -> str:
+    """Name the uploaded file format, even when PDF rows used CSV columns."""
+    if inputs.get("source_is_pdf") or any(
+        str(warning).endswith(PDF_ROWS_WARNING) for warning in inputs.get("parse_warnings") or []
+    ):
+        return "PDF"
+    source_format = inputs.get("source_format")
+    return SOURCE_NAMES.get(str(source_format), str(source_format or default))
+
+
 #: How often the uploaded series is sampled, as ``schema.infer_frequency`` labels it.
 FREQUENCY_TEXT: dict[str, dict[str, str]] = {
     "es": {
@@ -4705,7 +4720,7 @@ def _source_html(data: dict[str, Any], labels: dict[str, str]) -> str:
     out = ""
     source_format = inputs.get("source_format")
     if source_format and source_format != "csv":
-        shown = SOURCE_NAMES.get(source_format, source_format)
+        shown = source_name(inputs)
         out += f"<p>{_e(labels['report_source'])}: {_e(shown)}</p>"
     optimization = inputs.get("optimization")
     if optimization:

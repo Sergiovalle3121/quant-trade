@@ -3078,6 +3078,118 @@ class Store:
                 return None
             return {**dict(row), "attempts": int(row["attempts"]) + 1}
 
+    def prepare_email_delivery(
+        self, claimed: Mapping[str, Any], *, at: datetime
+    ) -> dict[str, Any] | None:
+        """Refresh a leased recipient or retire a challenge invalidated by an email change.
+
+        Purchase notices follow a newly verified address on the same outbox id.
+        Verification, change and reset tokens keep their original recipient;
+        once that recipient no longer matches the account, the token is retired.
+        """
+        sa, table = self._sa, self.email_outbox
+        challenge_id = str(claimed["id"])
+        attempts = int(claimed["attempts"])
+        stamp = _iso(at)
+        with self.engine.begin() as conn:
+            row = (
+                conn.execute(sa.select(table).where(table.c.id == challenge_id).with_for_update())
+                .mappings()
+                .first()
+            )
+            if row is None or row["status"] != "sending" or int(row["attempts"]) != attempts:
+                return None
+
+            account = (
+                conn.execute(
+                    sa.select(self.accounts.c.email, self.accounts.c.locale)
+                    .where(self.accounts.c.id == row["account_id"])
+                    .with_for_update()
+                )
+                .mappings()
+                .first()
+            )
+            kind = str(row["kind"])
+            current_email = str(account["email"]) if account is not None else ""
+            verified_email = conn.execute(
+                sa.select(self.verified_emails.c.email).where(
+                    self.verified_emails.c.account_id == row["account_id"]
+                )
+            ).scalar()
+            verified = bool(current_email and verified_email == current_email)
+            recipient = str(row["email"])
+            valid = account is not None and row["used_at"] is None and row["expires_at"] > stamp
+            purchase_notice = kind in ("purchase", "charge_review", "market_review")
+            order = None
+            if purchase_notice:
+                order = conn.execute(
+                    sa.select(self.checkout_orders.c.account_id).where(
+                        self.checkout_orders.c.id == challenge_id
+                    )
+                ).scalar()
+                valid = valid and verified and order == row["account_id"]
+                if valid:
+                    recipient = current_email
+            elif kind == "reset":
+                valid = valid and verified and recipient == current_email
+            elif kind == "verify":
+                valid = valid and recipient == current_email and not verified
+            elif kind == "change":
+                taken = conn.execute(
+                    sa.select(self.accounts.c.id)
+                    .where(self.accounts.c.email == recipient)
+                    .where(self.accounts.c.id != row["account_id"])
+                ).first()
+                valid = (
+                    valid
+                    and current_email == row["original_email"]
+                    and recipient != current_email
+                    and taken is None
+                )
+            else:
+                valid = False
+
+            if not valid:
+                # A charged buyer can verify the new address later. Keep the
+                # same notice id and let the operator requeue it then. Account
+                # deletion and obsolete account tokens are final instead.
+                recoverable = (
+                    purchase_notice
+                    and account is not None
+                    and row["used_at"] is None
+                    and row["expires_at"] > stamp
+                    and order == row["account_id"]
+                    and not verified
+                )
+                values: dict[str, Any] = {"status": "dead", "lease_until": ""}
+                if recoverable:
+                    values.update(email=current_email, locale=str(account["locale"]))
+                else:
+                    values["used_at"] = stamp
+                conn.execute(
+                    table.update()
+                    .where(table.c.id == challenge_id)
+                    .where(table.c.status == "sending")
+                    .where(table.c.attempts == attempts)
+                    .values(**values)
+                )
+                return None
+            locale = (
+                str(account["locale"])
+                if kind in ("purchase", "charge_review", "market_review")
+                else str(row["locale"])
+            )
+            updated = conn.execute(
+                table.update()
+                .where(table.c.id == challenge_id)
+                .where(table.c.status == "sending")
+                .where(table.c.attempts == attempts)
+                .values(email=recipient, locale=locale)
+            )
+            if not updated.rowcount:
+                return None
+            return {**dict(row), "email": recipient, "locale": locale}
+
     def finish_email_delivery(self, challenge_id: str, *, at: datetime) -> None:
         table = self.email_outbox
         with self.engine.begin() as conn:
@@ -5336,6 +5448,12 @@ def public_view(result_json: str) -> tuple[dict[str, Any], str]:
     result = AuditResult.model_validate_json(result_json)
     data = result.model_dump(mode="json")
     inputs = data.get("inputs", {})
+    # Expose only the format fact, never the parser's warning text, publicly.
+    from quant_trade.audit.importers import PDF_ROWS_WARNING
+
+    source_is_pdf = any(
+        str(warning).endswith(PDF_ROWS_WARNING) for warning in inputs.get("parse_warnings") or []
+    )
     verdict = data["verdict"]
     view = {
         "generated_at_utc": data.get("generated_at_utc", ""),
@@ -5349,7 +5467,8 @@ def public_view(result_json: str) -> tuple[dict[str, Any], str]:
             key: inputs[key]
             for key in ("digests", "dataset_digest", "source_format", "source")
             if key in inputs
-        },
+        }
+        | {"source_is_pdf": source_is_pdf},
         "engine": {key: data.get("engine", {}).get(key) for key in ("name", "package_version")},
         "declared": {"trials": data.get("declared", {}).get("trials")},
         "multiplicity": {"trials_used": data.get("multiplicity", {}).get("trials_used")},

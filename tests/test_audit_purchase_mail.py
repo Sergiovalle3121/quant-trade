@@ -267,6 +267,100 @@ def test_purchase_notice_survives_smtp_failure_and_restart(tmp_path: Path) -> No
     assert _outbox(reopened)[0]["status"] == "sent"
 
 
+def test_queued_purchase_notice_follows_newly_verified_email_without_new_id(tmp_path: Path) -> None:
+    cfg, store, order = _buyer(tmp_path)
+    assert fulfil(store, cfg, _paid(order.id, "cs_live_changed", "pi_changed"), at=NOW)
+
+    def fail(_msg, _settings):
+        raise OSError("fake SMTP outage")
+
+    assert mail.deliver_pending(store, cfg, sender=fail, now=NOW) == 0
+    original = _outbox(store)[0]
+    assert original["id"] == order.id and original["attempts"] == 1
+    assert (
+        store.request_email_change(
+            order.account_id,
+            "new@example.com",
+            locale="en",
+            at=NOW + timedelta(seconds=1),
+        )
+        == "pending"
+    )
+    challenge = next(row for row in _outbox(store) if row["kind"] == "change")
+    assert store.confirm_email_challenge(challenge["id"], at=NOW + timedelta(seconds=2)) == (
+        "change",
+        order.account_id,
+    )
+    sent = []
+    assert (
+        mail.deliver_pending(
+            store,
+            cfg,
+            sender=lambda msg, _: sent.append(msg),
+            now=NOW + timedelta(minutes=2),
+        )
+        == 1
+    )
+    assert len(sent) == 1 and sent[0]["To"] == "new@example.com"
+    assert sent[0]["Message-ID"] == f"<rigor-{order.id}@rigor.example>"
+    assert "USD 29.00" in sent[0].get_content()
+    assert "Private report" not in sent[0].get_content()
+    purchase = next(row for row in _outbox(store) if row["kind"] == "purchase")
+    assert purchase["id"] == order.id and purchase["email"] == "new@example.com"
+    assert purchase["status"] == "sent"
+    assert mail.deliver_pending(store, cfg, sender=lambda msg, _: sent.append(msg)) == 0
+
+
+def test_unverified_new_address_can_requeue_same_purchase_notice_after_verification(
+    tmp_path: Path,
+) -> None:
+    cfg, store, order = _buyer(tmp_path)
+    assert fulfil(
+        store, cfg, _paid(order.id, "cs_live_unverified_move", "pi_unverified_move"), at=NOW
+    )
+    assert store.set_email(order.account_id, "unverified@example.com")
+    sent = []
+    assert mail.deliver_pending(store, cfg, sender=lambda msg, _: sent.append(msg), now=NOW) == 0
+    assert sent == []
+    row = _outbox(store)[0]
+    assert row["status"] == "dead" and row["used_at"] is None
+    assert row["email"] == "unverified@example.com" and row["id"] == order.id
+    assert not store.requeue_purchase_email(order.id, at=NOW + timedelta(minutes=1))
+    with store.engine.begin() as conn:
+        conn.execute(
+            store.verified_emails.update()
+            .where(store.verified_emails.c.account_id == order.account_id)
+            .values(
+                email="unverified@example.com", verified_at=(NOW + timedelta(minutes=2)).isoformat()
+            )
+        )
+    assert store.requeue_purchase_email(order.id, at=NOW + timedelta(minutes=2))
+    assert not store.requeue_purchase_email(order.id, at=NOW + timedelta(minutes=2))
+    assert (
+        mail.deliver_pending(
+            store,
+            cfg,
+            sender=lambda msg, _: sent.append(msg),
+            now=NOW + timedelta(minutes=2),
+        )
+        == 1
+    )
+    assert len(sent) == 1 and sent[0]["To"] == "unverified@example.com"
+    assert sent[0]["Message-ID"] == f"<rigor-{order.id}@rigor.example>"
+    assert _outbox(store)[0]["status"] == "sent"
+
+
+def test_account_deletion_removes_queued_purchase_notice(tmp_path: Path) -> None:
+    cfg, store, order = _buyer(tmp_path)
+    assert fulfil(store, cfg, _paid(order.id, "cs_live_deleted", "pi_deleted"), at=NOW)
+    assert _outbox(store)[0]["email"] == "buyer@example.com"
+    store.delete_account(order.account_id)
+    assert _outbox(store) == []
+    sent = []
+    assert mail.deliver_pending(store, cfg, sender=lambda msg, _: sent.append(msg), now=NOW) == 0
+    assert sent == []
+
+
 def test_outbox_write_failure_rolls_back_entitlement_and_order(tmp_path: Path) -> None:
     cfg, store, order = _buyer(tmp_path)
 

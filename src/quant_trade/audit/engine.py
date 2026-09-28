@@ -588,6 +588,11 @@ def _bootstrap(returns: pd.Series, *, samples: int, seed: int) -> dict[str, Any]
 
 def _subperiods(frame: pd.DataFrame) -> list[dict[str, Any]]:
     table = subperiod_analysis(frame[["timestamp", "equity"]])
+    years = pd.to_datetime(frame["timestamp"], utc=True).dt.year
+    if len(table) > 1 and int((years == int(table["year"].iloc[0])).sum()) == 1:
+        # An opening value alone has no return; the following year already
+        # measures its return from that value.
+        table = table.iloc[1:]
     return [
         {
             "year": int(row["year"]),
@@ -1097,8 +1102,12 @@ def _reconciliation(inputs: AuditInputs) -> tuple[dict[str, Any], list[redflags.
         }, []
     if inputs.balance_only and _incomplete_ledger(inputs):
         # The printed balance also moves with deals the closed-trade list
-        # leaves out, so the gap is not a contradiction of the deal amounts.
-        return {"status": "NOT_MEASURED", "reason": _INCOMPLETE_LEDGER_REASON, **common}, []
+        # leaves out. Only withhold the contradiction when the independent
+        # row-money chain actually explains the printed balance. An open
+        # position must not hide a tampered Balance cell.
+        reconstructed = lead_number(inputs.report_metadata.get("reconstructed_final_balance"))
+        if reported is None or reconstructed is None or abs(reported - reconstructed) <= tolerance:
+            return {"status": "NOT_MEASURED", "reason": _INCOMPLETE_LEDGER_REASON, **common}, []
     if inputs.balance_only and reported is not None:
         flag = redflags.RedFlag(
             "MONETARY_RECONCILIATION_MISMATCH",

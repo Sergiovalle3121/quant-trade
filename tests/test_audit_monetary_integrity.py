@@ -328,11 +328,7 @@ def test_variants_bad_dates_cannot_feed_cscv() -> None:
         )
 
 
-def test_mt5_position_open_at_the_end_is_not_a_monetary_contradiction() -> None:
-    """An entry deal still open at the end moves the balance by its commission
-    without appearing in the closed trades: the gap (5.00, above the 1 bp
-    tolerance) cannot be reconciled, so it is NOT_MEASURED, never a
-    contradiction that forces class D."""
+def _mt5_with_open_position() -> bytes:
     clean = MT5.read_bytes()
     last_deal = b"<td>10 063.05</td><td>end of test</td></tr>"
     opened = (
@@ -341,11 +337,18 @@ def test_mt5_position_open_at_the_end_is_not_a_monetary_contradiction() -> None:
         b"<td>-5.00</td><td>0.00</td><td>0.00</td><td>10 058.05</td><td></td></tr>"
     )
     assert clean.count(last_deal) == 1
-    changed = clean.replace(last_deal, last_deal + opened)
+    return clean.replace(last_deal, last_deal + opened)
+
+
+def test_mt5_position_open_at_the_end_is_not_a_monetary_contradiction() -> None:
+    """An entry deal still open at the end moves the balance by its commission
+    without appearing in the closed trades: the gap (5.00, above the 1 bp
+    tolerance) cannot be reconciled, so it is NOT_MEASURED, never a
+    contradiction that forces class D."""
     inputs = build_inputs(
         None,
         DeclaredMetadata(cost_bps_per_side=1),
-        report_bytes=changed,
+        report_bytes=_mt5_with_open_position(),
         report_filename="mt5_tester.html",
         now=NOW,
     )
@@ -357,6 +360,27 @@ def test_mt5_position_open_at_the_end_is_not_a_monetary_contradiction() -> None:
     assert "open positions" in result.reconciliation["reason"]
     codes = {(flag["code"], flag["severity"]) for flag in result.red_flags}
     assert ("MONETARY_RECONCILIATION_MISMATCH", "FAIL") not in codes
+
+
+def test_open_position_does_not_hide_a_tampered_balance_cell() -> None:
+    report = _mt5_with_open_position()
+    original = b"<td>10 058.05</td><td></td></tr>"
+    assert report.count(original) == 1
+    tampered = report.replace(original, b"<td>11 058.05</td><td></td></tr>")
+    inputs = build_inputs(
+        None,
+        DeclaredMetadata(cost_bps_per_side=1),
+        report_bytes=tampered,
+        report_filename="mt5_tester.html",
+        now=NOW,
+    )
+    result = _run(inputs)
+    assert result.reconciliation is not None
+    assert result.reconciliation["status"] == "CONTRADICTION"
+    assert result.reconciliation["difference"]["value"] == pytest.approx(995.0)
+    assert ("MONETARY_RECONCILIATION_MISMATCH", "FAIL") in {
+        (flag["code"], flag["severity"]) for flag in result.red_flags
+    }
 
 
 @pytest.mark.parametrize(

@@ -17,7 +17,7 @@ from typing import Any
 from urllib.parse import parse_qs, urlsplit
 
 from quant_trade.audit.guard import assert_report_clean
-from quant_trade.audit.report import LABELS, SOURCE_NAMES, STATUS_TEXT, _dimension_title, _kpi_list
+from quant_trade.audit.report import LABELS, STATUS_TEXT, _dimension_title, _kpi_list, source_name
 from quant_trade.audit.theme import class_ring
 from quant_trade.audit.verdict import DIMENSION_ORDER
 
@@ -230,9 +230,7 @@ def _card(data: dict[str, Any], name: str, href: str, locale: str) -> str:
     inputs = data.get("inputs") or {}
     first = str(inputs.get("first_timestamp", ""))[:10]
     last = str(inputs.get("last_timestamp", ""))[:10]
-    source = SOURCE_NAMES.get(
-        str(inputs.get("source_format")), inputs.get("source_format") or "CSV"
-    )
+    source = source_name(inputs, "CSV")
     overall = str(data["verdict"]["overall"])
     return (
         "<div class='cmp-card'>" + class_ring(overall) + f"<div><div class='k'>{_e(name)}</div>"

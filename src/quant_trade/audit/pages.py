@@ -57,8 +57,8 @@ from quant_trade.audit.report import (
     CLASS_LADDER,
     DIMENSION_TITLES,
     DISCLAIMER,
-    SOURCE_NAMES,
     STATUS_TEXT,
+    source_name,
 )
 from quant_trade.audit.seo import BRAND, TAGLINE, PageMeta, head_meta, page_paths, private_meta
 from quant_trade.audit.settings import PACK_CREDITS
@@ -880,10 +880,12 @@ _UI: dict[str, dict[str, Any]] = {
             (
                 "globe",
                 "En tu moneda y tras la inflación",
-                "Si la cuenta está en dólares, ves su resultado en pesos mexicanos, "
-                "reales, euros y otras "
-                "cuatro monedas al tipo de cambio de cada día, y después de la inflación de "
-                "EE. UU. (datos públicos de FRED).",
+                "Si la cuenta está en dólares y hay tipos de cambio disponibles, ves su "
+                "resultado en pesos mexicanos, reales, euros y otras cuatro monedas. "
+                "Cuando hay índices de precios disponibles, ves cada moneda, incluido el "
+                "dólar, después de su propia inflación. Si la cuenta ya está en una de esas "
+                "monedas, ves el resultado tras su propia inflación. Tipos de cambio de FRED "
+                "e índices de precios de fuentes estadísticas oficiales.",
             ),
         ],
         "how_eyebrow": "Proceso",
@@ -913,7 +915,7 @@ _UI: dict[str, dict[str, Any]] = {
             "El dinero real detrás del % de una cuenta: depósitos, recargas y pérdidas abiertas",
             "Frente al efectivo y al mercado: el Sharpe sin lo que pagaba el efectivo, "
             "VIX tranquilo o agitado y crisis conocidas",
-            "Si la cuenta está en dólares: el resultado en tu moneda y tras la inflación",
+            "Según la moneda de la cuenta: conversión o inflación propia, con datos disponibles",
             "Página de verificación pública con sello",
         ],
         "upload_eyebrow": "Empieza aquí",
@@ -1102,10 +1104,12 @@ _UI: dict[str, dict[str, Any]] = {
             (
                 "globe",
                 "In your currency and after inflation",
-                "If the account is in dollars, you see its result in Mexican pesos, "
-                "reais, euros and "
-                "four more currencies at each day's exchange rate, and after US inflation "
-                "(public FRED data).",
+                "If the account is in dollars and exchange rates are available, you see its "
+                "result in Mexican pesos, reais, euros and four more currencies. "
+                "When price indexes are available, you see each currency, including the "
+                "dollar, after its own inflation. If the account is already in one of those "
+                "currencies, you see the result after its own inflation. Exchange rates "
+                "from FRED and price indexes from official statistical sources.",
             ),
         ],
         "how_eyebrow": "Process",
@@ -1135,7 +1139,8 @@ _UI: dict[str, dict[str, Any]] = {
             "The real money behind an account's %: deposits, top-ups and open losses",
             "Against cash and the market: the Sharpe without what cash paid, calm or "
             "agitated VIX and known crises",
-            "If the account is in dollars: the result in your currency and after inflation",
+            "Based on the account currency: conversion or its own inflation, where data "
+            "is available",
             "Public verification page with a badge",
         ],
         "upload_eyebrow": "Start here",
@@ -2600,10 +2605,7 @@ def verification_page(
     details = [
         (
             copy["v_format"],
-            SOURCE_NAMES.get(str(inputs.get("source_format")), "")
-            or inputs.get("source_format")
-            or inputs.get("source")
-            or "-",
+            source_name(inputs) or inputs.get("source") or "-",
         ),
         (copy["v_engine"], f"{engine.get('name', '')} {engine.get('package_version', '')}"),
     ]
