@@ -1173,12 +1173,14 @@ class Store:
         currency: str,
         at: datetime,
         declared_country: str = "",
+        locale: str = "",
     ) -> CheckoutOrder:
         """Freeze a new order or reuse its valid in-flight Checkout session.
 
         Both an HTTP retry and a concurrent second click get the same order id,
         which is sent to Stripe as the idempotency key. The slot is rotated
-        only after it expires or settles.
+        only after it expires or settles. ``locale`` is part of the slot, so a
+        buyer who switches language gets a Checkout page in that language.
         """
         if plan not in ("single", "pack") or amount_cents < 1 or currency != "usd":
             raise ValueError("invalid checkout plan or amount")
@@ -1192,6 +1194,9 @@ class Store:
             or not declared_country.isupper()
         ):
             raise ValueError("invalid declared market")
+        if locale and (len(locale) > 5 or not locale.isalpha()):
+            raise ValueError("invalid checkout locale")
+        slot_plan = f"{plan}:{locale}" if locale else plan
         sa = self._sa
         orders, slots = self.checkout_orders, self.checkout_slots
         stamp = _iso(at)
@@ -1222,7 +1227,7 @@ class Store:
                     slot = conn.execute(
                         sa.select(slots.c.order_id)
                         .where(slots.c.audit_id == audit_id)
-                        .where(slots.c.plan == plan)
+                        .where(slots.c.plan == slot_plan)
                         .with_for_update()
                     ).first()
                     if slot is not None:
@@ -1277,13 +1282,15 @@ class Store:
                         )
                     if slot is None:
                         conn.execute(
-                            slots.insert().values(audit_id=audit_id, plan=plan, order_id=order_id)
+                            slots.insert().values(
+                                audit_id=audit_id, plan=slot_plan, order_id=order_id
+                            )
                         )
                     else:
                         conn.execute(
                             slots.update()
                             .where(slots.c.audit_id == audit_id)
-                            .where(slots.c.plan == plan)
+                            .where(slots.c.plan == slot_plan)
                             .values(order_id=order_id)
                         )
                     row = (

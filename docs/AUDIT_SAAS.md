@@ -730,7 +730,7 @@ Every leaf value in the JSON carries an evidence tag:
   is stated next to it.
 
 On the site's pages (landing, upload form, guides, methodology, verification,
-contact) and in the HTML and PDF reports a reader sees these tags as words in
+contact, terms, privacy) and in the HTML and PDF reports a reader sees these tags as words in
 the page's language: Medido / Declarado / No medido, Measured / Declared / Not
 measured, Medido / Declarado / Não medido (`report.EVIDENCE_LABELS`). The codes
 stay in the JSON, the Markdown report and the badge CSS classes.
@@ -2957,6 +2957,11 @@ account deleted before the webhook grants nothing and is listed there too. A
 Stripe refund is only recorded; after refunding a credit order by hand, disable
 its code (`quant-trade audit codes disable <id>`, or «Desactivar» in `/panel`) so
 its unused credits go too.
+
+An open Checkout session is reused only in the language it was opened in
+(the reuse slot is plan plus language), so a buyer who switches to English or
+Portuguese gets Stripe's page and product name in that language
+(`tests/test_audit_account_credit_purchase.py::test_switching_language_opens_a_checkout_in_that_language`).
 
 `/terminos` (`/terms`) and `/privacidad` (`/privacy`) are rendered by
 `audit/legal.py` from the running configuration: the price, whether card

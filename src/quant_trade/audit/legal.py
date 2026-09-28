@@ -385,7 +385,7 @@ def terms_text(ctx: LegalContext, locale: str = "es") -> LegalText:
                     "upload: a platform report, an optimisation export, an equity curve or "
                     "returns and, if you supply them, trades, a benchmark and variants. The "
                     "output is a report with a verdict by dimension and every value labelled "
-                    "by its evidence (MEASURED, DECLARED or NOT_MEASURED).",
+                    "by its evidence (“Measured”, “Declared” or “Not measured”).",
                 ),
             ),
             (
@@ -440,8 +440,8 @@ def terms_text(ctx: LegalContext, locale: str = "es") -> LegalText:
                 "Accuracy",
                 (
                     "The report depends entirely on the files you upload, which are not "
-                    "checked against any broker. Values marked DECLARED come from your own "
-                    "statements. Values marked NOT_MEASURED could not be computed. We do not "
+                    "checked against any broker. Values marked “Declared” come from your own "
+                    "statements. Values marked “Not measured” could not be computed. We do not "
                     "warrant that the report detects every error in a backtest.",
                 ),
             ),
@@ -501,7 +501,7 @@ def terms_text(ctx: LegalContext, locale: str = "es") -> LegalText:
                 "que subes: el informe de tu plataforma, una exportación de optimización, una "
                 "curva de equity o de retornos y, si los aportas, operaciones, benchmark y "
                 "variantes. El resultado es un informe con un veredicto por dimensiones y "
-                "cada valor etiquetado según su evidencia (MEASURED, DECLARED o NOT_MEASURED).",
+                "cada valor etiquetado según su evidencia («Medido», «Declarado» o «No medido»).",
             ),
         ),
         (
@@ -559,8 +559,8 @@ def terms_text(ctx: LegalContext, locale: str = "es") -> LegalText:
             "Exactitud",
             (
                 "El informe depende por completo de los archivos que subes, que no se cotejan "
-                "con ningún bróker. Los valores marcados DECLARED provienen de tus propias "
-                "declaraciones. Los valores marcados NOT_MEASURED no pudieron calcularse. No "
+                "con ningún bróker. Los valores marcados «Declarado» provienen de tus propias "
+                "declaraciones. Los valores marcados «No medido» no pudieron calcularse. No "
                 "garantizamos que el informe detecte todos los errores de un backtest.",
             ),
         ),
@@ -642,7 +642,7 @@ def _terms_pt(
                 "que você envia: relatório da plataforma, exportação de otimização, curva de "
                 "patrimônio ou retornos e, se fornecidos, operações, benchmark e variantes. "
                 "O resultado é um relatório com avaliação por dimensão e cada valor marcado "
-                "pela evidência disponível (MEASURED, DECLARED ou NOT_MEASURED).",
+                "pela evidência disponível («Medido», «Declarado» ou «Não medido»).",
             ),
         ),
         (
@@ -696,8 +696,8 @@ def _terms_pt(
             "Limites da análise",
             (
                 "O relatório depende dos arquivos enviados, que não são conferidos com a "
-                "corretora. Valores DECLARED vêm de declarações do usuário; valores "
-                "NOT_MEASURED não puderam ser calculados. Não garantimos identificar todos "
+                "corretora. Valores «Declarado» vêm de declarações do usuário; valores "
+                "«Não medido» não puderam ser calculados. Não garantimos identificar todos "
                 "os erros de um backtest.",
             ),
         ),

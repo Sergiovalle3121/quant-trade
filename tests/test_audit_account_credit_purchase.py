@@ -305,3 +305,33 @@ def test_an_account_deleted_before_the_webhook_gets_no_credits(tmp_path: Path) -
     assert _webhook(client, _session(account_id, order_id)) == 200
     assert store.get_checkout_order(order_id).status != "delivered"
     assert store.account_codes_list(account_id) == []
+
+
+def test_switching_language_opens_a_checkout_in_that_language(tmp_path: Path) -> None:
+    client, calls = _client(tmp_path)
+    assert _buy(client).headers["location"] == "https://checkout.stripe.test/1"
+    csrf = re.search(r"name='csrf' value='([^']+)'", client.get("/pt/conta").text)
+    assert csrf
+    pt = client.post(
+        "/pt/conta/comprar",
+        data={"csrf": csrf.group(1), "billing_country": "MX", "final_sale": "yes"},
+        follow_redirects=False,
+    )
+    assert pt.headers["location"] == "https://checkout.stripe.test/2"
+    assert [call["locale"] for call in calls] == ["es", "pt"]
+    # Back in Spanish, the open Spanish session is reused.
+    assert _buy(client).headers["location"] == "https://checkout.stripe.test/1"
+    assert len(calls) == 2
+
+
+def test_an_open_order_is_reused_only_in_its_language(tmp_path: Path) -> None:
+    store = make_store(f"sqlite:///{tmp_path}/s.db")
+    now = datetime.now(UTC)
+    ref = account_order_ref("ab" * 16)
+    kwargs = {"account_id": "ab" * 16, "plan": PLAN_SINGLE, "amount_cents": 2900}
+    es = store.reserve_checkout(ref, currency="usd", at=now, locale="es", **kwargs)
+    again = store.reserve_checkout(ref, currency="usd", at=now, locale="es", **kwargs)
+    pt = store.reserve_checkout(ref, currency="usd", at=now, locale="pt", **kwargs)
+    assert es.id == again.id and pt.id != es.id
+    with pytest.raises(ValueError):
+        store.reserve_checkout(ref, currency="usd", at=now, locale="e s", **kwargs)
