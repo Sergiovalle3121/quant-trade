@@ -183,6 +183,11 @@ class AuditSettings:
     #: in the service (``AUDIT_ALLOW_RESERVED_EMAILS=true`` turns it off, for
     #: a staging copy); off when built directly, as in tests.
     refuse_reserved_emails: bool = False
+    #: Refuse sign-ups whose domain DNS says takes no mail (no such domain,
+    #: or neither MX nor address records). On in the service
+    #: (``AUDIT_SKIP_EMAIL_DNS=true`` turns it off); off when built directly,
+    #: so tests never reach the network.
+    check_email_domains: bool = False
 
     def __post_init__(self) -> None:
         if not 0 <= self.trusted_proxy_hops <= MAX_TRUSTED_PROXY_HOPS:
@@ -398,6 +403,8 @@ class AuditSettings:
             admin_key=env.get("AUDIT_ADMIN_KEY", "").strip(),
             public_data=env.get("AUDIT_PUBLIC_DATA", "true").strip().lower() in TRUE_VALUES,
             refuse_reserved_emails=env.get("AUDIT_ALLOW_RESERVED_EMAILS", "").strip().lower()
+            not in TRUE_VALUES,
+            check_email_domains=env.get("AUDIT_SKIP_EMAIL_DNS", "").strip().lower()
             not in TRUE_VALUES,
         )
 
