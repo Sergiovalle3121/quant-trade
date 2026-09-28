@@ -76,6 +76,9 @@ def confirmed_emails(monkeypatch: pytest.MonkeyPatch) -> None:
     from quant_trade.audit.store import Store
 
     monkeypatch.setattr(Store, "email_verified", lambda self, account_id: True)
+    # Invites are offered only while mail can confirm addresses. The mail
+    # worker starts only inside ``with TestClient(...)``, so nothing is sent.
+    monkeypatch.setattr(AuditSettings, "email_delivery_ready", property(lambda self: True))
 
 
 @pytest.mark.parametrize("locale,home", [("es", "/"), ("en", "/en"), ("pt", "/pt")])
