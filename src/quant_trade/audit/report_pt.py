@@ -1860,6 +1860,14 @@ VERDICT: dict[str, Any] = {
             "produziria sem habilidade."
         ),
         "multiplicity.NOT_MEASURED": "Multiplicidade não medida: {reason}.",
+        "multiplicity.NOT_MEASURED.undeclared": (
+            "Não foi declarado quantas configurações foram testadas; o cálculo usa 1, o caso "
+            "mais favorável, e a multiplicidade continua sem medição."
+        ),
+        "multiplicity.NOT_MEASURED.undeclared.fund": (
+            "Não foi declarado quantos fundos ou estratégias o mesmo gestor administra; o "
+            "cálculo usa 1, o caso mais favorável, e a multiplicidade continua sem medição."
+        ),
         "multiplicity.PASS.undeclared": (
             "Não foi declarado quantas configurações foram testadas; com 1, o caso mais "
             "favorável, o resultado continua acima do que uma tentativa sem habilidade "

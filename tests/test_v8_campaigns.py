@@ -184,6 +184,7 @@ def test_statistics_are_computed_not_declared(executed_campaigns) -> None:
     assert statistics["cscv"]["available"] is True
     assert statistics["cscv"]["method"] == "cscv_rank_based"
     assert statistics["cscv"]["parameter_variants"] == 4
+    assert statistics["cscv"]["effective_variants"] == 2
     assert statistics["walk_forward_window_count"] >= 5
 
 

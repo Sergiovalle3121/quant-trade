@@ -16,6 +16,7 @@ from quant_trade.audit.schema import DeclaredMetadata, ParseError, build_inputs,
 
 NOW = datetime(2026, 9, 27, tzinfo=UTC)
 MT5 = Path(__file__).parent / "fixtures" / "audit_imports" / "mt5_tester.html"
+MT5_HISTORY = MT5.with_name("mt5_history.html")
 
 
 def _run(inputs):  # type: ignore[no-untyped-def]
@@ -428,3 +429,71 @@ def test_monetary_details_localize_unit_phrase_and_number_grouping(code: str, de
         assert small in short and "in file units" not in short
     english = render_html(result, watermark=False, free_mode=True, locale="en")
     assert "9,082,362.36 in file units" in english
+
+
+def _mt5_history_with_partial_close() -> bytes:
+    """The EURUSD entry remains half open after its 0.10-lot close.
+
+    The Positions row includes only the closed half's 0.18 entry commission,
+    rounded to cents, plus its 0.35 exit commission. The full 0.35 entry
+    commission is already charged in the Deals balance chain.
+    """
+    report = MT5_HISTORY.read_bytes()
+    opening = b"<td nowrap>in</td><td nowrap>0.10</td><td nowrap>1.08500</td>"
+    assert report.count(opening) == 1
+    report = report.replace(
+        opening, b"<td nowrap>in</td><td nowrap>0.20</td><td nowrap>1.08500</td>"
+    )
+    position_cost = b'<td class="">-0.70</td><td class="">-0.62</td>'
+    assert report.count(position_cost) == 1
+    return report.replace(position_cost, b'<td class="">-0.53</td><td class="">-0.62</td>')
+
+
+def test_mt5_history_partial_close_keeps_clean_balance_inconclusive() -> None:
+    inputs = build_inputs(
+        None,
+        DeclaredMetadata(cost_bps_per_side=1),
+        report_bytes=_mt5_history_with_partial_close(),
+        report_filename="mt5_history.html",
+        now=NOW,
+    )
+    assert any("opened in the report were not closed" in w for w in inputs.warnings)
+    result = _run(inputs)
+    assert result.reconciliation is not None
+    assert result.reconciliation["status"] == "NOT_MEASURED"
+    assert result.reconciliation["difference"]["value"] == pytest.approx(-0.17)
+    assert result.forensics is not None
+    assert any(
+        check["id"] == "BALANCE_CHAIN" and check["status"] == "CLEAN"
+        for check in result.forensics["checks"]
+    )
+    assert ("MONETARY_RECONCILIATION_MISMATCH", "FAIL") not in {
+        (flag["code"], flag["severity"]) for flag in result.red_flags
+    }
+
+
+def test_mt5_history_partial_close_still_exposes_tampered_balance() -> None:
+    report = _mt5_history_with_partial_close()
+    original = b"<td nowrap>1 009.40</td><td nowrap>[tp 1.08700]</td>"
+    assert report.count(original) == 1
+    report = report.replace(original, b"<td nowrap>1 019.40</td><td nowrap>[tp 1.08700]</td>")
+    inputs = build_inputs(
+        None,
+        DeclaredMetadata(cost_bps_per_side=1),
+        report_bytes=report,
+        report_filename="mt5_history.html",
+        now=NOW,
+    )
+    result = _run(inputs)
+    assert result.reconciliation is not None
+    assert result.reconciliation["status"] == "CONTRADICTION"
+    assert result.reconciliation["difference"]["value"] == pytest.approx(9.83)
+    assert result.forensics is not None
+    assert any(
+        check["id"] == "BALANCE_CHAIN"
+        and any(figure[:2] == ["n_hits", "2"] for figure in check["figures"])
+        for check in result.forensics["checks"]
+    )
+    assert ("MONETARY_RECONCILIATION_MISMATCH", "FAIL") in {
+        (flag["code"], flag["severity"]) for flag in result.red_flags
+    }

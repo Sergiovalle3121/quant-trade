@@ -25,6 +25,8 @@ from quant_trade.audit.account import is_account_history
 from quant_trade.audit.crises import MARKET, MARKET_AS_OF
 from quant_trade.audit.decay import is_weaker
 from quant_trade.audit.decay import signed_amount as _signed_amount
+from quant_trade.audit.forensics.calibration import CALIBRATION
+from quant_trade.audit.forensics.review import METHOD_VERSION as FORENSIC_METHOD_VERSION
 from quant_trade.audit.guard import assert_report_clean
 from quant_trade.audit.holding import EDGE_SE
 from quant_trade.audit.i18n import localize
@@ -5052,6 +5054,18 @@ def _forensics_html(forensics: dict[str, Any] | None, locale: str) -> str:
     copy = INTEGRITY_TEXT[locale]
     checks = [check for check in forensics.get("checks", []) if isinstance(check, dict)]
     signals = [check for check in checks if check.get("status") == "SIGNAL"]
+    family = str(forensics.get("family", ""))
+
+    def granted(check: dict[str, Any]) -> bool:
+        # A calibration line records observations even when its cell cannot
+        # grant SIGNAL. Match the frozen method as well as the current cell.
+        cell = CALIBRATION.get((str(check.get("id", "")), family))
+        return bool(
+            forensics.get("method_version") == FORENSIC_METHOD_VERSION
+            and check.get("calibration")
+            and cell is not None
+            and cell.granted
+        )
 
     def check_name(check: dict[str, Any]) -> str:
         code = str(check.get("id", ""))
@@ -5092,9 +5106,7 @@ def _forensics_html(forensics: dict[str, Any] | None, locale: str) -> str:
     for check in checks:
         status = copy.get("check_" + str(check.get("status", "")).lower(), copy["check_info"])
         calibration_state = (
-            copy["forensic_calibrated"]
-            if check.get("calibration")
-            else copy["forensic_uncalibrated"]
+            copy["forensic_calibrated"] if granted(check) else copy["forensic_uncalibrated"]
         )
         all_rows += (
             f"<tr><th scope='row'><code>{_e(check.get('id', ''))}</code></th>"
@@ -7647,8 +7659,10 @@ def render_html(
                         "partitions",
                         "combinations",
                         "parameter_variants",
+                        "effective_variants",
                         "observations_used",
                     )
+                    if k in data["cscv"]
                 )
             )
             + "</p>"

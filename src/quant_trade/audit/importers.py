@@ -1715,8 +1715,15 @@ def _parse_mt5_history(reader: _TableReader) -> _Draft:
 
 
 def _count_opened_not_closed(deals: list[_Deal], positions: list[_Trip]) -> int:
+    # A Positions row describes the closed part of a position. Counting one
+    # opening Deal against one Positions row misses a partly closed position:
+    # its remaining entry commission has moved the balance, but does not
+    # belong to the closed-trade ledger yet. Follow the deal volumes as well.
+    fifo = _Fifo()
+    for deal in deals:
+        fifo.apply(deal)
     opened = sum(1 for deal in deals if deal.direction == "in")
-    return max(0, opened - len(positions))
+    return max(fifo.leftover(), opened - len(positions), 0)
 
 
 # ---------------------------------------------------------------------------

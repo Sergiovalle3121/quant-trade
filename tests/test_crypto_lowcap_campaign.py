@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pandas as pd
 import pytest
 from crypto_lowcap_fixture import AT, HOLDOUT, SELECTION, build_experiment
 
@@ -44,6 +45,13 @@ from quant_trade.research.ledger import read_trials
 from quant_trade.research.preregistration import assert_within_budget, load_preregistration
 
 CODE = "deadbeef"
+
+
+def test_cscv_with_duplicate_only_trials_is_unmeasured() -> None:
+    path = pd.Series([0.01, -0.02, 0.03, 0.0] * 4)
+    result = campaign.cscv({"trial-a": path, "trial-b": path.copy()}, partitions=4, max_pbo=0.5)
+    assert result["status"] == "NOT_MEASURED"
+    assert "two distinct parameter variants" in result["reason"]
 
 
 def _select(fx: dict) -> dict:
