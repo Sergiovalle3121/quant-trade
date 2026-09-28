@@ -136,12 +136,14 @@ def test_guide_pages_render_with_metadata_and_a_language_switch(tmp_path: Path) 
 
 def test_upload_form_and_landing_link_the_guides(tmp_path: Path) -> None:
     client = _client(tmp_path)
-    for path, locale in (("/", "es"), ("/en", "en")):
+    for path, locale in (("/auditar", "es"), ("/en/audit", "en")):
         text = client.get(path).text
         assert f"href='{guides_index_url(locale)}'" in text
         for guide in GUIDES:
             assert f"href='{guide_url(guide.slug, locale)}'" in text, guide.slug
         assert "id='subir'" in text
+    for path in ("/", "/en"):
+        assert "id='subir'" in client.get(path).text
 
 
 def test_error_pages_link_the_guides(tmp_path: Path) -> None:

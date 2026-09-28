@@ -205,10 +205,11 @@ def test_a_live_statement_is_uploaded_stored_and_shown(tmp_path: Path) -> None:
 
 
 def test_the_upload_form_offers_a_live_statement() -> None:
-    from quant_trade.audit.pages import landing
+    from quant_trade.audit.pages import upload_page
 
-    assert "name='live'" in landing(locale="es") and "cuenta real" in landing(locale="es")
-    assert "name='live'" in landing(locale="en") and "Live or demo" in landing(locale="en")
+    es, en = upload_page(locale="es"), upload_page(locale="en")
+    assert "name='live'" in es and "cuenta real" in es
+    assert "name='live'" in en and "Live or demo" in en
 
 
 def _priced(

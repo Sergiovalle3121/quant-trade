@@ -21,7 +21,7 @@ from quant_trade.audit import errors_pt  # noqa: E402
 from quant_trade.audit.guard import find_claims  # noqa: E402
 from quant_trade.audit.importers import ReportFormatError  # noqa: E402
 from quant_trade.audit.mapping import COPY as MAPPING_COPY  # noqa: E402
-from quant_trade.audit.pages import error_page, landing  # noqa: E402
+from quant_trade.audit.pages import error_page, upload_page  # noqa: E402
 from quant_trade.audit.schema import ParseError  # noqa: E402
 from quant_trade.audit.settings import AuditSettings  # noqa: E402
 from quant_trade.audit.store import make_store  # noqa: E402
@@ -145,7 +145,7 @@ def _text(page: str) -> str:
 
 
 def test_the_pt_form_sends_the_portuguese_language() -> None:
-    page = landing(locale="pt", free_mode=True)
+    page = upload_page(locale="pt", free_mode=True)
     assert "<option value='pt' selected>Português</option>" in page
 
 
@@ -222,17 +222,17 @@ def test_the_pt_trust_cards_open_the_portuguese_sample(tmp_path: Path) -> None:
 
 
 def test_back_from_a_portuguese_error_goes_to_the_portuguese_form(tmp_path: Path) -> None:
-    assert "href='/pt#subir'" in error_page("x", locale="pt")
-    assert "href='/?lang=es#subir'" in error_page("x", locale="es")
+    assert "href='/pt/auditar'" in error_page("x", locale="pt")
+    assert "href='/auditar'" in error_page("x", locale="es")
     client = _client(tmp_path)
     files = {"report": ("conta.xls", LEGACY_XLS, "application/vnd.ms-excel")}
     refused = client.post("/audits", files=files, data={"consent": "on", "locale": "pt"})
     missing = client.get("/pt/nao-existe")
+    assert "href='/pt/auditar'" in refused.text and "href='/pt'" in missing.text
     for page in (refused.text, missing.text):
-        assert "href='/pt#subir'" in page
         assert "/?lang=pt" not in page
     # And the page it goes to is the Portuguese form.
-    assert "<html lang='pt'>" in client.get("/pt").text
+    assert "<html lang='pt'>" in client.get("/pt/auditar").text
 
 
 def test_numbers_in_a_portuguese_refusal_use_portuguese_separators() -> None:
