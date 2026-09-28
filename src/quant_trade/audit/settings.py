@@ -329,14 +329,16 @@ class AuditSettings:
             access_codes=access_codes,
             referral_rewards=env.get("AUDIT_REFERRAL_REWARDS", "true").strip().lower()
             in TRUE_VALUES,
-            referral_global_monthly_cap=int(env.get("AUDIT_REFERRAL_GLOBAL_MONTHLY_CAP", "100")),
+            referral_global_monthly_cap=int(
+                env.get("AUDIT_REFERRAL_GLOBAL_MONTHLY_CAP", "").strip() or "100"
+            ),
             email_verification_required=env.get("AUDIT_EMAIL_VERIFICATION_REQUIRED", "false")
             .strip()
             .lower()
             in TRUE_VALUES,
             email_token_secret=env.get("AUDIT_EMAIL_TOKEN_SECRET", ""),
             smtp_host=env.get("AUDIT_SMTP_HOST", "").strip(),
-            smtp_port=int(env.get("AUDIT_SMTP_PORT", "587")),
+            smtp_port=int(env.get("AUDIT_SMTP_PORT", "").strip() or "587"),
             smtp_username=env.get("AUDIT_SMTP_USERNAME", "").strip(),
             smtp_password=env.get("AUDIT_SMTP_PASSWORD", ""),
             smtp_from=env.get("AUDIT_SMTP_FROM", "").strip(),
