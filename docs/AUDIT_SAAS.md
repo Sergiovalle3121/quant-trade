@@ -1918,7 +1918,12 @@ dimensions fail. **C** if exactly one fails, or significance or
 multiplicity is WEAK. **B** if significance and multiplicity pass and any of
 costs, out-of-sample or benchmark is WEAK or NOT_MEASURED. **A** only when
 all six pass (benchmark may be declared not applicable). Without trades or
-without a declared holdout the best possible class is B, on purpose.
+without a declared holdout the best possible class is B, on purpose. The same
+holds when multiplicity is `NOT_MEASURED` only because no trial count was
+declared or observed and the one-trial DSR clears the bar
+(`verdict.trials_undeclared_only`): a missing count is a missing piece, not a
+measured weakness, so the class is at most B and never A, and the B sentence
+names the number of trials among the missing pieces.
 
 Class A is worded as "no evidence of overfitting found in what was
 supplied". It is not a prediction.

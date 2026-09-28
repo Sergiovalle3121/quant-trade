@@ -483,6 +483,17 @@ def assess_benchmark(
     return _dimension(BENCHMARK, "WEAK", reasons, inputs)
 
 
+def trials_undeclared_only(dimension: Dimension) -> bool:
+    """A multiplicity left unmeasured only because no trial count was
+    declared: the deflated Sharpe was computed (at 1, the most favourable
+    case) and cleared the bar, but an unknown search is not a ruled-out one."""
+    if dimension.status != "NOT_MEASURED":
+        return False
+    trials = dimension.inputs.get("trials_used", {})
+    dsr = dimension.inputs.get("dsr_at_trials_used", {})
+    return trials.get("evidence") == "NOT_MEASURED" and dsr.get("evidence") == "MEASURED"
+
+
 def overall_class(
     dimensions: list[Dimension], *, own_index: bool = False
 ) -> Literal["A", "B", "C", "D"]:
@@ -495,10 +506,18 @@ def overall_class(
         return "D"
     if fails == 1 or status.get(STATISTICAL) == "WEAK" or status.get(MULTIPLICITY) == "WEAK":
         return "C"
-    if status.get(STATISTICAL) != "PASS" or status.get(MULTIPLICITY) != "PASS":
+    undeclared = any(
+        dimension.name == MULTIPLICITY and trials_undeclared_only(dimension)
+        for dimension in dimensions
+    )
+    if status.get(STATISTICAL) != "PASS" or (status.get(MULTIPLICITY) != "PASS" and not undeclared):
         # NOT_MEASURED statistics with no FAIL flag cannot happen (too few
         # observations is a FAIL flag), but the rule is stated for completeness.
         return "C"
+    if undeclared:
+        # A missing trial count is a missing piece, not a measured weakness:
+        # the result is capped at B and can never be an A.
+        return "B"
     rest = (status.get(COSTS), status.get(OUT_OF_SAMPLE), status.get(BENCHMARK))
     if (
         all(value in ("PASS", "NOT_APPLICABLE") for value in rest)
@@ -516,8 +535,8 @@ _TEXT: dict[str, dict[str, str]] = {
             "Esto no es una predicción de resultados futuros."
         ),
         "B": (
-            "Clase B: la estadística aguanta, pero faltan piezas (costes, fuera de muestra o "
-            "benchmark) para una conclusión completa."
+            "Clase B: la estadística aguanta, pero faltan piezas (costes, fuera de muestra, "
+            "benchmark o número de intentos) para una conclusión completa."
         ),
         "C": (
             "Clase C: hay una debilidad importante; no confiaríamos en este backtest sin "
@@ -577,11 +596,6 @@ _TEXT: dict[str, dict[str, str]] = {
             "No se declaró cuántos fondos o estrategias lleva el mismo gestor; el cálculo "
             "usa 1, el caso más favorable, y la multiplicidad queda sin medir."
         ),
-        f"{MULTIPLICITY}.PASS.undeclared": (
-            "No se declaró cuántas configuraciones se probaron; con 1, el caso más favorable, "
-            "el resultado sigue por encima de lo que produciría un intento sin habilidad. Si "
-            "se probaron más, declararlo puede cambiar esta conclusión."
-        ),
         f"{MULTIPLICITY}.WEAK.undeclared": (
             "No se declaró cuántas configuraciones se probaron, e incluso con 1, el caso más "
             "favorable, el Sharpe ajustado por las pruebas no llega al umbral."
@@ -589,11 +603,6 @@ _TEXT: dict[str, dict[str, str]] = {
         f"{MULTIPLICITY}.FAIL.undeclared": (
             "No se declaró cuántas configuraciones se probaron, e incluso con 1, el caso más "
             "favorable, el resultado no supera lo que produciría un intento sin habilidad."
-        ),
-        f"{MULTIPLICITY}.PASS.undeclared.fund": (
-            "No se declaró cuántos fondos o estrategias lleva el mismo gestor; con 1, el caso "
-            "más favorable, el resultado sigue por encima de lo que produciría un intento sin "
-            "habilidad. Si lleva más, declararlo puede cambiar esta conclusión."
         ),
         f"{MULTIPLICITY}.WEAK.undeclared.fund": (
             "No se declaró cuántos fondos o estrategias lleva el mismo gestor, e incluso con 1, "
@@ -640,8 +649,8 @@ _TEXT: dict[str, dict[str, str]] = {
             "This is not a prediction of future results."
         ),
         "B": (
-            "Class B: the statistics hold, but pieces are missing (costs, out-of-sample or "
-            "benchmark) for a complete conclusion."
+            "Class B: the statistics hold, but pieces are missing (costs, out-of-sample, "
+            "benchmark or number of trials) for a complete conclusion."
         ),
         "C": (
             "Class C: there is a material weakness; we would not rely on this backtest "
@@ -701,11 +710,6 @@ _TEXT: dict[str, dict[str, str]] = {
             "How many funds or strategies the same manager runs was not declared; the "
             "calculation uses 1, the most favourable case, and multiplicity remains unmeasured."
         ),
-        f"{MULTIPLICITY}.PASS.undeclared": (
-            "The number of configurations tried was not declared; with 1, the most favourable "
-            "case, the result stays above what an unskilled trial would produce. If more were "
-            "tried, declaring them may change this conclusion."
-        ),
         f"{MULTIPLICITY}.WEAK.undeclared": (
             "The number of configurations tried was not declared, and even with 1, the most "
             "favourable case, the Sharpe adjusted for trials misses the bar."
@@ -713,11 +717,6 @@ _TEXT: dict[str, dict[str, str]] = {
         f"{MULTIPLICITY}.FAIL.undeclared": (
             "The number of configurations tried was not declared, and even with 1, the most "
             "favourable case, the result does not exceed what an unskilled trial would produce."
-        ),
-        f"{MULTIPLICITY}.PASS.undeclared.fund": (
-            "How many funds or strategies the same manager runs was not declared; with 1, the "
-            "most favourable case, the result stays above what an unskilled trial would "
-            "produce. If there are more, declaring them may change this conclusion."
         ),
         f"{MULTIPLICITY}.WEAK.undeclared.fund": (
             "How many funds or strategies the same manager runs was not declared, and even "

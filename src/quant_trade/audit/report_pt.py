@@ -1782,8 +1782,9 @@ REPORT: dict[str, Any] = {
         [
             "B",
             (
-                "A estatística e o número de tentativas passam e nada falha, mas ainda falta "
-                "medir ou reforçar custos, fora da amostra, benchmark ou qualidade dos dados."
+                "A estatística passa, o número de tentativas passa ou não foi declarado e nada "
+                "falha, mas ainda falta medir ou reforçar custos, fora da amostra, benchmark, "
+                "qualidade dos dados ou o número de tentativas."
             ),
         ],
         [
@@ -1809,8 +1810,8 @@ VERDICT: dict[str, Any] = {
             "uma previsão de resultados futuros."
         ),
         "B": (
-            "Classe B: a estatística se sustenta, mas faltam peças (custos, fora da amostra ou "
-            "benchmark) para uma conclusão completa."
+            "Classe B: a estatística se sustenta, mas faltam peças (custos, fora da amostra, "
+            "benchmark ou número de tentativas) para uma conclusão completa."
         ),
         "C": (
             "Classe C: há uma fraqueza importante; não confiaríamos neste backtest sem resolvê-la."
@@ -1868,11 +1869,6 @@ VERDICT: dict[str, Any] = {
             "Não foi declarado quantos fundos ou estratégias o mesmo gestor administra; o "
             "cálculo usa 1, o caso mais favorável, e a multiplicidade continua sem medição."
         ),
-        "multiplicity.PASS.undeclared": (
-            "Não foi declarado quantas configurações foram testadas; com 1, o caso mais "
-            "favorável, o resultado continua acima do que uma tentativa sem habilidade "
-            "produziria. Se mais foram testadas, declará-las pode mudar esta conclusão."
-        ),
         "multiplicity.WEAK.undeclared": (
             "Não foi declarado quantas configurações foram testadas e, mesmo com 1, o caso mais "
             "favorável, o Sharpe ajustado pelos testes não chega ao limiar."
@@ -1880,11 +1876,6 @@ VERDICT: dict[str, Any] = {
         "multiplicity.FAIL.undeclared": (
             "Não foi declarado quantas configurações foram testadas e, mesmo com 1, o caso mais "
             "favorável, o resultado não supera o que uma tentativa sem habilidade produziria."
-        ),
-        "multiplicity.PASS.undeclared.fund": (
-            "Não foi declarado quantos fundos ou estratégias o mesmo gestor administra; com 1, "
-            "o caso mais favorável, o resultado continua acima do que uma tentativa sem "
-            "habilidade produziria. Se forem mais, declará-los pode mudar esta conclusão."
         ),
         "multiplicity.WEAK.undeclared.fund": (
             "Não foi declarado quantos fundos ou estratégias o mesmo gestor administra e, mesmo "
