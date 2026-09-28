@@ -3512,3 +3512,27 @@ def test_new_customers_behind_one_carrier_ipv4_still_get_their_free_report(
     home = [first_upload(100 + n, f"2001:db8:5:6::{n + 1:x}") for n in range(ipv6_cap + 1)]
     assert all("acct=welcome" in where for where in home[:ipv6_cap])
     assert "acct=welcome" not in home[-1]
+
+
+@pytest.mark.parametrize(
+    ("locale", "signin", "signup", "create"),
+    [
+        ("es", "/entrar", "/registro", "Crear cuenta"),
+        ("en", "/login", "/signup", "Create account"),
+        ("pt", "/pt/entrar", "/pt/cadastro", "Criar conta"),
+    ],
+)
+def test_signin_and_signup_always_offer_each_other(
+    locale: str, signin: str, signup: str, create: str
+) -> None:
+    login = account_pages.signin_page(locale=locale, csrf="c", next_path="/cuenta")
+    register = account_pages.signup_page(locale=locale, csrf="c", next_path="/cuenta")
+    for page in (login, register):
+        assert "class='acct-tabs'" in page
+        assert f"href='{signup}?next=/cuenta'" in page
+        assert f"href='{signin}?next=/cuenta'" in page
+        assert create in page
+    assert f"href='{signin}?next=/cuenta' aria-current='page'" in login
+    assert f"href='{signup}?next=/cuenta' aria-current='page'" in register
+    # Signing in also shows a full-width button to create an account.
+    assert "acct-alt-btn" in login

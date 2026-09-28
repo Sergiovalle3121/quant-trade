@@ -422,6 +422,8 @@ OPTIMIZATION_PASS_BYTES = 900
 REPORT_SIZE_FACTOR = 2
 
 _HOST = re.compile(r"^[A-Za-z0-9.-]{1,253}(:[0-9]{1,5})?$")
+#: Railway's own addresses; a read there moves to ``AUDIT_BASE_URL`` once it differs.
+RAILWAY_HOST_SUFFIX = ".up.railway.app"
 #: Query values that are secrets: the owner token and an access code.
 _SECRET_QUERY = re.compile(r"((?:^|[?&])(?:token|code)=)[^&\s\"]*", re.IGNORECASE)
 
@@ -1164,6 +1166,29 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         if path == "/" and request.query_params.get("lang") in ("es", "en"):
             locale = request.query_params["lang"]
         visits.add(day=today, locale=locale, ref=kept or arrived)
+
+    canonical_host = urlsplit(cfg.base_url).netloc.lower()
+
+    @app.middleware("http")
+    async def old_address(request: Request, call_next: Any) -> Any:
+        """Send a visit to Railway's own address on to the site's domain.
+
+        Only reads (GET, HEAD) move: a card-payment webhook or a form post to
+        the old address keeps working. Health checks stay where Railway
+        looks for them.
+        """
+        host = request.headers.get("host", "").lower().split(":", 1)[0]
+        if (
+            cfg.base_url.startswith("https://")
+            and host.endswith(RAILWAY_HOST_SUFFIX)
+            and host != canonical_host
+            and request.method in ("GET", "HEAD")
+            and request.url.path not in ("/health", "/ready")
+        ):
+            query = request.url.query
+            target = cfg.base_url + request.url.path + (f"?{query}" if query else "")
+            return _secure(RedirectResponse(target, status_code=308), path=request.url.path)
+        return await call_next(request)
 
     @app.middleware("http")
     async def no_store(request: Request, call_next: Any) -> Any:

@@ -1292,6 +1292,13 @@ text-overflow:ellipsis}
 .acct-list li{display:flex;gap:10px;align-items:flex-start}
 .acct-list svg{width:18px;height:18px;flex:none;margin-top:3px;color:var(--ok)}
 .acct-alt{margin-top:18px;font-size:.92rem}
+.acct-tabs{display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:4px;margin:0 0 22px;
+border-radius:12px;background:var(--surface-2);box-shadow:0 0 0 1px var(--border) inset}
+.acct-tabs a{display:flex;align-items:center;justify-content:center;min-height:42px;
+border-radius:9px;font-weight:600;color:var(--muted);text-decoration:none}
+.acct-tabs a[aria-current=page]{background:#fff;color:var(--text);
+box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.acct-alt-btn{width:100%;justify-content:center;margin-top:8px}
 .acct-terms a{color:var(--text);text-underline-offset:3px}
 .acct-head{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;
 margin-bottom:8px}
@@ -1508,6 +1515,19 @@ def _switch(kind: str, locale: str, next_path: str = "") -> dict[str, str]:
     return {lang: path(kind, lang) + query for lang in LANGUAGES}
 
 
+def _tabs(active: str, locale: str, next_path: str = "") -> str:
+    """Sign in and create account side by side, so neither is ever hidden."""
+    copy = COPY[locale]
+    query = f"?next={_e(_q(next_path))}" if next_path else ""
+    links = "".join(
+        f"<a href='{_e(path(kind, locale) + query)}'"
+        + (" aria-current='page'" if kind == active else "")
+        + f">{_e(copy[label])}</a>"
+        for kind, label in (("signin", "signin_button"), ("signup", "signup_button"))
+    )
+    return f"<nav class='acct-tabs' aria-label='{_e(copy['eyebrow'])}'>{links}</nav>"
+
+
 def signup_page(
     *,
     locale: str,
@@ -1524,7 +1544,8 @@ def signup_page(
 
     signin = path("signin", locale) + (f"?next={_e(_q(next_path))}" if next_path else "")
     form = (
-        (f"<div class='flash' role='status'>{_e(copy['invited_banner'])}</div>" if invite else "")
+        _tabs("signup", locale, next_path)
+        + (f"<div class='flash' role='status'>{_e(copy['invited_banner'])}</div>" if invite else "")
         + _alert(copy, error)
         + f"<form method='post' action='{path('signup', locale)}'>"
         + _hidden("csrf", csrf)
@@ -1574,7 +1595,8 @@ def signin_page(
     copy = COPY[locale]
     signup = path("signup", locale) + (f"?next={_e(_q(next_path))}" if next_path else "")
     form = (
-        _alert(copy, error, flash)
+        _tabs("signin", locale, next_path)
+        + _alert(copy, error, flash)
         + f"<form method='post' action='{path('signin', locale)}'>"
         + _hidden("csrf", csrf)
         + _hidden("next", next_path)
@@ -1594,8 +1616,9 @@ def signin_page(
             else ""
         )
         + f"<p class='acct-alt'><a href='{path('forgot', locale)}'>{_e(copy['forgot_link'])}"
-        "</a></p>" + f"<p class='acct-alt'>{_e(copy['no_account'])} "
-        f"<a href='{_e(signup)}'>{_e(copy['signup_link'])}</a></p>"
+        "</a></p>" + f"<p class='acct-alt'>{_e(copy['no_account'])}</p>"
+        f"<a class='btn btn-ghost btn-lg acct-alt-btn' href='{_e(signup)}'>"
+        f"{_e(copy['signup_link'])}</a>"
     )
     body = f"<div class='acct-grid'><div class='acct-form'>{form}</div>{_benefits(copy)}</div>"
     return _shell(
