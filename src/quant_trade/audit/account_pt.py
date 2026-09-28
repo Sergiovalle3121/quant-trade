@@ -238,6 +238,27 @@ COPY_PT: dict[str, str] = {
         "Olá, quero créditos para a minha conta: um relatório completo ou o pacote de 3."
     ),
     "buy_card": "Pague com cartão a partir da prévia de qualquer relatório.",
+    "buy_card_single": "Comprar 1 relatório · {price}",
+    "buy_card_pack": "Comprar pacote de 3 · {price}",
+    "buy_card_note": (
+        "Você paga com cartão na Stripe. Os créditos entram na sua conta assim que a Stripe "
+        "confirma o pagamento e servem para qualquer relatório."
+    ),
+    "buy_country": "País de cobrança",
+    "buy_country_prompt": "Escolha seu país",
+    "buy_final_sale": (
+        "Entendo que o crédito é entregue na hora e que a compra não é reembolsável."
+    ),
+    "buy_alt": "Prefere pagar pelo WhatsApp?",
+    "card_paid": (
+        "Pagamento recebido. Seus créditos aparecem aqui assim que a Stripe confirma; se "
+        "ainda não os vê, recarregue a página em um minuto."
+    ),
+    "buy_off": "O pagamento com cartão não está disponível agora.",
+    "buy_market": "Escolha seu país de cobrança para pagar.",
+    "buy_final_sale_needed": "Marque a caixa de compra não reembolsável para pagar.",
+    "buy_email": "Confirme seu e-mail para comprar créditos.",
+    "buy_review": "Há uma cobrança em análise. Não pague novamente; peça ajuda.",
     "security_title": "Senha e dados",
     "export_title": "Baixar meus dados",
     "export_help": (
