@@ -116,6 +116,9 @@ def confirmed_emails(monkeypatch: pytest.MonkeyPatch) -> None:
     from quant_trade.audit.store import Store
 
     monkeypatch.setattr(Store, "email_verified", lambda self, account_id: True)
+    # Invites are offered only while mail can confirm addresses. The mail
+    # worker starts only inside ``with TestClient(...)``, so nothing is sent.
+    monkeypatch.setattr(AuditSettings, "email_delivery_ready", property(lambda self: True))
 
 
 # -- pure helpers ------------------------------------------------------------------
@@ -2076,6 +2079,7 @@ def test_global_referral_budget_is_atomic_and_stays_spent_after_deletion(
         assert len(conn.execute(store.referral_global_slots.select()).all()) == 1  # type: ignore[attr-defined]
 
 
+@pytest.mark.usefixtures("confirmed_emails")
 def test_deleting_either_account_removes_its_invite_rows(tmp_path: Path) -> None:
     client, store, _ = _client(tmp_path)
     _signup(client)
@@ -3651,7 +3655,10 @@ def test_forgot_page_has_no_chat_detour_once_mail_is_on() -> None:
     assert "Todavía no enviamos correos" not in off
 
 
-def test_an_invite_is_not_credited_before_both_addresses_are_confirmed(tmp_path: Path) -> None:
+def test_an_invite_is_not_credited_before_both_addresses_are_confirmed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(AuditSettings, "email_delivery_ready", property(lambda self: True))
     client, store, _ = _client(tmp_path)
     _signup(client, "host@example.com", welcome=True)
     host = store.find_account("host@example.com")
@@ -3680,3 +3687,98 @@ def test_invite_card_says_both_addresses_must_be_confirmed() -> None:
         ("pt", "os dois confirmaram o e-mail"),
     ):
         assert words in account_pages.COPY[locale]["invite_help"]
+
+
+def test_without_mail_no_invite_is_offered_or_noted(tmp_path: Path) -> None:
+    # No mail service: no address can be confirmed, so no invite could pay.
+    client, store, settings = _client(tmp_path)
+    assert not settings.email_delivery_ready
+    _signup(client, "host@example.com", welcome=True)
+    assert "id='invite-link'" not in client.get("/cuenta").text
+    host = store.find_account("host@example.com")
+    token = store.invite_token(host.id, at=NOW)  # type: ignore[attr-defined]
+    guest = TestClient(client.app)
+    page = guest.get(f"/registro?invita={token}").text
+    assert f"value='{token}'" not in page
+    assert store.invite_summary(host.id, NOW).credited == 0  # type: ignore[attr-defined]
+
+
+def _domain_client(tmp_path: Path, answers: dict[tuple[str, str], object]):
+    from quant_trade.audit import inbox
+
+    def resolve(domain: str, kind: str) -> list[str]:
+        answer = answers.get((domain, kind), [])
+        if isinstance(answer, Exception):
+            raise answer
+        return answer  # type: ignore[return-value]
+
+    client, store, _ = _client(tmp_path, check_email_domains=True)
+    client.app.state.mail_domain_check = lambda email: inbox.domain_takes_mail(
+        email, resolve=resolve
+    )
+    return client, store
+
+
+@pytest.mark.parametrize(
+    "answers,taken",
+    [
+        ({("mail.test", "MX"): ["10 mx.mail.test."]}, True),
+        ({("mail.test", "A"): ["192.0.2.1"]}, True),  # no MX: the A record takes mail
+        ({("mail.test", "MX"): LookupError("mail.test")}, False),  # no such domain
+        ({}, False),  # exists with no MX and no address
+        ({("mail.test", "MX"): ["0 ."]}, False),  # null MX: takes no mail
+        ({("mail.test", "MX"): TimeoutError()}, True),  # DNS trouble never refuses
+    ],
+)
+def test_domain_takes_mail_reads_mx_then_address_records(
+    answers: dict[tuple[str, str], object], taken: bool
+) -> None:
+    from quant_trade.audit import inbox
+
+    def resolve(domain: str, kind: str) -> list[str]:
+        answer = answers.get((domain, kind), [])
+        if isinstance(answer, Exception):
+            raise answer
+        return answer  # type: ignore[return-value]
+
+    assert inbox.domain_takes_mail("ana@mail.test", resolve=resolve) is taken
+
+
+def test_signup_refuses_a_domain_that_takes_no_mail(tmp_path: Path) -> None:
+    client, store = _domain_client(
+        tmp_path,
+        {
+            ("rigor-review-qa.dev", "MX"): LookupError("rigor-review-qa.dev"),
+            ("real.test", "MX"): ["10 mx.real.test."],
+        },
+    )
+    csrf = _csrf(client.get("/registro").text)
+    refused = client.post(
+        "/registro",
+        data={"email": "qa@rigor-review-qa.dev", "password": PASSWORD, "csrf": csrf},
+        follow_redirects=False,
+    )
+    assert refused.status_code == 400 and "No encontramos ese dominio" in refused.text
+    assert store.find_account("qa@rigor-review-qa.dev") is None  # type: ignore[attr-defined]
+    english = client.get("/signup").text
+    created = client.post(
+        "/signup",
+        data={"email": "ana@real.test", "password": PASSWORD, "csrf": _csrf(english)},
+        follow_redirects=False,
+    )
+    assert created.status_code == 303
+    assert store.find_account("ana@real.test") is not None  # type: ignore[attr-defined]
+
+
+def test_the_dns_check_is_on_in_the_service_and_can_be_turned_off() -> None:
+    assert not AuditSettings().check_email_domains
+    assert AuditSettings.from_env({}).check_email_domains
+    assert not AuditSettings.from_env({"AUDIT_SKIP_EMAIL_DNS": "true"}).check_email_domains
+
+
+def test_the_no_domain_message_exists_in_three_languages() -> None:
+    from quant_trade.audit import account_pages, account_pt
+
+    assert "domain" in account_pages.COPY["en"]["email_no_domain"]
+    assert "dominio" in account_pages.COPY["es"]["email_no_domain"]
+    assert "domínio" in account_pt.COPY_PT["email_no_domain"]

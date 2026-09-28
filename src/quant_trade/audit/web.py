@@ -1044,6 +1044,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     app.state.mail_worker = mail_worker
     app.state.checkout_factory = payments.stripe_checkout
     app.state.session_lookup = payments.stripe_session
+    app.state.mail_domain_check = inbox.domain_takes_mail
     app.state.pause_new_audits = pause_new_audits
     app.state.pause_new_checkout = pause_new_checkout
     upload_attempts = AttemptLog()
@@ -1671,6 +1672,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     account_errors = (
         "email_bad",
         "email_disposable",
+        "email_no_domain",
         "email_mismatch",
         "email_same",
         "email_taken",
@@ -1694,8 +1696,14 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     )
 
     def _referrals_on() -> bool:
-        # The reward is paid when the invitee's free first report exists.
-        return not cfg.free_mode and acct.WELCOME_FULL_REPORT and cfg.referral_rewards
+        # The reward is paid when the invitee's free first report exists and
+        # both addresses are confirmed, so without mail nothing is offered.
+        return (
+            not cfg.free_mode
+            and acct.WELCOME_FULL_REPORT
+            and cfg.referral_rewards
+            and cfg.email_delivery_ready
+        )
 
     def _note_invite(request: Request, account_id: str, token: str, now: datetime) -> None:
         """Note who invited a new account; a failure never breaks the sign-up."""
@@ -1820,6 +1828,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 return again("email_bad", 400)
             if inbox.is_disposable(clean):
                 return again("email_disposable", 400)
+            if cfg.check_email_domains and not app.state.mail_domain_check(clean):
+                return again("email_no_domain", 400)
             problem = acct.password_problem(password, email=clean)
             if problem:
                 return again(problem, 400)
@@ -2859,6 +2869,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 return refused("email_bad")
             if inbox.is_disposable(clean):
                 return refused("email_disposable")
+            if cfg.check_email_domains and not app.state.mail_domain_check(clean):
+                return refused("email_no_domain")
             if clean != acct.normalise_email(email_again):
                 return refused("email_mismatch")
             if clean == account.email:

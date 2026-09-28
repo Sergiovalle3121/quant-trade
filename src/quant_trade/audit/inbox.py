@@ -13,6 +13,7 @@ exact domain or a parent domain. It is not a promise to catch every one.
 from __future__ import annotations
 
 import hashlib
+from collections.abc import Callable
 
 #: Providers that ignore dots in the local part.
 DOTLESS_DOMAINS = frozenset({"gmail.com"})
@@ -124,3 +125,55 @@ def is_reserved(email: str) -> bool:
     labels = domain.split(".")
     parents = {".".join(labels[i:]) for i in range(len(labels))}
     return bool(parents & RESERVED_DOMAINS) or ("." + domain).endswith(RESERVED_SUFFIXES)
+
+
+#: Seconds a sign-up waits on DNS before it gives the address the benefit of the doubt.
+DNS_LIFETIME_SECONDS = 3.0
+
+#: ``resolve(domain, record_type)`` returns the record texts, ``[]`` when the
+#: name exists without that record, and raises :class:`LookupError` when the
+#: name does not exist. Any other exception means "could not tell".
+Resolver = Callable[[str, str], list[str]]
+
+
+def _dns_resolve(domain: str, record_type: str) -> list[str]:
+    import dns.exception
+    import dns.resolver
+
+    try:
+        answer = dns.resolver.resolve(domain, record_type, lifetime=DNS_LIFETIME_SECONDS)
+    except dns.resolver.NXDOMAIN as exc:
+        raise LookupError(domain) from exc
+    except dns.resolver.NoAnswer:
+        return []
+    except dns.exception.DNSException as exc:
+        raise OSError(str(exc)) from exc
+    return [record.to_text() for record in answer]
+
+
+def domain_takes_mail(email: str, *, resolve: Resolver | None = None) -> bool:
+    """False only when DNS says the address's domain cannot receive mail.
+
+    A domain takes mail through its MX records or, with none, through its
+    A/AAAA address (RFC 5321 §5.1). A single null MX (``0 .``, RFC 7505)
+    declares that it takes none. A domain that does not exist takes none.
+    Timeouts, a missing resolver library and any other DNS trouble count
+    as "takes mail": a customer is never refused because DNS was slow.
+    """
+    _, domain = _split(email)
+    if not domain:
+        return False
+    try:
+        if resolve is None:
+            import dns.resolver  # noqa: F401 - only to know whether it is installed
+
+            resolve = _dns_resolve
+        mx = resolve(domain, "MX")
+        if mx:
+            exchanges = {record.split()[-1].rstrip(".") for record in mx}
+            return exchanges != {""}
+        return any(resolve(domain, kind) for kind in ("A", "AAAA"))
+    except LookupError:
+        return False
+    except Exception:  # noqa: BLE001 - DNS trouble never refuses a customer
+        return True

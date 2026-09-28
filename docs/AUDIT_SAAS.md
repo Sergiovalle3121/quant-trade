@@ -2094,6 +2094,7 @@ with an empty value):
 | `AUDIT_REFERRAL_GLOBAL_MONTHLY_CAP` | `100` | Maximum rewarded invites across the whole service per UTC month, reserved transactionally in `referral_global_slots`. At one credit per invite this caps the new monthly credit obligation. `0` stops new rewards. |
 | `AUDIT_EMAIL_VERIFICATION_REQUIRED` | `false` | Migration default. When `true`, both addresses must be confirmed before an invite reward and a buyer's address before a new Checkout. Sign-up still works; the free first full report waits until the address is confirmed (earlier uploads are previews with reason `unverified`). **Public paid launch requires `true` and SMTP verified end to end.** |
 | `AUDIT_EMAIL_TOKEN_SECRET`, `AUDIT_SMTP_HOST`, `AUDIT_SMTP_PORT`, `AUDIT_SMTP_USERNAME`, `AUDIT_SMTP_PASSWORD`, `AUDIT_SMTP_FROM`, `AUDIT_SMTP_SECURITY` | empty / `587` / `starttls` | Stable secret of at least 32 characters shared by replicas and encrypted SMTP transport. `/ready` fails when verification is required but delivery is not configured. Test real delivery, retries and legacy account confirmation before launch. No usable token or link is stored in the outbox. |
+| `AUDIT_SKIP_EMAIL_DNS` | `false` | `true` stops the sign-up DNS check that refuses domains taking no mail (for a staging copy without DNS). |
 | `AUDIT_RESEND_API_KEY`, `AUDIT_EMAIL_FROM` | empty | Resend's HTTPS API, used instead of SMTP when the key (`re_…`) is set. Railway disables outbound SMTP below the Pro plan, so this is the transport that works there. `AUDIT_EMAIL_FROM` (alias of `AUDIT_SMTP_FROM`) must be an address on a domain verified in Resend; until a domain is verified Resend only delivers to the Resend account owner. When `AUDIT_EMAIL_TOKEN_SECRET` is empty, the token secret is derived from the Resend key (HMAC-SHA256), so rotating the key voids only links still pending (24 h at most). The Message-ID is sent as Resend's `Idempotency-Key`, so a retry after a lost reply is not delivered twice. The privacy page names Resend and links its policy while it carries the mail. |
 | `AUDIT_CONTACT_URL` | empty | Where a client asks for a code (for example a `https://wa.me/…` link or a `mailto:`). Only `https://` and `mailto:` are shown. |
 | `AUDIT_PRICE_USD_CENTS` | `2900` | New single-report Checkout price in USD cents; each order freezes this amount. Existing paid reports and credits are unchanged. |
@@ -2445,6 +2446,12 @@ an account never changes what a report says.
   Sign-up and e-mail change also refuse reserved domains (example.com/net/org
   and `.example`, `.test`, `.invalid`, `.localhost`, `.local`) as `email_bad`
   when `AUDIT_ALLOW_RESERVED_EMAILS` is not `true` (the service default).
+  They also refuse, as `email_no_domain`, an address whose domain DNS says
+  takes no mail (`inbox.domain_takes_mail`): no such domain, a null MX
+  (`0 .`), or neither MX nor A/AAAA records. Timeouts and any other DNS
+  trouble let the address through (lookups give up after
+  `inbox.DNS_LIFETIME_SECONDS`, 3 s), so a slow resolver never refuses a
+  customer. On in the service; `AUDIT_SKIP_EMAIL_DNS=true` turns it off.
   While e-mail confirmation is off, a shared IPv4 address gets
   `WELCOME_REPORTS_PER_IPV4_UNVERIFIED` (3) free reports a month instead of
   the carrier-sized `WELCOME_REPORTS_PER_IPV4_PER_MONTH` (10).
@@ -2530,7 +2537,10 @@ an account never changes what a report says.
   outcome, slot) under a random id with no browser mark, so deleting
   credited invitees never frees the cap. They show in "Descargar mis datos".
   Set `AUDIT_REFERRAL_REWARDS=false` to stop new rewards; already earned
-  credits remain usable. Off in free mode or without the free first report.
+  credits remain usable. Off in free mode, without the free first report,
+  and while e-mail delivery is not configured: a credit needs both addresses
+  confirmed, so without mail the section and the invite link are not shown
+  and no sign-up is noted as invited.
 - **Email ownership and recovery** (`verified_emails`, `email_outbox`): new
   accounts and legacy accounts are unverified until they explicitly POST a
   confirmation form opened from their email. GET only renders the form, so
