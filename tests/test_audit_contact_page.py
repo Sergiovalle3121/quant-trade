@@ -93,3 +93,34 @@ def test_public_pages_show_evidence_labels_in_their_own_language(tmp_path: Path)
             assert word in text, (path, word)
         # The codes stay in classes; the reader sees words.
         assert "MEASURED" not in text and "DECLARED" not in text, path
+
+
+def test_guessed_legal_addresses_redirect_to_the_legal_pages(tmp_path: Path) -> None:
+    client = _client(tmp_path)
+    for alias, target in (
+        ("/en/terms", "/terms?lang=en"),
+        ("/en/privacy", "/privacy?lang=en"),
+        ("/pt/terms", "/pt/termos"),
+        ("/pt/privacy", "/pt/privacidade"),
+    ):
+        response = client.get(alias, follow_redirects=False)
+        assert response.status_code == 301 and response.headers["location"] == target
+        assert client.get(target).status_code == 200
+
+
+def test_reports_show_evidence_labels_in_their_own_language() -> None:
+    from quant_trade.audit.report import render_html
+    from quant_trade.audit.sample import sample_result
+
+    for locale, words in (
+        ("es", ("Medido", "Declarado")),
+        ("en", ("Measured", "Declared")),
+        ("pt", ("Medido", "Declarado")),
+    ):
+        page = render_html(sample_result(locale, bootstrap_samples=60), watermark=False)
+        text = _text(page.split("</head>", 1)[1])
+        for word in words:
+            assert word in text, (locale, word)
+        assert "MEASURED" not in text and "DECLARED" not in text, locale
+        # The badge keeps the code as its class, for its colour.
+        assert 'class="badge MEASURED"' in page

@@ -1492,9 +1492,9 @@ LABELS: dict[str, dict[str, str]] = {
             "para tu web. Nunca muestra tus archivos, operaciones ni descripción."
         ),
         "evidence_legend": (
-            "Cada cifra lleva su etiqueta: MEASURED, calculada de tus archivos; DECLARED, "
-            "declarada por ti o por el vendedor, sin verificar; NOT_MEASURED, faltó un dato "
-            "para calcularla."
+            "Cada cifra lleva su etiqueta: «Medido» si se calculó de tus archivos; "
+            "«Declarado» si lo afirmas tú o el vendedor, sin verificar; «No medido» si "
+            "faltó un dato para calcularla."
         ),
         "next": "Qué hacer ahora",
         "next_intro": (
@@ -2817,9 +2817,9 @@ LABELS: dict[str, dict[str, str]] = {
             "for your site. It never shows your files, trades or description."
         ),
         "evidence_legend": (
-            "Every figure carries its tag: MEASURED, computed from your files; DECLARED, "
-            "stated by you or the seller, not verified; NOT_MEASURED, a piece was missing to "
-            "compute it."
+            "Every figure carries its tag: “Measured” when computed from your files; "
+            "“Declared” when stated by you or the seller, not verified; “Not measured” when "
+            "a piece was missing to compute it."
         ),
         "next": "What to do now",
         "next_intro": (
@@ -3485,6 +3485,33 @@ def _fmt(value: Any, *, key: str = "") -> str:
         # A declared date arrives as 2024-06-03T00:00:00Z; the day is what was declared.
         return midnight.group(1)
     return _e(value)
+
+
+#: Evidence tags as a reader sees them on the site and in reports; the codes stay in the
+#: JSON and the badge CSS classes.
+EVIDENCE_LABELS: dict[str, dict[str, str]] = {
+    "es": {"MEASURED": "Medido", "DECLARED": "Declarado", "NOT_MEASURED": "No medido"},
+    "en": {"MEASURED": "Measured", "DECLARED": "Declared", "NOT_MEASURED": "Not measured"},
+    "pt": {"MEASURED": "Medido", "DECLARED": "Declarado", "NOT_MEASURED": "Não medido"},
+}
+
+
+def evidence_label(tag: str, locale: str) -> str:
+    return EVIDENCE_LABELS.get(locale, EVIDENCE_LABELS["en"]).get(tag, tag)
+
+
+def localize_tags(text: str, locale: str) -> str:
+    """Replace the tag codes in a sentence by their labels (NOT_MEASURED first)."""
+    for tag in ("NOT_MEASURED", "MEASURED", "DECLARED"):
+        text = re.sub(rf"\b{tag}\b", evidence_label(tag, locale), text)
+    return text
+
+
+def localize_text_nodes(markup: str, locale: str) -> str:
+    """Show the evidence codes as words in the page's language, in text only.
+
+    Attributes (the badge CSS classes, links) keep the codes."""
+    return re.sub(r">([^<]+)<", lambda m: f">{localize_tags(m.group(1), locale)}<", markup)
 
 
 def _badge(cls: str) -> str:
@@ -8224,12 +8251,16 @@ def render_html(
         + "</style>"
         + SCRIPT_TAG
         + "</head><body>"
-        + header
-        + hero
-        + _report_toc(toc, labels["toc"])
-        + "<main id='main' class='paper report-main'><div class='wrap wrap-mid'>"
-        + "".join(sections)
-        + "</div></main></body></html>"
+        + localize_text_nodes(
+            header
+            + hero
+            + _report_toc(toc, labels["toc"])
+            + "<main id='main' class='paper report-main'><div class='wrap wrap-mid'>"
+            + "".join(sections)
+            + "</div></main>",
+            locale,
+        )
+        + "</body></html>"
     )
 
 

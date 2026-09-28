@@ -1547,6 +1547,21 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     def audit_form_pt(request: Request, extras: int = 0) -> Response:
         return _audit_form(request, "pt", extras)
 
+    # The legal pages under the other addresses people guess for them.
+    for legal_alias, legal_path in (
+        ("/en/terms", "/terms?lang=en"),
+        ("/en/privacy", "/privacy?lang=en"),
+        ("/pt/terms", "/pt/termos"),
+        ("/pt/privacy", "/pt/privacidade"),
+        ("/pt/termos-de-uso", "/pt/termos"),
+        ("/pt/privacidad", "/pt/privacidade"),
+    ):
+
+        def _to_legal(legal_path: str = legal_path) -> Response:
+            return RedirectResponse(legal_path, status_code=301)
+
+        app.add_api_route(legal_alias, _to_legal, methods=["GET"], include_in_schema=False)
+
     # Addresses people type or share for the prices: the landing's price section.
     for price_path, landing_path in (
         ("/precios", "/"),

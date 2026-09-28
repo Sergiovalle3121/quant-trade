@@ -58,6 +58,9 @@ from quant_trade.audit.report import (
     DIMENSION_TITLES,
     DISCLAIMER,
     STATUS_TEXT,
+    evidence_label,
+    localize_tags,
+    localize_text_nodes,
     source_name,
 )
 from quant_trade.audit.seo import BRAND, TAGLINE, PageMeta, head_meta, page_paths, private_meta
@@ -1318,32 +1321,12 @@ def _class_text(overall: str, locale: str) -> str:
     return CLASS_B_PT if locale == "pt" and overall == "B" else class_text(overall, locale)
 
 
-#: Evidence tags as a reader sees them on the site; the codes stay in data, CSS classes
-#: and reports' machine-readable parts.
-EVIDENCE_LABELS: dict[str, dict[str, str]] = {
-    "es": {"MEASURED": "Medido", "DECLARED": "Declarado", "NOT_MEASURED": "No medido"},
-    "en": {"MEASURED": "Measured", "DECLARED": "Declared", "NOT_MEASURED": "Not measured"},
-    "pt": {"MEASURED": "Medido", "DECLARED": "Declarado", "NOT_MEASURED": "Não medido"},
-}
-
-
-def evidence_label(tag: str, locale: str) -> str:
-    return EVIDENCE_LABELS.get(locale, EVIDENCE_LABELS["en"]).get(tag, tag)
-
-
-def _localize_tags(text: str, locale: str) -> str:
-    """Replace the tag codes in a sentence by their labels (NOT_MEASURED first)."""
-    for tag in ("NOT_MEASURED", "MEASURED", "DECLARED"):
-        text = re.sub(rf"\b{tag}\b", evidence_label(tag, locale), text)
-    return text
-
-
 def _badge(tag: str, locale: str) -> str:
     return f"<span class='badge {_e(tag)}'>{_e(evidence_label(tag, locale))}</span>"
 
 
 def _disclaimer(locale: str) -> str:
-    return _localize_tags(DISCLAIMER_PT if locale == "pt" else DISCLAIMER[locale], locale)
+    return localize_tags(DISCLAIMER_PT if locale == "pt" else DISCLAIMER[locale], locale)
 
 
 def _method_title(locale: str) -> str:
@@ -1484,17 +1467,10 @@ def _page(
         _head(title, locale, meta_html)
         + f"<body><a class='skip' href='#main'>{_e(ui['skip'])}</a>"
         + _nav(locale, switch_href, solid=solid_nav, alternates=alternates)
-        + f"<main id='main'>{_localize_text_nodes(body, locale)}</main>"
+        + f"<main id='main'>{localize_text_nodes(body, locale)}</main>"
         + _footer(locale)
         + "</body></html>"
     )
-
-
-def _localize_text_nodes(markup: str, locale: str) -> str:
-    """Show the evidence codes as words in the page's language, in text only.
-
-    Attributes (the badge CSS classes, links) keep the codes."""
-    return re.sub(r">([^<]+)<", lambda m: f">{_localize_tags(m.group(1), locale)}<", markup)
 
 
 def _public_meta(
