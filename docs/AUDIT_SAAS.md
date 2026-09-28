@@ -3474,11 +3474,16 @@ access, and payment reconciliation continue. Restore either flag to `false`
 only after the incident is resolved. The values are read at process start,
 so editing an environment variable without restarting has no effect.
 
-At most `AUDIT_MAX_CONCURRENT_AUDITS + 1` audit request bodies can be in
+At most `16 × AUDIT_MAX_CONCURRENT_AUDITS` audit request bodies can be in
 multipart parsing or later audit processing per process. Additional requests
-get a 503 before their bodies are read. An admitted body is still bounded by
-the existing total request limit and by each field's size limit. This is an
-admission guard, not a durable job queue; an upload rejected with 503 must be
+get a 503 before their bodies are read. An admitted body must arrive within
+120 seconds, or the upload is cut off with a 408 and its admission slot is
+freed, so a few slow or stalled clients cannot make every other upload busy.
+An admitted body is still bounded by the existing total request limit and by
+each field's size limit. The audit computation itself still runs at most
+`AUDIT_MAX_CONCURRENT_AUDITS` at a time; a parsed upload waits up to
+`AUDIT_QUEUE_SECONDS` for a slot before it is told the service is busy. This
+is an admission guard, not a durable job queue; an upload rejected with 503 must be
 sent again. Limits and attempt counters are per process, so adding replicas
 requires shared admission and quota design before claiming greater capacity.
 The controls and DB/PDF failure probes are exercised in

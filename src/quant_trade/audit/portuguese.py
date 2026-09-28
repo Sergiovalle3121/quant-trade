@@ -792,6 +792,9 @@ MESSAGES_PT: dict[str, str] = {
         "O serviço está calculando outras auditorias neste momento; envie o arquivo de novo "
         "em um minuto."
     ),
+    "upload_timeout": (
+        "O arquivo demorou demais para chegar e o envio foi cancelado; envie-o de novo."
+    ),
     "pdf_busy": "Estamos preparando outros PDFs neste momento. Tente de novo em alguns segundos.",
     "pdf_limit": "Você preparou vários PDFs há pouco. Tente de novo em alguns minutos.",
     "pdf_unavailable": (
