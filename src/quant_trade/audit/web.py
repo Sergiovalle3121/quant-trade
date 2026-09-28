@@ -3576,12 +3576,13 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         if not (0 < len(device) <= 128):
             device = new_device = acct.new_secret()
         if not cfg.free_mode:
+            session = _session(request)
+            # Account first: every upload, code or not, belongs to an account.
+            if session is None:
+                return _gate(request, report_loc, "signin", 401)
             typed = access_code.strip()[:_CODE_MAX] if cfg.access_codes_enabled else ""
             usable = bool(typed) and await run_in_threadpool(db.code_usable, typed, now)
-            session = _session(request)
-            if not usable and session is None:
-                return _gate(request, report_loc, "code" if typed else "signin", 401)
-            if not usable and session is not None:
+            if not usable:
                 gate_account = session[0]
         try:
             uploads = {
@@ -4451,6 +4452,9 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         location = f"/audits/{audit_id}?token={token or ''}&lang={locale}"
         if record.paid:
             return RedirectResponse(location, status_code=303)
+        if not cfg.free_mode and _session(request) is None:
+            # A code is redeemed from an account, so the report lands on its list.
+            return _signin_redirect(locale, next_path=location)
         # Each attempt counts toward the hourly per-IP limit, like an upload.
         ip = acct.network_address(_client_ip(request, cfg.trusted_proxy_hops))
         now = datetime.now(UTC)

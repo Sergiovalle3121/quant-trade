@@ -821,7 +821,7 @@ def test_without_credits_my_account_shows_prices_and_a_ready_message_first(
 
 
 # -- the free tier: previews need an account, a few a month ------------------------
-def test_a_preview_needs_an_account_unless_a_working_code_pays_for_it(tmp_path: Path) -> None:
+def test_a_preview_needs_an_account_even_with_a_working_code(tmp_path: Path) -> None:
     client, store, _ = _client(tmp_path)
     refused = _upload(client)
     assert refused.status_code == 401
@@ -835,11 +835,11 @@ def test_a_preview_needs_an_account_unless_a_working_code_pays_for_it(tmp_path: 
         headers={"Accept": "application/json"},
     )
     assert as_json.status_code == 401 and as_json.json() == {"error": "free_tier_signin"}
-    bad = _upload(client, access_code="AUD-NOPE-NOPE-NOPE")
-    assert bad.status_code == 401 and "Ese código no sirve" in bad.text
     code, _ = store.create_access_code(credits=1, note="", at=NOW)  # type: ignore[attr-defined]
-    paid = _upload(client, access_code=code)
-    assert paid.status_code == 303 and paid.headers["location"].endswith("&code=applied")
+    # A working code no longer skips the account: the report must land on a list.
+    anonymous = _upload(client, access_code=code)
+    assert anonymous.status_code == 401 and "href='/registro?next=" in anonymous.text
+    assert store.code_usable(code, NOW)  # type: ignore[attr-defined]
     english = client.post(
         "/audits",
         files={"equity": ("e.csv", csv_bytes(positive_drift(500)), "text/csv")},
@@ -1790,14 +1790,17 @@ def test_download_my_data_refuses_cross_site_and_hides_others_descriptions(
 
     client, store, _ = _client(tmp_path)
     _signup(client, "ana@example.com")
-    # An anonymous upload paid with a code, later saved by Ana from its link.
+    # An older upload made without an account (codes needed none then), paid
+    # with a code and later saved by Ana from its link. Bea stands in for it.
     code, _ = store.create_access_code(credits=1, note="", at=NOW)  # type: ignore[attr-defined]
-    stranger = TestClient(client.app)
+    stranger = TestClient(client.app, base_url=str(client.base_url))
+    _signup(stranger, "bea@example.com")
     theirs = _audit_id(
         _upload(stranger, description="mi robot secreto", access_code=code).headers["location"]
     )
     with store.engine.begin() as conn:  # type: ignore[attr-defined]
         conn.execute(store.audits.update().values(paid=False, paid_at=None))  # type: ignore[attr-defined]
+        conn.execute(store.account_audits.delete())  # type: ignore[attr-defined]
     account = store.find_account("ana@example.com")  # type: ignore[attr-defined]
     store.link_audit(account.id, theirs, at=NOW)  # type: ignore[attr-defined]  # saved from a link
     refused = client.get(

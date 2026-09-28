@@ -2379,15 +2379,18 @@ Tests: `tests/test_audit_owner_panel.py`.
 A customer can create an account with an e-mail and a password to find, in
 one place, the reports they uploaded or saved, the access codes they
 redeemed or added (with the credits left), and what they paid for. The
-free preview needs one (see "Free tier" below); each report's private link
-and a report paid with an access code work without one, and an account never
-changes what a report says.
+free preview needs one (see "Free tier" below), and so does an upload or a
+redeem with an access code: outside free mode an anonymous upload gets the
+sign-in page (401) even with a working code, and `POST /audits/{id}/redeem`
+sends an anonymous visitor to sign in first, so every paid report lands on an
+account's list. A report's private link still opens without an account, and
+an account never changes what a report says.
 
 - **Free tier** (`accounts.FREE_PREVIEWS_PER_MONTH = 3`,
   `FREE_PREVIEWS_PER_IP_PER_MONTH = 10` per IPv6 /64,
   `FREE_PREVIEWS_PER_IPV4_PER_MONTH = 30` per IPv4 address; not in free
   mode). An upload
-  without a working access code needs a signed-in account (401 page with
+  needs a signed-in account, with or without an access code (401 page with
   "Crear cuenta gratis" otherwise; `{"error": "free_tier_signin"}` for JSON).
   Each account gets 3 free previews per calendar month (UTC), counted in
   the `free_previews` table; free previews are also capped per network

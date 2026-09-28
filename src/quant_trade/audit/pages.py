@@ -239,7 +239,7 @@ _COPY: dict[str, dict[str, Any]] = {
         ),
         "signin_first": (
             "Antes de subir, crea tu cuenta gratis: tu primer informe sale completo, con PDF, "
-            "sin pagar. Si ya compraste un código, puedes subir sin cuenta."
+            "sin pagar. Si ya compraste un código, lo usas al subir con tu cuenta."
         ),
         "signin_create": "Crear cuenta gratis",
         "signin_enter": "Ya tengo cuenta",
@@ -547,7 +547,7 @@ _COPY: dict[str, dict[str, Any]] = {
         ),
         "signin_first": (
             "Before you upload, create your free account: your first report comes out in full, "
-            "with the PDF, at no cost. If you bought a code, you can upload without an account."
+            "with the PDF, at no cost. Bought a code? Use it when you upload from your account."
         ),
         "signin_create": "Create a free account",
         "signin_enter": "I have an account",

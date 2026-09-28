@@ -270,9 +270,15 @@ def test_a_code_unlocks_an_existing_preview(tmp_path: Path) -> None:
     )
     assert wrong.headers["location"].endswith("&code=rejected")
     code, _ = store.create_access_code(credits=1, note="", at=NOW)  # type: ignore[attr-defined]
-    client.cookies.clear()  # a stranger: no account, a wrong token
-    stranger = client.post(f"/audits/{audit_id}/redeem?token=bad", data={"code": code})
-    assert stranger.status_code == 404
+    stranger = TestClient(client.app, base_url=str(client.base_url))
+    anonymous = stranger.post(
+        f"/audits/{audit_id}/redeem?token={token}", data={"code": code}, follow_redirects=False
+    )
+    assert anonymous.status_code == 303 and "/entrar?next=" in anonymous.headers["location"]
+    assert not store.get_audit(audit_id).paid  # type: ignore[attr-defined]
+    signed_in(stranger, "stranger@example.com")
+    wrong_token = stranger.post(f"/audits/{audit_id}/redeem?token=bad", data={"code": code})
+    assert wrong_token.status_code == 404
     right = client.post(
         f"/audits/{audit_id}/redeem?token={token}", data={"code": code}, follow_redirects=False
     )
