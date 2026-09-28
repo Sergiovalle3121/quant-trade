@@ -127,6 +127,34 @@ Every change below has an offline, deterministic test in
   sign-in, sign-up and panel counters moved to the database (`attempts`,
   hashed keys), so deploys no longer reset them. Parked: sign-up's 409
   confirms an e-mail exists (needs e-mail verification); scrypt N=2^14.
+- Owner panel path (`AUDIT_PANEL_PATH`, 2026-09-28; tests in
+  `tests/test_audit_owner_panel.py`). The panel can be served at a path the
+  owner chooses; the default stays `/panel`. The value is checked
+  (`settings.resolve_panel_path`: starts with `/`, 2 to 64 characters from
+  `A-Z a-z 0-9 / _ -`, no `//`, no trailing slash, first segment not used by
+  a public route) and an invalid one falls back to `/panel` with one start-up
+  warning that never prints the value; the setting is also kept out of the
+  settings `repr`. Fixed with it: without a valid `AUDIT_ADMIN_KEY` the panel
+  used to answer 404 with the "audit not found" page, 400 to a POST without
+  the key field and 405 to other methods, which told a scanner the path was
+  special; now the routes are not mounted without a key, so GET, HEAD, POST
+  and every other method get the ordinary localized 404 with the same
+  headers. With a custom path, `/panel` is an unknown page too. The panel
+  path is never written in `robots.txt` or the sitemap; its responses carry
+  `X-Robots-Tag: noindex, nofollow` and `Cache-Control: no-store`. The key
+  field takes at most 256 characters (as the login form already said), and
+  the access-log filter redacts `key=` as well. Unchanged: the key travels
+  only in POST bodies, is compared in constant time, and five wrong keys per
+  address per hour answer 429 (`attempts` table). Limits: a custom path is
+  obscurity, not a second secret, and it appears in Railway's own request
+  log; with a key set, the path still answers 405 to methods other than
+  GET, HEAD and POST. The track-record panel (`/historiales` under the panel
+  path) follows the same path and rules and stays off with `TRACK_SEAL_ENABLED`.
+- "Mi cuenta" in four parts (2026-09-28; `tests/test_audit_account_parts.py`):
+  layout only. No form, action, CSRF field, limit or redirect changed; the
+  four links are plain fragment links and the bar is CSS, so the Content
+  Security Policy is as before. The page's message is still one of the fixed
+  texts chosen by an allow-listed `done=` or `error=` code, never echoed.
 
 ## What the operator sets on Railway
 
