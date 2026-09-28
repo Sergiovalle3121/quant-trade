@@ -289,6 +289,11 @@ COPY_PT: dict[str, str] = {
     "buy_email": "Confirme seu e-mail para comprar créditos.",
     "buy_review": "Há uma cobrança em análise. Não pague novamente; peça ajuda.",
     "security_title": "Senha e dados",
+    "parts_label": "Partes da sua conta",
+    "part_reports": "Relatórios",
+    "part_credits": "Créditos e compras",
+    "part_security": "Segurança",
+    "part_data": "Seus dados",
     "export_title": "Baixar meus dados",
     "export_help": (
         "Um arquivo JSON com tudo o que guardamos da sua conta: seu e-mail, relatórios, "

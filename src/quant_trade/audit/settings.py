@@ -13,7 +13,8 @@ from __future__ import annotations
 import hashlib
 import hmac
 import os
-from collections.abc import Mapping
+import re
+from collections.abc import Collection, Mapping
 from dataclasses import dataclass, field
 
 from quant_trade.audit.schema import MAX_UPLOAD_BYTES
@@ -38,9 +39,34 @@ DEFAULT_MAX_CONCURRENT_AUDITS = 2
 DEFAULT_AUDIT_QUEUE_SECONDS = 30
 
 TRUE_VALUES = {"1", "true", "yes", "on"}
-#: The owner panel (``/panel``) stays off unless ``AUDIT_ADMIN_KEY`` is at
+#: The owner panel (``/panel`` by default) stays off unless ``AUDIT_ADMIN_KEY`` is at
 #: least this long: a short key could be guessed within the attempt limit.
 MIN_ADMIN_KEY_LENGTH = 32
+#: Where the owner panel is served unless ``AUDIT_PANEL_PATH`` names another path.
+DEFAULT_PANEL_PATH = "/panel"
+#: ``/`` plus 1 to 63 letters, digits, ``/``, ``_`` or ``-``.
+_PANEL_PATH = re.compile(r"/[A-Za-z0-9/_-]{1,63}")
+
+
+def panel_path_valid(value: str) -> bool:
+    """A path the owner panel may be served at: 2 to 64 safe characters, no
+    empty segment and no trailing slash."""
+    return (
+        _PANEL_PATH.fullmatch(value) is not None and "//" not in value and not value.endswith("/")
+    )
+
+
+def resolve_panel_path(value: str, *, taken: Collection[str] = ()) -> str:
+    """``value`` when it is a valid panel path whose first segment is not in
+    ``taken`` (the first segments of the public routes); else the default."""
+    if value == DEFAULT_PANEL_PATH:
+        return value
+    if not panel_path_valid(value):
+        return DEFAULT_PANEL_PATH
+    first = value.split("/")[1].lower()
+    if first in {segment.lower() for segment in taken}:
+        return DEFAULT_PANEL_PATH
+    return value
 
 
 def normalise_database_url(url: str) -> str:
@@ -175,6 +201,9 @@ class AuditSettings:
     #: Secret for the owner panel where codes are created from a browser.
     #: No default: empty (or shorter than MIN_ADMIN_KEY_LENGTH) turns it off.
     admin_key: str = field(default="", repr=False)
+    #: Where the owner panel is served, as configured. The service checks it
+    #: (``resolve_panel_path``) and falls back to the default when it is not valid.
+    panel_path: str = field(default=DEFAULT_PANEL_PATH, repr=False)
     #: Read public market closes (FRED, no key) to compare a strategy with
     #: holding the market it trades. On by default in the service
     #: (``AUDIT_PUBLIC_DATA=false`` turns it off); off when built directly.
@@ -401,6 +430,7 @@ class AuditSettings:
             operator_address=_text(env.get("AUDIT_OPERATOR_ADDRESS", "")),
             jurisdiction=_text(env.get("AUDIT_JURISDICTION", "")),
             admin_key=env.get("AUDIT_ADMIN_KEY", "").strip(),
+            panel_path=env.get("AUDIT_PANEL_PATH", "").strip() or DEFAULT_PANEL_PATH,
             public_data=env.get("AUDIT_PUBLIC_DATA", "true").strip().lower() in TRUE_VALUES,
             refuse_reserved_emails=env.get("AUDIT_ALLOW_RESERVED_EMAILS", "").strip().lower()
             not in TRUE_VALUES,
@@ -409,4 +439,11 @@ class AuditSettings:
         )
 
 
-__all__ = ["MIN_ADMIN_KEY_LENGTH", "AuditSettings", "normalise_database_url"]
+__all__ = [
+    "DEFAULT_PANEL_PATH",
+    "MIN_ADMIN_KEY_LENGTH",
+    "AuditSettings",
+    "normalise_database_url",
+    "panel_path_valid",
+    "resolve_panel_path",
+]

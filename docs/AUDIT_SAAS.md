@@ -2123,6 +2123,7 @@ with an empty value):
 | `AUDIT_OPERATOR_ADDRESS` | empty | Postal address of the operator. |
 | `AUDIT_JURISDICTION` | empty | Governing law and courts, for example "Leyes de México; tribunales de la Ciudad de México". |
 | `AUDIT_ADMIN_KEY` | empty | Secret for the owner panel at `/panel` (create, list and disable codes from a phone). Shorter than 32 characters or empty turns the panel off (404). |
+| `AUDIT_PANEL_PATH` | `/panel` | Path of the owner panel. Must start with `/`, have 2 to 64 characters from `A-Z a-z 0-9 / _ -`, no `//`, no trailing slash, and a first segment that no public route uses (`/cuenta`, `/pt`, `/audits`, `/static`...). An invalid value falls back to `/panel` and the start-up log says so without printing the value. Never listed in `robots.txt` or the sitemap. |
 | `AUDIT_TRUSTED_PROXY_HOPS` | `0` | Reverse proxies in front of the service. `0` ignores `X-Forwarded-For` (it is client-controlled) and rate-limits the socket address; `N` takes the N-th entry from the right. Railway needs `1`. |
 
 Checkout creates a database order before calling Stripe. The order freezes the
@@ -2431,6 +2432,27 @@ lock that address out for the hour (in memory, per process). Pages are
 `no-store` and `noindex`. The panel is for the owner, so it is Spanish only.
 Tests: `tests/test_audit_owner_panel.py`.
 
+To serve the panel somewhere else, set `AUDIT_PANEL_PATH` (for example
+`/oficina-7k2`) and redeploy; every form and link of the panel follows it,
+and `/panel` then answers like any page that does not exist. Rules
+(`settings.resolve_panel_path`): it starts with `/`, has 2 to 64 characters
+from `A-Z a-z 0-9 / _ -`, no `//`, no trailing slash, and its first segment
+is not the first segment of a public route. A value that breaks a rule
+keeps `/panel`, and the start-up log has one warning that names the
+variable, never the value. The path is not a secret that replaces the key:
+it only keeps the login form away from scanners. It is never written in
+`robots.txt` or the sitemap (that would reveal it); the panel's responses
+carry `X-Robots-Tag: noindex, nofollow` and `Cache-Control: no-store`
+themselves. Without a valid `AUDIT_ADMIN_KEY` the panel routes are not
+mounted at all, so the path gives the ordinary localized 404 for GET, HEAD,
+POST (with or without a key) and every other method: same status, body and
+headers as an unknown page. With a key set the path can still be told from
+an unknown page: 405 to other methods, 400 to a POST without the key field
+or with a key that is too long, 307 to the path with a trailing slash. The
+key field accepts at most 256 characters,
+and the access log redacts `key=` like `token=` and `code=`, in case
+someone types the key into a link by mistake.
+
 ### Customer accounts (`audit/accounts.py`, `/registro`, `/cuenta`)
 
 A customer can create an account with an e-mail and a password to find, in
@@ -2672,6 +2694,21 @@ an account never changes what a report says.
   `/entrar` `/login`, `/cuenta` `/account` ("Mis informes"), `/olvide`
   `/forgot`, `/restablecer` `/reset`; sign-out is a POST to `/salir` `/logout`.
   Every page links "Mi cuenta" from the navigation and the report header.
+- **Mi cuenta in four parts** (`account_pages.ACCOUNT_PARTS`): one page, one
+  address, four titled sections with fixed ids in every language:
+  `#informes` (reports and strategies), `#creditos` (buying, access codes,
+  purchases, invitations), `#seguridad` (e-mail confirmation, account
+  protection, password, recovery key, two-step, passkeys, sessions,
+  activity) and `#datos` (e-mail change, what the account keeps, data
+  export, delete account). Four links stay under the top bar (CSS
+  `position: sticky`, no script; they scroll sideways on a phone). The older
+  ids (`#estrategias`, `#invitar`, `#verificar-correo`, `#proteccion`,
+  `#recuperacion`, `#dos-pasos`, `#llaves`, `#sesiones`, `#actividad`,
+  `#correo`) stay inside their part, so old links and redirects still land
+  on their block. The page's message (`?done=`, `?error=`) is rendered in
+  the same bar as the links, so it is in view wherever a redirect lands.
+  With no credits the credits part comes before the reports, as the buying
+  block did before. Tests: `tests/test_audit_account_parts.py`.
 - **What lands on an account**: an upload made while signed in; a report
   opened by its link and saved with "Guardar en mi cuenta"; the code that
   unlocked a report while signed in; a code added by hand; a card purchase
@@ -2837,7 +2874,7 @@ an account never changes what a report says.
   out when the change completes, and "Actividad reciente" gets an
   "E-mail changed" line (never either address). Passkeys stay bound to the
   account, though a device may show the former address as their name.
-- **Protección de tu cuenta**: atop Mi cuenta, a card lists the recovery
+- **Protección de tu cuenta**: first in the security part of Mi cuenta, a card lists the recovery
   key, two-step sign-in and a passkey (only where passkeys work), each as
   on or with a link to its card, and counts how many are on. Two-step
   links to the recovery key while there is none, since it needs one. With
