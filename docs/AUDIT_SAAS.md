@@ -2842,8 +2842,12 @@ apps do not preview. Every new page must pass the guard in both languages
 ### Terms and privacy
 
 No refunds (sergio's decision, 2026-09-28, replacing the 2026-09-24 refund
-promise): the terms, the pricing section, the audience pages and the buy box
-say all sales are final. A full report that misreads the file (trades,
+promise): the terms and the buy box say all sales are final (the landing and
+audience pages lose their refund line in the redesign). Before Checkout the
+buyer must tick "the report is delivered at once and the purchase is not
+refundable" (`final_sale=yes`, ES/EN/PT); the acceptance and the terms
+version (`legal.LEGAL_UPDATED`) are kept per order in the additive table
+`checkout_order_terms`, as evidence for a chargeback. A full report that misreads the file (trades,
 balance or dates that do not match the platform) is fixed or replaced by a
 new credit (`quant-trade audit codes create --credits 1`). Only a duplicate
 charge or a charge that delivered no report (the `duplicate` and
