@@ -1907,7 +1907,9 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                     email=clean if acct.valid_email(clean) else "",
                     next_path=next_path,
                     invite=invite,
-                    typo_of=typo_of,
+                    # A ticked "keep what I typed" box survives the next error.
+                    typo_of=typo_of or (clean if email_as_typed else ""),
+                    typo_kept=bool(email_as_typed) and not typo_of,
                 )
                 return _anon_page(page, new_csrf, status)
 

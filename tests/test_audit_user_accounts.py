@@ -3835,6 +3835,11 @@ def test_the_no_domain_message_exists_in_three_languages() -> None:
         ("ana@aon.com", ""),  # a company next to aol.com
         ("ana@live.com.mx", ""),
         ("ana@empresa.mx", ""),
+        ("ana@hotmail.ca", ""),  # the provider's own country mailboxes
+        ("ana@outlook.cl", ""),
+        ("ana@protonmail.ch", ""),
+        ("ana@hotmail.co", "ana@hotmail.com"),
+        ("ana@gmail.comm", "ana@gmail.com"),
     ],
 )
 def test_suggest_domain_catches_provider_typos_only(typed: str, meant: str) -> None:
@@ -3908,3 +3913,22 @@ def test_the_kept_address_still_passes_every_other_check(tmp_path: Path) -> None
     )
     assert refused.status_code == 400
     assert store.find_account("ana@mailinator.com") is None  # type: ignore[attr-defined]
+
+
+def test_a_ticked_keep_box_survives_the_next_error(tmp_path: Path) -> None:
+    client, store, _ = _client(tmp_path)
+    csrf = _csrf(client.get("/registro").text)
+    short = client.post(
+        "/registro",
+        data={
+            "email": "ana@gmail.com",
+            "email_as_typed": "ana@gmial.com",
+            "password": "corta",
+            "csrf": csrf,
+        },
+        follow_redirects=False,
+    )
+    assert short.status_code == 400
+    assert "name='email_as_typed' value='ana@gmial.com' checked" in short.text
+    assert "Quisiste" not in short.text
+    assert store.find_account("ana@gmial.com") is None  # type: ignore[attr-defined]

@@ -259,13 +259,16 @@ def suggest_domain(email: str) -> str:
     local, domain = _split(email)
     if not local or not domain or domain in COMMON_PROVIDERS:
         return ""
+    label = domain.split(".", 1)[0]
     for provider in SUGGESTED_PROVIDERS:
         name = provider.partition(".")[0]
-        if len(name) < 5:
-            continue  # aol, live: too many real neighbours (aon.com, line.com)
+        if len(name) < 5 or label == name:
+            # aol, live: too many real neighbours (aon.com, line.com). The
+            # provider's own name with another ending may be its country
+            # mailbox (hotmail.ca, outlook.cl): only the ending loop below.
+            continue
         if _distance(domain, provider) <= (2 if len(name) >= 7 else 1):
             return f"{local}@{provider}"
-    label = domain.split(".", 1)[0]
     for provider in SUGGESTED_PROVIDERS:
         # The right name with a clipped or mistyped ending: gmail.co, gmail.cm.
         name, _, ending = provider.partition(".")

@@ -1606,14 +1606,18 @@ def signup_page(
     retention_days: int = 30,
     invite: str = "",
     typo_of: str = "",
+    typo_kept: bool = False,
 ) -> str:
-    """The sign-up form; ``typo_of`` asks whether that address was meant as ``email``."""
+    """The sign-up form; ``typo_of`` asks whether that address was meant as ``email``.
+
+    ``typo_kept`` shows the "keep what I typed" box ticked, after another error.
+    """
     locale = _locale(locale)
     copy = COPY[locale]
     from quant_trade.audit.legal import legal_url
 
     typo = ""
-    if typo_of:
+    if typo_of and error == "email_typo":
         typo = (
             "<div class='error' role='alert'>"
             + _e(copy["email_typo"].format(email=_safe_text(email)))
@@ -1623,7 +1627,7 @@ def signup_page(
     if typo_of:
         keep = (
             "<label class='acct-check'><input type='checkbox' name='email_as_typed' "
-            f"value='{_e(_safe_text(typo_of))}'> "
+            f"value='{_e(_safe_text(typo_of))}'{' checked' if typo_kept else ''}> "
             + _e(copy["email_typo_keep"].format(email=_safe_text(typo_of)))
             + "</label>"
         )
