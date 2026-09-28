@@ -278,7 +278,7 @@ def test_checkout_is_off_in_free_mode_and_webhook_is_absent(tmp_path: Path) -> N
 
 def test_paid_mode_locks_until_the_signed_webhook_arrives(tmp_path: Path) -> None:
     # Live Checkout opens only for a reviewed market and a declared country.
-    client = _client(tmp_path, free_mode=False, approved_markets=frozenset({"MX"}), **STRIPE)
+    client = _client(tmp_path, free_mode=False, **STRIPE)
     assert client.get("/health").json()["stripe_enabled"] is True
     audit_id, token = _id_and_token(_upload(client).headers["location"])
 
