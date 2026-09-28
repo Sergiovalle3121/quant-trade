@@ -13,7 +13,7 @@ from fastapi.testclient import TestClient  # noqa: E402
 
 from quant_trade.audit.guard import find_claims  # noqa: E402
 from quant_trade.audit.legal import legal_url  # noqa: E402
-from quant_trade.audit.pages import landing  # noqa: E402
+from quant_trade.audit.pages import landing, upload_page  # noqa: E402
 from quant_trade.audit.settings import AuditSettings  # noqa: E402
 from quant_trade.audit.store import make_store  # noqa: E402
 from quant_trade.audit.theme import (  # noqa: E402
@@ -286,7 +286,7 @@ def test_deposit_rows_are_cards_on_phones_and_facts_share_a_printed_row(tmp_path
 
 
 def test_upload_form_leaves_no_lone_field_on_desktop() -> None:
-    page = landing(locale="es", free_mode=False, price_usd=29, access_codes=True)
+    page = upload_page(locale="es", free_mode=False, price_usd=29, access_codes=True)
     form = page.split("id='subir'", 1)[1].split("</form>", 1)[0]
     grids = [
         re.split(r"<details|<label class='check'>|<label for='f-challenge'", part)[0]
@@ -317,7 +317,7 @@ def test_held_back_capital_reads_as_a_card() -> None:
 
 
 def test_form_labels_are_tied_to_their_fields_and_greys_meet_contrast() -> None:
-    page = landing(locale="es", free_mode=False, price_usd=29, access_codes=True)
+    page = upload_page(locale="es", free_mode=False, price_usd=29, access_codes=True)
     for name in ("challenge", "locale", "access_code", "trials", "description"):
         assert f"<label for='f-{name}'>" in page and f"id='f-{name}'" in page
     assert "aria-describedby='f-access_code-help'" in page
@@ -579,7 +579,7 @@ def test_landing_form_help_is_short_and_the_footer_says_things_once() -> None:
         ),
         ("en", "As your platform saves it: HTML, XLSX, CSV or PDF, up to 10 MB.", "Which file"),
     ):
-        page = landing(locale=locale, free_mode=False, price_usd=29, access_codes=True)
+        page = upload_page(locale=locale, free_mode=False, price_usd=29, access_codes=True)
         # One line under the main file; the formats and export guides open on demand.
         assert short in page
         assert f"<details class='more-help'><summary>{question}" in page
@@ -755,7 +755,7 @@ def test_audience_pages_show_problems_checks_price_and_other_cases_as_cards(
 
 @pytest.mark.parametrize("locale", ["es", "en"])
 def test_the_name_its_columns_step_groups_fields_by_file_shape(tmp_path: Path, locale: str) -> None:
-    page = _client(tmp_path).get(f"/?lang={locale}").text
+    page = _client(tmp_path).get("/auditar" if locale == "es" else "/en/audit").text
     groups = (
         ("Una fila por operación", "Una fila por ejecución", "En los dos casos")
         if locale == "es"
@@ -817,7 +817,7 @@ def test_sign_up_links_the_terms_and_privacy_words_themselves(tmp_path: Path, lo
 
 @pytest.mark.parametrize("locale", ["es", "en"])
 def test_an_or_rule_separates_the_report_from_the_curve(tmp_path: Path, locale: str) -> None:
-    page = _client(tmp_path).get(f"/?lang={locale}").text
+    page = _client(tmp_path).get("/auditar" if locale == "es" else "/en/audit").text
     word = "o" if locale == "es" else "or"
     rule = f"<div class='or-rule' aria-hidden='true'><span>{word}</span></div>"
     assert page.index("name='report'") < page.index(rule) < page.index("name='equity'")

@@ -239,7 +239,7 @@ def test_the_upload_form_offers_the_declaration(tmp_path) -> None:  # type: igno
 
     settings = AuditSettings(database_url=f"sqlite:///{tmp_path}/a.db", bootstrap_samples=100)
     client = TestClient(create_app(settings, make_store(settings.database_url)))
-    assert "name='net_of_fees'" in client.get("/").text
+    assert "name='net_of_fees'" in client.get("/auditar").text
     files = {"equity": ("fund.csv", _grid_csv(_returns(60, seed=9)), "text/csv")}
     response = client.post(
         "/audits",

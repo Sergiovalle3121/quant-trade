@@ -130,7 +130,7 @@ COPY_PT: dict[str, Any] = {
     ),
     "signin_first": (
         "Antes de enviar, crie a sua conta grátis: o seu primeiro relatório sai completo, com "
-        "PDF, sem pagar. Se você comprou um código, pode enviar sem conta."
+        "PDF, sem pagar."
     ),
     "signin_create": "Criar conta grátis",
     "signin_enter": "Já tenho conta",

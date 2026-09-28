@@ -278,7 +278,7 @@ def test_pages_are_served_in_three_languages_and_linked_everywhere(tmp_path: Pat
         assert any(path in page for path in terms), name
         assert any(path in page for path in privacy), name
     # Next to the upload form, not only in the footer.
-    form = pages["landing"].split("action='/audits'")[1].split("</form>")[0]
+    form = client.get("/auditar").text.split("action='/audits'")[1].split("</form>")[0]
     assert "/terminos?lang=es" in form and "/privacidad?lang=es" in form
 
 

@@ -10,7 +10,7 @@ import pytest
 pytest.importorskip("fastapi")
 
 from quant_trade.audit.guard import find_claims  # noqa: E402
-from quant_trade.audit.pages import _UI, landing  # noqa: E402
+from quant_trade.audit.pages import _UI, AUDIT_PATHS, landing, upload_page  # noqa: E402
 from quant_trade.audit.report import render_html  # noqa: E402
 from quant_trade.audit.sample import sample_result  # noqa: E402
 from quant_trade.audit.theme import REPORT  # noqa: E402
@@ -24,19 +24,17 @@ def _text(page: str) -> str:
 
 
 @pytest.mark.parametrize("locale", sorted(SIGNUP))
-def test_start_free_goes_to_sign_up_when_an_upload_needs_an_account(locale: str) -> None:
-    page = landing(locale=locale, free_mode=False, signed_in=False, access_codes=True)
-    home = {"es": "/", "en": "/en", "pt": "/pt"}[locale]
-    assert "href='#subir'" not in page and f"href='{home}#subir'" not in page
-    # Hero, prices, the closing call, the top bar and the phone menu.
-    assert page.count(f"href='{SIGNUP[locale]}'") >= 5
-    # Signed in, or in free mode, the same buttons still open the form on the page.
+def test_every_start_button_opens_the_upload_page(locale: str) -> None:
+    # The web layer sends a visitor without an account from that page to sign-up.
     for kwargs in (
+        {"free_mode": False, "signed_in": False},
         {"free_mode": False, "signed_in": True},
         {"free_mode": True, "signed_in": False},
     ):
-        other = landing(locale=locale, access_codes=True, **kwargs)
-        assert "href='#subir'" in other and other.count(f"href='{home}#subir'") == 2
+        page = landing(locale=locale, access_codes=True, **kwargs)
+        assert "#subir'" not in page and "action='/audits'" not in page
+        # Hero, prices, the start band, the closing call, the top bar and the phone menu.
+        assert page.count(f"href='{AUDIT_PATHS[locale]}'") >= 6
 
 
 @pytest.mark.parametrize("locale", sorted(SIGNUP))
@@ -230,7 +228,9 @@ def test_the_fund_page_says_its_own_index_cannot_make_an_a(locale: str) -> None:
 
 @pytest.mark.parametrize("locale", sorted(SIGNUP))
 def test_the_landing_says_a_pdf_statement_is_accepted(locale: str) -> None:
-    page = html.unescape(landing(locale=locale, free_mode=False, price_usd=29, access_codes=True))
+    options = {"locale": locale, "free_mode": False, "price_usd": 29, "access_codes": True}
+    # The landing or the upload page says it; the upload page accepts the file.
+    page = html.unescape(landing(**options) + upload_page(**options))
     phrase = {
         "es": "un estado de cuenta en PDF con su tabla de operaciones",
         "en": "a PDF statement with its trade table",

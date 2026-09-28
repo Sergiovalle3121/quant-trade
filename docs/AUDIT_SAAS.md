@@ -2037,7 +2037,9 @@ Routes:
 
 | Route | What it does |
 |---|---|
-| `GET /` | Landing (how it works, prices, FAQ, link to the sample) and the form; `?lang=en`. `GET /en` is the English landing, a short address to share. |
+| `GET /` | Landing (how it works, prices, FAQ, link to the sample); `?lang=en`. `GET /en` is the English landing, a short address to share. Its `#subir` band and every start button link to the upload page; old `?extras=1` links redirect there. |
+| `GET /auditar` | The upload form on its own page (`/en/audit`, `/pt/auditar`; `?extras=1` opens the extra files). Outside free mode a visitor without an account gets a 303 to sign-up with `next` back here (`/registro?next=/auditar`, `/signup?next=/en/audit`, `/pt/cadastro?next=/pt/auditar`), so nobody fills the form and loses it. |
+| `GET /precios` | 301 to the landing's prices (`/#pricing`); `/pricing` and `/en/pricing` go to `/en#pricing`, `/pt/precos` to `/pt#pricing`. |
 | `POST /audits` | Upload. An optional `access_code` field redeems a code (paid mode with codes on). |
 | `GET /audits/{id}?token=…` | The report, in the language chosen at upload; `&lang=en` or `&lang=es` shows it in the other one. `GET /audits/{id}.json?token=…` the record (402 while locked). |
 | `POST /audits/{id}/checkout?token=…` | Stripe Checkout (503 without Stripe). Form field `plan=single` (default) or `plan=pack`; the return link `?session_id=…` is confirmed with Stripe before anything unlocks. |

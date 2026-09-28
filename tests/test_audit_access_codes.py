@@ -209,7 +209,9 @@ def _upload(client: TestClient, **data):
 def test_an_upload_with_a_code_is_born_paid(tmp_path: Path) -> None:
     client, store = _selling_client(tmp_path)
     landing = client.get("/")
-    assert "name='access_code'" in landing.text and "https://wa.me/000" in landing.text
+    assert "https://wa.me/000" in landing.text
+    # The form (with its code field) is on its own page; this client is signed in.
+    assert "name='access_code'" in client.get("/auditar").text
     code, _ = store.create_access_code(credits=1, note="", at=NOW)  # type: ignore[attr-defined]
     response = _upload(client, access_code=code)
     assert response.status_code == 303

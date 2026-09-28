@@ -8,14 +8,14 @@ import html
 import pytest
 
 from quant_trade.audit.guard import find_claims
-from quant_trade.audit.pages import _COPY, landing
+from quant_trade.audit.pages import _COPY, upload_page
 
 LOCALES = ("es", "en", "pt")
 
 
 @pytest.mark.parametrize("locale", LOCALES)
 def test_the_form_asks_for_trials_outside_the_advanced_options(locale: str) -> None:
-    page = html.unescape(landing(locale=locale, free_mode=False))
+    page = html.unescape(upload_page(locale=locale, free_mode=False))
     field = page.index("name='trials'")
     assert field < page.index("<details class='adv'>")
     words = _COPY[locale]

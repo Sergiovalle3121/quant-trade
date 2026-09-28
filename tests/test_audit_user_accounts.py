@@ -32,6 +32,7 @@ from quant_trade.audit.accounts import (  # noqa: E402
 )
 from quant_trade.audit.guard import find_claims  # noqa: E402
 from quant_trade.audit.legal import LegalContext, privacy_text, terms_text  # noqa: E402
+from quant_trade.audit.pages import upload_page  # noqa: E402
 from quant_trade.audit.payments import fulfil, pack_code  # noqa: E402
 from quant_trade.audit.settings import AuditSettings  # noqa: E402
 from quant_trade.audit.store import make_store  # noqa: E402
@@ -1183,22 +1184,53 @@ def test_network_claims_hold_only_a_hash_and_the_purge_drops_them(tmp_path: Path
     assert left == ["preview:account:a:2026-01:0"]
 
 
-def test_landing_says_before_the_file_that_an_upload_needs_an_account(tmp_path: Path) -> None:
+def test_the_upload_page_sends_a_visitor_without_an_account_to_sign_up_first(
+    tmp_path: Path,
+) -> None:
     client, _store, _settings_ = _client(tmp_path)
-    for path, words, signup in (
-        ("/", "Antes de subir, crea tu cuenta gratis", "/registro"),
-        ("/en", "Before you upload, create your free account", "/signup"),
+    for path, target in (
+        ("/auditar", "/registro?next=/auditar"),
+        ("/en/audit", "/signup?next=/en/audit"),
+        ("/pt/auditar", "/pt/cadastro?next=/pt/auditar"),
     ):
-        page = client.get(path).text
+        # Before the file, so nobody fills the form in to be turned away.
+        response = client.get(path, follow_redirects=False)
+        assert response.status_code == 303 and response.headers["location"] == target
+    # The unit page still says it above the file fields if it is ever shown.
+    for locale, words, signup in (
+        ("es", "Antes de subir, crea tu cuenta gratis", "/registro"),
+        ("en", "Before you upload, create your free account", "/signup"),
+    ):
+        page = upload_page(locale=locale, free_mode=False, signed_in=False)
         box = page.split("class='signin-first'")[1].split("</div></div>")[0]
         assert words in box and f"href='{signup}'" in box
-        # It sits above the file fields, so nobody fills the form in to be turned away.
         assert page.index("class='signin-first'") < page.index("name='report'")
         assert find_claims(box) == []
     _signup(client)
-    assert "class='signin-first'" not in client.get("/").text
+    page = client.get("/auditar")
+    assert page.status_code == 200 and "name='report'" in page.text
+    assert "class='signin-first'" not in page.text
     free, _store, _settings_ = _client(tmp_path / "free", free_mode=True)
-    assert "class='signin-first'" not in free.get("/").text
+    page = free.get("/auditar")
+    assert page.status_code == 200 and "class='signin-first'" not in page.text
+    # Uploads need an account now: no line offers a way around it.
+    for locale in ("es", "en", "pt"):
+        page = upload_page(locale=locale, free_mode=False, signed_in=False)
+        for words in ("sin cuenta", "without an account", "sem conta"):
+            assert words not in page
+
+
+def test_the_price_addresses_open_the_landing_prices(tmp_path: Path) -> None:
+    client, _store, _settings_ = _client(tmp_path)
+    for path, target in (
+        ("/precios", "/#pricing"),
+        ("/pricing", "/en#pricing"),
+        ("/en/pricing", "/en#pricing"),
+        ("/pt/precos", "/pt#pricing"),
+    ):
+        response = client.get(path, follow_redirects=False)
+        assert response.status_code == 301 and response.headers["location"] == target
+    assert "id='pricing'" in client.get("/precios").text
 
 
 # -- small screens after sign-up ---------------------------------------------------

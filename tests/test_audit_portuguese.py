@@ -17,7 +17,7 @@ from fastapi.testclient import TestClient  # noqa: E402
 from quant_trade.audit.audiences import AUDIENCE_PAGES, audience_url  # noqa: E402
 from quant_trade.audit.guard import find_claims  # noqa: E402
 from quant_trade.audit.guides import GUIDES, guide_url, guides_index_url  # noqa: E402
-from quant_trade.audit.pages import _COPY, _UI, landing  # noqa: E402
+from quant_trade.audit.pages import _COPY, _UI, landing, upload_page  # noqa: E402
 from quant_trade.audit.portuguese import AUDIENCES_PT, INVESTOR_PT, link_locale  # noqa: E402
 from quant_trade.audit.settings import AuditSettings  # noqa: E402
 from quant_trade.audit.store import make_store  # noqa: E402
@@ -80,7 +80,7 @@ def test_portuguese_landing_has_no_spanish_left() -> None:
 
 
 def test_the_report_language_on_a_portuguese_page_is_portuguese() -> None:
-    page = _paid("pt")
+    page = upload_page(locale="pt", free_mode=False, price_usd=29, access_codes=True)
     assert "<option value='pt' selected>Português</option>" in page
     assert "O relatório sai em português, espanhol ou inglês." in page
     # Pages that have no Portuguese yet still link to English.
@@ -225,7 +225,7 @@ def test_every_export_guide_exists_in_portuguese(tmp_path: Path, guide) -> None:
         assert spanish not in text, spanish
     for lang in ("es", "en"):
         assert f"href='{guide_url(guide.slug, lang)}' hreflang='{lang}'" in response.text
-    assert "href='/pt#subir'" in response.text
+    assert "href='/pt/auditar'" in response.text
     _opens_every_link(client, response.text)
 
 
