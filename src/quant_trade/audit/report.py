@@ -1480,7 +1480,7 @@ LABELS: dict[str, dict[str, str]] = {
             "Guarda el enlace de esta página: con él vuelves a tu informe. Si lo subiste con tu "
             "cuenta, también lo tienes en «Mi cuenta»."
         ),
-        "pack": "pack de 3 informes: USD {price:.0f}",
+        "pack": "paquete de 3 informes: USD {price:.0f}",
         "buy_includes": (
             "Todas las cifras de cada sección|PDF para guardar o enviar|"
             "Página pública de verificación para compartir|"
@@ -3693,7 +3693,8 @@ def platform_value(key: str, value: Any) -> str:
         return text
     if key in _PLATFORM_COUNT_FIELDS:
         return f"{int(number)}" if number == int(number) else text
-    return f"{number:,.2f}"
+    shown = f"{number:,.2f}"
+    return "0.00" if shown == "-0.00" else shown
 
 
 def _is_evidence(value: Any) -> bool:

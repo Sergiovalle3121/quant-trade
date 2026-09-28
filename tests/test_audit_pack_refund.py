@@ -67,7 +67,7 @@ def test_locked_report_offers_the_pack(tmp_path: Path) -> None:
     data = {"trials": "3", "cost_bps": "5", "consent": "on"}
     response = client.post("/audits", files=files, data=data, follow_redirects=False)
     report = client.get(response.headers["location"]).text
-    assert "pack de 3 informes: USD 69" in report
+    assert "paquete de 3 informes: USD 69" in report
 
 
 def test_terms_state_the_pack_and_final_sales(tmp_path: Path) -> None:

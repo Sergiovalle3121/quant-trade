@@ -16,9 +16,11 @@ from fastapi.testclient import TestClient  # noqa: E402
 
 from quant_trade.audit import account_pages  # noqa: E402
 from quant_trade.audit import pdf as pdf_lib  # noqa: E402
+from quant_trade.audit.analytics import INTERVAL_METHOD  # noqa: E402
 from quant_trade.audit.audiences import AUDIENCE_PAGES, audience_url  # noqa: E402
 from quant_trade.audit.guard import find_claims  # noqa: E402
 from quant_trade.audit.guides import GUIDES, guide_url  # noqa: E402
+from quant_trade.audit.i18n import localize  # noqa: E402
 from quant_trade.audit.legal import LegalContext, privacy_text, terms_text  # noqa: E402
 from quant_trade.audit.market import SERIES  # noqa: E402
 from quant_trade.audit.pages import SAMPLE_BANNER, landing, upload_page  # noqa: E402
@@ -136,6 +138,12 @@ def test_the_spanish_report_uses_one_word_for_each_thing() -> None:
     assert platform_label("declared_profit_factor", "es") == "Factor de beneficio"
     assert LABELS["pt"]["kpi_pf"] == platform_label("declared_profit_factor", "pt")
     assert LABELS["pt"]["kpi_pf"] == "Fator de lucro"
+    # The notes translated by rule use the same names as the labels.
+    method = localize(INTERVAL_METHOD, "es")
+    assert "factor de beneficio" in method and "profit factor" not in method.lower()
+    assert "fator de lucro" in localize(INTERVAL_METHOD, "pt")
+    assert LABELS["es"]["pack"].startswith("paquete de 3 informes")
+    assert "pack " not in words.lower()
 
 
 @pytest.mark.parametrize(
@@ -200,6 +208,7 @@ def test_platform_balance_values_are_rounded_for_display_only() -> None:
     assert platform_value("reported_final_balance", "27369.750000") == "27,369.75"
     assert platform_value("largest_balance_difference", "0.000000") == "0.00"
     assert platform_value("largest_balance_difference", "-12.5") == "-12.50"
+    assert platform_value("largest_balance_difference", "-0.004") == "0.00"
     assert platform_value("balance_chain_breaks", "3") == "3"
     assert platform_value("balance_chain_breaks", "3.0") == "3"
     # Anything that is not a plain number, and every other field, is shown as stored.
