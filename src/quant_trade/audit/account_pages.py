@@ -1451,6 +1451,7 @@ box-shadow:0 1px 2px rgba(0,0,0,.04)}
 #invitar .field{max-width:640px}
 #invitar input[readonly]{font-family:var(--mono);font-size:.86rem;background:var(--surface-2);
 text-overflow:ellipsis}
+@media (max-width:620px),(hover:none) and (pointer:coarse){#invitar input[readonly]{font-size:16px}}
 #invitar .invite-actions{display:flex;flex-wrap:wrap;gap:8px}
 #invitar .invite-actions [hidden]{display:none}
 #invitar .btn svg{width:18px;height:18px;margin-right:8px}

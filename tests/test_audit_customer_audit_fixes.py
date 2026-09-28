@@ -220,6 +220,37 @@ def test_trailing_slash_redirect_ignores_what_the_client_sends(tmp_path: Path) -
     assert not foreign.headers["location"].startswith(BASE)
 
 
+def test_trailing_slash_redirect_keeps_https_when_the_host_carries_a_port(tmp_path: Path) -> None:
+    client = _client(tmp_path, base_url=BASE, trusted_proxy_hops=1)
+    moved = client.get(
+        "/en/?lang=en", headers={"host": "rigor.example:443"}, follow_redirects=False
+    )
+    assert moved.status_code == 307
+    assert moved.headers["location"] == f"{BASE}/en?lang=en"
+    # A host that only starts like the site's is another host.
+    for host in ("rigor.example.evil.example", "evil.example:443"):
+        foreign = client.get("/en/", headers={"host": host}, follow_redirects=False)
+        assert not foreign.headers.get("location", "").startswith(BASE), host
+
+
+@pytest.mark.parametrize("path", ["/guias/gu%C3%ADa/", "/guias/a%20b/"])
+def test_trailing_slash_redirect_keeps_https_on_an_encoded_path(tmp_path: Path, path: str) -> None:
+    client = _client(tmp_path, base_url=BASE, trusted_proxy_hops=1)
+    moved = client.get(path, headers={"host": "rigor.example"}, follow_redirects=False)
+    assert moved.status_code == 307
+    assert moved.headers["location"] == f"{BASE}{path.rstrip('/')}"
+
+
+@pytest.mark.parametrize("path", ["//evil.example/", "/%2F%2Fevil.example/", "/en%0d%0aX:1/"])
+def test_trailing_slash_redirect_never_leaves_the_site(tmp_path: Path, path: str) -> None:
+    client = _client(tmp_path, base_url=BASE, trusted_proxy_hops=1)
+    answer = client.get(path, headers={"host": "rigor.example"}, follow_redirects=False)
+    location = answer.headers.get("location", "")
+    assert location == "" or location.startswith(f"{BASE}/")
+    assert not location.startswith(f"{BASE}//")
+    assert "\r" not in location and "\n" not in location and "x" not in answer.headers
+
+
 def test_trailing_slash_redirect_is_unchanged_without_an_https_base(tmp_path: Path) -> None:
     client = _client(tmp_path)
     moved = client.get("/en/", follow_redirects=False)
@@ -258,6 +289,15 @@ def test_form_fields_are_16px_on_small_screens() -> None:
     for field in ("input[type=email]", "input[type=password]", "input[type=text]", "select"):
         assert field in body
     assert "textarea{font-size:16px" in body.replace("\n", "")
+    # A field with a smaller size of its own gets the same rule after it.
+    small = "#invitar input[readonly]{font-family:var(--mono);font-size:.86rem"
+    phone = (
+        "@media (max-width:620px),(hover:none) and (pointer:coarse)"
+        "{#invitar input[readonly]{font-size:16px}}"
+    )
+    css = account_pages.ACCOUNT_CSS
+    assert small in css and phone in css
+    assert css.index(small) < css.index(phone)
 
 
 def test_no_table_header_is_smaller_than_the_phone_size() -> None:

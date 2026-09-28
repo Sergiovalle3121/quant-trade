@@ -1257,15 +1257,19 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         """
         if response.status_code != 307 or not cfg.base_url.startswith("https://"):
             return
-        if request.headers.get("host", "").lower() != canonical_host:
+        # The host may carry a port ("host:443"); the site is the same one.
+        host = request.headers.get("host", "").lower()
+        if canonical_host not in (host, host.split(":", 1)[0]):
             return
         target = urlsplit(response.headers.get("location", ""))
         path = request.url.path
         twin = path.rstrip("/") if path.endswith("/") else f"{path}/"
-        same_site = target.scheme == "http" and target.netloc.lower() == canonical_host
-        if same_site and target.path == twin and not twin.startswith("//"):
+        same_site = target.scheme == "http" and target.netloc.lower() == host
+        # The router percent-encodes the path it writes ("gu%C3%ADa").
+        same_path = target.path in (twin, quote(twin))
+        if same_site and same_path and not target.path.startswith("//"):
             query = f"?{target.query}" if target.query else ""
-            response.headers["location"] = f"{cfg.base_url}{twin}{query}"
+            response.headers["location"] = f"{cfg.base_url}{target.path}{query}"
 
     @app.middleware("http")
     async def no_store(request: Request, call_next: Any) -> Any:
