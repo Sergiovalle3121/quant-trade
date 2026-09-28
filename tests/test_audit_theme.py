@@ -573,8 +573,12 @@ def test_phone_report_is_compact_and_reads_in_words() -> None:
 
 def test_landing_form_help_is_short_and_the_footer_says_things_once() -> None:
     for locale, short, question in (
-        ("es", "Tal cual lo guarda tu plataforma: HTML, XLSX o CSV, hasta 10 MB.", "¿Qué archivo"),
-        ("en", "As your platform saves it: HTML, XLSX or CSV, up to 10 MB.", "Which file"),
+        (
+            "es",
+            "Tal cual lo guarda tu plataforma: HTML, XLSX, CSV o PDF, hasta 10 MB.",
+            "¿Qué archivo",
+        ),
+        ("en", "As your platform saves it: HTML, XLSX, CSV or PDF, up to 10 MB.", "Which file"),
     ):
         page = landing(locale=locale, free_mode=False, price_usd=29, access_codes=True)
         # One line under the main file; the formats and export guides open on demand.
