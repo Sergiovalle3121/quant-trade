@@ -74,6 +74,11 @@ COPY_PT: dict[str, str] = {
         "recarregue esta página em instantes."
     ),
     "card_check_skipped": "Nenhum cartão foi conferido. Nada foi cobrado.",
+    "email_typo": (
+        "Você quis dizer {email}? Corrigimos abaixo: a confirmação e a recuperação da conta "
+        "chegam nele. Digite a senha de novo para continuar."
+    ),
+    "email_typo_keep": "Não, meu e-mail é {email}, como digitei.",
     "email_no_domain": (
         "Não encontramos esse domínio de e-mail. Confira se está bem escrito: a confirmação "
         "e a recuperação da conta chegam nele."

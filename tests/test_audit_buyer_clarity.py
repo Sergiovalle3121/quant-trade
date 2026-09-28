@@ -27,9 +27,7 @@ def test_the_live_account_shows_under_the_verdict() -> None:
 
 
 def test_a_locked_report_keeps_the_live_line_back() -> None:
-    page = render_html(
-        sample_result("es", bootstrap_samples=60), watermark=True, free_mode=False
-    )
+    page = render_html(sample_result("es", bootstrap_samples=60), watermark=True, free_mode=False)
     assert "Cuenta real: En el borde." not in page
 
 
@@ -86,8 +84,8 @@ def test_what_to_do_now_speaks_to_the_buyer_and_links_each_step() -> None:
 def test_the_evidence_tags_are_explained_under_the_verdict() -> None:
     page = _page("es")
     hero = page[: page.index("<nav class='report-toc")]
-    assert "MEASURED, calculada de tus archivos" in hero
-    assert "MEASURED, computed from your files" in _page("en")
+    assert "«Medido» si se calculó de tus archivos" in hero
+    assert "“Measured” when computed from your files" in _page("en")
 
 
 def test_generic_prop_firm_rules_show_no_internal_id_or_missing_date() -> None:
@@ -234,9 +232,7 @@ def test_trader_terms_in_the_tiles_carry_a_plain_line() -> None:
         assert f"<small>{LABELS['es']['kpi_hint_' + key]}</small>" in tiles
     assert "<small>" in _page("en") and "what was won for every 1 lost" in _page("en")
     # Locked tiles show no hint either.
-    locked = render_html(
-        sample_result("es", bootstrap_samples=60), watermark=True, free_mode=False
-    )
+    locked = render_html(sample_result("es", bootstrap_samples=60), watermark=True, free_mode=False)
     assert "lo ganado por cada 1 perdido" not in locked
     for locale in ("es", "en"):
         assert_report_clean(

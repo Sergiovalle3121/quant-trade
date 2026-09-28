@@ -730,10 +730,10 @@ Every leaf value in the JSON carries an evidence tag:
   is stated next to it.
 
 On the site's pages (landing, upload form, guides, methodology, verification,
-contact) a reader sees these tags as words in the page's language: Medido /
-Declarado / No medido, Measured / Declared / Not measured, Medido / Declarado
-/ Não medido (`pages.EVIDENCE_LABELS`). The codes stay in the JSON, the badge
-CSS classes and the reports.
+contact) and in the HTML and PDF reports a reader sees these tags as words in
+the page's language: Medido / Declarado / No medido, Measured / Declared / Not
+measured, Medido / Declarado / Não medido (`report.EVIDENCE_LABELS`). The codes
+stay in the JSON, the Markdown report and the badge CSS classes.
 
 | Section | Estimator | Source module |
 |---|---|---|
@@ -2063,6 +2063,7 @@ Routes:
 | `GET /ejemplo`, `GET /sample` | A full report of synthetic data, Spanish and English. |
 | `GET /terminos`, `GET /terms` | Terms of service (`audit/legal.py`), Spanish and English; either answers `?lang=`. |
 | `GET /privacidad`, `GET /privacy` | Privacy policy, Spanish and English. |
+| `GET /en/terms`, `/en/privacy`, `/pt/terms`, `/pt/privacy` | 301 to the legal page in that language (guessed addresses). |
 | `POST /webhooks/stripe`, `POST /waitlist`, `GET /health` | Payment confirmation, waiting list, health check. |
 
 Languages. Spanish is the default on every route, and the Spanish URLs and
@@ -2462,6 +2463,16 @@ an account never changes what a report says.
   trouble let the address through (lookups give up after
   `inbox.DNS_LIFETIME_SECONDS`, 3 s), so a slow resolver never refuses a
   customer. On in the service; `AUDIT_SKIP_EMAIL_DNS=true` turns it off.
+  Before those checks pass, sign-up asks «¿Quisiste decir ana@gmail.com?»
+  (`email_typo`, ES/EN/PT) when the domain is one or two keystrokes from a
+  well-known provider (`inbox.suggest_domain`: gmial.com, gmail.co,
+  hotmal.com, outlok.com, yahooo.com, icloud.co…). Typo domains often have
+  mail servers of a squatter's, so confirmation and recovery mail would
+  reach a stranger. The form comes back with the corrected address; a box
+  keeps the typed one, which still goes through every other check. Known
+  providers (`inbox.COMMON_PROVIDERS`, e.g. mail.com, gmx.de) are never
+  questioned, and neither are short names like aol or live beyond their
+  ending (aon.com stays silent).
   While e-mail confirmation is off, a shared IPv4 address gets
   `WELCOME_REPORTS_PER_IPV4_UNVERIFIED` (3) free reports a month instead of
   the carrier-sized `WELCOME_REPORTS_PER_IPV4_PER_MONTH` (10).
