@@ -59,6 +59,21 @@ COPY_PT: dict[str, str] = {
         "Esse e-mail é de um serviço de caixas temporárias. Use um e-mail que você mantenha: "
         "a confirmação e a recuperação da conta chegam nele."
     ),
+    "card_offer": (
+        "É a sua primeira vez e você divide computador ou rede? Verifique um cartão: nada é "
+        "cobrado e cada cartão dá um único relatório completo grátis."
+    ),
+    "card_offer_button": "Verificar cartão sem cobrança",
+    "card_check_ok": (
+        "Cartão confirmado, sem cobrança. Envie o arquivo de novo em «Auditar»: ele sai "
+        "completo e grátis."
+    ),
+    "card_check_taken": ("Esse cartão já deu o relatório grátis a outra conta. Nada foi cobrado."),
+    "card_check_failed": (
+        "Ainda não conseguimos confirmar o cartão. Nada foi cobrado; se você concluiu no Stripe, "
+        "recarregue esta página em instantes."
+    ),
+    "card_check_skipped": "Nenhum cartão foi conferido. Nada foi cobrado.",
     "email_typo": (
         "Você quis dizer {email}? Corrigimos abaixo: a confirmação e a recuperação da conta "
         "chegam nele. Digite a senha de novo para continuar."

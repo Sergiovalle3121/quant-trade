@@ -99,6 +99,23 @@ COPY: dict[str, dict[str, str]] = {
             "Ese correo es de un servicio de buzones temporales. Usa un correo que conserves: "
             "ahí te llegan la confirmación y la recuperación de tu cuenta."
         ),
+        "card_offer": (
+            "¿Es tu primera vez y compartes computadora o red? Verifica una tarjeta: no se "
+            "cobra nada y cada tarjeta da un solo informe completo gratis."
+        ),
+        "card_offer_button": "Verificar tarjeta sin cargo",
+        "card_check_ok": (
+            "Tarjeta confirmada, sin cargo. Sube tu archivo otra vez desde «Auditar»: sale "
+            "completo y gratis."
+        ),
+        "card_check_taken": (
+            "Esa tarjeta ya se usó para el informe gratis de otra cuenta. No se cobró nada."
+        ),
+        "card_check_failed": (
+            "No pudimos confirmar la tarjeta todavía. No se cobró nada; si terminaste en Stripe, "
+            "recarga esta página en un momento."
+        ),
+        "card_check_skipped": "No se verificó ninguna tarjeta. No se cobró nada.",
         "email_typo": (
             "¿Quisiste decir {email}? Lo corregimos abajo: ahí llegan la confirmación y la "
             "recuperación de tu cuenta. Escribe otra vez tu contraseña para seguir."
@@ -754,6 +771,23 @@ COPY: dict[str, dict[str, str]] = {
             "That address belongs to a temporary-inbox service. Use an address you keep: "
             "your account's confirmation and recovery go there."
         ),
+        "card_offer": (
+            "First time here, on a shared computer or network? Verify a card: nothing is "
+            "charged and each card gives one free full report."
+        ),
+        "card_offer_button": "Verify a card, no charge",
+        "card_check_ok": (
+            "Card confirmed, no charge. Upload your file again from «Audit»: it comes out in "
+            "full, free."
+        ),
+        "card_check_taken": (
+            "That card already gave another account its free report. Nothing was charged."
+        ),
+        "card_check_failed": (
+            "We could not confirm the card yet. Nothing was charged; if you finished on Stripe, "
+            "reload this page in a moment."
+        ),
+        "card_check_skipped": "No card was verified. Nothing was charged.",
         "email_typo": (
             "Did you mean {email}? We corrected it below: your account's confirmation and "
             "recovery go there. Type your password again to continue."
@@ -1370,6 +1404,7 @@ align-items:start}
 .acct-card{border:1px solid var(--border);border-radius:18px;padding:24px;
 background:#fff}
 .acct-perks{background:var(--surface-2)}
+.acct-card-check{border-color:color-mix(in srgb,var(--ok) 32%,var(--border))}
 .acct-check{display:flex;gap:10px;align-items:flex-start;margin:-4px 0 16px;font-size:.95rem}
 .acct-check input{margin-top:4px;width:auto}
 .acct-side{display:grid;gap:18px}
@@ -2759,6 +2794,7 @@ def report_box(
     credits: int = 0,
     locked: bool = False,
     next_path: str = "",
+    card_offer: bool = False,
 ) -> str:
     """The account line on a report page.
 
@@ -2801,6 +2837,17 @@ def report_box(
             f"<form method='post' action='{_e(base)}/credit{_e(query)}'>{_hidden('csrf', csrf)}"
             f"<button class='btn btn-primary' type='submit'>{icon('key')}"
             f"{_e(copy['credit_button'])}</button></form><span class='muted'>{_e(left)}</span>"
+            "</div>"
+        )
+    if card_offer:
+        # The free full report was refused for a shared browser or network:
+        # a card verified at no charge shows this is another person.
+        box += (
+            "<div class='acct-box acct-card-check no-print'>"
+            f"<span>{_e(copy['card_offer'])}</span>"
+            f"<form method='post' action='{_e(base)}/tarjeta{_e(query)}'>{_hidden('csrf', csrf)}"
+            f"<button class='btn btn-primary btn-sm' type='submit'>{icon('shield')}"
+            f"{_e(copy['card_offer_button'])}</button></form>"
             "</div>"
         )
     return box

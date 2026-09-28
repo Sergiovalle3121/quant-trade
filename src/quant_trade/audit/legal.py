@@ -912,6 +912,18 @@ def privacy_text(ctx: LegalContext, locale: str = "es") -> LegalText:
                     f"The address is cleared after {days} days; the three hashes stay, even if "
                     "you delete your account and without your e-mail in clear text, so the "
                     "offer cannot be repeated.",
+                    *(
+                        (
+                            "If a shared browser or network holds back that free report and you "
+                            "verify a card for it: Stripe checks the card without charging it, "
+                            "and we keep only a SHA-256 of the fingerprint Stripe gives that card"
+                            " (never its number) and the date, so each card gives one free "
+                            "report. The date goes with your account; the hash stays, like the "
+                            "three above.",
+                        )
+                        if ctx.card_payments
+                        else ()
+                    ),
                     "For 'Invite a colleague': each account's invite link, and for an account "
                     "created through someone's link, the date, whether its free first report "
                     "happened and the hash of its browser identifier, to refuse self-invites. "
@@ -1077,6 +1089,18 @@ def privacy_text(ctx: LegalContext, locale: str = "es") -> LegalText:
                 "de red, para que el mismo navegador, archivo o buzón lo reciba una sola vez. "
                 f"La dirección se borra a los {days} días; los tres hashes se quedan, aunque "
                 "borres tu cuenta y sin tu correo en claro, para que la oferta no se repita.",
+                *(
+                    (
+                        "Si un navegador o una red compartidos frenan ese informe gratis y "
+                        "verificas una tarjeta para recibirlo: Stripe revisa la tarjeta sin "
+                        "cobrarla y nosotros guardamos solo un SHA-256 de la huella que Stripe da"
+                        " a esa tarjeta (nunca su número) y la fecha, para que cada tarjeta dé un"
+                        " solo informe gratis. La fecha se borra con tu cuenta; el hash se queda,"
+                        " como los tres de arriba.",
+                    )
+                    if ctx.card_payments
+                    else ()
+                ),
                 "Para «Invita a un colega»: el enlace de invitación de cada cuenta y, para una "
                 "cuenta creada con el enlace de alguien, la fecha, si ya recibió su primer "
                 "informe gratis y el hash del identificador de su navegador, para rechazar "
@@ -1254,6 +1278,18 @@ def _privacy_pt(
                 f"só vez. O endereço é eliminado após {days} dias; os três hashes permanecem, "
                 "mesmo se você excluir a conta e sem o seu e-mail em texto claro, para que a "
                 "oferta não se repita.",
+                *(
+                    (
+                        "Se um navegador ou uma rede compartilhados impedirem esse relatório "
+                        "grátis e você verificar um cartão para recebê-lo: o Stripe confere o "
+                        "cartão sem cobrar, e guardamos só um SHA-256 da impressão que o Stripe "
+                        "dá a esse cartão (nunca o número) e a data, para que cada cartão dê um "
+                        "único relatório grátis. A data é eliminada com a sua conta; o hash "
+                        "permanece, como os três acima.",
+                    )
+                    if ctx.card_payments
+                    else ()
+                ),
                 "Para 'Indique um colega': o link de indicação de cada conta e, para uma conta "
                 "criada por esse link, a data, se seu primeiro relatório gratuito foi concluído "
                 "e o hash do identificador do navegador, para impedir autoindicações. Quem "

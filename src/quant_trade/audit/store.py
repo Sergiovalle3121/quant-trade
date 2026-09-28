@@ -43,6 +43,10 @@ CODE_GROUP_LENGTH = 4
 CODE_REFERENCE_PREFIX = "code:"
 #: The payment reference of the free first full report of a new account.
 WELCOME_REFERENCE_PREFIX = "welcome:"
+#: The free-claim key a card verified for the free full report holds forever.
+CARD_CLAIM_PREFIX = "welcome:card:"
+
+
 #: The ``audit_id`` of an order that buys credits for an account rather than
 #: unlocking one report: ``account:<account id>``. Such an order unlocks no
 #: report; its credits go on an access code linked to that account.
@@ -754,6 +758,18 @@ class Store:
             sa.Column("file_sha256", sa.String(64), nullable=False, default="", index=True),
             sa.Column("client_ip", sa.String(64), nullable=False, default="", index=True),
             sa.Column("created_at", sa.String(40), nullable=False, index=True),
+        )
+        #: A card an account verified with Stripe at no charge (Checkout in
+        #: setup mode) so its free full report passes the browser and network
+        #: limits. Only a SHA-256 of Stripe's card fingerprint, never a card
+        #: number; the row goes with ``delete_account``, while the claim
+        #: ``welcome:card:<sha256>`` stays so the card never frees a second one.
+        self.card_checks = sa.Table(
+            "card_checks",
+            self.metadata,
+            sa.Column("account_id", sa.String(32), primary_key=True),
+            sa.Column("card_sha256", sa.String(64), nullable=False),
+            sa.Column("created_at", sa.String(40), nullable=False),
         )
         #: A customer's own column mapping for a file no importer knows, per
         #: account and header (``audit/mapping.py``): column names and a hash
@@ -3478,6 +3494,7 @@ class Store:
                 self.account_codes,
                 self.account_audits,
                 self.column_maps,
+                self.card_checks,
                 self.strategies,
                 self.strategy_reports,
                 self.account_refs,
@@ -4407,6 +4424,49 @@ class Store:
         except sa.exc.IntegrityError:
             return
 
+    # -- card check for the free full report ---------------------------------
+    def record_card_check(self, account_id: str, card_sha256: str, *, at: datetime) -> str:
+        """Note a card verified at no charge: ``ok``, or ``taken`` by another account.
+
+        Idempotent: the webhook and the return page may both report the same
+        card for the same account. A card gives one free full report ever,
+        across accounts, deleted ones included.
+        """
+        sa = self._sa
+        key = CARD_CLAIM_PREFIX + card_sha256
+        with self.engine.connect() as conn:
+            holder = conn.execute(
+                sa.select(self.free_claims.c.reservation).where(self.free_claims.c.claim_key == key)
+            ).first()
+        if holder is not None and holder[0] != account_id:
+            return "taken"
+        try:
+            with self.engine.begin() as conn:
+                if holder is None:
+                    conn.execute(
+                        self.free_claims.insert().values(
+                            claim_key=key, reservation=account_id, created_at=_iso(at)
+                        )
+                    )
+                conn.execute(
+                    self.card_checks.insert().values(
+                        account_id=account_id, card_sha256=card_sha256, created_at=_iso(at)
+                    )
+                )
+        except sa.exc.IntegrityError:
+            # A simultaneous call: whoever holds the card now decides.
+            return "ok" if self.card_checked(account_id) else "taken"
+        return "ok"
+
+    def card_checked(self, account_id: str) -> bool:
+        with self.engine.connect() as conn:
+            row = conn.execute(
+                self._sa.select(self.card_checks.c.account_id).where(
+                    self.card_checks.c.account_id == account_id
+                )
+            ).first()
+        return row is not None
+
     # -- invites ("Invita a un colega") -------------------------------------
     def invite_token(self, account_id: str, *, at: datetime) -> str:
         """The account's invite token, made on first use."""
@@ -5061,6 +5121,11 @@ class Store:
                 .mappings()
                 .first()
             )
+            card = conn.execute(
+                sa.select(self.card_checks.c.created_at, self.card_checks.c.card_sha256).where(
+                    self.card_checks.c.account_id == account_id
+                )
+            ).first()
             maps = conn.execute(
                 sa.select(
                     self.column_maps.c.header_sha256,
@@ -5170,6 +5235,11 @@ class Store:
                     "file_fingerprint_sha256": welcome["file_sha256"],
                 }
                 if welcome is not None
+                else None
+            ),
+            "card_check": (
+                {"created_at": card[0], "card_fingerprint_sha256": card[1]}
+                if card is not None
                 else None
             ),
             "column_maps": [
@@ -5714,6 +5784,7 @@ def make_store(url: str) -> Store:
 
 
 __all__ = [
+    "CARD_CLAIM_PREFIX",
     "ACCOUNT_ORDER_PREFIX",
     "CODE_REFERENCE_PREFIX",
     "WELCOME_REFERENCE_PREFIX",

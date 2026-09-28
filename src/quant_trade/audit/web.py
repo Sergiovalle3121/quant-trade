@@ -414,6 +414,9 @@ _SKIP_LINK = re.compile(r"<a class='skip' href='#main'>[^<]*</a>")
 #: Why an account's upload became a preview although its free full report is
 #: unused: the file or the browser already had one, or the network's month is full.
 WELCOME_REFUSALS = ("file", "device", "network", "email", "unverified")
+#: The refusals a card verified at no charge replaces: signals that another
+#: person may share this browser or network.
+CARD_REFUSALS = ("device", "network")
 STRATEGY_PDFS_PER_WINDOW = 10
 STRATEGY_PDF_WINDOW = timedelta(minutes=10)
 #: How many upload fields ``POST /audits`` takes.
@@ -1051,6 +1054,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     app.state.account_checkout_factory = payments.stripe_account_checkout
     app.state.session_lookup = payments.stripe_session
     app.state.mail_domain_check = inbox.domain_takes_mail
+    app.state.card_check_factory = payments.stripe_card_check
+    app.state.card_fingerprint = payments.stripe_card_fingerprint
     app.state.pause_new_audits = pause_new_audits
     app.state.pause_new_checkout = pause_new_checkout
     upload_attempts = AttemptLog()
@@ -1819,6 +1824,84 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             and acct.WELCOME_FULL_REPORT
             and cfg.referral_rewards
             and cfg.email_delivery_ready
+        )
+
+    def _welcome_cap(net: str) -> int:
+        # Until addresses are confirmed a shared IPv4 is the only brake on
+        # made-up accounts, so it keeps the tighter cap.
+        return acct.network_cap(
+            net,
+            per_ip=acct.WELCOME_REPORTS_PER_IP_PER_MONTH,
+            per_ipv4=(
+                acct.WELCOME_REPORTS_PER_IPV4_PER_MONTH
+                if cfg.email_verification_required
+                else acct.WELCOME_REPORTS_PER_IPV4_UNVERIFIED
+            ),
+        )
+
+    def _first_look(
+        account: Any, device_sha256: str, net: str, now: datetime, *, card: bool = False
+    ) -> str:
+        """Why the account's next upload would not be its free full report; ``""`` if it would.
+
+        With ``card`` a confirmed card stands in for the browser and network
+        limits (:data:`CARD_REFUSALS`) and only those: the account, inbox and
+        e-mail confirmation rules still hold.
+        """
+        if not acct.WELCOME_FULL_REPORT:
+            return "off"
+        refused = db.welcome_refusal(
+            account.id,
+            device_sha256="" if card else device_sha256,
+            file_sha256="",
+            client_ip="" if card else net,
+            since=acct.month_start(now),
+            per_ip=_welcome_cap(net),
+        )
+        if not refused and db.free_claim_taken(inbox.welcome_key(account.email)):
+            # Another account on the same inbox (dots, +tags) had it.
+            refused = "email"
+        if not refused and cfg.email_verification_required and not db.email_verified(account.id):
+            refused = "unverified"
+        return refused
+
+    def _card_offer(request: Request, account: Any, now: datetime) -> bool:
+        """A card check would give this account its free full report."""
+        if not cfg.card_public or db.card_checked(account.id):
+            return False
+        device = request.cookies.get(acct.DEVICE_COOKIE) or ""
+        device_sha256 = acct.hash_secret(device) if 0 < len(device) <= 128 else ""
+        ip = _client_ip(request, cfg.trusted_proxy_hops)
+        net = acct.network_address(ip) if ip else ""
+        # Only when the card would clear every refusal: never a card taken
+        # for a report the inbox or an unconfirmed address still blocks.
+        return _first_look(account, device_sha256, net, now) in CARD_REFUSALS and not (
+            _first_look(account, device_sha256, net, now, card=True)
+        )
+
+    def _settle_card_check(session: Mapping[str, Any], account_id: str = "") -> str:
+        """Record a finished card check: ``ok``, ``taken`` or ``failed``."""
+        if not cfg.card_public:
+            # No offer is shown without live card sales, so nothing is recorded.
+            return "failed"
+        why = payments.card_check_refusal(cfg, session, account_id)
+        if why is not None:
+            logger.info("card check not recorded: %s", why)
+            return "failed"
+        owner = str((session.get("metadata") or {}).get("account_id") or "")
+        if db.get_account(owner) is None:
+            return "failed"
+        intent = session.get("setup_intent")
+        intent_id = str(intent.get("id") or "") if isinstance(intent, Mapping) else str(intent)
+        try:
+            fingerprint = app.state.card_fingerprint(cfg, intent_id)
+        except Exception:  # noqa: BLE001 - Stripe unreachable: the check can be retried
+            logger.warning("could not read a card check from Stripe")
+            return "failed"
+        if not fingerprint:
+            return "failed"
+        return db.record_card_check(
+            owner, payments.card_fingerprint_sha256(fingerprint), at=datetime.now(UTC)
         )
 
     def _note_invite(request: Request, account_id: str, token: str, now: datetime) -> None:
@@ -3850,17 +3933,9 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             per_ip=acct.FREE_PREVIEWS_PER_IP_PER_MONTH,
             per_ipv4=acct.FREE_PREVIEWS_PER_IPV4_PER_MONTH,
         )
-        welcome_cap = acct.network_cap(
-            net,
-            per_ip=acct.WELCOME_REPORTS_PER_IP_PER_MONTH,
-            # Until addresses are confirmed a shared IPv4 is the only brake
-            # on made-up accounts, so it keeps the tighter cap.
-            per_ipv4=(
-                acct.WELCOME_REPORTS_PER_IPV4_PER_MONTH
-                if cfg.email_verification_required
-                else acct.WELCOME_REPORTS_PER_IPV4_UNVERIFIED
-            ),
-        )
+        welcome_cap = _welcome_cap(net)
+        #: A card verified at no charge stands in for the browser and network limits.
+        card_checked = False
         #: Why this upload was not the account's free full report, when it
         #: could have been: told on the preview it becomes.
         welcome_refused = ""
@@ -3900,9 +3975,9 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             if welcome:
                 refused = db.welcome_refusal(
                     account_id,
-                    device_sha256=device_sha256,
+                    device_sha256="" if card_checked else device_sha256,
                     file_sha256=fingerprint,
-                    client_ip=net,
+                    client_ip="" if card_checked else net,
                     since=start,
                     per_ip=welcome_cap,
                 )
@@ -3915,13 +3990,13 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                                 for n in range(welcome_cap)
                             ]
                         }
-                        if ip
+                        if ip and not card_checked
                         else {}
                     )
                     keys = (
                         f"welcome:account:{account_id}",
                         inbox.welcome_key(account_email),
-                        f"welcome:device:{device_sha256}",
+                        *(() if card_checked else (f"welcome:device:{device_sha256}",)),
                         f"welcome:file:{fingerprint}",
                     )
                     if not db.claim_free(reservation, keys=keys, slots=slots, at=now):
@@ -3944,27 +4019,10 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
 
         if gate_account is not None:
             account_email = gate_account.email
-            first_look = (
-                db.welcome_refusal(
-                    gate_account.id,
-                    device_sha256=device_sha256,
-                    file_sha256="",
-                    client_ip=net,
-                    since=start,
-                    per_ip=welcome_cap,
-                )
-                if acct.WELCOME_FULL_REPORT
-                else "off"
-            )
-            if not first_look and db.free_claim_taken(inbox.welcome_key(account_email)):
-                # Another account on the same inbox (dots, +tags) had it.
-                first_look = "email"
-            if (
-                not first_look
-                and cfg.email_verification_required
-                and not db.email_verified(gate_account.id)
-            ):
-                first_look = "unverified"
+            first_look = _first_look(gate_account, device_sha256, net, now)
+            if first_look in CARD_REFUSALS and db.card_checked(gate_account.id):
+                card_checked = True
+                first_look = _first_look(gate_account, device_sha256, net, now, card=True)
             if not first_look:
                 welcome = True
             else:
@@ -4442,13 +4500,20 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         session_id: str | None = None,
         pay: str | None = None,
         acct_done: Annotated[str | None, Query(alias="acct")] = None,
+        card: str | None = None,
+        setup_session: str | None = None,
     ) -> str:
         record = _load(audit_id, token, request)
         locale = _view_locale(record, lang)
         ui = locale
         # Only known values are shown, so the query cannot inject text.
         notice = None
-        if session_id and cfg.stripe_enabled:
+        if card in ("checked", "skipped", "failed") and cfg.stripe_enabled and not record.paid:
+            outcome = card
+            if card == "checked":
+                outcome = _card_check_return(request, setup_session or "")
+            notice = account_pages.COPY[ui][f"card_check_{outcome}"]
+        elif session_id and cfg.stripe_enabled:
             record = _confirm_card_payment(record, session_id, request)
             order = db.get_checkout_session(session_id)
             notice = message(
@@ -4520,7 +4585,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             )
         account, csrf, _ = session
         state = "mine" if owner == account.id else ("unsaved" if owner is None else "other")
-        credits = db.account_credits(account.id, datetime.now(UTC)) if locked else 0
+        now = datetime.now(UTC)
+        credits = db.account_credits(account.id, now) if locked else 0
         return account_pages.report_box(
             locale=locale,
             state=state,
@@ -4529,6 +4595,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             csrf=csrf,
             credits=credits,
             locked=locked,
+            card_offer=locked and state == "mine" and _card_offer(request, account, now),
         )
 
     def _report_action(
@@ -4590,6 +4657,77 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             db.link_audit(account_id, record.id, at=now, via=VIA_PAID)
         done = "credit" if applied else "nocredit"
         return RedirectResponse(f"{back}&lang={locale}&acct={done}", status_code=303)
+
+    def _card_check_return(request: Request, setup_session: str) -> str:
+        """Back from a card check: ``ok``, ``taken`` or ``failed`` (the webhook may finish it).
+
+        Only the signed-in account the check was made for is recorded, and
+        lookups share the card-payment limits per address.
+        """
+        signed_in = _session(request)
+        if signed_in is None:
+            return "failed"
+        account = signed_in[0]
+        if db.card_checked(account.id):
+            return "ok"
+        if not setup_session.startswith(payments.SESSION_PREFIX) or len(setup_session) > 255:
+            return "failed"
+        now = datetime.now(UTC)
+        ip = _client_ip(request, cfg.trusted_proxy_hops)
+        if (
+            failed_card_sessions.count(setup_session, now)
+            or card_lookups.count(f"ip:{ip}", now) >= payments.CARD_LOOKUPS_PER_HOUR
+        ):
+            return "failed"
+        card_lookups.hit(f"ip:{ip}", now)
+        lookup: SessionLookup = app.state.session_lookup
+        try:
+            session = lookup(cfg, setup_session)
+        except Exception:  # noqa: BLE001 - Stripe unreachable: the webhook records it
+            logger.warning("card check lookup failed")
+            return "failed"
+        outcome = _settle_card_check(session, account.id)
+        if outcome == "failed":
+            failed_card_sessions.hit(setup_session, now)
+        return outcome
+
+    @app.post("/audits/{audit_id}/tarjeta")
+    def start_card_check(
+        request: Request,
+        audit_id: str,
+        csrf: Annotated[str, Form(max_length=200)] = "",
+        token: str | None = None,
+        lang: str | None = None,
+    ) -> Response:
+        """Open Stripe's no-charge card check for the owner of a locked preview."""
+        if _cross_site(request):
+            return _html_error(request, 403, message("cross_site", _locale(lang)), _locale(lang))
+        checked = _report_action(request, audit_id, token, csrf)
+        if not isinstance(checked, tuple):
+            return checked
+        record, session = checked
+        locale = _view_locale(record, lang)
+        back = (
+            f"/audits/{audit_id}?token={token}&lang={locale}"
+            if token
+            else f"/audits/{audit_id}?lang={locale}"
+        )
+        account = session[0]
+        if (
+            record.paid
+            or db.account_for_audit(record.id) != account.id
+            or not _card_offer(request, account, datetime.now(UTC))
+        ):
+            return RedirectResponse(back, status_code=303)
+        try:
+            stripe_session = app.state.card_check_factory(cfg, account.id, locale=locale, back=back)
+        except Exception:  # noqa: BLE001 - Stripe unreachable: say so on the report
+            logger.warning("could not open a card check")
+            return RedirectResponse(back + "&card=failed", status_code=303)
+        url = str(stripe_session.get("url") or "")
+        if not url.startswith("https://"):
+            return RedirectResponse(back + "&card=failed", status_code=303)
+        return RedirectResponse(url, status_code=303)
 
     def _confirm_card_payment(record: Any, session_id: str, request: Request) -> Any:
         """Back from Stripe: ask Stripe about that session and unlock what it paid.
@@ -5316,7 +5454,10 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             raise HTTPException(status_code=400, detail="invalid payload") from exc
         if event.get("type") in PAID_EVENTS:
             session = event.get("data", {}).get("object", {})
-            if isinstance(session, dict):
+            if isinstance(session, dict) and session.get("mode") == "setup":
+                # A card check charges nothing: it never reaches the paid path.
+                await run_in_threadpool(_settle_card_check, session)
+            elif isinstance(session, dict):
                 await run_in_threadpool(payments.fulfil, db, cfg, session, at=datetime.now(UTC))
         elif event.get("type") in ("refund.created", "refund.updated", "refund.failed"):
             refund = event.get("data", {}).get("object", {})
