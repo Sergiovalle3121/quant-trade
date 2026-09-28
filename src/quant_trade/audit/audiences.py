@@ -154,7 +154,7 @@ AUDIENCE_COPY: dict[str, dict[str, str]] = {
         ),
         "faq": "Perguntas",
         "start": "Começar grátis",
-        "sample": "Ver um relatório de exemplo (em inglês)",
+        "sample": "Ver um relatório de exemplo",
         "guide": "Como exportar",
         "others": "Outros casos",
         "home": "Início",
@@ -791,8 +791,8 @@ AUDIENCE_PAGES: tuple[Audience, ...] = (
                     (
                         "Challenge simulator",
                         "Resamples your history thousands of times and counts how often the "
-                        "daily loss, the total loss would be hit, or the target not reached in "
-                        "time.",
+                        "daily or the total loss limit would be hit, or the target not reached "
+                        "in time.",
                     ),
                     (
                         "Which firm does your history fit?",
@@ -1210,7 +1210,7 @@ AUDIENCE_PAGES: tuple[Audience, ...] = (
                     ),
                     (
                         "Frente ao seu próprio índice",
-                        "Se a tabela da ficha traz uma linha com o seu índice, o relatório "
+                        "Se a tabela da lâmina traz uma linha com o seu índice, o relatório "
                         "compara o fundo com ele nos meses em comum (24 ou mais): o retorno anual "
                         "de cada um, os meses acima, o beta e como se move quando o índice sobe "
                         "ou cai. Como é o índice que o gestor escolheu, superá-lo nunca basta "

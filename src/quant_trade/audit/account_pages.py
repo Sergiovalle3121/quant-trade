@@ -465,6 +465,7 @@ COPY: dict[str, dict[str, str]] = {
             "contraseña nueva."
         ),
         "forgot_contact": "Escribir por WhatsApp",
+        "forgot_mail": "Escribir a {email}",
         "forgot_message": f"Hola, olvidé la contraseña de mi cuenta de {BRAND}. Mi correo es: ",
         "recover_title": "Con tu clave de recuperación",
         "recover_lead": (
@@ -1147,6 +1148,7 @@ COPY: dict[str, dict[str, str]] = {
             "account's e-mail is yours and send you a one-time link to set a new password."
         ),
         "forgot_contact": "Write on WhatsApp",
+        "forgot_mail": "Write to {email}",
         "forgot_message": f"Hi, I forgot the password of my {BRAND} account. My e-mail is: ",
         "recover_title": "With your recovery key",
         "recover_lead": (
@@ -1893,16 +1895,23 @@ def forgot_page(
     email: str = "",
     email_delivery_ready: bool = False,
     flash: str = "",
+    contact_email: str = "",
 ) -> str:
     """Recover with a key or, when delivery is configured, an e-mail link."""
     locale = _locale(locale)
     copy = COPY[locale]
     button = ""
+    # The operator's own address comes first: not everyone uses the chat.
+    if "@" in contact_email and " " not in contact_email and not email_delivery_ready:
+        button = (
+            f"<p><a class='btn btn-ghost' href='mailto:{_e(contact_email)}'>{icon('chat')}"
+            f"{_e(copy['forgot_mail'].format(email=contact_email))}</a></p>"
+        )
     if contact_url and not email_delivery_ready:
         from quant_trade.audit.report import _prefilled
 
         href = _prefilled(contact_url, copy["forgot_message"])
-        button = (
+        button += (
             f"<p><a class='btn btn-ghost' href='{_e(href)}' rel='noopener noreferrer' "
             f"target='_blank'>{icon('chat')}{_e(copy['forgot_contact'])}</a></p>"
         )

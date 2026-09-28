@@ -147,31 +147,36 @@ def _account_recovery(ctx: LegalContext, locale: str) -> str:
     if ctx.email_delivery_ready:
         return {
             "es": (
-                "Si olvidas la contraseña, puedes pedir un enlace de un solo uso por correo "
-                "o usar tu clave de recuperación. Puedes borrar la cuenta desde su página."
+                "Si olvidas la contraseña, puedes usar tu clave de recuperación o pedir un "
+                "enlace de un solo uso, que enviamos solo a un correo confirmado. Puedes "
+                "borrar la cuenta desde su página."
             ),
             "en": (
-                "If you forget your password, you can request a one-time e-mail link or use "
-                "your recovery key. You can delete the account from its page."
+                "If you forget your password, you can use your recovery key or request a "
+                "one-time link, which we send only to a confirmed e-mail address. You can "
+                "delete the account from its page."
             ),
             "pt": (
-                "Se você esquecer a senha, pode pedir um link de uso único por e-mail ou usar "
-                "sua chave de recuperação. Você pode excluir a conta pela própria página."
+                "Se você esquecer a senha, pode usar sua chave de recuperação ou pedir um "
+                "link de uso único, que enviamos apenas a um e-mail confirmado. Você pode "
+                "excluir a conta pela própria página."
             ),
         }[locale]
     return {
         "es": (
-            "Si la olvidas, te enviamos un enlace de un solo uso después de comprobar que nos "
-            "escribes desde el correo de la cuenta. Puedes borrar la cuenta cuando quieras "
-            "desde su página."
+            "Si la olvidas, puedes poner una nueva con tu clave de recuperación. Si no tienes "
+            "clave, escríbenos: comprobamos que el correo de la cuenta es tuyo y te enviamos un "
+            "enlace de un solo uso. Puedes borrar la cuenta cuando quieras desde su página."
         ),
         "en": (
-            "If you forget it, we send you a one-time link after checking that you write from "
-            "the account's e-mail. You can delete the account at any time from its page."
+            "If you forget it, you can set a new one with your recovery key. If you have no "
+            "key, write to us: we check that the account's e-mail is yours and send you a "
+            "one-time link. You can delete the account at any time from its page."
         ),
         "pt": (
-            "Se você esquecê-la, enviamos um link de uso único depois de confirmar que você "
-            "escreve do e-mail da conta. Você pode excluir a conta pela própria página."
+            "Se você esquecê-la, pode criar uma nova com sua chave de recuperação. Se não "
+            "tiver chave, escreva para nós: confirmamos que o e-mail da conta é seu e enviamos "
+            "um link de uso único. Você pode excluir a conta pela própria página."
         ),
     }[locale]
 
@@ -414,8 +419,9 @@ def terms_text(ctx: LegalContext, locale: str = "es") -> LegalText:
                 "Your account",
                 (
                     (
-                        "A new account's first file is a free full report, once per account, "
-                        "browser and file, and a few per network address each month. "
+                        "The first file of a new account gets a free full report: once per "
+                        "account, browser and file, and only a few times a month from the "
+                        "same network address. "
                         f"After it, the free preview needs an account: {FREE_PREVIEWS_PER_MONTH} "
                         "a calendar month per account, also counted per network address. Past "
                         "that, each file is a paid report. "
@@ -579,7 +585,7 @@ def terms_text(ctx: LegalContext, locale: str = "es") -> LegalText:
             (
                 "Si publicas la verificación, la página muestra la clase, las dimensiones, "
                 "los hashes, la fecha y un aviso fijo; nunca tus archivos, operaciones ni "
-                "descripción. Puedes usar el sello en tu web, Telegram, foros o vídeos, "
+                "descripción. Puedes usar el sello en tu web, Telegram, foros o videos, "
                 "siempre enlazado a la página de verificación. No puedes presentarlo como "
                 "promesa de resultados, como respaldo de un producto ni junto a afirmaciones "
                 "de rentabilidad; si lo haces, podemos retirar la publicación.",
@@ -711,11 +717,11 @@ def _terms_pt(
             ),
         ),
         (
-            "Emblema e página de verificação",
+            "Selo e página de verificação",
             (
                 "Se você publicar a verificação, a página mostra a classe, as dimensões, "
                 "os hashes, a data e um aviso fixo, nunca arquivos, operações ou descrição. "
-                "Você pode usar o emblema em seu site, Telegram, fóruns ou vídeos, sempre "
+                "Você pode usar o selo em seu site, Telegram, fóruns ou vídeos, sempre "
                 "ligado à página de verificação. Não pode apresentá-lo como promessa de "
                 "resultado, endosso de um produto ou junto de alegações de rentabilidade; "
                 "nesse caso, podemos retirar a publicação.",
@@ -1327,9 +1333,9 @@ def _privacy_pt(
                 "eliminado após 90 dias sem visita ou com a conta.",
                 "Para contar visitas vindas de nossos próprios links: as visitas à página "
                 "inicial e às páginas de casos são contadas por dia, idioma e etiqueta do "
-                "link (como ?ref=f4), sem endereço de rede. A cookie "
+                "link (como ?ref=f4), sem endereço de rede. O cookie "
                 f"{SEEN_COOKIE} guarda só a data de hoje para contar um navegador uma vez "
-                "por dia. Se você chega por um link etiquetado, a cookie "
+                "por dia. Se você chega por um link etiquetado, o cookie "
                 f"{REF_COOKIE} guarda a etiqueta por {REF_DAYS} dias; se você criar uma conta, "
                 "a etiqueta permanece nela até a exclusão.",
             ),
@@ -1339,11 +1345,11 @@ def _privacy_pt(
             (
                 "Não pedimos nem guardamos chaves de corretora ou bolsa, senhas de conta de "
                 "trading ou dados de cartão. Estas páginas não usam analítica ou publicidade "
-                "de terceiros. As cookies são nossas: sessão, proteção dos formulários, "
+                "de terceiros. Os cookies são nossos: sessão, proteção dos formulários, "
                 "relatório ao qual voltar depois de entrar (por até uma hora), marca "
                 "do navegador para a oferta gratuita, origem de nossos próprios links e data "
-                "para contar uma visita por dia. Nenhuma acompanha você entre sites ou é "
-                "compartilhada. Nosso registro de acessos guarda apenas o endereço abreviado "
+                "para contar uma visita por dia. Nenhum acompanha você entre sites ou é "
+                "compartilhado. Nosso registro de acessos guarda apenas o endereço abreviado "
                 "(sem a parte final do IP) e nunca o segredo do link do relatório. O provedor "
                 "de hospedagem pode manter seus próprios registros de requisições com IP "
                 "completo pelo prazo definido por ele.",
@@ -1371,7 +1377,7 @@ def _privacy_pt(
                 "Página de verificação: pública até você retirá-la no relatório, pedir sua "
                 "retirada ou pedir a exclusão da auditoria. Se publicada, a limpeza conserva "
                 "apenas o que ela mostra (classe, estados das dimensões, hashes, datas, "
-                "número de tentativas e versão do mecanismo), para manter a página e o emblema.",
+                "número de tentativas e versão do mecanismo), para manter a página e o selo.",
                 "Lista de novidades: até você pedir a remoção.",
                 "Conta: até você excluí-la na própria página ou pedir sua exclusão. Isso "
                 "elimina e-mail, hash da senha, sessões e a lista de relatórios e códigos. "

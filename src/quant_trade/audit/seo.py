@@ -31,7 +31,7 @@ TAGLINE: dict[str, str] = {
     "pt": "Auditoria estatística independente de backtests e históricos",
 }
 SITE_NAME: dict[str, str] = {locale: f"{BRAND} · {TAGLINE[locale]}" for locale in TAGLINE}
-OG_LOCALE: dict[str, str] = {"es": "es_ES", "en": "en_US", "pt": "pt_BR"}
+OG_LOCALE: dict[str, str] = {"es": "es_MX", "en": "en_US", "pt": "pt_BR"}
 #: The share picture per language.
 OG_IMAGE_LOCALE: dict[str, str] = {"es": "es", "en": "en", "pt": "pt"}
 

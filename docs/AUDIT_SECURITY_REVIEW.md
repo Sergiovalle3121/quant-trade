@@ -248,6 +248,24 @@ Limits that remain from this pass:
   without its key (a 404 for an account that does not hold it); opening the
   link again works.
 
+## Customer audit: texts, links and labels (2026-09-28)
+
+Reviewed against `main` at 8a536fb. Scope: wording, labels and links of the
+public pages and the report in Spanish, English and Portuguese. No control was
+relaxed and no header, redirect, form field, limit or setting changed. The
+tests are offline and deterministic (`tests/test_audit_customer_copy.py`,
+`tests/test_audit_portuguese_report.py`, `tests/test_audit_method.py`).
+
+| # | Finding | Severity | Fix |
+|---|---|---|---|
+| T1 | A Portuguese report linked the Spanish check page (`/comprobar`) and the English terms and privacy pages. | Low | The three links come from the fixed tables `seo.CHECK_PATH` and `legal.LEGAL_PATHS` by the report's language; nothing from the request is read, and every target is a path of this site. |
+| T5 | The source link of Brazil's inflation series answered 404 on the publisher's site. | Low | `market.PROVIDER_URLS["bcb"]` links the series page of Banco Central do Brasil's SGS. It is a fixed `https://` template filled with the series number written in the code, escaped where the report prints it. A report made before this change keeps the address stored in its result, because a stored result is never rewritten. |
+| T7 | With no recovery key and automatic mail off, the forgot-password pages offered only the chat link. | Low | They show the operator's address first, as a `mailto:` link. The address is `AUDIT_OPERATOR_CONTACT`, the value the terms, privacy and contact pages already publish; it is shown only when it has an `@` and no space, it is HTML-escaped, and nothing is shown when it is not configured. The block disappears when automatic mail is on, as the chat link does. No form, field or route was added. |
+
+The other changes of this pass are texts only. The terms describe password
+recovery as the site does it: the recovery key, a one-time link sent only to
+a confirmed address when mail is on, and writing to the operator otherwise.
+
 ## Customer audit of the public pages (2026-09-28)
 
 Reviewed against `main` at 8a536fb, after a customer-style read of the
