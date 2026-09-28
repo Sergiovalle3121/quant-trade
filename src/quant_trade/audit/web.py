@@ -120,6 +120,7 @@ from quant_trade.audit.store import (
     VIA_SAVED,
     VIA_UPLOAD,
     Store,
+    account_order_ref,
     make_store,
     strategy_name,
 )
@@ -1043,6 +1044,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     app.state.visits = visits
     app.state.mail_worker = mail_worker
     app.state.checkout_factory = payments.stripe_checkout
+    app.state.account_checkout_factory = payments.stripe_account_checkout
     app.state.session_lookup = payments.stripe_session
     app.state.pause_new_audits = pause_new_audits
     app.state.pause_new_checkout = pause_new_checkout
@@ -1667,8 +1669,14 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         "email_pending",
         "email_verified",
         "email_verification_sent",
+        "card_paid",
     )
     account_errors = (
+        "buy_off",
+        "buy_market",
+        "buy_final_sale_needed",
+        "buy_email",
+        "buy_review",
         "email_bad",
         "email_disposable",
         "email_mismatch",
@@ -2447,6 +2455,11 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                     error=error if error in account_errors else "",
                     access_codes=cfg.access_codes_enabled,
                     card_payments=cfg.stripe_enabled,
+                    card_markets=(
+                        [m for m in ("MX", "US", "BR", "ES") if m in cfg.approved_markets]
+                        if cfg.card_public and not pause_new_checkout
+                        else []
+                    ),
                     contact_url=cfg.contact_url,
                     email_verified=db.email_verified(account.id),
                     email_pending=db.pending_email_change(account.id, now),
@@ -2801,6 +2814,81 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             if outcome == "linked":
                 return RedirectResponse(f"{base}?done=code_linked", status_code=303)
             return RedirectResponse(f"{base}?error=code_{outcome}", status_code=303)
+
+        return handler
+
+    def _buy_post(path_locale: str) -> Callable[..., Response]:
+        """Buy credits by card from "My account": one report or the pack.
+
+        The credits land on the signed-in account once Stripe's signed
+        webhook confirms the payment; nothing is unlocked here.
+        """
+
+        def handler(
+            request: Request,
+            plan: Annotated[str, Form(max_length=8)] = payments.PLAN_SINGLE,
+            billing_country: Annotated[str, Form(max_length=8)] = "",
+            final_sale: Annotated[str, Form(max_length=8)] = "",
+            csrf: Annotated[str, Form(max_length=200)] = "",
+            lang: str | None = None,
+        ) -> Response:
+            checked = _signed_in_action(request, path_locale, lang, csrf)
+            if not isinstance(checked, tuple):
+                return checked
+            account, _, locale, _ = checked
+            base = account_pages.path("account", locale)
+            # Live payments only: Stripe's public test card never buys credits.
+            if not cfg.card_public or pause_new_checkout:
+                return RedirectResponse(f"{base}?error=buy_off", status_code=303)
+            reference = account_order_ref(account.id)
+            if db.has_checkout_review(reference):
+                return RedirectResponse(f"{base}?error=buy_review", status_code=303)
+            declared_country = billing_country.strip().upper()
+            if declared_country not in cfg.approved_markets:
+                return RedirectResponse(f"{base}?error=buy_market", status_code=303)
+            if cfg.email_verification_required and not db.email_verified(account.id):
+                return RedirectResponse(f"{base}?error=buy_email", status_code=303)
+            if final_sale != "yes":
+                return RedirectResponse(f"{base}?error=buy_final_sale_needed", status_code=303)
+            if plan != payments.PLAN_PACK or not cfg.pack_price_usd:
+                plan = payments.PLAN_SINGLE
+            now = datetime.now(UTC)
+            try:
+                order = db.reserve_checkout(
+                    reference,
+                    account_id=account.id,
+                    plan=plan,
+                    amount_cents=payments.plan_price_cents(cfg, plan),
+                    currency=payments.CURRENCY,
+                    at=now,
+                    declared_country=declared_country,
+                )
+            except ValueError:
+                return RedirectResponse(f"{base}?error=buy_review", status_code=303)
+            db.record_final_sale(order.id, terms_version=LEGAL_UPDATED, at=now)
+            if order.checkout_url and order.expires_at > now.isoformat().replace("+00:00", "Z"):
+                return RedirectResponse(order.checkout_url, status_code=303)
+            created = app.state.account_checkout_factory(
+                cfg,
+                account.id,
+                plan=plan,
+                locale=locale,
+                order_id=order.id,
+                amount_cents=order.amount_cents,
+            )
+            url = str(created.get("url") or "")
+            expiration = created.get("expires_at")
+            db.attach_checkout_session(
+                order.id,
+                session_id=str(created.get("id") or ""),
+                checkout_url=url,
+                expires_at=(
+                    datetime.fromtimestamp(expiration, UTC)
+                    if isinstance(expiration, int) and not isinstance(expiration, bool)
+                    else None
+                ),
+            )
+            return RedirectResponse(url, status_code=303)
 
         return handler
 
@@ -3340,6 +3428,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         app.add_api_route(paths["signout"], _signout_post(path_locale), methods=["POST"])
         app.add_api_route(paths["account"], _account_get(path_locale), **html_get)
         app.add_api_route(paths["account"] + "/codigo", _code_post(path_locale), methods=["POST"])
+        app.add_api_route(paths["account"] + "/comprar", _buy_post(path_locale), methods=["POST"])
         app.add_api_route(paths["account"] + "/comparar", _account_compare(path_locale), **html_get)
         app.add_api_route(
             paths["account"] + "/contrasena", _password_post(path_locale), methods=["POST"]

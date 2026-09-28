@@ -53,6 +53,14 @@ PATHS: dict[str, dict[str, str]] = {
     },
 }
 
+#: Billing countries as the credit form names them.
+MARKET_NAMES: dict[str, dict[str, str]] = {
+    "MX": {"es": "México", "en": "Mexico", "pt": "México"},
+    "US": {"es": "Estados Unidos", "en": "United States", "pt": "Estados Unidos"},
+    "BR": {"es": "Brasil", "en": "Brazil", "pt": "Brasil"},
+    "ES": {"es": "España", "en": "Spain", "pt": "Espanha"},
+}
+
 COPY: dict[str, dict[str, str]] = {
     "es": {
         "eyebrow": "Tu cuenta",
@@ -268,6 +276,27 @@ COPY: dict[str, dict[str, str]] = {
             "Hola, quiero créditos para mi cuenta: un informe completo o el paquete de 3."
         ),
         "buy_card": "Paga con tarjeta desde la vista previa de cualquier informe.",
+        "buy_card_single": "Comprar 1 informe · {price}",
+        "buy_card_pack": "Comprar paquete de 3 · {price}",
+        "buy_card_note": (
+            "Pagas con tarjeta en Stripe. Los créditos quedan en tu cuenta en cuanto Stripe "
+            "confirma el pago y sirven para cualquier informe."
+        ),
+        "buy_country": "País de facturación",
+        "buy_country_prompt": "Elige tu país",
+        "buy_final_sale": (
+            "Entiendo que el crédito se entrega al momento y que la compra no es reembolsable."
+        ),
+        "buy_alt": "¿Prefieres pagar por WhatsApp?",
+        "card_paid": (
+            "Pago recibido. Tus créditos aparecen aquí en cuanto Stripe lo confirma; si aún "
+            "no los ves, recarga la página en un minuto."
+        ),
+        "buy_off": "El pago con tarjeta no está disponible en este momento.",
+        "buy_market": "Elige tu país de facturación para pagar.",
+        "buy_final_sale_needed": "Marca la casilla de compra no reembolsable para pagar.",
+        "buy_email": "Confirma tu correo para comprar créditos.",
+        "buy_review": "Hay un cobro pendiente de revisión. No vuelvas a pagar; pide ayuda.",
         "security_title": "Contraseña y datos",
         "export_title": "Descargar mis datos",
         "export_help": (
@@ -892,6 +921,27 @@ COPY: dict[str, dict[str, str]] = {
         "buy_prices_pack": "Pack of 3 credits: {price}.",
         "buy_message": "Hi, I want credits for my account: one full report or the pack of 3.",
         "buy_card": "Pay by card from the preview of any report.",
+        "buy_card_single": "Buy 1 report · {price}",
+        "buy_card_pack": "Buy the pack of 3 · {price}",
+        "buy_card_note": (
+            "You pay by card on Stripe. The credits land on your account as soon as Stripe "
+            "confirms the payment and work for any report."
+        ),
+        "buy_country": "Billing country",
+        "buy_country_prompt": "Choose your country",
+        "buy_final_sale": (
+            "I understand that the credit is delivered at once and the purchase is not refundable."
+        ),
+        "buy_alt": "Prefer to pay on WhatsApp?",
+        "card_paid": (
+            "Payment received. Your credits show here as soon as Stripe confirms it; if you do "
+            "not see them yet, reload the page in a minute."
+        ),
+        "buy_off": "Card payment is not available right now.",
+        "buy_market": "Choose your billing country to pay.",
+        "buy_final_sale_needed": "Tick the non-refundable purchase box to pay.",
+        "buy_email": "Confirm your e-mail to buy credits.",
+        "buy_review": "A charge is under review. Do not pay again; ask for help.",
         "security_title": "Password and data",
         "export_title": "Download my data",
         "export_help": (
@@ -2354,6 +2404,7 @@ def account_page(
     error: str = "",
     access_codes: bool = False,
     card_payments: bool = False,
+    card_markets: Sequence[str] = (),
     contact_url: str = "",
     free_mode: bool = False,
     price_cents: int = 0,
@@ -2447,25 +2498,62 @@ def account_page(
             + "</section>"
         )
     buy = ""
-    if (access_codes and contact_url) or card_payments:
+    # Card first when live card payment is on: the buyer pays on Stripe and
+    # the credits land on this account; WhatsApp stays as the alternative.
+    card_buy = bool(card_markets) and price_cents > 0
+    if (access_codes and contact_url) or card_payments or card_buy:
         lines = ""
-        if price_cents > 0:
+        if price_cents > 0 and not card_buy:
             prices = copy["buy_prices_single"].format(price=_usd(price_cents))
             if pack_price_cents > 0:
                 prices += " " + copy["buy_prices_pack"].format(price=_usd(pack_price_cents))
             lines += f"<p>{_e(prices)}</p>"
+        if card_buy:
+            options = "".join(
+                f"<option value='{_e(country)}'>"
+                f"{_e(MARKET_NAMES.get(country, {}).get(locale, country))}</option>"
+                for country in card_markets
+            )
+            pack_button = (
+                "<button class='btn btn-ghost' type='submit' name='plan' value='pack'>"
+                f"{_e(copy['buy_card_pack'].format(price=_usd(pack_price_cents)))}</button>"
+                if pack_price_cents > 0
+                else ""
+            )
+            lines += (
+                f"<form class='acct-buy' method='post' action='{path('account', locale)}/comprar'>"
+                + _hidden("csrf", csrf)
+                + f"<label for='buy-country'>{_e(copy['buy_country'])}</label>"
+                "<select id='buy-country' name='billing_country' required>"
+                f"<option value='' selected disabled>{_e(copy['buy_country_prompt'])}</option>"
+                + options
+                + "</select>"
+                "<label class='final-sale'><input type='checkbox' name='final_sale' "
+                f"value='yes' required> <span>{_e(copy['buy_final_sale'])}</span></label>"
+                "<div class='inline-form'>"
+                "<button class='btn btn-primary' type='submit' name='plan' value='single'>"
+                f"{icon('card')}{_e(copy['buy_card_single'].format(price=_usd(price_cents)))}"
+                f"</button>{pack_button}</div>"
+                f"<p class='muted'>{icon('lock')}{_e(copy['buy_card_note'])}</p></form>"
+            )
         if access_codes and contact_url:
             from quant_trade.audit.report import _prefilled
 
             href = _prefilled(contact_url, copy["buy_message"])
-            lines += (
-                f"<p><a class='btn btn-dark' href='{_e(href)}' rel='noopener noreferrer' "
-                f"target='_blank'>{icon('chat')}{_e(copy['buy_code'])}</a></p>"
-                "<ol class='buy-steps'>"
-                + "".join(f"<li>{_e(step)}</li>" for step in copy["buy_code_how"].split("|"))
-                + f"</ol><p class='muted'>{_e(copy['buy_code_wait'])}</p>"
-            )
-        if card_payments:
+            if card_buy:
+                lines += (
+                    f"<p class='muted'><a href='{_e(href)}' rel='noopener noreferrer' "
+                    f"target='_blank'>{icon('chat')}{_e(copy['buy_alt'])}</a></p>"
+                )
+            else:
+                lines += (
+                    f"<p><a class='btn btn-dark' href='{_e(href)}' rel='noopener noreferrer' "
+                    f"target='_blank'>{icon('chat')}{_e(copy['buy_code'])}</a></p>"
+                    "<ol class='buy-steps'>"
+                    + "".join(f"<li>{_e(step)}</li>" for step in copy["buy_code_how"].split("|"))
+                    + f"</ol><p class='muted'>{_e(copy['buy_code_wait'])}</p>"
+                )
+        if card_payments and not card_buy:
             lines += f"<p class='muted'>{_e(copy['buy_card'])}</p>"
         buy = f"<section class='acct-sec'><h2>{_e(copy['buy_title'])}</h2>{lines}</section>"
     purchases = (
