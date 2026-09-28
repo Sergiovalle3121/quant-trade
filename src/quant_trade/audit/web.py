@@ -427,6 +427,8 @@ _HOST = re.compile(r"^[A-Za-z0-9.-]{1,253}(:[0-9]{1,5})?$")
 RAILWAY_HOST_SUFFIX = ".up.railway.app"
 #: Query values that are secrets: the owner token and an access code.
 _SECRET_QUERY = re.compile(r"((?:^|[?&])(?:token|code)=)[^&\s\"]*", re.IGNORECASE)
+#: The same inside a URL-encoded ``next`` (``%3Ftoken%3D…``, ``%26code%3D…``).
+_SECRET_QUERY_ENCODED = re.compile(r"((?:%3F|%26)(?:token|code)%3D)[^&\s\"%]*", re.IGNORECASE)
 
 #: The file names as the error sentences use them.
 UPLOAD_NAMES: dict[str, dict[str, str]] = {
@@ -468,7 +470,8 @@ def message(key: str, locale: str, **values: Any) -> str:
 def redact_secrets(text: str) -> str:
     """``text`` with the value of every ``token=`` and ``code=`` query parameter
     replaced, so an access log line never carries an owner token."""
-    return _SECRET_QUERY.sub(r"\1[redacted]", text)
+    text = _SECRET_QUERY.sub(r"\1[redacted]", text)
+    return _SECRET_QUERY_ENCODED.sub(r"\1[redacted]", text)
 
 
 def shorten_client_address(address: str) -> str:
