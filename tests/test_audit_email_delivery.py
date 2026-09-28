@@ -211,7 +211,7 @@ def test_signup_outbox_survives_restart_and_checkout_waits_for_post(tmp_path: Pa
     )[1]
     allowed = client.post(
         f"/audits/{second_id}/checkout?token={token}",
-        data={"billing_country": "MX"},
+        data={"billing_country": "MX", "final_sale": "yes"},
         follow_redirects=False,
     )
     assert allowed.status_code == 303 and len(observed) == 1
@@ -230,7 +230,7 @@ def test_verified_owner_must_be_the_signed_in_checkout_buyer(tmp_path: Path) -> 
 
     path = f"/audits/{audit_id}/checkout?token={token}"
     anonymous = TestClient(app, base_url=cfg.base_url)
-    assert anonymous.post(path, follow_redirects=False).status_code == 403
+    assert anonymous.post(path, follow_redirects=False).status_code == 303  # to sign in
     stranger = TestClient(app, base_url=cfg.base_url)
     _signup(stranger, "stranger@example.com")
     _confirm(stranger, _mail_link(store, cfg, "stranger@example.com"))
@@ -239,7 +239,10 @@ def test_verified_owner_must_be_the_signed_in_checkout_buyer(tmp_path: Path) -> 
 
     app.state.checkout_factory = lambda *_args, **_kwargs: "https://checkout.stripe.test/owner"
     assert (
-        owner.post(path, data={"billing_country": "MX"}, follow_redirects=False).status_code == 303
+        owner.post(
+            path, data={"billing_country": "MX", "final_sale": "yes"}, follow_redirects=False
+        ).status_code
+        == 303
     )
     assert len(store.list_checkout_orders()) == 1
 

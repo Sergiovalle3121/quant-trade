@@ -220,8 +220,8 @@ COPY_PT: dict[str, Any] = {
     "contact": "Pedir um código",
     "price_pack": "Pacote de {n} relatórios: USD {price:.0f} (USD {each:.0f} cada um).",
     "refund_note": (
-        "Todas as vendas são finais. Se o relatório ler mal o seu arquivo (operações, saldo ou "
-        "datas que não batem com a sua plataforma), nós o corrigimos ou damos um novo crédito."
+        "Se o relatório ler mal o seu arquivo (operações, saldo ou datas que não batem com a "
+        "sua plataforma) e não conseguirmos corrigir, devolvemos o valor desse relatório."
     ),
     "account_note": (
         "O seu primeiro relatório completo, grátis ao criar a sua conta; depois, "
@@ -694,9 +694,9 @@ TRUST_PT: dict[str, Any] = {
         ),
         (
             "card",
-            "Se ler mal o seu arquivo, nós corrigimos",
-            "Se as operações, o saldo ou as datas não batem com a sua plataforma, nós "
-            "corrigimos ou damos um novo crédito para outro relatório.",
+            "Se ler mal o seu arquivo, devolvemos o valor",
+            "Se as operações, o saldo ou as datas não batem com a sua plataforma e não "
+            "conseguimos corrigir, devolvemos o que você pagou por esse relatório.",
             "Termos do serviço",
             "terms",
         ),

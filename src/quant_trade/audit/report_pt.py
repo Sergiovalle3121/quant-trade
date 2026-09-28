@@ -113,6 +113,9 @@ REPORT: dict[str, Any] = {
             "confirmado; nós nunca vemos nem guardamos os dados do seu cartão. Todas as vendas "
             "são finais."
         ),
+        "final_sale": (
+            "Entendo que o relatório é entregue na hora e que a compra não é reembolsável."
+        ),
         "pay_links_note": (
             "O pagamento abre em outra aba. Quando terminar, volte aqui: o relatório é "
             "desbloqueado assim que a Stripe confirma o pagamento."

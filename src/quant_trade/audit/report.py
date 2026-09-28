@@ -481,6 +481,9 @@ LABELS: dict[str, dict[str, str]] = {
             "nosotros no vemos ni guardamos los datos de tu tarjeta. Todas las ventas son "
             "finales."
         ),
+        "final_sale": (
+            "Entiendo que el informe se entrega al momento y que la compra no es reembolsable."
+        ),
         "pay_links_note": (
             "El pago se abre en otra pestaña. Cuando termines, vuelve aquí: el informe se "
             "desbloquea en cuanto Stripe confirma el pago."
@@ -1836,6 +1839,9 @@ LABELS: dict[str, dict[str, str]] = {
         "pay_secure": (
             "Secure payment with Stripe. You see the full report as soon as the payment is "
             "confirmed; we never see or store your card details. All sales are final."
+        ),
+        "final_sale": (
+            "I understand that the report is delivered at once and the purchase is not refundable."
         ),
         "pay_links_note": (
             "The payment opens in another tab. When you finish, come back here: the report "
@@ -7444,6 +7450,8 @@ def render_html(
             f"<form class='paybox buy' method='post' action='{_e(checkout_url)}'>"
             + price_html
             + market_select
+            + "<label class='final-sale'><input type='checkbox' name='final_sale' value='yes' "
+            f"required> <span>{_e(labels['final_sale'])}</span></label>"
             + "<div><div class='inline-form'>"
             "<button class='btn btn-primary btn-lg' type='submit' name='plan' value='single'>"
             f"{icon('card')}{_e(labels['pay'])}</button>{pack_button}</div>"

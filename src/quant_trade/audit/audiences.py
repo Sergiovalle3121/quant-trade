@@ -109,8 +109,8 @@ AUDIENCE_COPY: dict[str, dict[str, str]] = {
             f"es gratis ({FREE_PREVIEWS_PER_MONTH} al mes) y no pide tarjeta: clase de A a D, "
             "gráficas, "
             "banderas rojas y qué significa cada dimensión. El informe completo cuesta "
-            "USD {price:.0f} (USD {pack:.0f} el paquete de 3). Las ventas son finales; si el "
-            "informe lee mal tu archivo, lo corregimos o te damos un crédito nuevo."
+            "USD {price:.0f} (USD {pack:.0f} el paquete de 3). Si el informe lee mal tu archivo "
+            "y no podemos corregirlo, te devolvemos el importe."
         ),
         "faq": "Preguntas",
         "start": "Empezar gratis",
@@ -131,8 +131,8 @@ AUDIENCE_COPY: dict[str, dict[str, str]] = {
             f"preview is free ({FREE_PREVIEWS_PER_MONTH} a month) and needs no card: A to D "
             "class, charts, red flags "
             "and what each dimension means. The full report is USD {price:.0f} (USD {pack:.0f} "
-            "for a pack of 3). Sales are final; if the report misreads your file, we fix it or "
-            "give you a new credit."
+            "for a pack of 3). If the report misreads your file and we cannot fix it, we refund "
+            "you."
         ),
         "faq": "Questions",
         "start": "Start free",
@@ -152,9 +152,8 @@ AUDIENCE_COPY: dict[str, dict[str, str]] = {
             "O seu primeiro relatório completo é grátis ao criar a sua conta. Depois, a prévia "
             f"é grátis ({FREE_PREVIEWS_PER_MONTH} por mês) e não pede cartão: classe de A a D, "
             "gráficos, bandeiras vermelhas e o que cada dimensão significa. O relatório "
-            "completo custa USD {price:.0f} (USD {pack:.0f} o pacote de 3). As vendas são "
-            "finais; se o relatório ler mal o seu arquivo, nós o corrigimos ou damos um novo "
-            "crédito."
+            "completo custa USD {price:.0f} (USD {pack:.0f} o pacote de 3). Se o relatório ler "
+            "mal o seu arquivo e não conseguirmos corrigir, devolvemos o valor."
         ),
         "faq": "Perguntas",
         "start": "Começar grátis",

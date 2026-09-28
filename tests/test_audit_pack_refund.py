@@ -44,23 +44,18 @@ def test_pack_is_on_sale_only_with_codes_and_a_real_discount() -> None:
     assert hidden.pack_price_usd == 0.0
 
 
-def test_landing_shows_pack_and_final_sales_when_selling(tmp_path: Path) -> None:
+def test_landing_shows_pack_when_selling(tmp_path: Path) -> None:
     client = _client(tmp_path, **SELLING)
     es = client.get("/?lang=es").text
     assert "Pack de 3 informes: USD 69 (USD 23 cada uno)." in es
-    assert "Todas las ventas son finales" in es
-    assert "te devolvemos" not in es
     en = client.get("/?lang=en").text
     assert "Pack of 3 reports: USD 69 (USD 23 each)." in en
-    assert "All sales are final" in en
-    assert "we refund" not in en
     assert find_claims(es) == [] and find_claims(en) == []
 
 
 def test_free_mode_shows_neither(tmp_path: Path) -> None:
     page = _client(tmp_path).get("/?lang=es").text
     assert "Pack de 3" not in page
-    assert "ventas son finales" not in page
 
 
 def test_locked_report_offers_the_pack(tmp_path: Path) -> None:

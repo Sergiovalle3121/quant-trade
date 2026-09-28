@@ -520,6 +520,15 @@ class Store:
             sa.Column("billing_country", sa.String(2), nullable=False, default=""),
             sa.Column("checked_at", sa.String(40), nullable=False, default=""),
         )
+        # Additive table: the buyer ticked "the report is delivered at once and
+        # the purchase is not refundable" before Checkout, under these terms.
+        self.checkout_order_terms = sa.Table(
+            "checkout_order_terms",
+            self.metadata,
+            sa.Column("order_id", sa.String(64), primary_key=True),
+            sa.Column("terms_version", sa.String(40), nullable=False),
+            sa.Column("accepted_at", sa.String(40), nullable=False),
+        )
         # Additive mapping: older databases need no ALTER TABLE. A refund can
         # arrive before the Checkout webhook and remain unlinked until it does.
         self.stripe_payment_intents = sa.Table(
@@ -1270,6 +1279,36 @@ class Store:
         if row is None:
             return None
         return str(row["declared_country"]), str(row["billing_country"])
+
+    def record_final_sale(self, order_id: str, *, terms_version: str, at: datetime) -> None:
+        """Keep the buyer's first acceptance of a final sale for this order."""
+        if not _usable_key(order_id):
+            raise ValueError("invalid order id")
+        table = self.checkout_order_terms
+        if self.final_sale_acceptance(order_id) is not None:
+            return
+        try:
+            with self.engine.begin() as conn:
+                conn.execute(
+                    table.insert().values(
+                        order_id=order_id, terms_version=terms_version, accepted_at=_iso(at)
+                    )
+                )
+        except self._sa.exc.IntegrityError:
+            pass  # a concurrent click recorded it first
+
+    def final_sale_acceptance(self, order_id: str) -> tuple[str, str] | None:
+        """(terms version, accepted at) of the order's final-sale checkbox, if ticked."""
+        if not _usable_key(order_id):
+            return None
+        table = self.checkout_order_terms
+        with self.engine.connect() as conn:
+            row = conn.execute(
+                self._sa.select(table.c.terms_version, table.c.accepted_at).where(
+                    table.c.order_id == order_id
+                )
+            ).first()
+        return (str(row[0]), str(row[1])) if row else None
 
     def has_checkout_review(self, audit_id: str) -> bool:
         """A charged audit awaiting operator resolution must not be sold again."""

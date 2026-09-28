@@ -69,7 +69,7 @@ from quant_trade.audit.engine import run_audit
 from quant_trade.audit.errors_pt import FILES_PT
 from quant_trade.audit.guides import GUIDES_BY_PATH, guide_url
 from quant_trade.audit.importers import detect_format
-from quant_trade.audit.legal import LegalContext, privacy_text, terms_text
+from quant_trade.audit.legal import LEGAL_UPDATED, LegalContext, privacy_text, terms_text
 from quant_trade.audit.market import MarketData
 from quant_trade.audit.owner import (
     MAX_CREDITS,
@@ -4886,6 +4886,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         lang: str | None = None,
         plan: Annotated[str, Form()] = payments.PLAN_SINGLE,
         billing_country: Annotated[str, Form()] = "",
+        final_sale: Annotated[str, Form(max_length=8)] = "",
     ) -> Response:
         record = _load(audit_id, token, request)
         if not (cfg.stripe_enabled and cfg.card_for(audit_id)):
@@ -4943,6 +4944,13 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                     account_pages.COPY[locale]["email_checkout_required"],
                     locale,
                 )
+        if final_sale != "yes":
+            final_sale_needed = {
+                "es": "Marca la casilla de compra no reembolsable para pagar.",
+                "en": "Tick the non-refundable purchase box to pay.",
+                "pt": "Marque a caixa de compra não reembolsável para pagar.",
+            }
+            return _html_error(request, 400, final_sale_needed[locale], locale)
         # The pack is sold only while it is on sale; anything else is one audit.
         if plan != payments.PLAN_PACK or not cfg.pack_price_usd:
             plan = payments.PLAN_SINGLE
@@ -4968,6 +4976,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             return RedirectResponse(
                 f"/audits/{audit_id}?token={token}&lang={locale}", status_code=303
             )
+        db.record_final_sale(order.id, terms_version=LEGAL_UPDATED, at=now)
         if order.checkout_url and order.expires_at > now.isoformat().replace("+00:00", "Z"):
             return RedirectResponse(order.checkout_url, status_code=303)
         factory: CheckoutFactory = app.state.checkout_factory
