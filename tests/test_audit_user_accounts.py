@@ -3536,3 +3536,69 @@ def test_signin_and_signup_always_offer_each_other(
     assert f"href='{signup}?next=/cuenta' aria-current='page'" in register
     # Signing in also shows a full-width button to create an account.
     assert "acct-alt-btn" in login
+
+
+def _seeded_file(seed: int) -> dict[str, tuple[str, bytes, str]]:
+    return {"equity": ("e.csv", csv_bytes(positive_drift(500, seed=seed)), "text/csv")}
+
+
+def test_the_free_report_is_once_per_inbox_across_dots_and_tags(tmp_path: Path) -> None:
+    client, _, _ = _client(tmp_path)
+    _signup(client, "ana.perez@gmail.com", welcome=True)
+    first = client.post(
+        "/audits", files=_seeded_file(11), data={"consent": "on"}, follow_redirects=False
+    )
+    assert "acct=welcome" in first.headers["location"]
+    # Same inbox, new browser, new file: dots and a +tag do not make a new person.
+    other = TestClient(client.app)
+    _signup(other, "AnaPerez+rigor@googlemail.com", welcome=True)
+    again = other.post(
+        "/audits", files=_seeded_file(12), data={"consent": "on"}, follow_redirects=False
+    )
+    assert "acct=preview_email" in again.headers["location"]
+    page = other.get(again.headers["location"]).text
+    assert "uno por persona" in page
+
+
+def test_unconfirmed_email_waits_for_the_free_report(tmp_path: Path) -> None:
+    settings = _settings(
+        tmp_path,
+        base_url="https://rigor.example",
+        email_verification_required=True,
+        email_token_secret="stable secret shared across replicas 1234567890",
+        resend_api_key="re_test_0123456789abcdefghij",
+        smtp_from="Rigor <hola@example.com>",
+    )
+    store = make_store(settings.database_url)
+    client = TestClient(create_app(settings, store), base_url=settings.base_url)
+    _signup(client, "nueva@example.com", welcome=True)
+    pending = client.post(
+        "/audits", files=_seeded_file(21), data={"consent": "on"}, follow_redirects=False
+    )
+    assert "acct=preview_unverified" in pending.headers["location"]
+    account = store.find_account("nueva@example.com")
+    assert account is not None and not store.welcome_used(account.id)
+
+
+@pytest.mark.parametrize(
+    "email", ["x@mailinator.com", "x@yopmail.com", "x@eu.guerrillamail.com", "x@10minutemail.com"]
+)
+def test_throwaway_inboxes_cannot_open_an_account(tmp_path: Path, email: str) -> None:
+    client, store, _ = _client(tmp_path)
+    response = _signup(client, email, welcome=True)
+    assert store.find_account(email) is None
+    assert response.status_code == 400
+    assert "buzones temporales" in response.text
+
+
+def test_inbox_basic_form_and_disposable_list() -> None:
+    from quant_trade.audit import inbox
+
+    assert inbox.basic_form("A.Na+x@GMAIL.com") == "ana@gmail.com"
+    assert inbox.basic_form("a.na+x@outlook.com") == "a.na@outlook.com"
+    assert inbox.welcome_key("ana@gmail.com") == inbox.welcome_key("a.n.a+1@googlemail.com")
+    assert inbox.welcome_key("ana@gmail.com") != inbox.welcome_key("ana@outlook.com")
+    assert "ana" not in inbox.welcome_key("ana@gmail.com")
+    assert inbox.is_disposable("x@sub.mailinator.com")
+    assert not inbox.is_disposable("x@gmail.com")
+    assert not inbox.is_disposable("x@notmailinator.com")

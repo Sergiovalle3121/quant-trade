@@ -55,6 +55,10 @@ COPY_PT: dict[str, str] = {
         "Suas compras com cartão e com código, com data"
     ),
     "email_bad": "Esse e-mail não parece válido.",
+    "email_disposable": (
+        "Esse e-mail é de um serviço de caixas temporárias. Use um e-mail que você mantenha: "
+        "a confirmação e a recuperação da conta chegam nele."
+    ),
     "password_short": f"A senha precisa de pelo menos {MIN_PASSWORD_CHARS} caracteres.",
     "password_long": "A senha é longa demais (no máximo 256 caracteres).",
     "password_bad": "A senha tem um caractere que não pode ser usado.",
@@ -121,6 +125,14 @@ COPY_PT: dict[str, str] = {
     "welcome_refused_device": (
         "Este navegador já usou um relatório completo grátis em outra conta, então desta vez é "
         "uma prévia: assim a oferta não se repete com contas novas."
+    ),
+    "welcome_refused_email": (
+        "Este e-mail já recebeu um relatório completo gratuito em outra conta, então desta vez "
+        "é uma prévia. O primeiro relatório gratuito é um por pessoa."
+    ),
+    "welcome_refused_unverified": (
+        "Confirme seu e-mail pelo link que enviamos e seu próximo arquivo receberá o primeiro "
+        "relatório completo gratuito. Até lá, isto é uma prévia."
     ),
     "welcome_refused_network": (
         "Esta rede já usou os relatórios completos grátis deste mês, então desta vez é uma "

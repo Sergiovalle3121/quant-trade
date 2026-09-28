@@ -148,7 +148,8 @@ class AuditSettings:
     #: Maximum credited invites across the service in one UTC calendar month.
     referral_global_monthly_cap: int = 100
     #: Migration switch: when enabled, new Checkout and referral rewards
-    #: require a confirmed email. Sign-up and the first free report still work.
+    #: require a confirmed email. Sign-up works; the free first report waits
+    #: for a confirmed address.
     email_verification_required: bool = False
     email_token_secret: str = field(default="", repr=False)
     smtp_host: str = ""

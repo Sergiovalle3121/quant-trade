@@ -43,6 +43,7 @@ from quant_trade.audit import (
     account_pages,
     forensics_web,
     funnel,
+    inbox,
     mapping,
     payments,
     track_seal_pages,
@@ -407,7 +408,7 @@ PDF_CACHE_SIZE = 16
 _SKIP_LINK = re.compile(r"<a class='skip' href='#main'>[^<]*</a>")
 #: Why an account's upload became a preview although its free full report is
 #: unused: the file or the browser already had one, or the network's month is full.
-WELCOME_REFUSALS = ("file", "device", "network")
+WELCOME_REFUSALS = ("file", "device", "network", "email", "unverified")
 STRATEGY_PDFS_PER_WINDOW = 10
 STRATEGY_PDF_WINDOW = timedelta(minutes=10)
 #: How many upload fields ``POST /audits`` takes.
@@ -1666,6 +1667,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     )
     account_errors = (
         "email_bad",
+        "email_disposable",
         "email_mismatch",
         "email_same",
         "email_taken",
@@ -1803,6 +1805,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 return again("too_many", 429)
             if not acct.valid_email(clean):
                 return again("email_bad", 400)
+            if inbox.is_disposable(clean):
+                return again("email_disposable", 400)
             problem = acct.password_problem(password, email=clean)
             if problem:
                 return again(problem, 400)
@@ -2838,6 +2842,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             clean = acct.normalise_email(email)
             if not acct.valid_email(clean):
                 return refused("email_bad")
+            if inbox.is_disposable(clean):
+                return refused("email_disposable")
             if clean != acct.normalise_email(email_again):
                 return refused("email_mismatch")
             if clean == account.email:
@@ -3613,6 +3619,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         #: Why this upload was not the account's free full report, when it
         #: could have been: told on the preview it becomes.
         welcome_refused = ""
+        account_email = ""
 
         def preview_or_credit(account_id: str) -> Response | None:
             """The first look at the monthly previews and the credits."""
@@ -3668,6 +3675,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                     )
                     keys = (
                         f"welcome:account:{account_id}",
+                        inbox.welcome_key(account_email),
                         f"welcome:device:{device_sha256}",
                         f"welcome:file:{fingerprint}",
                     )
@@ -3690,6 +3698,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             return None
 
         if gate_account is not None:
+            account_email = gate_account.email
             first_look = (
                 db.welcome_refusal(
                     gate_account.id,
@@ -3702,6 +3711,15 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 if acct.WELCOME_FULL_REPORT
                 else "off"
             )
+            if not first_look and db.free_claim_taken(inbox.welcome_key(account_email)):
+                # Another account on the same inbox (dots, +tags) had it.
+                first_look = "email"
+            if (
+                not first_look
+                and cfg.email_verification_required
+                and not db.email_verified(gate_account.id)
+            ):
+                first_look = "unverified"
             if not first_look:
                 welcome = True
             else:

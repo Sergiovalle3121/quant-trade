@@ -87,6 +87,10 @@ COPY: dict[str, dict[str, str]] = {
             "Tus compras con tarjeta o código, con fecha"
         ),
         "email_bad": "Ese correo no parece válido.",
+        "email_disposable": (
+            "Ese correo es de un servicio de buzones temporales. Usa un correo que conserves: "
+            "ahí te llegan la confirmación y la recuperación de tu cuenta."
+        ),
         "password_short": f"La contraseña necesita al menos {MIN_PASSWORD_CHARS} caracteres.",
         "password_long": "La contraseña es demasiado larga (máximo 256 caracteres).",
         "password_bad": "La contraseña tiene un carácter que no se puede usar.",
@@ -153,6 +157,14 @@ COPY: dict[str, dict[str, str]] = {
         "welcome_refused_device": (
             "Este navegador ya usó un informe completo gratis en otra cuenta, así que esta vez "
             "es una vista previa: así la oferta no se repite con cuentas nuevas."
+        ),
+        "welcome_refused_email": (
+            "Este correo ya recibió un informe completo gratis en otra cuenta, así que esta vez "
+            "es una vista previa. El primer informe gratis es uno por persona."
+        ),
+        "welcome_refused_unverified": (
+            "Confirma tu correo con el enlace que te enviamos y tu siguiente archivo recibirá "
+            "el primer informe completo gratis. Mientras tanto, esto es una vista previa."
         ),
         "welcome_refused_network": (
             "Esta red ya usó los informes completos gratis de este mes, así que esta vez es una "
@@ -694,6 +706,10 @@ COPY: dict[str, dict[str, str]] = {
             "Your card and code purchases, with dates"
         ),
         "email_bad": "That e-mail address does not look valid.",
+        "email_disposable": (
+            "That address belongs to a temporary-inbox service. Use an address you keep: "
+            "your account's confirmation and recovery go there."
+        ),
         "password_short": f"The password needs at least {MIN_PASSWORD_CHARS} characters.",
         "password_long": "The password is too long (256 characters at most).",
         "password_bad": "The password has a character that cannot be used.",
@@ -761,6 +777,14 @@ COPY: dict[str, dict[str, str]] = {
         "welcome_refused_device": (
             "This browser already used a free full report on another account, so this time it "
             "is a preview: that way the offer is not repeated with new accounts."
+        ),
+        "welcome_refused_email": (
+            "This e-mail already received a free full report on another account, so this time "
+            "it is a preview. The free first report is one per person."
+        ),
+        "welcome_refused_unverified": (
+            "Confirm your e-mail with the link we sent and your next file will get the free "
+            "first full report. Until then, this is a preview."
         ),
         "welcome_refused_network": (
             "This network already used this month's free full reports, so this time it is a "

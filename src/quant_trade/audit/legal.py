@@ -259,11 +259,12 @@ def _price_es(ctx: LegalContext) -> tuple[str, ...]:
         "La vista previa es gratuita. El informe completo cuesta "
         f"USD {ctx.price_usd:.2f} por auditoría."
     ]
-    if ctx.card_payments and ctx.email_verification_required:
+    if ctx.email_verification_required:
         lines.append(
-            "Para pagar con tarjeta debes confirmar el correo de tu cuenta. Tu primer informe "
-            "completo gratis sigue disponible antes de confirmarlo."
+            "Tu primer informe completo gratis llega cuando confirmas el correo de tu cuenta."
         )
+    if ctx.card_payments and ctx.email_verification_required:
+        lines.append("Para pagar con tarjeta debes confirmar el correo de tu cuenta.")
     if ctx.card_payments:
         lines.append(
             "El pago con tarjeta lo procesa Stripe en su propia página de pago. El cargo se "
@@ -315,11 +316,10 @@ def _price_en(ctx: LegalContext) -> tuple[str, ...]:
             "affected.",
         )
     lines = [f"The preview is free. The full report costs USD {ctx.price_usd:.2f} per audit."]
+    if ctx.email_verification_required:
+        lines.append("Your first free full report comes once you confirm your account e-mail.")
     if ctx.card_payments and ctx.email_verification_required:
-        lines.append(
-            "To pay by card, confirm your account e-mail. Your first free full report "
-            "remains available before confirmation."
-        )
+        lines.append("To pay by card, confirm your account e-mail.")
     if ctx.card_payments:
         lines.append(
             "Card payments are processed by Stripe on its own checkout page. The charge is in "
@@ -372,11 +372,12 @@ def _price_pt(ctx: LegalContext) -> tuple[str, ...]:
     lines = [
         f"A prévia é gratuita. O relatório completo custa USD {ctx.price_usd:.2f} por auditoria."
     ]
-    if ctx.card_payments and ctx.email_verification_required:
+    if ctx.email_verification_required:
         lines.append(
-            "Para pagar com cartão, confirme o e-mail da sua conta. Seu primeiro relatório "
-            "completo gratuito continua disponível antes da confirmação."
+            "Seu primeiro relatório completo gratuito chega quando você confirma o e-mail da conta."
         )
+    if ctx.card_payments and ctx.email_verification_required:
+        lines.append("Para pagar com cartão, confirme o e-mail da sua conta.")
     if ctx.card_payments:
         lines.append(
             "O pagamento com cartão é processado pelo Stripe na página de pagamento dele. "
@@ -983,10 +984,12 @@ def privacy_text(ctx: LegalContext, locale: str = "es") -> LegalText:
                     f"after {days} days.",
                     "For the free first full report: a random identifier of your browser "
                     f"(a cookie named {DEVICE_COOKIE}, stored by us only as a hash), the "
-                    "SHA-256 of the file and the network address, so the same browser or file "
-                    "gets it only once. The address is cleared after "
-                    f"{days} days; the two hashes stay, even if you delete your account and "
-                    "without your e-mail, so the offer cannot be repeated.",
+                    "SHA-256 of the file, a SHA-256 of your e-mail in its basic form (lower "
+                    "case, without anything after a '+' and, for Gmail, without dots) and the "
+                    "network address, so the same browser, file or inbox gets it only once. "
+                    f"The address is cleared after {days} days; the three hashes stay, even if "
+                    "you delete your account and without your e-mail in clear text, so the "
+                    "offer cannot be repeated.",
                     "For 'Invite a colleague': each account's invite link, and for an account "
                     "created through someone's link, the date, whether its free first report "
                     "happened and the hash of its browser identifier, to refuse self-invites. "
@@ -1147,10 +1150,11 @@ def privacy_text(ctx: LegalContext, locale: str = "es") -> LegalText:
                 "días.",
                 "Para el primer informe completo gratis: un identificador al azar de tu "
                 f"navegador (una cookie llamada {DEVICE_COOKIE}, que guardamos solo como hash), "
-                "el SHA-256 del archivo y la dirección de red, para que el mismo navegador o "
-                f"archivo lo reciba una sola vez. La dirección se borra a los {days} días; los "
-                "dos hashes se quedan, aunque borres tu cuenta y sin tu correo, para que la "
-                "oferta no se repita.",
+                "el SHA-256 del archivo, un SHA-256 de tu correo en su forma básica (en "
+                "minúsculas, sin lo que va tras un «+» y, en Gmail, sin puntos) y la dirección "
+                "de red, para que el mismo navegador, archivo o buzón lo reciba una sola vez. "
+                f"La dirección se borra a los {days} días; los tres hashes se quedan, aunque "
+                "borres tu cuenta y sin tu correo en claro, para que la oferta no se repita.",
                 "Para «Invita a un colega»: el enlace de invitación de cada cuenta y, para una "
                 "cuenta creada con el enlace de alguien, la fecha, si ya recibió su primer "
                 "informe gratis y el hash del identificador de su navegador, para rechazar "
@@ -1322,10 +1326,12 @@ def _privacy_pt(
                 f"endereço de rede. O endereço é eliminado com os demais dados após {days} dias.",
                 "Para o primeiro relatório completo gratuito: um identificador aleatório do "
                 f"navegador (cookie {DEVICE_COOKIE}, guardado por nós apenas como hash), "
-                "o SHA-256 do arquivo e o endereço de rede, para que o mesmo navegador ou "
-                f"arquivo o receba uma só vez. O endereço é eliminado após {days} dias; "
-                "os dois hashes permanecem, mesmo se você excluir a conta e sem o seu e-mail, "
-                "para que a oferta não se repita.",
+                "o SHA-256 do arquivo, um SHA-256 do seu e-mail na forma básica (em "
+                "minúsculas, sem o que vem após um '+' e, no Gmail, sem pontos) e o endereço "
+                "de rede, para que o mesmo navegador, arquivo ou caixa de entrada o receba uma "
+                f"só vez. O endereço é eliminado após {days} dias; os três hashes permanecem, "
+                "mesmo se você excluir a conta e sem o seu e-mail em texto claro, para que a "
+                "oferta não se repita.",
                 "Para 'Indique um colega': o link de indicação de cada conta e, para uma conta "
                 "criada por esse link, a data, se seu primeiro relatório gratuito foi concluído "
                 "e o hash do identificador do navegador, para impedir autoindicações. Quem "

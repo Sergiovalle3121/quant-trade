@@ -2087,7 +2087,7 @@ with an empty value):
 | `AUDIT_ACCESS_CODES` | `false` | Offer manual access-code sales and typed-code redemption. With `AUDIT_FREE_MODE=false` it turns on paid mode without Stripe. Credits already on an account remain spendable when this is `false`. |
 | `AUDIT_REFERRAL_REWARDS` | `true` | Set `false` to stop new invite rewards and hide the reward promise during an incident. Previously granted credits remain usable. |
 | `AUDIT_REFERRAL_GLOBAL_MONTHLY_CAP` | `100` | Maximum rewarded invites across the whole service per UTC month, reserved transactionally in `referral_global_slots`. At one credit per invite this caps the new monthly credit obligation. `0` stops new rewards. |
-| `AUDIT_EMAIL_VERIFICATION_REQUIRED` | `false` | Migration default. When `true`, both addresses must be confirmed before an invite reward and a buyer's address before a new Checkout. Sign-up and the first free report still work. **Public paid launch requires `true` and SMTP verified end to end.** |
+| `AUDIT_EMAIL_VERIFICATION_REQUIRED` | `false` | Migration default. When `true`, both addresses must be confirmed before an invite reward and a buyer's address before a new Checkout. Sign-up still works; the free first full report waits until the address is confirmed (earlier uploads are previews with reason `unverified`). **Public paid launch requires `true` and SMTP verified end to end.** |
 | `AUDIT_EMAIL_TOKEN_SECRET`, `AUDIT_SMTP_HOST`, `AUDIT_SMTP_PORT`, `AUDIT_SMTP_USERNAME`, `AUDIT_SMTP_PASSWORD`, `AUDIT_SMTP_FROM`, `AUDIT_SMTP_SECURITY` | empty / `587` / `starttls` | Stable secret of at least 32 characters shared by replicas and encrypted SMTP transport. `/ready` fails when verification is required but delivery is not configured. Test real delivery, retries and legacy account confirmation before launch. No usable token or link is stored in the outbox. |
 | `AUDIT_RESEND_API_KEY`, `AUDIT_EMAIL_FROM` | empty | Resend's HTTPS API, used instead of SMTP when the key (`re_…`) is set. Railway disables outbound SMTP below the Pro plan, so this is the transport that works there. `AUDIT_EMAIL_FROM` (alias of `AUDIT_SMTP_FROM`) must be an address on a domain verified in Resend; until a domain is verified Resend only delivers to the Resend account owner. When `AUDIT_EMAIL_TOKEN_SECRET` is empty, the token secret is derived from the Resend key (HMAC-SHA256), so rotating the key voids only links still pending (24 h at most). The Message-ID is sent as Resend's `Idempotency-Key`, so a retry after a lost reply is not delivered twice. The privacy page names Resend and links its policy while it carries the mail. |
 | `AUDIT_CONTACT_URL` | empty | Where a client asks for a code (for example a `https://wa.me/…` link or a `mailto:`). Only `https://` and `mailto:` are shown. |
@@ -2423,6 +2423,17 @@ changes what a report says.
   free report is unused but an upload becomes a preview for one of these
   reasons (browser, network), the preview says why
   (`account_pages.COPY["welcome_refused_*"]`).
+  One per inbox (`audit/inbox.py`): the free report also takes the claim
+  `welcome:inbox:<SHA-256 of the basic form>`, where the basic form is
+  lower case, without a `+tag` and, for Gmail/Googlemail, without dots.
+  Another account on the same inbox gets a preview with reason `email`.
+  The claim stays after the account is deleted (hash only). While
+  `AUDIT_EMAIL_VERIFICATION_REQUIRED=true`, an account with an unconfirmed
+  address gets a preview with reason `unverified` and keeps its free
+  report for after confirming. Sign-up and e-mail change refuse addresses
+  on a short list of well-known temporary-inbox services
+  (`inbox.DISPOSABLE_DOMAINS`, exact or parent domain; error
+  `email_disposable`); the list is not exhaustive.
 - **Networks** (`accounts.network_address`): every free-tier limit that
   counts an address (free reports and previews per network, and their claim
   keys) counts an IPv6 address as its /64, since
