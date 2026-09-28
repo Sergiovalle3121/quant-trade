@@ -2935,6 +2935,11 @@ Stripe refund is only recorded; after refunding a credit order by hand, disable
 its code (`quant-trade audit codes disable <id>`, or «Desactivar» in `/panel`) so
 its unused credits go too.
 
+An open Checkout session is reused only in the language it was opened in
+(the reuse slot is plan plus language), so a buyer who switches to English or
+Portuguese gets Stripe's page and product name in that language
+(`tests/test_audit_account_credit_purchase.py::test_switching_language_opens_a_checkout_in_that_language`).
+
 `/terminos` (`/terms`) and `/privacidad` (`/privacy`) are rendered by
 `audit/legal.py` from the running configuration: the price, whether card
 payments (Stripe) or access codes are on, the retention window and the
