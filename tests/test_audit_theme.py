@@ -1164,8 +1164,10 @@ def test_phone_walk_fixes_scroll_cue_evidence_cards_and_firm_titles() -> None:
     assert "animation-timeline:scroll(self inline)" in phone
     assert "100%{-webkit-mask-image:none;mask-image:none}" in phone
     assert ".paper table:not(.ev):not(.firms)" in phone
-    # Evidence cards: the value sits beside the name, the tag goes underneath.
-    assert ".metrics.ev td:nth-child(3){grid-area:2/1;justify-self:start}" in phone
+    # Evidence cards: the value sits beside the name, its tag right under the
+    # value and the note beside the tag, so a row with a note spends no line on it.
+    assert ".metrics.ev td:nth-child(3){grid-area:2/2;justify-self:end;align-self:start}" in phone
+    assert ".metrics.ev td:nth-child(4){grid-area:2/1}" in phone
     # Prop-firm cards read their challenge name as the card's title.
     assert ".firms td:first-child small{display:block" in phone
 
