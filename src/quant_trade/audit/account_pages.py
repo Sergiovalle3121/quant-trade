@@ -87,6 +87,10 @@ COPY: dict[str, dict[str, str]] = {
             "Tus compras con tarjeta o código, con fecha"
         ),
         "email_bad": "Ese correo no parece válido.",
+        "email_disposable": (
+            "Ese correo es de un servicio de buzones temporales. Usa un correo que conserves: "
+            "ahí te llegan la confirmación y la recuperación de tu cuenta."
+        ),
         "password_short": f"La contraseña necesita al menos {MIN_PASSWORD_CHARS} caracteres.",
         "password_long": "La contraseña es demasiado larga (máximo 256 caracteres).",
         "password_bad": "La contraseña tiene un carácter que no se puede usar.",
@@ -154,6 +158,14 @@ COPY: dict[str, dict[str, str]] = {
             "Este navegador ya usó un informe completo gratis en otra cuenta, así que esta vez "
             "es una vista previa: así la oferta no se repite con cuentas nuevas."
         ),
+        "welcome_refused_email": (
+            "Este correo ya recibió un informe completo gratis en otra cuenta, así que esta vez "
+            "es una vista previa. El primer informe gratis es uno por persona."
+        ),
+        "welcome_refused_unverified": (
+            "Confirma tu correo con el enlace que te enviamos y tu siguiente archivo recibirá "
+            "el primer informe completo gratis. Mientras tanto, esto es una vista previa."
+        ),
         "welcome_refused_network": (
             "Esta red ya usó los informes completos gratis de este mes, así que esta vez es una "
             "vista previa. Tu informe gratis sigue disponible desde otra red o el mes próximo."
@@ -190,6 +202,11 @@ COPY: dict[str, dict[str, str]] = {
         "purchases_none": "Aún no hay compras en tu cuenta.",
         "col_report": "Informe",
         "stores_title": "Qué guardamos y cómo borrarlo",
+        "stores_short": (
+            "Tu correo y una huella de tu contraseña, nunca la contraseña. Tus datos no se "
+            "venden y puedes borrar tu cuenta cuando quieras."
+        ),
+        "stores_more": "Todo lo que guardamos",
         "stores": (
             "Tu correo y una huella de tu contraseña (scrypt): nunca la contraseña en sí.|"
             "Tus informes y los archivos que subes. De los que no se pagan borramos archivos e "
@@ -261,9 +278,9 @@ COPY: dict[str, dict[str, str]] = {
         "export_button": "Descargar mis datos (JSON)",
         "invite_title": "Invita a un colega",
         "invite_help": (
-            "Comparte tu enlace personal. Cuando alguien crea su cuenta con él y recibe su "
-            "primer informe gratis, tú recibes {credits} {unit} para un informe completo, "
-            "hasta {cap} al mes."
+            "Comparte tu enlace personal. Cuando alguien crea su cuenta con él, recibe su "
+            "primer informe gratis y los dos han confirmado su correo, tú recibes {credits} "
+            "{unit} para un informe completo, hasta {cap} al mes."
         ),
         "invite_unit_one": "crédito",
         "invite_unit_many": "créditos",
@@ -374,8 +391,9 @@ COPY: dict[str, dict[str, str]] = {
             "enlace para cambiar la contraseña."
         ),
         "forgot_lead": (
-            "Todavía no enviamos correos. Escríbenos desde el correo de tu cuenta y te "
-            "mandamos un enlace de un solo uso para poner una contraseña nueva."
+            "El enlace automático por correo aún no está activo. Escríbenos: comprobamos que el "
+            "correo de la cuenta es tuyo y te mandamos un enlace de un solo uso para poner una "
+            "contraseña nueva."
         ),
         "forgot_contact": "Escribir por WhatsApp",
         "forgot_message": f"Hola, olvidé la contraseña de mi cuenta de {BRAND}. Mi correo es: ",
@@ -694,6 +712,10 @@ COPY: dict[str, dict[str, str]] = {
             "Your card and code purchases, with dates"
         ),
         "email_bad": "That e-mail address does not look valid.",
+        "email_disposable": (
+            "That address belongs to a temporary-inbox service. Use an address you keep: "
+            "your account's confirmation and recovery go there."
+        ),
         "password_short": f"The password needs at least {MIN_PASSWORD_CHARS} characters.",
         "password_long": "The password is too long (256 characters at most).",
         "password_bad": "The password has a character that cannot be used.",
@@ -762,6 +784,14 @@ COPY: dict[str, dict[str, str]] = {
             "This browser already used a free full report on another account, so this time it "
             "is a preview: that way the offer is not repeated with new accounts."
         ),
+        "welcome_refused_email": (
+            "This e-mail already received a free full report on another account, so this time "
+            "it is a preview. The free first report is one per person."
+        ),
+        "welcome_refused_unverified": (
+            "Confirm your e-mail with the link we sent and your next file will get the free "
+            "first full report. Until then, this is a preview."
+        ),
         "welcome_refused_network": (
             "This network already used this month's free full reports, so this time it is a "
             "preview. Your free report is still available from another network or next month."
@@ -798,6 +828,11 @@ COPY: dict[str, dict[str, str]] = {
         "purchases_none": "No purchases on your account yet.",
         "col_report": "Report",
         "stores_title": "What we keep and how to delete it",
+        "stores_short": (
+            "Your e-mail and a fingerprint of your password, never the password. Your data is "
+            "not sold and you can delete your account whenever you want."
+        ),
+        "stores_more": "Everything we keep",
         "stores": (
             "Your e-mail and a fingerprint of your password (scrypt): never the password itself.|"
             "Your reports and the files you upload. For unpaid ones we delete the files and the "
@@ -867,9 +902,9 @@ COPY: dict[str, dict[str, str]] = {
         "export_button": "Download my data (JSON)",
         "invite_title": "Invite a colleague",
         "invite_help": (
-            "Share your personal link. When someone creates their account with it and gets "
-            "their free first report, you get {credits} {unit} for a full report, up to {cap} "
-            "a month."
+            "Share your personal link. When someone creates their account with it, gets their "
+            "free first report and you have both confirmed your e-mail, you get {credits} "
+            "{unit} for a full report, up to {cap} a month."
         ),
         "invite_unit_one": "credit",
         "invite_unit_many": "credits",
@@ -978,8 +1013,8 @@ COPY: dict[str, dict[str, str]] = {
             "reset link will arrive."
         ),
         "forgot_lead": (
-            "We do not send e-mails yet. Write to us from your account's e-mail and we send "
-            "you a one-time link to set a new password."
+            "The automatic e-mail link is not active yet. Write to us: we check that the "
+            "account's e-mail is yours and send you a one-time link to set a new password."
         ),
         "forgot_contact": "Write on WhatsApp",
         "forgot_message": f"Hi, I forgot the password of my {BRAND} account. My e-mail is: ",
@@ -1256,6 +1291,8 @@ COPY: dict[str, dict[str, str]] = {
 }
 COPY["pt"] = COPY_PT
 PATHS["pt"] = PATHS_PT
+#: Addresses people type by analogy with another language's sign-up path.
+SIGNUP_ALIASES: dict[str, tuple[str, ...]] = {"pt": ("/pt/registro", "/pt/signup")}
 #: The languages every account screen exists in.
 LANGUAGES = ("es", "en", "pt")
 
@@ -1292,6 +1329,13 @@ text-overflow:ellipsis}
 .acct-list li{display:flex;gap:10px;align-items:flex-start}
 .acct-list svg{width:18px;height:18px;flex:none;margin-top:3px;color:var(--ok)}
 .acct-alt{margin-top:18px;font-size:.92rem}
+.acct-tabs{display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:4px;margin:0 0 22px;
+border-radius:12px;background:var(--surface-2);box-shadow:0 0 0 1px var(--border) inset}
+.acct-tabs a{display:flex;align-items:center;justify-content:center;min-height:42px;
+border-radius:9px;font-weight:600;color:var(--muted);text-decoration:none}
+.acct-tabs a[aria-current=page]{background:#fff;color:var(--text);
+box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.acct-alt-btn{width:100%;justify-content:center;margin-top:8px}
 .acct-terms a{color:var(--text);text-underline-offset:3px}
 .acct-head{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;
 margin-bottom:8px}
@@ -1475,6 +1519,17 @@ def _benefits(copy: dict[str, str]) -> str:
     return f"<div class='acct-card acct-perks'><ul class='acct-list'>{items}</ul></div>"
 
 
+def _stores_short(copy: dict[str, str], locale: str) -> str:
+    """One line under the sign-up form; the full list lives in the privacy policy."""
+    from quant_trade.audit.legal import legal_url
+
+    return (
+        f"<div class='acct-card acct-stores'><h3>{icon('shield')}{_e(copy['stores_title'])}</h3>"
+        f"<p class='muted'>{_e(copy['stores_short'])}</p>"
+        f"<p><a href='{_e(legal_url('privacy', locale))}'>{_e(copy['stores_more'])}</a></p></div>"
+    )
+
+
 def _stores(copy: dict[str, str], retention_days: int) -> str:
     """What the account keeps and how to delete it, in plain words."""
     items = "".join(
@@ -1508,6 +1563,19 @@ def _switch(kind: str, locale: str, next_path: str = "") -> dict[str, str]:
     return {lang: path(kind, lang) + query for lang in LANGUAGES}
 
 
+def _tabs(active: str, locale: str, next_path: str = "") -> str:
+    """Sign in and create account side by side, so neither is ever hidden."""
+    copy = COPY[locale]
+    query = f"?next={_e(_q(next_path))}" if next_path else ""
+    links = "".join(
+        f"<a href='{_e(path(kind, locale) + query)}'"
+        + (" aria-current='page'" if kind == active else "")
+        + f">{_e(copy[label])}</a>"
+        for kind, label in (("signin", "signin_button"), ("signup", "signup_button"))
+    )
+    return f"<nav class='acct-tabs' aria-label='{_e(copy['eyebrow'])}'>{links}</nav>"
+
+
 def signup_page(
     *,
     locale: str,
@@ -1524,7 +1592,8 @@ def signup_page(
 
     signin = path("signin", locale) + (f"?next={_e(_q(next_path))}" if next_path else "")
     form = (
-        (f"<div class='flash' role='status'>{_e(copy['invited_banner'])}</div>" if invite else "")
+        _tabs("signup", locale, next_path)
+        + (f"<div class='flash' role='status'>{_e(copy['invited_banner'])}</div>" if invite else "")
         + _alert(copy, error)
         + f"<form method='post' action='{path('signup', locale)}'>"
         + _hidden("csrf", csrf)
@@ -1549,7 +1618,7 @@ def signup_page(
     )
     body = (
         f"<div class='acct-grid'><div class='acct-form'>{form}</div>"
-        f"<div class='acct-side'>{_benefits(copy)}{_stores(copy, retention_days)}</div></div>"
+        f"<div class='acct-side'>{_benefits(copy)}{_stores_short(copy, locale)}</div></div>"
     )
     return _shell(
         locale,
@@ -1574,7 +1643,8 @@ def signin_page(
     copy = COPY[locale]
     signup = path("signup", locale) + (f"?next={_e(_q(next_path))}" if next_path else "")
     form = (
-        _alert(copy, error, flash)
+        _tabs("signin", locale, next_path)
+        + _alert(copy, error, flash)
         + f"<form method='post' action='{path('signin', locale)}'>"
         + _hidden("csrf", csrf)
         + _hidden("next", next_path)
@@ -1594,8 +1664,9 @@ def signin_page(
             else ""
         )
         + f"<p class='acct-alt'><a href='{path('forgot', locale)}'>{_e(copy['forgot_link'])}"
-        "</a></p>" + f"<p class='acct-alt'>{_e(copy['no_account'])} "
-        f"<a href='{_e(signup)}'>{_e(copy['signup_link'])}</a></p>"
+        "</a></p>" + f"<p class='acct-alt'>{_e(copy['no_account'])}</p>"
+        f"<a class='btn btn-ghost btn-lg acct-alt-btn' href='{_e(signup)}'>"
+        f"{_e(copy['signup_link'])}</a>"
     )
     body = f"<div class='acct-grid'><div class='acct-form'>{form}</div>{_benefits(copy)}</div>"
     return _shell(
@@ -1621,7 +1692,7 @@ def forgot_page(
     locale = _locale(locale)
     copy = COPY[locale]
     button = ""
-    if contact_url:
+    if contact_url and not email_delivery_ready:
         from quant_trade.audit.report import _prefilled
 
         href = _prefilled(contact_url, copy["forgot_message"])
@@ -1671,15 +1742,19 @@ def forgot_page(
             + f"<button class='btn btn-primary btn-lg' type='submit'>"
             f"{_e(copy['recover_button'])}</button></form>"
         )
-    help_key = "forgot_email_lead" if email_delivery_ready else "forgot_lead"
+    # With mail on, the e-mail link is the way back: no chat detour.
+    none = (
+        ""
+        if email_delivery_ready
+        else f"<h2>{_e(copy['recover_none_title'])}</h2>"
+        f"<p class='muted'>{_e(copy['forgot_lead'])}</p>" + button
+    )
     body = (
         "<div class='wrap-narrow'>"
         + _alert(copy, error, flash)
         + email_request
         + recover
-        + f"<h2>{_e(copy['recover_none_title'])}</h2>"
-        f"<p class='muted'>{_e(copy[help_key])}</p>"
-        + button
+        + none
         + f"<p class='acct-alt'><a href='{path('signin', locale)}'>{_e(copy['signin_link'])}</a>"
         "</p></div>"
     )

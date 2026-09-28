@@ -55,6 +55,10 @@ COPY_PT: dict[str, str] = {
         "Suas compras com cartão e com código, com data"
     ),
     "email_bad": "Esse e-mail não parece válido.",
+    "email_disposable": (
+        "Esse e-mail é de um serviço de caixas temporárias. Use um e-mail que você mantenha: "
+        "a confirmação e a recuperação da conta chegam nele."
+    ),
     "password_short": f"A senha precisa de pelo menos {MIN_PASSWORD_CHARS} caracteres.",
     "password_long": "A senha é longa demais (no máximo 256 caracteres).",
     "password_bad": "A senha tem um caractere que não pode ser usado.",
@@ -122,6 +126,14 @@ COPY_PT: dict[str, str] = {
         "Este navegador já usou um relatório completo grátis em outra conta, então desta vez é "
         "uma prévia: assim a oferta não se repete com contas novas."
     ),
+    "welcome_refused_email": (
+        "Este e-mail já recebeu um relatório completo gratuito em outra conta, então desta vez "
+        "é uma prévia. O primeiro relatório gratuito é um por pessoa."
+    ),
+    "welcome_refused_unverified": (
+        "Confirme seu e-mail pelo link que enviamos e seu próximo arquivo receberá o primeiro "
+        "relatório completo gratuito. Até lá, isto é uma prévia."
+    ),
     "welcome_refused_network": (
         "Esta rede já usou os relatórios completos grátis deste mês, então desta vez é uma "
         "prévia. Seu relatório grátis continua disponível de outra rede ou no mês que vem."
@@ -157,6 +169,11 @@ COPY_PT: dict[str, str] = {
     "purchases_title": "Suas compras",
     "purchases_none": "Ainda não há compras na sua conta.",
     "col_report": "Relatório",
+    "stores_short": (
+        "Seu e-mail e uma impressão da sua senha, nunca a senha. Seus dados não são vendidos "
+        "e você pode excluir a conta quando quiser."
+    ),
+    "stores_more": "Tudo o que guardamos",
     "stores_title": "O que guardamos e como apagar",
     "stores": (
         "Seu e-mail e uma impressão digital da sua senha (scrypt): nunca a senha em si.|"
@@ -227,9 +244,9 @@ COPY_PT: dict[str, str] = {
     "export_button": "Baixar meus dados (JSON)",
     "invite_title": "Convide um colega",
     "invite_help": (
-        "Compartilhe seu link pessoal. Quando alguém cria a conta com ele e recebe o primeiro "
-        "relatório grátis, você recebe {credits} {unit} para um relatório completo, até {cap} "
-        "por mês."
+        "Compartilhe seu link pessoal. Quando alguém cria a conta com ele, recebe o primeiro "
+        "relatório grátis e os dois confirmaram o e-mail, você recebe {credits} {unit} para "
+        "um relatório completo, até {cap} por mês."
     ),
     "invite_unit_one": "crédito",
     "invite_unit_many": "créditos",
@@ -339,8 +356,8 @@ COPY_PT: dict[str, str] = {
         "um link para trocar a senha."
     ),
     "forgot_lead": (
-        "Ainda não enviamos e-mails. Escreva para nós a partir do e-mail da sua conta e "
-        "enviamos um link de uso único para criar uma nova senha."
+        "O link automático por e-mail ainda não está ativo. Escreva para nós: confirmamos "
+        "que o e-mail da conta é seu e enviamos um link de uso único para criar uma nova senha."
     ),
     "forgot_contact": "Escrever pelo WhatsApp",
     "forgot_message": f"Olá, esqueci a senha da minha conta {BRAND}. Meu e-mail é: ",
