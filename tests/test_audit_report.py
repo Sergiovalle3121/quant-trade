@@ -5,7 +5,14 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 import pytest
-from audit_fixtures import best_of_n_walks, csv_bytes, positive_drift, spiked, trades_frame
+from audit_fixtures import (
+    best_of_n_walks,
+    csv_bytes,
+    positive_drift,
+    spiked,
+    trades_frame,
+    variants_bytes,
+)
 
 from quant_trade.audit.engine import run_audit
 from quant_trade.audit.guard import AuditReportError, find_claims
@@ -41,6 +48,29 @@ def test_html_carries_disclaimer_hashes_and_watermark_toggle() -> None:
     assert result_sha256(result) in preview
     assert "abc123" in preview
     assert "class='lockbox'" not in preview  # free mode locks nothing
+
+
+def test_legacy_measured_cscv_without_effective_count_still_renders() -> None:
+    winner, matrix = best_of_n_walks(trials=4, n=64)
+    inputs = build_inputs(
+        csv_bytes(winner),
+        DeclaredMetadata(trials=4),
+        variants_bytes=variants_bytes(matrix),
+    )
+    result = run_audit(
+        inputs,
+        now=NOW,
+        audit_id="legacy-cscv",
+        bootstrap_samples=50,
+        risk_samples=50,
+        challenge_samples=50,
+    )
+    assert result.cscv["status"] == "MEASURED"
+    old_cscv = {key: value for key, value in result.cscv.items() if key != "effective_variants"}
+    old_result = result.model_copy(update={"cscv": old_cscv})
+    page = render_html(old_result, watermark=False)
+    assert "parameter_variants=4" in page
+    assert "effective_variants=" not in page
 
 
 def test_paid_mode_locks_detail_until_paid() -> None:

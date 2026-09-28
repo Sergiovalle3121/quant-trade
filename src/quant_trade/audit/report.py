@@ -7662,6 +7662,7 @@ def render_html(
                         "effective_variants",
                         "observations_used",
                     )
+                    if k in data["cscv"]
                 )
             )
             + "</p>"
