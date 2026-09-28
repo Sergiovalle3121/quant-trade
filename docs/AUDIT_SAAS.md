@@ -749,6 +749,12 @@ Three details a buyer reading a real MetaTrader report asked about:
   Sharpe (sample standard deviation, the audit's periods per year). The
   platform's own Sharpe is shown apart, as DECLARED, and can differ (MT5
   computes it another way).
+- Year by year: each calendar year starts from the previous year's last
+  value, so the yearly returns compound to the total. A first year that
+  holds only the starting point (a fund record's opening value dated
+  31 December, or a curve that starts on a year's last day) has no return
+  in it and is left out of the table (`engine._subperiods`); before, it
+  showed as a year of 0.0 %.
 - Drawdown with open trades: a report rebuilt from closed trades cannot see
   open losses. When the file prints the platform's equity drawdown (MT5
   "Equity Drawdown Maximal/Relative", in any language the importer reads),
