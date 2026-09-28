@@ -99,6 +99,81 @@ def _confirm(client: TestClient, link: str) -> None:
     )
 
 
+@pytest.mark.parametrize("kind", ["verify", "reset", "change"])
+def test_email_change_cancels_queued_challenges_to_old_addresses(tmp_path: Path, kind: str) -> None:
+    cfg = _settings(tmp_path)
+    store = make_store(cfg.database_url)
+    now = datetime(2026, 9, 27, tzinfo=UTC)
+    account = store.create_account(
+        email="old@example.com", password_hash="unused", locale="en", at=now
+    )
+    assert account is not None
+    if kind in ("reset", "change"):
+        with store.engine.begin() as conn:
+            conn.execute(
+                store.verified_emails.insert().values(
+                    account_id=account.id, email=account.email, verified_at=now.isoformat()
+                )
+            )
+    if kind == "verify":
+        challenge_id = store.request_email_verification(account.id, at=now)
+    elif kind == "reset":
+        challenge_id = store.request_email_reset(account.email, locale="en", at=now)
+    else:
+        assert (
+            store.request_email_change(account.id, "pending@example.com", locale="en", at=now)
+            == "pending"
+        )
+        with store.engine.connect() as conn:
+            challenge_id = conn.execute(
+                store._sa.select(store.email_outbox.c.id).where(
+                    store.email_outbox.c.kind == "change"
+                )
+            ).scalar_one()
+    assert challenge_id
+    assert store.set_email(account.id, "current@example.com")
+    sent = []
+    assert mail.deliver_pending(store, cfg, sender=lambda msg, _: sent.append(msg), now=now) == 0
+    assert sent == []
+    with store.engine.connect() as conn:
+        row = (
+            conn.execute(store.email_outbox.select().where(store.email_outbox.c.id == challenge_id))
+            .mappings()
+            .one()
+        )
+    assert row["status"] == "dead" and row["used_at"] is not None
+
+
+def test_reset_challenge_is_rechecked_after_its_delivery_lease(tmp_path: Path) -> None:
+    cfg = _settings(tmp_path)
+    store = make_store(cfg.database_url)
+    now = datetime(2026, 9, 27, tzinfo=UTC)
+    account = store.create_account(
+        email="old@example.com", password_hash="unused", locale="en", at=now
+    )
+    assert account is not None
+    with store.engine.begin() as conn:
+        conn.execute(
+            store.verified_emails.insert().values(
+                account_id=account.id, email=account.email, verified_at=now.isoformat()
+            )
+        )
+    assert store.request_email_reset(account.email, locale="en", at=now)
+    claimed = store.claim_email_delivery(now)
+    assert claimed is not None and claimed["kind"] == "reset"
+    assert store.set_email(account.id, "current@example.com")
+    assert store.prepare_email_delivery(claimed, at=now) is None
+    with store.engine.connect() as conn:
+        row = (
+            conn.execute(
+                store.email_outbox.select().where(store.email_outbox.c.id == claimed["id"])
+            )
+            .mappings()
+            .one()
+        )
+    assert row["status"] == "dead" and row["used_at"] is not None
+
+
 def test_signup_outbox_survives_restart_and_checkout_waits_for_post(tmp_path: Path) -> None:
     cfg = _settings(tmp_path)
     assert cfg.email_delivery_ready

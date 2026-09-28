@@ -253,7 +253,10 @@ def deliver_pending(
             break
         challenge_id = str(row["id"])
         try:
-            sender(compose(row, settings, store), settings)
+            prepared = store.prepare_email_delivery(row, at=current)
+            if prepared is None:
+                continue
+            sender(compose(prepared, settings, store), settings)
         except Exception:  # noqa: BLE001 - an SMTP failure must not lose the queue
             logger.warning("email delivery failed for outbox id %s", challenge_id)
             store.retry_email_delivery(challenge_id, at=current)
