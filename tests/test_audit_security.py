@@ -531,3 +531,11 @@ def test_the_privacy_page_says_what_the_logs_keep(tmp_path: Path) -> None:
     english = client.get("/privacy").text
     assert "dirección acortada" in spanish and "plazo de conservación" in spanish
     assert "shortened address" in english and "retention period" in english
+
+
+def test_redaction_reaches_a_token_inside_an_encoded_next() -> None:
+    line = "GET /entrar?next=%2Faudits%2Fabc%3Flang%3Des%26token%3DSECRET_T%26x%3D1 HTTP/1.1"
+    out = redact_secrets(line)
+    assert "SECRET_T" not in out
+    assert "%26token%3D[redacted]%26x%3D1" in out
+    assert "SECRET_C" not in redact_secrets("/entrar?next=%2Fa%3Fcode%3DSECRET_C")

@@ -43,6 +43,7 @@ from quant_trade.audit import (
     account_pages,
     forensics_web,
     funnel,
+    inbox,
     mapping,
     payments,
     track_seal_pages,
@@ -407,7 +408,7 @@ PDF_CACHE_SIZE = 16
 _SKIP_LINK = re.compile(r"<a class='skip' href='#main'>[^<]*</a>")
 #: Why an account's upload became a preview although its free full report is
 #: unused: the file or the browser already had one, or the network's month is full.
-WELCOME_REFUSALS = ("file", "device", "network")
+WELCOME_REFUSALS = ("file", "device", "network", "email", "unverified")
 STRATEGY_PDFS_PER_WINDOW = 10
 STRATEGY_PDF_WINDOW = timedelta(minutes=10)
 #: How many upload fields ``POST /audits`` takes.
@@ -422,8 +423,12 @@ OPTIMIZATION_PASS_BYTES = 900
 REPORT_SIZE_FACTOR = 2
 
 _HOST = re.compile(r"^[A-Za-z0-9.-]{1,253}(:[0-9]{1,5})?$")
+#: Railway's own addresses; a read there moves to ``AUDIT_BASE_URL`` once it differs.
+RAILWAY_HOST_SUFFIX = ".up.railway.app"
 #: Query values that are secrets: the owner token and an access code.
 _SECRET_QUERY = re.compile(r"((?:^|[?&])(?:token|code)=)[^&\s\"]*", re.IGNORECASE)
+#: The same inside a URL-encoded ``next`` (``%3Ftoken%3D…``, ``%26code%3D…``).
+_SECRET_QUERY_ENCODED = re.compile(r"((?:%3F|%26)(?:token|code)%3D)[^&\s\"%]*", re.IGNORECASE)
 
 #: The file names as the error sentences use them.
 UPLOAD_NAMES: dict[str, dict[str, str]] = {
@@ -465,7 +470,8 @@ def message(key: str, locale: str, **values: Any) -> str:
 def redact_secrets(text: str) -> str:
     """``text`` with the value of every ``token=`` and ``code=`` query parameter
     replaced, so an access log line never carries an owner token."""
-    return _SECRET_QUERY.sub(r"\1[redacted]", text)
+    text = _SECRET_QUERY.sub(r"\1[redacted]", text)
+    return _SECRET_QUERY_ENCODED.sub(r"\1[redacted]", text)
 
 
 def shorten_client_address(address: str) -> str:
@@ -1165,6 +1171,29 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             locale = request.query_params["lang"]
         visits.add(day=today, locale=locale, ref=kept or arrived)
 
+    canonical_host = urlsplit(cfg.base_url).netloc.lower()
+
+    @app.middleware("http")
+    async def old_address(request: Request, call_next: Any) -> Any:
+        """Send a visit to Railway's own address on to the site's domain.
+
+        Only reads (GET, HEAD) move: a card-payment webhook or a form post to
+        the old address keeps working. Health checks stay where Railway
+        looks for them.
+        """
+        host = request.headers.get("host", "").lower().split(":", 1)[0]
+        if (
+            cfg.base_url.startswith("https://")
+            and host.endswith(RAILWAY_HOST_SUFFIX)
+            and host != canonical_host
+            and request.method in ("GET", "HEAD")
+            and request.url.path not in ("/health", "/ready")
+        ):
+            query = request.url.query
+            target = cfg.base_url + request.url.path + (f"?{query}" if query else "")
+            return _secure(RedirectResponse(target, status_code=308), path=request.url.path)
+        return await call_next(request)
+
     @app.middleware("http")
     async def no_store(request: Request, call_next: Any) -> Any:
         response = await call_next(request)
@@ -1641,6 +1670,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     )
     account_errors = (
         "email_bad",
+        "email_disposable",
         "email_mismatch",
         "email_same",
         "email_taken",
@@ -1694,15 +1724,16 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         if not _referrals_on():
             return
         try:
-            if cfg.email_verification_required:
-                ready = any(
-                    invitee_id == account_id
-                    and db.email_verified(invitee_id)
-                    and db.email_verified(inviter_id)
-                    for invitee_id, inviter_id, _ in db.email_referral_candidates(account_id)
-                )
-                if not ready:
-                    return
+            # Both addresses confirmed, always: an unconfirmed sign-up is not
+            # a colleague, and with no mail service no invite is credited.
+            ready = any(
+                invitee_id == account_id
+                and db.email_verified(invitee_id)
+                and db.email_verified(inviter_id)
+                for invitee_id, inviter_id, _ in db.email_referral_candidates(account_id)
+            )
+            if not ready:
+                return
             db.reward_referral(
                 account_id,
                 device_sha256=device_sha256,
@@ -1716,11 +1747,18 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             logger.warning("could not settle an invite")
 
     def _settle_confirmed_invites(account_id: str, now: datetime) -> None:
-        if not _referrals_on() or not cfg.email_verification_required:
+        if not _referrals_on():
             return
         for invitee_id, inviter_id, device in db.email_referral_candidates(account_id):
             if db.email_verified(invitee_id) and db.email_verified(inviter_id):
                 _reward_invite(invitee_id, device, "", now)
+
+    def _alias_to(target: str) -> Callable[..., Response]:
+        def handler(request: Request) -> Response:
+            query = request.url.query
+            return RedirectResponse(target + (f"?{query}" if query else ""), status_code=308)
+
+        return handler
 
     def _signup_get(path_locale: str) -> Callable[..., Response]:
         def handler(
@@ -1778,6 +1816,10 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 return again("too_many", 429)
             if not acct.valid_email(clean):
                 return again("email_bad", 400)
+            if cfg.refuse_reserved_emails and inbox.is_reserved(clean):
+                return again("email_bad", 400)
+            if inbox.is_disposable(clean):
+                return again("email_disposable", 400)
             problem = acct.password_problem(password, email=clean)
             if problem:
                 return again(problem, 400)
@@ -2813,6 +2855,10 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             clean = acct.normalise_email(email)
             if not acct.valid_email(clean):
                 return refused("email_bad")
+            if cfg.refuse_reserved_emails and inbox.is_reserved(clean):
+                return refused("email_bad")
+            if inbox.is_disposable(clean):
+                return refused("email_disposable")
             if clean != acct.normalise_email(email_again):
                 return refused("email_mismatch")
             if clean == account.email:
@@ -3286,6 +3332,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         paths = account_pages.PATHS[path_locale]
         html_get = {"methods": ["GET"], "response_class": HTMLResponse}
         app.add_api_route(paths["signup"], _signup_get(path_locale), **html_get)
+        for alias in account_pages.SIGNUP_ALIASES.get(path_locale, ()):
+            app.add_api_route(alias, _alias_to(paths["signup"]), methods=["GET"])
         app.add_api_route(paths["signup"], _signup_post(path_locale), methods=["POST"])
         app.add_api_route(paths["signin"], _signin_get(path_locale), **html_get)
         app.add_api_route(paths["signin"], _signin_post(path_locale), methods=["POST"])
@@ -3583,11 +3631,18 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         welcome_cap = acct.network_cap(
             net,
             per_ip=acct.WELCOME_REPORTS_PER_IP_PER_MONTH,
-            per_ipv4=acct.WELCOME_REPORTS_PER_IPV4_PER_MONTH,
+            # Until addresses are confirmed a shared IPv4 is the only brake
+            # on made-up accounts, so it keeps the tighter cap.
+            per_ipv4=(
+                acct.WELCOME_REPORTS_PER_IPV4_PER_MONTH
+                if cfg.email_verification_required
+                else acct.WELCOME_REPORTS_PER_IPV4_UNVERIFIED
+            ),
         )
         #: Why this upload was not the account's free full report, when it
         #: could have been: told on the preview it becomes.
         welcome_refused = ""
+        account_email = ""
 
         def preview_or_credit(account_id: str) -> Response | None:
             """The first look at the monthly previews and the credits."""
@@ -3643,6 +3698,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                     )
                     keys = (
                         f"welcome:account:{account_id}",
+                        inbox.welcome_key(account_email),
                         f"welcome:device:{device_sha256}",
                         f"welcome:file:{fingerprint}",
                     )
@@ -3665,6 +3721,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             return None
 
         if gate_account is not None:
+            account_email = gate_account.email
             first_look = (
                 db.welcome_refusal(
                     gate_account.id,
@@ -3677,6 +3734,15 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 if acct.WELCOME_FULL_REPORT
                 else "off"
             )
+            if not first_look and db.free_claim_taken(inbox.welcome_key(account_email)):
+                # Another account on the same inbox (dots, +tags) had it.
+                first_look = "email"
+            if (
+                not first_look
+                and cfg.email_verification_required
+                and not db.email_verified(gate_account.id)
+            ):
+                first_look = "unverified"
             if not first_look:
                 welcome = True
             else:
@@ -4686,6 +4752,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             retention_days=cfg.retention_days,
             max_uploads_per_hour_per_ip=cfg.max_uploads_per_hour_per_ip,
             email_delivery_ready=cfg.email_delivery_ready,
+            email_via_resend=cfg.resend_ready,
             email_verification_required=cfg.email_verification_required,
         )
 

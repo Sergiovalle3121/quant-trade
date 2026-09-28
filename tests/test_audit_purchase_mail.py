@@ -104,19 +104,19 @@ def _held(store, cfg, order, *, sid: str = "cs_live_market_notice"):
             "es",
             "Pago de Rigor retenido para revisión",
             "este cargo no habilitó una compra",
-            "este mensaje no confirma un reembolso",
+            "te escribiremos con la solución",
         ),
         (
             "en",
             "Rigor payment held for review",
             "this charge did not unlock a purchase",
-            "this message does not confirm a refund",
+            "write to you with the solution",
         ),
         (
             "pt",
             "Pagamento do Rigor retido para análise",
             "esta cobrança não liberou uma compra",
-            "esta mensagem não confirma um reembolso",
+            "escreveremos com a solução",
         ),
     ],
 )
@@ -222,7 +222,7 @@ def test_second_charge_has_review_notice_and_no_second_entitlement(tmp_path: Pat
         == 2
     )
     assert (
-        "does not confirm a refund"
+        "write to you with the solution"
         in next(m for m in messages if "review" in m["Subject"]).get_content()
     )
 

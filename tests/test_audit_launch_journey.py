@@ -70,7 +70,16 @@ def _redeem_credit(client: TestClient, audit_id: str, token: str, locale: str) -
     assert result.status_code == 303
 
 
+@pytest.fixture
+def confirmed_emails(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Invites pay only between confirmed addresses; mail is covered elsewhere."""
+    from quant_trade.audit.store import Store
+
+    monkeypatch.setattr(Store, "email_verified", lambda self, account_id: True)
+
+
 @pytest.mark.parametrize("locale,home", [("es", "/"), ("en", "/en"), ("pt", "/pt")])
+@pytest.mark.usefixtures("confirmed_emails")
 def test_registration_referral_checkout_credit_pdf_and_help(
     tmp_path: Path, locale: str, home: str
 ) -> None:

@@ -194,21 +194,21 @@ def test_legal_copy_matches_once_per_file_and_purchase_notice_rules() -> None:
         (
             "es",
             "una vez por cuenta, navegador y archivo",
-            "el mismo navegador o archivo lo reciba una sola vez",
+            "el mismo navegador, archivo o buzón lo reciba una sola vez",
             "avisos de compra",
             "cambio de opinión",
         ),
         (
             "en",
             "once per account, browser and file",
-            "the same browser or file gets it only once",
+            "the same browser, file or inbox gets it only once",
             "purchase or additional-charge",
             "change of mind",
         ),
         (
             "pt",
             "uma vez por conta, navegador e arquivo",
-            "o mesmo navegador ou arquivo o receba uma só vez",
+            "o mesmo navegador, arquivo ou caixa de entrada o receba uma só vez",
             "avisos de compra",
             "mudança de ideia",
         ),
@@ -486,3 +486,14 @@ def test_card_payment_wording_appears_only_while_cards_are_on() -> None:
     assert "hash do código de acesso" in privacy_pt
     for page in (terms_es, terms_en, terms_pt, privacy_es, privacy_en, privacy_pt):
         assert find_claims(page) == []
+
+
+def test_privacy_names_resend_only_when_it_carries_the_mail() -> None:
+    base = {**OPERATOR, "free_mode": False, "price_usd": 29, "email_delivery_ready": True}
+    with_resend = LegalContext(**base, email_via_resend=True)
+    without = LegalContext(**base)
+    for locale in ("es", "en", "pt"):
+        privacy = legal_page(privacy_text(with_resend, locale), locale=locale)
+        assert "Resend" in privacy and "resend.com/legal/privacy-policy" in privacy
+        assert find_claims(privacy) == []
+        assert "Resend" not in legal_page(privacy_text(without, locale), locale=locale)

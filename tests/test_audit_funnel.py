@@ -387,7 +387,8 @@ def test_a_failing_tag_store_never_breaks_a_sign_up(tmp_path: Path) -> None:
 
 def test_what_we_keep_names_the_tag_in_every_language(tmp_path: Path) -> None:
     client, _ = _client(tmp_path)
-    for path in ("/registro", "/signup", "/pt/cadastro"):
+    # Sign-up shows one line; the full list, tag included, is the policy's.
+    for path in ("/privacidad", "/privacy", "/pt/privacidade"):
         assert "?ref=f4" in client.get(path).text, path
 
 
