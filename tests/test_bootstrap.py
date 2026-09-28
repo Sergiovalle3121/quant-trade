@@ -63,6 +63,26 @@ def test_observed_statistics_match_direct_computation():
     assert set(stats) == set(STATISTICS)
 
 
+def test_drawdown_includes_initial_capital_before_first_return():
+    # Wealth starts at 1.0. Omitting that peak reports only the second loss
+    # (-10%) instead of the full two-period fall (-19%).
+    losses = pd.Series([-0.10, -0.10])
+    assert observed_statistics(losses)["max_drawdown"] == pytest.approx(-0.19)
+    assert observed_statistics(pd.Series([-0.10, 0.05]))["max_drawdown"] == pytest.approx(-0.10)
+    for method in ("iid", "moving_block", "stationary"):
+        draws = {
+            "iid": iid_bootstrap(losses, samples=20, seed=7),
+            "moving_block": moving_block_bootstrap(losses, samples=20, seed=7, block_size=2),
+            "stationary": stationary_bootstrap(losses, samples=20, seed=7, expected_block_size=2),
+        }[method]
+        assert np.allclose(draws["max_drawdown"], -0.19)
+    band = bootstrap_confidence_intervals(
+        losses, method="stationary", samples=20, seed=7, block_size=2
+    )
+    for column in ("point_estimate", "p2.5", "p50", "p97.5"):
+        assert band.loc["max_drawdown", column] == pytest.approx(-0.19)
+
+
 # --- reproducibility ------------------------------------------------------
 
 

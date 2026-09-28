@@ -845,6 +845,7 @@ def _cscv(variants: np.ndarray | None) -> tuple[dict[str, Any], float | None]:
         "partitions": evidence.partitions,
         "combinations": evidence.combinations,
         "parameter_variants": evidence.parameter_variants,
+        "effective_variants": evidence.effective_variants,
         "observations_used": evidence.observations,
         "observations_dropped": int(len(variants) - usable),
     }, float(evidence.pbo)

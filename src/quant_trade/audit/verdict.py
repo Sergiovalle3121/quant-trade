@@ -236,6 +236,21 @@ def assess_multiplicity(
         if dsr < thresholds.dsr_weak or not pbo_bad:
             reasons.append(dsr_reason(f"< {thresholds.dsr_weak}"))
         return _dimension(MULTIPLICITY, "FAIL", reasons, inputs)
+    if trials_evidence == "NOT_MEASURED" and dsr >= thresholds.dsr_pass:
+        # One assumed trial is the most favourable DSR, not evidence that
+        # multiple testing has been ruled out. Keep adverse measured results
+        # above, but never promote an unknown search count to PASS.
+        return _dimension(
+            MULTIPLICITY,
+            "NOT_MEASURED",
+            [
+                (
+                    trials_phrase(trials, trials_evidence, "en"),
+                    trials_phrase(trials, trials_evidence, "es"),
+                )
+            ],
+            inputs,
+        )
     if dsr >= thresholds.dsr_pass:
         reasons = [dsr_reason(f">= {thresholds.dsr_pass}")]
         if pbo is not None:
@@ -554,6 +569,14 @@ _TEXT: dict[str, dict[str, str]] = {
             "el mejor de esos intentos sin habilidad."
         ),
         f"{MULTIPLICITY}.NOT_MEASURED": "Multiplicidad no medida: {reason}.",
+        f"{MULTIPLICITY}.NOT_MEASURED.undeclared": (
+            "No se declaró cuántas configuraciones se probaron; el cálculo usa 1, el caso "
+            "más favorable, y la multiplicidad queda sin medir."
+        ),
+        f"{MULTIPLICITY}.NOT_MEASURED.undeclared.fund": (
+            "No se declaró cuántos fondos o estrategias lleva el mismo gestor; el cálculo "
+            "usa 1, el caso más favorable, y la multiplicidad queda sin medir."
+        ),
         f"{MULTIPLICITY}.PASS.undeclared": (
             "No se declaró cuántas configuraciones se probaron; con 1, el caso más favorable, "
             "el resultado sigue por encima de lo que produciría un intento sin habilidad. Si "
@@ -670,6 +693,14 @@ _TEXT: dict[str, dict[str, str]] = {
             "of those trials would produce without skill."
         ),
         f"{MULTIPLICITY}.NOT_MEASURED": "Multiplicity not measured: {reason}.",
+        f"{MULTIPLICITY}.NOT_MEASURED.undeclared": (
+            "The number of configurations tried was not declared; the calculation uses 1, "
+            "the most favourable case, and multiplicity remains unmeasured."
+        ),
+        f"{MULTIPLICITY}.NOT_MEASURED.undeclared.fund": (
+            "How many funds or strategies the same manager runs was not declared; the "
+            "calculation uses 1, the most favourable case, and multiplicity remains unmeasured."
+        ),
         f"{MULTIPLICITY}.PASS.undeclared": (
             "The number of configurations tried was not declared; with 1, the most favourable "
             "case, the result stays above what an unskilled trial would produce. If more were "
