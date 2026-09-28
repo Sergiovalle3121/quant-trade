@@ -298,7 +298,7 @@ def test_paid_mode_locks_until_the_signed_webhook_arrives(tmp_path: Path) -> Non
     client.app.state.checkout_factory = fake_checkout
     redirect = client.post(
         f"/audits/{audit_id}/checkout?token={token}",
-        data={"billing_country": "MX"},
+        data={"billing_country": "MX", "final_sale": "yes"},
         follow_redirects=False,
     )
     assert redirect.status_code == 303
@@ -338,7 +338,7 @@ def test_paid_mode_locks_until_the_signed_webhook_arrives(tmp_path: Path) -> Non
     assert (
         client.post(
             f"/audits/{audit_id}/checkout?token={token}",
-            data={"billing_country": "MX"},
+            data={"billing_country": "MX", "final_sale": "yes"},
             follow_redirects=False,
         ).status_code
         == 303

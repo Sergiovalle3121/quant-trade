@@ -478,7 +478,11 @@ LABELS: dict[str, dict[str, str]] = {
         "pay_pack": "Comprar el paquete de 3 (USD {price:.0f})",
         "pay_secure": (
             "Pago seguro con Stripe. Ves el informe completo en cuanto se confirma el pago; "
-            "nosotros no vemos ni guardamos los datos de tu tarjeta."
+            "nosotros no vemos ni guardamos los datos de tu tarjeta. Todas las ventas son "
+            "finales."
+        ),
+        "final_sale": (
+            "Entiendo que el informe se entrega al momento y que la compra no es reembolsable."
         ),
         "pay_links_note": (
             "El pago se abre en otra pestaña. Cuando termines, vuelve aquí: el informe se "
@@ -1480,7 +1484,7 @@ LABELS: dict[str, dict[str, str]] = {
         "buy_includes": (
             "Todas las cifras de cada sección|PDF para guardar o enviar|"
             "Página pública de verificación para compartir|"
-            "Reembolso si el informe lee mal tu archivo"
+            "Corrección o crédito nuevo si lee mal tu archivo"
         ),
         "publish": "Publicar verificación pública",
         "publish_help": (
@@ -1834,7 +1838,10 @@ LABELS: dict[str, dict[str, str]] = {
         "pay_pack": "Buy the pack of 3 (USD {price:.0f})",
         "pay_secure": (
             "Secure payment with Stripe. You see the full report as soon as the payment is "
-            "confirmed; we never see or store your card details."
+            "confirmed; we never see or store your card details. All sales are final."
+        ),
+        "final_sale": (
+            "I understand that the report is delivered at once and the purchase is not refundable."
         ),
         "pay_links_note": (
             "The payment opens in another tab. When you finish, come back here: the report "
@@ -2802,7 +2809,7 @@ LABELS: dict[str, dict[str, str]] = {
         "buy_includes": (
             "Every figure in every section|A PDF to keep or send|"
             "A public verification page to share|"
-            "A refund if the report misreads your file"
+            "A fix or a new credit if it misreads your file"
         ),
         "publish": "Publish a public verification",
         "publish_help": (
@@ -7445,6 +7452,8 @@ def render_html(
             f"<form class='paybox buy' method='post' action='{_e(checkout_url)}'>"
             + price_html
             + market_select
+            + "<label class='final-sale'><input type='checkbox' name='final_sale' value='yes' "
+            f"required> <span>{_e(labels['final_sale'])}</span></label>"
             + "<div><div class='inline-form'>"
             "<button class='btn btn-primary btn-lg' type='submit' name='plan' value='single'>"
             f"{icon('card')}{_e(labels['pay'])}</button>{pack_button}</div>"

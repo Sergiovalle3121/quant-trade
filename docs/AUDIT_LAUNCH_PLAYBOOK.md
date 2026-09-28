@@ -7,9 +7,9 @@
 > [expediente de lanzamiento](launch/RIGOR_PUBLIC_LAUNCH.md). Entre ellas:
 > Stripe Checkout y webhooks probados, confirmación de correo con SMTP real y
 > `AUDIT_EMAIL_VERIFICATION_REQUIRED=true`, migración de cuentas existentes,
-> revisión de términos y conciliación de reembolsos. Las devoluciones se
-> tramitan según términos y revisión manual; esta guía no promete un
-> reembolso automático. Los Payment Links heredados deben desactivarse en
+> revisión de términos y conciliación de reembolsos. Las ventas son finales:
+> solo se devuelve a mano, desde Stripe, un cobro duplicado o uno que no
+> entregó ningún informe; esta guía no promete reembolsos. Los Payment Links heredados deben desactivarse en
 > Stripe antes de subir precios y sus pagos históricos deben conciliarse.
 
 Guía histórica de las primeras ventas manuales de Rigor
@@ -125,7 +125,7 @@ comprobar).
 | Vistas previas posteriores | 3 gratis por cuenta y mes, con límites por red | Clase, gráficas, banderas rojas, lectura del archivo y explicación de cada dimensión. |
 | Informe completo adicional | USD 29 (`AUDIT_PRICE_USD_CENTS=2900`) | Después del primer informe gratis. |
 | Paquete de 3 | USD 69 (`AUDIT_PACK_PRICE_USD_CENTS=6900`) | Con tarjeta: desbloquea el informe actual y deja 2 créditos; por venta manual: un código de 3 créditos tras verificar el pago. |
-| Incidencia de lectura | Revisión y resolución según `/terminos` | Si un informe de pago lee mal operaciones, saldo o fechas, el cliente puede contactar con soporte; se corrige, emite un crédito o tramita manualmente el reembolso que proceda. |
+| Incidencia de lectura | Revisión y resolución según `/terminos` | Si un informe de pago lee mal operaciones, saldo o fechas, el cliente puede contactar con soporte; se corrige o se emite un crédito nuevo; las ventas son finales. |
 
 La cuenta nueva recibe su primer informe completo sin pagar. Después puede
 usar tres vistas previas gratis al mes y decidir si compra otros informes.

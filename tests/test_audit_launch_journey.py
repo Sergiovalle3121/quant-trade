@@ -148,7 +148,7 @@ def test_registration_referral_checkout_credit_pdf_and_help(
     app.state.checkout_factory = fake_checkout
     checkout = owner.post(
         f"/audits/{priced_id}/checkout?token={priced_token}&lang={locale}",
-        data={"plan": "pack", "billing_country": "MX"},
+        data={"plan": "pack", "billing_country": "MX", "final_sale": "yes"},
         follow_redirects=False,
     )
     assert checkout.status_code == 303

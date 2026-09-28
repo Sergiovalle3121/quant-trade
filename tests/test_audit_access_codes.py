@@ -329,7 +329,7 @@ def test_every_buy_box_lists_what_the_payment_unlocks(tmp_path: Path) -> None:
     assert "https://wa.me/000" in box[0] + box[1]
     items = LABELS["es"]["buy_includes"].split("|")
     assert len(items) == 4 and all(item in included for item in items)
-    assert "Reembolso" in included
+    assert "Reembolso" not in included and "crédito nuevo" in included
     assert find_claims(included) == []
     assert find_claims(LABELS["en"]["buy_includes"]) == []
 

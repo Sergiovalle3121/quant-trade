@@ -100,7 +100,7 @@ def test_paid_delivery_preserves_the_same_monetary_and_forensic_limits(tmp_path:
     client.app.state.checkout_factory = fake_checkout
     checkout = client.post(
         f"/audits/{audit_id}/checkout?token={token}",
-        data={"plan": "single", "billing_country": "MX"},
+        data={"plan": "single", "billing_country": "MX", "final_sale": "yes"},
         follow_redirects=False,
     )
     assert checkout.status_code == 303 and len(order_ids) == 1

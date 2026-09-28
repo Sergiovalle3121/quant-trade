@@ -208,7 +208,7 @@ En incidente, `AUDIT_PAUSE_NEW_AUDITS` suspende **todas las nuevas cargas**, inc
 | ¿Por qué no obtuve gratis? | La bienvenida exige un archivo importable y usa reglas de cuenta, dispositivo y red; la huella del archivo se conserva para revisión, no bloquea por sí sola. Una red compartida puede requerir revisión. Mostrar causa y referencia de ayuda sin atribuir fraude. |
 | ¿Cuándo llega el informe? | Mostrar tiempo observado del entorno y estado de cola; no prometer «en segundos» sin medición representativa. |
 | ¿Qué pasa si no se puede importar? | Error recuperable y guía de exportación; no consumir derecho por archivo imposible de procesar. |
-| ¿Cómo se devuelven pagos? | Publicar condición y proceso revisados legalmente; registrar solicitud y decisión. Una nota interna no ejecuta un reembolso. |
+| ¿Cómo se devuelven pagos? | No se devuelven: las ventas son finales (decisión de Sergio, 28/09/2026). Un informe que lee mal el archivo se corrige o recibe un crédito nuevo. Solo un cobro duplicado o uno que no entregó informe se devuelve a mano desde Stripe; registrar solicitud y decisión. |
 
 ### 9.3 Compartir e incentivo
 
