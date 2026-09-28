@@ -105,13 +105,13 @@ PURCHASE_WORDS = {
         "charge_review": (
             "Cargo adicional en revisión en Rigor",
             "Registramos otro cargo para un informe ya habilitado. "
-            "Revisaremos este cargo manualmente; este mensaje no confirma un reembolso.",
+            "Revisaremos este cargo manualmente y te escribiremos con la solución.",
         ),
         "market_review": (
             "Pago de Rigor retenido para revisión",
             "Registramos este pago, pero este cargo no habilitó una compra porque "
-            "debemos revisar el país de facturación. Revisaremos el cargo manualmente; "
-            "este mensaje no confirma un reembolso.",
+            "debemos revisar el país de facturación. Revisaremos el cargo manualmente y "
+            "te escribiremos con la solución.",
         ),
         "single": "Informe individual",
         "pack": "Paquete de tres informes",
@@ -126,13 +126,13 @@ PURCHASE_WORDS = {
         "charge_review": (
             "Additional Rigor charge under review",
             "We recorded another charge for an already unlocked report. "
-            "We will review this charge manually; this message does not confirm a refund.",
+            "We will review this charge manually and write to you with the solution.",
         ),
         "market_review": (
             "Rigor payment held for review",
             "We recorded this payment, but this charge did not unlock a purchase "
-            "because the billing country needs review. We will review the charge manually; "
-            "this message does not confirm a refund.",
+            "because the billing country needs review. We will review the charge manually "
+            "and write to you with the solution.",
         ),
         "single": "Single report",
         "pack": "Three-report pack",
@@ -147,13 +147,13 @@ PURCHASE_WORDS = {
         "charge_review": (
             "Cobrança adicional em análise no Rigor",
             "Registramos outra cobrança para um relatório já liberado. "
-            "Analisaremos esta cobrança manualmente; esta mensagem não confirma um reembolso.",
+            "Analisaremos esta cobrança manualmente e escreveremos com a solução.",
         ),
         "market_review": (
             "Pagamento do Rigor retido para análise",
             "Registramos este pagamento, mas esta cobrança não liberou uma compra "
-            "porque precisamos analisar o país de cobrança. Analisaremos a cobrança manualmente; "
-            "esta mensagem não confirma um reembolso.",
+            "porque precisamos analisar o país de cobrança. Analisaremos a cobrança manualmente "
+            "e escreveremos com a solução.",
         ),
         "single": "Relatório individual",
         "pack": "Pacote de três relatórios",
