@@ -87,7 +87,9 @@ TRACK_SEAL_EXAMPLES_ENABLED = False
 REAL_PAIRS_DOCUMENTED = 15
 MIN_REAL_PAIRS = 5
 
-PANEL_RECORDS_PATH = PANEL_PATH + "/historiales"
+#: Under the owner panel's path, which ``AUDIT_PANEL_PATH`` may change.
+PANEL_RECORDS_SUFFIX = "/historiales"
+PANEL_RECORDS_PATH = PANEL_PATH + PANEL_RECORDS_SUFFIX
 #: Ids are ``secrets.token_urlsafe`` strings; anything else is a 404.
 _ID = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 #: The action segments follow the account pages: Spanish in every language.
@@ -1051,12 +1053,12 @@ def _panel_shell(body: str) -> str:
     return guard_page(_page(PANEL_TEXT["title"], "es", content, solid_nav=True))
 
 
-def panel_login_page(*, error: str = "") -> str:
+def panel_login_page(*, error: str = "", panel_path: str = PANEL_PATH) -> str:
     err = f"<div class='error'>{_e(PANEL_COPY[error])}</div>" if error else ""
     return _panel_shell(
         err
         + f"<p>{_e(PANEL_COPY['login_lead'])}</p>"
-        + f"<form method='post' action='{PANEL_RECORDS_PATH}'>"
+        + f"<form method='post' action='{_e(panel_path + PANEL_RECORDS_SUFFIX)}'>"
         + _field(
             PANEL_COPY["key"],
             "<input type='password' name='key' required autocomplete='current-password' "
@@ -1067,7 +1069,12 @@ def panel_login_page(*, error: str = "") -> str:
 
 
 def panel_records_page(
-    *, key: str, records: Sequence[tuple[RecordView, bool]], flash: str = "", error: str = ""
+    *,
+    key: str,
+    records: Sequence[tuple[RecordView, bool]],
+    flash: str = "",
+    error: str = "",
+    panel_path: str = PANEL_PATH,
 ) -> str:
     """Every record with its chain verification; hide or show its page."""
     notice = f"<div class='flash'>{_e(PANEL_TEXT[flash])}</div>" if flash else ""
@@ -1081,7 +1088,7 @@ def panel_records_page(
         if record.status != STATUS_WITHDRAWN:
             verb = "unhide" if record.hidden_at else "hide"
             action = (
-                f"<form method='post' action='{PANEL_RECORDS_PATH}'>"
+                f"<form method='post' action='{_e(panel_path + PANEL_RECORDS_SUFFIX)}'>"
                 f"<input type='hidden' name='key' value='{_e(key)}'>"
                 f"<input type='hidden' name='action' value='{verb}'>"
                 f"<input type='hidden' name='seal_id' value='{_e(record.id)}'>"
@@ -1110,7 +1117,7 @@ def panel_records_page(
         + notice
         + f"<p>{_e(PANEL_TEXT['lead'])}</p>"
         + table
-        + f"<p><a href='{PANEL_PATH}'>{_e(PANEL_TEXT['back'])}</a></p>"
+        + f"<p><a href='{_e(panel_path)}'>{_e(PANEL_TEXT['back'])}</a></p>"
     )
 
 
@@ -1505,13 +1512,15 @@ def register(
             app.add_api_route(prefix + "/chain.json", _chain_get(), methods=["GET"])
 
     # -- owner panel ---------------------------------------------------------
-    @app.get(PANEL_RECORDS_PATH, response_class=HTMLResponse)
+    # Under the path the app resolved; without the key nothing is mounted, so
+    # the address answers like any page that does not exist.
+    panel_path = str(getattr(app.state, "panel_path", PANEL_PATH))
+
     def panel_records_login() -> str:
         if not settings.admin_enabled:
             raise _not_found()
-        return panel_login_page()
+        return panel_login_page(panel_path=panel_path)
 
-    @app.post(PANEL_RECORDS_PATH, response_class=HTMLResponse)
     def panel_records(
         request: Request,
         key: Annotated[str, Form(max_length=256)],
@@ -1525,10 +1534,14 @@ def register(
         ip = _client_ip(request, settings.trusted_proxy_hops)
         now = _now()
         if panel_failures.count(ip, now) >= MAX_FAILED_LOGINS_PER_HOUR:
-            return HTMLResponse(panel_login_page(error="too_many"), status_code=429)
+            return HTMLResponse(
+                panel_login_page(error="too_many", panel_path=panel_path), status_code=429
+            )
         if not hmac.compare_digest(key.encode(), settings.admin_key.encode()):
             panel_failures.hit(ip, now)
-            return HTMLResponse(panel_login_page(error="wrong_key"), status_code=403)
+            return HTMLResponse(
+                panel_login_page(error="wrong_key", panel_path=panel_path), status_code=403
+            )
         flash = error = ""
         if action in ("hide", "unhide"):
             if not _ID.match(seal_id):
@@ -1543,7 +1556,18 @@ def register(
         records = [
             (record, service.verify(store, record.id)[0]) for record in service.all_records(store)
         ]
-        return HTMLResponse(panel_records_page(key=key, records=records, flash=flash, error=error))
+        return HTMLResponse(
+            panel_records_page(
+                key=key, records=records, flash=flash, error=error, panel_path=panel_path
+            )
+        )
+
+    if settings.admin_enabled:
+        records_path = panel_path + PANEL_RECORDS_SUFFIX
+        app.add_api_route(records_path, panel_records_login, **html_get)
+        app.add_api_route(
+            records_path, panel_records, methods=["POST"], response_class=HTMLResponse
+        )
 
     return True
 
@@ -1553,6 +1577,7 @@ __all__ = [
     "EXAMPLE_VIEW",
     "MIN_REAL_PAIRS",
     "PANEL_RECORDS_PATH",
+    "PANEL_RECORDS_SUFFIX",
     "PANEL_TEXT",
     "PATHS",
     "REAL_PAIRS_DOCUMENTED",

@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING
 
 from quant_trade.audit.funnel import DIRECT, REF_DAYS, REF_TAGS
 from quant_trade.audit.pages import _e, _field, _page, _page_hero
+from quant_trade.audit.settings import DEFAULT_PANEL_PATH
 
 if TYPE_CHECKING:
     from quant_trade.audit.funnel import Funnel, FunnelCounts
@@ -27,7 +28,8 @@ if TYPE_CHECKING:
         StripeRefundRecord,
     )
 
-PANEL_PATH = "/panel"
+#: The default path; the service serves the panel at ``AUDIT_PANEL_PATH`` when set.
+PANEL_PATH = DEFAULT_PANEL_PATH
 MAX_CREDITS = 100
 MAX_NOTE_CHARS = 120
 MAX_EXPIRES_DAYS = 3650
@@ -210,13 +212,13 @@ def _shell(body: str) -> str:
     )
 
 
-def login_page(*, error: str = "") -> str:
+def login_page(*, error: str = "", panel_path: str = PANEL_PATH) -> str:
     """The key form. ``error`` is one of the ``TEXT`` keys or empty."""
     err = f"<div class='error'>{_e(TEXT[error])}</div>" if error else ""
     return _shell(
         err
         + f"<p>{_e(TEXT['login_lead'])}</p>"
-        + f"<form method='post' action='{PANEL_PATH}'>"
+        + f"<form method='post' action='{_e(panel_path)}'>"
         + _field(
             TEXT["key"],
             "<input type='password' name='key' required autocomplete='current-password' "
@@ -226,7 +228,7 @@ def login_page(*, error: str = "") -> str:
     )
 
 
-def _codes_table(key: str, codes: Sequence[AccessCodeRecord]) -> str:
+def _codes_table(key: str, codes: Sequence[AccessCodeRecord], panel_path: str = PANEL_PATH) -> str:
     if not codes:
         return f"<p class='muted'>{_e(TEXT['none'])}</p>"
     head = "".join(f"<th>{_e(col)}</th>" for col in TEXT["cols"].split("|"))
@@ -235,7 +237,7 @@ def _codes_table(key: str, codes: Sequence[AccessCodeRecord]) -> str:
         action = ""
         if not record.disabled:
             action = (
-                f"<form method='post' action='{PANEL_PATH}'>{_key_field(key)}"
+                f"<form method='post' action='{_e(panel_path)}'>{_key_field(key)}"
                 "<input type='hidden' name='action' value='disable'>"
                 f"<input type='hidden' name='code_id' value='{_e(record.id)}'>"
                 f"<button class='btn btn-ghost' type='submit'>{_e(TEXT['disable'])}</button>"
@@ -346,14 +348,17 @@ def _refunds_table(refunds: Sequence[StripeRefundRecord]) -> str:
 
 
 def _mail_issues_table(
-    key: str, issues: Sequence[EmailDeliveryIssue], counts: dict[str, int]
+    key: str,
+    issues: Sequence[EmailDeliveryIssue],
+    counts: dict[str, int],
+    panel_path: str = PANEL_PATH,
 ) -> str:
     rows = []
     for issue in issues:
         action = "-"
         if issue.status == "dead":
             action = (
-                f"<form method='post' action='{PANEL_PATH}'>{_key_field(key)}"
+                f"<form method='post' action='{_e(panel_path)}'>{_key_field(key)}"
                 "<input type='hidden' name='action' value='mail_requeue'>"
                 f"<input type='hidden' name='mail_id' value='{_e(issue.id)}'>"
                 f"<button class='btn btn-ghost' type='submit'>{_e(TEXT['mail_requeue'])}</button>"
@@ -526,6 +531,7 @@ def panel_page(
     reset_link: str = "",
     accounts: int = 0,
     funnel: str = "",
+    panel_path: str = PANEL_PATH,
 ) -> str:
     """The panel after a correct key: the create form, a new code once, the list."""
     shown = ""
@@ -538,7 +544,7 @@ def panel_page(
     err = f"<div class='error'>{_e(TEXT[error])}</div>" if error else ""
     create = (
         f"<h2 style='margin-top:32px'>{_e(TEXT['create_title'])}</h2>"
-        f"<form method='post' action='{PANEL_PATH}'>{_key_field(key)}"
+        f"<form method='post' action='{_e(panel_path)}'>{_key_field(key)}"
         "<input type='hidden' name='action' value='create'>"
         + _field(
             TEXT["credits"],
@@ -555,7 +561,7 @@ def panel_page(
         + f"<button class='btn btn-dark' type='submit'>{_e(TEXT['create'])}</button></form>"
     )
     listing = f"<h2 style='margin-top:40px'>{_e(TEXT['codes_title'])}</h2>"
-    listing += _codes_table(key, codes)
+    listing += _codes_table(key, codes, panel_path)
     reset_shown = ""
     if reset_link:
         reset_shown = (
@@ -567,7 +573,7 @@ def panel_page(
         f"<p class='muted'>{_e(TEXT['accounts'])}: {accounts}</p>"
         f"<p>{_e(TEXT['reset_lead'])}</p>"
         + reset_shown
-        + f"<form method='post' action='{PANEL_PATH}'>{_key_field(key)}"
+        + f"<form method='post' action='{_e(panel_path)}'>{_key_field(key)}"
         "<input type='hidden' name='action' value='reset'>"
         + _field(
             TEXT["reset_email"],
@@ -582,7 +588,9 @@ def panel_page(
         + _refused_table(refused)
         + _orders_table(orders)
         + _refunds_table(refunds)
-        + _mail_issues_table(key, mail_issues, mail_warning_counts or {"dead": 0, "overdue": 0})
+        + _mail_issues_table(
+            key, mail_issues, mail_warning_counts or {"dead": 0, "overdue": 0}, panel_path
+        )
         + funnel
         + create
         + listing

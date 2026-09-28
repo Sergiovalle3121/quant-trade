@@ -95,6 +95,10 @@ COPY: dict[str, dict[str, str]] = {
             "Tus compras con tarjeta o código, con fecha"
         ),
         "email_bad": "Ese correo no parece válido.",
+        "email_simple": (
+            "Usa un correo simple, como nombre@ejemplo.com: sin espacios, comillas, comas, "
+            "paréntesis ni acentos."
+        ),
         "email_disposable": (
             "Ese correo es de un servicio de buzones temporales. Usa un correo que conserves: "
             "ahí te llegan la confirmación y la recuperación de tu cuenta."
@@ -140,6 +144,11 @@ COPY: dict[str, dict[str, str]] = {
         "csrf": "El formulario caducó. Recarga la página y vuelve a enviarlo.",
         "signed_out": "Saliste de tu cuenta.",
         "welcome": "Cuenta creada. Ya puedes subir un archivo: el informe se guarda aquí.",
+        "welcome_confirm": (
+            "Cuenta creada. Te enviamos un enlace de confirmación a tu correo: ábrelo para "
+            "desbloquear tu primer informe completo gratis y las compras. Si no lo ves, revisa "
+            "la carpeta de spam."
+        ),
         "account_title": "Mis informes",
         "account_lead": "Todo lo que auditaste con esta cuenta, en un solo lugar.",
         "signed_in_as": "Sesión iniciada como",
@@ -324,6 +333,11 @@ COPY: dict[str, dict[str, str]] = {
         "buy_email": "Confirma tu correo para comprar créditos.",
         "buy_review": "Hay un cobro pendiente de revisión. No vuelvas a pagar; pide ayuda.",
         "security_title": "Contraseña y datos",
+        "parts_label": "Partes de tu cuenta",
+        "part_reports": "Informes",
+        "part_credits": "Créditos y compras",
+        "part_security": "Seguridad",
+        "part_data": "Tus datos",
         "export_title": "Descargar mis datos",
         "export_help": (
             "Un archivo JSON con todo lo que guardamos de tu cuenta: tu correo, tus informes, "
@@ -368,12 +382,12 @@ COPY: dict[str, dict[str, str]] = {
         "email_status_title": "Correo de tu cuenta",
         "email_verified_status": "Correo confirmado.",
         "email_unverified_status": (
-            "Tu correo aún no está confirmado. Tu primer informe completo gratis sigue "
-            "disponible; confirma el correo para comprar o recibir créditos por invitaciones."
+            "Tu correo aún no está confirmado. Confírmalo para desbloquear tu primer informe "
+            "completo gratis, las compras y los créditos por invitaciones."
         ),
         "email_delivery_unavailable": (
-            "El envío de correos no está disponible ahora. Puedes usar tu primer informe "
-            "gratis; las compras y los créditos por invitaciones requieren confirmación."
+            "El envío de correos no está disponible ahora. El primer informe completo gratis, "
+            "las compras y los créditos por invitaciones requieren confirmar el correo."
         ),
         "email_request_button": "Enviar enlace de confirmación",
         "email_pending_note": (
@@ -390,8 +404,8 @@ COPY: dict[str, dict[str, str]] = {
             "Correo confirmado. Ya puedes usar las compras y las recompensas disponibles."
         ),
         "email_checkout_required": (
-            "Confirma tu correo desde Mi cuenta antes de pagar. Tu primer informe completo "
-            "gratis sigue disponible."
+            "Confirma tu correo desde Mi cuenta antes de pagar. Confirmarlo también "
+            "desbloquea tu primer informe completo gratis."
         ),
         "email_now": "Ahora entras con {email}. Desde el cambio entrarás con el correo nuevo.",
         "email_new": "Correo nuevo",
@@ -767,6 +781,10 @@ COPY: dict[str, dict[str, str]] = {
             "Your card and code purchases, with dates"
         ),
         "email_bad": "That e-mail address does not look valid.",
+        "email_simple": (
+            "Use a plain e-mail address, like name@example.com: no spaces, quotes, commas, "
+            "brackets or accents."
+        ),
         "email_disposable": (
             "That address belongs to a temporary-inbox service. Use an address you keep: "
             "your account's confirmation and recovery go there."
@@ -813,6 +831,11 @@ COPY: dict[str, dict[str, str]] = {
         "csrf": "The form expired. Reload the page and submit it again.",
         "signed_out": "You signed out.",
         "welcome": "Account created. Upload a file now: the report is saved here.",
+        "welcome_confirm": (
+            "Account created. We sent a confirmation link to your e-mail: open it to unlock "
+            "your first free full report and purchases. If you do not see it, check your spam "
+            "folder."
+        ),
         "account_title": "My reports",
         "account_lead": "Everything you audited with this account, in one place.",
         "signed_in_as": "Signed in as",
@@ -995,6 +1018,11 @@ COPY: dict[str, dict[str, str]] = {
         "buy_email": "Confirm your e-mail to buy credits.",
         "buy_review": "A charge is under review. Do not pay again; ask for help.",
         "security_title": "Password and data",
+        "parts_label": "Parts of your account",
+        "part_reports": "Reports",
+        "part_credits": "Credits and purchases",
+        "part_security": "Security",
+        "part_data": "Your data",
         "export_title": "Download my data",
         "export_help": (
             "A JSON file with everything we keep about your account: your e-mail, reports, "
@@ -1038,12 +1066,12 @@ COPY: dict[str, dict[str, str]] = {
         "email_status_title": "Your account e-mail",
         "email_verified_status": "E-mail confirmed.",
         "email_unverified_status": (
-            "Your e-mail is not confirmed yet. Your first free full report is still available; "
-            "confirm the e-mail to buy reports or receive referral credits."
+            "Your e-mail is not confirmed yet. Confirm it to unlock your first free full "
+            "report, purchases and referral credits."
         ),
         "email_delivery_unavailable": (
-            "E-mail delivery is unavailable now. You can use your first free report; "
-            "purchases and referral credits require confirmation."
+            "E-mail delivery is unavailable now. The first free full report, purchases and "
+            "referral credits require a confirmed e-mail."
         ),
         "email_request_button": "Send a confirmation link",
         "email_pending_note": (
@@ -1058,8 +1086,8 @@ COPY: dict[str, dict[str, str]] = {
         ),
         "email_verified": "E-mail confirmed. You can now use available purchases and rewards.",
         "email_checkout_required": (
-            "Confirm your e-mail from My account before paying. Your first free full report "
-            "is still available."
+            "Confirm your e-mail from My account before paying. Confirming it also unlocks "
+            "your first free full report."
         ),
         "email_now": "You sign in with {email}. After the change you sign in with the new address.",
         "email_new": "New e-mail",
@@ -1489,6 +1517,26 @@ font-weight:700;border:2px solid currentColor}
 border:1px solid var(--border);margin:2px 4px 2px 0;color:var(--text-2)}
 .acct-sec{margin-top:40px}
 .acct-sec h2{margin:0 0 10px}
+.acct-parts{position:sticky;top:60px;z-index:40;margin:0 0 24px;padding:8px 0;
+background:var(--bg);border-bottom:1px solid var(--border)}
+.acct-parts nav{display:flex;gap:4px;overflow-x:auto;scrollbar-width:none}
+.acct-parts nav::-webkit-scrollbar{display:none}
+.acct-parts a{flex:none;display:flex;align-items:center;min-height:40px;padding:0 14px;
+border-radius:999px;font-size:.9rem;font-weight:600;white-space:nowrap;color:var(--text-2);
+text-decoration:none}
+.acct-parts a:hover,.acct-parts a:focus-visible{background:var(--surface-2);color:var(--text)}
+.acct-parts .flash,.acct-parts .error{margin:8px 0 0;font-size:.9rem}
+.acct-part{margin-top:56px}
+.acct-part>h2{margin:0 0 18px;padding-bottom:12px;border-bottom:1px solid var(--border);
+font-size:1.7rem}
+.acct-part>h2+.acct-sec{margin-top:0}
+.acct-sec>h3{margin:0 0 10px;font-size:1.35rem}
+.acct-card h4{margin:0 0 14px;font-size:1.17em;font-weight:620;letter-spacing:-.03em;
+line-height:1.08}
+.acct-part,.acct-part [id]{scroll-margin-top:52px}
+.acct-parts.has-alert~.acct-part,.acct-parts.has-alert~.acct-part [id]{scroll-margin-top:140px}
+@media (max-width:520px){.acct-parts{top:56px}}
+@media print{.acct-parts nav{display:none}.acct-parts{position:static}}
 .acct-card h3{margin:0 0 14px}
 .acct-box{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;
 border:1px solid var(--border);border-radius:14px;padding:12px 16px;margin:14px 0;
@@ -1559,7 +1607,7 @@ padding:10px 0;border-top:1px solid var(--border)}
 .acct-protect{margin:0 0 24px}
 .acct-email-status{margin:0 0 24px;border-color:var(--border);overflow-wrap:anywhere}
 .acct-card#correo{overflow-wrap:anywhere}
-.acct-email-status h2{margin:0 0 8px;font-size:1.15rem}
+.acct-email-status h3{margin:0 0 8px;font-size:1.15rem}
 .acct-email-status p{margin:8px 0}
 .acct-email-status form{margin:14px 0 0}
 .paper input:focus-visible,.paper select:focus-visible,.paper textarea:focus-visible{
@@ -1928,10 +1976,11 @@ def compare_mine_note(locale: str) -> str:
     )
 
 
-def gate_page(*, locale: str, reason: str, limit: int) -> str:
+def gate_page(*, locale: str, reason: str, limit: int, extras: bool = False) -> str:
     """Why an upload did not run: no account, a bad code, or the month's free previews used.
 
-    ``reason`` is ``signin``, ``code``, ``quota`` or ``network``.
+    ``reason`` is ``signin``, ``code``, ``quota`` or ``network``; ``extras`` brings the
+    visitor back to the upload page with its extra boxes open.
     """
     locale = _locale(locale)
     copy = COPY[locale]
@@ -1940,7 +1989,7 @@ def gate_page(*, locale: str, reason: str, limit: int) -> str:
 
     if reason in ("signin", "code"):
         # After signing up or in, back to the upload page: the file was not kept.
-        back = "?next=" + _e(_q(AUDIT_PATHS[locale]))
+        back = "?next=" + _e(_q(AUDIT_PATHS[locale] + ("?extras=1" if extras else "")))
         buttons = (
             f"<a class='btn btn-primary btn-lg' href='{path('signup', locale)}{back}'>"
             f"{_e(copy['gate_signup'])}</a>"
@@ -2355,7 +2404,7 @@ def invite_section(locale: str, invite: InviteView) -> str:
         + "</span></div></div>"
     )
     return (
-        f"<section class='acct-sec' id='invitar'><h2>{_e(copy['invite_title'])}</h2>"
+        f"<section class='acct-sec' id='invitar'><h3>{_e(copy['invite_title'])}</h3>"
         + "<p class='muted'>"
         + _e(copy["invite_help"].format(credits=invite.credits, unit=unit, cap=invite.monthly_cap))
         + "</p>"
@@ -2414,7 +2463,7 @@ def _email_status_card(
     )
     return (
         "<section class='acct-card acct-email-status' id='verificar-correo'>"
-        f"<h2>{_e(copy['email_status_title'])}</h2><p>{_e(copy[status])}</p>"
+        f"<h3>{_e(copy['email_status_title'])}</h3><p>{_e(copy[status])}</p>"
         + pending_note
         + delivery_note
         + resend
@@ -2467,6 +2516,36 @@ def _email_card(
         + f"<button class='btn btn-dark' type='submit'>"
         f"{_e(copy['email_change_request' if verification_required else 'change_email'])}</button>"
         "</form>"
+    )
+
+
+#: The four parts of "Mi cuenta" and their ids, the same in every language
+#: (like the older ids inside them, which links and redirects still use).
+ACCOUNT_PARTS: dict[str, str] = {
+    "reports": "informes",
+    "credits": "creditos",
+    "security": "seguridad",
+    "data": "datos",
+}
+
+
+def _parts_nav(copy: dict[str, str], alert: str = "") -> str:
+    """The four links that stay under the top bar, with the page's message."""
+    links = "".join(
+        f"<a href='#{anchor}'>{_e(copy['part_' + part])}</a>"
+        for part, anchor in ACCOUNT_PARTS.items()
+    )
+    return (
+        f"<div class='acct-parts{' has-alert' if alert else ''}'>"
+        f"<nav aria-label='{_e(copy['parts_label'])}'>{links}</nav>{alert}</div>"
+    )
+
+
+def _part(copy: dict[str, str], part: str, inner: str) -> str:
+    anchor = ACCOUNT_PARTS[part]
+    return (
+        f"<section class='acct-part' id='{anchor}' aria-labelledby='{anchor}-titulo'>"
+        f"<h2 id='{anchor}-titulo'>{_e(copy['part_' + part])}</h2>{inner}</section>"
     )
 
 
@@ -2552,7 +2631,7 @@ def account_page(
         f"<span>{_e(copy['paid_reports'])}</span></div></div>"
     )
     reports = (
-        f"<section class='acct-sec' id='informes'><h2>{_e(copy['reports_title'])}</h2>"
+        f"<section class='acct-sec'><h3>{_e(copy['reports_title'])}</h3>"
         + _reports_table(copy, locale, audits, free_mode=free_mode)
         + "</section>"
     )
@@ -2571,7 +2650,7 @@ def account_page(
                 "</div></form>"
             )
         codes_html = (
-            f"<section class='acct-sec'><h2>{_e(copy['codes_title'])}</h2>"
+            f"<section class='acct-sec'><h3>{_e(copy['codes_title'])}</h3>"
             f"<p class='muted'>{_e(copy['codes_help'])}</p>"
             + _codes_table(copy, codes, now)
             + add
@@ -2635,9 +2714,9 @@ def account_page(
                 )
         if card_payments and not card_buy:
             lines += f"<p class='muted'>{_e(copy['buy_card'])}</p>"
-        buy = f"<section class='acct-sec'><h2>{_e(copy['buy_title'])}</h2>{lines}</section>"
+        buy = f"<section class='acct-sec'><h3>{_e(copy['buy_title'])}</h3>{lines}</section>"
     purchases = (
-        f"<section class='acct-sec'><h2>{_e(copy['purchases_title'])}</h2>"
+        f"<section class='acct-sec'><h3>{_e(copy['purchases_title'])}</h3>"
         + _purchases_table(copy, locale, audits)
         + "</section>"
     )
@@ -2646,8 +2725,8 @@ def account_page(
         if recovery_created
         else copy["recovery_missing"]
     )
-    # What protects the account and what is still off, near the top: without
-    # a key, a forgotten password needs the owner.
+    # What protects the account and what is still off, first in "Seguridad":
+    # without a key, a forgotten password needs the owner.
     recovery_nudge = _protection_card(
         copy,
         recovery=bool(recovery_created),
@@ -2682,7 +2761,6 @@ def account_page(
             "</button></form>"
         )
     security = (
-        f"<section class='acct-sec'><h2>{_e(copy['security_title'])}</h2>"
         "<div class='acct-grid'>"
         f"<form class='acct-card' method='post' action='{path('account', locale)}/contrasena'>"
         f"<h3>{_e(copy['change_password'])}</h3>"
@@ -2699,28 +2777,6 @@ def account_page(
             copy["password_help"],
         )
         + f"<button class='btn btn-dark' type='submit'>{_e(copy['change_password'])}</button>"
-        "</form>"
-        + _email_card(
-            copy,
-            locale,
-            csrf,
-            account.email,
-            has_passkeys=bool(passkeys),
-            delivery_ready=email_delivery_ready,
-            verification_required=email_verification_required,
-        )
-        + "<form class='acct-card acct-danger' method='post' "
-        f"action='{path('account', locale)}/borrar'>"
-        f"<h3>{_e(copy['delete_title'])}</h3><p class='muted'>{_e(copy['delete_help'])}</p>"
-        + _hidden("csrf", csrf)
-        + _field(
-            copy["password_current"],
-            "<input type='password' name='current' required maxlength='256' "
-            "autocomplete='current-password'>",
-        )
-        + "<label class='check'><input type='checkbox' name='with_reports' value='yes'> "
-        f"<span>{_e(copy['delete_reports'])}</span></label>"
-        f"<p><button class='btn btn-ghost' type='submit'>{_e(copy['delete_button'])}</button></p>"
         "</form>"
         f"<form class='acct-card' id='recuperacion' method='post' "
         f"action='{path('account', locale)}/recuperacion'>"
@@ -2743,16 +2799,53 @@ def account_page(
         + "</div>"
         + (_sessions_card(copy, locale, csrf, sessions) if sessions else "")
         + (_activity_card(copy, events) if events else "")
-        + _stores(copy, retention_days)
-        + "<div class='acct-card acct-export'>"
+    )
+    data = (
+        "<div class='acct-grid'>"
+        + _email_card(
+            copy,
+            locale,
+            csrf,
+            account.email,
+            has_passkeys=bool(passkeys),
+            delivery_ready=email_delivery_ready,
+            verification_required=email_verification_required,
+        )
+        + "<form class='acct-card acct-danger' method='post' "
+        f"action='{path('account', locale)}/borrar'>"
+        f"<h3>{_e(copy['delete_title'])}</h3><p class='muted'>{_e(copy['delete_help'])}</p>"
+        + _hidden("csrf", csrf)
+        + _field(
+            copy["password_current"],
+            "<input type='password' name='current' required maxlength='256' "
+            "autocomplete='current-password'>",
+        )
+        + "<label class='check'><input type='checkbox' name='with_reports' value='yes'> "
+        f"<span>{_e(copy['delete_reports'])}</span></label>"
+        f"<p><button class='btn btn-ghost' type='submit'>{_e(copy['delete_button'])}</button></p>"
+        "</form></div>" + _stores(copy, retention_days) + "<div class='acct-card acct-export'>"
         f"<h3>{_e(copy['export_title'])}</h3><p class='muted'>{_e(copy['export_help'])}</p>"
         f"<a class='btn btn-ghost' href='{path('account', locale)}/datos' download>"
         f"{icon('file')} {_e(copy['export_button'])}</a></div>"
-        "</section>"
     )
-    body = (
-        _alert(copy, error, flash)
-        + _email_status_card(
+    reports_part = _part(
+        copy,
+        "reports",
+        reports
+        + strategies_section(locale=locale, csrf=csrf, strategies=strategies, audits=audits),
+    )
+    credits_part = _part(
+        copy,
+        "credits",
+        buy
+        + codes_html
+        + purchases
+        + (invite_section(locale, invite) if invite is not None else ""),
+    )
+    security_part = _part(
+        copy,
+        "security",
+        _email_status_card(
             copy,
             locale,
             csrf,
@@ -2761,19 +2854,22 @@ def account_page(
             delivery_ready=email_delivery_ready,
             verification_required=email_verification_required,
         )
+        + recovery_nudge
+        + security,
+    )
+    body = (
+        # The message stays with the four links, which follow the reader down
+        # the page: a redirect that lands on a block lower down still shows it.
+        _parts_nav(copy, _alert(copy, error, flash))
         + (_visit_notice(copy, locale, notice) if notice else "")
         + header
-        + recovery_nudge
         + kpis
         # Without credits, how to get more comes before the list.
-        + (buy if credits == 0 else "")
-        + reports
-        + strategies_section(locale=locale, csrf=csrf, strategies=strategies, audits=audits)
-        + (invite_section(locale, invite) if invite is not None else "")
-        + codes_html
-        + (buy if credits > 0 else "")
-        + purchases
-        + security
+        + (credits_part if credits == 0 else "")
+        + reports_part
+        + (credits_part if credits > 0 else "")
+        + security_part
+        + _part(copy, "data", data)
     )
     return _shell(
         locale,
@@ -2793,7 +2889,6 @@ def report_box(
     csrf: str = "",
     credits: int = 0,
     locked: bool = False,
-    next_path: str = "",
     card_offer: bool = False,
 ) -> str:
     """The account line on a report page.
@@ -2802,18 +2897,21 @@ def report_box(
     ``unsaved`` (signed in, not on any account) or ``other`` (on another
     account). ``query`` is the report's own query string (token and language)
     for the forms; ``credits`` offers the one-click unlock when ``locked``.
+    A signed-out visitor goes to sign-up or sign-in through a form, so the
+    report's key is never written inside a ``next`` address.
     """
     locale = _locale(locale)
     copy = COPY[locale]
     base = f"/audits/{audit_id}"
     parts: list[str] = []
     if state == "anon":
-        suffix = f"?next={_e(_q(next_path))}" if next_path else ""
         parts.append(
             f"<span>{_e(copy['anon_box'])}</span>"
-            f"<a class='btn btn-dark btn-sm' href='{path('signup', locale)}{suffix}'>"
-            f"{_e(copy['anon_signup'])}</a>"
-            f"<a href='{path('signin', locale)}{suffix}'>{_e(copy['anon_signin'])}</a>"
+            f"<form method='post' action='{_e(base)}/account{_e(query)}'>"
+            "<button class='btn btn-dark btn-sm' type='submit' name='go' value='signup'>"
+            f"{_e(copy['anon_signup'])}</button> "
+            "<button class='btn btn-ghost btn-sm' type='submit' name='go' value='signin'>"
+            f"{_e(copy['anon_signin'])}</button></form>"
         )
     elif state == "mine":
         parts.append(
@@ -2911,7 +3009,7 @@ def _protection_card(
     total = len(items)
     if on == total:
         return (
-            f"<p class='acct-nudge acct-protect-ok'>{icon('shield')}"
+            f"<p class='acct-nudge acct-protect-ok' id='proteccion'>{icon('shield')}"
             f"<span>{_e(copy['protect_all'])}</span></p>"
         )
     rows = ""
@@ -3233,7 +3331,7 @@ def strategies_section(
         )
         form = (
             f"<form class='acct-card strat-file' method='post' action='{base}/guardar'>"
-            f"<h3>{_e(copy['file_title'])}</h3>"
+            f"<h4>{_e(copy['file_title'])}</h4>"
             + _hidden("csrf", csrf)
             + _field(copy["report"], f"<select name='audit_id' required>{report_options}</select>")
             + _field(copy["strategy"], f"<select name='strategy'>{strategy_options}</select>")
@@ -3248,7 +3346,7 @@ def strategies_section(
     else:
         form = f"<p class='muted'>{_e(copy['no_reports'])}</p>"
     return (
-        f"<section class='acct-sec' id='estrategias'><h2>{_e(copy['section_title'])}</h2>"
+        f"<section class='acct-sec' id='estrategias'><h3>{_e(copy['section_title'])}</h3>"
         f"<p class='muted'>{_e(copy['section_lead'])}</p>{listing}{form}"
         f"<style>{STRATEGY_CSS}</style></section>"
     )

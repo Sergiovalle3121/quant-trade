@@ -50,8 +50,10 @@ PUBLIC_PAGES: tuple[dict[str, str], ...] = (
     dict(METHOD_PATH),
     *({lang: audience_url(a.slug, lang) for lang in ("es", "en", "pt")} for a in AUDIENCE_PAGES),
     dict(CHECK_PATH),
-    {"es": "/terminos", "en": "/terms"},
-    {"es": "/privacidad", "en": "/privacy"},
+    {"es": "/terminos", "en": "/terms", "pt": "/pt/termos"},
+    {"es": "/privacidad", "en": "/privacy", "pt": "/pt/privacidade"},
+    # The contact page (pages.CONTACT_PATHS, kept in step by a test).
+    {"es": "/contacto", "en": "/en/contact", "pt": "/pt/contato"},
 )
 
 #: Paths crawlers are asked to skip: report URLs carry the owner's token.
@@ -80,6 +82,32 @@ DISALLOWED_PATHS: tuple[str, ...] = (
     "/pt/esqueci",
     "/pt/redefinir",
 )
+
+#: Private pages a crawler may fetch but must not list: the comparison of two
+#: reports and the e-mail confirmation (compare.COMPARE_PATH and mail.PATHS, kept
+#: in step by a test). They carry the header and stay out of ``robots.txt``, so
+#: a crawler that finds a link reads the ``noindex`` instead of guessing.
+NOINDEX_PATHS: tuple[str, ...] = (
+    "/comparar",
+    "/compare",
+    "/pt/comparar",
+    "/confirmar-correo",
+    "/confirm-email",
+    "/pt/confirmar-email",
+)
+
+
+def _under(path: str, prefix: str) -> bool:
+    """Whether ``path`` is ``prefix`` or a page below it: ``/pt/contato`` is not
+    under ``/pt/conta``."""
+    if prefix.endswith("/"):
+        return path.startswith(prefix)
+    return path == prefix or path.startswith(prefix + "/")
+
+
+def is_private_path(path: str) -> bool:
+    """Whether a page at ``path`` must carry the ``noindex`` header."""
+    return any(_under(path, prefix) for prefix in DISALLOWED_PATHS + NOINDEX_PATHS)
 
 
 @dataclass(frozen=True)
@@ -195,7 +223,23 @@ def private_meta(title: str, locale: str) -> str:
 
 
 def robots_txt(base_url: str) -> str:
-    lines = ["User-agent: *", *(f"Disallow: {path}" for path in DISALLOWED_PATHS), "Allow: /"]
+    # A rule matches by prefix, so ``Disallow: /pt/conta`` would also close the
+    # public ``/pt/contato``: such a page gets its own, longer ``Allow`` line,
+    # listed first for the crawlers that stop at the first rule that matches.
+    allowed = sorted(
+        {
+            path
+            for pair in PUBLIC_PAGES
+            for path in pair.values()
+            if path.startswith(DISALLOWED_PATHS) and not is_private_path(path)
+        }
+    )
+    lines = [
+        "User-agent: *",
+        *(f"Allow: {path}" for path in allowed),
+        *(f"Disallow: {path}" for path in DISALLOWED_PATHS),
+        "Allow: /",
+    ]
     lines += ["", f"Sitemap: {base_url.rstrip('/')}/sitemap.xml", ""]
     return "\n".join(lines)
 
@@ -223,6 +267,7 @@ __all__ = [
     "BRAND",
     "DISALLOWED_PATHS",
     "NOINDEX",
+    "NOINDEX_PATHS",
     "OG_IMAGE_LOCALE",
     "OG_LOCALE",
     "PUBLIC_PAGES",
@@ -230,6 +275,7 @@ __all__ = [
     "TAGLINE",
     "PageMeta",
     "head_meta",
+    "is_private_path",
     "page_paths",
     "private_meta",
     "robots_txt",
