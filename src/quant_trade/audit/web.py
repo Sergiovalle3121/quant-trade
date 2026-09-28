@@ -1566,9 +1566,9 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         app.add_api_route(alias, _to_contact, methods=["GET"], include_in_schema=False)
 
     @app.get("/en", response_class=HTMLResponse)
-    def index_en(request: Request) -> Response:
+    def index_en(request: Request, extras: int = 0) -> Response:
         """A short address to share with English-speaking traders."""
-        return index(request, lang="en")
+        return index(request, lang="en", extras=extras)
 
     @app.get("/pt", response_class=HTMLResponse)
     def index_pt(

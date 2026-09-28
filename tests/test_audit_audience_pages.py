@@ -139,6 +139,8 @@ def test_robot_buyers_land_on_the_form_with_the_extra_files_open(tmp_path: Path)
     # Links shared before the form had its own page still open the extra boxes.
     old = client.get("/?lang=es&extras=1", follow_redirects=False)
     assert old.status_code == 303 and old.headers["location"] == "/auditar?extras=1"
+    old_en = client.get("/en?extras=1", follow_redirects=False)
+    assert old_en.status_code == 303 and old_en.headers["location"] == "/en/audit?extras=1"
 
 
 @pytest.mark.parametrize(
