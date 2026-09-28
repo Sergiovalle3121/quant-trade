@@ -46,10 +46,10 @@ from quant_trade.audit.forensics import (
 from quant_trade.audit.owner import MAX_FAILED_LOGINS_PER_HOUR, PANEL_PATH
 from quant_trade.audit.owner import TEXT as PANEL_COPY
 from quant_trade.audit.pages import (
+    AUDIT_PATHS,
     BADGE_NOTICE,
     _e,
     _field,
-    _home,
     _page,
     _page_hero,
     _utc_time,
@@ -671,7 +671,7 @@ def public_page(
             f"alt='{_e(BADGE_NOTICE[locale])}' width='480' height='72'></div>"
         )
     footer = (
-        f"<p class='check-cta'>{icon('shield')}<span><a href='{_home(locale)}#subir'>"
+        f"<p class='check-cta'>{icon('shield')}<span><a href='{AUDIT_PATHS[locale]}'>"
         f"{_e(copy['other_record'])}</a></span></p>"
     )
     body = top + notice + facts + stretch + events + notes + limits + tail + footer

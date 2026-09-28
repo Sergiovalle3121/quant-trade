@@ -2463,6 +2463,16 @@ an account never changes what a report says.
   trouble let the address through (lookups give up after
   `inbox.DNS_LIFETIME_SECONDS`, 3 s), so a slow resolver never refuses a
   customer. On in the service; `AUDIT_SKIP_EMAIL_DNS=true` turns it off.
+  Before those checks pass, sign-up asks «¿Quisiste decir ana@gmail.com?»
+  (`email_typo`, ES/EN/PT) when the domain is one or two keystrokes from a
+  well-known provider (`inbox.suggest_domain`: gmial.com, gmail.co,
+  hotmal.com, outlok.com, yahooo.com, icloud.co…). Typo domains often have
+  mail servers of a squatter's, so confirmation and recovery mail would
+  reach a stranger. The form comes back with the corrected address; a box
+  keeps the typed one, which still goes through every other check. Known
+  providers (`inbox.COMMON_PROVIDERS`, e.g. mail.com, gmx.de) are never
+  questioned, and neither are short names like aol or live beyond their
+  ending (aon.com stays silent).
   While e-mail confirmation is off, a shared IPv4 address gets
   `WELCOME_REPORTS_PER_IPV4_UNVERIFIED` (3) free reports a month instead of
   the carrier-sized `WELCOME_REPORTS_PER_IPV4_PER_MONTH` (10).
