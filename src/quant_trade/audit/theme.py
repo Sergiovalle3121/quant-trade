@@ -564,7 +564,6 @@ color:var(--text);font-size:.92rem}
 .ribbon{position:absolute;top:24px;right:24px;font:500 .66rem var(--mono);letter-spacing:.1em;
 text-transform:uppercase;padding:5px 10px;border-radius:999px;color:var(--btn-fg);background:var(--btn-bg)}
 .pay-ways{margin:28px 0 0;max-width:1000px}
-.refund-note{margin-top:16px}
 .faq{max-width:900px}
 .faq details{border-bottom:1px solid var(--border)}
 .faq details:first-child{border-top:1px solid var(--border)}
@@ -1387,7 +1386,62 @@ table.currency th,table.currency td{padding:6px 8px!important}}
 """
 
 #: The full stylesheet, inlined in every page.
-STYLE = FONTS + BASE + NAV + BUTTONS + HERO + MOCK + SECTIONS + FORMS + ALERTS + FOOTER
+# The landing's first screen: copy beside the report, and the language menu.
+HERO_SPLIT = """
+.hero-split{text-align:left;padding:clamp(40px,6vw,88px) 0 clamp(56px,7vw,96px)}
+.hero-grid{display:grid;grid-template-columns:minmax(0,.92fr) minmax(0,1.08fr);gap:clamp(32px,4.5vw,72px);
+align-items:center}
+.hero-split h1{font-size:clamp(2.5rem,4.6vw,4.4rem);margin:22px 0 20px;max-width:none}
+.hero-split h1 .l{white-space:nowrap}
+.hero-split h1 em{background:linear-gradient(92deg,#f4f4f6 0%,#9aa6ff 45%,#6ee7a8 100%);
+-webkit-background-clip:text;background-clip:text;color:transparent}
+.hero-split .lead{margin:0;max-width:34em}
+.hero-split .hero-cta{justify-content:flex-start;margin-top:34px}
+.hero-split .trust{justify-content:flex-start;flex-direction:column;align-items:flex-start;gap:10px;
+margin-top:32px}
+.hero-split .stage{margin:0;padding:0;max-width:none}
+.hero-split .stage::before{left:0;right:0;top:6%;bottom:0;background:radial-gradient(closest-side,
+rgba(120,140,255,.34),rgba(110,231,168,.12) 55%,transparent)}
+.hero-split .stage .mock{animation:float 7s ease-in-out 1.6s infinite}
+.hero-split .mock-body{grid-template-columns:minmax(0,1fr)}
+.hero-split .mock-col+.mock-col{border-left:0;border-top:1px solid rgba(255,255,255,.07)}
+.hero-split .mock-kpis{margin-top:14px}
+.hero-split .mock-col{padding:18px 24px}
+.hero-split .mock-dims{margin-top:12px}
+.hero-split .mock-dims li{padding:8px 0}
+.hero-split .spark{max-height:118px;width:100%}
+.hero-split .mock-t{font-size:.9rem}
+.hero-split .mock-cap{text-align:left}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
+@media (max-width:980px){.hero-grid{grid-template-columns:minmax(0,1fr)}
+.hero-split{text-align:center}.hero-split .lead{margin:0 auto}
+.hero-split .hero-cta,.hero-split .trust{justify-content:center;align-items:center}
+.hero-split .mock-cap{text-align:center}}
+@media (prefers-reduced-motion:reduce){.hero-split .stage .mock{animation:none}}
+.langs{position:relative}
+.langs>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:6px;
+font-size:.78rem;font-weight:500;color:#a3a3aa;padding:7px 10px;border-radius:999px;
+transition:color .2s,background .2s;min-height:36px}
+.langs>summary::-webkit-details-marker{display:none}
+.langs>summary:hover,.langs[open]>summary{color:#fff;background:rgba(255,255,255,.07)}
+.langs>summary svg{width:15px;height:15px}
+.langs>summary .chev{width:12px;height:12px;transition:transform .25s var(--ease)}
+.langs[open]>summary .chev{transform:rotate(180deg)}
+.langs-panel{position:absolute;right:0;top:calc(100% + 8px);min-width:170px;display:grid;gap:2px;
+padding:8px;border-radius:16px;border:1px solid rgba(255,255,255,.12);background:rgba(14,14,16,.97);
+box-shadow:0 24px 50px -18px rgba(0,0,0,.8);backdrop-filter:blur(20px);
+-webkit-backdrop-filter:blur(20px);animation:drop .3s var(--ease);z-index:60}
+.langs-panel a,.langs-panel span{display:block;text-decoration:none;font-size:.9rem;
+color:#e6e6ea;padding:10px 12px;border-radius:10px}
+.langs-panel a:hover{background:rgba(255,255,255,.07)}
+.langs-panel span{color:#fff;font-weight:600;background:rgba(255,255,255,.05)}
+@media (max-width:520px){.nav-end>.langs{display:none}}
+.dims-legend{list-style:none;margin:28px 0 0;padding:0;display:flex;flex-wrap:wrap;gap:12px 32px;
+color:var(--text-3);font-size:.84rem}
+.dims-legend li{display:flex;align-items:center;gap:10px}
+"""
+
+STYLE = FONTS + BASE + NAV + BUTTONS + HERO + HERO_SPLIT + MOCK + SECTIONS + FORMS + ALERTS + FOOTER
 STYLE += REPORT + STATS + VERIFY + MOTION + PRINT
 
 

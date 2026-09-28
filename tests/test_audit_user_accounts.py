@@ -720,7 +720,7 @@ def test_the_landing_says_the_free_preview_comes_with_an_account(tmp_path: Path)
     assert "Tu primer informe completo, gratis al crear tu cuenta" in es
     assert "después, 3 vistas previas gratis al mes. Sin tarjeta." in es
     assert "Primer informe completo gratis con tu cuenta" in es
-    assert "el primer informe completo y 3 al mes" in es
+    assert "tu primer informe completo; después, 3 vistas previas al mes" in es
     assert "cuenta opcional" not in es and "cuenta es opcional" not in es
     assert "sin crear cuenta" not in es and "Cuenta gratis opcional" not in es
     en = client.get("/en").text
