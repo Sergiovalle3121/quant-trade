@@ -41,59 +41,39 @@ def test_start_free_goes_to_sign_up_when_an_upload_needs_an_account(locale: str)
 
 @pytest.mark.parametrize("locale", sorted(SIGNUP))
 def test_the_landing_sells_what_the_full_report_now_measures(locale: str) -> None:
+    # The long feature cards left the landing (too much text); the price card still
+    # names what the full report measures, and the language menu offers all three.
     ui = _UI[locale]
-    titles = [title for _, title, _ in ui["diffs"]]
-    assert len(titles) == 7
     words = {
         "es": ("efectivo", "VIX", "inflación"),
         "en": ("cash", "VIX", "inflation"),
         "pt": ("caixa", "VIX", "inflação"),
     }[locale]
-    text = _text(landing(locale=locale, free_mode=False, signed_in=False))
+    page = landing(locale=locale, free_mode=False, signed_in=False)
+    text = _text(page)
     for word in words:
-        assert word in " ".join(t for _, _, t in ui["diffs"]), word
         assert word in " ".join(ui["full_items"]), word
-    assert "FRED" in text and "3" in text
-    # The report and its public page exist in three languages, and the chip says so.
-    chip = " ".join(t for _, t in ui["trust"])
-    assert {"es": "portugués", "en": "Portuguese", "pt": "português"}[locale] in chip
+        assert word in text, word
+    assert "class='langs'" in page
+    for name in ("Español", "English", "Português"):
+        assert name in text
     assert find_claims(text) == []
 
 
 @pytest.mark.parametrize(
-    ("locale", "own_inflation", "available", "official", "obsolete"),
+    ("locale", "own_inflation", "available"),
     [
-        (
-            "es",
-            "propia inflación",
-            "índices de precios disponibles",
-            "fuentes estadísticas oficiales",
-            "inflación de EE. UU.",
-        ),
-        (
-            "en",
-            "own inflation",
-            "price indexes are available",
-            "official statistical sources",
-            "after US inflation",
-        ),
-        (
-            "pt",
-            "própria inflação",
-            "índices de preços disponíveis",
-            "fontes estatísticas oficiais",
-            "inflação dos EUA",
-        ),
+        ("es", "inflación propia", "con datos disponibles"),
+        ("en", "its own inflation", "where data is available"),
+        ("pt", "inflação própria", "com dados disponíveis"),
     ],
 )
 def test_landing_names_each_currency_inflation_and_its_data_limit(
-    locale: str, own_inflation: str, available: str, official: str, obsolete: str
+    locale: str, own_inflation: str, available: str
 ) -> None:
     text = _text(landing(locale=locale, free_mode=False, signed_in=False))
     assert own_inflation in text
     assert available in text
-    assert official in text and "FRED" in text
-    assert obsolete not in text
     assert find_claims(text) == []
 
 
