@@ -128,6 +128,25 @@ Every change below has an offline, deterministic test in
   hashed keys), so deploys no longer reset them. Parked: sign-up's 409
   confirms an e-mail exists (needs e-mail verification); scrypt N=2^14.
 
+## Launch basics (2026-09-28)
+
+Reviewed against `main` at 9c77197. Scope: which pages search engines may
+list, the icon files and the language of error pages. No control was
+relaxed: the Content Security Policy, the other security headers, the rate
+limits and the redirect from Railway's address are unchanged. Every change
+has an offline, deterministic test in `tests/test_audit_launch_basics.py`.
+
+| # | Finding | Severity | Fix |
+|---|---|---|---|
+| L1 | The `X-Robots-Tag` header was decided with `path.startswith(DISALLOWED_PATHS)`, so the public `/pt/contato` was caught by the account prefix `/pt/conta` and kept out of search engines, by the header and by `robots.txt`. No private page was exposed. | Low | `seo.is_private_path` matches an entry or a page below it (`/pt/conta`, `/pt/conta/...`), not a longer word. `robots.txt` keeps every `Disallow` line and adds `Allow: /pt/contato` before them. Every route was compared with every private prefix: this was the only pair, and a test keeps it so. Every account, report, webhook and health path keeps its header. |
+| L2 | The comparison pages (`/comparar`, `/compare`, `/pt/comparar`) and the e-mail confirmation pages (`/confirmar-correo`, `/confirm-email`, `/pt/confirmar-email`) were private only by `<meta name="robots">`; their 200 answers had no `X-Robots-Tag`. | Low | They send `X-Robots-Tag: noindex, nofollow` (`seo.NOINDEX_PATHS`), on every status. They are left out of `robots.txt` on purpose, so a crawler that follows a link reads the header. |
+| L3 | `/favicon.ico` answered 404. | Low | `/favicon.ico` and `/apple-touch-icon.png` serve two files from the static allow-list (`theme.STATIC_FILES`, `theme.ICON_PATHS`): the route takes no file name from the request. They carry every security header and `Cache-Control: public, max-age=604800`, the same as `/static/`; every other route stays `no-store`. The policy `img-src 'self' data:` already allowed them. A read on Railway's address is forwarded to the domain like any other. |
+| L4 | An error page under an English address was in Spanish. | Low | The language comes from the first step of the path, compared with a fixed set built from the route tables (`web.ENGLISH_ROOTS`); `?lang=` still accepts only `es`, `en` or `pt`. Nothing from the request is echoed. |
+
+Not changed here: `/panel` is not in `robots.txt` (another change handles
+the panel). The 413 and "busy" pages, built before routing, still choose
+their language from `?lang=` only.
+
 ## What the operator sets on Railway
 
 - `AUDIT_BASE_URL=https://<your domain>`: absolute links stop depending on

@@ -2092,7 +2092,7 @@ with an empty value):
 | Variable | Default | Meaning |
 |---|---|---|
 | `DATABASE_URL` | `sqlite:///state/audit/audit.db` | SQLite file or Railway Postgres (`postgres://` is normalised to `postgresql+psycopg://`). |
-| `AUDIT_BASE_URL` | `http://localhost:8000` | Public URL used in Stripe success and cancel links, canonical and Open Graph links, the badge snippet, `robots.txt` and `sitemap.xml`. While it is left at the default, those links use the address the request reached (`https` when `AUDIT_TRUSTED_PROXY_HOPS` > 0). Set it to your domain in production. |
+| `AUDIT_BASE_URL` | `http://localhost:8000` | Public URL used in Stripe success and cancel links, canonical and Open Graph links, the badge snippet, `robots.txt` and `sitemap.xml`. While it is left at the default, the page links (canonical, Open Graph, badge snippet, `robots.txt`, `sitemap.xml`) use the address the request reached (`https` when `AUDIT_TRUSTED_PROXY_HOPS` > 0). The Stripe return links do not: `audit/payments.py` always builds them from `AUDIT_BASE_URL`, so with the default a buyer would be sent back to `http://localhost:8000`. Set it to your domain in production. |
 | `AUDIT_FREE_MODE` | `true` | Serve watermarked reports with nothing locked. Forced `true` unless both Stripe secrets are set or `AUDIT_ACCESS_CODES=true`. |
 | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` | empty | Both are needed for card payments: a secret (`sk_…`) or restricted (`rk_…`) key and the webhook signing secret (`whsec_…`). A publishable key (`pk_…`) leaves card payments off. `/health` shows `card_mode` (`off`, `test`, `live`) from the key's prefix, never the key. |
 | `STRIPE_PAYMENT_LINK_SINGLE`, `STRIPE_PAYMENT_LINK_PACK` | empty | Historical Payment Links (`https://buy.stripe.com/…`) for one audit and the pack. They do not create a frozen database order before payment. This branch no longer presents live links as a new buying path because they bypass country admission; signed webhooks for historical paid links remain accepted. |
@@ -2103,8 +2103,8 @@ with an empty value):
 | `AUDIT_ACCESS_CODES` | `false` | Offer manual access-code sales and typed-code redemption. With `AUDIT_FREE_MODE=false` it turns on paid mode without Stripe. Credits already on an account remain spendable when this is `false`. |
 | `AUDIT_REFERRAL_REWARDS` | `true` | Set `false` to stop new invite rewards and hide the reward promise during an incident. Previously granted credits remain usable. |
 | `AUDIT_REFERRAL_GLOBAL_MONTHLY_CAP` | `100` | Maximum rewarded invites across the whole service per UTC month, reserved transactionally in `referral_global_slots`. At one credit per invite this caps the new monthly credit obligation. `0` stops new rewards. |
-| `AUDIT_EMAIL_VERIFICATION_REQUIRED` | `false` | Migration default. When `true`, both addresses must be confirmed before an invite reward and a buyer's address before a new Checkout. Sign-up still works; the free first full report waits until the address is confirmed (earlier uploads are previews with reason `unverified`). **Public paid launch requires `true` and SMTP verified end to end.** |
-| `AUDIT_EMAIL_TOKEN_SECRET`, `AUDIT_SMTP_HOST`, `AUDIT_SMTP_PORT`, `AUDIT_SMTP_USERNAME`, `AUDIT_SMTP_PASSWORD`, `AUDIT_SMTP_FROM`, `AUDIT_SMTP_SECURITY` | empty / `587` / `starttls` | Stable secret of at least 32 characters shared by replicas and encrypted SMTP transport. `/ready` fails when verification is required but delivery is not configured. Test real delivery, retries and legacy account confirmation before launch. No usable token or link is stored in the outbox. |
+| `AUDIT_EMAIL_VERIFICATION_REQUIRED` | `false` | Migration default. When `true`, both addresses must be confirmed before an invite reward and a buyer's address before a new Checkout. Sign-up still works; the free first full report waits until the address is confirmed (earlier uploads are previews with reason `unverified`). **Public paid launch requires `true` and e-mail delivery (Resend's API or SMTP, see the next two rows) verified end to end.** |
+| `AUDIT_EMAIL_TOKEN_SECRET`, `AUDIT_SMTP_HOST`, `AUDIT_SMTP_PORT`, `AUDIT_SMTP_USERNAME`, `AUDIT_SMTP_PASSWORD`, `AUDIT_SMTP_FROM`, `AUDIT_SMTP_SECURITY` | empty / `587` / `starttls` | Stable secret of at least 32 characters shared by replicas and encrypted SMTP transport. SMTP is one of two transports: when `AUDIT_RESEND_API_KEY` is set (next row but one) the mail goes through Resend's HTTPS API and the `AUDIT_SMTP_HOST`, port, user, password and security variables are not used; the sender is `AUDIT_EMAIL_FROM`, or `AUDIT_SMTP_FROM` when that is empty. `/ready` fails when verification is required but delivery is not configured. Test real delivery, retries and legacy account confirmation before launch. No usable token or link is stored in the outbox. |
 | `AUDIT_SKIP_EMAIL_DNS` | `false` | `true` stops the sign-up DNS check that refuses domains taking no mail (for a staging copy without DNS). |
 | `AUDIT_RESEND_API_KEY`, `AUDIT_EMAIL_FROM` | empty | Resend's HTTPS API, used instead of SMTP when the key (`re_…`) is set. Railway disables outbound SMTP below the Pro plan, so this is the transport that works there. `AUDIT_EMAIL_FROM` (alias of `AUDIT_SMTP_FROM`) must be an address on a domain verified in Resend; until a domain is verified Resend only delivers to the Resend account owner. When `AUDIT_EMAIL_TOKEN_SECRET` is empty, the token secret is derived from the Resend key (HMAC-SHA256), so rotating the key voids only links still pending (24 h at most). The Message-ID is sent as Resend's `Idempotency-Key`, so a retry after a lost reply is not delivered twice. The privacy page names Resend and links its policy while it carries the mail. |
 | `AUDIT_CONTACT_URL` | empty | Where a client asks for a code (for example a `https://wa.me/…` link or a `mailto:`). Only `https://` and `mailto:` are shown. |
@@ -2155,6 +2155,17 @@ webhook replay cannot queue another notice. The message contains only the
 order reference, charged amount, currency and plan, never a report token or
 result. Delivery is at least once: monitor dead/retrying rows and verify real
 SMTP in staging before promising an email to buyers.
+
+**No "your report is ready" e-mail (product decision, 2026-09-28).** The
+report is produced on screen right after the upload and stays in "Mi
+cuenta" ("My account", "Minha conta"), so there is nothing to wait for and
+no separate e-mail announces it. The outbox knows six kinds and none is a
+report notice: `verify`, `change`, `reset`, `purchase`, `charge_review` and
+`market_review`. A purchase produces two messages: the service's own
+purchase e-mail described above, and Stripe's automatic receipt (receipts
+for successful payments are enabled in the Stripe account since
+2026-09-28). The receipt is sent by Stripe to the address typed in Checkout;
+the service neither sends nor stores it.
 `/ready` reports numeric `warnings.purchase_mail_dead`,
 `warnings.purchase_mail_overdue` and `warnings.purchase_mail_probe_failed`
 without turning an SMTP delivery failure into a service restart. Monitor
@@ -2179,8 +2190,9 @@ to all buyers until old sessions are reconciled.
 ### Deploying on Railway
 
 1. Create a service from this repository. `railway.json` selects
-   `Dockerfile.web` and the `/health` check; the container listens on
-   `$PORT`.
+   `Dockerfile.web` and the `/ready` check (`healthcheckPath`; `/health`
+   stays as a liveness probe that does not query storage, see "Operator
+   probes and incident admission"); the container listens on `$PORT`.
    Every merge redeploys, and Railway's default draining time (SIGTERM to
    SIGKILL) is 0 s. Set the service's Draining time to 120 s (Settings, or
    the variable `RAILWAY_DEPLOYMENT_DRAINING_SECONDS=120`); `railway.json`
@@ -2206,6 +2218,7 @@ to all buyers until old sessions are reconciled.
    host answers 308 to the same path and query on `AUDIT_BASE_URL`, so old
    report, verification and badge links keep working. POSTs (the Stripe
    webhook, forms) and `/health`, `/ready` are served where they arrive.
+   See "Moving to the custom domain" below for the whole move.
 4. Leave `AUDIT_FREE_MODE=true` until the first paid audit is wanted. To
    sell with access codes only (no Stripe), set `AUDIT_ACCESS_CODES=true`,
    `AUDIT_FREE_MODE=false`, `AUDIT_PRICE_USD_CENTS` and optionally
@@ -2230,6 +2243,34 @@ to all buyers until old sessions are reconciled.
 6. Set the four `AUDIT_OPERATOR_*`/`AUDIT_JURISDICTION` variables. Until
    they are set, `/terminos` and `/privacidad` show "[sin configurar]" and a
    warning, and `/health` reports `"legal_configured": false`.
+
+### Moving to the custom domain
+
+The site's address is `https://rigorscore.com`. What the move consists of:
+
+- **Canonical host.** `AUDIT_BASE_URL=https://rigorscore.com` on Railway. It
+  is the address in canonical, Open Graph and `hreflang` tags, `robots.txt`,
+  `sitemap.xml`, the badge snippet, the links in every e-mail and the passkey
+  relying party. With `https` it also turns HSTS on.
+- **Old address.** The Railway address stays attached to the service. A GET
+  or HEAD on any `*.up.railway.app` host answers 308 to the same path and
+  query on `AUDIT_BASE_URL` (`old_address` in `audit/web.py`), the icon files
+  included. `/health` and `/ready` are never redirected, so Railway's own
+  probe keeps answering where it looks.
+- **Stripe webhook.** The endpoint is `POST /webhooks/stripe`. A POST is
+  never redirected on either host, so an endpoint still registered in Stripe
+  with the Railway address keeps delivering; register the one on
+  `https://rigorscore.com/webhooks/stripe` and retire the old one once the new
+  one has delivered.
+- **Stripe return links.** The success and cancel links of every Checkout
+  (report, account credit, card check) are built from `AUDIT_BASE_URL`
+  (`audit/payments.py`), never from the address the request reached: a buyer
+  who started on the old address comes back on the domain.
+- **Passkeys** registered on the old host stop working (see "Passkeys" under
+  customer accounts); password, code and recovery key are unaffected.
+
+`tests/test_audit_domain_move.py` and `tests/test_audit_launch_basics.py`
+cover the redirect, the posts that stay and the icons.
 
 ### Testing a deployment on Railway
 
@@ -2928,6 +2969,39 @@ the page itself is `noindex` so that an unpublished audit does not stay in
 search results. No page sets `og:image`: the badge is SVG, which most chat
 apps do not preview. Every new page must pass the guard in both languages
 (`tests/test_audit_guides_seo.py`).
+
+Launch basics (2026-09-28, `tests/test_audit_launch_basics.py`):
+
+- **Icon.** `/favicon.ico` (16, 32 and 48 px) and `/apple-touch-icon.png`
+  (180 px) are files in `audit/static/`, drawn from the brand mark by
+  `tools/make_favicon.py` with the standard library only. They are served
+  from the static allow-list (`theme.ICON_PATHS`) with the static files'
+  one-week `Cache-Control`, and every page links them next to the inline SVG
+  icon. Both are same-origin images, which `img-src 'self' data:` allows.
+- **Private by address, not by prefix.** `seo.is_private_path` decides the
+  `X-Robots-Tag` header: a path is private when it is a `DISALLOWED_PATHS`
+  entry or a page below it, so `/pt/contato` (contact) is no longer caught
+  by `/pt/conta` (account). `robots.txt` rules match by prefix, so the file
+  keeps `Disallow: /pt/conta` and adds `Allow: /pt/contato` before it: the
+  longer rule wins. A test compares every route with every private prefix;
+  `/pt/contato` is the only such pair.
+- **Header-only pages.** `/comparar`, `/compare`, `/pt/comparar` and the
+  e-mail confirmation pages (`/confirmar-correo`, `/confirm-email`,
+  `/pt/confirmar-email`) send `X-Robots-Tag: noindex, nofollow`
+  (`seo.NOINDEX_PATHS`). They are not in `robots.txt`: a crawler that is kept
+  out of a page cannot read its `noindex`.
+- **Sitemap.** The three contact pages and the Portuguese terms and privacy
+  pages are in `PUBLIC_PAGES`, so they have canonical, `og:url`, `hreflang`
+  and a sitemap entry like the other public pages.
+- **Error pages by address.** Without `?lang=`, an error page is Portuguese
+  under `/pt`, English under `/en` and under the English addresses that have
+  no prefix (`web.ENGLISH_ROOTS`, read from `PUBLIC_PAGES`, the account and
+  e-mail paths and the comparison path), and Spanish otherwise. `?lang=`
+  still decides. The 413 and "busy" pages built before routing
+  (`_scope_locale`) still use `?lang=` only.
+- **Sample title.** The tab title of `/ejemplo` and `/pt/exemplo` ends in
+  "ejemplo" and "exemplo" instead of the report id "sample". The report and
+  its numbers are untouched.
 
 ### Terms and privacy
 
