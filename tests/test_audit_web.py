@@ -276,7 +276,8 @@ def test_checkout_is_off_in_free_mode_and_webhook_is_absent(tmp_path: Path) -> N
 
 
 def test_paid_mode_locks_until_the_signed_webhook_arrives(tmp_path: Path) -> None:
-    client = _client(tmp_path, free_mode=False, **STRIPE)
+    # Live Checkout opens only for a reviewed market and a declared country.
+    client = _client(tmp_path, free_mode=False, approved_markets=frozenset({"MX"}), **STRIPE)
     assert client.get("/health").json()["stripe_enabled"] is True
     audit_id, token = _id_and_token(_upload(client).headers["location"])
 
@@ -292,7 +293,11 @@ def test_paid_mode_locks_until_the_signed_webhook_arrives(tmp_path: Path) -> Non
         return "https://checkout.stripe.test/session"
 
     client.app.state.checkout_factory = fake_checkout
-    redirect = client.post(f"/audits/{audit_id}/checkout?token={token}", follow_redirects=False)
+    redirect = client.post(
+        f"/audits/{audit_id}/checkout?token={token}",
+        data={"billing_country": "MX"},
+        follow_redirects=False,
+    )
     assert redirect.status_code == 303
     assert redirect.headers["location"] == "https://checkout.stripe.test/session"
     assert seen == [(audit_id, token)]
@@ -328,7 +333,9 @@ def test_paid_mode_locks_until_the_signed_webhook_arrives(tmp_path: Path) -> Non
     assert client.get(f"/audits/{audit_id}.json?token={token}").status_code == 200
     assert (
         client.post(
-            f"/audits/{audit_id}/checkout?token={token}", follow_redirects=False
+            f"/audits/{audit_id}/checkout?token={token}",
+            data={"billing_country": "MX"},
+            follow_redirects=False,
         ).status_code
         == 303
     )
