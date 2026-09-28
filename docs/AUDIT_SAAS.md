@@ -2340,13 +2340,11 @@ changes what a report says.
   use a monthly preview. It is refused (the upload falls back to the
   free-preview rules) when the account already had it, when this browser
   already gave one (a `rigor_device` cookie holding a random id, stored as
-  its SHA-256), or when the network address reached the monthly cap. Two
-  real users may examine the same file from the same network, within its
-  monthly cap. The
+  its SHA-256), when the same file (SHA-256 of the upload) already got one
+  on any account, or when the network address reached the monthly cap. The
   `welcome_reports` row outlives the account, so deleting and signing up
   again does not repeat it. The purge clears the address; the device and
-  file hashes stay for audit evidence, not a cross-account refusal. "Mi cuenta"
-  shows it as Disponible/Usado. The "file" is
+  file hashes stay. "Mi cuenta" shows it as Disponible/Usado. The "file" is
   a fingerprint of what it says (`accounts.content_fingerprint`: timestamps
   and returns rounded to 5 decimals), so a trailing newline, other line
   endings or renamed columns do not make a new file. When the account's
@@ -2363,7 +2361,7 @@ changes what a report says.
 - **Limits under simultaneous uploads** (`free_claims` table). The checks
   above are a first look that answers at once; after parsing, the upload
   takes its claims in one transaction, all or nothing: the free report takes
-  `welcome:account:`, `welcome:device:` and one numbered
+  `welcome:account:`, `welcome:device:`, `welcome:file:` and one numbered
   per-network slot of the month; a free preview takes one of the account's
   3 numbered slots of the month and one of the network's 10. A claim that
   is taken sends the upload down the next rule (preview, credit, 402 with

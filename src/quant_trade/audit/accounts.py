@@ -553,9 +553,8 @@ def content_fingerprint(frame: Any) -> str:
 
     The curve's timestamps and returns rounded to five decimals: the same
     track record with a trailing newline, other line endings, extra spaces
-    or renamed columns gives the same fingerprint. The mark supports audit
-    and reconciliation; another eligible account is not blocked by the file
-    alone while its browser and network limits still apply.
+    or renamed columns gives the same fingerprint, so it cannot collect a
+    second free full report on another account.
     """
     digest = hashlib.sha256()
     for stamp, ret in zip(frame["timestamp"], frame["ret"], strict=False):

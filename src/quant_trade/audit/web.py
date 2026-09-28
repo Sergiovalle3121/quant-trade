@@ -3639,6 +3639,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                     keys = (
                         f"welcome:account:{account_id}",
                         f"welcome:device:{device_sha256}",
+                        f"welcome:file:{fingerprint}",
                     )
                     if not db.claim_free(reservation, keys=keys, slots=slots, at=now):
                         return None

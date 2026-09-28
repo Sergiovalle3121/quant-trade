@@ -721,10 +721,10 @@ class Store:
             sa.Column("client_ip", sa.String(64), nullable=False, default="", index=True),
             sa.Column("created_at", sa.String(40), nullable=False, index=True),
         )
-        #: The one free full report each new account gets. The browser mark
-        #: prevents repeat claims from that browser; the file SHA-256 records
-        #: the prior use but does not alone bar another eligible account.
-        #: The address is cleared by the retention purge.
+        #: The one free full report each new account gets. The device (a hash
+        #: of a random browser cookie) and the file's SHA-256 stay so that the
+        #: same browser or file never gets a second one on another account;
+        #: the address is cleared by the retention purge.
         self.welcome_reports = sa.Table(
             "welcome_reports",
             self.metadata,
@@ -4002,6 +4002,8 @@ class Store:
                 return "account"
             if device_sha256 and used(table.c.device_sha256 == device_sha256):
                 return "device"
+            if file_sha256 and used(table.c.file_sha256 == file_sha256):
+                return "file"
             if client_ip and (
                 used((table.c.client_ip == client_ip) & (table.c.created_at >= _iso(since)))
                 >= per_ip

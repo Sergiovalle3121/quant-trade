@@ -469,9 +469,8 @@ def terms_text(ctx: LegalContext, locale: str = "es") -> LegalText:
                 "Your account",
                 (
                     (
-                        "A new account's first eligible upload is a free full report, once "
-                        "per account and browser, with a monthly network limit. The same "
-                        "file on another eligible account does not by itself block it. "
+                        "A new account's first file is a free full report, once per account, "
+                        "browser and file, and a few per network address each month. "
                         f"After it, the free preview needs an account: {FREE_PREVIEWS_PER_MONTH} "
                         "a calendar month per account, also counted per network address. Past "
                         "that, each file is a paid report. "
@@ -592,9 +591,8 @@ def terms_text(ctx: LegalContext, locale: str = "es") -> LegalText:
             "Tu cuenta",
             (
                 (
-                    "La primera carga elegible de una cuenta nueva da un informe completo "
-                    "gratis, una vez por cuenta y navegador, con límite mensual por red. "
-                    "El mismo archivo en otra cuenta elegible no la bloquea por sí solo. "
+                    "El primer archivo de una cuenta nueva es un informe completo gratis, una vez "
+                    "por cuenta, navegador y archivo, y unos pocos por dirección de red al mes. "
                     "Después, la vista previa gratis necesita una cuenta: "
                     f"{FREE_PREVIEWS_PER_MONTH} por mes calendario y por cuenta, "
                     "contadas también por dirección de red. "
@@ -690,9 +688,8 @@ def _terms_pt(
     account = (
         (
             "O primeiro arquivo de uma conta nova dá direito a um relatório completo "
-            "gratuito, uma vez por conta e navegador, sujeito também aos limites "
-            "mensais por endereço de rede. O mesmo arquivo em outra conta elegível não "
-            "a bloqueia por si só. Uma rede compartilhada, por si só, não impede "
+            "gratuito, uma vez por conta, navegador e arquivo, sujeito também aos limites "
+            "mensais por endereço de rede. Uma rede compartilhada, por si só, não impede "
             "o acesso. Depois disso, a prévia gratuita exige uma conta: "
             f"{FREE_PREVIEWS_PER_MONTH} por mês civil por conta, também sujeitas aos limites "
             "por rede. Após esses limites, cada arquivo exige pagamento. "
@@ -956,12 +953,10 @@ def privacy_text(ctx: LegalContext, locale: str = "es") -> LegalText:
                     f"after {days} days.",
                     "For the free first full report: a random identifier of your browser "
                     f"(a cookie named {DEVICE_COOKIE}, stored by us only as a hash), the "
-                    "SHA-256 of the file and the network address. The browser and account "
-                    "limits prevent repeat claims; the same file on another eligible account "
-                    "does not block it by itself. The address is cleared after "
-                    f"{days} days; the two hashes stay without your e-mail even if you "
-                    "delete your account. The browser hash helps prevent a repeat claim; "
-                    "the file hash records what was previously used.",
+                    "SHA-256 of the file and the network address, so the same browser or file "
+                    "gets it only once. The address is cleared after "
+                    f"{days} days; the two hashes stay, even if you delete your account and "
+                    "without your e-mail, so the offer cannot be repeated.",
                     "For 'Invite a colleague': each account's invite link, and for an account "
                     "created through someone's link, the date, whether its free first report "
                     "happened and the hash of its browser identifier, to refuse self-invites. "
@@ -1122,12 +1117,10 @@ def privacy_text(ctx: LegalContext, locale: str = "es") -> LegalText:
                 "días.",
                 "Para el primer informe completo gratis: un identificador al azar de tu "
                 f"navegador (una cookie llamada {DEVICE_COOKIE}, que guardamos solo como hash), "
-                "el SHA-256 del archivo y la dirección de red. Los límites por cuenta y "
-                "navegador evitan repetir la oferta; el mismo archivo en otra cuenta elegible "
-                f"no la bloquea por sí solo. La dirección se borra a los {days} días; los "
-                "dos hashes se quedan sin tu correo aunque borres la cuenta. La marca del "
-                "navegador ayuda a impedir un segundo regalo; el hash del archivo deja "
-                "constancia de lo usado.",
+                "el SHA-256 del archivo y la dirección de red, para que el mismo navegador o "
+                f"archivo lo reciba una sola vez. La dirección se borra a los {days} días; los "
+                "dos hashes se quedan, aunque borres tu cuenta y sin tu correo, para que la "
+                "oferta no se repita.",
                 "Para «Invita a un colega»: el enlace de invitación de cada cuenta y, para una "
                 "cuenta creada con el enlace de alguien, la fecha, si ya recibió su primer "
                 "informe gratis y el hash del identificador de su navegador, para rechazar "
@@ -1299,12 +1292,10 @@ def _privacy_pt(
                 f"endereço de rede. O endereço é eliminado com os demais dados após {days} dias.",
                 "Para o primeiro relatório completo gratuito: um identificador aleatório do "
                 f"navegador (cookie {DEVICE_COOKIE}, guardado por nós apenas como hash), "
-                "o SHA-256 do arquivo e o endereço de rede. Os limites por conta e navegador "
-                "evitam repetição; o mesmo arquivo em outra conta elegível não a bloqueia "
-                f"por si só. O endereço é eliminado após {days} dias; "
-                "os dois hashes permanecem sem o e-mail mesmo se você excluir a conta. "
-                "A marca do navegador ajuda a impedir outro presente; o hash do arquivo "
-                "registra o que já foi usado.",
+                "o SHA-256 do arquivo e o endereço de rede, para que o mesmo navegador ou "
+                f"arquivo o receba uma só vez. O endereço é eliminado após {days} dias; "
+                "os dois hashes permanecem, mesmo se você excluir a conta e sem o seu e-mail, "
+                "para que a oferta não se repita.",
                 "Para 'Indique um colega': o link de indicação de cada conta e, para uma conta "
                 "criada por esse link, a data, se seu primeiro relatório gratuito foi concluído "
                 "e o hash do identificador do navegador, para impedir autoindicações. Quem "
