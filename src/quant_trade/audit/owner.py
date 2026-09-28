@@ -114,7 +114,7 @@ TEXT: dict[str, str] = {
     "funnel_country_missing": (
         "Sólo las compras nuevas con dirección de facturación comprobada por Stripe tienen "
         "país observado. Las compras anteriores figuran NOT_MEASURED. Visitas, registros y "
-        "cargas por país siguen NOT_MEASURED; no se deducen del idioma ni la IP."
+        "cargas por país siguen NOT_MEASURED: no se deduce el país del idioma ni la IP."
     ),
     "funnel_country_cols": "País facturado|Compras live|Entregas|Cobro bruto USD",
     "funnel_contribution": (
