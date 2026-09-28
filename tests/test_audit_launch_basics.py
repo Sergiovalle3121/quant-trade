@@ -30,6 +30,7 @@ from quant_trade.audit.web import (  # noqa: E402
     ENGLISH_ROOTS,
     MESSAGES,
     create_app,
+    request_body_limit,
 )
 
 BASE = "https://audit.example"
@@ -99,6 +100,36 @@ def test_the_icon_is_a_real_file_browsers_can_keep(tmp_path: Path) -> None:
     for path, name in ICON_PATHS.items():
         assert client.get(path).content == (STATIC_DIR / name).read_bytes()
         assert client.get(f"/static/{name}").status_code == 200
+
+
+def test_the_icon_address_takes_nothing_from_the_request(tmp_path: Path) -> None:
+    client = _client(tmp_path)
+    for path, name in ICON_PATHS.items():
+        for query in ("icon_name=app.js", "name=app.js", "icon_name=nope"):
+            response = client.get(f"{path}?{query}")
+            assert response.status_code == 200, (path, query)
+            assert response.content == (STATIC_DIR / name).read_bytes(), (path, query)
+    assert client.get("/favicon.ico?icon_name=app.js").headers["content-type"] == "image/x-icon"
+
+
+def test_a_short_address_forwards_to_its_own_page_only(tmp_path: Path) -> None:
+    client = _client(tmp_path)
+    elsewhere = "https://elsewhere.example/"
+    for alias, target in (
+        ("/soporte", "/contacto"),
+        ("/contact", "/en/contact"),
+        ("/support", "/en/contact"),
+        ("/pt/suporte", "/pt/contato"),
+        ("/precios", "/#pricing"),
+        ("/pricing", "/en#pricing"),
+        ("/pt/precos", "/pt#pricing"),
+        ("/en/terms", "/terms?lang=en"),
+        ("/pt/privacy", "/pt/privacidade"),
+    ):
+        for name in ("contact_path", "landing_path", "legal_path", "target", "next"):
+            response = client.get(alias, params={name: elsewhere}, follow_redirects=False)
+            assert response.status_code == 301, (alias, name)
+            assert response.headers["location"] == target, (alias, name)
 
 
 def test_the_icon_file_is_what_the_tool_draws() -> None:
@@ -227,6 +258,12 @@ def test_comparison_and_confirmation_pages_carry_the_noindex_header(tmp_path: Pa
         ("/account/nothing", "en"),
         ("/pt/nada", "pt"),
         ("/pt/guias/nada", "pt"),
+        # Under a short address that forwards to a page: the language of that page.
+        ("/support/nothing", "en"),
+        ("/contact/nothing", "en"),
+        ("/pricing/nothing", "en"),
+        ("/soporte/nada", "es"),
+        ("/precios/nada", "es"),
         # The query still decides.
         ("/en/nothing?lang=es", "es"),
         ("/guides/nothing?lang=pt", "pt"),
@@ -263,6 +300,28 @@ def test_other_errors_follow_the_address_too(tmp_path: Path) -> None:
         response = client.post(path)
         assert response.status_code == 405
         assert f"<html lang='{locale}'>" in response.text
+
+
+@pytest.mark.parametrize(
+    ("path", "locale"),
+    [
+        ("/entrar", "es"),
+        ("/login", "en"),
+        ("/en/contact", "en"),
+        ("/pt/entrar", "pt"),
+        ("/login?lang=pt", "pt"),
+        ("/pt/entrar?lang=es", "es"),
+    ],
+)
+def test_a_body_over_the_limit_is_refused_in_the_language_of_the_address(
+    tmp_path: Path, path: str, locale: str
+) -> None:
+    client = _client(tmp_path, max_upload_bytes=1024)
+    body = b"x" * (request_body_limit(1024) + 1)
+    response = client.post(path, content=body, headers={"content-type": "text/plain"})
+    assert response.status_code == 413
+    assert f"<html lang='{locale}'>" in response.text
+    assert response.headers["x-robots-tag"] == seo.NOINDEX
 
 
 def test_contact_and_portuguese_legal_pages_have_address_tags_and_are_in_the_sitemap(

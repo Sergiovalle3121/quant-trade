@@ -131,7 +131,8 @@ Every change below has an offline, deterministic test in
 ## Launch basics (2026-09-28)
 
 Reviewed against `main` at 9c77197. Scope: which pages search engines may
-list, the icon files and the language of error pages. No control was
+list, the icon files, the language of error pages and the short addresses
+that forward to a page. No control was
 relaxed: the Content Security Policy, the other security headers, the rate
 limits and the redirect from Railway's address are unchanged. Every change
 has an offline, deterministic test in `tests/test_audit_launch_basics.py`.
@@ -140,12 +141,12 @@ has an offline, deterministic test in `tests/test_audit_launch_basics.py`.
 |---|---|---|---|
 | L1 | The `X-Robots-Tag` header was decided with `path.startswith(DISALLOWED_PATHS)`, so the public `/pt/contato` was caught by the account prefix `/pt/conta` and kept out of search engines, by the header and by `robots.txt`. No private page was exposed. | Low | `seo.is_private_path` matches an entry or a page below it (`/pt/conta`, `/pt/conta/...`), not a longer word. `robots.txt` keeps every `Disallow` line and adds `Allow: /pt/contato` before them. Every route was compared with every private prefix: this was the only pair, and a test keeps it so. Every account, report, webhook and health path keeps its header. |
 | L2 | The comparison pages (`/comparar`, `/compare`, `/pt/comparar`) and the e-mail confirmation pages (`/confirmar-correo`, `/confirm-email`, `/pt/confirmar-email`) were private only by `<meta name="robots">`; their 200 answers had no `X-Robots-Tag`. | Low | They send `X-Robots-Tag: noindex, nofollow` (`seo.NOINDEX_PATHS`), on every status. They are left out of `robots.txt` on purpose, so a crawler that follows a link reads the header. |
-| L3 | `/favicon.ico` answered 404. | Low | `/favicon.ico` and `/apple-touch-icon.png` serve two files from the static allow-list (`theme.STATIC_FILES`, `theme.ICON_PATHS`): the route takes no file name from the request. They carry every security header and `Cache-Control: public, max-age=604800`, the same as `/static/`; every other route stays `no-store`. The policy `img-src 'self' data:` already allowed them. A read on Railway's address is forwarded to the domain like any other. |
-| L4 | An error page under an English address was in Spanish. | Low | The language comes from the first step of the path, compared with a fixed set built from the route tables (`web.ENGLISH_ROOTS`); `?lang=` still accepts only `es`, `en` or `pt`. Nothing from the request is echoed. |
+| L3 | `/favicon.ico` answered 404. | Low | `/favicon.ico` and `/apple-touch-icon.png` serve two files from the static allow-list (`theme.STATIC_FILES`, `theme.ICON_PATHS`): the route takes no file name from the request (a first version took `?icon_name=` and could answer another file of the allow-list; caught in review before merge, and a test asks with that query). They carry every security header and `Cache-Control: public, max-age=604800`, the same as `/static/`; every other route stays `no-store`. The policy `img-src 'self' data:` already allowed them. A read on Railway's address is forwarded to the domain like any other. |
+| L4 | An error page under an English address was in Spanish. | Low | The language comes from the first step of the path, compared with a fixed set built from the route tables (`web.ENGLISH_ROOTS`); `?lang=` still accepts only `es`, `en` or `pt`. Nothing from the request is echoed. The 413 and "busy" pages, built before routing, follow the same rule. |
+| L5 | Open redirect, already on `main`: the short addresses that forward to a page (`/soporte`, `/contact`, `/support`, `/en/support`, `/pt/suporte`, `/precios`, `/pricing`, `/en/pricing`, `/pt/precos` and the legal aliases under `/en` and `/pt`) were handlers whose target was a default argument, which FastAPI reads as a query parameter. `/soporte?contact_path=https://elsewhere.example/` answered 301 to that site. | Medium | One helper (`_forward` in `web.py`) registers them with a handler that takes no parameter, so the target is the one written in the code. A test asks every kind of alias with `contact_path`, `landing_path`, `legal_path`, `target` and `next` set to another site and gets the fixed page. |
 
 Not changed here: `/panel` is not in `robots.txt` (another change handles
-the panel). The 413 and "busy" pages, built before routing, still choose
-their language from `?lang=` only.
+the panel).
 
 ## What the operator sets on Railway
 

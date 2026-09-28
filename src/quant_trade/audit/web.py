@@ -1111,10 +1111,20 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             response.headers["X-Robots-Tag"] = NOINDEX
         return response
 
+    #: ``ENGLISH_ROOTS`` plus the short addresses that forward to an English page.
+    english_roots = set(ENGLISH_ROOTS)
+
+    def _path_locale(path: str) -> str:
+        """Portuguese under ``/pt``, English under an English route, else Spanish."""
+        root = path.lstrip("/").split("/", 1)[0]
+        if root == "pt":
+            return "pt"
+        return "en" if root in english_roots else "es"
+
     def _scope_locale(scope: Any) -> str:
         query = scope.get("query_string", b"").decode("latin-1")
         match = re.search(r"(?:^|&)lang=(es|en|pt)(?:&|$)", query)
-        return match.group(1) if match else "es"
+        return match.group(1) if match else _path_locale(scope.get("path", ""))
 
     def _too_large_response(scope: Any) -> Any:
         path = scope.get("path", "")
@@ -1266,10 +1276,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         lang = request.query_params.get("lang")
         if lang in REPORT_LOCALES:
             return str(lang)
-        root = request.url.path.lstrip("/").split("/", 1)[0]
-        if root == "pt":
-            return "pt"
-        return "en" if root in ENGLISH_ROOTS else "es"
+        return _path_locale(request.url.path)
 
     def _html_error(
         request: Request, status: int, message: str, locale: str, *, kind: str = "audit"
@@ -1499,12 +1506,27 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         return Response(content=content, media_type=media_type)
 
     # The icon where browsers, phones and search engines ask for it.
+    def _icon(name: str) -> Callable[[], Response]:
+        def handler() -> Response:  # the name is fixed: nothing is read from the request
+            return static(name)
+
+        return handler
+
     for icon_path, icon_name in ICON_PATHS.items():
+        app.add_api_route(icon_path, _icon(icon_name), methods=["GET"], include_in_schema=False)
 
-        def _icon(icon_name: str = icon_name) -> Response:
-            return static(icon_name)
+    def _forward(alias: str, target: str) -> None:
+        """A short address that forwards to a fixed page of the site.
 
-        app.add_api_route(icon_path, _icon, methods=["GET"], include_in_schema=False)
+        The handler takes no parameter: the target never comes from the request.
+        """
+
+        def handler() -> Response:
+            return RedirectResponse(target, status_code=301)
+
+        if _path_locale(urlsplit(target).path) == "en":
+            english_roots.add(alias.split("/")[1])
+        app.add_api_route(alias, handler, methods=["GET"], include_in_schema=False)
 
     @app.get("/robots.txt", response_class=PlainTextResponse)
     def robots(request: Request) -> str:
@@ -1594,11 +1616,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         ("/pt/termos-de-uso", "/pt/termos"),
         ("/pt/privacidad", "/pt/privacidade"),
     ):
-
-        def _to_legal(legal_path: str = legal_path) -> Response:
-            return RedirectResponse(legal_path, status_code=301)
-
-        app.add_api_route(legal_alias, _to_legal, methods=["GET"], include_in_schema=False)
+        _forward(legal_alias, legal_path)
 
     # Addresses people type or share for the prices: the landing's price section.
     for price_path, landing_path in (
@@ -1607,11 +1625,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         ("/en/pricing", "/en"),
         ("/pt/precos", "/pt"),
     ):
-
-        def _prices(landing_path: str = landing_path) -> Response:
-            return RedirectResponse(f"{landing_path}#pricing", status_code=301)
-
-        app.add_api_route(price_path, _prices, methods=["GET"], include_in_schema=False)
+        _forward(price_path, f"{landing_path}#pricing")
 
     def _contact(request: Request, locale: str) -> HTMLResponse:
         return HTMLResponse(
@@ -1644,11 +1658,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         ("/en/support", "/en/contact"),
         ("/pt/suporte", "/pt/contato"),
     ):
-
-        def _to_contact(contact_path: str = contact_path) -> Response:
-            return RedirectResponse(contact_path, status_code=301)
-
-        app.add_api_route(alias, _to_contact, methods=["GET"], include_in_schema=False)
+        _forward(alias, contact_path)
 
     @app.get("/en", response_class=HTMLResponse)
     def index_en(request: Request, extras: int = 0) -> Response:

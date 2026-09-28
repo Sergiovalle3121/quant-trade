@@ -2155,17 +2155,6 @@ webhook replay cannot queue another notice. The message contains only the
 order reference, charged amount, currency and plan, never a report token or
 result. Delivery is at least once: monitor dead/retrying rows and verify real
 SMTP in staging before promising an email to buyers.
-
-**No "your report is ready" e-mail (product decision, 2026-09-28).** The
-report is produced on screen right after the upload and stays in "Mi
-cuenta" ("My account", "Minha conta"), so there is nothing to wait for and
-no separate e-mail announces it. The outbox knows six kinds and none is a
-report notice: `verify`, `change`, `reset`, `purchase`, `charge_review` and
-`market_review`. A purchase produces two messages: the service's own
-purchase e-mail described above, and Stripe's automatic receipt (receipts
-for successful payments are enabled in the Stripe account since
-2026-09-28). The receipt is sent by Stripe to the address typed in Checkout;
-the service neither sends nor stores it.
 `/ready` reports numeric `warnings.purchase_mail_dead`,
 `warnings.purchase_mail_overdue` and `warnings.purchase_mail_probe_failed`
 without turning an SMTP delivery failure into a service restart. Monitor
@@ -2186,6 +2175,17 @@ pre-Checkout order reuse. Their historical USD 29/69 floor remains accepted
 for paid callbacks after a price rise, so **retire active old links in the
 Stripe Dashboard before changing prices**; do not claim the new price applies
 to all buyers until old sessions are reconciled.
+
+**No "your report is ready" e-mail (product decision, 2026-09-28).** The
+report is produced on screen right after the upload and stays in "Mi
+cuenta" ("My account", "Minha conta"), so there is nothing to wait for and
+no separate e-mail announces it. The outbox knows six kinds and none is a
+report notice: `verify`, `change`, `reset`, `purchase`, `charge_review` and
+`market_review`. A purchase produces two messages: the service's own
+purchase e-mail described above, and Stripe's automatic receipt (receipts
+for successful payments are enabled in the Stripe account since
+2026-09-28). The receipt is sent by Stripe to the address typed in Checkout;
+the service neither sends nor stores it.
 
 ### Deploying on Railway
 
@@ -2996,9 +2996,14 @@ Launch basics (2026-09-28, `tests/test_audit_launch_basics.py`):
 - **Error pages by address.** Without `?lang=`, an error page is Portuguese
   under `/pt`, English under `/en` and under the English addresses that have
   no prefix (`web.ENGLISH_ROOTS`, read from `PUBLIC_PAGES`, the account and
-  e-mail paths and the comparison path), and Spanish otherwise. `?lang=`
-  still decides. The 413 and "busy" pages built before routing
-  (`_scope_locale`) still use `?lang=` only.
+  e-mail paths and the comparison path), and Spanish otherwise. A short
+  address that forwards to an English page (`/pricing`, `/contact`,
+  `/support`) counts as English too. `?lang=` still decides. The 413 and
+  "busy" pages built before routing (`_scope_locale`) follow the same rule.
+- **Short addresses.** The addresses that forward to a page (`/soporte`,
+  `/contact`, `/pricing`, `/en/terms`...) and the icon addresses are
+  handlers without parameters: the target and the file are fixed in the
+  code, and a query string cannot change them.
 - **Sample title.** The tab title of `/ejemplo` and `/pt/exemplo` ends in
   "ejemplo" and "exemplo" instead of the report id "sample". The report and
   its numbers are untouched.
