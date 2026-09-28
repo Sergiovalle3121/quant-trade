@@ -350,3 +350,50 @@ def test_mt5_position_open_at_the_end_is_not_a_monetary_contradiction() -> None:
     assert "open positions" in result.reconciliation["reason"]
     codes = {(flag["code"], flag["severity"]) for flag in result.red_flags}
     assert ("MONETARY_RECONCILIATION_MISMATCH", "FAIL") not in codes
+
+
+@pytest.mark.parametrize(
+    ("code", "detail"),
+    [
+        (
+            "MONETARY_RECONCILIATION_MISMATCH",
+            "printed final balance differs from initial balance plus flows and net closed P&L "
+            "by 9,082,362.36 in file units; the return was rebuilt from deal amounts",
+        ),
+        (
+            "MONETARY_RECONCILIATION_UNEXPLAINED",
+            "separate curve and closed trades differ by -9,082,362.36 in file units; provide "
+            "cash flows, currency conversion and open-position valuation to reconcile them",
+        ),
+    ],
+)
+def test_monetary_details_localize_unit_phrase_and_number_grouping(code: str, detail: str) -> None:
+    from quant_trade.audit.i18n import localize
+    from quant_trade.audit.report import render_html
+
+    changed = tampered_mt5_tester_bytes(MT5.read_bytes())
+    inputs = build_inputs(
+        None,
+        DeclaredMetadata(cost_bps_per_side=1),
+        report_bytes=changed,
+        report_filename="mt5_tester.html",
+        now=NOW,
+    )
+    result = _run(inputs)
+    flag = {"code": code, "severity": "FAIL", "detail": detail, "value": 9082362.36}
+    result = result.model_copy(update={"red_flags": [flag]})
+    expected = {
+        "es": ("9.082.362,36 en unidades del archivo", "en 330,61 en unidades del archivo"),
+        "pt": ("9.082.362,36 em unidades do arquivo", "em 330,61 em unidades do arquivo"),
+    }
+    for locale, (grouped, small) in expected.items():
+        page = render_html(result, watermark=False, free_mode=True, locale=locale)
+        assert "in file units" not in page
+        assert "9,082,362.36" not in page
+        assert grouped in page
+        short = localize(
+            detail.replace("-9,082,362.36", "330.61").replace("9,082,362.36", "330.61"), locale
+        )
+        assert small in short and "in file units" not in short
+    english = render_html(result, watermark=False, free_mode=True, locale="en")
+    assert "9,082,362.36 in file units" in english

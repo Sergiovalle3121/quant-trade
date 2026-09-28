@@ -2350,6 +2350,23 @@ _REASONS_PT: tuple[tuple[str, re.Pattern[str], str], ...] = tuple(
 )
 
 
+#: A number the engine printed with English grouping: ``-9,082,362.36``.
+_ENGLISH_NUMBER = re.compile(r"[+-]?(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?")
+#: The engine's unit phrase when the account currency is not stated.
+_FILE_UNITS = {"es": "en unidades del archivo", "pt": "em unidades do arquivo"}
+
+
+def local_number(value: str) -> str:
+    """``-9,082,362.36`` as Spanish and Portuguese write it: ``-9.082.362,36``.
+
+    The same convention as the Portuguese refusals (``errors_pt``); text that
+    is not a plain English-formatted number comes back unchanged.
+    """
+    if not _ENGLISH_NUMBER.fullmatch(value):
+        return value
+    return value.replace(",", " ").replace(".", ",").replace(" ", ".")
+
+
 def _translate_values(values: dict[str, str], locale: str = "es") -> dict[str, str]:
     """Placeholders that are themselves fixed English phrases."""
     compared, trials, initial = (
@@ -2358,6 +2375,10 @@ def _translate_values(values: dict[str, str], locale: str = "es") -> dict[str, s
         else (_COMPARED, _TRIAL_SOURCES, _INITIAL_SOURCES)
     )
     out = dict(values)
+    if "difference" in out:
+        out["difference"] = local_number(out["difference"])
+    if out.get("currency") == "in file units":
+        out["currency"] = _FILE_UNITS[locale]
     if "what" in out:
         out["what"] = compared.get(out["what"], out["what"])
     if "source" in out:
