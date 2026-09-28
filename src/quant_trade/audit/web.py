@@ -1839,18 +1839,22 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             ),
         )
 
-    def _first_look(account: Any, device_sha256: str, net: str, now: datetime) -> str:
+    def _first_look(
+        account: Any, device_sha256: str, net: str, now: datetime, *, card: bool = False
+    ) -> str:
         """Why the account's next upload would not be its free full report; ``""`` if it would.
 
-        Before any card check: :data:`CARD_REFUSALS` are what a card replaces.
+        With ``card`` a confirmed card stands in for the browser and network
+        limits (:data:`CARD_REFUSALS`) and only those: the account, inbox and
+        e-mail confirmation rules still hold.
         """
         if not acct.WELCOME_FULL_REPORT:
             return "off"
         refused = db.welcome_refusal(
             account.id,
-            device_sha256=device_sha256,
+            device_sha256="" if card else device_sha256,
             file_sha256="",
-            client_ip=net,
+            client_ip="" if card else net,
             since=acct.month_start(now),
             per_ip=_welcome_cap(net),
         )
@@ -1869,10 +1873,17 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         device_sha256 = acct.hash_secret(device) if 0 < len(device) <= 128 else ""
         ip = _client_ip(request, cfg.trusted_proxy_hops)
         net = acct.network_address(ip) if ip else ""
-        return _first_look(account, device_sha256, net, now) in CARD_REFUSALS
+        # Only when the card would clear every refusal: never a card taken
+        # for a report the inbox or an unconfirmed address still blocks.
+        return _first_look(account, device_sha256, net, now) in CARD_REFUSALS and not (
+            _first_look(account, device_sha256, net, now, card=True)
+        )
 
     def _settle_card_check(session: Mapping[str, Any], account_id: str = "") -> str:
         """Record a finished card check: ``ok``, ``taken`` or ``failed``."""
+        if not cfg.card_public:
+            # No offer is shown without live card sales, so nothing is recorded.
+            return "failed"
         why = payments.card_check_refusal(cfg, session, account_id)
         if why is not None:
             logger.info("card check not recorded: %s", why)
@@ -4010,7 +4021,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             first_look = _first_look(gate_account, device_sha256, net, now)
             if first_look in CARD_REFUSALS and db.card_checked(gate_account.id):
                 card_checked = True
-                first_look = ""
+                first_look = _first_look(gate_account, device_sha256, net, now, card=True)
             if not first_look:
                 welcome = True
             else:
@@ -4688,6 +4699,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         lang: str | None = None,
     ) -> Response:
         """Open Stripe's no-charge card check for the owner of a locked preview."""
+        if _cross_site(request):
+            return _html_error(request, 403, message("cross_site", _locale(lang)), _locale(lang))
         checked = _report_action(request, audit_id, token, csrf)
         if not isinstance(checked, tuple):
             return checked

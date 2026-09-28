@@ -2476,8 +2476,10 @@ an account never changes what a report says.
   While e-mail confirmation is off, a shared IPv4 address gets
   `WELCOME_REPORTS_PER_IPV4_UNVERIFIED` (3) free reports a month instead of
   the carrier-sized `WELCOME_REPORTS_PER_IPV4_PER_MONTH` (10).
-  **Card check, no charge.** When the free report is refused only for a
-  shared browser (`device`) or network (`network`) (`web.CARD_REFUSALS`) and
+  **Card check, no charge.** When the free report is refused for a
+  shared browser (`device`) or network (`network`) (`web.CARD_REFUSALS`),
+  the card would clear every refusal (no other account on the same inbox
+  had it, and the address is confirmed where confirmation is required) and
   live card sales are public (`card_public`), the owner's locked preview
   offers «Verificar tarjeta sin cargo» (`POST /audits/{id}/tarjeta`). It
   opens Stripe Checkout in setup mode (`payments.card_check_params`:
@@ -2492,8 +2494,9 @@ an account never changes what a report says.
   `card_checks` (with the date) and as the claim `welcome:card:<sha256>`,
   so one card gives one free report ever: a second account gets
   `card_check_taken`. The account's next upload then skips the browser and
-  network limits (and their claims) but keeps the account, inbox and file
-  limits. The `card_checks` row goes with the account and is in «Descargar
+  network limits (and their claims) but keeps the account, inbox, file and
+  e-mail confirmation rules. Without `card_public` (cards off, or a test
+  key) nothing is recorded, and a post from another site is refused. The `card_checks` row goes with the account and is in «Descargar
   mis datos»; the claim stays, like the other free-report hashes. The
   preview itself stays locked: the customer uploads again.
   An invite is credited only once both the inviter's and the invitee's

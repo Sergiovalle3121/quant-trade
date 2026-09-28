@@ -266,3 +266,84 @@ def test_the_card_check_is_in_the_data_download_and_goes_with_the_account(
     assert "fp_d" not in json.dumps(exported)
     store.delete_account(bea.id)
     assert not store.card_checked(bea.id)
+
+
+def test_a_card_never_stands_in_for_a_confirmed_email(tmp_path: Path) -> None:
+    app, store, fake = _app(
+        tmp_path,
+        email_verification_required=True,
+        email_token_secret="stable secret shared across replicas 1234567890",
+        smtp_host="smtp.example",
+        smtp_from="Rigor <hello@example.com>",
+    )
+    confirmed: set[str] = set()
+    store.email_verified = lambda account_id: account_id in confirmed
+    client = signed_in(TestClient(app, base_url=BASE), "ana@example.com", welcome=True)
+    confirmed.add(store.find_account("ana@example.com").id)
+    _upload(client, 1)
+    _switch(client, "bea@example.com")
+    bea = store.find_account("bea@example.com")
+    audit_id, token, location = _upload(client, 2)
+    assert "acct=preview_device" in location
+    page = client.get(location).text
+    # The card would not give the report while the address is unconfirmed.
+    assert "Verificar tarjeta sin cargo" not in page
+    refused = client.post(
+        f"/audits/{audit_id}/tarjeta?token={token}",
+        data={"csrf": _CSRF.findall(client.get("/cuenta").text)[-1]},
+        follow_redirects=False,
+    )
+    assert refused.headers["location"] != "https://checkout.stripe.test/s" and not fake.created
+    # Even a card recorded some other way leaves the confirmation rule standing.
+    store.record_card_check(bea.id, payments.card_fingerprint_sha256("fp"), at=datetime.now(UTC))
+    again_id, _, again = _upload(client, 3)
+    assert "acct=welcome" not in again and not store.get_audit(again_id).paid
+    confirmed.add(bea.id)
+    later_id, _, later = _upload(client, 4)
+    assert "acct=welcome" in later and store.get_audit(later_id).paid
+
+
+def test_no_card_offer_when_the_inbox_already_had_its_free_report(tmp_path: Path) -> None:
+    app, store, fake = _app(tmp_path)
+    client = signed_in(TestClient(app, base_url=BASE), "ana@example.com", welcome=True)
+    _upload(client, 1)
+    _switch(client, "ana+two@example.com")
+    audit_id, token, location = _upload(client, 2)
+    assert "acct=preview_device" in location
+    page = client.get(location).text
+    assert "Verificar tarjeta sin cargo" not in page
+    client.post(
+        f"/audits/{audit_id}/tarjeta?token={token}",
+        data={"csrf": _CSRF.findall(client.get("/cuenta").text)[-1]},
+        follow_redirects=False,
+    )
+    assert not fake.created
+
+
+def test_the_card_check_refuses_a_post_from_another_site(tmp_path: Path) -> None:
+    app, store, fake = _app(tmp_path)
+    client, _ = _shared_browser(app, store)
+    audit_id, token, location = _upload(client, 2)
+    page = client.get(location).text
+    response = client.post(
+        f"/audits/{audit_id}/tarjeta?token={token}",
+        data={"csrf": _CSRF.findall(page)[-1]},
+        headers={"sec-fetch-site": "cross-site"},
+        follow_redirects=False,
+    )
+    assert response.status_code == 403 and not fake.created
+
+
+def test_a_test_key_service_records_no_card_check(tmp_path: Path) -> None:
+    app, store, fake = _app(tmp_path, stripe_secret_key="sk_test_card")
+    client, bea = _shared_browser(app, store)
+    audit_id, token, _ = _upload(client, 2)
+    done = fake.finish(bea.id, "fp_test", livemode=False)
+    client.get(f"/audits/{audit_id}?token={token}&card=checked&setup_session={done}")
+    body = json.dumps(
+        {"type": "checkout.session.completed", "data": {"object": fake.sessions[done]}}
+    ).encode()
+    signature = sign_stripe_payload(body, "whsec_card", timestamp=int(time.time()))
+    answer = client.post("/webhooks/stripe", content=body, headers={"stripe-signature": signature})
+    assert answer.status_code == 200
+    assert not store.card_checked(bea.id)
