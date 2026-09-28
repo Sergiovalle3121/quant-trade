@@ -90,6 +90,7 @@ from quant_trade.audit.pages import (
     badge_svg,
     check_page,
     compare_page,
+    contact_page,
     error_page,
     guide_page,
     guides_index_page,
@@ -1526,6 +1527,43 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             return RedirectResponse(f"{landing_path}#pricing", status_code=301)
 
         app.add_api_route(price_path, _prices, methods=["GET"], include_in_schema=False)
+
+    def _contact(request: Request, locale: str) -> HTMLResponse:
+        return HTMLResponse(
+            contact_page(
+                locale=locale,
+                email=cfg.operator_contact,
+                contact_url=cfg.contact_url,
+                base_url=_site_url(request),
+            )
+        )
+
+    @app.get("/contacto", response_class=HTMLResponse)
+    def contact_es(request: Request) -> HTMLResponse:
+        """Who to write to (Spanish); the English and Portuguese pages follow."""
+        return _contact(request, "es")
+
+    @app.get("/en/contact", response_class=HTMLResponse)
+    def contact_en(request: Request) -> HTMLResponse:
+        return _contact(request, "en")
+
+    @app.get("/pt/contato", response_class=HTMLResponse)
+    def contact_pt(request: Request) -> HTMLResponse:
+        return _contact(request, "pt")
+
+    # Other names people try for the same page.
+    for alias, contact_path in (
+        ("/soporte", "/contacto"),
+        ("/contact", "/en/contact"),
+        ("/support", "/en/contact"),
+        ("/en/support", "/en/contact"),
+        ("/pt/suporte", "/pt/contato"),
+    ):
+
+        def _to_contact(contact_path: str = contact_path) -> Response:
+            return RedirectResponse(contact_path, status_code=301)
+
+        app.add_api_route(alias, _to_contact, methods=["GET"], include_in_schema=False)
 
     @app.get("/en", response_class=HTMLResponse)
     def index_en(request: Request) -> Response:

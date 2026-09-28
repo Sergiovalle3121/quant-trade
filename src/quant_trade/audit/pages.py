@@ -1526,6 +1526,7 @@ def _footer(locale: str) -> str:
     legal = (
         f"<li><a href='{_e(legal_url('terms', locale))}'>{_e(copy['terms_link'])}</a></li>"
         f"<li><a href='{_e(legal_url('privacy', locale))}'>{_e(copy['privacy_link'])}</a></li>"
+        f"<li><a href='{CONTACT_PATHS[locale]}'>{_e(CONTACT_COPY[locale]['eyebrow'])}</a></li>"
     )
     return (
         "<footer class='foot'><div class='wrap'><div class='foot-grid'>"
@@ -2829,6 +2830,148 @@ def legal_page(
         "</div></div>"
     )
     return _page(text.title, locale, body, meta_html=meta, alternates=alternates, solid_nav=True)
+
+
+#: The contact page in each language; /soporte, /support and /pt/suporte lead here.
+CONTACT_PATHS: dict[str, str] = {"es": "/contacto", "en": "/en/contact", "pt": "/pt/contato"}
+
+CONTACT_COPY: dict[str, dict[str, Any]] = {
+    "es": {
+        "eyebrow": "Contacto",
+        "title": "Habla con una persona",
+        "lead": (
+            "Dudas sobre un informe, tu cuenta o un pago: escríbenos y te respondemos por el "
+            "mismo medio."
+        ),
+        "email": "Correo",
+        "email_text": "Para dudas sobre informes, cuentas, pagos y borrado de datos.",
+        "chat": "WhatsApp",
+        "chat_text": "Para una pregunta corta.",
+        "open": "Escribir",
+        "none": "El operador todavía no ha publicado un medio de contacto.",
+        "before_title": "Antes de escribir",
+        "before": (
+            "Si es sobre un informe, incluye su identificador (está en la dirección del informe).",
+            "Nunca envíes tu contraseña, tu clave de recuperación ni los datos de tu tarjeta: "
+            "nadie de Rigor te los va a pedir.",
+            "Para borrar tus datos o tu cuenta, lo puedes hacer tú desde Mi cuenta; la política "
+            "de privacidad explica qué se guarda.",
+        ),
+        "links_title": "Quizá ya está respondido",
+        "faq": "Preguntas frecuentes",
+        "guides": "Guías para exportar tu archivo",
+        "account": "Mi cuenta",
+        "privacy": "Política de privacidad",
+    },
+    "en": {
+        "eyebrow": "Contact",
+        "title": "Talk to a person",
+        "lead": (
+            "Questions about a report, your account or a payment: write to us and we reply "
+            "the same way."
+        ),
+        "email": "E-mail",
+        "email_text": "For questions about reports, accounts, payments and data deletion.",
+        "chat": "WhatsApp",
+        "chat_text": "For a short question.",
+        "open": "Write",
+        "none": "The operator has not published a contact channel yet.",
+        "before_title": "Before you write",
+        "before": (
+            "If it is about a report, include its id (it is in the report's address).",
+            "Never send your password, your recovery key or your card details: nobody from "
+            "Rigor will ask for them.",
+            "You can delete your data or your account yourself from My account; the privacy "
+            "policy explains what is kept.",
+        ),
+        "links_title": "It may already be answered",
+        "faq": "Frequent questions",
+        "guides": "Guides to export your file",
+        "account": "My account",
+        "privacy": "Privacy policy",
+    },
+    "pt": {
+        "eyebrow": "Contato",
+        "title": "Fale com uma pessoa",
+        "lead": (
+            "Dúvidas sobre um relatório, a sua conta ou um pagamento: escreva para nós e "
+            "respondemos pelo mesmo meio."
+        ),
+        "email": "E-mail",
+        "email_text": "Para dúvidas sobre relatórios, contas, pagamentos e exclusão de dados.",
+        "chat": "WhatsApp",
+        "chat_text": "Para uma pergunta curta.",
+        "open": "Escrever",
+        "none": "O operador ainda não publicou um meio de contato.",
+        "before_title": "Antes de escrever",
+        "before": (
+            "Se for sobre um relatório, inclua o identificador dele (está no endereço do "
+            "relatório).",
+            "Nunca envie a sua senha, a sua chave de recuperação nem os dados do seu cartão: "
+            "ninguém da Rigor vai pedi-los.",
+            "Você mesmo pode excluir os seus dados ou a sua conta em Minha conta; a política de "
+            "privacidade explica o que é guardado.",
+        ),
+        "links_title": "Talvez já esteja respondido",
+        "faq": "Perguntas frequentes",
+        "guides": "Guias para exportar o seu arquivo",
+        "account": "Minha conta",
+        "privacy": "Política de privacidade",
+    },
+}
+
+
+def contact_page(
+    *, locale: str = "es", email: str = "", contact_url: str = "", base_url: str = ""
+) -> str:
+    """Who to write to: the operator's e-mail and chat link, both from the environment.
+
+    Nothing is shown that the operator did not configure: no default address exists."""
+    locale = _locale(locale)
+    words = CONTACT_COPY[locale]
+    path = CONTACT_PATHS[locale]
+    meta = _public_meta(f"{words['title']} · {BRAND}", words["lead"], locale, path, base_url)
+    cards = []
+    if "@" in email and " " not in email:
+        cards.append(("chat", words["email"], words["email_text"], f"mailto:{email}", email))
+    if contact_url:
+        cards.append(("chat", words["chat"], words["chat_text"], contact_url, words["open"]))
+    channels = (
+        "<div class='cards cards-2'>"
+        + "".join(
+            f"<div class='card spot'><div class='icon'>{icon(name)}</div><h3>{_e(title)}</h3>"
+            f"<p>{_e(text)}</p><p><a class='btn btn-dark btn-sm' href='{_e(href)}' rel='noopener'>"
+            f"{_e(label)}</a></p></div>"
+            for name, title, text, href, label in cards
+        )
+        + "</div>"
+        if cards
+        else f"<p class='muted'>{_e(words['none'])}</p>"
+    )
+    before = "".join(
+        f"<li>{icon('shield')}<span>{_e(line)}</span></li>" for line in words["before"]
+    )
+    links = " · ".join(
+        f"<a href='{_e(href)}'>{_e(label)}</a>"
+        for href, label in (
+            (f"{_home(locale)}#faq", words["faq"]),
+            (guides_index_url(locale), words["guides"]),
+            (_ACCOUNT_PATHS[locale][2], words["account"]),
+            (legal_url("privacy", locale), words["privacy"]),
+        )
+    )
+    body = (
+        _page_hero(words["eyebrow"], words["title"], words["lead"])
+        + "<div class='paper page-main'><div class='wrap wrap-mid'>"
+        + channels
+        + f"<h2 class='label' style='margin-top:36px'>{_e(words['before_title'])}</h2>"
+        + f"<ul class='checks'>{before}</ul>"
+        + f"<h2 class='label' style='margin-top:28px'>{_e(words['links_title'])}</h2>"
+        + f"<p>{links}</p></div></div>"
+    )
+    return _page(
+        words["title"], locale, body, meta_html=meta, alternates=CONTACT_PATHS, solid_nav=True
+    )
 
 
 def compare_page(
