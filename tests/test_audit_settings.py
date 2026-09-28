@@ -52,6 +52,19 @@ def test_database_url_normalisation_and_base_url() -> None:
     assert settings.base_url == "https://audit.example"
 
 
+def test_empty_smtp_port_and_referral_cap_use_their_defaults() -> None:
+    """A variable left blank in a hosting panel means unset, not a crash."""
+    blank = AuditSettings.from_env(
+        {"AUDIT_SMTP_PORT": "", "AUDIT_REFERRAL_GLOBAL_MONTHLY_CAP": "  "}
+    )
+    assert blank.smtp_port == 587
+    assert blank.referral_global_monthly_cap == 100
+    given = AuditSettings.from_env(
+        {"AUDIT_SMTP_PORT": "465", "AUDIT_REFERRAL_GLOBAL_MONTHLY_CAP": "7"}
+    )
+    assert (given.smtp_port, given.referral_global_monthly_cap) == (465, 7)
+
+
 def test_trusted_proxy_hops_defaults_to_zero_and_reads_the_environment() -> None:
     assert AuditSettings.from_env({}).trusted_proxy_hops == 0
     assert AuditSettings.from_env({"AUDIT_TRUSTED_PROXY_HOPS": ""}).trusted_proxy_hops == 0
