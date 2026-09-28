@@ -2896,7 +2896,11 @@ final. The credits sit on a code derived from the Stripe session with the
 webhook secret (`payments.credit_code`), linked to the buyer's account, so a
 Stripe retry never grants twice and the buyer never has to type a code. A
 paid session held for review (billing country) blocks a second purchase
-from that account until the owner resolves it in `/panel`.
+from that account until the owner resolves it in `/panel`. A payment for an
+account deleted before the webhook grants nothing and is listed there too. A
+Stripe refund is only recorded; after refunding a credit order by hand, disable
+its code (`quant-trade audit codes disable <id>`, or «Desactivar» in `/panel`) so
+its unused credits go too.
 
 `/terminos` (`/terms`) and `/privacidad` (`/privacy`) are rendered by
 `audit/legal.py` from the running configuration: the price, whether card

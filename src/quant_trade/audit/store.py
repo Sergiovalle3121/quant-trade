@@ -1919,6 +1919,15 @@ class Store:
                     )
                     if row is None:
                         raise ValueError("unknown checkout order")
+                    # An account deleted after Checkout gets nothing it could
+                    # never use: the charge goes to the owner's review instead.
+                    if (
+                        conn.execute(
+                            sa.select(self.accounts.c.id).where(self.accounts.c.id == account_id)
+                        ).first()
+                        is None
+                    ):
+                        raise ValueError("credit purchase for a deleted account")
                     if (
                         row["audit_id"] != reference
                         or row["account_id"] != account_id

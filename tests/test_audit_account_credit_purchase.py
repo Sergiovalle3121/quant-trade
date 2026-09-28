@@ -293,3 +293,15 @@ def test_the_credit_texts_exist_in_every_language() -> None:
     for copy in (account_pages.COPY["es"], account_pages.COPY["en"], account_pt.COPY_PT):
         for key in keys:
             assert copy[key] and find_claims(copy[key]) == []
+
+
+def test_an_account_deleted_before_the_webhook_gets_no_credits(tmp_path: Path) -> None:
+    client, calls = _client(tmp_path)
+    account_id = _account_id(client)
+    _buy(client)
+    order_id = calls[0]["order_id"]
+    store = client.app.state.store
+    store.delete_account(account_id)
+    assert _webhook(client, _session(account_id, order_id)) == 200
+    assert store.get_checkout_order(order_id).status != "delivered"
+    assert store.account_codes_list(account_id) == []
