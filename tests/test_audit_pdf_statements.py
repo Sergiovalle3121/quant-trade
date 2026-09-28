@@ -203,6 +203,10 @@ def test_the_upload_shows_the_screen_with_the_notice_then_reads_the_named_column
         "/audits", files=files, data={"consent": "on", **named}, follow_redirects=False
     )
     assert posted.status_code == 303, posted.text[:500]
+    rendered = client.get(posted.headers["location"])
+    assert rendered.status_code == 200
+    assert "Formato del archivo: PDF</p>" in rendered.text
+    assert "Formato del archivo: CSV / Excel" not in rendered.text
 
 
 def test_a_table_past_the_cell_cap_or_an_answer_past_the_size_cap_is_refused(

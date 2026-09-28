@@ -475,10 +475,11 @@ UI_PT: dict[str, Any] = {
         (
             "globe",
             "Na sua moeda e depois da inflação",
-            "Se a conta está em dólares, você vê o resultado em reais, pesos mexicanos, "
-            "euros e mais "
-            "quatro moedas ao câmbio de cada dia, e depois da inflação dos EUA (dados públicos "
-            "do FRED).",
+            "Se a conta está em dólares e há câmbio disponível, você vê o resultado em "
+            "reais, pesos mexicanos, euros e mais quatro moedas. Quando há índices de preços "
+            "disponíveis, você vê cada moeda, inclusive o dólar, depois da sua própria "
+            "inflação. Se a conta já está em uma dessas moedas, você vê o resultado após a "
+            "inflação dela. Câmbio do FRED e índices de preços de fontes estatísticas oficiais.",
         ),
     ],
     "how_eyebrow": "Processo",
@@ -508,7 +509,7 @@ UI_PT: dict[str, Any] = {
         "O dinheiro real por trás do % de uma conta: depósitos, recargas e perdas abertas",
         "Frente ao caixa e ao mercado: o Sharpe sem o que o caixa pagava, VIX tranquilo ou "
         "agitado e crises conhecidas",
-        "Se a conta está em dólares: o resultado na sua moeda e depois da inflação",
+        "Conforme a moeda da conta: conversão ou inflação própria, com dados disponíveis",
         "Página pública de verificação com selo",
     ],
     "upload_eyebrow": "Comece aqui",

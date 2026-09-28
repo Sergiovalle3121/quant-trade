@@ -5334,6 +5334,12 @@ def public_view(result_json: str) -> tuple[dict[str, Any], str]:
     result = AuditResult.model_validate_json(result_json)
     data = result.model_dump(mode="json")
     inputs = data.get("inputs", {})
+    # Expose only the format fact, never the parser's warning text, publicly.
+    from quant_trade.audit.importers import PDF_ROWS_WARNING
+
+    source_is_pdf = any(
+        str(warning).endswith(PDF_ROWS_WARNING) for warning in inputs.get("parse_warnings") or []
+    )
     verdict = data["verdict"]
     view = {
         "generated_at_utc": data.get("generated_at_utc", ""),
@@ -5347,7 +5353,8 @@ def public_view(result_json: str) -> tuple[dict[str, Any], str]:
             key: inputs[key]
             for key in ("digests", "dataset_digest", "source_format", "source")
             if key in inputs
-        },
+        }
+        | {"source_is_pdf": source_is_pdf},
         "engine": {key: data.get("engine", {}).get(key) for key in ("name", "package_version")},
         "declared": {"trials": data.get("declared", {}).get("trials")},
         "multiplicity": {"trials_used": data.get("multiplicity", {}).get("trials_used")},
