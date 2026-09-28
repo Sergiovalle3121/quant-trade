@@ -34,6 +34,7 @@ def _settings(tmp_path: Path) -> AuditSettings:
         access_codes=False,
         stripe_secret_key="sk_live_test",
         stripe_webhook_secret="whsec_email",
+        approved_markets=frozenset({"MX"}),
         email_verification_required=True,
         email_token_secret="stable secret shared across replicas 1234567890",
         smtp_host="smtp.example",
@@ -133,7 +134,11 @@ def test_signup_outbox_survives_restart_and_checkout_waits_for_post(tmp_path: Pa
         observed.append(kwargs),
         "https://checkout.stripe.test/email",
     )[1]
-    allowed = client.post(f"/audits/{second_id}/checkout?token={token}", follow_redirects=False)
+    allowed = client.post(
+        f"/audits/{second_id}/checkout?token={token}",
+        data={"billing_country": "MX"},
+        follow_redirects=False,
+    )
     assert allowed.status_code == 303 and len(observed) == 1
     assert observed[0]["amount_cents"] == 2900
 
@@ -158,7 +163,9 @@ def test_verified_owner_must_be_the_signed_in_checkout_buyer(tmp_path: Path) -> 
     assert store.list_checkout_orders() == []
 
     app.state.checkout_factory = lambda *_args, **_kwargs: "https://checkout.stripe.test/owner"
-    assert owner.post(path, follow_redirects=False).status_code == 303
+    assert (
+        owner.post(path, data={"billing_country": "MX"}, follow_redirects=False).status_code == 303
+    )
     assert len(store.list_checkout_orders()) == 1
 
 

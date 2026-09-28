@@ -188,7 +188,7 @@ def checkout_params(
     metadata = {"audit_id": audit_id, "plan": plan, APP_KEY: APP_MARKER}
     if order_id:
         metadata["order_id"] = order_id
-    return {
+    params = {
         "mode": "payment",
         "line_items": [line],
         # Stripe fills in {CHECKOUT_SESSION_ID}; the return page confirms it.
@@ -199,6 +199,9 @@ def checkout_params(
         "client_reference_id": audit_id,
         "locale": stripe_locale,
     }
+    if not settings.card_test_mode and settings.approved_markets:
+        params["billing_address_collection"] = "required"
+    return params
 
 
 def _plain(value: Any) -> dict[str, Any]:
@@ -357,6 +360,40 @@ def fulfil(
                 session_id=_safe(session_id), audit_id=_safe(audit_id), reason=reason, at=at
             )
         return None
+    if order is not None and session.get("livemode") is True:
+        market = store.checkout_market(order.id)
+        if market is not None:
+            declared_country, _ = market
+            customer_details = session.get("customer_details") or {}
+            address = (
+                customer_details.get("address") or {}
+                if isinstance(customer_details, Mapping)
+                else {}
+            )
+            billing_country = (
+                str(address.get("country") or "").upper() if isinstance(address, Mapping) else ""
+            )
+            if (
+                billing_country != declared_country
+                or billing_country not in settings.approved_markets
+            ):
+                amount_total = session.get("amount_total")
+                store.record_market_review(
+                    order_id=order.id,
+                    session_id=session_id,
+                    audit_id=audit_id,
+                    billing_country=billing_country,
+                    paid_cents=amount_total if isinstance(amount_total, int) else 0,
+                    reason="billing country mismatch or unavailable",
+                    at=at,
+                )
+                logger.warning(
+                    "paid Stripe session %s held for market review on audit %s",
+                    _safe(session_id),
+                    _safe(audit_id),
+                )
+                return None
+            store.record_checkout_market(order.id, billing_country, at=at)
     source = session.get("currency_conversion") or session
     amount = source.get("amount_total")
     if not isinstance(amount, int) or isinstance(amount, bool):

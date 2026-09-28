@@ -47,6 +47,7 @@ SELLING = {
     "pack_price_usd_cents": 6900,
     "contact_url": "https://wa.me/5200000000",
     "base_url": "https://rigor.example",
+    "approved_markets": frozenset({"MX"}),
 }
 NOW = datetime(2026, 9, 25, tzinfo=UTC)
 
@@ -83,6 +84,7 @@ def _session(audit_id: str, *, plan: str = PLAN_SINGLE, sid: str = "cs_test_1", 
         "livemode": True,
         "currency": "usd",
         "amount_total": PAID[plan],
+        "customer_details": {"address": {"country": "MX"}},
         "metadata": {"audit_id": audit_id, "plan": plan, "app": "rigor"},
         **extra,
     }
@@ -277,7 +279,9 @@ def test_checkout_route_sends_the_chosen_plan(tmp_path: Path) -> None:
     client.app.state.checkout_factory = fake
     url = f"/audits/{audit_id}/checkout?token={token}&lang=en"
     for plan in ("pack", "single", "gift"):
-        response = client.post(url, data={"plan": plan}, follow_redirects=False)
+        response = client.post(
+            url, data={"plan": plan, "billing_country": "MX"}, follow_redirects=False
+        )
         assert response.headers["location"] == "https://checkout.stripe.test/s"
     assert [(plan, locale, amount) for plan, locale, _, amount in seen] == [
         ("pack", "en", 6900),
@@ -289,7 +293,10 @@ def test_checkout_route_sends_the_chosen_plan(tmp_path: Path) -> None:
     no_pack = _client(tmp_path / "b", pack_price_usd_cents=0)
     aid, tok = _upload(no_pack)
     no_pack.app.state.checkout_factory = fake
-    no_pack.post(f"/audits/{aid}/checkout?token={tok}", data={"plan": "pack"})
+    no_pack.post(
+        f"/audits/{aid}/checkout?token={tok}",
+        data={"plan": "pack", "billing_country": "MX"},
+    )
     assert seen[-1][0:2] == ("single", "es")
     assert "name='plan' value='pack'" not in no_pack.get(f"/audits/{aid}?token={tok}").text
 
@@ -314,15 +321,102 @@ def test_checkout_retry_after_restart_reuses_frozen_order(tmp_path: Path) -> Non
 
     client.app.state.checkout_factory = fake
     path = f"/audits/{audit_id}/checkout?token={token}"
-    first = client.post(path, follow_redirects=False)
+    first = client.post(path, data={"billing_country": "MX"}, follow_redirects=False)
     assert first.headers["location"] == "https://checkout.stripe.test/frozen"
     restarted = _client(tmp_path, price_usd_cents=4900)
     restarted.app.state.checkout_factory = fake
-    second = restarted.post(path, follow_redirects=False)
+    second = restarted.post(path, data={"billing_country": "MX"}, follow_redirects=False)
     assert second.headers["location"] == first.headers["location"]
     assert len(calls) == 1
     (order,) = restarted.app.state.store.list_checkout_orders()
     assert order.amount_cents == 2900 and order.session_id == "cs_frozen"
+
+
+def test_live_checkout_needs_approved_country_and_freezes_it(tmp_path: Path) -> None:
+    client = _client(tmp_path, approved_markets=frozenset({"MX", "US"}))
+    audit_id, token = _upload(client)
+    path = f"/audits/{audit_id}/checkout?token={token}"
+    page = client.get(f"/audits/{audit_id}?token={token}").text
+    assert "name='billing_country'" in page and "País de facturación" in page
+    for value in ("", "BR", "ZZ"):
+        denied = client.post(path, data={"billing_country": value}, follow_redirects=False)
+        assert denied.status_code == 403
+    assert client.app.state.store.list_checkout_orders() == []
+
+    client.app.state.checkout_factory = lambda *_args, **_kwargs: {
+        "id": "cs_market_1",
+        "url": "https://checkout.stripe.test/market",
+    }
+    allowed = client.post(path, data={"billing_country": "MX"}, follow_redirects=False)
+    assert allowed.status_code == 303
+    order = client.app.state.store.list_checkout_orders()[0]
+    assert client.app.state.store.checkout_market(order.id) == ("MX", "")
+    changed = client.post(path, data={"billing_country": "US"}, follow_redirects=False)
+    assert changed.status_code == 409
+    assert len(client.app.state.store.list_checkout_orders()) == 1
+
+
+def test_live_checkout_is_closed_without_approved_markets(tmp_path: Path) -> None:
+    settings = _settings(tmp_path, approved_markets=frozenset())
+    assert not settings.card_public
+    client = _client(tmp_path, approved_markets=frozenset())
+    audit_id, token = _upload(client)
+    page = client.get(f"/audits/{audit_id}?token={token}").text
+    assert "name='billing_country'" not in page
+    assert client.post(f"/audits/{audit_id}/checkout?token={token}").status_code == 503
+    assert client.app.state.store.list_checkout_orders() == []
+
+
+def test_market_mismatch_records_charge_without_delivery(tmp_path: Path) -> None:
+    client = _client(tmp_path)
+    audit_id, token = _upload(client)
+    client.app.state.checkout_factory = lambda *_args, **_kwargs: {
+        "id": "cs_market_bad",
+        "url": "https://checkout.stripe.test/market-bad",
+    }
+    path = f"/audits/{audit_id}/checkout?token={token}"
+    assert (
+        client.post(path, data={"billing_country": "MX"}, follow_redirects=False).status_code == 303
+    )
+    store = client.app.state.store
+    order = store.list_checkout_orders()[0]
+    bad = _session(
+        audit_id,
+        sid="cs_market_bad",
+        metadata={"audit_id": audit_id, "plan": PLAN_SINGLE, "app": "rigor", "order_id": order.id},
+        customer_details={"address": {"country": "US"}},
+    )
+    assert _webhook(client, bad) == 200
+    assert not store.get_audit(audit_id).paid
+    assert store.get_checkout_order(order.id).status == "paid_review"
+    assert store.get_checkout_order(order.id).paid_amount_cents == 2900
+    assert store.checkout_market(order.id) == ("MX", "US")
+    assert len(store.list_refused_payments()) == 1
+    assert _webhook(client, bad) == 200
+    assert len(store.list_refused_payments()) == 1
+
+
+def test_matching_stripe_billing_country_delivers_and_is_recorded(tmp_path: Path) -> None:
+    client = _client(tmp_path)
+    audit_id, token = _upload(client)
+    client.app.state.checkout_factory = lambda *_args, **_kwargs: {
+        "id": "cs_market_good",
+        "url": "https://checkout.stripe.test/market-good",
+    }
+    path = f"/audits/{audit_id}/checkout?token={token}"
+    assert (
+        client.post(path, data={"billing_country": "MX"}, follow_redirects=False).status_code == 303
+    )
+    store = client.app.state.store
+    order = store.list_checkout_orders()[0]
+    paid = _session(
+        audit_id,
+        sid="cs_market_good",
+        metadata={"audit_id": audit_id, "plan": PLAN_SINGLE, "app": "rigor", "order_id": order.id},
+    )
+    assert _webhook(client, paid) == 200
+    assert store.get_audit(audit_id).paid
+    assert store.checkout_market(order.id) == ("MX", "MX")
 
 
 def test_a_timeout_retries_with_the_same_persisted_idempotency_key(tmp_path: Path) -> None:
@@ -348,8 +442,8 @@ def test_a_timeout_retries_with_the_same_persisted_idempotency_key(tmp_path: Pat
     client.app.state.checkout_factory = timeout
     path = f"/audits/{audit_id}/checkout?token={token}"
     with pytest.raises(TimeoutError):
-        client.post(path, follow_redirects=False)
-    retry = client.post(path, follow_redirects=False)
+        client.post(path, data={"billing_country": "MX"}, follow_redirects=False)
+    retry = client.post(path, data={"billing_country": "MX"}, follow_redirects=False)
     assert retry.headers["location"] == "https://checkout.stripe.test/recovered"
     assert len(set(order_ids)) == 1
 
@@ -676,7 +770,7 @@ def test_payment_links_from_env_need_the_webhook_secret() -> None:
     }
     settings = AuditSettings.from_env(env)
     assert settings.links_enabled and not settings.stripe_enabled
-    assert card_mode(settings) == "live" and settings.card_public
+    assert card_mode(settings) == "live" and not settings.card_public
     assert settings.stripe_test_audits == frozenset({"a1", "a2"})
     no_secret = AuditSettings.from_env({**env, "STRIPE_WEBHOOK_SECRET": ""})
     assert not no_secret.links_enabled and no_secret.free_mode
@@ -733,15 +827,15 @@ def test_payment_link_tags_append_to_an_existing_query() -> None:
     )
 
 
-def test_report_links_carry_the_audit_and_the_webhook_unlocks_it(tmp_path: Path) -> None:
+def test_historical_links_are_hidden_but_the_webhook_still_unlocks_them(tmp_path: Path) -> None:
     client = _client(tmp_path, **LINKS)
     audit_id, token = _upload(client)
     assert client.get("/health").json()["card_via"] == "links"
     page = client.get(f"/audits/{audit_id}?token={token}").text
     single = f"https://buy.stripe.com/abc123?client_reference_id={audit_id}&amp;locale=es"
     pack = f"https://buy.stripe.com/pack456?client_reference_id={audit_id}&amp;locale=es"
-    assert single in page and pack in page
-    assert "Ya pagué: ver mi informe" in page and "&amp;pay=done" in page
+    assert single not in page and pack not in page
+    assert "Ya pagué: ver mi informe" not in page
     assert "wa.me" in page and "name='code'" in page
     assert find_claims(page) == []
     # No Checkout session is ever created in this mode.

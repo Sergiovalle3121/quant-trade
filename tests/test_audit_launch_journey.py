@@ -82,6 +82,7 @@ def test_registration_referral_checkout_credit_pdf_and_help(
         access_codes=False,
         stripe_secret_key="sk_live_test",
         stripe_webhook_secret="whsec_journey",
+        approved_markets=frozenset({"MX"}),
         contact_url="https://wa.me/5200000000",
     )
     store = make_store(settings.database_url)
@@ -138,7 +139,7 @@ def test_registration_referral_checkout_credit_pdf_and_help(
     app.state.checkout_factory = fake_checkout
     checkout = owner.post(
         f"/audits/{priced_id}/checkout?token={priced_token}&lang={locale}",
-        data={"plan": "pack"},
+        data={"plan": "pack", "billing_country": "MX"},
         follow_redirects=False,
     )
     assert checkout.status_code == 303
@@ -150,6 +151,7 @@ def test_registration_referral_checkout_credit_pdf_and_help(
         "livemode": True,
         "currency": "usd",
         "amount_total": 6900,
+        "customer_details": {"address": {"country": "MX"}},
         "metadata": {
             "audit_id": priced_id,
             "plan": "pack",

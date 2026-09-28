@@ -3981,6 +3981,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             free_mode=cfg.free_mode,
             price_usd=cfg.price_usd,
             checkout_url=f"{base}/checkout{query}" if unlockable else None,
+            market_choices=(tuple(sorted(cfg.approved_markets)) if cfg.card_public else ()),
             pay_links=(link_single, link_pack, f"{base}{query}&pay=done") if link_single else None,
             redeem_url=f"{base}/redeem{query}" if redeemable else None,
             publish_url=f"{base}/publish{query}" if publishable else None,
@@ -4804,6 +4805,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         token: str | None = None,
         lang: str | None = None,
         plan: Annotated[str, Form()] = payments.PLAN_SINGLE,
+        billing_country: Annotated[str, Form()] = "",
     ) -> Response:
         record = _load(audit_id, token, request)
         if not (cfg.stripe_enabled and cfg.card_for(audit_id)):
@@ -4817,6 +4819,14 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             )
         if pause_new_checkout:
             return _html_error(request, 503, message("incident_paused", locale), locale)
+        declared_country = billing_country.strip().upper()
+        if not cfg.card_test_mode and declared_country not in cfg.approved_markets:
+            market_error = {
+                "es": "Los cobros no están habilitados para ese país de facturación.",
+                "en": "Payments are not enabled for that billing country.",
+                "pt": "Os pagamentos não estão habilitados para esse país de cobrança.",
+            }
+            return _html_error(request, 403, market_error[locale], locale)
         if cfg.email_verification_required:
             buyer_session = _session(request)
             account_id = db.account_for_audit(audit_id)
@@ -4844,8 +4854,16 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 amount_cents=payments.plan_price_cents(cfg, plan),
                 currency=payments.CURRENCY,
                 at=now,
+                declared_country=declared_country if not cfg.card_test_mode else "",
             )
-        except ValueError:
+        except ValueError as exc:
+            if str(exc) == "checkout market changed":
+                changed = {
+                    "es": "El país de esta compra pendiente no puede cambiar. Pide ayuda.",
+                    "en": "The country on this pending purchase cannot change. Ask for help.",
+                    "pt": "O país desta compra pendente não pode mudar. Peça ajuda.",
+                }
+                return _html_error(request, 409, changed[locale], locale)
             return RedirectResponse(
                 f"/audits/{audit_id}?token={token}&lang={locale}", status_code=303
             )

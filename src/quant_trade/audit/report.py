@@ -7094,6 +7094,7 @@ def render_html(
     free_mode: bool = True,
     price_usd: float | None = None,
     checkout_url: str | None = None,
+    market_choices: tuple[str, ...] = (),
     redeem_url: str | None = None,
     publish_url: str | None = None,
     notice: str | None = None,
@@ -7179,6 +7180,35 @@ def render_html(
         )
     if locked and checkout_url:
         # Card payment is the main way to pay; the pack is the second button.
+        market_caption = {
+            "es": "País de facturación",
+            "en": "Billing country",
+            "pt": "País de cobrança",
+        }
+        market_prompt = {
+            "es": "Elige tu país",
+            "en": "Choose your country",
+            "pt": "Escolha seu país",
+        }
+        market_names = {
+            "MX": {"es": "México", "en": "Mexico", "pt": "México"},
+            "US": {"es": "Estados Unidos", "en": "United States", "pt": "Estados Unidos"},
+            "BR": {"es": "Brasil", "en": "Brazil", "pt": "Brasil"},
+            "ES": {"es": "España", "en": "Spain", "pt": "Espanha"},
+        }
+        market_select = (
+            "<label for='billing-country'>"
+            f"{_e(market_caption[locale])}</label>"
+            "<select id='billing-country' name='billing_country' required>"
+            f"<option value='' selected disabled>{_e(market_prompt[locale])}</option>"
+            + "".join(
+                f"<option value='{country}'>{_e(market_names[country][locale])}</option>"
+                for country in market_choices
+            )
+            + "</select>"
+            if market_choices
+            else ""
+        )
         pack_button = (
             "<button class='btn btn-ghost btn-lg' type='submit' name='plan' value='pack'>"
             f"{_e(labels['pay_pack'].format(price=pack_price_usd))}</button>"
@@ -7188,6 +7218,7 @@ def render_html(
         paybox = (
             f"<form class='paybox buy' method='post' action='{_e(checkout_url)}'>"
             + price_html
+            + market_select
             + "<div><div class='inline-form'>"
             "<button class='btn btn-primary btn-lg' type='submit' name='plan' value='single'>"
             f"{icon('card')}{_e(labels['pay'])}</button>{pack_button}</div>"
@@ -8133,6 +8164,7 @@ def render(
     free_mode: bool = True,
     price_usd: float | None = None,
     checkout_url: str | None = None,
+    market_choices: tuple[str, ...] = (),
     redeem_url: str | None = None,
     publish_url: str | None = None,
     notice: str | None = None,
@@ -8158,6 +8190,7 @@ def render(
         free_mode=free_mode,
         price_usd=price_usd,
         checkout_url=checkout_url,
+        market_choices=market_choices,
         redeem_url=redeem_url,
         publish_url=publish_url,
         notice=notice,

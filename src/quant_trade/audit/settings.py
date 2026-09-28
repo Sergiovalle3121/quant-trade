@@ -98,6 +98,10 @@ class AuditSettings:
     #: Audits that may be unlocked by a test-mode payment. Empty in normal
     #: operation, so Stripe's public test card never unlocks a real report.
     stripe_test_audits: frozenset[str] = frozenset()
+    #: Live Checkout stays closed until approved buyer markets are configured.
+    #: Country is declared before checkout and checked against Stripe billing
+    #: country after payment; this list is not inferred from IP or language.
+    approved_markets: frozenset[str] = frozenset()
     free_mode: bool = True
     max_upload_bytes: int = MAX_UPLOAD_BYTES
     max_uploads_per_hour_per_ip: int = DEFAULT_MAX_UPLOADS_PER_HOUR_PER_IP
@@ -161,6 +165,8 @@ class AuditSettings:
             raise ValueError("smtp_port must be between 1 and 65535")
         if self.smtp_security not in ("starttls", "ssl"):
             raise ValueError("smtp_security must be starttls or ssl")
+        if any(country not in {"MX", "US", "BR", "ES"} for country in self.approved_markets):
+            raise ValueError("approved_markets must use reviewed ISO countries MX, US, BR or ES")
 
     @property
     def email_delivery_ready(self) -> bool:
@@ -214,14 +220,18 @@ class AuditSettings:
 
     @property
     def card_public(self) -> bool:
-        """Every visitor can pay by card: live mode only."""
-        return (self.stripe_enabled or self.links_enabled) and not self.card_test_mode
+        """Live Checkout is public only after markets are explicitly approved.
+
+        Historical Payment Links remain receivable by webhook, but cannot be
+        offered as a new public buying path: they bypass the market selector.
+        """
+        return self.stripe_enabled and not self.card_test_mode and bool(self.approved_markets)
 
     def card_for(self, audit_id: str) -> bool:
         """Card payment is offered on this audit: live mode, or a listed test audit."""
         if not (self.stripe_enabled or self.links_enabled):
             return False
-        return not self.card_test_mode or audit_id in self.stripe_test_audits
+        return self.card_public or (self.card_test_mode and audit_id in self.stripe_test_audits)
 
     @property
     def access_codes_enabled(self) -> bool:
@@ -289,6 +299,11 @@ class AuditSettings:
             stripe_link_pack=stripe_link_pack if payment_link_valid(stripe_link_pack) else "",
             allow_legacy_payment_links=allow_legacy_links,
             stripe_test_audits=_ids(env.get("AUDIT_STRIPE_TEST_AUDITS", "")),
+            approved_markets=frozenset(
+                country.strip().upper()
+                for country in env.get("AUDIT_APPROVED_MARKETS", "").split(",")
+                if country.strip()
+            ),
             # Free mode is forced unless Stripe is fully configured or the
             # owner opted into selling access codes.
             free_mode=requested_free or not (configured or access_codes),

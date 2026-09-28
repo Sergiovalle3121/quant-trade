@@ -509,6 +509,17 @@ class Store:
             sa.Column("resolution", sa.String(80), nullable=False, default=""),
             sa.Column("livemode", sa.Boolean),
         )
+        # Additive table: an existing deployment needs no ALTER on orders.
+        # The buyer declares a market before Checkout; Stripe's billing country
+        # is recorded separately after payment, with its different provenance.
+        self.checkout_order_markets = sa.Table(
+            "checkout_order_markets",
+            self.metadata,
+            sa.Column("order_id", sa.String(64), primary_key=True),
+            sa.Column("declared_country", sa.String(2), nullable=False),
+            sa.Column("billing_country", sa.String(2), nullable=False, default=""),
+            sa.Column("checked_at", sa.String(40), nullable=False, default=""),
+        )
         # Additive mapping: older databases need no ALTER TABLE. A refund can
         # arrive before the Checkout webhook and remain unlinked until it does.
         self.stripe_payment_intents = sa.Table(
@@ -1125,6 +1136,7 @@ class Store:
         amount_cents: int,
         currency: str,
         at: datetime,
+        declared_country: str = "",
     ) -> CheckoutOrder:
         """Freeze a new order or reuse its valid in-flight Checkout session.
 
@@ -1134,6 +1146,12 @@ class Store:
         """
         if plan not in ("single", "pack") or amount_cents < 1 or currency != "usd":
             raise ValueError("invalid checkout plan or amount")
+        if declared_country and (
+            len(declared_country) != 2
+            or not declared_country.isalpha()
+            or not declared_country.isupper()
+        ):
+            raise ValueError("invalid declared market")
         sa = self._sa
         orders, slots = self.checkout_orders, self.checkout_slots
         stamp = _iso(at)
@@ -1165,6 +1183,14 @@ class Store:
                             and old["status"] in ("creating", "open")
                             and str(old["expires_at"]) > stamp
                         ):
+                            if declared_country:
+                                frozen_market = conn.execute(
+                                    sa.select(self.checkout_order_markets.c.declared_country).where(
+                                        self.checkout_order_markets.c.order_id == old["id"]
+                                    )
+                                ).scalar_one_or_none()
+                                if frozen_market != declared_country:
+                                    raise ValueError("checkout market changed")
                             return self._checkout_order(old)
                     order_id = secrets.token_hex(16)
                     conn.execute(
@@ -1185,6 +1211,15 @@ class Store:
                             resolution="",
                         )
                     )
+                    if declared_country:
+                        conn.execute(
+                            self.checkout_order_markets.insert().values(
+                                order_id=order_id,
+                                declared_country=declared_country,
+                                billing_country="",
+                                checked_at="",
+                            )
+                        )
                     if slot is None:
                         conn.execute(
                             slots.insert().values(audit_id=audit_id, plan=plan, order_id=order_id)
@@ -1206,6 +1241,79 @@ class Store:
                 # Another request inserted this report/plan slot. Read it on retry.
                 continue
         raise RuntimeError("could not reserve checkout")
+
+    def checkout_market(self, order_id: str) -> tuple[str, str] | None:
+        """Return (buyer-declared country, Stripe billing country), if recorded."""
+        if not _usable_key(order_id):
+            return None
+        with self.engine.connect() as conn:
+            row = (
+                conn.execute(
+                    self._sa.select(self.checkout_order_markets).where(
+                        self.checkout_order_markets.c.order_id == order_id
+                    )
+                )
+                .mappings()
+                .first()
+            )
+        if row is None:
+            return None
+        return str(row["declared_country"]), str(row["billing_country"])
+
+    def record_checkout_market(self, order_id: str, billing_country: str, *, at: datetime) -> None:
+        """Keep the provider-observed country for reconciliation and cohort reporting."""
+        with self.engine.begin() as conn:
+            conn.execute(
+                self.checkout_order_markets.update()
+                .where(self.checkout_order_markets.c.order_id == order_id)
+                .values(billing_country=billing_country, checked_at=_iso(at))
+            )
+
+    def record_market_review(
+        self,
+        *,
+        order_id: str,
+        session_id: str,
+        audit_id: str,
+        billing_country: str,
+        paid_cents: int,
+        reason: str,
+        at: datetime,
+    ) -> None:
+        """Keep a charged, market-rejected order and operator issue atomically."""
+        sa = self._sa
+        with self.engine.begin() as conn:
+            conn.execute(
+                self.checkout_order_markets.update()
+                .where(self.checkout_order_markets.c.order_id == order_id)
+                .values(billing_country=billing_country, checked_at=_iso(at))
+            )
+            conn.execute(
+                self.checkout_orders.update()
+                .where(self.checkout_orders.c.id == order_id)
+                .where(self.checkout_orders.c.status.in_(("creating", "open", "paid_review")))
+                .values(
+                    status="paid_review",
+                    paid_amount_cents=paid_cents,
+                    confirmed_at=_iso(at),
+                    resolution="manual_refund_review",
+                    livemode=True,
+                )
+            )
+            known = conn.execute(
+                sa.select(self.refused_payments.c.session_id).where(
+                    self.refused_payments.c.session_id == session_id
+                )
+            ).first()
+            if known is None:
+                conn.execute(
+                    self.refused_payments.insert().values(
+                        session_id=session_id[:255],
+                        audit_id=audit_id[:80],
+                        reason=reason[:80],
+                        created_at=_iso(at),
+                    )
+                )
 
     def attach_checkout_session(
         self, order_id: str, *, session_id: str, checkout_url: str, expires_at: datetime | None
