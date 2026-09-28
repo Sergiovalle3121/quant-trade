@@ -6,7 +6,6 @@ import re
 from pathlib import Path
 
 import pytest
-from audit_fixtures import clean_mt5_tester_bytes
 
 from quant_trade.audit import importers, report
 from quant_trade.audit.forensics import review
@@ -16,8 +15,6 @@ FIXTURES = Path(__file__).parent / "fixtures" / "audit_imports"
 
 def _balance_row(name: str, locale: str) -> str:
     data = (FIXTURES / name).read_bytes()
-    if name == "mt5_tester.html":
-        data = clean_mt5_tester_bytes(data)
     result = review(data, source_format=importers.detect_format(data))
     html = report._forensics_html(result.as_dict(), locale)
     found = re.search(r"<tr><th scope='row'><code>BALANCE_CHAIN</code>.*?</tr>", html)
