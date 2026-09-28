@@ -32,6 +32,14 @@ STATIC_FILES: dict[str, str] = {
     "fonts/jetbrains-mono-var.woff2": "font/woff2",
     # The link previews shown when a page is shared (tools/make_og_images.py).
     **dict.fromkeys(OG_IMAGES, "image/png"),
+    # The brand mark as files (tools/make_favicon.py), served at ICON_PATHS.
+    "favicon.ico": "image/x-icon",
+    "apple-touch-icon.png": "image/png",
+}
+#: Where browsers and search engines look for the icon, to its file above.
+ICON_PATHS: dict[str, str] = {
+    "/favicon.ico": "favicon.ico",
+    "/apple-touch-icon.png": "apple-touch-icon.png",
 }
 
 #: Cache static files for a week; their names change when their content does.
@@ -42,8 +50,11 @@ STATIC_CACHE_CONTROL = "public, max-age=604800"
 SCRIPT_SRC = (
     "/static/app.js?v=" + hashlib.sha256((STATIC_DIR / "app.js").read_bytes()).hexdigest()[:12]
 )
-#: The brand mark as the tab icon, inline so it needs no request.
+#: The brand mark as the tab icon, inline so it needs no request; the two files
+#: are for search results and a phone's home screen, which take no inline icon.
 FAVICON = (
+    "<link rel='icon' href='/favicon.ico' sizes='16x16 32x32 48x48'>"
+    "<link rel='apple-touch-icon' sizes='180x180' href='/apple-touch-icon.png'>"
     "<link rel='icon' type='image/svg+xml' href=\"data:image/svg+xml,"
     "%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E"
     "%3Crect width='32' height='32' rx='9' fill='%23111113'/%3E%3Cpath d='M5 23c3.5 0 5-11 11-11"
@@ -1456,6 +1467,7 @@ def grid_bg() -> str:
 
 __all__ = [
     "CLASS_COLOURS",
+    "ICON_PATHS",
     "SCRIPT_SRC",
     "SCRIPT_TAG",
     "STATIC_CACHE_CONTROL",
