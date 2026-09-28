@@ -43,6 +43,17 @@ CODE_GROUP_LENGTH = 4
 CODE_REFERENCE_PREFIX = "code:"
 #: The payment reference of the free first full report of a new account.
 WELCOME_REFERENCE_PREFIX = "welcome:"
+#: The ``audit_id`` of an order that buys credits for an account rather than
+#: unlocking one report: ``account:<account id>``. Such an order unlocks no
+#: report; its credits go on an access code linked to that account.
+ACCOUNT_ORDER_PREFIX = "account:"
+
+
+def account_order_ref(account_id: str) -> str:
+    """The order reference of a credit purchase for ``account_id``."""
+    if not account_id or len(account_id) > 32 or not account_id.isalnum():
+        raise ValueError("invalid account id")
+    return ACCOUNT_ORDER_PREFIX + account_id
 
 
 def new_access_code() -> str:
@@ -1155,6 +1166,10 @@ class Store:
         """
         if plan not in ("single", "pack") or amount_cents < 1 or currency != "usd":
             raise ValueError("invalid checkout plan or amount")
+        # A credit purchase has no report to lock: it belongs to its account.
+        for_account = audit_id.startswith(ACCOUNT_ORDER_PREFIX)
+        if for_account and audit_id != account_order_ref(account_id):
+            raise ValueError("credit purchase for another account")
         if declared_country and (
             len(declared_country) != 2
             or not declared_country.isalpha()
@@ -1168,12 +1183,16 @@ class Store:
         for _ in range(3):
             try:
                 with self.engine.begin() as conn:
-                    audit = conn.execute(
-                        sa.select(self.audits.c.paid)
-                        .where(self.audits.c.id == audit_id)
-                        .with_for_update()
-                    ).first()
-                    if audit is None or bool(audit[0]):
+                    audit = (
+                        None
+                        if for_account
+                        else conn.execute(
+                            sa.select(self.audits.c.paid)
+                            .where(self.audits.c.id == audit_id)
+                            .with_for_update()
+                        ).first()
+                    )
+                    if not for_account and (audit is None or bool(audit[0])):
                         raise ValueError("audit unavailable for checkout")
                     unresolved = conn.execute(
                         sa.select(orders.c.id)
@@ -1858,6 +1877,145 @@ class Store:
                 # committed a result or will roll back; a fresh read decides.
                 continue
         raise RuntimeError("could not settle card payment")
+
+    def settle_credit_purchase(
+        self,
+        *,
+        order_id: str,
+        session_id: str,
+        account_id: str,
+        plan: str,
+        credits: int,
+        paid_cents: int,
+        code: str,
+        at: datetime,
+        payment_intent_id: str = "",
+        payment_livemode: bool | None = None,
+        queue_receipt: bool = False,
+    ) -> PaymentOutcome:
+        """Put a paid credit purchase on its account once, in one transaction.
+
+        The credits go on an access code linked to the account; the code is
+        derived from the session, so a Stripe retry or the return page finds
+        the same code and never grants twice. Only the order frozen at
+        Checkout start is accepted: a credit purchase has no legacy path.
+        """
+        if credits < 1 or not code:
+            raise ValueError("invalid credit purchase")
+        if payment_livemode is not None and type(payment_livemode) is not bool:
+            raise ValueError("invalid paid session mode")
+        sa, orders = self._sa, self.checkout_orders
+        reference = account_order_ref(account_id)
+        stamp = _iso(at)
+        for _ in range(3):
+            try:
+                with self.engine.begin() as conn:
+                    row = (
+                        conn.execute(
+                            sa.select(orders).where(orders.c.id == order_id).with_for_update()
+                        )
+                        .mappings()
+                        .first()
+                    )
+                    if row is None:
+                        raise ValueError("unknown checkout order")
+                    # An account deleted after Checkout gets nothing it could
+                    # never use: the charge goes to the owner's review instead.
+                    if (
+                        conn.execute(
+                            sa.select(self.accounts.c.id).where(self.accounts.c.id == account_id)
+                        ).first()
+                        is None
+                    ):
+                        raise ValueError("credit purchase for a deleted account")
+                    if (
+                        row["audit_id"] != reference
+                        or row["account_id"] != account_id
+                        or row["plan"] != plan
+                        or row["currency"] != "usd"
+                        or paid_cents < int(row["amount_cents"])
+                        or (row["session_id"] and row["session_id"] != session_id)
+                    ):
+                        raise ValueError("paid session disagrees with frozen order")
+                    if (
+                        row["livemode"] is not None
+                        and payment_livemode is not None
+                        and bool(row["livemode"]) != payment_livemode
+                    ):
+                        raise ValueError("paid session mode disagrees with frozen order")
+                    if row["status"] != "delivered":
+                        conn.execute(
+                            orders.update()
+                            .where(orders.c.id == order_id)
+                            .values(
+                                session_id=session_id,
+                                paid_amount_cents=paid_cents,
+                                confirmed_at=stamp,
+                                livemode=payment_livemode,
+                            )
+                        )
+                        digest = hash_access_code(code)
+                        code_id = conn.execute(
+                            sa.select(self.access_codes.c.id).where(
+                                self.access_codes.c.code_sha256 == digest
+                            )
+                        ).scalar()
+                        if code_id is None:
+                            code_id = secrets.token_hex(6)
+                            conn.execute(
+                                self.access_codes.insert().values(
+                                    id=code_id,
+                                    code_sha256=digest,
+                                    credits_total=credits,
+                                    credits_used=0,
+                                    note="Créditos pagados con tarjeta",
+                                    created_at=stamp,
+                                    expires_at=None,
+                                    disabled=False,
+                                )
+                            )
+                            conn.execute(
+                                self.credit_grants.insert().values(
+                                    code_id=code_id,
+                                    origin="purchase",
+                                    order_id=order_id,
+                                    credits=credits,
+                                    created_at=stamp,
+                                )
+                            )
+                        linked = conn.execute(
+                            sa.select(self.account_codes.c.account_id).where(
+                                self.account_codes.c.code_id == code_id
+                            )
+                        ).scalar()
+                        if linked is None:
+                            conn.execute(
+                                self.account_codes.insert().values(
+                                    code_id=code_id, account_id=account_id, linked_at=stamp
+                                )
+                            )
+                        elif linked != account_id:
+                            raise ValueError("credit code on another account")
+                        conn.execute(
+                            orders.update()
+                            .where(orders.c.id == order_id)
+                            .values(status="delivered", resolution="")
+                        )
+                    self.record_payment_intent_in_tx(
+                        conn,
+                        order_id,
+                        session_id,
+                        payment_intent_id,
+                        at,
+                        livemode=payment_livemode,
+                    )
+                    if queue_receipt:
+                        self._queue_purchase_notice_in_tx(conn, order_id, "purchase", at)
+                    return PaymentOutcome("delivered", order_id)
+            except sa.exc.IntegrityError:
+                # A competing webhook settled this order; a fresh read decides.
+                continue
+        raise RuntimeError("could not settle credit purchase")
 
     def list_checkout_orders(self, limit: int = 50) -> list[CheckoutOrder]:
         with self.engine.connect() as conn:
@@ -5549,6 +5707,7 @@ def make_store(url: str) -> Store:
 
 
 __all__ = [
+    "ACCOUNT_ORDER_PREFIX",
     "CODE_REFERENCE_PREFIX",
     "WELCOME_REFERENCE_PREFIX",
     "AccountAudit",
@@ -5564,6 +5723,7 @@ __all__ = [
     "AuditRecord",
     "PublicationRecord",
     "Store",
+    "account_order_ref",
     "hash_access_code",
     "make_store",
     "new_access_code",

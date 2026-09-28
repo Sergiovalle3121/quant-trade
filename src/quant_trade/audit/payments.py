@@ -34,11 +34,13 @@ from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 from quant_trade.audit.seo import BRAND
 from quant_trade.audit.settings import PACK_CREDITS, AuditSettings
 from quant_trade.audit.store import (
+    ACCOUNT_ORDER_PREFIX,
     CODE_ALPHABET,
     CODE_GROUP_LENGTH,
     CODE_GROUPS,
     CODE_PREFIX,
     Store,
+    account_order_ref,
 )
 
 logger = logging.getLogger("quant_trade.audit.payments")
@@ -138,8 +140,20 @@ def pack_code(secret: str, session_id: str) -> str:
     session always gives the same code, so a second confirmation of the
     same payment never creates a second code.
     """
+    return _session_code(secret, b"pack:", session_id)
+
+
+def credit_code(secret: str, session_id: str) -> str:
+    """The code that carries credits bought from "My account", like :func:`pack_code`.
+
+    It is linked to the buyer's account, so the buyer never needs to see it.
+    """
+    return _session_code(secret, b"credits:", session_id)
+
+
+def _session_code(secret: str, label: bytes, session_id: str) -> str:
     digest = hmac.new(
-        secret.encode("utf-8"), b"pack:" + session_id.encode("utf-8"), hashlib.sha256
+        secret.encode("utf-8"), label + session_id.encode("utf-8"), hashlib.sha256
     ).digest()
     chars = [CODE_ALPHABET[byte % len(CODE_ALPHABET)] for byte in digest]
     groups = [
@@ -202,6 +216,86 @@ def checkout_params(
     if not settings.card_test_mode and settings.approved_markets:
         params["billing_address_collection"] = "required"
     return params
+
+
+#: Where "My account" lives in each language; the credit Checkout comes back there.
+ACCOUNT_PATHS = {"es": "/cuenta", "en": "/account", "pt": "/pt/conta"}
+#: Credits a plan puts on an account: one report, or the pack.
+PLAN_CREDITS = {PLAN_SINGLE: 1, PLAN_PACK: PACK_CREDITS}
+
+
+def account_checkout_params(
+    settings: AuditSettings,
+    account_id: str,
+    *,
+    plan: str,
+    locale: str,
+    order_id: str,
+    amount_cents: int,
+) -> dict[str, Any]:
+    """The Checkout session for credits bought from "My account"; pure, so it is tested.
+
+    The metadata names the account, never a report: the paid session puts
+    the credits on that account and unlocks nothing else.
+    """
+    if plan not in PLANS:
+        raise ValueError(f"unknown plan {plan!r}")
+    lang, stripe_locale = _payment_locales(locale)
+    back = f"{settings.base_url}{ACCOUNT_PATHS[lang]}"
+    metadata = {
+        "account_id": account_id,
+        "plan": plan,
+        "order_id": order_id,
+        APP_KEY: APP_MARKER,
+    }
+    return {
+        "mode": "payment",
+        "line_items": [
+            {
+                "price_data": {
+                    "currency": "usd",
+                    "unit_amount": amount_cents,
+                    "product_data": {"name": PRODUCT_NAMES[lang][plan]},
+                },
+                "quantity": 1,
+            }
+        ],
+        "success_url": back + "?done=card_paid",
+        "cancel_url": back,
+        "metadata": metadata,
+        "payment_intent_data": {"metadata": metadata},
+        "client_reference_id": account_order_ref(account_id),
+        "locale": stripe_locale,
+        "billing_address_collection": "required",
+    }
+
+
+def stripe_account_checkout(
+    settings: AuditSettings,
+    account_id: str,
+    *,
+    plan: str,
+    locale: str,
+    order_id: str,
+    amount_cents: int,
+) -> dict[str, Any]:
+    """Create/retrieve the credit Checkout session, the order id as idempotency key."""
+    import stripe
+
+    params = account_checkout_params(
+        settings,
+        account_id,
+        plan=plan,
+        locale=locale,
+        order_id=order_id,
+        amount_cents=amount_cents,
+    )
+    session = stripe.checkout.Session.create(
+        api_key=settings.stripe_secret_key,
+        idempotency_key=f"rigor-checkout-{order_id}",
+        **params,
+    )
+    return _plain(session)
 
 
 def _plain(value: Any) -> dict[str, Any]:
@@ -303,6 +397,8 @@ def fulfil(
         return None
     session_id = str(session.get("id") or "")
     metadata = session.get("metadata") or {}
+    if metadata.get("account_id"):
+        return _fulfil_credits(store, settings, session, at=at)
     # A Checkout session this service created names the audit in its
     # metadata; a Payment Link carries it as ``client_reference_id``.
     audit_id = str(metadata.get("audit_id") or session.get("client_reference_id") or "")
@@ -452,6 +548,116 @@ def fulfil(
     return audit_id
 
 
+def _billing_country(session: Mapping[str, Any]) -> str:
+    details = session.get("customer_details") or {}
+    address = details.get("address") or {} if isinstance(details, Mapping) else {}
+    return str(address.get("country") or "").upper() if isinstance(address, Mapping) else ""
+
+
+def _fulfil_credits(
+    store: Store, settings: AuditSettings, session: Mapping[str, Any], *, at: datetime
+) -> str | None:
+    """Put the credits of a paid "My account" purchase on its account; its reference.
+
+    Stricter than a report purchase: only a live payment of an order frozen
+    at Checkout start, for the same account, plan and price, from an
+    approved billing country. Anything else stays locked for the owner's
+    review in /panel, like any other refused payment.
+    """
+    session_id = str(session.get("id") or "")
+    metadata = session.get("metadata") or {}
+    account_id = str(metadata.get("account_id") or "")
+    plan = str(metadata.get("plan") or "")
+    order_id = str(metadata.get("order_id") or "")
+    order = store.get_checkout_order(order_id) if order_id else None
+    try:
+        reference = account_order_ref(account_id)
+    except ValueError:
+        reference = ""
+    reason: str | None
+    if not session_id.startswith(SESSION_PREFIX) or not reference:
+        reason = "no Checkout session or no account id"
+    # Stripe's public test card must never put credits on an account.
+    elif session.get("livemode") is not True or settings.card_test_mode:
+        reason = "test payment for account credits"
+    elif order is None:
+        reason = "unknown order"
+    elif order.audit_id != reference or order.plan != plan or plan not in PLAN_CREDITS:
+        reason = "order mismatch"
+    elif store.checkout_market(order.id) is None:
+        reason = "no declared market"
+    else:
+        reason = refusal(settings, session, plan, expected_cents=order.amount_cents)
+    if reason is not None:
+        logger.warning(
+            "paid Stripe session %s refused for account credits: %s", _safe(session_id), reason
+        )
+        if session.get("livemode") is True and session_id.startswith(SESSION_PREFIX):
+            store.record_refused_payment(
+                session_id=_safe(session_id),
+                audit_id=(reference or ACCOUNT_ORDER_PREFIX)[:80],
+                reason=reason,
+                at=at,
+            )
+        return None
+    assert order is not None  # narrowed by the checks above
+    source = session.get("currency_conversion") or session
+    amount = source.get("amount_total")
+    if not isinstance(amount, int) or isinstance(amount, bool):
+        return None
+    payment_intent = session.get("payment_intent")
+    if isinstance(payment_intent, Mapping):
+        payment_intent = payment_intent.get("id")
+    market = store.checkout_market(order.id)
+    declared_country = market[0] if market is not None else ""
+    billing_country = _billing_country(session)
+    if billing_country != declared_country or billing_country not in settings.approved_markets:
+        store.record_market_review(
+            order_id=order.id,
+            session_id=session_id,
+            audit_id=reference,
+            billing_country=billing_country,
+            paid_cents=amount,
+            payment_intent_id=str(payment_intent or ""),
+            reason="billing country mismatch or unavailable",
+            at=at,
+            queue_receipt=settings.email_delivery_ready,
+        )
+        logger.warning(
+            "paid Stripe session %s for account credits held for market review",
+            _safe(session_id),
+        )
+        return None
+    try:
+        store.settle_credit_purchase(
+            order_id=order.id,
+            session_id=session_id,
+            account_id=account_id,
+            plan=plan,
+            credits=PLAN_CREDITS[plan],
+            paid_cents=amount,
+            code=credit_code(settings.stripe_webhook_secret, session_id),
+            at=at,
+            payment_intent_id=str(payment_intent or ""),
+            payment_livemode=True,
+            queue_receipt=settings.email_delivery_ready,
+        )
+    except ValueError:
+        logger.warning(
+            "paid Stripe session %s disagrees with credit order %s",
+            _safe(session_id),
+            _safe(order.id),
+        )
+        store.record_refused_payment(
+            session_id=_safe(session_id), audit_id=reference, reason="order mismatch", at=at
+        )
+        return None
+    store.record_checkout_market(
+        order.id, billing_country, declared_country=declared_country, at=at
+    )
+    return reference
+
+
 def pack_for(store: Store, settings: AuditSettings, session_id: str | None) -> tuple[str, int]:
     """The pack code a card payment created and its credits left, or ``("", 0)``."""
     if not session_id or not session_id.startswith(SESSION_PREFIX):
@@ -466,6 +672,7 @@ def pack_for(store: Store, settings: AuditSettings, session_id: str | None) -> t
 
 
 __all__ = [
+    "ACCOUNT_PATHS",
     "APP_KEY",
     "CARD_LOOKUPS_PER_HOUR",
     "APP_MARKER",
@@ -477,13 +684,17 @@ __all__ = [
     "card_mode",
     "card_via",
     "payment_link_urls",
+    "PLAN_CREDITS",
+    "account_checkout_params",
     "checkout_params",
+    "credit_code",
     "fulfil",
     "pack_code",
     "pack_for",
     "paid_in_full",
     "plan_price_cents",
     "refusal",
+    "stripe_account_checkout",
     "stripe_checkout",
     "stripe_session",
 ]
