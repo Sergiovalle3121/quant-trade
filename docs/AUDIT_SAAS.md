@@ -2055,6 +2055,7 @@ Routes:
 | `POST /audits` | Upload. An optional `access_code` field redeems a code (paid mode with codes on). |
 | `GET /audits/{id}?token=…` | The report, in the language chosen at upload; `&lang=en` or `&lang=es` shows it in the other one. `GET /audits/{id}.json?token=…` the record (402 while locked). |
 | `POST /audits/{id}/checkout?token=…` | Stripe Checkout (503 without Stripe). Form field `plan=single` (default) or `plan=pack`; the return link `?session_id=…` is confirmed with Stripe before anything unlocks. Needs a signed-in account: a visitor is sent to sign in and back to the report, a report on another account is refused (403), and the order is recorded on the buyer's account (`tests/test_audit_card_payments.py::test_checkout_needs_the_signed_in_account_that_owns_the_report`). |
+| `POST /cuenta/comprar` (`/account/comprar`, `/pt/conta/comprar`) | Buy credits by card from "My account": `plan=single` (1 credit, the report price) or `plan=pack` (3 credits, the pack price), with `billing_country` from `AUDIT_APPROVED_MARKETS` and the required `final_sale=yes` box. Live Stripe only (no button and `?error=buy_off` in test mode, without markets or while new checkouts are paused). The order is a `checkout_orders` row whose `audit_id` is `account:<account id>`; the signed webhook puts the credits on an access code linked to the account and unlocks no report. A test-mode payment, another account, amount, plan or billing country grants nothing (`tests/test_audit_account_credit_purchase.py`). |
 | `POST /audits/{id}/redeem?token=…` | Unlock an existing preview with an access code. |
 | `POST /audits/{id}/publish?token=…` | Create (or return) the public verification page. Paid audits, or any audit in free mode; 402 otherwise. |
 | `POST /audits/{id}/unpublish?token=…` | Remove the public page. |
@@ -2911,6 +2912,18 @@ charge or a charge that delivered no report (the `duplicate` and
 dashboard; the terms keep one sentence that statutory rights are not
 limited. The refund webhook handling stays so those manual refunds are
 recorded.
+
+Credits bought from "My account" follow the same rules: the same required
+box (worded for a credit), stored in `checkout_order_terms`, and sales are
+final. The credits sit on a code derived from the Stripe session with the
+webhook secret (`payments.credit_code`), linked to the buyer's account, so a
+Stripe retry never grants twice and the buyer never has to type a code. A
+paid session held for review (billing country) blocks a second purchase
+from that account until the owner resolves it in `/panel`. A payment for an
+account deleted before the webhook grants nothing and is listed there too. A
+Stripe refund is only recorded; after refunding a credit order by hand, disable
+its code (`quant-trade audit codes disable <id>`, or «Desactivar» in `/panel`) so
+its unused credits go too.
 
 `/terminos` (`/terms`) and `/privacidad` (`/privacy`) are rendered by
 `audit/legal.py` from the running configuration: the price, whether card
