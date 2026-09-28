@@ -13,7 +13,7 @@ pytest.importorskip("fastapi")
 pytest.importorskip("sqlalchemy")
 
 from fastapi.testclient import TestClient  # noqa: E402
-from test_audit_purchase_mail import NOW, _buyer, _outbox, _paid  # noqa: E402
+from test_audit_purchase_mail import NOW, _buyer, _held, _outbox, _paid  # noqa: E402
 
 from quant_trade.audit import mail, pdf  # noqa: E402
 from quant_trade.audit.payments import fulfil  # noqa: E402
@@ -157,6 +157,54 @@ def test_charge_review_requeue_requires_duplicate_live_order(tmp_path: Path) -> 
         )
     assert store.requeue_purchase_email(review["id"], at=NOW + timedelta(days=1))
     assert not store.requeue_purchase_email(review["id"], at=NOW + timedelta(days=1))
+
+
+def test_market_review_mail_is_visible_and_requeued_only_while_held(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    cfg, store, order = _buyer(tmp_path)
+    assert _held(store, cfg, order) is None
+    _exhaust_smtp(store, cfg, start=NOW)
+    row = _outbox(store)[0]
+    assert row["kind"] == "market_review" and row["status"] == "dead"
+    assert store.purchase_email_warning_counts(at=NOW + timedelta(days=1)) == {
+        "dead": 1,
+        "overdue": 0,
+    }
+    assert [
+        issue.kind for issue in store.list_purchase_email_issues(at=NOW + timedelta(days=1))
+    ] == ["market_review"]
+    monkeypatch.setattr(pdf, "available", lambda: True)
+    key = "operator-key-long-enough-for-admin"
+    client = TestClient(create_app(replace(cfg, admin_key=key), store))
+    assert client.get("/ready").json()["warnings"]["purchase_mail_dead"] == 1
+    panel = client.post("/panel", data={"key": key})
+    assert panel.status_code == 200
+    assert order.id in panel.text and "market_review" in panel.text
+    assert "buyer@example.com" not in panel.text
+    with store.engine.begin() as conn:
+        conn.execute(
+            store.checkout_orders.update()
+            .where(store.checkout_orders.c.id == order.id)
+            .values(status="delivered")
+        )
+    assert not store.requeue_purchase_email(order.id, at=NOW + timedelta(days=1))
+    with store.engine.begin() as conn:
+        conn.execute(
+            store.checkout_orders.update()
+            .where(store.checkout_orders.c.id == order.id)
+            .values(status="paid_review")
+        )
+    assert store.requeue_purchase_email(order.id, at=NOW + timedelta(days=1))
+    assert not store.requeue_purchase_email(order.id, at=NOW + timedelta(days=1))
+    sent = []
+    assert (
+        mail.deliver_pending(
+            store, cfg, sender=lambda msg, _: sent.append(msg), now=NOW + timedelta(days=1)
+        )
+        == 1
+    )
+    assert sent[0]["Subject"] == "Rigor payment held for review"
 
 
 def test_overdue_warning_does_not_change_readiness(

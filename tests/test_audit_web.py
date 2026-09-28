@@ -39,6 +39,7 @@ STRIPE = {
     "stripe_secret_key": "sk_live_x",
     "stripe_webhook_secret": "whsec_test",
     "stripe_price_id": "price_x",
+    "approved_markets": frozenset({"MX"}),
 }
 
 
@@ -287,10 +288,12 @@ def test_paid_mode_locks_until_the_signed_webhook_arrives(tmp_path: Path) -> Non
     assert client.get(f"/audits/{audit_id}.json?token={token}").status_code == 402
 
     seen: list[tuple[str, str]] = []
+    order_ids: list[str] = []
 
-    def fake_checkout(settings: AuditSettings, aid: str, tok: str, **_: str) -> str:
+    def fake_checkout(settings: AuditSettings, aid: str, tok: str, **kwargs: str) -> dict[str, str]:
         seen.append((aid, tok))
-        return "https://checkout.stripe.test/session"
+        order_ids.append(kwargs["order_id"])
+        return {"id": "cs_test_1", "url": "https://checkout.stripe.test/session"}
 
     client.app.state.checkout_factory = fake_checkout
     redirect = client.post(
@@ -311,8 +314,9 @@ def test_paid_mode_locks_until_the_signed_webhook_arrives(tmp_path: Path) -> Non
                     "payment_status": "paid",
                     "livemode": True,
                     "currency": "usd",
-                    "amount_total": 4900,
-                    "metadata": {"audit_id": audit_id, "app": "rigor"},
+                    "amount_total": 2900,
+                    "customer_details": {"address": {"country": "MX"}},
+                    "metadata": {"audit_id": audit_id, "app": "rigor", "order_id": order_ids[0]},
                 }
             },
         }

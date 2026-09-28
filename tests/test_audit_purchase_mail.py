@@ -87,6 +87,100 @@ def _outbox(store):
         return conn.execute(store.email_outbox.select()).mappings().all()
 
 
+def _held(store, cfg, order, *, sid: str = "cs_live_market_notice"):
+    if store.checkout_market(order.id) is None:
+        store.record_checkout_market(order.id, "", declared_country="MX", at=NOW)
+    session = {
+        **_paid(order.id, sid, "pi_market_notice"),
+        "customer_details": {"address": {"country": "US"}},
+    }
+    return fulfil(store, replace(cfg, approved_markets=frozenset({"MX"})), session, at=NOW)
+
+
+@pytest.mark.parametrize(
+    ("locale", "subject", "message", "refund_copy"),
+    [
+        (
+            "es",
+            "Pago de Rigor retenido para revisión",
+            "este cargo no habilitó una compra",
+            "este mensaje no confirma un reembolso",
+        ),
+        (
+            "en",
+            "Rigor payment held for review",
+            "this charge did not unlock a purchase",
+            "this message does not confirm a refund",
+        ),
+        (
+            "pt",
+            "Pagamento do Rigor retido para análise",
+            "esta cobrança não liberou uma compra",
+            "esta mensagem não confirma um reembolso",
+        ),
+    ],
+)
+def test_market_review_notice_is_durable_once_and_honest_in_each_language(
+    tmp_path: Path, locale: str, subject: str, message: str, refund_copy: str
+) -> None:
+    cfg, store, order = _buyer(tmp_path)
+    with store.engine.begin() as conn:
+        conn.execute(
+            store.accounts.update()
+            .where(store.accounts.c.id == order.account_id)
+            .values(locale=locale)
+        )
+    assert _held(store, cfg, order) is None
+    assert _held(store, cfg, order) is None
+    assert store.get_checkout_order(order.id).status == "paid_review"
+    assert not store.get_audit(order.audit_id).paid
+    rows = _outbox(store)
+    assert len(rows) == 1
+    assert rows[0]["id"] == order.id
+    assert rows[0]["kind"] == "market_review"
+    assert rows[0]["locale"] == locale
+    sent = []
+    assert mail.deliver_pending(store, cfg, sender=lambda msg, _: sent.append(msg), now=NOW) == 1
+    assert sent[0]["Subject"] == subject
+    body = sent[0].get_content()
+    assert message in body
+    assert order.id in body and "USD 29.00" in body
+    assert refund_copy in body
+    assert "Private report" not in body and "token=" not in body
+    assert sent[0]["Message-ID"] == f"<rigor-{order.id}@rigor.example>"
+    assert _outbox(store)[0]["status"] == "sent"
+
+
+@pytest.mark.parametrize(("verified", "smtp_ready"), [(False, True), (True, False)])
+def test_market_review_without_verified_configured_mail_still_keeps_charge(
+    tmp_path: Path, verified: bool, smtp_ready: bool
+) -> None:
+    cfg, store, order = _buyer(tmp_path, verified=verified)
+    if not smtp_ready:
+        cfg = replace(cfg, smtp_host="")
+    assert _held(store, cfg, order) is None
+    assert store.get_checkout_order(order.id).status == "paid_review"
+    assert _outbox(store) == []
+
+
+def test_market_review_outbox_failure_rolls_back_charge(tmp_path: Path) -> None:
+    cfg, store, order = _buyer(tmp_path)
+
+    def fail_outbox(_conn, _cursor, statement, _parameters, _context, _executemany):
+        if "INSERT INTO email_outbox" in statement:
+            raise RuntimeError("fake outbox write failure")
+
+    sa.event.listen(store.engine, "before_cursor_execute", fail_outbox)
+    try:
+        with pytest.raises(RuntimeError, match="fake outbox write failure"):
+            _held(store, cfg, order)
+    finally:
+        sa.event.remove(store.engine, "before_cursor_execute", fail_outbox)
+    assert store.get_checkout_order(order.id).status == "creating"
+    assert store.checkout_market(order.id) == ("MX", "")
+    assert _outbox(store) == []
+
+
 def test_paid_replay_queues_one_notice_without_report_token(tmp_path: Path) -> None:
     cfg, store, order = _buyer(tmp_path)
     session = _paid(order.id, "cs_live_notice_1", "pi_notice_1")

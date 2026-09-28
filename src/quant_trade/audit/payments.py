@@ -395,6 +395,7 @@ def fulfil(
                     payment_intent_id=str(payment_intent or ""),
                     reason="billing country mismatch or unavailable",
                     at=at,
+                    queue_receipt=settings.email_delivery_ready,
                 )
                 logger.warning(
                     "paid Stripe session %s held for market review on audit %s",

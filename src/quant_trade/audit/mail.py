@@ -104,6 +104,12 @@ PURCHASE_WORDS = {
             "Registramos otro cargo para un informe ya habilitado. "
             "Revisaremos este cargo manualmente; este mensaje no confirma un reembolso.",
         ),
+        "market_review": (
+            "Pago de Rigor retenido para revisión",
+            "Registramos este pago, pero este cargo no habilitó una compra porque "
+            "debemos revisar el país de facturación. Revisaremos el cargo manualmente; "
+            "este mensaje no confirma un reembolso.",
+        ),
         "single": "Informe individual",
         "pack": "Paquete de tres informes",
         "reference": "Referencia",
@@ -119,6 +125,12 @@ PURCHASE_WORDS = {
             "We recorded another charge for an already unlocked report. "
             "We will review this charge manually; this message does not confirm a refund.",
         ),
+        "market_review": (
+            "Rigor payment held for review",
+            "We recorded this payment, but this charge did not unlock a purchase "
+            "because the billing country needs review. We will review the charge manually; "
+            "this message does not confirm a refund.",
+        ),
         "single": "Single report",
         "pack": "Three-report pack",
         "reference": "Reference",
@@ -133,6 +145,12 @@ PURCHASE_WORDS = {
             "Cobrança adicional em análise no Rigor",
             "Registramos outra cobrança para um relatório já liberado. "
             "Analisaremos esta cobrança manualmente; esta mensagem não confirma um reembolso.",
+        ),
+        "market_review": (
+            "Pagamento do Rigor retido para análise",
+            "Registramos este pagamento, mas esta cobrança não liberou uma compra "
+            "porque precisamos analisar o país de cobrança. Analisaremos a cobrança manualmente; "
+            "esta mensagem não confirma um reembolso.",
         ),
         "single": "Relatório individual",
         "pack": "Pacote de três relatórios",
@@ -165,11 +183,14 @@ def compose(
 ) -> EmailMessage:
     locale = str(row["locale"]) if row["locale"] in PATHS else "es"
     kind = str(row["kind"])
-    if kind in ("purchase", "charge_review"):
+    if kind in ("purchase", "charge_review", "market_review"):
         if store is None:
             raise ValueError("purchase notice needs its order ledger")
         order = store.get_checkout_order(str(row["id"]))
-        if order is None or order.status not in ("delivered", "duplicate"):
+        allowed_statuses = (
+            ("paid_review",) if kind == "market_review" else ("delivered", "duplicate")
+        )
+        if order is None or order.status not in allowed_statuses:
             raise ValueError("purchase notice has no settled order")
         words = PURCHASE_WORDS[locale]
         subject, lead = words[kind]
