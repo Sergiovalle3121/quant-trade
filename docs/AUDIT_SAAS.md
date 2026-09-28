@@ -3405,10 +3405,14 @@ the return uses the reconstructed deal amounts. When the importer reports a
 position still open at the end, or a close whose money is in the balance but
 not in the trade list, the gap is `NOT_MEASURED` instead: those deals move the
 balance without being closed trades. For an independently uploaded
-curve, an unexplained difference produces
-`MONETARY_RECONCILIATION_UNEXPLAINED` (`WARN`) and the equation stays
-`NOT_MEASURED` because unreported deposits, open positions or conversion
-could explain it. Neither alert claims fraud. The calibrated forensic battery
+curve, an unexplained difference leaves the equation `NOT_MEASURED` with the
+reason shown, and raises **no** red flag and no data-quality penalty:
+unreported deposits, floating P&L in the curve, conversion or a scaled index
+could explain it, and genuine files with separate equity curves show the same
+gap (7 of 40 in a real-file gate). `MONETARY_RECONCILIATION_UNEXPLAINED` is
+no longer raised; its title and advice stay only so stored reports still
+render. `MONETARY_RECONCILIATION_MISMATCH` (`FAIL`) remains the only
+monetary-reconciliation flag, and it does not claim fraud. The calibrated forensic battery
 is also run over the original platform bytes; a `BALANCE_CHAIN SIGNAL` adds
 `FORENSIC_BALANCE_CHAIN_SIGNAL` (`WARN`) with method version and calibration,
 without treating a heuristic as proof of alteration. An MT5 tester report

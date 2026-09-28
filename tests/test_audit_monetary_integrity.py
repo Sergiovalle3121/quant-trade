@@ -181,10 +181,12 @@ def test_legitimate_deposit_rounding_and_unknown_curve_currency() -> None:
     assert matched["currency"] == "UNKNOWN"
     assert flags == []
 
-    # An unexplained change in a separate curve remains inconclusive, not fraud.
+    # An unexplained change in a separate curve remains inconclusive: it is
+    # NOT_MEASURED with its reason and raises no red flag.
     without_flow, flags = _reconciliation(replace(inputs, cash_flows=[]))
     assert without_flow["status"] == "NOT_MEASURED"
-    assert {flag.code for flag in flags} == {"MONETARY_RECONCILIATION_UNEXPLAINED"}
+    assert "could explain the difference" in without_flow["reason"]
+    assert flags == []
 
 
 def test_build_commit_sha_is_declared_only_when_explicit_and_valid() -> None:
@@ -229,7 +231,11 @@ def _seed_812_files() -> tuple[bytes, bytes, bytes]:
     return rows.to_csv(index=False).encode(), curve(1.0), curve(20.0)
 
 
-def test_seed_812_scaled_curve_is_unexplained_and_control_is_consistent() -> None:
+def test_seed_812_scaled_curve_is_not_measured_without_a_flag() -> None:
+    """A separate curve 20x the trades' variation (a scaled index, floating
+    P&L or undisclosed flows look the same) cannot be reconciled: the section
+    says NOT_MEASURED and why, and no red flag or data-quality penalty follows,
+    because genuine files with separate curves produce the same gap."""
     trades, honest_curve, inflated_curve = _seed_812_files()
     declared = DeclaredMetadata(cost_bps_per_side=5)
     control = _run(build_inputs(honest_curve, declared, trades_bytes=trades, now=NOW))
@@ -241,9 +247,10 @@ def test_seed_812_scaled_curve_is_unexplained_and_control_is_consistent() -> Non
     assert suspect.reconciliation is not None
     assert suspect.reconciliation["status"] == "NOT_MEASURED"
     assert suspect.reconciliation["difference"]["value"] > 19000
-    assert "MONETARY_RECONCILIATION_UNEXPLAINED" in {f["code"] for f in suspect.red_flags}
-    assert next(d for d in suspect.verdict.dimensions if d.name == "data_quality").status != "PASS"
-    assert suspect.verdict.overall != "A"
+    assert "could explain the difference" in suspect.reconciliation["reason"]
+    assert not any(f["code"].startswith("MONETARY_") for f in suspect.red_flags)
+    quality = {d.name: d.status for d in suspect.verdict.dimensions}["data_quality"]
+    assert quality == {d.name: d.status for d in control.verdict.dimensions}["data_quality"]
 
 
 def test_dependent_2000_returns_cannot_receive_class_a_from_plain_psr() -> None:
