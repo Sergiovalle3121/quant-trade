@@ -196,21 +196,21 @@ def test_legal_copy_matches_once_per_file_and_purchase_notice_rules() -> None:
             "una vez por cuenta, navegador y archivo",
             "el mismo navegador, archivo o buzón lo reciba una sola vez",
             "avisos de compra",
-            "cambio de opinión",
+            "Todas las ventas son finales",
         ),
         (
             "en",
             "once per account, browser and file",
             "the same browser, file or inbox gets it only once",
             "purchase or additional-charge",
-            "change of mind",
+            "All sales are final",
         ),
         (
             "pt",
             "uma vez por conta, navegador e arquivo",
             "o mesmo navegador, arquivo ou caixa de entrada o receba uma só vez",
             "avisos de compra",
-            "mudança de ideia",
+            "Todas as vendas são finais",
         ),
     ):
         terms = re.sub(r"\s+", " ", legal_page(terms_text(ctx, locale), locale=locale))
@@ -278,7 +278,7 @@ def test_pages_are_served_in_three_languages_and_linked_everywhere(tmp_path: Pat
         assert any(path in page for path in terms), name
         assert any(path in page for path in privacy), name
     # Next to the upload form, not only in the footer.
-    form = pages["landing"].split("action='/audits'")[1].split("</form>")[0]
+    form = client.get("/auditar").text.split("action='/audits'")[1].split("</form>")[0]
     assert "/terminos?lang=es" in form and "/privacidad?lang=es" in form
 
 
@@ -467,17 +467,19 @@ def test_card_payment_wording_appears_only_while_cards_are_on() -> None:
             page = legal_page(text, locale=locale)
             assert "Stripe" not in page and find_claims(page) == []
     terms_es = legal_page(terms_text(on, "es"), locale="es")
-    assert "misma tarjeta a través de Stripe" in terms_es and "USD 23.00" in terms_es
+    assert "misma tarjeta" not in terms_es
+    assert "cobro duplicado" in terms_es
     assert "dólares estadounidenses" in terms_es
     terms_en = legal_page(terms_text(on, "en"), locale="en")
-    assert "same card through Stripe" in terms_en and "USD 23.00" in terms_en
+    assert "same card" not in terms_en
+    assert "duplicate charge" in terms_en
     privacy_es = legal_page(privacy_text(on, "es"), locale="es")
     assert "correo que escribes en su página de pago" in privacy_es
     assert "hash de su código de acceso" in privacy_es
     privacy_en = legal_page(privacy_text(on, "en"), locale="en")
     assert "e-mail address you type on its checkout" in privacy_en
     terms_pt = legal_page(terms_text(on, "pt"), locale="pt")
-    assert "mesmo cartão pelo Stripe" in terms_pt and "USD 23.00" in terms_pt
+    assert "mesmo cartão" not in terms_pt
     assert "USD 29.00" in terms_pt and "USD 69.00" in terms_pt
     assert "cobrança duplicada" in terms_pt
     assert "até 5 créditos por mês civil" in terms_pt

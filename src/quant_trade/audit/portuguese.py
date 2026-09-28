@@ -95,10 +95,9 @@ COPY_PT: dict[str, Any] = {
     "variants_help": "Uma coluna de retornos por variante testada; habilita o PBO.",
     "trials": "Quantas configurações ou versões foram testadas antes de escolher esta?",
     "trials_help": (
-        "O Rigor só pode descontar a sorte de testar muitas se você disser quantas. Se você "
-        "enviar o XML de otimização do MT5, elas são contadas "
-        "sozinhas. Num histórico de conta ou de fundo, indique quantas estratégias ou fundos o "
-        "mesmo gestor administra. Se não souber, deixe em branco."
+        "Configurações testadas antes de escolher esta. Se ficar vazio, o relatório usa 1 (o "
+        "caso mais favorável) e a classe fica no máximo em B. Se você enviar o XML de "
+        "otimização do MT5, elas são contadas sozinhas."
     ),
     "cost_bps": (
         "Custo extra por lado em pontos-base, além do que o seu relatório já detalha (vazio = 0)"
@@ -130,7 +129,7 @@ COPY_PT: dict[str, Any] = {
     ),
     "signin_first": (
         "Antes de enviar, crie a sua conta grátis: o seu primeiro relatório sai completo, com "
-        "PDF, sem pagar. Se você comprou um código, use-o ao enviar pela sua conta."
+        "PDF, sem pagar."
     ),
     "signin_create": "Criar conta grátis",
     "signin_enter": "Já tenho conta",

@@ -70,7 +70,7 @@ from quant_trade.audit.engine import run_audit
 from quant_trade.audit.errors_pt import FILES_PT
 from quant_trade.audit.guides import GUIDES_BY_PATH, guide_url
 from quant_trade.audit.importers import detect_format
-from quant_trade.audit.legal import LegalContext, privacy_text, terms_text
+from quant_trade.audit.legal import LEGAL_UPDATED, LegalContext, privacy_text, terms_text
 from quant_trade.audit.market import MarketData
 from quant_trade.audit.owner import (
     MAX_CREDITS,
@@ -83,12 +83,15 @@ from quant_trade.audit.owner import (
     panel_page,
 )
 from quant_trade.audit.pages import (
+    _ACCOUNT_PATHS,
+    AUDIT_PATHS,
     LANDING_PATHS,
     SAMPLE_BANNER,
     audience_page,
     badge_svg,
     check_page,
     compare_page,
+    contact_page,
     error_page,
     guide_page,
     guides_index_page,
@@ -96,6 +99,7 @@ from quant_trade.audit.pages import (
     legal_page,
     method_page,
     sample_meta,
+    upload_page,
     verification_page,
 )
 from quant_trade.audit.payments import stripe_checkout
@@ -1477,15 +1481,18 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         joined: int = 0,
         error: str | None = None,
         extras: int = 0,
-    ) -> str:
+    ) -> Response:
         return _landing(request, _locale(lang), joined=joined, error=error, extras=extras)
 
     def _landing(
         request: Request, locale: str, *, joined: int = 0, error: str | None = None, extras: int = 0
-    ) -> str:
+    ) -> Response:
+        if extras:
+            # Links shared before the form had its own page open its extra boxes there.
+            return RedirectResponse(f"{AUDIT_PATHS[locale]}?extras=1", status_code=303)
         # Only known codes are shown, so the query string cannot inject text.
         shown = message("invalid_email", locale) if error == "email" else None
-        return landing(
+        page = landing(
             locale=locale,
             free_mode=cfg.free_mode,
             price_usd=cfg.price_usd,
@@ -1501,16 +1508,102 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             signed_in=_session(request) is not None,
             operator=(cfg.operator_name, cfg.operator_address),
         )
+        return HTMLResponse(page)
+
+    def _audit_form(request: Request, locale: str, extras: int) -> Response:
+        signed_in = _session(request) is not None
+        if not signed_in and not cfg.free_mode:
+            # Uploads need an account: sign up (or sign in) first, then come back here,
+            # so nobody fills the form and loses it.
+            signup = _ACCOUNT_PATHS[locale][0]
+            return RedirectResponse(
+                f"{signup}?next={quote(AUDIT_PATHS[locale], safe='/')}", status_code=303
+            )
+        return HTMLResponse(
+            upload_page(
+                locale=locale,
+                free_mode=cfg.free_mode,
+                price_usd=cfg.price_usd,
+                access_codes=cfg.access_codes_enabled,
+                retention_days=cfg.retention_days,
+                base_url=_site_url(request),
+                extras_open=bool(extras),
+                signed_in=signed_in,
+            )
+        )
+
+    @app.get("/auditar", response_class=HTMLResponse)
+    def audit_form_es(request: Request, extras: int = 0) -> Response:
+        """The upload form on its own page (Spanish)."""
+        return _audit_form(request, "es", extras)
+
+    @app.get("/en/audit", response_class=HTMLResponse)
+    def audit_form_en(request: Request, extras: int = 0) -> Response:
+        return _audit_form(request, "en", extras)
+
+    @app.get("/pt/auditar", response_class=HTMLResponse)
+    def audit_form_pt(request: Request, extras: int = 0) -> Response:
+        return _audit_form(request, "pt", extras)
+
+    # Addresses people type or share for the prices: the landing's price section.
+    for price_path, landing_path in (
+        ("/precios", "/"),
+        ("/pricing", "/en"),
+        ("/en/pricing", "/en"),
+        ("/pt/precos", "/pt"),
+    ):
+
+        def _prices(landing_path: str = landing_path) -> Response:
+            return RedirectResponse(f"{landing_path}#pricing", status_code=301)
+
+        app.add_api_route(price_path, _prices, methods=["GET"], include_in_schema=False)
+
+    def _contact(request: Request, locale: str) -> HTMLResponse:
+        return HTMLResponse(
+            contact_page(
+                locale=locale,
+                email=cfg.operator_contact,
+                contact_url=cfg.contact_url,
+                base_url=_site_url(request),
+            )
+        )
+
+    @app.get("/contacto", response_class=HTMLResponse)
+    def contact_es(request: Request) -> HTMLResponse:
+        """Who to write to (Spanish); the English and Portuguese pages follow."""
+        return _contact(request, "es")
+
+    @app.get("/en/contact", response_class=HTMLResponse)
+    def contact_en(request: Request) -> HTMLResponse:
+        return _contact(request, "en")
+
+    @app.get("/pt/contato", response_class=HTMLResponse)
+    def contact_pt(request: Request) -> HTMLResponse:
+        return _contact(request, "pt")
+
+    # Other names people try for the same page.
+    for alias, contact_path in (
+        ("/soporte", "/contacto"),
+        ("/contact", "/en/contact"),
+        ("/support", "/en/contact"),
+        ("/en/support", "/en/contact"),
+        ("/pt/suporte", "/pt/contato"),
+    ):
+
+        def _to_contact(contact_path: str = contact_path) -> Response:
+            return RedirectResponse(contact_path, status_code=301)
+
+        app.add_api_route(alias, _to_contact, methods=["GET"], include_in_schema=False)
 
     @app.get("/en", response_class=HTMLResponse)
-    def index_en(request: Request) -> str:
+    def index_en(request: Request, extras: int = 0) -> Response:
         """A short address to share with English-speaking traders."""
-        return index(request, lang="en")
+        return index(request, lang="en", extras=extras)
 
     @app.get("/pt", response_class=HTMLResponse)
     def index_pt(
         request: Request, joined: int = 0, error: str | None = None, extras: int = 0
-    ) -> str:
+    ) -> Response:
         """The Portuguese landing and its own account, report, sample and legal paths."""
         return _landing(request, "pt", joined=joined, error=error, extras=extras)
 
@@ -4969,11 +5062,14 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         lang: str | None = None,
         plan: Annotated[str, Form()] = payments.PLAN_SINGLE,
         billing_country: Annotated[str, Form()] = "",
+        final_sale: Annotated[str, Form(max_length=8)] = "",
     ) -> Response:
         record = _load(audit_id, token, request)
         if not (cfg.stripe_enabled and cfg.card_for(audit_id)):
             raise HTTPException(status_code=503, detail="payments_disabled")
         locale = _view_locale(record, lang)
+        if _cross_site(request):
+            return _html_error(request, 403, message("cross_site", locale), locale)
         if db.has_checkout_review(audit_id):
             review = {
                 "es": "Hay un cobro pendiente de revisión. No vuelvas a pagar; pide ayuda.",
@@ -4989,6 +5085,20 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             )
         if pause_new_checkout:
             return _html_error(request, 503, message("incident_paused", locale), locale)
+        # Every purchase belongs to a signed-in account: a visitor signs in (or
+        # creates the account) first and comes back to this report to pay.
+        buyer = _session(request)
+        if buyer is None:
+            return _signin_redirect(
+                locale, next_path=f"/audits/{audit_id}?token={token or ''}&lang={locale}"
+            )
+        if db.account_for_audit(audit_id) != buyer[0].id:
+            other_account = {
+                "es": "Este informe está en otra cuenta. Entra con esa cuenta para pagarlo.",
+                "en": "This report is on another account. Sign in with that account to pay.",
+                "pt": "Este relatório está em outra conta. Entre com essa conta para pagar.",
+            }
+            return _html_error(request, 403, other_account[locale], locale)
         declared_country = billing_country.strip().upper()
         if not cfg.card_test_mode and declared_country not in cfg.approved_markets:
             market_error = {
@@ -5012,6 +5122,13 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                     account_pages.COPY[locale]["email_checkout_required"],
                     locale,
                 )
+        if final_sale != "yes":
+            final_sale_needed = {
+                "es": "Marca la casilla de compra no reembolsable para pagar.",
+                "en": "Tick the non-refundable purchase box to pay.",
+                "pt": "Marque a caixa de compra não reembolsável para pagar.",
+            }
+            return _html_error(request, 400, final_sale_needed[locale], locale)
         # The pack is sold only while it is on sale; anything else is one audit.
         if plan != payments.PLAN_PACK or not cfg.pack_price_usd:
             plan = payments.PLAN_SINGLE
@@ -5037,6 +5154,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             return RedirectResponse(
                 f"/audits/{audit_id}?token={token}&lang={locale}", status_code=303
             )
+        db.record_final_sale(order.id, terms_version=LEGAL_UPDATED, at=now)
         if order.checkout_url and order.expires_at > now.isoformat().replace("+00:00", "Z"):
             return RedirectResponse(order.checkout_url, status_code=303)
         factory: CheckoutFactory = app.state.checkout_factory

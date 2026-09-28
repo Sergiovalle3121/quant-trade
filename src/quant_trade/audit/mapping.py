@@ -23,7 +23,7 @@ from datetime import UTC, datetime, timedelta
 
 from quant_trade.audit import importers as imp
 from quant_trade.audit import universal
-from quant_trade.audit.pages import _COPY, _e, _error_card, _page, _page_hero
+from quant_trade.audit.pages import _COPY, _e, _error_card, _page, _page_hero, audit_path
 from quant_trade.audit.seo import BRAND
 
 #: Refusals a column mapping can fix: the table was read, its columns were not.
@@ -859,7 +859,7 @@ def mapping_page(
         for name, value in (carried or {}).items()
         if name in CARRIED_FIELDS and value
     )
-    back = "/pt#subir" if locale == "pt" else f"/?lang={locale}#subir"
+    back = audit_path(locale)
     if "locale" not in (carried or {}):
         hidden += f"<input type='hidden' name='locale' value='{locale}'>"
     pdf_notice = (

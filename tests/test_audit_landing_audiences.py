@@ -6,7 +6,7 @@ from __future__ import annotations
 import re
 
 from quant_trade.audit.guard import find_claims
-from quant_trade.audit.pages import AUDIENCES, landing
+from quant_trade.audit.pages import AUDIENCES, landing, upload_page
 
 
 def _paid_landing(locale: str, *, card_payments: bool) -> str:
@@ -76,7 +76,7 @@ def test_paid_price_card_explains_the_flow_and_lists_fund_checks() -> None:
 
 def test_second_files_and_challenge_sit_in_a_closed_extras_box() -> None:
     for locale, summary in (("es", "Añadir más archivos"), ("en", "Add more files")):
-        page = _paid_landing(locale, card_payments=False)
+        page = upload_page(locale=locale, free_mode=False, price_usd=29, access_codes=True)
         form = page.split("id='subir'", 1)[1].split("</form>", 1)[0]
         before, extras = form.split("<details class='adv extras'>", 1)
         # One file is enough: the main report and the curve come first, open.

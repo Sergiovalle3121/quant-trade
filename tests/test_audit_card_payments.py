@@ -280,7 +280,9 @@ def test_checkout_route_sends_the_chosen_plan(tmp_path: Path) -> None:
     url = f"/audits/{audit_id}/checkout?token={token}&lang=en"
     for plan in ("pack", "single", "gift"):
         response = client.post(
-            url, data={"plan": plan, "billing_country": "MX"}, follow_redirects=False
+            url,
+            data={"plan": plan, "billing_country": "MX", "final_sale": "yes"},
+            follow_redirects=False,
         )
         assert response.headers["location"] == "https://checkout.stripe.test/s"
     assert [(plan, locale, amount) for plan, locale, _, amount in seen] == [
@@ -295,7 +297,7 @@ def test_checkout_route_sends_the_chosen_plan(tmp_path: Path) -> None:
     no_pack.app.state.checkout_factory = fake
     no_pack.post(
         f"/audits/{aid}/checkout?token={tok}",
-        data={"plan": "pack", "billing_country": "MX"},
+        data={"plan": "pack", "billing_country": "MX", "final_sale": "yes"},
     )
     assert seen[-1][0:2] == ("single", "es")
     assert "name='plan' value='pack'" not in no_pack.get(f"/audits/{aid}?token={tok}").text
@@ -321,11 +323,15 @@ def test_checkout_retry_after_restart_reuses_frozen_order(tmp_path: Path) -> Non
 
     client.app.state.checkout_factory = fake
     path = f"/audits/{audit_id}/checkout?token={token}"
-    first = client.post(path, data={"billing_country": "MX"}, follow_redirects=False)
+    first = client.post(
+        path, data={"billing_country": "MX", "final_sale": "yes"}, follow_redirects=False
+    )
     assert first.headers["location"] == "https://checkout.stripe.test/frozen"
     restarted = _client(tmp_path, price_usd_cents=4900)
     restarted.app.state.checkout_factory = fake
-    second = restarted.post(path, data={"billing_country": "MX"}, follow_redirects=False)
+    second = restarted.post(
+        path, data={"billing_country": "MX", "final_sale": "yes"}, follow_redirects=False
+    )
     assert second.headers["location"] == first.headers["location"]
     assert len(calls) == 1
     (order,) = restarted.app.state.store.list_checkout_orders()
@@ -347,11 +353,15 @@ def test_live_checkout_needs_approved_country_and_freezes_it(tmp_path: Path) -> 
         "id": "cs_market_1",
         "url": "https://checkout.stripe.test/market",
     }
-    allowed = client.post(path, data={"billing_country": "MX"}, follow_redirects=False)
+    allowed = client.post(
+        path, data={"billing_country": "MX", "final_sale": "yes"}, follow_redirects=False
+    )
     assert allowed.status_code == 303
     order = client.app.state.store.list_checkout_orders()[0]
     assert client.app.state.store.checkout_market(order.id) == ("MX", "")
-    changed = client.post(path, data={"billing_country": "US"}, follow_redirects=False)
+    changed = client.post(
+        path, data={"billing_country": "US", "final_sale": "yes"}, follow_redirects=False
+    )
     assert changed.status_code == 409
     assert len(client.app.state.store.list_checkout_orders()) == 1
 
@@ -376,7 +386,10 @@ def test_market_mismatch_records_charge_without_delivery(tmp_path: Path) -> None
     }
     path = f"/audits/{audit_id}/checkout?token={token}"
     assert (
-        client.post(path, data={"billing_country": "MX"}, follow_redirects=False).status_code == 303
+        client.post(
+            path, data={"billing_country": "MX", "final_sale": "yes"}, follow_redirects=False
+        ).status_code
+        == 303
     )
     store = client.app.state.store
     order = store.list_checkout_orders()[0]
@@ -425,7 +438,9 @@ def test_market_mismatch_records_charge_without_delivery(tmp_path: Path) -> None
     counts = funnel.build(store.funnel_events("2000-01-01")).total.counts
     assert counts["gross_usd_cents"] == 2900
     assert counts["refund_usd_cents"] == 1000
-    blocked = client.post(path, data={"billing_country": "MX"}, follow_redirects=False)
+    blocked = client.post(
+        path, data={"billing_country": "MX", "final_sale": "yes"}, follow_redirects=False
+    )
     assert blocked.status_code == 409
     assert len(store.list_checkout_orders()) == 1
     assert "No vuelvas a pagar" in client.get(f"/audits/{audit_id}?token={token}").text
@@ -453,7 +468,10 @@ def test_matching_stripe_billing_country_delivers_and_is_recorded(tmp_path: Path
     }
     path = f"/audits/{audit_id}/checkout?token={token}"
     assert (
-        client.post(path, data={"billing_country": "MX"}, follow_redirects=False).status_code == 303
+        client.post(
+            path, data={"billing_country": "MX", "final_sale": "yes"}, follow_redirects=False
+        ).status_code
+        == 303
     )
     store = client.app.state.store
     order = store.list_checkout_orders()[0]
@@ -481,7 +499,7 @@ def test_two_paid_sessions_with_one_order_metadata_keep_separate_charges(
     assert (
         client.post(
             f"/audits/{audit_id}/checkout?token={token}",
-            data={"billing_country": "MX"},
+            data={"billing_country": "MX", "final_sale": "yes"},
             follow_redirects=False,
         ).status_code
         == 303
@@ -577,7 +595,7 @@ def test_webhook_replay_queues_review_notice_for_its_own_order(tmp_path: Path) -
     assert (
         client.post(
             f"/audits/{audit_id}/checkout?token={token}",
-            data={"billing_country": "MX"},
+            data={"billing_country": "MX", "final_sale": "yes"},
             follow_redirects=False,
         ).status_code
         == 303
@@ -639,8 +657,12 @@ def test_a_timeout_retries_with_the_same_persisted_idempotency_key(tmp_path: Pat
     client.app.state.checkout_factory = timeout
     path = f"/audits/{audit_id}/checkout?token={token}"
     with pytest.raises(TimeoutError):
-        client.post(path, data={"billing_country": "MX"}, follow_redirects=False)
-    retry = client.post(path, data={"billing_country": "MX"}, follow_redirects=False)
+        client.post(
+            path, data={"billing_country": "MX", "final_sale": "yes"}, follow_redirects=False
+        )
+    retry = client.post(
+        path, data={"billing_country": "MX", "final_sale": "yes"}, follow_redirects=False
+    )
     assert retry.headers["location"] == "https://checkout.stripe.test/recovered"
     assert len(set(order_ids)) == 1
 
@@ -1225,3 +1247,72 @@ def test_a_sale_from_another_app_is_not_listed_on_the_panel(tmp_path: Path) -> N
     assert _webhook(client, marked) == 200
     listed = [r.session_id for r in client.app.state.store.list_refused_payments()]
     assert listed == ["cs_marked"]
+
+
+# -- the buyer's account --------------------------------------------------------
+def test_checkout_needs_the_signed_in_account_that_owns_the_report(tmp_path: Path) -> None:
+    from quant_trade.audit import account_pages
+
+    client = _client(tmp_path)
+    audit_id, token = _upload(client)
+    calls: list[str] = []
+    client.app.state.checkout_factory = lambda *_args, **_kwargs: (
+        calls.append("x") or "https://checkout.stripe.test/s"
+    )
+    url = f"/audits/{audit_id}/checkout?token={token}&lang=es"
+    form = {"plan": "single", "billing_country": "MX", "final_sale": "yes"}
+
+    # A visitor without a session is sent to sign in, and back to the report.
+    visitor = TestClient(client.app, base_url=str(client.base_url))
+    response = visitor.post(url, data=form, follow_redirects=False)
+    assert response.status_code == 303
+    location = response.headers["location"]
+    assert location.startswith(account_pages.path("signin", "es") + "?next=")
+    assert parse_qs(urlsplit(location).query)["next"] == [
+        f"/audits/{audit_id}?token={token}&lang=es"
+    ]
+
+    # A post from another site is refused before anything is recorded.
+    forged = client.post(
+        url, data=form, headers={"sec-fetch-site": "cross-site"}, follow_redirects=False
+    )
+    assert forged.status_code == 403
+
+    # Another account cannot pay for (and take) this report.
+    other = signed_in(TestClient(client.app), email="other@example.com")
+    refused = other.post(url, data=form, follow_redirects=False)
+    assert refused.status_code == 403
+    assert "otra cuenta" in refused.text
+    assert calls == [] and client.app.state.store.list_checkout_orders() == []
+
+    # The owner pays, and the order is on the owner's account.
+    paid = client.post(url, data=form, follow_redirects=False)
+    assert paid.headers["location"] == "https://checkout.stripe.test/s"
+    (order,) = client.app.state.store.list_checkout_orders()
+    assert order.account_id == client.app.state.store.account_for_audit(audit_id)
+
+
+def test_paying_needs_the_final_sale_box_and_keeps_its_acceptance(tmp_path: Path) -> None:
+    from quant_trade.audit.legal import LEGAL_UPDATED
+
+    client = _client(tmp_path)
+    audit_id, token = _upload(client)
+    page = client.get(f"/audits/{audit_id}?token={token}").text
+    assert "name='final_sale'" in page and "la compra no es reembolsable" in page
+    assert "Todas las ventas son finales" in page
+    client.app.state.checkout_factory = lambda *_args, **_kwargs: "https://checkout.stripe.test/s"
+    url = f"/audits/{audit_id}/checkout?token={token}&lang=es"
+
+    unticked = client.post(url, data={"billing_country": "MX"}, follow_redirects=False)
+    assert unticked.status_code == 400 and "no reembolsable" in unticked.text
+    assert client.app.state.store.list_checkout_orders() == []
+
+    ticked = client.post(
+        url, data={"billing_country": "MX", "final_sale": "yes"}, follow_redirects=False
+    )
+    assert ticked.headers["location"] == "https://checkout.stripe.test/s"
+    (order,) = client.app.state.store.list_checkout_orders()
+    version, accepted_at = client.app.state.store.final_sale_acceptance(order.id)
+    assert version == LEGAL_UPDATED and accepted_at.endswith("Z")
+    for lang, words in (("en", "not refundable"), ("pt", "não é reembolsável")):
+        assert words in client.get(f"/audits/{audit_id}?token={token}&lang={lang}").text
