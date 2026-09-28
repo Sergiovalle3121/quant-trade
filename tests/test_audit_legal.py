@@ -111,6 +111,41 @@ def test_privacy_describes_what_the_store_keeps() -> None:
     assert OPERATOR["operator_contact"] in es
 
 
+@pytest.mark.parametrize(
+    ("locale", "declared", "observed", "order"),
+    [
+        (
+            "es",
+            "país de facturación que declaras",
+            "país de facturación observado por Stripe",
+            "asociados al pedido",
+        ),
+        (
+            "en",
+            "billing country you declare",
+            "billing country observed by Stripe",
+            "linked to the order",
+        ),
+        (
+            "pt",
+            "país de cobrança que você declara",
+            "país de cobrança observado pelo Stripe",
+            "associados ao pedido",
+        ),
+    ],
+)
+def test_privacy_discloses_both_checkout_billing_countries(
+    locale: str, declared: str, observed: str, order: str
+) -> None:
+    enabled = legal_page(
+        privacy_text(LegalContext(**OPERATOR, card_payments=True), locale), locale=locale
+    )
+    assert declared in enabled and observed in enabled and order in enabled
+
+    disabled = legal_page(privacy_text(LegalContext(**OPERATOR), locale), locale=locale)
+    assert declared not in disabled and observed not in disabled
+
+
 def test_terms_price_follows_the_payment_mode() -> None:
     free = legal_page(terms_text(LegalContext(), "es"), locale="es")
     assert "gratuito" in free and "Stripe" not in free

@@ -834,6 +834,9 @@ def _stripe_keeps(ctx: LegalContext, locale: str) -> tuple[str, ...]:
         return (
             "When you pay by card: the Stripe checkout session id, the payment date and, for "
             "a pack, the hash of the pack's access code.",
+            "For a Checkout order, we keep the billing country you declare before payment and, "
+            "when Stripe provides it, the billing country observed by Stripe. Both are linked "
+            "to the order to check market availability and reconcile a charge.",
             "Stripe receives your card details, the e-mail address you type on its checkout "
             "page (it sends the receipt there) and your card's country, plus the report id and "
             "whether you bought one report or the pack. Stripe processes them under its own "
@@ -843,6 +846,10 @@ def _stripe_keeps(ctx: LegalContext, locale: str) -> tuple[str, ...]:
         return (
             "Quando você paga com cartão: guardamos o identificador da sessão de pagamento "
             "do Stripe, a data e, no caso de um pacote, o hash do código de acesso.",
+            "Em um pedido do Checkout, guardamos o país de cobrança que você declara antes do "
+            "pagamento e, quando o Stripe o informa, o país de cobrança observado pelo Stripe. "
+            "Ambos ficam associados ao pedido para verificar a disponibilidade nesse mercado "
+            "e conciliar uma cobrança.",
             "O Stripe recebe os dados do cartão, o e-mail digitado em sua página de pagamento "
             "(para enviar o recibo), o país do cartão, o identificador do relatório e a "
             "informação de que você comprou um relatório ou o pacote. O Stripe trata esses "
@@ -851,6 +858,10 @@ def _stripe_keeps(ctx: LegalContext, locale: str) -> tuple[str, ...]:
     return (
         "Si pagas con tarjeta: el identificador de la sesión de pago de Stripe, la fecha del "
         "pago y, si compras el paquete, el hash de su código de acceso.",
+        "En un pedido de Checkout guardamos el país de facturación que declaras antes de pagar "
+        "y, cuando Stripe lo comunica, el país de facturación observado por Stripe. Ambos "
+        "quedan asociados al pedido para comprobar la disponibilidad en ese mercado y "
+        "conciliar un cargo.",
         "Stripe recibe los datos de tu tarjeta, el correo que escribes en su página de pago "
         "(ahí te envía el recibo) y el país de tu tarjeta, además del identificador del "
         "informe y si compraste un informe o el paquete. Stripe los trata según su propia "
