@@ -311,6 +311,34 @@ def test_an_order_held_for_review_is_never_expired(tmp_path: Path) -> None:
     assert fake.expire_calls == [] and len(fake.created) == 1
 
 
+def test_alternating_languages_stops_opening_new_sessions(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    """Past the hourly limit the old session is reused, as before the expiry existed."""
+    client, fake = _client(tmp_path)
+    audit_id, token = _upload(client)
+    limit = payments.EXPIRIES_PER_HOUR
+    with caplog.at_level(logging.WARNING, logger="quant_trade.audit.payments"):
+        seen = [_pay(client, audit_id, token, ("es", "en")[turn % 2]) for turn in range(limit + 8)]
+    assert len(fake.expire_calls) == limit
+    assert len(fake.created) == limit + 2
+    # The last two sessions stay open at Stripe and each language reuses its own.
+    assert sorted(sid for sid, status in fake.status.items() if status == "open") == [
+        f"cs_live_{limit + 1}",
+        f"cs_live_{limit + 2}",
+    ]
+    assert set(seen[limit + 2 :]) == {
+        f"https://checkout.stripe.test/{limit + 1}",
+        f"https://checkout.stripe.test/{limit + 2}",
+    }
+    assert f"expiry limit reached: superseded Checkout session cs_live_{limit + 1}" in caplog.text
+    # The limit is the account's too: its credit purchases expire nothing this hour.
+    _buy(client, "es")
+    _buy(client, "en")
+    assert len(fake.expire_calls) == limit
+    assert len(fake.created) == limit + 4
+
+
 # -- the store --------------------------------------------------------------------
 def test_only_open_unexpired_orders_of_the_same_purchase_are_superseded(
     tmp_path: Path,
@@ -354,6 +382,60 @@ def test_only_open_unexpired_orders_of_the_same_purchase_are_superseded(
     assert store.reserve_checkout(ref, plan=PLAN_SINGLE, at=now, locale="es", **kwargs).id != es
 
 
+def test_a_slow_older_request_never_supersedes_the_newer_session(tmp_path: Path) -> None:
+    store = make_store(f"sqlite:///{tmp_path}/s.db")
+    now = datetime(2026, 9, 25, tzinfo=UTC)
+    account = "ab" * 16
+    ref = account_order_ref(account)
+    kwargs = {"account_id": account, "plan": PLAN_SINGLE, "amount_cents": 2900, "currency": "usd"}
+    # Spanish is reserved first, but Stripe answers it after the English one.
+    slow = store.reserve_checkout(ref, at=now, locale="es", **kwargs)
+    later = now + timedelta(seconds=2)
+    fast = store.reserve_checkout(ref, at=later, locale="en", **kwargs)
+    for order, sid in ((fast, "cs_live_en"), (slow, "cs_live_es")):
+        store.attach_checkout_session(
+            order.id,
+            session_id=sid,
+            checkout_url=f"https://checkout.stripe.test/{sid}",
+            expires_at=later + timedelta(hours=1),
+        )
+    done = later + timedelta(seconds=5)
+    # The older request finishes last: the buyer's newer session is not its to close.
+    assert store.superseded_checkouts(slow.id, at=done) == []
+    assert [order.id for order in store.superseded_checkouts(fast.id, at=done)] == [slow.id]
+
+
+def test_a_refused_permission_leaves_the_old_session_open(tmp_path: Path) -> None:
+    store = make_store(f"sqlite:///{tmp_path}/s.db")
+    settings = AuditSettings(database_url=f"sqlite:///{tmp_path}/s.db", **SELLING)
+    now = datetime(2026, 9, 25, tzinfo=UTC)
+    account = "ab" * 16
+    ref = account_order_ref(account)
+    kwargs = {"account_id": account, "plan": PLAN_SINGLE, "amount_cents": 2900, "currency": "usd"}
+    orders = []
+    for locale in ("es", "en"):
+        order = store.reserve_checkout(ref, at=now, locale=locale, **kwargs)
+        store.attach_checkout_session(
+            order.id,
+            session_id=f"cs_live_{locale}",
+            checkout_url=f"https://checkout.stripe.test/{locale}",
+            expires_at=now + timedelta(hours=1),
+        )
+        orders.append(order.id)
+    calls: list[str] = []
+    done = payments.expire_superseded(
+        store,
+        settings,
+        orders[1],
+        expirer=lambda cfg, sid: calls.append(sid) or {"id": sid, "status": "expired"},
+        at=now,
+        allowed=lambda: False,
+    )
+    assert done == 0 and calls == []
+    assert store.get_checkout_order(orders[0]).resolution == ""
+    assert store.reserve_checkout(ref, at=now, locale="es", **kwargs).id == orders[0]
+
+
 def test_expire_superseded_never_raises(tmp_path: Path) -> None:
     store = make_store(f"sqlite:///{tmp_path}/s.db")
     settings = AuditSettings(database_url=f"sqlite:///{tmp_path}/s.db", **SELLING)
@@ -394,6 +476,100 @@ def test_the_expire_call_is_one_post_to_stripes_expire_endpoint(tmp_path: Path) 
     assert method == "post" and not post_data
     assert url == "https://api.stripe.com/v1/checkout/sessions/cs_live_old/expire"
     assert payments.EXPIRE_TIMEOUT_SECONDS == 10
+
+
+def _stripe_answers(stripe: Any, status: str, seen: list[tuple[str, str]]) -> Any:
+    """Stripe refusing the expiry of a session it holds in ``status``."""
+
+    class Refuser(stripe.HTTPClient):
+        name = "refuser"
+
+        def request(self, method: str, url: str, headers: Any, post_data: Any = None) -> Any:
+            seen.append((method, url))
+            if method == "post":
+                error = {"type": "invalid_request_error", "message": "not open"}
+                return json.dumps({"error": error}), 400, {"Request-Id": "req_1"}
+            body = {"id": "cs_live_old", "object": "checkout.session", "status": status}
+            return json.dumps(body), 200, {"Request-Id": "req_2"}
+
+    return Refuser()
+
+
+def test_a_session_stripe_already_expired_counts_as_expired(tmp_path: Path) -> None:
+    """The answer was lost, or another request expired it: one read settles it."""
+    stripe = pytest.importorskip("stripe")
+    seen: list[tuple[str, str]] = []
+    settings = AuditSettings(database_url=f"sqlite:///{tmp_path}/s.db", **SELLING)
+    answer = payments.stripe_expire_session(
+        settings, "cs_live_old", http_client=_stripe_answers(stripe, "expired", seen)
+    )
+    assert answer["id"] == "cs_live_old" and answer["status"] == "expired"
+    assert seen == [
+        ("post", "https://api.stripe.com/v1/checkout/sessions/cs_live_old/expire"),
+        ("get", "https://api.stripe.com/v1/checkout/sessions/cs_live_old"),
+    ]
+
+
+@pytest.mark.parametrize("status", ["complete", "open"])
+def test_a_refused_expiry_of_a_paid_or_open_session_stays_an_error(
+    tmp_path: Path, status: str
+) -> None:
+    stripe = pytest.importorskip("stripe")
+    seen: list[tuple[str, str]] = []
+    settings = AuditSettings(database_url=f"sqlite:///{tmp_path}/s.db", **SELLING)
+    with pytest.raises(stripe.InvalidRequestError):
+        payments.stripe_expire_session(
+            settings, "cs_live_old", http_client=_stripe_answers(stripe, status, seen)
+        )
+    assert len(seen) == 2
+
+
+def test_the_expire_call_works_on_an_sdk_without_the_v1_namespace(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    stripe = pytest.importorskip("stripe")
+    built: list[dict[str, Any]] = []
+
+    class Sessions:
+        def expire(self, session_id: str) -> dict[str, Any]:
+            return {"id": session_id, "status": "expired"}
+
+    class Checkout:
+        sessions = Sessions()
+
+    class OldClient:
+        checkout = Checkout()
+
+        def __init__(self, key: str, **options: Any) -> None:
+            built.append(options)
+
+    monkeypatch.setattr(stripe, "StripeClient", OldClient)
+    settings = AuditSettings(database_url=f"sqlite:///{tmp_path}/s.db", **SELLING)
+    answer = payments.stripe_expire_session(settings, "cs_live_old", http_client=object())
+    assert answer == {"id": "cs_live_old", "status": "expired"}
+    assert built[0]["max_network_retries"] == 0
+
+
+def test_a_session_expired_behind_our_back_is_repaired_on_the_next_switch(
+    tmp_path: Path,
+) -> None:
+    """Stripe expired it but the order was never marked: the next switch marks it."""
+    client, fake = _client(tmp_path)
+    audit_id, token = _upload(client)
+    store = client.app.state.store
+    _pay(client, audit_id, token, "es")
+    fake.status["cs_live_1"] = "expired"  # expired at Stripe, the answer never arrived
+
+    def expirer(cfg: AuditSettings, session_id: str) -> dict[str, Any]:
+        # What ``stripe_expire_session`` returns after its read of the session.
+        fake.expire_calls.append(session_id)
+        return {"id": session_id, "status": fake.status[session_id]}
+
+    client.app.state.session_expirer = expirer
+    _pay(client, audit_id, token, "en")
+    assert store.get_checkout_session("cs_live_1").resolution == "expired_language_change"
+    # Spanish again opens a fresh session instead of the dead one.
+    assert _pay(client, audit_id, token, "es") == "https://checkout.stripe.test/3"
 
 
 # -- credits from "My account" ------------------------------------------------------

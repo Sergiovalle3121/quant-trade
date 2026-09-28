@@ -3031,15 +3031,27 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
 
         return handler
 
-    def _expire_superseded(order_id: str, at: datetime) -> BackgroundTask:
+    checkout_expiries = AttemptLog()
+
+    def _expire_superseded(order: Any, at: datetime) -> BackgroundTask:
         """After the redirect: close the session this one replaced in another language."""
+
+        def allowed() -> bool:
+            # Counted per purchase and per account: past the limit the old
+            # session stays open and is reused, so alternating languages
+            # cannot keep opening sessions at Stripe.
+            by_purchase = checkout_expiries.hit("purchase:" + order.audit_id, at)
+            by_account = checkout_expiries.hit("account:" + order.account_id, at)
+            return max(by_purchase, by_account) < payments.EXPIRIES_PER_HOUR
+
         return BackgroundTask(
             payments.expire_superseded,
             db,
             cfg,
-            order_id,
+            order.id,
             expirer=app.state.session_expirer,
             at=at,
+            allowed=allowed,
         )
 
     def _buy_post(path_locale: str) -> Callable[..., Response]:
@@ -3114,9 +3126,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                     else None
                 ),
             )
-            return RedirectResponse(
-                url, status_code=303, background=_expire_superseded(order.id, now)
-            )
+            return RedirectResponse(url, status_code=303, background=_expire_superseded(order, now))
 
         return handler
 
@@ -5451,7 +5461,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         db.attach_checkout_session(
             order.id, session_id=session_id, checkout_url=url, expires_at=expires
         )
-        return RedirectResponse(url, status_code=303, background=_expire_superseded(order.id, now))
+        return RedirectResponse(url, status_code=303, background=_expire_superseded(order, now))
 
     @app.post("/webhooks/stripe")
     async def stripe_webhook(request: Request) -> Response:

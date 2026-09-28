@@ -147,7 +147,16 @@ Every change below has an offline, deterministic test in
   one more endpoint. Limits: best effort (a failed expiry leaves the old
   session open, as it was before); the no-charge card check is not covered
   (no charge, no order); two switches at the same moment can expire each
-  other's session, which charges nothing. Also fixed: the two redirects of
+  other's session, which charges nothing. Review follow-up: because an
+  expired order is not reused, alternating languages would open one new
+  Stripe session per click on `POST /audits/{id}/checkout`, which has no
+  request limit of its own; expiry calls are now capped at 6 per purchase
+  and per account in an hour (in memory, per process), and past the cap the
+  old session stays open and is reused, so the sessions one report can open
+  stay bounded. An order made after the new one is never expired (a slow
+  older request cannot close the newer session), and a failed expiry reads
+  the session once and marks the order only when Stripe already holds it as
+  `expired`, never when it is `complete`. Also fixed: the two redirects of
   `POST /audits/{id}/checkout` that wrote `token=None` when the signed-in
   owner paid without the token in the URL now write an empty token.
 

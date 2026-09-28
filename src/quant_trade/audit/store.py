@@ -1625,6 +1625,8 @@ class Store:
         plan still holds: the same purchase started in another language. An
         order that is paid, in review, delivered or past its expiry is never
         listed, and nothing is listed until the new order has its own session.
+        An order made after ``order_id`` is not listed either: a slow older
+        request never closes the session the buyer moved on to.
         """
         if not _usable_key(order_id):
             return []
@@ -1659,6 +1661,7 @@ class Store:
                     .where(orders.c.session_id.is_not(None))
                     .where(orders.c.session_id != "")
                     .where(orders.c.expires_at > stamp)
+                    .where(orders.c.created_at <= new["created_at"])
                     .order_by(orders.c.created_at, orders.c.id)
                 )
                 .mappings()

@@ -2971,6 +2971,9 @@ payable twice for a day. Rules (`payments.expire_superseded`,
 - Only the same purchase: the same report, or the same account's credits,
   and the same plan, held by the reuse slot of another language. Another
   plan, another report and another account are left alone.
+- Only an order made no later than the new one: a slow older request that
+  finishes last never closes the session the buyer moved on to; both stay
+  open, as before this rule.
 - Only an order that is `open`, has a session id and is not past its expiry.
   An order that is `paid_review`, `delivered` or `duplicate` is never sent to
   Stripe, and Stripe itself refuses to expire a session that is complete, so
@@ -2981,6 +2984,18 @@ payable twice for a day. Rules (`payments.expire_superseded`,
   or any error is logged with the session id and the error class only and
   changes nothing: the old order stays reusable in its language, as before
   this rule, and the next new session of that purchase tries again.
+- When the expiry call fails, the session is read once with the same
+  timeout: if Stripe already holds it as `expired` (the answer was lost, or
+  another request expired it) the order is marked like any expired one. A
+  session Stripe holds as `complete` or `open` is never marked. Until a later
+  language switch repairs it, a session expired at Stripe but not marked
+  here is still offered in its own language and shows Stripe's expired page.
+- At most `payments.EXPIRIES_PER_HOUR` (6) expiry calls per purchase and per
+  account in an hour, counted in memory per process. Past the limit the old
+  session is left open and reused in its language, so switching back and
+  forth opens at most two more sessions instead of one per click.
+- The call uses the SDK's `StripeClient` (`stripe>=8.0`), through its `v1`
+  namespace when the installed SDK has one.
 - Once Stripe answers `expired`, the old order keeps its status `open`, its
   session id and its checkout URL, takes an expiry of now and
   `resolution=expired_language_change`. That is the state of a session that

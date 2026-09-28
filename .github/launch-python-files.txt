@@ -29,6 +29,7 @@ tests/audit_fixtures.py
 tests/forgery_lab.py
 tests/test_audit_access_codes.py
 tests/test_audit_card_payments.py
+tests/test_audit_checkout_language.py
 tests/test_audit_email_delivery.py
 tests/test_audit_email_pages.py
 tests/test_audit_email_routes_ui.py
