@@ -104,6 +104,7 @@ from quant_trade.audit.pages import (
 )
 from quant_trade.audit.payments import stripe_checkout
 from quant_trade.audit.portuguese import MESSAGES_PT, link_locale
+from quant_trade.audit.prop_presets import DEFAULT_PRESET
 from quant_trade.audit.report import render, result_sha256
 from quant_trade.audit.retention import RetentionWorker
 from quant_trade.audit.sample import sample_result
@@ -1517,8 +1518,12 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         )
         return HTMLResponse(page)
 
-    def _audit_form(request: Request, locale: str, extras: int) -> Response:
+    def _audit_form(request: Request, locale: str, extras: int, done: str = "") -> Response:
         signed_in = _session(request) is not None
+        # Only the known value is shown, so the query cannot inject text.
+        notice = ""
+        if done == "welcome_confirm" and _confirm_pending(request):
+            notice = account_pages.COPY[locale]["welcome_confirm"]
         if not signed_in and not cfg.free_mode:
             # Uploads need an account: sign up (or sign in) first, then come back here,
             # so nobody fills the form and loses it.
@@ -1535,21 +1540,22 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 base_url=_site_url(request),
                 extras_open=bool(extras),
                 signed_in=signed_in,
+                notice=notice,
             )
         )
 
     @app.get("/auditar", response_class=HTMLResponse)
-    def audit_form_es(request: Request, extras: int = 0) -> Response:
+    def audit_form_es(request: Request, extras: int = 0, done: str = "") -> Response:
         """The upload form on its own page (Spanish)."""
-        return _audit_form(request, "es", extras)
+        return _audit_form(request, "es", extras, done)
 
     @app.get("/en/audit", response_class=HTMLResponse)
-    def audit_form_en(request: Request, extras: int = 0) -> Response:
-        return _audit_form(request, "en", extras)
+    def audit_form_en(request: Request, extras: int = 0, done: str = "") -> Response:
+        return _audit_form(request, "en", extras, done)
 
     @app.get("/pt/auditar", response_class=HTMLResponse)
-    def audit_form_pt(request: Request, extras: int = 0) -> Response:
-        return _audit_form(request, "pt", extras)
+    def audit_form_pt(request: Request, extras: int = 0, done: str = "") -> Response:
+        return _audit_form(request, "pt", extras, done)
 
     # The legal pages under the other addresses people guess for them.
     for legal_alias, legal_path in (
@@ -1759,13 +1765,38 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 max_age=acct.REPORT_KEY_MINUTES * 60,
             )
 
-    def _back_to(request: Request, next_path: str) -> Response:
+    def _back_to(request: Request, next_path: str, *, mailed: bool = False) -> Response:
         """To ``next`` after signing in; a report gets back the key its cookie kept.
 
-        The cookie is used once: ``_start_session`` clears it.
+        The cookie is used once: ``_start_session`` clears it. ``mailed`` asks the
+        upload page or the report for the "confirmation link sent" notice.
         """
         kept = request.cookies.get(acct.REPORT_KEY_COOKIE)
-        return RedirectResponse(acct.join_report_key(next_path, kept), status_code=303)
+        target = acct.join_report_key(next_path, kept)
+        parts = urlsplit(target)
+        name = (
+            "done"
+            if parts.path in AUDIT_PATHS.values()
+            else "acct"
+            if re.fullmatch(r"/audits/[A-Za-z0-9_-]+", parts.path)
+            else ""
+        )
+        if mailed and name:
+            query = f"{parts.query}&" if parts.query else ""
+            target = f"{parts.path}?{query}{name}=welcome_confirm"
+            if parts.fragment:
+                target += f"#{parts.fragment}"
+        return RedirectResponse(target, status_code=303)
+
+    def _confirm_pending(request: Request) -> bool:
+        """Signed in, a confirmation link can be sent and the address is not confirmed."""
+        session = _session(request)
+        return (
+            session is not None
+            and cfg.email_verification_required
+            and cfg.email_delivery_ready
+            and not db.email_verified(session[0].id)
+        )
 
     def _without_report_key(request: Request, next_path: str) -> Response | None:
         """An older link with a report's key inside ``next``: the same page without it."""
@@ -2103,11 +2134,11 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                     db.set_account_ref(account.id, ref, at=now)
                 except Exception:  # noqa: BLE001 - the account and its session come first
                     logger.warning("could not keep a sign-up tag")
+            # The confirmation link was queued with the account.
+            mailed = cfg.email_verification_required and cfg.email_delivery_ready
             if next_path:
-                response: Response = _back_to(request, next_path)
+                response: Response = _back_to(request, next_path, mailed=mailed)
             else:
-                # The confirmation link was queued with the account.
-                mailed = cfg.email_verification_required and cfg.email_delivery_ready
                 response = _account_redirect(locale, "welcome_confirm" if mailed else "welcome")
             _start_session(response, account, request, event="signup")
             return response
@@ -2253,6 +2284,9 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             pending = _challenge(request)
             if pending is None:
                 return _signin_redirect(locale, done="two_step_expired", next_path=next_path)
+            cleaned = _without_report_key(request, next_path)
+            if cleaned is not None:
+                return cleaned
             csrf = _anon_csrf(request)
             page = account_pages.two_step_page(
                 locale=locale,
@@ -2566,10 +2600,14 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 if step
                 else account_pages.path("signin", locale)
             )
+            # A form from before the key left ``next`` can still bring it.
+            next_path, report_key = acct.split_report_key(next_path)
             if next_path:
                 back += "?next=" + quote(next_path, safe="")
             if not _passkey_started(request, now):
-                return RedirectResponse(back, status_code=303)
+                limited = RedirectResponse(back, status_code=303)
+                _keep_report_key(limited, report_key)
+                return limited
             token, challenge = _new_passkey_challenge(now, "step" if step else "signin", account_id)
             options = pk.authentication_options(rp, challenge=challenge, allowed=allowed)
             action = (
@@ -2577,7 +2615,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 if step
                 else account_pages.passkey_signin_path(locale)
             ) + "/entrar"
-            return _passkey_page(
+            page = _passkey_page(
                 request,
                 locale=locale,
                 csrf=_anon_csrf(request),
@@ -2589,6 +2627,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 token=token,
                 anon=True,
             )
+            _keep_report_key(page, report_key)
+            return page
 
         return handler
 
@@ -3936,10 +3976,11 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             # Account first: every upload, code or not, belongs to an account.
             if session is None:
                 # Whoever filled an extra box finds them open after signing up.
+                # The challenge list always sends its first choice: that is no choice.
                 chose_extras = bool(
                     (optimization is not None and optimization.filename)
                     or (live is not None and live.filename)
-                    or challenge.strip()
+                    or challenge.strip() not in ("", DEFAULT_PRESET)
                 )
                 return _gate(request, report_loc, "signin", 401, extras=chose_extras)
             typed = access_code.strip()[:_CODE_MAX] if cfg.access_codes_enabled else ""
@@ -4603,6 +4644,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             )
         elif acct_done == "saved":
             notice = account_pages.COPY[ui]["saved_notice"]
+        elif acct_done == "welcome_confirm" and _confirm_pending(request):
+            notice = account_pages.COPY[ui]["welcome_confirm"]
         elif (
             acct_done
             and acct_done.startswith("preview_")
@@ -4637,6 +4680,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
 
         ``next`` names the report only; its key waits in a short-lived cookie.
         """
+        if _cross_site(request):
+            return _html_error(request, 403, message("cross_site", _locale(lang)), _locale(lang))
         record = _load(audit_id, token, request)
         locale = _view_locale(record, lang)
         back = f"/audits/{record.id}?token={token or ''}&lang={locale}"

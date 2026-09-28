@@ -46,6 +46,7 @@ from quant_trade.audit.accounts import (  # noqa: E402
 )
 from quant_trade.audit.guard import find_claims  # noqa: E402
 from quant_trade.audit.pages import upload_page  # noqa: E402
+from quant_trade.audit.prop_presets import DEFAULT_PRESET  # noqa: E402
 from quant_trade.audit.settings import AuditSettings  # noqa: E402
 from quant_trade.audit.store import make_store  # noqa: E402
 
@@ -863,9 +864,11 @@ def test_an_upload_without_account_that_used_an_extra_box_comes_back_to_them(
     refused = _upload(client, challenge="ftmo-2step-100k")
     assert refused.status_code == 401
     assert "href='/registro?next=/auditar%3Fextras%3D1'" in refused.text
-    plain = _upload(client)
-    assert plain.status_code == 401
-    assert "href='/registro?next=/auditar'" in plain.text
+    # A browser always sends the list's first choice: that alone opens nothing.
+    for data in ({}, {"challenge": DEFAULT_PRESET}, {"challenge": " "}):
+        plain = _upload(client, **data)
+        assert plain.status_code == 401
+        assert "href='/registro?next=/auditar'" in plain.text and "extras" not in plain.text
 
 
 def test_a_signed_in_visitor_sent_to_sign_in_goes_straight_back(tmp_path: Path) -> None:
@@ -890,3 +893,246 @@ def test_a_signed_in_visitor_sent_to_sign_in_goes_straight_back(tmp_path: Path) 
         f"/audits/{audit_id}/account?token=wrong", data={"go": "signup"}, follow_redirects=False
     )
     assert refused.status_code == 404 and "set-cookie" not in refused.headers
+
+
+# -- After review: the cases the first pass left open ---------------------------------
+def test_a_last_try_left_by_a_stopped_worker_is_sent_on_request(tmp_path: Path) -> None:
+    cfg = _mail_settings(tmp_path)
+    store = make_store(cfg.database_url)
+    account_id = _account_for(store, "verify")
+    _ask(store, "verify", account_id, NOW)
+    # The eighth try was claimed and its worker stopped before answering.
+    lease = (NOW + timedelta(seconds=90)).isoformat().replace("+00:00", "Z")
+    with store.engine.begin() as conn:
+        conn.execute(
+            store.email_outbox.update().values(status="sending", attempts=8, lease_until=lease)
+        )
+    # While the lease runs the message belongs to that worker.
+    soon = NOW + timedelta(seconds=60)
+    _ask(store, "verify", account_id, soon)
+    row = _outbox(store)[0]
+    assert row["status"] == "sending" and row["attempts"] == 8
+    later = NOW + timedelta(minutes=5)
+    assert _deliver(store, cfg, later) == []
+    _ask(store, "verify", account_id, later)
+    row = _outbox(store)[0]
+    assert row["status"] == "queued" and row["attempts"] == 0 and row["lease_until"] == ""
+    sent = _deliver(store, cfg, later)
+    assert len(sent) == 1
+    # The name of the try that stopped: had the provider taken it, this is no second one.
+    assert sent[0]["Message-ID"] == f"<rigor-{row['id']}@example.com>"
+    assert len(_outbox(store)) == 1
+
+
+def test_the_second_step_page_cleans_an_older_next(tmp_path: Path) -> None:
+    client, _store, audit_id, token = _shared_report(tmp_path)
+    owner = TestClient(client.app)
+    _signup(owner, "ana@example.com")
+    _turn_on_two_step(owner)
+    visitor = TestClient(client.app)
+    step = _signin_with_next(visitor, "ana@example.com", f"/audits/{audit_id}?lang=es")
+    assert step.headers["location"].startswith("/entrar/codigo?next=")
+    old = f"/entrar/codigo?next=%2Faudits%2F{audit_id}%3Ftoken%3D{token}%26lang%3Des"
+    moved = visitor.get(old, follow_redirects=False)
+    assert moved.status_code == 303
+    assert moved.headers["location"] == f"/entrar/codigo?next=%2Faudits%2F{audit_id}%3Flang%3Des"
+    assert f"{REPORT_KEY_COOKIE}={audit_id}.{token};" in _kept(moved)
+    shown = visitor.get(moved.headers["location"], follow_redirects=False)
+    assert shown.status_code == 200 and token not in shown.text
+
+
+def test_the_passkey_page_takes_the_key_out_of_an_older_next(tmp_path: Path) -> None:
+    pytest.importorskip("webauthn")
+    pytest.importorskip("cbor2")
+    from test_audit_passkeys import ORIGIN, Device, _add_passkey, _options
+
+    client, _store, audit_id, token = _shared_report(tmp_path, base_url=ORIGIN)
+    owner = TestClient(client.app)
+    _signup(owner, "ana@example.com")
+    device = Device()
+    assert "done=passkey_added" in _add_passkey(owner, device)
+    visitor = TestClient(client.app)
+    form = visitor.get("/entrar")
+    # As a form rendered before the change would post it.
+    page = visitor.post(
+        "/entrar/llave",
+        data={"csrf": _csrf(form.text), "next": f"/audits/{audit_id}?token={token}&lang=es"},
+        follow_redirects=False,
+    )
+    assert page.status_code == 200 and token not in page.text
+    assert f"{REPORT_KEY_COOKIE}={audit_id}.{token};" in _kept(page)
+    options, action = _options(page.text)
+    done = visitor.post(
+        action,
+        data={
+            "credential": device.get(options),
+            "csrf": _csrf(page.text),
+            "next": f"/audits/{audit_id}?lang=es",
+        },
+        follow_redirects=False,
+    )
+    assert done.status_code == 303
+    assert done.headers["location"] == f"/audits/{audit_id}?token={token}&lang=es"
+
+
+def test_another_site_cannot_plant_the_report_key(tmp_path: Path) -> None:
+    client, _store, audit_id, token = _shared_report(tmp_path)
+    visitor = TestClient(client.app)
+    address = f"/audits/{audit_id}/account?token={token}&lang=es"
+    for headers in (
+        {"Sec-Fetch-Site": "cross-site"},
+        {"Sec-Fetch-Site": "same-site"},
+        {"Origin": "https://evil.example"},
+    ):
+        refused = visitor.post(
+            address, data={"go": "signup"}, headers=headers, follow_redirects=False
+        )
+        assert refused.status_code == 403, headers
+        assert "set-cookie" not in refused.headers
+    # The report's own form: same origin, or no origin under no-referrer.
+    for headers in ({"Sec-Fetch-Site": "same-origin"}, {"Origin": "null"}):
+        taken = visitor.post(
+            address, data={"go": "signup"}, headers=headers, follow_redirects=False
+        )
+        assert taken.status_code == 303, headers
+        assert f"{REPORT_KEY_COOKIE}={audit_id}.{token};" in _kept(taken)
+
+
+@pytest.mark.parametrize("locale", ["es", "en", "pt"])
+@pytest.mark.parametrize("extras", ["", "?extras=1"])
+def test_sign_up_on_the_way_to_the_form_says_a_confirmation_link_was_sent(
+    tmp_path: Path, locale: str, extras: str
+) -> None:
+    client, store, _ = _client(tmp_path, **MAIL)
+    client = TestClient(client.app, base_url=SITE)
+    next_path = UPLOAD[locale] + extras
+    form = client.get(SIGNUP[locale], params={"next": next_path})
+    assert form.status_code == 200
+    done = client.post(
+        SIGNUP[locale],
+        data={
+            "email": "ana@example.com",
+            "password": PASSWORD,
+            "csrf": _csrf(form.text),
+            "next": next_path,
+        },
+        follow_redirects=False,
+    )
+    assert done.status_code == 303
+    where = done.headers["location"]
+    assert where == f"{next_path}{'&' if extras else '?'}done=welcome_confirm"
+    page = client.get(where)
+    assert page.status_code == 200
+    for words in SENT[locale]:
+        assert words in page.text
+    assert ("<details class='adv extras' open>" in page.text) == bool(extras)
+    assert not any(words in page.text for words in STALE)
+
+    # Signing in later goes to the form as before, with no notice asked for.
+    client.cookies.delete("rigor_session")
+    form = client.get(SIGNIN[locale], params={"next": next_path})
+    back = client.post(
+        SIGNIN[locale],
+        data={
+            "email": "ana@example.com",
+            "password": PASSWORD,
+            "csrf": _csrf(form.text),
+            "next": next_path,
+        },
+        follow_redirects=False,
+    )
+    assert back.status_code == 303 and back.headers["location"] == next_path
+    assert SENT[locale][0] not in client.get(next_path).text
+
+    # Once the address is confirmed the same link says nothing.
+    account = store.find_account("ana@example.com")  # type: ignore[attr-defined]
+    _verify(store, account.id, "ana@example.com")
+    assert SENT[locale][0] not in client.get(where).text
+
+
+def test_the_confirmation_notice_is_not_shown_without_confirmation_or_mail(
+    tmp_path: Path,
+) -> None:
+    settings: tuple[tuple[str, dict[str, Any]], ...] = (
+        ("a", {}),
+        ("b", {**MAIL, "smtp_host": ""}),
+    )
+    for name, extra in settings:
+        client, _store, _ = _client(tmp_path / name, **extra)
+        client = TestClient(client.app, base_url=SITE)
+        form = client.get("/registro?next=/auditar")
+        done = client.post(
+            "/registro",
+            data={
+                "email": "ana@example.com",
+                "password": PASSWORD,
+                "csrf": _csrf(form.text),
+                "next": "/auditar",
+            },
+            follow_redirects=False,
+        )
+        assert done.headers["location"] == "/auditar", name
+        # A hand-made link shows nothing either.
+        page = client.get("/auditar?done=welcome_confirm")
+        assert page.status_code == 200 and SENT["es"][0] not in page.text, name
+
+
+@pytest.mark.parametrize("locale", ["es", "en", "pt"])
+def test_sign_up_from_a_report_says_a_confirmation_link_was_sent(
+    tmp_path: Path, locale: str
+) -> None:
+    client, store, _ = _client(tmp_path, **MAIL)
+    uploader = TestClient(client.app, base_url=SITE)
+    _signup(uploader, "uploader@example.com")
+    location = _upload(uploader).headers["location"]
+    token = parse_qs(urlsplit(location).query)["token"][0]
+    audit_id = _audit_id(location)
+
+    visitor = TestClient(client.app, base_url=SITE)
+    start = visitor.post(
+        f"/audits/{audit_id}/account?token={token}&lang={locale}",
+        data={"go": "signup"},
+        follow_redirects=False,
+    )
+    assert "Secure" in _kept(start)
+    form = visitor.get(start.headers["location"])
+    done = visitor.post(
+        SIGNUP[locale],
+        data={
+            "email": "nueva@example.com",
+            "password": PASSWORD,
+            "csrf": _csrf(form.text),
+            "next": f"/audits/{audit_id}?lang={locale}",
+        },
+        follow_redirects=False,
+    )
+    assert done.status_code == 303
+    where = done.headers["location"]
+    assert where == f"/audits/{audit_id}?token={token}&lang={locale}&acct=welcome_confirm"
+    page = visitor.get(where)
+    assert page.status_code == 200
+    for words in SENT[locale]:
+        assert words in page.text
+    # Whoever only has the link, or confirmed already, reads no such notice.
+    reader = TestClient(client.app, base_url=SITE)
+    assert SENT[locale][0] not in reader.get(where).text
+    account = store.find_account("nueva@example.com")  # type: ignore[attr-defined]
+    _verify(store, account.id, "nueva@example.com")
+    assert SENT[locale][0] not in visitor.get(where).text
+
+
+def test_sign_up_on_the_way_elsewhere_keeps_its_address(tmp_path: Path) -> None:
+    client, _store, _ = _client(tmp_path, **MAIL)
+    client = TestClient(client.app, base_url=SITE)
+    form = client.get("/registro?next=/cuenta/datos")
+    done = client.post(
+        "/registro",
+        data={
+            "email": "ana@example.com",
+            "password": PASSWORD,
+            "csrf": _csrf(form.text),
+            "next": "/cuenta/datos",
+        },
+        follow_redirects=False,
+    )
+    assert done.headers["location"] == "/cuenta/datos"

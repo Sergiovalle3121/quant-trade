@@ -2903,8 +2903,12 @@ class Store:
                 at - timedelta(minutes=10)
             )
             # Queued with its tries used up: an earlier resend that kept the
-            # old count and was never claimed again.
-            stalled = existing["status"] == "queued" and int(existing["attempts"]) >= 8
+            # old count and was never claimed again. The same for a last try
+            # whose worker stopped: its lease ran out and nobody takes it.
+            stalled = int(existing["attempts"]) >= 8 and (
+                existing["status"] == "queued"
+                or (existing["status"] == "sending" and str(existing["lease_until"]) < now)
+            )
             if resend or stalled:
                 conn.execute(
                     table.update()
