@@ -2464,6 +2464,26 @@ an account never changes what a report says.
   While e-mail confirmation is off, a shared IPv4 address gets
   `WELCOME_REPORTS_PER_IPV4_UNVERIFIED` (3) free reports a month instead of
   the carrier-sized `WELCOME_REPORTS_PER_IPV4_PER_MONTH` (10).
+  **Card check, no charge.** When the free report is refused only for a
+  shared browser (`device`) or network (`network`) (`web.CARD_REFUSALS`) and
+  live card sales are public (`card_public`), the owner's locked preview
+  offers «Verificar tarjeta sin cargo» (`POST /audits/{id}/tarjeta`). It
+  opens Stripe Checkout in setup mode (`payments.card_check_params`:
+  `mode=setup`, card only, metadata `app=rigor`, `purpose=welcome_card`,
+  `account_id`), which checks the card and charges nothing. The webhook
+  branches on `mode=setup` before the paid path, so a setup session never
+  unlocks a report; it and the return page (`card=checked&setup_session=`,
+  signed-in owner only, same lookup limits as card payments) record the
+  check only for Rigor's own finished session in the key's mode (a
+  test-mode card never counts on a live key). Stripe's card fingerprint is
+  read from the SetupIntent and kept only as a salted SHA-256 in
+  `card_checks` (with the date) and as the claim `welcome:card:<sha256>`,
+  so one card gives one free report ever: a second account gets
+  `card_check_taken`. The account's next upload then skips the browser and
+  network limits (and their claims) but keeps the account, inbox and file
+  limits. The `card_checks` row goes with the account and is in «Descargar
+  mis datos»; the claim stays, like the other free-report hashes. The
+  preview itself stays locked: the customer uploads again.
   An invite is credited only once both the inviter's and the invitee's
   addresses are confirmed, whether or not confirmation is required
   elsewhere; with no mail service, no invite is credited.

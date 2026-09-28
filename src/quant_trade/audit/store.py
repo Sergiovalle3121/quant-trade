@@ -4269,9 +4269,7 @@ class Store:
         key = CARD_CLAIM_PREFIX + card_sha256
         with self.engine.connect() as conn:
             holder = conn.execute(
-                sa.select(self.free_claims.c.reservation).where(
-                    self.free_claims.c.claim_key == key
-                )
+                sa.select(self.free_claims.c.reservation).where(self.free_claims.c.claim_key == key)
             ).first()
         if holder is not None and holder[0] != account_id:
             return "taken"

@@ -204,6 +204,69 @@ def checkout_params(
     return params
 
 
+#: ``metadata.purpose`` of a Checkout session in setup mode that verifies a
+#: card, at no charge, for an account's free full report.
+CARD_CHECK_PURPOSE = "welcome_card"
+
+
+def card_check_params(
+    settings: AuditSettings, account_id: str, *, locale: str, back: str
+) -> dict[str, Any]:
+    """The setup-mode Checkout session that verifies a card without charging it.
+
+    Stripe saves no charge: setup mode only checks the card and returns a
+    SetupIntent whose card fingerprint is the same for the same card on
+    every account. ``back`` is the site path the customer returns to.
+    """
+    _, stripe_locale = _payment_locales(locale)
+    joiner = "&" if "?" in back else "?"
+    target = f"{settings.base_url}{back}{joiner}"
+    metadata = {
+        APP_KEY: APP_MARKER,
+        "purpose": CARD_CHECK_PURPOSE,
+        "account_id": account_id,
+    }
+    return {
+        "mode": "setup",
+        "payment_method_types": ["card"],
+        "success_url": target + "card=checked&setup_session={CHECKOUT_SESSION_ID}",
+        "cancel_url": target + "card=skipped",
+        "metadata": metadata,
+        "setup_intent_data": {"metadata": metadata},
+        "client_reference_id": account_id,
+        "locale": stripe_locale,
+    }
+
+
+def card_check_refusal(
+    settings: AuditSettings, session: Mapping[str, Any], account_id: str = ""
+) -> str | None:
+    """Why a Checkout session is not a finished card check; ``None`` if it is.
+
+    Only Rigor's own setup session, finished, in the same mode (live or
+    test) as the configured key, and for ``account_id`` when one is given.
+    """
+    metadata = session.get("metadata") or {}
+    if metadata.get(APP_KEY) != APP_MARKER or metadata.get("purpose") != CARD_CHECK_PURPOSE:
+        return "not a card check"
+    if session.get("mode") != "setup" or session.get("status") != "complete":
+        return "not complete"
+    if session.get("livemode") is not (not settings.card_test_mode):
+        return "wrong mode"
+    owner = str(metadata.get("account_id") or "")
+    if not owner or (account_id and owner != account_id):
+        return "another account"
+    intent = session.get("setup_intent")
+    if not (isinstance(intent, str) and intent) and not isinstance(intent, dict):
+        return "no setup intent"
+    return None
+
+
+def card_fingerprint_sha256(fingerprint: str) -> str:
+    """What is kept of a card: a SHA-256 of Stripe's fingerprint, never the fingerprint."""
+    return hashlib.sha256(b"rigor-card:" + fingerprint.encode("utf-8")).hexdigest()
+
+
 def _plain(value: Any) -> dict[str, Any]:
     to_dict = getattr(value, "to_dict", None)
     return dict(to_dict() if callable(to_dict) else value)
@@ -236,6 +299,35 @@ def stripe_checkout(
         options["idempotency_key"] = f"rigor-checkout-{order_id}"
     session = stripe.checkout.Session.create(**options, **params)
     return _plain(session)
+
+
+def stripe_card_check(
+    settings: AuditSettings, account_id: str, *, locale: str, back: str
+) -> dict[str, Any]:
+    """Create the setup-mode Checkout session of :func:`card_check_params`."""
+    import stripe
+
+    params = card_check_params(settings, account_id, locale=locale, back=back)
+    session = stripe.checkout.Session.create(api_key=settings.stripe_secret_key, **params)
+    return _plain(session)
+
+
+def stripe_card_fingerprint(settings: AuditSettings, setup_intent_id: str) -> str:
+    """The card fingerprint of a succeeded SetupIntent, ``""`` otherwise (needs the SDK)."""
+    import stripe
+
+    intent = _plain(
+        stripe.SetupIntent.retrieve(
+            setup_intent_id, api_key=settings.stripe_secret_key, expand=["payment_method"]
+        )
+    )
+    if intent.get("status") != "succeeded":
+        return ""
+    method = intent.get("payment_method")
+    if not method or isinstance(method, str):
+        return ""  # not expanded: no card to read
+    card = _plain(method).get("card")
+    return str(_plain(card).get("fingerprint") or "") if card else ""
 
 
 def stripe_session(settings: AuditSettings, session_id: str) -> dict[str, Any]:
@@ -467,6 +559,7 @@ def pack_for(store: Store, settings: AuditSettings, session_id: str | None) -> t
 
 __all__ = [
     "APP_KEY",
+    "CARD_CHECK_PURPOSE",
     "CARD_LOOKUPS_PER_HOUR",
     "APP_MARKER",
     "PAID_STATUSES",
