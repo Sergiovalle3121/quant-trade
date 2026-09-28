@@ -360,6 +360,13 @@ def fulfil(
                 session_id=_safe(session_id), audit_id=_safe(audit_id), reason=reason, at=at
             )
         return None
+    source = session.get("currency_conversion") or session
+    amount = source.get("amount_total")
+    if not isinstance(amount, int) or isinstance(amount, bool):
+        return None  # refusal already checked it; defensive for Mapping implementations
+    payment_intent = session.get("payment_intent")
+    if isinstance(payment_intent, Mapping):
+        payment_intent = payment_intent.get("id")
     if order is not None and session.get("livemode") is True:
         market = store.checkout_market(order.id)
         if market is not None:
@@ -377,13 +384,13 @@ def fulfil(
                 billing_country != declared_country
                 or billing_country not in settings.approved_markets
             ):
-                amount_total = session.get("amount_total")
                 store.record_market_review(
                     order_id=order.id,
                     session_id=session_id,
                     audit_id=audit_id,
                     billing_country=billing_country,
-                    paid_cents=amount_total if isinstance(amount_total, int) else 0,
+                    paid_cents=amount,
+                    payment_intent_id=str(payment_intent or ""),
                     reason="billing country mismatch or unavailable",
                     at=at,
                 )
@@ -394,13 +401,6 @@ def fulfil(
                 )
                 return None
             store.record_checkout_market(order.id, billing_country, at=at)
-    source = session.get("currency_conversion") or session
-    amount = source.get("amount_total")
-    if not isinstance(amount, int) or isinstance(amount, bool):
-        return None  # refusal already checked it; defensive for Mapping implementations
-    payment_intent = session.get("payment_intent")
-    if isinstance(payment_intent, Mapping):
-        payment_intent = payment_intent.get("id")
     try:
         outcome = store.settle_card_payment(
             order_id=order_id,

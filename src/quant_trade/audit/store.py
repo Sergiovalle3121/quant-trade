@@ -1301,6 +1301,7 @@ class Store:
         audit_id: str,
         billing_country: str,
         paid_cents: int,
+        payment_intent_id: str,
         reason: str,
         at: datetime,
     ) -> None:
@@ -1326,6 +1327,14 @@ class Store:
                     resolution="manual_refund_review",
                     livemode=True,
                 )
+            )
+            self.record_payment_intent_in_tx(
+                conn,
+                order_id,
+                session_id,
+                payment_intent_id,
+                at,
+                livemode=True,
             )
             known = conn.execute(
                 sa.select(self.refused_payments.c.session_id).where(

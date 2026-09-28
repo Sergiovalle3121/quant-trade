@@ -380,11 +380,40 @@ def test_market_mismatch_records_charge_without_delivery(tmp_path: Path) -> None
     )
     store = client.app.state.store
     order = store.list_checkout_orders()[0]
+    refund = {
+        "id": "re_market_bad",
+        "object": "refund",
+        "payment_intent": "pi_market_bad",
+        "charge": "ch_market_bad",
+        "amount": 1000,
+        "currency": "usd",
+        "status": "succeeded",
+    }
+    refund_event = json.dumps(
+        {
+            "id": "evt_market_bad_refund",
+            "type": "refund.created",
+            "livemode": True,
+            "data": {"object": refund},
+        }
+    ).encode()
+    signature = sign_stripe_payload(refund_event, WEBHOOK_SECRET, timestamp=int(time.time()))
+    assert (
+        client.post(
+            "/webhooks/stripe", content=refund_event, headers={"stripe-signature": signature}
+        ).status_code
+        == 200
+    )
+    assert store.list_stripe_refunds()[0].order_id == ""
     bad = _session(
         audit_id,
         sid="cs_market_bad",
         metadata={"audit_id": audit_id, "plan": PLAN_SINGLE, "app": "rigor", "order_id": order.id},
         customer_details={"address": {"country": "US"}},
+        currency="mxn",
+        amount_total=52900,
+        currency_conversion={"source_currency": "usd", "amount_total": 2900},
+        payment_intent="pi_market_bad",
     )
     assert _webhook(client, bad) == 200
     assert not store.get_audit(audit_id).paid
@@ -392,6 +421,10 @@ def test_market_mismatch_records_charge_without_delivery(tmp_path: Path) -> None
     assert store.get_checkout_order(order.id).paid_amount_cents == 2900
     assert store.checkout_market(order.id) == ("MX", "US")
     assert store.funnel_country_events("2000-01-01") == [("US", 1, 0, 2900)]
+    assert store.list_stripe_refunds()[0].order_id == order.id
+    counts = funnel.build(store.funnel_events("2000-01-01")).total.counts
+    assert counts["gross_usd_cents"] == 2900
+    assert counts["refund_usd_cents"] == 1000
     blocked = client.post(path, data={"billing_country": "MX"}, follow_redirects=False)
     assert blocked.status_code == 409
     assert len(store.list_checkout_orders()) == 1
