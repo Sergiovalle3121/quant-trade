@@ -244,9 +244,9 @@ COPY_PT: dict[str, str] = {
     "export_button": "Baixar meus dados (JSON)",
     "invite_title": "Convide um colega",
     "invite_help": (
-        "Compartilhe seu link pessoal. Quando alguém cria a conta com ele e recebe o primeiro "
-        "relatório grátis, você recebe {credits} {unit} para um relatório completo, até {cap} "
-        "por mês."
+        "Compartilhe seu link pessoal. Quando alguém cria a conta com ele, recebe o primeiro "
+        "relatório grátis e os dois confirmaram o e-mail, você recebe {credits} {unit} para "
+        "um relatório completo, até {cap} por mês."
     ),
     "invite_unit_one": "crédito",
     "invite_unit_many": "créditos",

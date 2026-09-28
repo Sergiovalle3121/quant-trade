@@ -278,9 +278,9 @@ COPY: dict[str, dict[str, str]] = {
         "export_button": "Descargar mis datos (JSON)",
         "invite_title": "Invita a un colega",
         "invite_help": (
-            "Comparte tu enlace personal. Cuando alguien crea su cuenta con él y recibe su "
-            "primer informe gratis, tú recibes {credits} {unit} para un informe completo, "
-            "hasta {cap} al mes."
+            "Comparte tu enlace personal. Cuando alguien crea su cuenta con él, recibe su "
+            "primer informe gratis y los dos han confirmado su correo, tú recibes {credits} "
+            "{unit} para un informe completo, hasta {cap} al mes."
         ),
         "invite_unit_one": "crédito",
         "invite_unit_many": "créditos",
@@ -902,9 +902,9 @@ COPY: dict[str, dict[str, str]] = {
         "export_button": "Download my data (JSON)",
         "invite_title": "Invite a colleague",
         "invite_help": (
-            "Share your personal link. When someone creates their account with it and gets "
-            "their free first report, you get {credits} {unit} for a full report, up to {cap} "
-            "a month."
+            "Share your personal link. When someone creates their account with it, gets their "
+            "free first report and you have both confirmed your e-mail, you get {credits} "
+            "{unit} for a full report, up to {cap} a month."
         ),
         "invite_unit_one": "credit",
         "invite_unit_many": "credits",

@@ -3668,3 +3668,12 @@ def test_an_invite_is_not_credited_before_both_addresses_are_confirmed(tmp_path:
     )
     assert "acct=welcome" in upload.headers["location"]
     assert store.account_credits(host.id, datetime.now(UTC)) == 0
+
+
+def test_invite_card_says_both_addresses_must_be_confirmed() -> None:
+    for locale, words in (
+        ("es", "los dos han confirmado su correo"),
+        ("en", "you have both confirmed your e-mail"),
+        ("pt", "os dois confirmaram o e-mail"),
+    ):
+        assert words in account_pages.COPY[locale]["invite_help"]

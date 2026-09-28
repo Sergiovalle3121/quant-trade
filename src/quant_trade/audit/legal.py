@@ -753,12 +753,8 @@ def _terms_pt(
                     "primeiro relatório completo gratuito, até "
                     f"{REFERRAL_MONTHLY_CAP} créditos por mês civil. Indicações feitas pelo "
                     "mesmo navegador não contam como novas pessoas. Compartilhar uma rede "
-                    "não invalida uma indicação por si só."
-                    + (
-                        " Para receber o crédito, seu e-mail precisa estar confirmado."
-                        if ctx.email_verification_required
-                        else ""
-                    )
+                    "não invalida uma indicação por si só. Para receber o crédito, o seu "
+                    "e-mail e o da pessoa indicada precisam estar confirmados."
                 ),
                 *(
                     (
