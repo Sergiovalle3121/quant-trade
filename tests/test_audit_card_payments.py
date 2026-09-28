@@ -553,6 +553,69 @@ def test_two_paid_sessions_with_one_order_metadata_keep_separate_charges(
     assert counts["refund_usd_cents"] == 1000
 
 
+def test_webhook_replay_queues_review_notice_for_its_own_order(tmp_path: Path) -> None:
+    client = _client(
+        tmp_path,
+        smtp_host="smtp.example",
+        smtp_from="Rigor <hello@rigor.example>",
+        email_token_secret="stable fake secret for tests 1234567890123456",
+    )
+    store = client.app.state.store
+    account = store.find_account("tester@example.com")
+    assert account is not None
+    with store.engine.begin() as conn:
+        conn.execute(
+            store.verified_emails.insert().values(
+                account_id=account.id, email=account.email, verified_at=NOW.isoformat()
+            )
+        )
+    audit_id, token = _upload(client)
+    client.app.state.checkout_factory = lambda *_args, **_kwargs: {
+        "id": "cs_market_mail_first",
+        "url": "https://checkout.stripe.test/market-mail",
+    }
+    assert (
+        client.post(
+            f"/audits/{audit_id}/checkout?token={token}",
+            data={"billing_country": "MX"},
+            follow_redirects=False,
+        ).status_code
+        == 303
+    )
+    original = store.list_checkout_orders()[0]
+    metadata = {
+        "audit_id": audit_id,
+        "plan": PLAN_SINGLE,
+        "app": "rigor",
+        "order_id": original.id,
+    }
+    good = _session(
+        audit_id,
+        sid="cs_market_mail_first",
+        metadata=metadata,
+        payment_intent="pi_market_mail_first",
+    )
+    held = _session(
+        audit_id,
+        sid="cs_market_mail_second",
+        metadata=metadata,
+        customer_details={"address": {"country": "US"}},
+        payment_intent="pi_market_mail_second",
+    )
+    for session in (good, held, good, held):
+        assert _webhook(client, session) == 200
+    orders = {order.session_id: order for order in store.list_checkout_orders()}
+    assert orders["cs_market_mail_first"].status == "delivered"
+    assert orders["cs_market_mail_second"].status == "paid_review"
+    with store.engine.connect() as conn:
+        notices = conn.execute(store.email_outbox.select()).mappings().all()
+    assert {(row["id"], row["kind"]) for row in notices} == {
+        (original.id, "purchase"),
+        (orders["cs_market_mail_second"].id, "market_review"),
+    }
+    assert all(row["email"] == account.email for row in notices)
+
+
 def test_a_timeout_retries_with_the_same_persisted_idempotency_key(tmp_path: Path) -> None:
     client = _client(tmp_path)
     audit_id, token = _upload(client)

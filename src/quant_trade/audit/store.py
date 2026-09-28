@@ -1330,6 +1330,7 @@ class Store:
         payment_intent_id: str,
         reason: str,
         at: datetime,
+        queue_receipt: bool = False,
     ) -> None:
         """Keep a charged, market-rejected order and operator issue atomically."""
         sa, orders, markets = self._sa, self.checkout_orders, self.checkout_order_markets
@@ -1450,10 +1451,66 @@ class Store:
                                 created_at=stamp,
                             )
                         )
+                    if queue_receipt:
+                        self._queue_purchase_notice_in_tx(
+                            conn, resolved_order_id, "market_review", at
+                        )
                 return
             except sa.exc.IntegrityError:
                 continue  # a competing webhook recorded this session first
         raise RuntimeError("could not record market review")
+
+    def _queue_purchase_notice_in_tx(
+        self, conn: Any, order_id: str, kind: str, at: datetime
+    ) -> None:
+        """Commit one buyer notice with its charge, if the address is verified."""
+        sa = self._sa
+        account_id = conn.execute(
+            sa.select(self.checkout_orders.c.account_id).where(
+                self.checkout_orders.c.id == order_id
+            )
+        ).scalar()
+        if not account_id:
+            return
+        address = (
+            conn.execute(
+                sa.select(self.accounts.c.email, self.accounts.c.locale)
+                .join(
+                    self.verified_emails,
+                    self.verified_emails.c.account_id == self.accounts.c.id,
+                )
+                .where(self.accounts.c.id == account_id)
+                .where(self.verified_emails.c.email == self.accounts.c.email)
+            )
+            .mappings()
+            .first()
+        )
+        if address is None:
+            return
+        existing = conn.execute(
+            sa.select(self.email_outbox.c.id).where(self.email_outbox.c.id == order_id)
+        ).first()
+        if existing is not None:
+            return
+        stamp = _iso(at)
+        conn.execute(
+            self.email_outbox.insert().values(
+                id=order_id,
+                account_id=str(account_id),
+                kind=kind,
+                email=str(address["email"]),
+                original_email="",
+                locale=str(address["locale"]),
+                created_at=stamp,
+                expires_at=_iso(at + timedelta(days=7)),
+                used_at=None,
+                status="queued",
+                attempts=0,
+                next_attempt_at=stamp,
+                lease_until="",
+                sent_at="",
+            )
+        )
 
     def attach_checkout_session(
         self, order_id: str, *, session_id: str, checkout_url: str, expires_at: datetime | None
@@ -1517,49 +1574,7 @@ class Store:
             """
             if not queue_receipt:
                 return
-            account_id = conn.execute(
-                sa.select(orders.c.account_id).where(orders.c.id == resolved_order_id)
-            ).scalar()
-            if not account_id:
-                return
-            address = (
-                conn.execute(
-                    sa.select(self.accounts.c.email, self.accounts.c.locale)
-                    .join(
-                        self.verified_emails,
-                        self.verified_emails.c.account_id == self.accounts.c.id,
-                    )
-                    .where(self.accounts.c.id == account_id)
-                    .where(self.verified_emails.c.email == self.accounts.c.email)
-                )
-                .mappings()
-                .first()
-            )
-            if address is None:
-                return
-            existing = conn.execute(
-                sa.select(self.email_outbox.c.id).where(self.email_outbox.c.id == resolved_order_id)
-            ).first()
-            if existing is not None:
-                return
-            conn.execute(
-                self.email_outbox.insert().values(
-                    id=resolved_order_id,
-                    account_id=str(account_id),
-                    kind=kind,
-                    email=str(address["email"]),
-                    original_email="",
-                    locale=str(address["locale"]),
-                    created_at=stamp,
-                    expires_at=_iso(at + timedelta(days=7)),
-                    used_at=None,
-                    status="queued",
-                    attempts=0,
-                    next_attempt_at=stamp,
-                    lease_until="",
-                    sent_at="",
-                )
-            )
+            self._queue_purchase_notice_in_tx(conn, resolved_order_id, kind, at)
 
         def link_payment_intent(conn: Any, resolved_order_id: str) -> None:
             recorded_mode = conn.execute(
@@ -2917,7 +2932,7 @@ class Store:
             (table.c.status == "sending") & (table.c.lease_until <= overdue_at)
         )
         return (
-            table.c.kind.in_(("purchase", "charge_review"))
+            table.c.kind.in_(("purchase", "charge_review", "market_review"))
             & table.c.used_at.is_(None)
             & ((table.c.status == "dead") | overdue)
         )
@@ -2986,7 +3001,7 @@ class Store:
                         .join(verified, verified.c.account_id == account.c.id)
                     )
                     .where(table.c.id == challenge_id)
-                    .where(table.c.kind.in_(("purchase", "charge_review")))
+                    .where(table.c.kind.in_(("purchase", "charge_review", "market_review")))
                     .where(table.c.status == "dead")
                     .where(table.c.used_at.is_(None))
                     .where(table.c.sent_at == "")
@@ -2999,9 +3014,12 @@ class Store:
                 .mappings()
                 .first()
             )
-            if row is None or row["status"] != (
-                "delivered" if row["kind"] == "purchase" else "duplicate"
-            ):
+            required_status = {
+                "purchase": "delivered",
+                "charge_review": "duplicate",
+                "market_review": "paid_review",
+            }
+            if row is None or row["status"] != required_status[row["kind"]]:
                 return False
             expires_at = max(str(row["expires_at"]), _iso(at + timedelta(days=7)))
             updated = conn.execute(
