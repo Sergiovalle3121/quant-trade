@@ -177,3 +177,98 @@ def domain_takes_mail(email: str, *, resolve: Resolver | None = None) -> bool:
         return False
     except Exception:  # noqa: BLE001 - DNS trouble never refuses a customer
         return True
+
+
+#: Mail providers whose near-misses are worth a «¿Quisiste decir…?». A domain
+#: on this list is never questioned, so real look-alikes (mail.com, gmx.de)
+#: stay silent.
+COMMON_PROVIDERS = frozenset(
+    {
+        "gmail.com",
+        "googlemail.com",
+        "hotmail.com",
+        "hotmail.es",
+        "hotmail.co.uk",
+        "hotmail.fr",
+        "outlook.com",
+        "outlook.es",
+        "live.com",
+        "live.com.mx",
+        "msn.com",
+        "yahoo.com",
+        "yahoo.com.mx",
+        "yahoo.com.br",
+        "yahoo.es",
+        "yahoo.co.uk",
+        "ymail.com",
+        "icloud.com",
+        "me.com",
+        "mac.com",
+        "aol.com",
+        "protonmail.com",
+        "proton.me",
+        "pm.me",
+        "gmx.com",
+        "gmx.de",
+        "gmx.net",
+        "mail.com",
+        "email.com",
+        "web.de",
+        "yandex.com",
+        "zoho.com",
+        "uol.com.br",
+        "bol.com.br",
+        "terra.com.br",
+        "prodigy.net.mx",
+    }
+)
+#: The providers suggested; the rest of the list only keeps silent.
+SUGGESTED_PROVIDERS = (
+    "gmail.com",
+    "hotmail.com",
+    "outlook.com",
+    "yahoo.com",
+    "icloud.com",
+    "live.com",
+    "aol.com",
+    "protonmail.com",
+)
+
+
+def _distance(a: str, b: str) -> int:
+    """Edits between two words, a swap of neighbours counting as one."""
+    rows = [list(range(len(b) + 1))]
+    for i, ca in enumerate(a, 1):
+        row = [i] + [0] * len(b)
+        for j, cb in enumerate(b, 1):
+            row[j] = min(rows[-1][j] + 1, row[j - 1] + 1, rows[-1][j - 1] + (ca != cb))
+            if i > 1 and j > 1 and ca == b[j - 2] and a[i - 2] == cb:
+                row[j] = min(row[j], rows[-2][j - 2] + 1)
+        rows.append(row)
+    return rows[-1][-1]
+
+
+def suggest_domain(email: str) -> str:
+    """The address with a well-known provider's domain when this one looks mistyped.
+
+    ``ana@gmial.com`` gives ``ana@gmail.com``; ``ana@gmail.co`` too. A
+    domain that is itself a known provider, or not close to one, gives
+    ``""``. A typo domain can have mail servers of its own (squatters
+    register them), so the DNS check does not catch it.
+    """
+    local, domain = _split(email)
+    if not local or not domain or domain in COMMON_PROVIDERS:
+        return ""
+    for provider in SUGGESTED_PROVIDERS:
+        name = provider.partition(".")[0]
+        if len(name) < 5:
+            continue  # aol, live: too many real neighbours (aon.com, line.com)
+        if _distance(domain, provider) <= (2 if len(name) >= 7 else 1):
+            return f"{local}@{provider}"
+    label = domain.split(".", 1)[0]
+    for provider in SUGGESTED_PROVIDERS:
+        # The right name with a clipped or mistyped ending: gmail.co, gmail.cm.
+        name, _, ending = provider.partition(".")
+        if label == name and "." in domain and _distance(domain[len(name) + 1 :], ending) <= 1:
+            return f"{local}@{provider}"
+    return ""

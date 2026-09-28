@@ -1888,15 +1888,17 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             csrf: Annotated[str, Form(max_length=200)] = "",
             next: Annotated[str, Form(max_length=1000)] = "",
             invite: Annotated[str, Form(max_length=40)] = "",
+            email_as_typed: Annotated[str, Form(max_length=320)] = "",
             lang: str | None = None,
         ) -> Response:
             locale = _account_locale(path_locale, lang)
             next_path = acct.safe_next(next)
-            clean = acct.normalise_email(email)
+            # "No, my address is the one I typed": the box keeps that address.
+            clean = acct.normalise_email(email_as_typed or email)
             new_csrf = _anon_csrf(request)
             invite = _invite(invite) if _referrals_on() else ""
 
-            def again(error: str, status: int) -> Response:
+            def again(error: str, status: int, *, typo_of: str = "") -> Response:
                 page = account_pages.signup_page(
                     retention_days=cfg.retention_days,
                     locale=locale,
@@ -1905,6 +1907,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                     email=clean if acct.valid_email(clean) else "",
                     next_path=next_path,
                     invite=invite,
+                    typo_of=typo_of,
                 )
                 return _anon_page(page, new_csrf, status)
 
@@ -1921,6 +1924,12 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 return again("email_bad", 400)
             if inbox.is_disposable(clean):
                 return again("email_disposable", 400)
+            suggested = "" if email_as_typed else inbox.suggest_domain(clean)
+            if suggested:
+                # A mistyped provider can have mail servers of a stranger's:
+                # the address is confirmed before the account exists.
+                typed, clean = clean, suggested
+                return again("email_typo", 200, typo_of=typed)
             if cfg.check_email_domains and not app.state.mail_domain_check(clean):
                 return again("email_no_domain", 400)
             problem = acct.password_problem(password, email=clean)

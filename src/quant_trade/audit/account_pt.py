@@ -59,6 +59,11 @@ COPY_PT: dict[str, str] = {
         "Esse e-mail é de um serviço de caixas temporárias. Use um e-mail que você mantenha: "
         "a confirmação e a recuperação da conta chegam nele."
     ),
+    "email_typo": (
+        "Você quis dizer {email}? Corrigimos abaixo: a confirmação e a recuperação da conta "
+        "chegam nele. Digite a senha de novo para continuar."
+    ),
+    "email_typo_keep": "Não, meu e-mail é {email}, como digitei.",
     "email_no_domain": (
         "Não encontramos esse domínio de e-mail. Confira se está bem escrito: a confirmação "
         "e a recuperação da conta chegam nele."

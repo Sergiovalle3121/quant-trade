@@ -3814,3 +3814,97 @@ def test_the_no_domain_message_exists_in_three_languages() -> None:
     assert "domain" in account_pages.COPY["en"]["email_no_domain"]
     assert "dominio" in account_pages.COPY["es"]["email_no_domain"]
     assert "domínio" in account_pt.COPY_PT["email_no_domain"]
+
+
+@pytest.mark.parametrize(
+    "typed,meant",
+    [
+        ("ana@gmial.com", "ana@gmail.com"),
+        ("ana@gmai.com", "ana@gmail.com"),
+        ("ana@gmail.co", "ana@gmail.com"),
+        ("ana@gmail.con", "ana@gmail.com"),
+        ("ana@hotmial.com", "ana@hotmail.com"),
+        ("ana@hotmal.com", "ana@hotmail.com"),
+        ("ana@outlok.com", "ana@outlook.com"),
+        ("ana@yahooo.com", "ana@yahoo.com"),
+        ("ana@icloud.co", "ana@icloud.com"),
+        ("ana@gmail.com", ""),
+        ("ana@mail.com", ""),  # a real provider next to gmail.com
+        ("ana@email.com", ""),
+        ("ana@gmx.de", ""),
+        ("ana@aon.com", ""),  # a company next to aol.com
+        ("ana@live.com.mx", ""),
+        ("ana@empresa.mx", ""),
+    ],
+)
+def test_suggest_domain_catches_provider_typos_only(typed: str, meant: str) -> None:
+    from quant_trade.audit import inbox
+
+    assert inbox.suggest_domain(typed) == meant
+
+
+@pytest.mark.parametrize("path,word", [("/registro", "Quisiste"), ("/signup", "Did you mean")])
+def test_signup_asks_about_a_mistyped_provider_before_creating_the_account(
+    tmp_path: Path, path: str, word: str
+) -> None:
+    client, store, _ = _client(tmp_path)
+    csrf = _csrf(client.get(path).text)
+    asked = client.post(
+        path,
+        data={"email": "ana@gmial.com", "password": PASSWORD, "csrf": csrf},
+        follow_redirects=False,
+    )
+    assert asked.status_code == 200 and word in asked.text
+    assert "value='ana@gmail.com'" in asked.text
+    assert "name='email_as_typed' value='ana@gmial.com'" in asked.text
+    assert store.find_account("ana@gmial.com") is None  # type: ignore[attr-defined]
+    assert store.find_account("ana@gmail.com") is None  # type: ignore[attr-defined]
+    # Accepting the correction creates the account on the provider's domain.
+    fixed = client.post(
+        path,
+        data={"email": "ana@gmail.com", "password": PASSWORD, "csrf": _csrf(asked.text)},
+        follow_redirects=False,
+    )
+    assert fixed.status_code == 303
+    assert store.find_account("ana@gmail.com") is not None  # type: ignore[attr-defined]
+
+
+def test_signup_keeps_the_typed_address_when_the_box_says_so(tmp_path: Path) -> None:
+    client, store, _ = _client(tmp_path)
+    csrf = _csrf(client.get("/pt/cadastro").text)
+    asked = client.post(
+        "/pt/cadastro",
+        data={"email": "bia@hotmal.com", "password": PASSWORD, "csrf": csrf},
+        follow_redirects=False,
+    )
+    assert "Você quis dizer bia@hotmail.com?" in asked.text
+    kept = client.post(
+        "/pt/cadastro",
+        data={
+            "email": "bia@hotmail.com",
+            "email_as_typed": "bia@hotmal.com",
+            "password": PASSWORD,
+            "csrf": _csrf(asked.text),
+        },
+        follow_redirects=False,
+    )
+    assert kept.status_code == 303
+    assert store.find_account("bia@hotmal.com") is not None  # type: ignore[attr-defined]
+    assert store.find_account("bia@hotmail.com") is None  # type: ignore[attr-defined]
+
+
+def test_the_kept_address_still_passes_every_other_check(tmp_path: Path) -> None:
+    client, store, _ = _client(tmp_path)
+    csrf = _csrf(client.get("/registro").text)
+    refused = client.post(
+        "/registro",
+        data={
+            "email": "ana@gmail.com",
+            "email_as_typed": "ana@mailinator.com",
+            "password": PASSWORD,
+            "csrf": csrf,
+        },
+        follow_redirects=False,
+    )
+    assert refused.status_code == 400
+    assert store.find_account("ana@mailinator.com") is None  # type: ignore[attr-defined]
