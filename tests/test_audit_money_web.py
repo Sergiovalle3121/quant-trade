@@ -60,6 +60,7 @@ def test_paid_delivery_preserves_the_same_monetary_and_forensic_limits(tmp_path:
         access_codes=False,
         stripe_secret_key="sk_live_synthetic_test",
         stripe_webhook_secret="whsec_synthetic_test",
+        approved_markets=frozenset({"MX"}),
     )
     client = signed_in(TestClient(create_app(settings, make_store(settings.database_url))))
     uploaded = client.post(
@@ -94,7 +95,7 @@ def test_paid_delivery_preserves_the_same_monetary_and_forensic_limits(tmp_path:
     client.app.state.checkout_factory = fake_checkout
     checkout = client.post(
         f"/audits/{audit_id}/checkout?token={token}",
-        data={"plan": "single"},
+        data={"plan": "single", "billing_country": "MX"},
         follow_redirects=False,
     )
     assert checkout.status_code == 303 and len(order_ids) == 1
@@ -108,6 +109,7 @@ def test_paid_delivery_preserves_the_same_monetary_and_forensic_limits(tmp_path:
                     "livemode": True,
                     "currency": "usd",
                     "amount_total": 2900,
+                    "customer_details": {"address": {"country": "MX"}},
                     "metadata": {
                         "audit_id": audit_id,
                         "plan": "single",
