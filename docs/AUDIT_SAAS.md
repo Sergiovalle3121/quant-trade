@@ -1997,6 +1997,8 @@ or a Portuguese rule.
   When fewer than two distinct variants remain, PBO is `NOT_MEASURED`. This
   does not reduce the declared trial count used by DSR: a distinct parameter
   search is still a trial even if its returns happen to match another trial.
+  The CSCV payload reports both `parameter_variants` (submitted columns) and
+  `effective_variants` (distinct return paths used in its ranks).
 - The bootstrap is per period and does not annualise; its block size is
   `min(20, n/10)`. The research bootstrap's maximum drawdown starts at unit
   initial wealth before the first resampled return, so a loss on the first

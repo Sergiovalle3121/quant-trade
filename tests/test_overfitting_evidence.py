@@ -79,7 +79,8 @@ def test_cscv_is_invariant_to_exact_duplicate_parameter_columns():
         duplicate = cscv_probability_of_backtest_overfitting(with_copies, partitions=4)
         assert duplicate.pbo == original.pbo
         assert duplicate.decision == original.decision
-        assert duplicate.parameter_variants == matrix.shape[1]
+        assert duplicate.parameter_variants == matrix.shape[1] + 8
+        assert duplicate.effective_variants == matrix.shape[1]
         prepended = cscv_probability_of_backtest_overfitting(
             np.column_stack([matrix[:, column], matrix]), partitions=4
         )

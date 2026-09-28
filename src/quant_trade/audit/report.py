@@ -7659,6 +7659,7 @@ def render_html(
                         "partitions",
                         "combinations",
                         "parameter_variants",
+                        "effective_variants",
                         "observations_used",
                     )
                 )

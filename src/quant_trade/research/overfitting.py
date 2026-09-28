@@ -47,12 +47,14 @@ class CSCVPBOEvidence:
     Bailey et al. logit transform ``log(omega / (1 - omega))`` with
     ``omega = rank / (n_variants + 1)``. All statistics are computed from the
     complete observation-by-variant matrix; this is not a renamed
-    walk-forward loss rate.
+    walk-forward loss rate. ``parameter_variants`` counts submitted columns;
+    ``effective_variants`` counts distinct return paths ranked by CSCV.
     """
 
     method: str
     observations: int
     parameter_variants: int
+    effective_variants: int
     partitions: int
     combinations: int
     pbo: float
@@ -172,7 +174,8 @@ def cscv_probability_of_backtest_overfitting(
     return CSCVPBOEvidence(
         method="cscv_rank_based",
         observations=observations,
-        parameter_variants=variants,
+        parameter_variants=submitted_variants,
+        effective_variants=variants,
         partitions=partitions,
         combinations=len(logits),
         pbo=pbo,
