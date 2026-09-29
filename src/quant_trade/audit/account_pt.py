@@ -155,6 +155,11 @@ COPY_PT: dict[str, str] = {
         "Este arquivo já recebeu um relatório completo grátis, então desta vez "
         "é uma prévia. Seu relatório grátis continua disponível para outro arquivo."
     ),
+    "same_file_note": (
+        "Você já tinha auditado este mesmo arquivo com a sua conta; este envio conta como "
+        "uma nova prévia."
+    ),
+    "same_file_link": "Abrir o relatório que você já tem",
     "welcome_refused_device": (
         "Este navegador já usou um relatório completo grátis em outra conta, então desta vez é "
         "uma prévia: assim a oferta não se repete com contas novas."

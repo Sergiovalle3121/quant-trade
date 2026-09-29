@@ -317,3 +317,18 @@ Limits that remain from this pass:
   `AUDIT_QUEUE_SECONDS` (default 30). Raise the first only with more memory.
 - Start the service with `quant-trade audit serve` (the Dockerfile already
   does), so the redacting log configuration is used.
+
+## Customer audit: report wording, upload guidance and refusals (2026-09-29)
+
+Reviewed against `main` at c6ce500. Scope: texts of the report, the upload
+page and the refusals in Spanish, English and Portuguese. No reader,
+threshold, limit or setting changed; no control was relaxed. Tests are
+offline and deterministic (`tests/test_audit_report_polish.py`).
+
+| # | Finding | Severity | Fix |
+|---|---|---|---|
+| P1 | A file that arrived with 0 bytes was answered "a file is missing"; a picture in the curve box was answered "needs a date column". | Low (wording) | `MESSAGES["empty_upload"]` names the box when the browser sent a file name with no bytes and nothing else was uploaded; `MESSAGES["curve_is_picture"]` when the curve box holds a file starting with a PNG, JPEG, GIF, TIFF or PDF signature (`PICTURE_SIGNATURES`) and the reader refused it. Both keep status 400; `_read_limited`, the byte limits and what is accepted are unchanged. The file name is never echoed. |
+| P2 | A curve over the reader's 5 MB limit was told "10 MB" by the field or a byte count by the reader. | Low (wording) | `MESSAGES["curve_too_large"]` states `schema.MAX_UPLOAD_BYTES` as megabytes in both refusals (413 from the field, 400 from the reader). The field limit (`REPORT_FIELDS`, twice `max_upload_bytes`, so a platform report dropped in the curve box is still read as the report) and the reader's limit are unchanged. |
+| P3 | A Portuguese report posted its comparison to `/compare` with `lang=pt`, which answered in Spanish. | Low | The report posts to `COMPARE_PATH["pt"]`; the three `POST` comparison routes treat `lang=pt` as Portuguese. Links, tokens and the checks on both reports are unchanged. |
+| P4 | A preview of a file the account had already audited said nothing about the earlier report. | Low (product) | `Store.earlier_audit_of_same_files(account_id, audit_id)` looks only among audits linked to that account (`account_audits`), not purged, uploaded before this one, with the same set of SHA-256 digests (SQL prefilter on `equity_sha256` and `created_at`, then the full digest set, at most 20 candidates). `web._account_box` calls it only when the viewer is signed in as the owner of the report being viewed and the report is locked; the note links `/audits/<id>?lang=…` with no token, which that same account opens through its session. No report of another account is ever read for this or named. Nothing changes in what is spent. |
+| P5 | The badge code made from an English or Portuguese verification page linked `/v/<id>` (Spanish). | Low | The link carries `?lang=en` or `?lang=pt` from the page's own language table; Spanish keeps the bare path. The badge, the page's allow-list and the public id are unchanged. |

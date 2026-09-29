@@ -108,6 +108,7 @@ from quant_trade.audit.report import render, result_sha256
 from quant_trade.audit.retention import RetentionWorker
 from quant_trade.audit.sample import sample_result
 from quant_trade.audit.schema import (
+    MAX_UPLOAD_BYTES,
     AuditResult,
     DeclaredMetadata,
     ParseError,
@@ -196,6 +197,38 @@ MESSAGES: dict[str, dict[str, str]] = {
             "accept: optimise again with the genetic algorithm or narrower parameter "
             "ranges and export it again. You can also upload the report without the "
             'XML and type the number of passes in "Configurations tried".'
+        ),
+    },
+    "empty_upload": {
+        "es": (
+            "El archivo {what} llegó vacío (0 bytes): expórtalo de nuevo desde tu plataforma, "
+            "revisa que tenga contenido y súbelo otra vez."
+        ),
+        "en": (
+            "The {what} file arrived empty (0 bytes): export it again from your platform, "
+            "check that it has content and upload it again."
+        ),
+    },
+    "curve_too_large": {
+        "es": (
+            "El archivo de la curva de equity pesa más de {limit}, el máximo que aceptamos "
+            "para una curva: sube un periodo más corto o datos menos frecuentes (por ejemplo, "
+            "diarios en vez de por minuto)."
+        ),
+        "en": (
+            "The equity curve file is larger than {limit}, the most we accept for a curve: "
+            "upload a shorter period or less frequent data (for example daily instead of "
+            "per minute)."
+        ),
+    },
+    "curve_is_picture": {
+        "es": (
+            "El archivo de la curva de equity es una imagen o un PDF, no una tabla: sube la "
+            "curva en CSV o Excel, con una columna de fecha y otra de equity o de retorno."
+        ),
+        "en": (
+            "The equity curve file is a picture or a PDF, not a table: upload the curve as "
+            "CSV or Excel, with a date column and an equity or return column."
         ),
     },
     "equity_required": {
@@ -436,6 +469,17 @@ REPORT_FIELDS = frozenset({"equity", "report", "live", "optimization"})
 #: Bytes a pass takes in an MT5 optimisation export, for the size refusal.
 OPTIMIZATION_PASS_BYTES = 900
 REPORT_SIZE_FACTOR = 2
+#: How a picture or a PDF begins (PNG, JPEG, GIF, TIFF, PDF): named as
+#: such when it arrives in the curve box, which takes tables only.
+PICTURE_SIGNATURES = (
+    b"\x89PNG\r\n\x1a\n",
+    b"\xff\xd8\xff",
+    b"GIF87a",
+    b"GIF89a",
+    b"II*\x00",
+    b"MM\x00*",
+    b"%PDF-",
+)
 
 _HOST = re.compile(r"^[A-Za-z0-9.-]{1,253}(:[0-9]{1,5})?$")
 #: Railway's own addresses; a read there moves to ``AUDIT_BASE_URL`` once it differs.
@@ -4111,6 +4155,11 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 text = message(
                     "optimization_too_large", report_loc, limit=_megabytes(limit), passes=passes
                 )
+            elif exc.what == "equity":
+                # The curve reader stops at its own, smaller limit: say that one.
+                text = message(
+                    "curve_too_large", report_loc, limit=_megabytes(min(limit, MAX_UPLOAD_BYTES))
+                )
             else:
                 text = message(
                     "too_large",
@@ -4120,6 +4169,11 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 )
             return _html_error(request, 413, text, report_loc)
         if not uploads["equity"] and not uploads["report"]:
+            # A file that arrived with no bytes is named as empty, not as missing.
+            for what, sent in (("report", report), ("equity", equity)):
+                if sent is not None and sent.filename:
+                    text = message("empty_upload", report_loc, what=UPLOAD_NAMES[what][report_loc])
+                    return _html_error(request, 400, text, report_loc)
             return _html_error(request, 400, message("equity_required", report_loc), report_loc)
         # A new account's first file is a free full report (once per account,
         # browser and file); then the month's free previews; then a credit;
@@ -4353,6 +4407,17 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             try:
                 inputs = attempt(report_columns)
             except ParseError as exc:
+                curve = uploads["equity"]
+                if curve and not uploads["report"] and curve.startswith(PICTURE_SIGNATURES):
+                    # Refused as before; the sentence says what the file is.
+                    return _html_error(
+                        request, 400, message("curve_is_picture", report_loc), report_loc
+                    )
+                if exc.code == "too_large" and curve and len(curve) > MAX_UPLOAD_BYTES:
+                    text = message(
+                        "curve_too_large", report_loc, limit=_megabytes(MAX_UPLOAD_BYTES)
+                    )
+                    return _html_error(request, 400, text, report_loc)
                 # A "curve" that starts at 0 or crosses it is a list of
                 # results, and a curve file with no value column may be one:
                 # both are offered to name, a result list preselected as such.
@@ -4532,6 +4597,9 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             text = mapping.COPY[locale]["results" if results else "unknown"]
         else:
             text = _sentence(exc.localized(locale))
+        if len(table.samples) < 2 and not chosen:
+            # One row, or none: naming columns cannot help until the file is whole.
+            text = mapping.COPY[locale]["one_row"]
         if _wants_json(request):
             return JSONResponse(
                 {"error": text, "code": exc.code, "columns": table.names}, status_code=422
@@ -4822,7 +4890,13 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         state = "mine" if owner == account.id else ("unsaved" if owner is None else "other")
         now = datetime.now(UTC)
         credits = db.account_credits(account.id, now) if locked else 0
-        return account_pages.report_box(
+        same_file = ""
+        if locked and state == "mine":
+            # Only a report of this same account is ever named or linked.
+            earlier = db.earlier_audit_of_same_files(account.id, record.id)
+            if earlier:
+                same_file = account_pages.same_file_note(locale, f"/audits/{earlier}?lang={locale}")
+        return same_file + account_pages.report_box(
             locale=locale,
             state=state,
             audit_id=record.id,
@@ -5403,7 +5477,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         return _compare_form_page("pt", request=request)
 
     def _compare(link_a: str, link_b: str, lang: str | None, default: str) -> Response:
-        locale = "pt" if default == "pt" else _locale(lang or default)
+        # A Portuguese report posted to another language's address stays Portuguese.
+        locale = "pt" if "pt" in (default, lang) else _locale(lang or default)
         copy = COMPARE_COPY[locale]
         first, second = parse_report_link(link_a), parse_report_link(link_b)
         if first is None or second is None:

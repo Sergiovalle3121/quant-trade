@@ -794,6 +794,24 @@ MEANING: dict[str, dict[str, str]] = {
             "No se pudo descontar el número de intentos porque la significación no se midió. "
             "Con una curva más larga se puede calcular."
         ),
+        f"{MULTIPLICITY}.NOT_MEASURED.undeclared": (
+            "No se declaró cuántas configuraciones se probaron, así que la clase no puede pasar "
+            "de B. Al declararlo (aunque sea 1), Rigor puede descontarlo."
+        ),
+        f"{MULTIPLICITY}.NOT_MEASURED.undeclared.fund": (
+            "No se declaró cuántos fondos o estrategias lleva el mismo gestor, así que la clase "
+            "no puede pasar de B. Al declararlo (aunque sea 1), Rigor puede descontarlo."
+        ),
+        f"{MULTIPLICITY}.FAIL.undeclared": (
+            "Incluso contando una sola configuración, el caso más favorable, el resultado no "
+            "supera lo que daría un intento sin ventaja real. No se declaró cuántas se probaron: "
+            "con más de una, la conclusión sería aún más débil."
+        ),
+        f"{MULTIPLICITY}.FAIL.undeclared.fund": (
+            "Incluso contando un solo fondo, el caso más favorable, el resultado no supera lo "
+            "que daría un intento sin ventaja real. No se declaró cuántos fondos o estrategias "
+            "lleva el gestor: con más de uno, la conclusión sería aún más débil."
+        ),
         f"{COSTS}.PASS": (
             "Las operaciones aguantan aunque los costos se tripliquen. "
             "Los costos reales dependen de tu bróker y de la ejecución."
@@ -902,6 +920,25 @@ MEANING: dict[str, dict[str, str]] = {
             "The number of trials could not be discounted because significance was not "
             "measured. A longer curve makes it computable."
         ),
+        f"{MULTIPLICITY}.NOT_MEASURED.undeclared": (
+            "The number of configurations tried was not declared, so the class cannot go above "
+            "B. Once it is declared (even if it is 1), Rigor can discount it."
+        ),
+        f"{MULTIPLICITY}.NOT_MEASURED.undeclared.fund": (
+            "How many funds or strategies the same manager runs was not declared, so the class "
+            "cannot go above B. Once it is declared (even if it is 1), Rigor can discount it."
+        ),
+        f"{MULTIPLICITY}.FAIL.undeclared": (
+            "Even counting a single configuration, the most favourable case, the result does "
+            "not exceed what a trial with no real edge would give. How many were tried was not "
+            "declared: with more than one, the conclusion would be weaker still."
+        ),
+        f"{MULTIPLICITY}.FAIL.undeclared.fund": (
+            "Even counting a single fund, the most favourable case, the result does not exceed "
+            "what a trial with no real edge would give. How many funds or strategies the "
+            "manager runs was not declared: with more than one, the conclusion would be weaker "
+            "still."
+        ),
         f"{COSTS}.PASS": (
             "The trades hold up even if costs triple. "
             "Real costs depend on your broker and on execution."
@@ -986,14 +1023,34 @@ def class_text(overall: str, locale: str = "es") -> str:
     return texts.get(overall, "")
 
 
+def trials_undeclared(inputs: dict[str, Any] | None) -> bool:
+    """The deflated Sharpe was computed, but at a trial count nobody declared
+    and no file showed (1, the most favourable case)."""
+    inputs = inputs or {}
+    trials = inputs.get("trials_used") or {}
+    dsr = inputs.get("dsr_at_trials_used") or {}
+    return trials.get("evidence") == "NOT_MEASURED" and dsr.get("evidence") == "MEASURED"
+
+
 def meaning(
-    name: str, status: str, locale: str = "es", *, account: bool = False, fund: bool = False
+    name: str,
+    status: str,
+    locale: str = "es",
+    *,
+    account: bool = False,
+    fund: bool = False,
+    undeclared: bool = False,
 ) -> str:
     """Two plain sentences on what a dimension's status means for the reader.
 
     ``account`` picks the wording for an account history and ``fund`` the
-    wording for a fund's track record, where one exists."""
+    wording for a fund's track record, where one exists. ``undeclared`` picks
+    the wording for a trial count that was never declared, where one exists."""
     texts = MEANING.get(locale, MEANING["es"])
+    if undeclared and fund and f"{name}.{status}.undeclared.fund" in texts:
+        return texts[f"{name}.{status}.undeclared.fund"]
+    if undeclared and f"{name}.{status}.undeclared" in texts:
+        return texts[f"{name}.{status}.undeclared"]
     if fund and f"{name}.{status}.fund" in texts:
         return texts[f"{name}.{status}.fund"]
     if account and f"{name}.{status}.account" in texts:
@@ -1100,4 +1157,5 @@ __all__ = [
     "meaning",
     "overall_class",
     "summary",
+    "trials_undeclared",
 ]

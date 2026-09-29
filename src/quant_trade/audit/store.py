@@ -96,6 +96,10 @@ def _iso(value: datetime) -> str:
     return value.astimezone(UTC).isoformat().replace("+00:00", "Z")
 
 
+#: Earlier reports of an account compared file by file with a new upload.
+SAME_FILE_CANDIDATES = 20
+
+
 @dataclass(frozen=True)
 class AuditRecord:
     id: str
@@ -4384,6 +4388,34 @@ class Store:
         except sa.exc.IntegrityError:  # pragma: no cover - lost a race to the same row
             return "other"
         return "linked"
+
+    def earlier_audit_of_same_files(self, account_id: str, audit_id: str) -> str | None:
+        """Another report on this account made from the same files as
+        ``audit_id`` (the same set of SHA-256 digests) and uploaded before it,
+        a full one first; ``None`` when there is none. Only reports linked to
+        ``account_id`` are looked at, and purged ones are left out."""
+        record = self.get_audit(audit_id)
+        if not account_id or record is None or not record.digests:
+            return None
+        sa = self._sa
+        a, link = self.audits, self.account_audits
+        with self.engine.connect() as conn:
+            rows = conn.execute(
+                sa.select(a.c.id)
+                .select_from(link.join(a, a.c.id == link.c.audit_id))
+                .where(link.c.account_id == account_id)
+                .where(a.c.id != audit_id)
+                .where(a.c.purged_at.is_(None))
+                .where(a.c.created_at < record.created_at)
+                .where(a.c.equity_sha256 == record.digests.get("equity.csv"))
+                .order_by(a.c.paid.desc(), a.c.created_at)
+                .limit(SAME_FILE_CANDIDATES)
+            ).all()
+        for row in rows:
+            other = self.get_audit(str(row[0]))
+            if other is not None and other.digests == record.digests:
+                return other.id
+        return None
 
     def account_for_audit(self, audit_id: str) -> str | None:
         if not _usable_key(audit_id):

@@ -250,7 +250,8 @@ GUIDES: tuple[Guide, ...] = (
     Guide(
         slug="cuenta-proveedor",
         slug_en="provider-account",
-        platform="Cuenta de un proveedor / Provider's account",
+        platform="Cuenta de un proveedor",
+        platform_en="Provider's account",
         field="report",
         text={
             "es": GuideText(

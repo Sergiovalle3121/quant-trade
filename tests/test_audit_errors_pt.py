@@ -154,7 +154,7 @@ def test_the_pt_form_sends_the_portuguese_language() -> None:
     [
         ({"report": ("conta.xls", LEGACY_XLS, "application/vnd.ms-excel")}, "planilha antiga"),
         ({"report": ("conta.zip", _zip("a.csv", "b.csv"), "application/zip")}, "2 exportações"),
-        ({"equity": ("curva.csv", b"", "text/csv")}, "Falta o arquivo"),
+        ({"equity": ("curva.csv", b"", "text/csv")}, "chegou vazio (0 bytes)"),
     ],
 )
 def test_an_upload_from_pt_is_refused_in_portuguese(
