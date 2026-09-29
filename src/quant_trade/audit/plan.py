@@ -119,7 +119,7 @@ TITLES: dict[str, dict[str, str]] = {
         DATA_QUALITY: "Limpia las banderas de los datos",
         STATISTICAL: "Aporta más historial",
         MULTIPLICITY: "Mide cuántas configuraciones se probaron",
-        COSTS: "Comprueba los costes reales",
+        COSTS: "Comprueba los costos reales",
         OUT_OF_SAMPLE: "Añade un tramo fuera de muestra",
         BENCHMARK: "Compara con una alternativa pasiva",
     },
@@ -211,8 +211,8 @@ FLAG_HINTS: dict[str, dict[str, str]] = {
     },
     "IMPLAUSIBLE_SHARPE": {
         "es": (
-            "Un Sharpe tan alto suele venir de datos de baja calidad, costes omitidos o un "
-            "periodo corto: prueba con ticks reales, costes reales y un periodo más largo."
+            "Un Sharpe tan alto suele venir de datos de baja calidad, costos omitidos o un "
+            "periodo corto: prueba con ticks reales, costos reales y un periodo más largo."
         ),
         "en": (
             "A Sharpe this high usually comes from poor data, missing costs or a short "
@@ -224,7 +224,7 @@ FLAG_HINTS: dict[str, dict[str, str]] = {
         "en": "Date ranges are missing: export the whole period without cuts.",
     },
     "ZERO_DECLARED_COSTS": {
-        "es": "Declara el coste por lado de tu bróker (spread, comisión y deslizamiento).",
+        "es": "Declara el costo por lado de tu bróker (spread, comisión y deslizamiento).",
         "en": "Declare your broker's cost per side (spread, commission and slippage).",
     },
     "TRIALS_BELOW_VARIANTS": {
@@ -326,7 +326,7 @@ FLAG_HINTS: dict[str, dict[str, str]] = {
     "MONETARY_RECONCILIATION_UNEXPLAINED": {
         "es": (
             "Sube curva y operaciones de la misma cuenta y periodo, con flujos de efectivo, "
-            "costes y valoración de posiciones abiertas; la causa aún no se puede medir."
+            "costos y valoración de posiciones abiertas; la causa aún no se puede medir."
         ),
         "en": (
             "Upload the curve and trades for the same account and period, including cash "
@@ -676,7 +676,7 @@ def _costs_step(data: dict[str, Any], status: str, locale: str) -> tuple[str, li
     if status == "NOT_MEASURED" or costs.get("status") != "MEASURED":
         finding = _say(
             locale,
-            "Sin la lista de operaciones no se pueden volver a aplicar los costes; sin ellas la "
+            "Sin la lista de operaciones no se pueden volver a aplicar los costos; sin ellas la "
             "mejor clase posible es B.",
             "Without the list of trades the costs cannot be re-applied; without them the "
             "best possible class is B.",
@@ -701,7 +701,7 @@ def _costs_step(data: dict[str, Any], status: str, locale: str) -> tuple[str, li
     if breakeven is None or breakeven <= 0:
         finding = _say(
             locale,
-            "Incluso sin coste extra, el neto de las operaciones no queda por encima de cero "
+            "Incluso sin costo extra, el neto de las operaciones no queda por encima de cero "
             "tras las comisiones y el swap del archivo.",
             "Even with no extra cost, the trades do not net above zero after the "
             "commission and swap in the file.",
@@ -711,7 +711,7 @@ def _costs_step(data: dict[str, Any], status: str, locale: str) -> tuple[str, li
     else:
         finding = _say(
             locale,
-            f"El neto llega a cero con {_fmt(breakeven)} pb por lado de coste extra. Para "
+            f"El neto llega a cero con {_fmt(breakeven)} pb por lado de costo extra. Para "
             f"pasar esta dimensión tiene que seguir por encima de cero a 3x la referencia "
             f"({_fmt(needed)} pb por lado).",
             f"The net reaches zero at {_fmt(breakeven)} bps per side of extra cost. To "
@@ -753,8 +753,8 @@ def _costs_step(data: dict[str, Any], status: str, locale: str) -> tuple[str, li
         locale,
         [
             broker,
-            "Declara el coste real por lado al subir: se suma a lo que el informe ya detalla.",
-            "Menos operaciones o un recorrido mayor por operación hacen que el coste pese menos.",
+            "Declara el costo real por lado al subir: se suma a lo que el informe ya detalla.",
+            "Menos operaciones o un recorrido mayor por operación hacen que el costo pese menos.",
         ],
         [
             broker,
@@ -842,7 +842,7 @@ def _fund_costs(locale: str) -> tuple[str, list[str]]:
     """The cost step for a fund's track record, whose costs are inside each month."""
     finding = _say(
         locale,
-        "Un historial mensual de fondo ya trae sus costes de operación dentro de cada mes, "
+        "Un historial mensual de fondo ya trae sus costos de operación dentro de cada mes, "
         "pero sin la lista de operaciones no se pueden volver a aplicar: la mejor clase "
         "posible es B.",
         "A fund's monthly record already carries its trading costs inside each month, but "

@@ -13,7 +13,7 @@
 > Stripe antes de subir precios y sus pagos históricos deben conciliarse.
 
 Guía histórica de las primeras ventas manuales de Rigor
-(https://rigor.up.railway.app, código en `src/quant_trade/audit/`). En esa
+(https://rigorscore.com, código en `src/quant_trade/audit/`). En esa
 versión se proponían transferencias, Mercado Pago o un medio acordado por
 WhatsApp y la entrega por código; ese flujo ya no es instrucción vigente para
 abrir cobros. Las claves de Stripe por sí solas tampoco abren la puerta de
@@ -77,7 +77,7 @@ gratis. Si editas una plantilla, ejecuta
 
 Un informe que responde, con el archivo que el cliente ya tiene, a la
 pregunta que se hace antes de arriesgar dinero en un robot o en una cuenta
-ajena: ¿este resultado es evidencia o es suerte, sobreajuste y costes mal
+ajena: ¿este resultado es evidencia o es suerte, sobreajuste y costos mal
 contados? Cada número dice si se midió del archivo (MEASURED), si lo declaró
 el cliente o su plataforma (DECLARED) o si no se pudo medir (NOT_MEASURED).
 
@@ -142,7 +142,7 @@ esté en `false`.
 
 Solo tú puedes hacer lo que falta:
 
-- [ ] Crear un código de 1 crédito en `https://rigor.up.railway.app/panel`
+- [ ] Crear un código de 1 crédito en `https://rigorscore.com/panel`
       (con tu `AUDIT_ADMIN_KEY`, que está en Railway > Variables), canjearlo
       en un informe tuyo y desactivarlo. Así sabes hacerlo antes de que pague
       nadie.
@@ -240,7 +240,7 @@ una sola venta trae a otros compradores.
 4. **Hilo en "Commercial Content" de Forex Factory**, como Commercial Member
    con identidad pública (plantilla F1). Es el mayor punto de encuentro de
    compradores y vendedores de EA en inglés. Comprueba antes, en un
-   navegador, si la membresía comercial tiene coste y qué exige.
+   navegador, si la membresía comercial tiene costo y qué exige.
 
 5. **Traders de acciones, futuros y cripto que programan o prueban sus
    estrategias** (plantillas F2, F3 y D3). Rigor no depende del mercado, así
@@ -257,7 +257,7 @@ anuncio de pago si los números de la sección 8 lo justifican.
 ## 5. Plantillas
 
 Cambia lo que va entre `<…>` antes de enviar. `<dominio>` es
-`rigor.up.railway.app` (o el valor de `AUDIT_BASE_URL` si cambia). No añadas
+`rigorscore.com` (o el valor de `AUDIT_BASE_URL` si cambia). No añadas
 frases sobre resultados futuros: cada plantilla pasa el guard tal como está.
 
 ### Tus contactos
@@ -267,7 +267,7 @@ frases sobre resultados futuros: cada plantilla pasa el guard tal como está.
 ```text
 Hola, <nombre>. Te escribo porque sé que <operas acciones o cripto con tu estrategia / usas robots / estás con retos de prop firm / inviertes con un gestor>.
 
-Lancé Rigor, un servicio que audita backtests e historiales de cuenta: subes el informe de MetaTrader, TradingView, Myfxbook o tu plataforma tal cual, o tu curva de equity de cualquier mercado, y te dice con estadística si el resultado se sostiene o si es sobreajuste, costes mal contados o suerte. Da una clase de A a D, y cada número dice si se midió del archivo o si solo lo declaró la plataforma.
+Lancé Rigor, un servicio que audita backtests e historiales de cuenta: subes el informe de MetaTrader, TradingView, Myfxbook o tu plataforma tal cual, o tu curva de equity de cualquier mercado, y te dice con estadística si el resultado se sostiene o si es sobreajuste, costos mal contados o suerte. Da una clase de A a D, y cada número dice si se midió del archivo o si solo lo declaró la plataforma.
 
 También compara un backtest con la cuenta real donde corre el robot y separa los depósitos del resultado de operar, que es donde más se maquilla un historial.
 
@@ -301,7 +301,7 @@ If it is useful to you or someone you know, that helps me a lot. If not, no prob
 ```text
 ¡Hola, <nombre>! Gracias por escribir.
 
-Rigor analiza el backtest o el historial de cuenta que ya tienes y le da una clase de A a D en seis dimensiones: significación estadística, número de intentos (Sharpe deflactado), costes, fuera de muestra, calidad de datos y benchmark. Además revisa con qué datos se hizo la prueba, si el resultado depende de pocas operaciones, si sigue funcionando en el periodo reciente y qué capital pide.
+Rigor analiza el backtest o el historial de cuenta que ya tienes y le da una clase de A a D en seis dimensiones: significación estadística, número de intentos (Sharpe deflactado), costos, fuera de muestra, calidad de datos y benchmark. Además revisa con qué datos se hizo la prueba, si el resultado depende de pocas operaciones, si sigue funcionando en el periodo reciente y qué capital pide.
 
 Cómo empezar:
 1. Sube tu archivo en https://<dominio> tal cual sale de tu plataforma (MT5, MT4, TradingView, NinjaTrader, Myfxbook, FX Blue, señales de MQL5, QuantConnect, backtesting.py o vectorbt).
@@ -471,7 +471,7 @@ Título: Rigor: auditoría estadística de backtests e historiales de EA (MT4, M
 
 Soy <nombre>, autor de Rigor (miembro comercial, declaro mi interés).
 
-Qué hace: lee el informe de MT5 o MT4 tal cual (en 7 idiomas), el XML de optimización, la lista de operaciones de TradingView, el CSV de Myfxbook, FX Blue o una señal de MQL5, o el historial de otras 21 plataformas (Interactive Brokers, Tradovate, cTrader, Rithmic, Binance y más; si no reconoce las columnas, te pregunta qué es cada una), y da una clase de A a D en seis dimensiones: significación estadística, Sharpe deflactado con el número real de intentos, costes, fuera de muestra, calidad de datos y benchmark. Cada número dice si se midió del archivo, si lo declaró la plataforma o si no se pudo medir.
+Qué hace: lee el informe de MT5 o MT4 tal cual (en 7 idiomas), el XML de optimización, la lista de operaciones de TradingView, el CSV de Myfxbook, FX Blue o una señal de MQL5, o el historial de otras 21 plataformas (Interactive Brokers, Tradovate, cTrader, Rithmic, Binance y más; si no reconoce las columnas, te pregunta qué es cada una), y da una clase de A a D en seis dimensiones: significación estadística, Sharpe deflactado con el número real de intentos, costos, fuera de muestra, calidad de datos y benchmark. Cada número dice si se midió del archivo, si lo declaró la plataforma o si no se pudo medir.
 
 También: el resultado sin sus mejores operaciones, el modelo de ticks del probador, si la mejor pasada es un pico aislado o una meseta, si el periodo reciente se parece al resto, y una cuenta real frente a miles de historias remuestreadas de su propio backtest, con los depósitos separados del resultado de operar.
 
@@ -508,7 +508,7 @@ How it audits, with every threshold: https://<domain>/methodology
 Un backtest con curva perfecta suele ser la mejor de muchas configuraciones probadas. Tres comprobaciones rápidas:
 
 1. ¿Cuántas combinaciones se optimizaron? Si fueron 500, un Sharpe de 2 puede ser pura suerte. El Sharpe deflactado (Bailey y López de Prado) descuenta ese número de intentos.
-2. ¿Qué pasa con el doble de spread y comisión? Si la curva se aplana, el margen depende de los costes supuestos.
+2. ¿Qué pasa con el doble de spread y comisión? Si la curva se aplana, el margen depende de los costos supuestos.
 3. ¿Hay un tramo que no se usó para elegir parámetros? Mira ese tramo por separado.
 
 Y si el robot promedia pérdidas o dobla el lote tras perder, el drawdown flotante no aparece en la curva de balance.
@@ -539,7 +539,7 @@ Qué hacer:
 - Exporta el XML de la pestaña Optimización y guarda cuántas pasadas hiciste.
 - Mira si las pasadas vecinas a la elegida también salen bien (meseta) o si la tuya está sola (pico aislado).
 - Reserva un tramo de fechas que no uses para optimizar.
-- Repite la prueba con el doble de costes.
+- Repite la prueba con el doble de costos.
 
 Todo esto es estadística sobre datos pasados: sirve para descartar ilusiones, no para prever el futuro.
 ```
@@ -695,7 +695,7 @@ Cuando un fondo enseña su rentabilidad media al año, conviene partir ese núme
 
 Con 36 meses o más en común con el índice se puede calcular, con su rango al 95 %. Si sale positivo pero no se distingue de cero, también se puede calcular cuántos meses harían falta.
 
-Rigor lo hace con la tabla mensual del fondo y la de su índice: https://rigor.up.railway.app/para/inversores-gestores-fondos?ref=f8
+Rigor lo hace con la tabla mensual del fondo y la de su índice: https://rigorscore.com/para/inversores-gestores-fondos?ref=f8
 
 No dice si invertir: separa lo que el historial demuestra de lo que solo sugiere.
 ```
@@ -711,7 +711,7 @@ When a fund shows its average return a year, it pays to split that number in thr
 
 With 36 months or more in common with the index it can be computed, with its 95 % range. If it comes out positive but cannot be told apart from zero, you can also compute how many months that would take.
 
-Rigor does it from the fund's monthly table and its index's: https://rigor.up.railway.app/for/investors-managers-funds?ref=f8
+Rigor does it from the fund's monthly table and its index's: https://rigorscore.com/for/investors-managers-funds?ref=f8
 
 It does not say whether to invest: it separates what the history shows from what it only suggests.
 ```
@@ -723,7 +723,7 @@ El Sharpe mide el resultado por encima de lo que pagaba el efectivo. Casi todas 
 
 Con la tasa de tu moneda, el mismo historial puede verse bastante menos bueno. Vale la pena recalcularlo antes de enseñarlo o de comprar una estrategia por su Sharpe.
 
-Rigor usa la tasa oficial de la moneda de tu cuenta (pesos mexicanos, reales, euros, libras, yenes, dólares canadienses o francos suizos) cuando tu reporte la indica; si no la indica o está en dólares, la de EE. UU., y en otra moneda no calcula esa línea: https://rigor.up.railway.app/?ref=f9
+Rigor usa la tasa oficial de la moneda de tu cuenta (pesos mexicanos, reales, euros, libras, yenes, dólares canadienses o francos suizos) cuando tu reporte la indica; si no la indica o está en dólares, la de EE. UU., y en otra moneda no calcula esa línea: https://rigorscore.com/?ref=f9
 ```
 
 #### F9 · EN · The Sharpe in your account's currency
@@ -733,7 +733,7 @@ The Sharpe measures the return above what cash paid. Almost every calculator sub
 
 With your currency's rate, the same history can look quite a bit less good. It is worth recomputing before you show it or buy a strategy for its Sharpe.
 
-Rigor uses the official rate of your account's currency (Mexican pesos, reais, euros, pounds, yen, Canadian dollars or Swiss francs) when your report names it; if it names none or is in dollars, the US rate, and in another currency it leaves that line out: https://rigor.up.railway.app/en?ref=f9
+Rigor uses the official rate of your account's currency (Mexican pesos, reais, euros, pounds, yen, Canadian dollars or Swiss francs) when your report names it; if it names none or is in dollars, the US rate, and in another currency it leaves that line out: https://rigorscore.com/en?ref=f9
 ```
 
 #### F10 · ES · Si operas con Revolut o con Zerodha
@@ -744,7 +744,7 @@ Si operas acciones con Revolut o en India con Zerodha, puedes revisar tu histori
 - Revolut: el estado de cuenta de acciones (CSV).
 - Zerodha: el Tradebook de Console (Reports > Tradebook, en CSV).
 
-El informe arma tus operaciones con las compras y ventas (un depósito nunca cuenta como resultado de operar) y mide si el resultado se distingue de la suerte. Qué subir y de dónde: https://rigor.up.railway.app/guias/csv-universal?ref=f10
+El informe arma tus operaciones con las compras y ventas (un depósito nunca cuenta como resultado de operar) y mide si el resultado se distingue de la suerte. Qué subir y de dónde: https://rigorscore.com/guias/csv-universal?ref=f10
 ```
 
 #### F10 · EN · If you trade with Revolut or Zerodha
@@ -755,19 +755,19 @@ If you trade stocks with Revolut, or in India with Zerodha, you can review your 
 - Revolut: the stocks account statement (CSV).
 - Zerodha: the Console Tradebook (Reports > Tradebook, as CSV).
 
-The report builds your trades from the buys and sells (a deposit never counts as a trading result) and measures whether the result stands out from luck. What to upload and where from: https://rigor.up.railway.app/guides/universal-csv?ref=f10
+The report builds your trades from the buys and sells (a deposit never counts as a trading result) and measures whether the result stands out from luck. What to upload and where from: https://rigorscore.com/guides/universal-csv?ref=f10
 ```
 
 #### F11 · ES · Cuando alguien pregunta si es seguro
 
 ```text
-Rigor no se conecta a tu bróker ni te pide claves: subes un archivo exportado. Tu cuenta puede usar verificación en dos pasos con una app de autenticación, y entonces para entrar o recuperarla hacen falta dos de tres: tu contraseña, el código de la app o tu clave de recuperación. En Mi cuenta ves dónde está abierta y cierras cada sesión, y ves tus entradas más recientes (hasta 90 días), incluidos los intentos con contraseña incorrecta. También puedes entrar con una llave de acceso: la huella, la cara o el PIN de tu teléfono o computadora, sin escribir la contraseña. Más en las preguntas frecuentes: https://rigor.up.railway.app/?ref=f11#faq
+Rigor no se conecta a tu bróker ni te pide claves: subes un archivo exportado. Tu cuenta puede usar verificación en dos pasos con una app de autenticación, y entonces para entrar o recuperarla hacen falta dos de tres: tu contraseña, el código de la app o tu clave de recuperación. En Mi cuenta ves dónde está abierta y cierras cada sesión, y ves tus entradas más recientes (hasta 90 días), incluidos los intentos con contraseña incorrecta. También puedes entrar con una llave de acceso: la huella, la cara o el PIN de tu teléfono o computadora, sin escribir la contraseña. Más en las preguntas frecuentes: https://rigorscore.com/?ref=f11#faq
 ```
 
 #### F11 · EN · When someone asks whether it is safe
 
 ```text
-Rigor does not connect to your broker or ask for keys: you upload an exported file. Your account can use two-step sign-in with an authenticator app, and then signing in or recovering it takes two of three: your password, the code from the app or your recovery key. In My account you see where it is open and sign out each session, and you see your most recent sign-ins (up to 90 days), including wrong-password tries. You can also sign in with a passkey: your phone's or computer's fingerprint, face or PIN, without typing the password. More in the FAQ: https://rigor.up.railway.app/en?ref=f11#faq
+Rigor does not connect to your broker or ask for keys: you upload an exported file. Your account can use two-step sign-in with an authenticator app, and then signing in or recovering it takes two of three: your password, the code from the app or your recovery key. In My account you see where it is open and sign out each session, and you see your most recent sign-ins (up to 90 days), including wrong-password tries. You can also sign in with a passkey: your phone's or computer's fingerprint, face or PIN, without typing the password. More in the FAQ: https://rigorscore.com/en?ref=f11#faq
 ```
 
 #### F12 · ES · ¿Dejó de funcionar o es una mala racha?
@@ -780,7 +780,7 @@ Tres cuidados:
 2. El ruido se mide con cuidado: si cada rentabilidad se parece a la anterior, la varianza simple se queda corta; Rigor toma la mayor de tres estimaciones (simple, Newey-West y una corregida por autocorrelación).
 3. La fecha es un rango: dice dónde se nota más el cambio, no su causa.
 
-Rigor lo hace con tu archivo: si hay un cambio claro, te da la fecha con su rango al 95 % y la media antes y después; si no, te lo dice: https://rigor.up.railway.app/?ref=f12
+Rigor lo hace con tu archivo: si hay un cambio claro, te da la fecha con su rango al 95 % y la media antes y después; si no, te lo dice: https://rigorscore.com/?ref=f12
 
 Describe tu historial; no dice qué pasará después.
 ```
@@ -795,7 +795,7 @@ Three cautions:
 2. The noise is measured carefully: if each return resembles the one before, the plain variance falls short; Rigor takes the largest of three estimates (plain, Newey-West and one widened for autocorrelation).
 3. The date is a range: it says where the change shows most, not its cause.
 
-Rigor does it from your file: if a change is clear, it gives the date with its 95 % range and the average before and after; if not, it says so: https://rigor.up.railway.app/en?ref=f12
+Rigor does it from your file: if a change is clear, it gives the date with its 95 % range and the average before and after; if not, it says so: https://rigorscore.com/en?ref=f12
 
 It describes your history; it does not say what comes next.
 ```
@@ -859,7 +859,7 @@ Hola, <nombre>. Me preguntaste si Rigor sirve para <acciones / futuros / cripto>
 
 Sí: Rigor no depende del mercado, mide el historial que subes. Puedes subir la lista de operaciones de TradingView o NinjaTrader, el CSV de QuantConnect, backtesting.py o vectorbt, o tu curva de equity o serie de retornos en CSV o Excel (diaria, semanal o mensual).
 
-Te dice si tu Sharpe se distingue del azar, cuánto queda después de descontar las configuraciones que probaste, qué pasa con el doble de costes, si sigue funcionando en el periodo reciente y qué capital pide. Cada número dice si se midió del archivo o si no se pudo medir.
+Te dice si tu Sharpe se distingue del azar, cuánto queda después de descontar las configuraciones que probaste, qué pasa con el doble de costos, si sigue funcionando en el periodo reciente y qué capital pide. Cada número dice si se midió del archivo o si no se pudo medir.
 
 La vista previa es gratis: https://<dominio>
 El informe completo cuesta USD 29. Ejemplo: https://<dominio>/ejemplo
@@ -885,7 +885,7 @@ C o D. Es este: **los compradores ya desconfían de los backtests, y la página
 de verificación les deja comprobar por su cuenta qué archivo se auditó y con
 qué resultado, sin que el vendedor enseñe sus operaciones.** Y antes de
 publicar, el informe privado le dice qué preguntarán los compradores
-(sobreajuste, costes, periodo reciente, cuenta real frente al backtest).
+(sobreajuste, costos, periodo reciente, cuenta real frente al backtest).
 
 Qué recibe el vendedor por USD 29 (o USD 69 si audita tres versiones o un
 backtest y su cuenta):
@@ -921,7 +921,7 @@ Asunto: Una página pública para que tus compradores comprueben tu backtest
 
 Hola, <nombre>. Vi <nombre del robot> en <sitio>.
 
-Soy el autor de Rigor, un servicio que audita backtests de EA a partir del informe de MT5 y del XML de optimización, y da una clase de A a D en seis dimensiones (significación, número de intentos, costes, fuera de muestra, calidad de datos y benchmark). Si tienes una cuenta real o demo con el robot, también la compara con el backtest.
+Soy el autor de Rigor, un servicio que audita backtests de EA a partir del informe de MT5 y del XML de optimización, y da una clase de A a D en seis dimensiones (significación, número de intentos, costos, fuera de muestra, calidad de datos y benchmark). Si tienes una cuenta real o demo con el robot, también la compara con el backtest.
 
 Si quieres, el resultado se publica en una página de verificación con los hashes del archivo auditado y un sello para tu web o tu Telegram. El sello dice textualmente: "Auditoría estadística de datos aportados – no verificados con el bróker – no garantiza resultados". Así tus compradores comprueban qué archivo se auditó sin que enseñes tus operaciones.
 

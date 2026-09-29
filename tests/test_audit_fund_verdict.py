@@ -141,7 +141,7 @@ def test_no_plan_step_asks_a_fund_for_robot_files(locale: str) -> None:
             " ".join([step.title, step.finding, *step.actions])
             for step in improvement_plan(data, locale)
         )
-        for word in ("MT5", "EA ", "XML", "coste por lado", "cost per side", "optimiza", "optimis"):
+        for word in ("MT5", "EA ", "XML", "costo por lado", "cost per side", "optimiza", "optimis"):
             assert word not in text, (locale, word)
         assert_report_clean(render(result, watermark=False)[0])  # type: ignore[arg-type]
 

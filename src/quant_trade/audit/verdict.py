@@ -73,9 +73,9 @@ NOT_MEASURED_ES: dict[str, str] = {
     "PSR not computed": "PSR no calculado",
     "statistical significance not measured": "significación estadística no medida",
     "no trades uploaded; costs cannot be re-applied": (
-        "no se subieron operaciones; no se pueden volver a aplicar los costes"
+        "no se subieron operaciones; no se pueden volver a aplicar los costos"
     ),
-    "cost rows missing": "faltan filas de costes",
+    "cost rows missing": "faltan filas de costos",
     "no out-of-sample start declared": "no se declaró un inicio fuera de muestra",
     FUND_OOS_REASON: "el historial del fondo no dice desde cuándo su proceso opera sin cambios",
     "declared out-of-sample start lies outside the uploaded series": (
@@ -315,7 +315,7 @@ def assess_costs(
             [
                 (
                     f"net pnl at 1x the reference cost is {at_one.net_pnl:,.2f} <= 0",
-                    f"el resultado neto a 1x el coste de referencia es {at_one.net_pnl:,.2f} <= 0",
+                    f"el resultado neto a 1x el costo de referencia es {at_one.net_pnl:,.2f} <= 0",
                 )
             ],
             inputs,
@@ -327,7 +327,7 @@ def assess_costs(
             [
                 (
                     f"net pnl at {multiple} the reference cost is {at_pass.net_pnl:,.2f} > 0",
-                    f"el resultado neto a {multiple} el coste de referencia es "
+                    f"el resultado neto a {multiple} el costo de referencia es "
                     f"{at_pass.net_pnl:,.2f} > 0",
                 )
             ],
@@ -535,7 +535,7 @@ _TEXT: dict[str, dict[str, str]] = {
             "Esto no es una predicción de resultados futuros."
         ),
         "B": (
-            "Clase B: la estadística aguanta, pero faltan piezas (costes, fuera de muestra, "
+            "Clase B: la estadística aguanta, pero faltan piezas (costos, fuera de muestra, "
             "benchmark o número de intentos) para una conclusión completa."
         ),
         "C": (
@@ -614,14 +614,14 @@ _TEXT: dict[str, dict[str, str]] = {
             "habilidad."
         ),
         f"{COSTS}.PASS": (
-            "Con 3 veces el coste de referencia, el resultado de las operaciones sigue positivo."
+            "Con 3 veces el costo de referencia, el resultado de las operaciones sigue positivo."
         ),
         f"{COSTS}.WEAK": (
-            "Las operaciones siguen en positivo con el coste de referencia, pero no con 3 "
-            "veces ese coste."
+            "Las operaciones siguen en positivo con el costo de referencia, pero no con 3 "
+            "veces ese costo."
         ),
-        f"{COSTS}.FAIL": "Con el coste de referencia, las operaciones pierden dinero en neto.",
-        f"{COSTS}.NOT_MEASURED": "Costes no medidos: {reason}.",
+        f"{COSTS}.FAIL": "Con el costo de referencia, las operaciones pierden dinero en neto.",
+        f"{COSTS}.NOT_MEASURED": "Costos no medidos: {reason}.",
         f"{OUT_OF_SAMPLE}.PASS": (
             "En el periodo apartado para comprobar (fuera de muestra) el resultado se "
             "mantiene y cae poco frente al resto."
@@ -795,19 +795,19 @@ MEANING: dict[str, dict[str, str]] = {
             "Con una curva más larga se puede calcular."
         ),
         f"{COSTS}.PASS": (
-            "Las operaciones aguantan aunque los costes se tripliquen. "
-            "Los costes reales dependen de tu bróker y de la ejecución."
+            "Las operaciones aguantan aunque los costos se tripliquen. "
+            "Los costos reales dependen de tu bróker y de la ejecución."
         ),
         f"{COSTS}.WEAK": (
-            "Con costes normales el resultado sigue positivo, pero con costes altos desaparece. "
+            "Con costos normales el resultado sigue positivo, pero con costos altos desaparece. "
             "Un spread o una comisión mayores que los supuestos lo borrarían."
         ),
         f"{COSTS}.FAIL": (
-            "Con el coste de referencia, las operaciones pierden dinero en neto. "
-            "El resultado del backtest depende de no pagar costes."
+            "Con el costo de referencia, las operaciones pierden dinero en neto. "
+            "El resultado del backtest depende de no pagar costos."
         ),
         f"{COSTS}.NOT_MEASURED": (
-            "Sin la lista de operaciones no se pueden volver a aplicar los costes. "
+            "Sin la lista de operaciones no se pueden volver a aplicar los costos. "
             "Sube el informe de la plataforma para medirlos."
         ),
         f"{OUT_OF_SAMPLE}.PASS": (

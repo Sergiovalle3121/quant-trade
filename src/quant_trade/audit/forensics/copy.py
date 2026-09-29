@@ -846,7 +846,7 @@ FIGURE_LABELS: dict[str, dict[str, str]] = {
         "hidden_cells": "celdas ocultas",
         "hidden_nonempty": "celdas ocultas con contenido",
         "hidden_rows": "filas ocultas",
-        "hidden_cost_rows": "filas de coste ocultas",
+        "hidden_cost_rows": "filas de costo ocultas",
         "decimal_comma": "coma decimal",
         "sections": "secciones (código)",
         "entries_inconsistent": "entradas incoherentes",

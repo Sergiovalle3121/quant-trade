@@ -3961,7 +3961,7 @@ changed. Tests: `tests/test_audit_customer_copy.py`.
 - The Portuguese site says the report and its PDF come in Portuguese,
   Spanish or English.
 - Spanish is Latin American Spanish: no "vosotros" form, "computadora",
-  "videos", "tasas"; `og:locale` is `es_MX`. "costes" stays as it is.
+  "videos", "tasas"; `og:locale` is `es_MX`. "costos" stays as it is.
 - The platform table names four more fields in the three languages
   (`balance_chain_breaks`, `largest_balance_difference`,
   `reconstructed_final_balance`, `reported_final_balance`).
