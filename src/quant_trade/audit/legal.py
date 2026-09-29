@@ -75,6 +75,9 @@ class LegalContext:
     operator_name: str = ""
     operator_contact: str = ""
     operator_address: str = ""
+    #: Street, number, postal code and city, printed before the country.
+    operator_street_address: str = ""
+    operator_phone: str = ""
     jurisdiction: str = ""
     free_mode: bool = True
     price_usd: float = 0.0
@@ -131,6 +134,21 @@ def legal_links_html(locale: str) -> str:
 
 def _value(value: str, locale: str) -> str:
     return value or _NOT_SET[locale]
+
+
+def _address(ctx: LegalContext, locale: str) -> str:
+    """The physical address: the street, then the country as ``locale`` words it."""
+    country = _value(ctx.operator_address, locale)
+    if ctx.operator_street_address and ctx.operator_address:
+        return f"{ctx.operator_street_address}, {country}"
+    return country
+
+
+def _tel(ctx: LegalContext, locale: str) -> str:
+    """The telephone after the contact, in the provider's line only."""
+    if not ctx.operator_phone:
+        return ""
+    return {"en": ", phone "}.get(locale, ", tel. ") + ctx.operator_phone
 
 
 def _warning(ctx: LegalContext, locale: str) -> str | None:
@@ -374,7 +392,7 @@ def _price_pt(ctx: LegalContext) -> tuple[str, ...]:
 def terms_text(ctx: LegalContext, locale: str = "es") -> LegalText:
     locale = _locale(locale)
     name = _value(ctx.operator_name, locale)
-    address = _value(ctx.operator_address, locale)
+    address = _address(ctx, locale)
     contact = _value(ctx.operator_contact, locale)
     jurisdiction = _value(ctx.jurisdiction, locale)
     warning = _warning(ctx, locale)
@@ -382,7 +400,7 @@ def terms_text(ctx: LegalContext, locale: str = "es") -> LegalText:
         return _terms_pt(ctx, name, address, contact, jurisdiction, warning)
     if locale == "en":
         sections: tuple[tuple[str, tuple[str, ...]], ...] = (
-            ("Provider", (f'{name}, {address}. Contact: {contact} ("we").',)),
+            ("Provider", (f'{name}, {address}. Contact: {contact}{_tel(ctx, "en")} ("we").',)),
             (
                 "What the service is",
                 (
@@ -499,7 +517,7 @@ def terms_text(ctx: LegalContext, locale: str = "es") -> LegalText:
         )
         return LegalText("Terms of service", warning, sections, LEGAL_UPDATED)
     sections = (
-        ("Prestador", (f'{name}, {address}. Contacto: {contact} ("nosotros").',)),
+        ("Prestador", (f'{name}, {address}. Contacto: {contact}{_tel(ctx, "es")} ("nosotros").',)),
         (
             "Qué es el servicio",
             (
@@ -640,7 +658,7 @@ def _terms_pt(
         else "A conta é opcional enquanto o serviço estiver no modo gratuito."
     )
     sections: tuple[tuple[str, tuple[str, ...]], ...] = (
-        ("Prestador", (f'{name}, {address}. Contato: {contact} ("nós").',)),
+        ("Prestador", (f'{name}, {address}. Contato: {contact}{_tel(ctx, "pt")} ("nós").',)),
         (
             "O que é o serviço",
             (
@@ -875,7 +893,7 @@ def _email_keeps_text(locale: str) -> tuple[str, ...]:
 def privacy_text(ctx: LegalContext, locale: str = "es") -> LegalText:
     locale = _locale(locale)
     name = _value(ctx.operator_name, locale)
-    address = _value(ctx.operator_address, locale)
+    address = _address(ctx, locale)
     contact = _value(ctx.operator_contact, locale)
     days = ctx.retention_days
     limit = ctx.max_uploads_per_hour_per_ip
@@ -884,7 +902,7 @@ def privacy_text(ctx: LegalContext, locale: str = "es") -> LegalText:
         return _privacy_pt(ctx, name, address, contact, days, limit, warning)
     if locale == "en":
         sections: tuple[tuple[str, tuple[str, ...]], ...] = (
-            ("Who is responsible", (f"{name}, {address}. Contact: {contact}.",)),
+            ("Who is responsible", (f"{name}, {address}. Contact: {contact}{_tel(ctx, 'en')}.",)),
             (
                 "What we keep",
                 (
@@ -1062,7 +1080,7 @@ def privacy_text(ctx: LegalContext, locale: str = "es") -> LegalText:
         )
         return LegalText("Privacy policy", warning, sections, LEGAL_UPDATED)
     sections = (
-        ("Responsable", (f"{name}, {address}. Contacto: {contact}.",)),
+        ("Responsable", (f"{name}, {address}. Contacto: {contact}{_tel(ctx, 'es')}.",)),
         (
             "Qué guardamos",
             (
@@ -1253,7 +1271,7 @@ def _privacy_pt(
     warning: str | None,
 ) -> LegalText:
     sections: tuple[tuple[str, tuple[str, ...]], ...] = (
-        ("Responsável", (f"{name}, {address}. Contato: {contact}.",)),
+        ("Responsável", (f"{name}, {address}. Contato: {contact}{_tel(ctx, 'pt')}.",)),
         (
             "O que guardamos",
             (

@@ -204,6 +204,12 @@ class AuditSettings:
     operator_address_pt: str = ""
     jurisdiction_en: str = ""
     jurisdiction_pt: str = ""
+    #: Optional street, number, postal code and city, and a telephone number,
+    #: printed only on the terms and privacy pages next to the provider's name
+    #: (a Mexican online seller must show a physical address and a telephone
+    #: before the sale). The landing keeps showing ``operator_address`` alone.
+    operator_street_address: str = ""
+    operator_phone: str = ""
     #: Secret for the owner panel where codes are created from a browser.
     #: No default: empty (or shorter than MIN_ADMIN_KEY_LENGTH) turns it off.
     admin_key: str = field(default="", repr=False)
@@ -450,6 +456,8 @@ class AuditSettings:
             operator_address_pt=_text(env.get("AUDIT_OPERATOR_ADDRESS_PT", "")),
             jurisdiction_en=_text(env.get("AUDIT_JURISDICTION_EN", "")),
             jurisdiction_pt=_text(env.get("AUDIT_JURISDICTION_PT", "")),
+            operator_street_address=_text(env.get("AUDIT_OPERATOR_STREET_ADDRESS", "")),
+            operator_phone=_text(env.get("AUDIT_OPERATOR_PHONE", "")),
             admin_key=env.get("AUDIT_ADMIN_KEY", "").strip(),
             panel_path=env.get("AUDIT_PANEL_PATH", "").strip() or DEFAULT_PANEL_PATH,
             public_data=env.get("AUDIT_PUBLIC_DATA", "true").strip().lower() in TRUE_VALUES,

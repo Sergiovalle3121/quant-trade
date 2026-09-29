@@ -5508,6 +5508,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             operator_name=cfg.operator_name,
             operator_contact=cfg.operator_contact,
             operator_address=cfg.operator_address_for(locale),
+            operator_street_address=cfg.operator_street_address,
+            operator_phone=cfg.operator_phone,
             jurisdiction=cfg.jurisdiction_for(locale),
             free_mode=cfg.free_mode,
             price_usd=cfg.price_usd,

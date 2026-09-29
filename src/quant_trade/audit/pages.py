@@ -341,7 +341,7 @@ _COPY: dict[str, dict[str, Any]] = {
         ),
         "pay_card": (
             "Pago con tarjeta desde el propio informe, procesado por Stripe: lo ves completo "
-            "al momento, sin esperar un código."
+            "al momento, sin esperar un código. Por ahora solo en México y Estados Unidos."
         ),
         "pay_code": (
             "Pago por transferencia u otro medio que acordamos por WhatsApp: al confirmarse el "
@@ -651,7 +651,7 @@ _COPY: dict[str, dict[str, Any]] = {
         ),
         "pay_card": (
             "Card payment from the report itself, processed by Stripe: you see it in full at "
-            "once, without waiting for a code."
+            "once, without waiting for a code. For now, in Mexico and the United States only."
         ),
         "pay_code": (
             "Pay by bank transfer or another method we agree on WhatsApp: once the payment is "
@@ -979,7 +979,8 @@ _UI: dict[str, dict[str, Any]] = {
             "Tu archivo nunca se publica.",
             (
                 "Tu primer informe completo, gratis al crear tu cuenta; después, "
-                f"{_FREE} vistas previas gratis al mes. Sin tarjeta."
+                f"{_FREE} vistas previas gratis al mes. Sin cobro: a veces pedimos validar "
+                "una tarjeta, sin cargo."
             ),
             "Borrado automático si no desbloqueas el informe.",
         ],
@@ -1221,7 +1222,8 @@ _UI: dict[str, dict[str, Any]] = {
             "Your file is never published.",
             (
                 "Your first full report, free when you create your account; then "
-                f"{_FREE} free previews a month. No card."
+                f"{_FREE} free previews a month. No charge: now and then we ask to verify a card, "
+                "and nothing is charged."
             ),
             "Deleted automatically if you do not unlock the report.",
         ],
