@@ -70,6 +70,7 @@ REF_TAGS: dict[str, str] = {
     "reddit": "Perfil de Reddit",
     "ff": "Perfil de Forex Factory",
     "telegram": "Telegram",
+    "discord": "Discord",
     "youtube": "YouTube",
     "x": "X (Twitter)",
     "instagram": "Instagram",

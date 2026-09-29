@@ -1040,7 +1040,7 @@ Cada enlace a Rigor que publiques lleva al final la etiqueta de su texto:
 `/para/retos-prop-firm?ref=f6`, el P1 a `/?ref=p1` y el D3 a
 `/para/traders-acciones-futuros-cripto?ref=d3`. En tu perfil de un foro o red
 usa la etiqueta del sitio (`mql5`, `rankia`, `reddit`, `ff`, `telegram`,
-`youtube`, `x`, `instagram`, `facebook`, `linkedin`, `tiktok`, `email`) y en tu
+`discord`, `youtube`, `x`, `instagram`, `facebook`, `linkedin`, `tiktok`, `email`) y en tu
 estado de WhatsApp `w0`. La lista completa está en `audit/funnel.py`
 (`REF_TAGS`) y en `/panel`.
 
