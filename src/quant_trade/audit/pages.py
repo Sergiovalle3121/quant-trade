@@ -1672,11 +1672,16 @@ def _hero(locale: str, sample: str) -> str:
     )
 
 
+#: Challenges from named firms; the generic two-step reference is not a firm's
+#: challenge, so pages that say "N challenges from FTMO, ..." leave it out.
+FIRM_CHALLENGES = sum(1 for rules in PRESETS.values() if rules.firm != "Generic")
+
+
 def _specs(locale: str) -> str:
     """The key figures in a row, then the platforms the importers read."""
     ui = _UI[locale]
     counts = {
-        "presets": len(PRESETS),
+        "presets": FIRM_CHALLENGES,
         # Distinct platforms named on the page: the dedicated readers (minus
         # the generic "CSV") plus the exports the universal reader recognises.
         "platforms": len({*PLATFORMS, *RECOGNISED_PLATFORMS} - {"CSV"}),
@@ -3460,7 +3465,7 @@ def audience_page(
         else words["price_text"].format(price=price_usd, pack=pack_price_usd or price_usd * 3)
     )
     faq = "".join(
-        f"<details><summary>{_e(q)}</summary><p>{_e(a.format(presets=len(PRESETS)))}</p></details>"
+        f"<details><summary>{_e(q)}</summary><p>{_e(a.format(presets=FIRM_CHALLENGES))}</p></details>"
         for q, a in text.faq
     )
     others = "".join(

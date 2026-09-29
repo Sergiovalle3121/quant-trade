@@ -197,3 +197,17 @@ def test_prop_page_names_the_firm_fit_check(tmp_path: Path) -> None:
     assert "¿Con qué firma encaja tu historial?" in es and "mejor día" in es
     assert "Which firm does your history fit?" in en and "best-day" in en
     assert find_claims(es) == [] and find_claims(en) == []
+
+
+def test_prop_page_counts_firm_challenges_apart_from_the_generic_one(tmp_path: Path) -> None:
+    from quant_trade.audit.prop_presets import PRESETS
+
+    firms = sum(1 for rules in PRESETS.values() if rules.firm != "Generic")
+    assert firms == len(PRESETS) - 1
+    client = _client(tmp_path)
+    es = client.get("/para/retos-prop-firm").text
+    en = client.get("/for/prop-firm-challenges").text
+    pt = client.get(audience_url("retos-prop-firm", "pt")).text
+    assert f"{firms} retos de FTMO" in es and "más un reto genérico" in es
+    assert f"{firms} FTMO, FundedNext" in en
+    assert f"{firms} desafios da FTMO" in pt
