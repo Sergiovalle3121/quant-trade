@@ -12,7 +12,7 @@ pytest.importorskip("sqlalchemy")
 
 from fastapi.testclient import TestClient  # noqa: E402
 
-from quant_trade.audit import account_pages  # noqa: E402
+from quant_trade.audit import account_pages, theme  # noqa: E402
 from quant_trade.audit.guard import find_claims  # noqa: E402
 from quant_trade.audit.settings import AuditSettings  # noqa: E402
 from quant_trade.audit.store import (  # noqa: E402
@@ -203,6 +203,23 @@ def test_the_bar_sticks_below_the_top_bar_and_scrolls_sideways_on_a_phone() -> N
     # A block a redirect points to is not hidden under the two bars.
     assert ".acct-part,.acct-part [id]{scroll-margin-top:" in css
     assert ".acct-parts.has-alert~.acct-part" in css
+
+
+def test_the_icons_of_the_buying_block_are_the_size_of_their_text() -> None:
+    # An icon with no rule of its own grows to the width of its box: the
+    # padlock under the card buttons once filled the screen.
+    page = _page("es", credits=0, card_markets=("MX", "US"))
+    buy = page.split("<form class='acct-buy'")[1].split("</form>")[0]
+    padlock = theme.icon("lock")
+    assert f"<p class='muted'>{padlock}" in buy
+    assert theme.icon("chat") in page.split("<form class='acct-buy'")[1].split("</section>")[0]
+    css = account_pages.ACCOUNT_CSS
+    assert ".acct-buy .muted svg,.acct-sec>.muted svg{flex:none;width:16px;height:16px" in css
+    assert ".acct-buy{display:grid;gap:12px" in css
+    # The safety net for every page: an icon the theme draws is never wider
+    # than the text beside it unless a rule of its own says so.
+    assert "viewBox='0 0 24 24'" in padlock and "aria-hidden='true'" in padlock
+    assert ":where(svg[aria-hidden='true'][viewBox='0 0 24 24']){width:1.15em;" in theme.BASE
 
 
 def test_without_credits_buying_still_comes_before_the_reports() -> None:

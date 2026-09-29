@@ -217,6 +217,7 @@ body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);fon
 line-height:1.6;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;
 text-rendering:optimizeLegibility;font-feature-settings:'cv11','ss01','ss03';overflow-x:hidden}
 img,svg{max-width:100%;height:auto}
+:where(svg[aria-hidden='true'][viewBox='0 0 24 24']){width:1.15em;flex:none;vertical-align:-.2em}
 a{color:inherit;text-decoration-thickness:1px;text-underline-offset:3px;
 text-decoration-color:color-mix(in srgb,currentColor 40%,transparent);transition:color .2s,text-decoration-color .2s}
 a:hover{text-decoration-color:currentColor}
