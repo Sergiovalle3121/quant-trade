@@ -4038,3 +4038,78 @@ changed. Tests: `tests/test_audit_customer_copy.py`.
 - The stress count agrees in number when one scenario breaks
   (`stress_count_one`).
 - The terms describe password recovery as the site does it.
+
+## Customer audit: report wording, upload guidance and refusals (2026-09-29)
+
+Words, page chrome and which fixed sentence is chosen; no figure, threshold,
+class, evidence tag or reader changed. Tests: `tests/test_audit_report_polish.py`.
+
+- **Trials not declared.** When the deflated Sharpe was computed at 1 trial
+  and nobody declared a count (`verdict.trials_undeclared`: `trials_used`
+  `NOT_MEASURED` with `dsr_at_trials_used` `MEASURED`), "what it means for
+  you" and the plan say that the class cannot go above B because the number
+  of configurations tried was not declared, and that declaring it (even 1)
+  lets Rigor discount it (`MEANING["multiplicity.NOT_MEASURED.undeclared"]`,
+  its `.fund` twin, `multiplicity.FAIL.undeclared` for the fund with one
+  undeclared trial; `plan._multiplicity_step`). The public verification page
+  uses the same sentence, before and after the purge: the kept public view
+  stores the fact per dimension (`undeclared`, a boolean derived from the
+  two evidence tags, `store.public_view`), never the inputs; a view kept
+  before this change has no such fact and shows the general sentence. The
+  old sentence ("significance was not measured") stays for the case it
+  describes. The cap at B is unchanged.
+- **Money reconciliation.** `RECON_REASONS` knows "closed trades do not cover
+  the final part of the curve" in the three languages; a reason with no fixed
+  sentence still goes through `localize`. The heading and the reason are two
+  sentences ("No se pudo cerrar la conciliación. Las operaciones cerradas…").
+- **Comparing from a Portuguese report** posts to `/pt/comparar` with the
+  Portuguese label and button (`compare.COMPARE_PATH`, `compare.COPY`); the
+  three comparison routes keep `lang=pt` Portuguese whatever the address.
+- **All checks and their status** names each check for the reader in the
+  page language (`forensics.copy.CHECK_NAMES`, else the red-flag title, else
+  the key as words) with the key beside it in `<code>`.
+- **Column page.** A fixed note, always shown, says that a fund's monthly
+  table (a year per row, a month per column) goes in the curve box, with a
+  link back to the upload page (`mapping.COPY["monthly"]`). Detection is
+  unchanged. A table with fewer than two rows under its header is told so on
+  that page (`mapping.COPY["one_row"]`) instead of being asked for columns
+  first; the page and its status are the same.
+- **Refusals that say what to fix.** A file that arrived with 0 bytes in the
+  report or curve box is called empty (`MESSAGES["empty_upload"]`), not
+  missing; "Falta el archivo" stays for no file at all. A picture in the
+  curve box (PNG, JPEG, GIF or TIFF, `web.PICTURE_SIGNATURES`) is called a
+  picture, not a table without a date column
+  (`MESSAGES["curve_is_picture"]`). A PDF is not a picture here: a PDF
+  statement's table still reaches the column screen as before. Both
+  refusals keep 400; nothing new is accepted and nothing is refused that
+  was not.
+- **Limits.** The curve reader stops at 5 MB (`schema.MAX_UPLOAD_BYTES`)
+  while the field accepts 10 MB so that a platform report dropped there is
+  read as the report. Both refusals of a curve over 5 MB now say "5 MB, the
+  most we accept for a curve" (`MESSAGES["curve_too_large"]`, 413 from the
+  field, 400 from the reader); an over-10 MB file in the curve box whose
+  name or first bytes are a platform report (`looks_like_platform_report`
+  on `UploadTooLarge.filename` and `.head`) is told the report's 10 MB
+  instead. Every box on the upload page states its limit: 5 MB for the
+  curve, trades, benchmark and variants; 10 MB for the report, the live
+  statement and the optimisation XML.
+- **Own files.** The curve and trades boxes carry one line: dates as
+  year-month-day (2026-03-31) and a decimal point read best; a file in
+  day/month/year should say so in the description (`dates_hint`).
+- **Challenge list.** The options are built for the page's own language
+  (`_preset_options(locale)`), so the Portuguese page shows "fase 1" and the
+  generic preset in Portuguese; the default option is unchanged.
+- **Small wording.** "1 configuración probada" (singular in the three
+  languages, `LABELS["passes_one"]`); the provider-account guide is named in
+  one language at a time (`platform_en`); the Portuguese report uses
+  "passagem/passagens" for an optimisation pass everywhere, as MetaTrader 5
+  does; the badge code made from an English or Portuguese page links
+  `/v/<id>?lang=<language>`.
+- **Same file again.** A preview of a file the same account already
+  audited shows a note with a link to the report it already has
+  (`Store.earlier_audit_of_same_files`: same set of SHA-256 digests, an
+  earlier upload linked to the same account, not purged, a full report
+  first; the SQL prefilter uses the curve's digest, or the platform
+  report's digest in `audit_files` when the upload has no curve of its
+  own). Nothing changes in what is spent: the upload is a preview as
+  before. The note appears only to the signed-in owner of both reports.

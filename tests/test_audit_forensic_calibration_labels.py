@@ -17,7 +17,11 @@ def _balance_row(name: str, locale: str) -> str:
     data = (FIXTURES / name).read_bytes()
     result = review(data, source_format=importers.detect_format(data))
     html = report._forensics_html(result.as_dict(), locale)
-    found = re.search(r"<tr><th scope='row'><code>BALANCE_CHAIN</code>.*?</tr>", html)
+    found = re.search(
+        r"<tr><th scope='row'>[^<]*<small class='muted'><code>BALANCE_CHAIN</code></small></th>"
+        r".*?</tr>",
+        html,
+    )
     assert found is not None
     return found.group()
 

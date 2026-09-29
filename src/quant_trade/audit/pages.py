@@ -75,7 +75,7 @@ from quant_trade.audit.theme import (
     icon,
     logo,
 )
-from quant_trade.audit.verdict import DIMENSION_ORDER, class_text, meaning
+from quant_trade.audit.verdict import DIMENSION_ORDER, class_text, meaning, trials_undeclared
 
 #: The fixed wording of the badge and of the verification page's notice. It
 #: states what the audit is and denies what it is not; it never mentions
@@ -182,11 +182,13 @@ _COPY: dict[str, dict[str, Any]] = {
         "live_help": (
             "El historial de la cuenta donde corre el robot (MetaTrader, el CSV que exporta "
             "Myfxbook, FX Blue o una señal de MQL5, u otro de los formatos de arriba). Te "
-            "decimos si se comporta como el backtest y revisamos sus depósitos y retiros."
+            "decimos si se comporta como el backtest y revisamos sus depósitos y retiros. "
+            "Hasta 10 MB."
         ),
         "optimization": "Exportación de optimización de MT5 (XML, opcional)",
         "optimization_help": (
-            "Cuenta las configuraciones que probaste: el Sharpe deflactado usa ese número real."
+            "Cuenta las configuraciones que probaste: el Sharpe deflactado usa ese número "
+            "real. Hasta 10 MB."
         ),
         "equity": (
             "Curva de equity o serie de retornos (CSV o Excel; obligatoria si no subes un informe)"
@@ -194,17 +196,26 @@ _COPY: dict[str, dict[str, Any]] = {
         "equity_help": (
             "Columnas: timestamp y equity (o return), en CSV, texto de Excel o XLSX. También la "
             "tabla de rentabilidades mensuales de un fondo (un año por fila, un mes por "
-            "columna). Hasta 5 MB."
+            "columna). Hasta 5 MB (si sueltas aquí un informe de plataforma, hasta 10 MB)."
         ),
         "initial_balance": "Balance inicial (si el informe no lo indica)",
         "challenge": "Reto de prop firm a simular",
         "challenge_help": "Reglas leídas en la web oficial de cada firma el {as_of}. "
         "El informe cita la fuente; confirma las reglas con la firma antes de pagar su reto.",
         "trades": "Operaciones cerradas (CSV, opcional)",
-        "trades_help": "entry_time, exit_time, quantity, entry_price, exit_price, side.",
+        "trades_help": (
+            "entry_time, exit_time, quantity, entry_price, exit_price, side. Hasta 5 MB."
+        ),
+        "dates_hint": (
+            "Se leen mejor las fechas como año-mes-día (2026-03-31) y el punto decimal. Si tu "
+            "archivo usa día/mes/año, dilo en la descripción."
+        ),
         "benchmark": "Benchmark (CSV, opcional)",
+        "benchmark_help": "Hasta 5 MB.",
         "variants": "Matriz de variantes (CSV, opcional)",
-        "variants_help": "Una columna de retornos por variante probada; habilita el PBO.",
+        "variants_help": (
+            "Una columna de retornos por variante probada; habilita el PBO. Hasta 5 MB."
+        ),
         "trials": "¿Cuántas configuraciones o versiones se probaron antes de elegir esta?",
         "trials_help": (
             "Configuraciones probadas antes de elegir esta. Si lo dejas vacío, el informe usa 1 "
@@ -491,16 +502,19 @@ _COPY: dict[str, dict[str, Any]] = {
         "live_help": (
             "The history of the account running the robot (MetaTrader, the CSV exported by "
             "Myfxbook, FX Blue or an MQL5 signal, or any format above). We tell you whether "
-            "it behaves like the backtest and review its deposits and withdrawals."
+            "it behaves like the backtest and review its deposits and withdrawals. "
+            "Up to 10 MB."
         ),
         "optimization": "MT5 optimisation export (XML, optional)",
         "optimization_help": (
-            "Counts the configurations you tried: the deflated Sharpe uses that real number."
+            "Counts the configurations you tried: the deflated Sharpe uses that real number. "
+            "Up to 10 MB."
         ),
         "equity": "Equity curve or return series (CSV or Excel; required without a report)",
         "equity_help": (
             "Columns: timestamp and equity (or return), as CSV, Excel text or XLSX. Also a "
-            "fund's monthly returns table (a year per row, a month per column). Up to 5 MB."
+            "fund's monthly returns table (a year per row, a month per column). Up to 5 MB (a "
+            "platform report dropped here, up to 10 MB)."
         ),
         "initial_balance": "Starting balance (if the report does not state it)",
         "challenge": "Prop-firm challenge to simulate",
@@ -508,10 +522,17 @@ _COPY: dict[str, dict[str, Any]] = {
         "The report cites the source; confirm the rules with the firm before paying for its "
         "challenge.",
         "trades": "Closed trades (CSV, optional)",
-        "trades_help": "entry_time, exit_time, quantity, entry_price, exit_price, side.",
+        "trades_help": (
+            "entry_time, exit_time, quantity, entry_price, exit_price, side. Up to 5 MB."
+        ),
+        "dates_hint": (
+            "Dates as year-month-day (2026-03-31) and a decimal point read best. If your file "
+            "uses day/month/year, say so in the description."
+        ),
         "benchmark": "Benchmark (CSV, optional)",
+        "benchmark_help": "Up to 5 MB.",
         "variants": "Variant matrix (CSV, optional)",
-        "variants_help": "One return column per variant tried; enables the PBO.",
+        "variants_help": "One return column per variant tried; enables the PBO. Up to 5 MB.",
         "trials": "How many configurations or versions were tried before choosing this one?",
         "trials_help": (
             "Configurations tried before choosing this one. Left blank, the report uses 1 (the "
@@ -2281,9 +2302,15 @@ def _upload_form(
         f"{_e(ui['advanced'])} <small>· {_e(ui['advanced_note'])}</small></span>"
         "<svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' "
         "aria-hidden='true'><path d='M6 9l6 6 6-6'/></svg></summary><div class='adv-body'>"
-        + _drop("trades", copy["trades"], ".csv,text/csv", _e(copy["trades_help"]), locale)
+        + _drop(
+            "trades",
+            copy["trades"],
+            ".csv,text/csv",
+            f"{_e(copy['trades_help'])}<br>{_e(copy['dates_hint'])}",
+            locale,
+        )
         + "<div class='form-grid'>"
-        + _drop("benchmark", copy["benchmark"], ".csv,text/csv", "", locale)
+        + _drop("benchmark", copy["benchmark"], ".csv,text/csv", _e(copy["benchmark_help"]), locale)
         + _drop("variants", copy["variants"], ".csv,text/csv", _e(copy["variants_help"]), locale)
         + _field(
             copy["cost_bps"],
@@ -2339,7 +2366,7 @@ def _upload_form(
             "equity",
             copy["equity"],
             ".csv,.txt,.tsv,.xlsx,.ods,text/csv",
-            _e(copy["equity_help"]),
+            f"{_e(copy['equity_help'])}<br>{_e(copy['dates_hint'])}",
             locale,
         )
         # Declared trials decide whether multiplicity can pass (verdict.assess_multiplicity),
@@ -2360,7 +2387,7 @@ def _upload_form(
         + "</div>"
         + _field(
             copy["challenge"],
-            f"<select name='challenge'>{_preset_options(linked)}</select>",
+            f"<select name='challenge'>{_preset_options(locale)}</select>",
             copy["challenge_help"].format(as_of=_plain_date(AS_OF, locale)),
         )
         + "</div></details>"
@@ -2623,6 +2650,17 @@ def _utc_time(stamp: str, locale: str) -> str:
     return f"<time datetime='{_e(stamp)}'>{day} · {when:%H:%M} UTC</time>"
 
 
+def _meaning_of(dimension: dict[str, Any], locale: str) -> str:
+    """The fixed plain text of a dimension, in its undeclared-trials wording when
+    the trial count was never declared: read from the dimension's inputs on a
+    live result, or from the fact the kept public view stores in their place."""
+    if "inputs" in dimension:
+        undeclared = trials_undeclared(dimension.get("inputs"))
+    else:
+        undeclared = bool(dimension.get("undeclared"))
+    return meaning(dimension["name"], dimension["status"], locale, undeclared=undeclared)
+
+
 def verification_page(
     result: dict[str, Any],
     *,
@@ -2650,7 +2688,7 @@ def verification_page(
     cards = "".join(
         f"<div class='item s-{_e(str(d['status']))}'>"
         f"<h3>{_e(titles.get(d['name'], d['name']))} {_status_chip(str(d['status']), locale)}</h3>"
-        f"<p>{_e(meaning(d['name'], d['status'], locale))}</p></div>"
+        f"<p>{_e(_meaning_of(d, locale))}</p></div>"
         for d in verdict["dimensions"]
     )
     inputs = result.get("inputs", {})
@@ -2686,8 +2724,10 @@ def verification_page(
     )
     page_url = f"{base_url}/v/{public_id}"
     badge_url = f"{page_url}/badge.svg?lang={locale}"
+    # The badge opens the page in the language it was made in (Spanish has no suffix).
+    badge_link = page_url if locale == "es" else f"{page_url}?lang={locale}"
     snippet = (
-        f"<a href='{page_url}'><img src='{badge_url}' alt='{BADGE_NOTICE[locale]}' "
+        f"<a href='{badge_link}'><img src='{badge_url}' alt='{BADGE_NOTICE[locale]}' "
         "width='480' height='72'></a>"
     )
     cls_label = CLASS_WORD[locale]

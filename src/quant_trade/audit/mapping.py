@@ -150,6 +150,15 @@ COPY: dict[str, dict[str, str]] = {
             "Tu archivo: con esas columnas quedan menos de dos filas con fecha y cifra "
             "legibles. Revisa que la fecha y la cifra sean las columnas correctas."
         ),
+        "one_row": (
+            "Tu archivo tiene menos de dos filas con datos, y con tan poco no hay nada que "
+            "medir. Revisa que la exportación esté completa y sube el archivo entero."
+        ),
+        "monthly": (
+            "¿Es la tabla mensual de un fondo (un año por fila, un mes por columna)? Súbela "
+            "en el recuadro «Curva de equity o serie de retornos»."
+        ),
+        "monthly_link": "Volver a la página de subida",
     },
     "en": {
         "eyebrow": "Your file",
@@ -214,6 +223,15 @@ COPY: dict[str, dict[str, str]] = {
             "Your file: with those columns fewer than two rows have a readable date and "
             "figure. Check that the date and the figure are the right columns."
         ),
+        "one_row": (
+            "Your file has fewer than two rows of data, and with so little there is nothing "
+            "to measure. Check that the export is complete and upload the whole file."
+        ),
+        "monthly": (
+            "Is it a fund's monthly table (a year per row, a month per column)? Upload it in "
+            "the 'Equity curve or return series' box."
+        ),
+        "monthly_link": "Back to the upload page",
     },
     "pt": {
         "eyebrow": "Seu arquivo",
@@ -283,6 +301,15 @@ COPY: dict[str, dict[str, str]] = {
             "Seu arquivo: com essas colunas restam menos de duas linhas com data e valor "
             "legíveis. Verifique se a data e o valor são as colunas certas."
         ),
+        "one_row": (
+            "Seu arquivo tem menos de duas linhas com dados, e com tão pouco não há o que "
+            "medir. Confira se a exportação está completa e envie o arquivo inteiro."
+        ),
+        "monthly": (
+            "É a tabela mensal de um fundo (um ano por linha, um mês por coluna)? Envie-a no "
+            "campo «Curva de equity ou série de retornos»."
+        ),
+        "monthly_link": "Voltar à página de envio",
     },
 }
 
@@ -865,10 +892,17 @@ def mapping_page(
     pdf_notice = (
         f"<p class='warning' role='note'>{_e(words['pdf_notice'])}</p>" if table.pdf else ""
     )
+    # Always shown: a fund's monthly table belongs in the curve box, and this
+    # page would otherwise offer no way there.
+    monthly_note = (
+        f"<p class='help' role='note' style='margin-top:16px'>{_e(words['monthly'])} "
+        f"<a href='{back}#subir'>{_e(words['monthly_link'])}</a></p>"
+    )
     body = (
         _page_hero(words["eyebrow"], words["title"], words["lead"], dot="warn")
         + "<div class='paper page-main'><div class='wrap'>"
         + _error_card(problem, locale)
+        + monthly_note
         + f"<section class='map-preview' style='margin-top:32px'><h2>{_e(words['found'])}</h2>"
         f"<p class='help'>{_e(words['found_help'])}</p>{pdf_notice}{_preview(table, words)}"
         "</section>"

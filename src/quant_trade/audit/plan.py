@@ -34,6 +34,7 @@ from quant_trade.audit.verdict import (
     OUT_OF_SAMPLE,
     STATISTICAL,
     overall_class,
+    trials_undeclared,
 )
 
 #: The order in which open dimensions are worked: a data problem or a
@@ -545,6 +546,61 @@ def _significance_step(data: dict[str, Any], status: str, locale: str) -> tuple[
 
 def _multiplicity_step(data: dict[str, Any], status: str, locale: str) -> tuple[str, list[str]]:
     mult = data.get("multiplicity") or {}
+    if status == "NOT_MEASURED" and trials_undeclared(mult):
+        # The deflated Sharpe was computed and cleared the bar at 1 trial: what
+        # is missing is the declaration, not more history.
+        if _fund_record(data):
+            return _say(
+                locale,
+                "No se declaró cuántos fondos o estrategias lleva el mismo gestor; por eso la "
+                "clase no puede pasar de B.",
+                "How many funds or strategies the same manager runs was not declared; that is "
+                "why the class cannot go above B.",
+                "Não foi declarado quantos fundos ou estratégias o mesmo gestor administra; por "
+                "isso a classe não pode passar de B.",
+            ), _say(
+                locale,
+                [
+                    "Pregunta al gestor cuántos fondos o estrategias lleva o ha cerrado y "
+                    "decláralo (aunque sea 1) al subir el historial: Rigor lo descuenta.",
+                ],
+                [
+                    "Ask the manager how many funds or strategies they run or have closed and "
+                    "declare it (even if it is 1) when you upload the record: Rigor discounts "
+                    "it.",
+                ],
+                [
+                    "Pergunte ao gestor quantos fundos ou estratégias administra ou já encerrou "
+                    "e declare esse número (mesmo que seja 1) ao enviar o histórico: o Rigor o "
+                    "desconta.",
+                ],
+            )
+        return _say(
+            locale,
+            "No se declaró cuántas configuraciones se probaron; por eso la clase no puede pasar "
+            "de B.",
+            "The number of configurations tried was not declared; that is why the class cannot "
+            "go above B.",
+            "Não foi declarado quantas configurações foram testadas; por isso a classe não pode "
+            "passar de B.",
+        ), _say(
+            locale,
+            [
+                "Al subir tus archivos, declara cuántas configuraciones probaste (aunque sea "
+                "1): Rigor lo descuenta.",
+                "O sube el XML de la optimización de MT5: el número pasa a ser medido.",
+            ],
+            [
+                "When you upload your files, declare how many configurations you tried (even "
+                "if it is 1): Rigor discounts it.",
+                "Or upload the MT5 optimisation XML: the count becomes measured.",
+            ],
+            [
+                "Ao enviar seus arquivos, declare quantas configurações você testou (mesmo que "
+                "seja 1): o Rigor desconta esse número.",
+                "Ou envie o XML da otimização do MT5: o número passa a ser medido.",
+            ],
+        )
     if status == "NOT_MEASURED" or mult.get("status") != "MEASURED":
         finding = _say(
             locale,

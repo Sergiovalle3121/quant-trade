@@ -26,6 +26,7 @@ from quant_trade.audit.crises import MARKET, MARKET_AS_OF
 from quant_trade.audit.decay import is_weaker
 from quant_trade.audit.decay import signed_amount as _signed_amount
 from quant_trade.audit.forensics.calibration import CALIBRATION
+from quant_trade.audit.forensics.copy import CHECK_NAMES as FORENSIC_CHECK_NAMES
 from quant_trade.audit.forensics.review import METHOD_VERSION as FORENSIC_METHOD_VERSION
 from quant_trade.audit.guard import assert_report_clean
 from quant_trade.audit.holding import EDGE_SE
@@ -67,6 +68,7 @@ from quant_trade.audit.verdict import (
     Locale,
     meaning,
     summary,
+    trials_undeclared,
 )
 from quant_trade.evidence.canonical_json import (
     canonical_dumps,
@@ -1647,6 +1649,7 @@ LABELS: dict[str, dict[str, str]] = {
         "colmap": "Cómo se leyó cada columna de tu archivo",
         "optimization": "Exportación de optimización",
         "passes": "configuraciones probadas",
+        "passes_one": "configuración probada",
         "trials_used": "Intentos usados en el Sharpe deflactado",
         "horizon": "1 año",
         "reasons_detail": "Detalle técnico de cada dimensión",
@@ -2969,6 +2972,7 @@ LABELS: dict[str, dict[str, str]] = {
         "colmap": "How each column of your file was read",
         "optimization": "Optimisation export",
         "passes": "configurations tried",
+        "passes_one": "configuration tried",
         "trials_used": "Trials used in the deflated Sharpe",
         "horizon": "1 year",
         "reasons_detail": "Technical detail by dimension",
@@ -3869,7 +3873,14 @@ def _meaning_html(
         dimension = by_name.get(name)
         if dimension is None:
             continue
-        text = meaning(name, dimension["status"], locale, account=account, fund=fund)
+        text = meaning(
+            name,
+            dimension["status"],
+            locale,
+            account=account,
+            fund=fund,
+            undeclared=trials_undeclared(dimension.get("inputs")),
+        )
         items.append(
             f"<div class='item s-{_e(dimension['status'])}'>"
             f"<h3>{_e(_dimension_title(name, locale))} "
@@ -4875,7 +4886,8 @@ def _source_html(data: dict[str, Any], labels: dict[str, str]) -> str:
     if optimization:
         passes = optimization["passes"]
         out += (
-            f"<p>{_e(labels['optimization'])}: {_fmt(passes['value'])} {_e(labels['passes'])} "
+            f"<p>{_e(labels['optimization'])}: {_fmt(passes['value'])} "
+            f"{_e(labels['passes_one' if passes['value'] == 1 else 'passes'])} "
             f"{_badge(passes['evidence'])}</p>"
         )
     metadata = dict(inputs.get("report_metadata") or {})
@@ -4968,6 +4980,11 @@ RECON_REASONS: dict[str, tuple[str, str, str]] = {
         "Some trades fall outside the curve dates.",
         "Há operações fora das datas cobertas pela curva.",
     ),
+    "closed trades do not cover the final part of the curve": (
+        "Las operaciones cerradas no cubren el tramo final de la curva.",
+        "The closed trades do not cover the final part of the curve.",
+        "As operações fechadas não cobrem o trecho final da curva.",
+    ),
     "closed-trade ledger agrees within tolerance; this does not authenticate the history": (
         "Las operaciones cerradas cuadran dentro de la tolerancia; esto no autentica el historial.",
         "Closed trades agree within tolerance; this does not authenticate the history.",
@@ -5032,7 +5049,15 @@ def _reconciliation_html(recon: dict[str, Any] | None, locale: str) -> str:
         "MATCH": "recon_match",
         "CONTRADICTION": "recon_contradiction",
     }.get(status, "recon_unmeasured")
-    reason = _recon_text(str(recon.get("reason", "")), locale, RECON_REASONS)
+    raw_reason = str(recon.get("reason", ""))
+    reason = _recon_text(raw_reason, locale, RECON_REASONS)
+    if reason and raw_reason not in RECON_REASONS and locale != "en":
+        # A reason with no fixed sentence still reads in the page language.
+        reason = localize(reason, locale)
+    if reason and reason[-1] not in ".!?":
+        reason = reason[:1].upper() + reason[1:] + "."
+    # The heading and its reason are two sentences, never one glued line.
+    heading = copy[status_key] + ("." if reason else "")
     currency = str(recon.get("currency", "UNKNOWN"))
     currency_label = currency if currency != "UNKNOWN" else copy["recon_currency_unknown"]
     coverage = recon.get("coverage") or {}
@@ -5095,7 +5120,7 @@ def _reconciliation_html(recon: dict[str, Any] | None, locale: str) -> str:
     return (
         f"<p class='muted'>{_e(copy['recon_intro'])}</p>"
         f"<p class='integrity-status {'bad' if status == 'CONTRADICTION' else 'neutral'}'>"
-        f"<strong>{_e(copy[status_key])}</strong> {_e(reason)}</p>"
+        f"<strong>{_e(heading)}</strong> {_e(reason)}</p>"
         f"<div class='recon-formulas'><p>{_e(copy['recon_net_equation'])}: "
         f"{_e(amount('gross_closed_pnl'))} − {_e(amount('itemised_costs'))} = "
         f"{_e(amount('net_closed_pnl'))}</p>"
@@ -5139,6 +5164,15 @@ def _forensics_html(forensics: dict[str, Any] | None, locale: str) -> str:
         code = str(check.get("id", ""))
         return copy["balance_chain"] if code == "BALANCE_CHAIN" else code.replace("_", " ").title()
 
+    def reader_name(check: dict[str, Any]) -> str:
+        # The name a customer reads; the internal key stays beside it.
+        code = str(check.get("id", ""))
+        named = FORENSIC_CHECK_NAMES.get(locale, FORENSIC_CHECK_NAMES["es"]).get(code)
+        if named:
+            return named
+        titled = flag_title(code, locale)
+        return titled if titled != code else check_name(check)
+
     signal_cards = []
     for check in signals:
         figures = "".join(
@@ -5177,7 +5211,8 @@ def _forensics_html(forensics: dict[str, Any] | None, locale: str) -> str:
             copy["forensic_calibrated"] if granted(check) else copy["forensic_uncalibrated"]
         )
         all_rows += (
-            f"<tr><th scope='row'><code>{_e(check.get('id', ''))}</code></th>"
+            f"<tr><th scope='row'>{_e(reader_name(check))} "
+            f"<small class='muted'><code>{_e(check.get('id', ''))}</code></small></th>"
             f"<td>{_e(status)}</td><td>{_e(calibration_state)}</td></tr>"
         )
     checks_html = (
@@ -7573,12 +7608,12 @@ def render_html(
         )
     compare_html = ""
     if compare_link and not locked:
+        from quant_trade.audit.compare import COMPARE_PATH, MAX_LINK_CHARS
         from quant_trade.audit.compare import COPY as COMPARE_COPY
-        from quant_trade.audit.compare import MAX_LINK_CHARS
 
-        # The comparison page has Spanish and English; Portuguese uses the English one.
-        ccopy = COMPARE_COPY["es" if locale == "es" else "en"]
-        action = "/comparar" if locale == "es" else "/compare"
+        # Each language posts to its own comparison page.
+        ccopy = COMPARE_COPY.get(locale, COMPARE_COPY["en"])
+        action = COMPARE_PATH.get(locale, COMPARE_PATH["en"])
         compare_html = (
             f"<form class='publish no-print' method='post' action='{action}'>"
             f"<p class='muted'>{_e(labels['compare_help'])}</p>"

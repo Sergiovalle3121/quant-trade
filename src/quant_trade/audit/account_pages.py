@@ -203,6 +203,11 @@ COPY: dict[str, dict[str, str]] = {
             "Este archivo ya recibió un informe completo gratis, así que esta vez es una "
             "vista previa. Tu informe gratis sigue disponible para otro archivo."
         ),
+        "same_file_note": (
+            "Ya habías auditado este mismo archivo con tu cuenta; esta subida cuenta como una "
+            "vista previa nueva."
+        ),
+        "same_file_link": "Abrir el informe que ya tienes",
         "welcome_refused_device": (
             "Este navegador ya usó un informe completo gratis en otra cuenta, así que esta vez "
             "es una vista previa: así la oferta no se repite con cuentas nuevas."
@@ -916,6 +921,11 @@ COPY: dict[str, dict[str, str]] = {
             "This file already got a free full report, so this time it is a "
             "preview. Your free report is still available for another file."
         ),
+        "same_file_note": (
+            "You had already audited this same file with your account; this upload counts as "
+            "a new preview."
+        ),
+        "same_file_link": "Open the report you already have",
         "welcome_refused_device": (
             "This browser already used a free full report on another account, so this time it "
             "is a preview: that way the offer is not repeated with new accounts."
@@ -3064,6 +3074,15 @@ def account_page(
         copy["account_lead"],
         body,
         switch={lang: path("account", lang) for lang in LANGUAGES},
+    )
+
+
+def same_file_note(locale: str, href: str) -> str:
+    """On a preview: the account already holds a report of the same file."""
+    copy = COPY[_locale(locale)]
+    return (
+        f"<div class='notice no-print' role='note'>{_e(copy['same_file_note'])} "
+        f"<a href='{_e(href)}'>{_e(copy['same_file_link'])}</a></div>"
     )
 
 
