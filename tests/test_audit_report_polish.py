@@ -15,13 +15,14 @@ pytest.importorskip("sqlalchemy")
 
 from fastapi.testclient import TestClient  # noqa: E402
 
-from quant_trade.audit import account_pages, mapping  # noqa: E402
+from quant_trade.audit import account_pages, mapping, pdf_tables  # noqa: E402
 from quant_trade.audit.engine import run_audit  # noqa: E402
 from quant_trade.audit.forensics.copy import CHECK_NAMES  # noqa: E402
 from quant_trade.audit.guard import find_claims  # noqa: E402
 from quant_trade.audit.guides import GUIDES  # noqa: E402
 from quant_trade.audit.pages import upload_page, verification_page  # noqa: E402
 from quant_trade.audit.prop_presets import PRESETS, preset_label  # noqa: E402
+from quant_trade.audit.report import LABELS as REPORT_LABELS  # noqa: E402
 from quant_trade.audit.report import (  # noqa: E402
     RECON_REASONS,
     _forensics_html,
@@ -30,16 +31,15 @@ from quant_trade.audit.report import (  # noqa: E402
     render,
     render_html,
 )
-from quant_trade.audit.report import LABELS as REPORT_LABELS  # noqa: E402
 from quant_trade.audit.schema import (  # noqa: E402
     MAX_UPLOAD_BYTES,
     DeclaredMetadata,
     build_inputs,
 )
 from quant_trade.audit.settings import AuditSettings  # noqa: E402
-from quant_trade.audit.store import make_store  # noqa: E402
+from quant_trade.audit.store import make_store, public_view  # noqa: E402
 from quant_trade.audit.verdict import MEANING, meaning, trials_undeclared  # noqa: E402
-from quant_trade.audit.web import MESSAGES, create_app  # noqa: E402
+from quant_trade.audit.web import MESSAGES, PICTURE_SIGNATURES, create_app, message  # noqa: E402
 
 NOW = datetime(2026, 1, 1, tzinfo=UTC)
 LOCALES = ("es", "en", "pt")
@@ -118,6 +118,49 @@ def test_the_public_page_explains_undeclared_trials_too() -> None:
         locale="es",
     )
     assert "la clase no puede pasar de B" in _text(page)
+
+
+def test_the_kept_public_view_keeps_the_undeclared_fact_not_the_inputs() -> None:
+    view, _ = public_view(_undeclared("es").model_dump_json())
+    by_name = {d["name"]: d for d in view["verdict"]["dimensions"]}
+    assert by_name["multiplicity"]["undeclared"] is True
+    assert all(set(d) == {"name", "status", "undeclared"} for d in by_name.values())
+    assert sum(d["undeclared"] for d in by_name.values()) == 1
+    for locale, said in (
+        ("es", "la clase no puede pasar de B"),
+        ("en", "the class cannot go above B"),
+        ("pt", "a classe não pode passar de B"),
+    ):
+        page = verification_page(
+            view,
+            public_id="abc123",
+            published_at="2026-01-02T00:00:00+00:00",
+            result_sha256="0" * 64,
+            base_url="https://example.test",
+            locale=locale,
+        )
+        assert said in _text(page)
+
+
+def test_the_public_page_of_undeclared_trials_is_the_same_after_the_purge(
+    tmp_path: Path,
+) -> None:
+    client = _client(tmp_path, base_url="https://audit.example")
+    files = {"equity": ("equity.csv", csv_bytes(positive_drift(1500)), "text/csv")}
+    location = client.post(
+        "/audits", files=files, data={"consent": "on"}, follow_redirects=False
+    ).headers["location"]
+    audit_id, token = _audit_id(location), location.split("token=")[1]
+    public_id = client.post(
+        f"/audits/{audit_id}/publish?token={token}", headers={"accept": "application/json"}
+    ).json()["public_id"]
+    before = client.get(f"/v/{public_id}").text
+    assert "la clase no puede pasar de B" in _text(before)
+    assert "porque la significación no se midió" not in _text(before)
+    store = client.app.state.store
+    assert store.purge_expired(datetime(2100, 1, 1, tzinfo=UTC), retention_days=1) == 1
+    after = client.get(f"/v/{public_id}").text
+    assert after == before
 
 
 # -- I2: money reconciliation ---------------------------------------------------
@@ -287,9 +330,9 @@ def test_no_file_at_all_is_still_a_missing_file(tmp_path: Path) -> None:
 @pytest.mark.parametrize(
     ("locale", "said"),
     [
-        ("es", "es una imagen o un PDF, no una tabla"),
-        ("en", "is a picture or a PDF, not a table"),
-        ("pt", "é uma imagem ou um PDF, não uma tabela"),
+        ("es", "es una imagen, no una tabla"),
+        ("en", "is a picture, not a table"),
+        ("pt", "é uma imagem, não uma tabela"),
     ],
 )
 def test_a_picture_in_the_curve_box_is_called_a_picture(
@@ -302,6 +345,29 @@ def test_a_picture_in_the_curve_box_is_called_a_picture(
     text = _text(answer.text)
     assert said in text
     assert "timestamp, date" not in text
+    assert "PDF" not in message("curve_is_picture", locale)
+
+
+def test_a_pdf_statement_in_the_curve_box_still_reaches_the_column_screen(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A PDF is not a picture: its table is read (the PDF extraction stands
+    in for itself here) and offered to name, as it was before the refusal."""
+    rows = [["Fecha", "Balance"]] + [
+        [f"2024-01-{day:02d}", f"{10000 + day * 7 - (day % 3) * 5}"] for day in range(2, 30)
+    ]
+    monkeypatch.setattr(pdf_tables, "rows", lambda data: [list(row) for row in rows])
+    assert b"%PDF-" not in PICTURE_SIGNATURES
+    client = _client(tmp_path)
+    pdf = b"%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\n%%EOF\n"
+    files = {"equity": ("estado.pdf", pdf, "application/pdf")}
+    screen = client.post("/audits", files=files, data={"consent": "on", "locale": "es"})
+    assert screen.status_code == 422, screen.text[:300]
+    assert "no es una tabla" not in _text(screen.text)
+    assert "Dinos qué es cada columna" in screen.text
+    named = {"consent": "on", "locale": "es", "col_date": "Fecha", "col_balance": "Balance"}
+    posted = client.post("/audits", files=files, data=named, follow_redirects=False)
+    assert posted.status_code == 303, posted.text[:300]
 
 
 @pytest.mark.parametrize(
@@ -347,6 +413,9 @@ def test_every_box_states_its_limit_and_the_date_guidance(
         assert large in box(name), name
     for name in ("equity", "trades"):
         assert hint in box(name), name
+    # The curve box says a platform report dropped there may reach 10 MB.
+    assert "10 MB" in box("equity")
+    assert "soltado" not in box("equity") and "solto aqui" not in box("equity")
     assert find_claims(_text(page)) == []
 
 
@@ -372,6 +441,31 @@ def test_a_curve_over_the_limit_is_told_the_real_limit(
         text = _text(answer.text)
         assert said in text
         assert "10 MB" not in text and "bytes" not in text
+
+
+@pytest.mark.parametrize(
+    ("locale", "said"),
+    [
+        ("es", "El archivo del informe pesa más de 10 MB"),
+        ("en", "The report file is larger than 10 MB"),
+        ("pt", "O arquivo do relatório passa de 10 MB"),
+    ],
+)
+def test_an_oversized_platform_report_in_the_curve_box_is_told_the_report_limit(
+    tmp_path: Path, locale: str, said: str
+) -> None:
+    """The help beside the curve box promises 10 MB for a platform report
+    dropped there, so its refusal says 10 MB and names the report."""
+    client = _client(tmp_path)
+    row = b"<tr><td>2024.01.02 00:00</td><td>10000.00</td></tr>\n"
+    page = b"<!DOCTYPE html><html><body><table>" + row * (2 * MAX_UPLOAD_BYTES // len(row) + 100)
+    assert len(page) > 2 * MAX_UPLOAD_BYTES
+    files = {"equity": ("ReportTester.html", page, "text/html")}
+    answer = client.post("/audits", files=files, data={"consent": "on", "locale": locale})
+    assert answer.status_code == 413
+    text = _text(answer.text)
+    assert said in text
+    assert "5 MB" not in text
 
 
 def test_the_new_messages_exist_in_three_languages_and_pass_the_guard() -> None:
@@ -426,8 +520,13 @@ def test_the_provider_guide_is_named_in_one_language_at_a_time() -> None:
     assert guide.platform_for("es") == "Cuenta de un proveedor"
     assert guide.platform_for("en") == "Provider's account"
     assert guide.platform_for("pt") == "Conta de um fornecedor"
-    for locale in LOCALES:
-        assert " / " not in guide.platform_for(locale)
+    optimisation = next(g for g in GUIDES if g.slug == "mt5-optimization")
+    assert optimisation.platform_for("es") == "MetaTrader 5 (optimización)"
+    assert optimisation.platform_for("en") == "MetaTrader 5 (optimisation)"
+    assert optimisation.platform_for("pt") == "MetaTrader 5 (otimização)"
+    for any_guide in GUIDES:
+        for locale in LOCALES:
+            assert " / " not in any_guide.platform_for(locale), (any_guide.slug, locale)
 
 
 def test_the_portuguese_report_uses_one_word_for_optimisation_passes() -> None:
@@ -527,3 +626,51 @@ def test_a_report_of_another_account_is_never_named(tmp_path: Path) -> None:
     # Opened by its link without a session, the note is not shown either.
     client.cookies.clear()
     assert "Ya habías auditado" not in client.get(second.headers["location"]).text
+
+
+def _report_audit(store, audit_id: str, digest: str, *, at: datetime) -> None:
+    """An upload made from a platform report: no curve digest of its own."""
+    store.create_audit(
+        audit_id=audit_id,
+        created_at=at,
+        token_hash="h" * 64,
+        client_ip="",
+        declared_json="{}",
+        result_json=f'{{"audit_id": "{audit_id}"}}',
+        report_html="<html></html>",
+        overall_class="B",
+        digests={"report.html": digest},
+        equity_csv=None,
+        files={"report.html": b"<html></html>"},
+    )
+
+
+def test_a_platform_report_uploaded_again_finds_its_earlier_report(tmp_path: Path) -> None:
+    """The prefilter uses the report's own digest, so the earlier report is
+    found past any number of other report uploads of the same account."""
+    store = make_store(f"sqlite:///{tmp_path}/audit.db")
+    account = store.create_account(
+        email="ana@example.com", password_hash="x" * 64, locale="es", at=NOW
+    )
+    assert account is not None
+    when = NOW
+    for index in range(25):
+        when = when.replace(day=1 + index % 28, month=1 + index // 28)
+        _report_audit(store, f"other{index:02d}", f"{index:064x}", at=when)
+        store.link_audit(account.id, f"other{index:02d}", at=when)
+    first = datetime(2026, 3, 1, tzinfo=UTC)
+    _report_audit(store, "first", "f" * 64, at=first)
+    store.link_audit(account.id, "first", at=first)
+    again = datetime(2026, 3, 2, tzinfo=UTC)
+    _report_audit(store, "again", "f" * 64, at=again)
+    store.link_audit(account.id, "again", at=again)
+    assert store.earlier_audit_of_same_files(account.id, "again") == "first"
+    # A different report, or the first upload itself, names nothing.
+    assert store.earlier_audit_of_same_files(account.id, "first") is None
+    assert store.earlier_audit_of_same_files(account.id, "other24") is None
+    # Another account never sees it.
+    other = store.create_account(
+        email="luis@example.com", password_hash="x" * 64, locale="es", at=NOW
+    )
+    assert other is not None
+    assert store.earlier_audit_of_same_files(other.id, "again") is None

@@ -4398,7 +4398,23 @@ class Store:
         if not account_id or record is None or not record.digests:
             return None
         sa = self._sa
-        a, link = self.audits, self.account_audits
+        a, link, files = self.audits, self.account_audits, self.audit_files
+        # The prefilter uses the curve's digest, or, for an upload made from
+        # a platform report (no curve of its own), the digest of that file.
+        equity_sha256 = record.digests.get("equity.csv")
+        if equity_sha256 is not None:
+            same_file = a.c.equity_sha256 == equity_sha256
+        else:
+            other_digests = [
+                digest
+                for name, digest in sorted(record.digests.items())
+                if name not in ("trades.csv", "benchmark.csv", "variants.csv")
+            ]
+            if not other_digests:
+                return None
+            same_file = sa.exists().where(
+                (files.c.audit_id == a.c.id) & (files.c.sha256 == other_digests[0])
+            )
         with self.engine.connect() as conn:
             rows = conn.execute(
                 sa.select(a.c.id)
@@ -4407,7 +4423,7 @@ class Store:
                 .where(a.c.id != audit_id)
                 .where(a.c.purged_at.is_(None))
                 .where(a.c.created_at < record.created_at)
-                .where(a.c.equity_sha256 == record.digests.get("equity.csv"))
+                .where(same_file)
                 .order_by(a.c.paid.desc(), a.c.created_at)
                 .limit(SAME_FILE_CANDIDATES)
             ).all()
@@ -5854,12 +5870,21 @@ def public_view(result_json: str) -> tuple[dict[str, Any], str]:
         str(warning).endswith(PDF_ROWS_WARNING) for warning in inputs.get("parse_warnings") or []
     )
     verdict = data["verdict"]
+    # Whether the trial count was left undeclared: a fact the page's fixed
+    # sentence for the multiplicity dimension depends on, never a number.
+    from quant_trade.audit.verdict import trials_undeclared
+
     view = {
         "generated_at_utc": data.get("generated_at_utc", ""),
         "verdict": {
             "overall": verdict["overall"],
             "dimensions": [
-                {"name": d["name"], "status": d["status"]} for d in verdict["dimensions"]
+                {
+                    "name": d["name"],
+                    "status": d["status"],
+                    "undeclared": trials_undeclared(d.get("inputs")),
+                }
+                for d in verdict["dimensions"]
             ],
         },
         "inputs": {

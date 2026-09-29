@@ -83,7 +83,7 @@ COPY_PT: dict[str, Any] = {
     "equity_help": (
         "Colunas: timestamp e equity (ou return), em CSV, texto do Excel ou XLSX. Também a "
         "tabela de rentabilidades mensais de um fundo (um ano por linha, um mês por coluna). "
-        "Até 5 MB (um relatório de plataforma solto aqui, até 10 MB)."
+        "Até 5 MB (se você soltar aqui um relatório de plataforma, até 10 MB)."
     ),
     "initial_balance": "Saldo inicial (se o relatório não informar)",
     "challenge": "Desafio de prop firm para simular",
@@ -770,8 +770,8 @@ MESSAGES_PT: dict[str, str] = {
         "em vez de por minuto)."
     ),
     "curve_is_picture": (
-        "O arquivo da curva de equity é uma imagem ou um PDF, não uma tabela: envie a curva "
-        "em CSV ou Excel, com uma coluna de data e outra de equity ou de retorno."
+        "O arquivo da curva de equity é uma imagem, não uma tabela: envie a curva em CSV ou "
+        "Excel, com uma coluna de data e outra de equity ou de retorno."
     ),
     "equity_required": (
         "Falta o arquivo: envie o relatório da sua plataforma (MetaTrader, "

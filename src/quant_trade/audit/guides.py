@@ -364,7 +364,8 @@ GUIDES: tuple[Guide, ...] = (
     ),
     Guide(
         slug="mt5-optimization",
-        platform="MetaTrader 5 (optimización / optimisation)",
+        platform="MetaTrader 5 (optimización)",
+        platform_en="MetaTrader 5 (optimisation)",
         field="optimization",
         text={
             "es": GuideText(

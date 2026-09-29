@@ -223,12 +223,12 @@ MESSAGES: dict[str, dict[str, str]] = {
     },
     "curve_is_picture": {
         "es": (
-            "El archivo de la curva de equity es una imagen o un PDF, no una tabla: sube la "
-            "curva en CSV o Excel, con una columna de fecha y otra de equity o de retorno."
+            "El archivo de la curva de equity es una imagen, no una tabla: sube la curva en "
+            "CSV o Excel, con una columna de fecha y otra de equity o de retorno."
         ),
         "en": (
-            "The equity curve file is a picture or a PDF, not a table: upload the curve as "
-            "CSV or Excel, with a date column and an equity or return column."
+            "The equity curve file is a picture, not a table: upload the curve as CSV or "
+            "Excel, with a date column and an equity or return column."
         ),
     },
     "equity_required": {
@@ -469,8 +469,9 @@ REPORT_FIELDS = frozenset({"equity", "report", "live", "optimization"})
 #: Bytes a pass takes in an MT5 optimisation export, for the size refusal.
 OPTIMIZATION_PASS_BYTES = 900
 REPORT_SIZE_FACTOR = 2
-#: How a picture or a PDF begins (PNG, JPEG, GIF, TIFF, PDF): named as
-#: such when it arrives in the curve box, which takes tables only.
+#: How a picture begins (PNG, JPEG, GIF, TIFF): named as such when it
+#: arrives in the curve box, which takes tables only. A PDF is not listed:
+#: a PDF statement's table is read through the column screen.
 PICTURE_SIGNATURES = (
     b"\x89PNG\r\n\x1a\n",
     b"\xff\xd8\xff",
@@ -478,7 +479,6 @@ PICTURE_SIGNATURES = (
     b"GIF89a",
     b"II*\x00",
     b"MM\x00*",
-    b"%PDF-",
 )
 
 _HOST = re.compile(r"^[A-Za-z0-9.-]{1,253}(:[0-9]{1,5})?$")
@@ -891,9 +891,13 @@ class AuditAdmissionMiddleware:
 
 
 class UploadTooLarge(Exception):
-    def __init__(self, what: str) -> None:
+    def __init__(self, what: str, *, filename: str | None = None, head: bytes = b"") -> None:
         super().__init__(what)
         self.what = what
+        #: The file's name and its first bytes, so that the refusal can tell a
+        #: platform report dropped in the curve box from a curve.
+        self.filename = filename
+        self.head = head
 
 
 def hash_token(token: str) -> str:
@@ -1406,7 +1410,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 break
             size += len(chunk)
             if size > _field_limit(what):
-                raise UploadTooLarge(what)
+                head = chunks[0] if chunks else chunk
+                raise UploadTooLarge(what, filename=upload.filename, head=head)
             chunks.append(chunk)
         data = b"".join(chunks)
         return data or None
@@ -4156,10 +4161,26 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                     "optimization_too_large", report_loc, limit=_megabytes(limit), passes=passes
                 )
             elif exc.what == "equity":
-                # The curve reader stops at its own, smaller limit: say that one.
-                text = message(
-                    "curve_too_large", report_loc, limit=_megabytes(min(limit, MAX_UPLOAD_BYTES))
-                )
+                # A platform report dropped in the curve box is read as the
+                # report, so it is told the report's limit; a curve is told
+                # the curve reader's own, smaller limit.
+                try:
+                    as_report = looks_like_platform_report(exc.filename, exc.head)
+                except Exception:  # noqa: BLE001 - a truncated head never breaks the refusal
+                    as_report = False
+                if as_report:
+                    text = message(
+                        "too_large",
+                        report_loc,
+                        what=UPLOAD_NAMES["report"][report_loc],
+                        limit=_megabytes(limit),
+                    )
+                else:
+                    text = message(
+                        "curve_too_large",
+                        report_loc,
+                        limit=_megabytes(min(limit, MAX_UPLOAD_BYTES)),
+                    )
             else:
                 text = message(
                     "too_large",

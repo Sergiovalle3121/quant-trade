@@ -196,7 +196,7 @@ _COPY: dict[str, dict[str, Any]] = {
         "equity_help": (
             "Columnas: timestamp y equity (o return), en CSV, texto de Excel o XLSX. También la "
             "tabla de rentabilidades mensuales de un fondo (un año por fila, un mes por "
-            "columna). Hasta 5 MB (un informe de plataforma soltado aquí, hasta 10 MB)."
+            "columna). Hasta 5 MB (si sueltas aquí un informe de plataforma, hasta 10 MB)."
         ),
         "initial_balance": "Balance inicial (si el informe no lo indica)",
         "challenge": "Reto de prop firm a simular",
@@ -2652,13 +2652,13 @@ def _utc_time(stamp: str, locale: str) -> str:
 
 def _meaning_of(dimension: dict[str, Any], locale: str) -> str:
     """The fixed plain text of a dimension, in its undeclared-trials wording when
-    the trial count was never declared."""
-    return meaning(
-        dimension["name"],
-        dimension["status"],
-        locale,
-        undeclared=trials_undeclared(dimension.get("inputs")),
-    )
+    the trial count was never declared: read from the dimension's inputs on a
+    live result, or from the fact the kept public view stores in their place."""
+    if "inputs" in dimension:
+        undeclared = trials_undeclared(dimension.get("inputs"))
+    else:
+        undeclared = bool(dimension.get("undeclared"))
+    return meaning(dimension["name"], dimension["status"], locale, undeclared=undeclared)
 
 
 def verification_page(
