@@ -51,6 +51,7 @@ tests/test_audit_plan.py
 tests/test_audit_portuguese_report.py
 tests/test_audit_public.py
 tests/test_audit_purchase_mail.py
+tests/test_audit_reading_rules.py
 tests/test_audit_refunds.py
 tests/test_audit_report.py
 tests/test_audit_schema.py
@@ -62,3 +63,4 @@ tests/test_forensics_review.py
 tests/test_forensics_totals.py
 tests/test_forgery_lab.py
 tools/rigor_load_smoke.py
+tools/rigor_reading_regression.py

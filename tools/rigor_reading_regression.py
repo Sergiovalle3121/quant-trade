@@ -140,6 +140,41 @@ def generic_trades(delimiter: str, decimal: str, *, thousands: bool = False) -> 
     return ("\n".join(lines) + "\n").encode("utf-8")
 
 
+def points_trades(mark: str) -> bytes:
+    """A ``;`` list whose prices are whole index points with a thousands mark
+    (``128.450``, as a Brazilian WIN trader writes them) or the same digits
+    with a comma (``128,450``): every number reads both ways and nothing else
+    in the file settles the mark."""
+    header = ["abertura", "fechamento", "qtd", "preco_in", "preco_out", "lado", "ativo"]
+    lines = [";".join(header)]
+    for index in range(40):
+        day = 2 + index * 7
+        month = 1 + day // 28
+        opened = f"2024-{month:02d}-{1 + day % 28:02d} 10:00:00"
+        closed = f"2024-{month:02d}-{1 + day % 28:02d} 15:30:00"
+        price_in = 128_450 + index * 25
+        price_out = price_in + (150 if index % 3 else -225)
+        cells = [opened, closed, "1"]
+        cells += [f"{price:,}".replace(",", mark) for price in (price_in, price_out)]
+        cells += ["compra", "WINZ24"]
+        lines.append(";".join(cells))
+    return ("\n".join(lines) + "\n").encode("utf-8")
+
+
+def three_days_a_month(*, month_first: bool) -> bytes:
+    """Three days at the start of each month with the day numbers rising
+    (Mar 1-3, Apr 4-6, May 7-9, Jun 10-12), every day and month 12 or less.
+    Read the wrong way round it becomes a regular monthly series, so a hole
+    between short runs alone must never settle the order."""
+    cells = []
+    for month, days in ((3, (1, 2, 3)), (4, (4, 5, 6)), (5, (7, 8, 9)), (6, (10, 11, 12))):
+        for day in days:
+            first, second = (month, day) if month_first else (day, month)
+            cells.append(f"{first:02d}/{second:02d}/2024")
+    rows = [f"{cell},{10_000 + 10 * index}" for index, cell in enumerate(cells)]
+    return ("date,equity\n" + "\n".join(rows) + "\n").encode("utf-8")
+
+
 def short_curve(rows: int) -> bytes:
     values = [10_000.0, 10_150.0, 10_090.0, 10_240.0][:rows]
     lines = [f"2024-0{index + 1}-15,{value:.2f}" for index, value in enumerate(values)]
@@ -294,11 +329,17 @@ def cases(extra: Path | None) -> list[dict[str, Any]]:
         "new/curve mixing both orders",
         equity_bytes=b"date,equity\n13/01/2024,10000\n01/14/2024,10100\n01/15/2024,10050\n",
     )
+    # A hole between short runs: main read the US file right and the
+    # day-first one wrong; both are now refused rather than guessed.
+    add("new/curve three days a month, US", equity_bytes=three_days_a_month(month_first=True))
+    add("new/curve three days a month, dmy", equity_bytes=three_days_a_month(month_first=False))
     # 109.48 becomes 109.148: three digits after the only mark.
     listed(
         "new/trades semicolon numbers readable both ways",
         generic_trades(";", ".").replace(b".", b".1"),
     )
+    listed("new/trades semicolon points 128.450", points_trades("."), 1_000_000.0)
+    listed("new/trades semicolon points 128,450", points_trades(","), 1_000_000.0)
     add("new/curve with two returns", equity_bytes=short_curve(3))
     add("new/curve with one return", equity_bytes=short_curve(2))
 

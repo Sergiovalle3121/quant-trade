@@ -1465,9 +1465,9 @@ def _semicolon_decimal(mapping: ColumnMap, rows: list[list[str]]) -> str:
     if unsettled is not None:
         raise imp.ReportFormatError(
             "ambiguous_decimal_mark",
-            f"the numbers of the file could use a decimal point or a decimal comma (for "
-            f"example {unsettled}): write them with a decimal point and no thousands "
-            "separator (1234.56) and upload it again",
+            f"the numbers of the file could be read with a decimal point or with a decimal "
+            f"comma (for example {unsettled}): write them with a decimal point and no "
+            "thousands separator (1234.56) and upload it again",
             f"los números del archivo pueden llevar punto decimal o coma decimal (por "
             f"ejemplo {unsettled}): escríbelos con punto decimal y sin separador de miles "
             "(1234.56) y vuelve a subir el archivo",

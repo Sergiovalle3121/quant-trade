@@ -98,8 +98,8 @@ RULES: tuple[tuple[str, str], ...] = (
     ("the {what} file has fewer than two usable rows",
      "o arquivo {what} tem menos de duas linhas utilizáveis"),
     ("the {what} file mixes day/month/year and month/day/year dates ({sample} and "
-     "{other_sample}): write every date the same way, best as year-month-day (2024-03-15), "
-     "and upload it again",
+     "{other_sample}): write every date the same way, preferably as year-month-day "
+     "(2024-03-15), and upload it again",
      "o arquivo {what} mistura datas dia/mês/ano e mês/dia/ano ({sample} e {other_sample}): "
      "escreva todas as datas do mesmo jeito, de preferência como ano-mês-dia (2024-03-15), "
      "e envie-o de novo"),
@@ -320,9 +320,9 @@ RULES: tuple[tuple[str, str], ...] = (
      "o arquivo mistura números com ponto decimal e com vírgula decimal ({sample} e "
      "{other_sample}): escreva todos os números do mesmo jeito, com ponto decimal e sem "
      "separador de milhar (1234.56), e envie o arquivo de novo"),
-    ("the numbers of the file could use a decimal point or a decimal comma (for example "
-     "{sample}): write them with a decimal point and no thousands separator (1234.56) and "
-     "upload it again",
+    ("the numbers of the file could be read with a decimal point or with a decimal comma "
+     "(for example {sample}): write them with a decimal point and no thousands separator "
+     "(1234.56) and upload it again",
      "os números do arquivo podem ter ponto decimal ou vírgula decimal (por exemplo "
      "{sample}): escreva-os com ponto decimal e sem separador de milhar (1234.56) e envie "
      "o arquivo de novo"),

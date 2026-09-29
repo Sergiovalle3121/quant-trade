@@ -478,9 +478,14 @@ MONTH_FIRST_NOTE = "dates read as month/day/year"
 
 #: With every date readable both ways, an order is taken only when its
 #: largest gap is at most ``REGULAR_GAP`` times its usual one while the
-#: other order's is over ``BROKEN_GAP`` times.
+#: other order breaks: its dates run backwards, or they fall into short runs
+#: with a jump of about a year between them (over ``BROKEN_GAP`` times the
+#: usual gap and at least ``YEAR_JUMP_DAYS`` days), which is what a monthly or
+#: quarterly series looks like read the wrong way round. A hole of a few
+#: months in a genuine daily file never settles the order by itself.
 REGULAR_GAP = 5.0
 BROKEN_GAP = 10.0
+YEAR_JUMP_DAYS = 300.0
 
 
 def _numeric_dates(series: pd.Series) -> pd.Series:
@@ -495,9 +500,10 @@ def _read_dates(series: pd.Series, *, day_first: bool) -> pd.Series:
     return pd.to_datetime(series, utc=True, errors="coerce", format="mixed", dayfirst=day_first)
 
 
-def _gap_spread(stamps: pd.Series) -> float | None:
-    """The largest gap between consecutive dates over the usual one, or
-    ``None`` when the dates are not in order (either way) or too few."""
+def _gap_spread(stamps: pd.Series) -> tuple[float, float] | None:
+    """The largest gap between consecutive dates over the usual one, and that
+    gap in days; ``None`` when the dates are not in order (either way) or
+    too few."""
     clean = stamps.dropna()
     if len(clean) < 3 or len(clean) != len(stamps):
         return None
@@ -507,7 +513,8 @@ def _gap_spread(stamps: pd.Series) -> float | None:
     usual = float(gaps.median())
     if usual <= 0:
         return None
-    return float(gaps.max()) / usual
+    largest = float(gaps.max())
+    return largest / usual, largest / 86_400.0
 
 
 def _day_first(columns: list[pd.Series], *, what: str) -> bool | None:
@@ -517,8 +524,9 @@ def _day_first(columns: list[pd.Series], *, what: str) -> bool | None:
     A first number over 12 anywhere makes the file day first, a second
     number over 12 month first, and both in one file is refused. When every
     date reads both ways the order that leaves the dates in order and
-    evenly spaced is taken if the other does not; otherwise the file is
-    refused rather than guessed.
+    evenly spaced is taken only if the other breaks them (backwards, a trade
+    closing before it opens, or runs of days a year apart); otherwise the
+    file is refused rather than guessed.
     """
     day_cell: str | None = None
     month_cell: str | None = None
@@ -538,7 +546,7 @@ def _day_first(columns: list[pd.Series], *, what: str) -> bool | None:
     if day_cell and month_cell:
         raise ParseError(
             f"the {what} file mixes day/month/year and month/day/year dates ({day_cell} and "
-            f"{month_cell}): write every date the same way, best as year-month-day "
+            f"{month_cell}): write every date the same way, preferably as year-month-day "
             "(2024-03-15), and upload it again",
             message_es=(
                 f"El archivo {_file_es(what)} mezcla fechas día/mes/año y mes/día/año "
@@ -549,7 +557,7 @@ def _day_first(columns: list[pd.Series], *, what: str) -> bool | None:
         )
     if day_cell or month_cell:
         return day_cell is not None
-    spreads: dict[bool, float | None] = {}
+    spreads: dict[bool, tuple[float, float] | None] = {}
     for day_first in (True, False):
         read = [
             _read_dates(column[_numeric_dates(column)], day_first=day_first) for column in columns
@@ -563,7 +571,9 @@ def _day_first(columns: list[pd.Series], *, what: str) -> bool | None:
         spreads[day_first] = None if backwards else _gap_spread(read[0])
     for day_first in (True, False):
         own, other = spreads[day_first], spreads[not day_first]
-        if own is not None and own <= REGULAR_GAP and (other is None or other > BROKEN_GAP):
+        if own is None or own[0] > REGULAR_GAP:
+            continue
+        if other is None or (other[0] > BROKEN_GAP and other[1] >= YEAR_JUMP_DAYS):
             return day_first
     raise ParseError(
         f"the {what} file has dates that could be day/month/year or month/day/year (for "
@@ -585,12 +595,14 @@ def _to_timestamps(series: pd.Series, *, day_first: bool | None = None) -> pd.Se
         numeric = pd.to_numeric(series, errors="coerce")
         unit = "ms" if numeric.abs().max() > 1e11 else "s"
         return pd.to_datetime(numeric, unit=unit, utc=True, errors="coerce")
-    stamps = pd.to_datetime(series, utc=True, errors="coerce", format="mixed")
-    if day_first:
-        numeric_dates = _numeric_dates(series)
-        day_month = _read_dates(series[numeric_dates], day_first=True)
-        stamps = stamps.where(~numeric_dates, day_month.reindex(series.index))
-    return stamps
+    if not day_first:
+        return pd.to_datetime(series, utc=True, errors="coerce", format="mixed")
+    # One pass over the column: the numeric day/month cells read day first,
+    # every other cell exactly as above ("mixed" reads each cell on its own).
+    numeric_dates = _numeric_dates(series)
+    day_month = _read_dates(series[numeric_dates], day_first=True)
+    others = pd.to_datetime(series[~numeric_dates], utc=True, errors="coerce", format="mixed")
+    return pd.concat([day_month, others]).reindex(series.index)
 
 
 def _date_order_note(day_first: bool | None) -> list[str]:

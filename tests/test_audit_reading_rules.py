@@ -92,6 +92,7 @@ def test_a_file_mixing_both_orders_is_refused() -> None:
         parse_equity_csv(data)
     assert info.value.code == "mixed_date_order"
     assert "13/01/2024 and 01/14/2024" in str(info.value)
+    assert "preferably as year-month-day" in str(info.value)
     assert "mezcla fechas día/mes/año y mes/día/año" in info.value.localized("es")
     portuguese = errors_pt.portuguese(str(info.value))
     assert portuguese is not None and "mistura datas dia/mês/ano" in portuguese
@@ -138,6 +139,49 @@ def test_a_daily_us_series_in_one_month_is_settled_by_its_order() -> None:
         parse_equity_csv(("date,equity\n" + "\n".join(rows) + "\n").encode())
     # Both orders leave gaps of the same kind: nothing settles it.
     assert info.value.code == "ambiguous_date_order"
+
+
+@pytest.mark.parametrize("month_first", [True, False])
+def test_a_hole_between_short_runs_settles_nothing(month_first: bool) -> None:
+    # Mar 1-3, Apr 4-6, May 7-9, Jun 10-12: read the other way round it is a
+    # regular monthly series, and the month-long holes of the right reading
+    # must not hand the file to the wrong one.
+    with pytest.raises(ParseError) as info:
+        parse_equity_csv(TOOL.three_days_a_month(month_first=month_first))
+    assert info.value.code == "ambiguous_date_order"
+
+
+def test_runs_of_days_half_a_year_apart_settle_nothing_either() -> None:
+    runs = ((1, (1, 2, 3)), (6, (4, 5, 6)), (12, (7, 8, 9)))
+    days = [f"{month:02d}/{day:02d}/2024" for month, run in runs for day in run]
+    rows = [f"{day},{10_000 + index}" for index, day in enumerate(days)]
+    with pytest.raises(ParseError) as info:
+        parse_equity_csv(("date,equity\n" + "\n".join(rows) + "\n").encode())
+    assert info.value.code == "ambiguous_date_order"
+
+
+def test_a_quarterly_us_series_is_settled_by_the_jump_of_a_year() -> None:
+    # Day first it would be Jan 1, 4, 7, 10 of each year: runs a year apart.
+    quarters = [f"{month:02d}/01/{year}" for year in (2022, 2023, 2024) for month in (1, 4, 7, 10)]
+    rows = [f"{day},{10_000 + 100 * index}" for index, day in enumerate(quarters)]
+    series = parse_equity_csv(("date,equity\n" + "\n".join(rows) + "\n").encode())
+    assert series.warnings == [MONTH_FIRST_NOTE]
+    stamps = series.frame["timestamp"]
+    assert stamps.iloc[0] == pd.Timestamp("2022-01-01", tz="UTC")
+    assert stamps.iloc[-1] == pd.Timestamp("2024-10-01", tz="UTC")
+
+
+def test_cells_that_are_not_numeric_dates_read_as_before_in_a_day_first_file() -> None:
+    data = b"date,equity\n2024-03-13,100\n14/03/2024,101\n15 Mar 2024,102\n16/03/2024 09:00,103\n"
+    series = parse_equity_csv(data)
+    assert series.warnings == [DAY_FIRST_NOTE]
+    assert series.unparseable_rows == 0
+    assert [stamp.strftime("%Y-%m-%d %H:%M") for stamp in series.frame["timestamp"]] == [
+        "2024-03-13 00:00",
+        "2024-03-14 00:00",
+        "2024-03-15 00:00",
+        "2024-03-16 09:00",
+    ]
 
 
 def test_trades_written_day_first_lose_no_row() -> None:
@@ -247,6 +291,7 @@ def test_numbers_that_read_both_ways_are_refused() -> None:
         import_report(data, "a.csv", initial_balance=100_000.0, columns=TOOL.COLUMNS)
     assert info.value.code == "ambiguous_decimal_mark"
     assert "109.148" in str(info.value)
+    assert "could be read with a decimal point or with a decimal comma" in str(info.value)
     assert "punto decimal o coma decimal" in info.value.localized("es")
     portuguese = errors_pt.portuguese(str(info.value))
     assert portuguese is not None and "ponto decimal ou vírgula decimal" in portuguese
@@ -273,6 +318,21 @@ def test_whole_numbers_need_no_mark() -> None:
     data = ("\n".join(";".join(cells) for cells in lines) + "\n").encode()
     price_in, _ = _first_prices(data)
     assert price_in == 109.0
+
+
+@pytest.mark.parametrize("mark", [".", ","])
+def test_a_list_whose_every_number_reads_both_ways_is_refused_not_guessed(mark: str) -> None:
+    # Index points with a thousands mark (128.450) or the same digits with a
+    # comma: the semicolon used to make them 128450 and 128.450 by itself.
+    # The choice to ask rather than take that prior is the owner's (see
+    # docs/AUDIT_SAAS.md); this freezes it.
+    with pytest.raises(ReportFormatError) as info:
+        import_report(TOOL.points_trades(mark), "win.csv", initial_balance=1_000_000.0,
+                      columns=TOOL.COLUMNS)  # fmt: skip
+    assert info.value.code == "ambiguous_decimal_mark"
+    assert f"128{mark}450" in str(info.value)
+    portuguese = errors_pt.portuguese(str(info.value))
+    assert portuguese is not None and f"128{mark}450" in portuguese
 
 
 @pytest.mark.parametrize(

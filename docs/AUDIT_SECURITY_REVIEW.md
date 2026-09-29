@@ -313,9 +313,11 @@ ratio the engine could not compute (`audit/engine.py`). These changes alter
 what an upload is accepted as, so they are listed here; no limit, rate,
 header or account control moved. Every change has an offline, deterministic
 test in `tests/test_audit_reading_rules.py`, and
-`tools/rigor_reading_regression.py` audits every file the repository holds
+`tools/rigor_reading_regression.py compare --base-src <main checkout>/src
+--extra <folder of local files>` audits every file the repository holds
 under `main` and under this branch and shows that only the intended files
-read differently (the table is in the pull request).
+read differently (at review time: 74 cases, 0 changed outside the intended
+ones; run it to reproduce the table).
 
 | # | Finding | Severity | Fix |
 |---|---|---|---|
@@ -333,6 +335,24 @@ The choices, and what stays:
   same pandas call as before; the day-first branch touches only the cells
   that match the numeric day/month pattern. Two-digit years follow the same
   rule (they were never read year first).
+- A hole between short runs never settles the order by itself. Review found
+  a US file (Mar 1-3, Apr 4-6, May 7-9, Jun 10-12, every number 12 or less)
+  that the first cut read day first because its month-long holes looked
+  "broken" next to the regular monthly series the wrong order made of it.
+  The other order must now run backwards, close a trade before it opens, or
+  fall into runs a year apart (`YEAR_JUMP_DAYS`), which is what a monthly or
+  quarterly series looks like read the wrong way round; that file, its
+  day-first mirror and a variant with runs half a year apart are refused
+  (`ambiguous_date_order`) and tested.
+- Cost inside the audit queue (two slots, 30 s wait, unchanged). A day-first
+  column is read in one pass (the numeric cells day first, the rest with the
+  old call), so a hand-made day-first curve of 150,000 rows costs what a
+  month-first one did on `main` (about 11 s on the review laptop); a
+  month-first or year-first column costs the same as before. Only a file
+  whose every date reads both ways is parsed twice more to settle the order
+  (about 24 s against 11 s on `main` for that 150,000-row file, which is
+  then refused); such a file is intraday data inside twelve days, and the
+  upload rate limit is unchanged.
 - The regression tool needs the two source trees on disk and runs each in
   its own subprocess (`PYTHONPATH`), so neither can import the other's
   code; it writes no customer file anywhere, only figures.

@@ -115,11 +115,21 @@ from the whole file, never cell by cell:
   holding both is refused (`mixed_date_order`) with the two cells named. When
   every date reads both ways (all days 12 or less), the order under which the
   dates stay in sequence and evenly spaced (largest gap at most `REGULAR_GAP`
-  times the usual one) is taken when the other order breaks that (largest gap
-  over `BROKEN_GAP` times the usual one, or dates out of sequence); otherwise
-  the file is refused (`ambiguous_date_order`) and asked for year-month-day.
-  A list of trades decides from its entry and exit columns together, and an
-  order under which a trade closes before it opens is out. The order taken is
+  times the usual one) is taken only when the other order breaks them: its
+  dates run backwards, or they fall into short runs with a jump of about a
+  year between them (over `BROKEN_GAP` times the usual gap and at least
+  `YEAR_JUMP_DAYS` days), which is what a monthly or quarterly series looks
+  like read the wrong way round. Otherwise the file is refused
+  (`ambiguous_date_order`) and asked for year-month-day: so are twelve
+  monthly rows on the 1st, the first twelve days of one month, and a file
+  with a few days a month whose holes would otherwise hand it to the wrong
+  order (Mar 1-3, Apr 4-6, May 7-9, Jun 10-12 reads as a monthly series the
+  other way round). Refusing beats guessing there, even when one order is the
+  customary one. A list of trades decides from its entry and exit columns
+  together, and an order under which a trade closes before it opens is out.
+  A day-first column is read in one pass (the numeric day/month cells day
+  first, every other cell as before); only a file whose every date reads
+  both ways is parsed twice more to settle the order. The order taken is
   stated in the report's reading notes ("dates read as day/month/year",
   "fechas leídas como día/mes/año", "datas lidas como dia/mês/ano"), a
   factual note with no evidence tag. Platform exports keep their own readers
@@ -133,7 +143,15 @@ from the whole file, never cell by cell:
   cell that reads both ways (`1.234`, `1,234`) takes the file's mark. Cells
   settling both marks refuse the file (`mixed_decimal_marks`); no settled mark
   while some cell reads both ways refuses it too (`ambiguous_decimal_mark`),
-  with the ask to write numbers as `1234.56`. Whole numbers need no mark. A
+  with the ask to write numbers as `1234.56`. That second refusal also meets
+  a `;` list whose every marked number reads both ways: index points with a
+  thousands dot (`128.450`, as a WIN trader writes them) or a three-decimal
+  price with a decimal comma (`149,123`), whole quantities and no other
+  decimal cell. The semicolon alone used to make those a decimal comma
+  (`128450`, `149.123`), which is the usual meaning; taking that prior back
+  for `;` files when nothing settles the mark is one line in
+  `_semicolon_decimal` and the owner's call, since it is a guess. Whole
+  numbers need no mark. A
   comma- or tab-separated file is read as before (a decimal point, with a
   cell that plainly uses a decimal comma read as such). The curve reader's
   own column rule is unchanged (below, "Portuguese curves").
@@ -145,11 +163,12 @@ from the whole file, never cell by cell:
   a measured `0.00`. The class does not depend on them.
 
 `tools/rigor_reading_regression.py compare --base-src <other checkout>/src`
-audits every file of the repository (the importer fixtures, the example
-upload, every synthetic generator of `tests/audit_fixtures.py`) plus the
-new reading cases under two source trees and lists every field that
-differs; `tests/test_audit_reading_rules.py` freezes what `main` at c6ce500
-read from each repository file and checks it still reads the same.
+(`--extra <folder>` adds a local folder of files) audits every file of the
+repository (the importer fixtures, the example upload, every synthetic
+generator of `tests/audit_fixtures.py`) plus the new reading cases under
+two source trees and lists every field that differs;
+`tests/test_audit_reading_rules.py` freezes what `main` at c6ce500 read
+from each repository file and checks it still reads the same.
 
 ### Importers and their limits
 
