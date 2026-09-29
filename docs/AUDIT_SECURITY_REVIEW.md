@@ -304,6 +304,39 @@ Limits that remain from this pass:
 - The description of the private pages (sign-up, sign-in, recovery,
   comparison) is one fixed sentence per language; they stay `noindex`.
 
+## Reading of customer files: dates, decimals, an uncomputed Sharpe (2026-09-29)
+
+Reviewed against `main` at c6ce500, from a customer-style audit with local
+copies. Scope: how a hand-made CSV is read (`audit/schema.py`, the
+universal list of trades in `audit/universal.py`) and the evidence tag of a
+ratio the engine could not compute (`audit/engine.py`). These changes alter
+what an upload is accepted as, so they are listed here; no limit, rate,
+header or account control moved. Every change has an offline, deterministic
+test in `tests/test_audit_reading_rules.py`, and
+`tools/rigor_reading_regression.py` audits every file the repository holds
+under `main` and under this branch and shows that only the intended files
+read differently (the table is in the pull request).
+
+| # | Finding | Severity | Fix |
+|---|---|---|---|
+| R1 | A curve or a trades CSV with dates written day/month/year (`15/03/2024`, the usual order in Mexico, Brazil, Latin America and Europe) was read row by row: a day of 12 or less became the month, a day past 12 was silently read the other way round. The same file went from class B to class D with false "extreme jumps" and "dates out of order" flags and no warning. | High (wrong verdict on the main path of Spanish- and Portuguese-speaking customers; no exposure) | The order of day and month is decided once for the whole file (`schema._day_first`), never row by row: a first number over 12 anywhere makes it day first, a second number over 12 month first, and a file with both is refused (`mixed_date_order`). When every date reads both ways, the order that leaves the dates in sequence and evenly spaced is taken if the other does not; otherwise the file is refused (`ambiguous_date_order`) and asked for year-month-day. Year-first dates, month names and epoch numbers are read exactly as before. The report's reading notes state the order taken ("dates read as day/month/year"). A list of trades decides from its entry and exit columns together, and no trade may close before it opens under the order taken. Platform exports keep their own readers. Both refusals exist in the three languages (`errors_pt.RULES`) and pass the guard; the quoted cell is only digits and separators. |
+| R2 | A hand-made trades CSV separated by `;` with a decimal point (`109.48`) had its numbers read a hundred times too large (`10948`): the decimal comma was assumed from the delimiter alone. Money figures then carried the MEASURED tag, or the upload was refused for the wrong reason (balance at zero). | High (false measured figures; no exposure) | The decimal mark of a `;` file comes from its own number columns (`universal._semicolon_decimal`, on the mapped amount columns only): the mark any cell settles by itself (`109.48`, `109,48`, `1.234,56`, `1,234.56`, `1.234.567`, `0,001`) is the file's; a cell such as `1.234` or `1,234` takes it from the rest. A file whose cells settle both marks is refused (`mixed_decimal_marks`); one whose cells settle none while some read both ways is refused (`ambiguous_decimal_mark`) rather than guessed. Files separated by a comma or a tab are read exactly as before. Both refusals exist in the three languages and pass the guard; the quoted cell is only digits and marks, kept as written (never reformatted by the Portuguese number rule). |
+| R3 | With fewer than three returns the annualised Sharpe was `0.00` tagged MEASURED (and a Sortino from two returns), next to a significance section that said "not measured, fewer than three returns". | Medium (a figure that was not computed shown as measured) | The performance table's Sharpe, and the Sortino when there are fewer than three returns, are `NOT_MEASURED` with the reason the significance section already uses ("fewer than three returns", "zero variance"), so the table and the summary print no figure. The benchmark section's two Sharpe ratios follow the same rule. Nothing else reads a zero from them: the class, the flags and the other figures of every repository file are unchanged (regression test, `FROZEN` in the test file). |
+
+The choices, and what stays:
+
+- Refusing beats guessing. A file every date of which reads both ways is
+  short (a longer daily file has a day past 12), and the customer is asked
+  for year-month-day, which every platform exports. The same for a `;` file
+  whose numbers never settle their mark.
+- `_to_timestamps` reads a month-first or year-first column with the very
+  same pandas call as before; the day-first branch touches only the cells
+  that match the numeric day/month pattern. Two-digit years follow the same
+  rule (they were never read year first).
+- The regression tool needs the two source trees on disk and runs each in
+  its own subprocess (`PYTHONPATH`), so neither can import the other's
+  code; it writes no customer file anywhere, only figures.
+
 ## What the operator sets on Railway
 
 - `AUDIT_BASE_URL=https://<your domain>`: absolute links stop depending on

@@ -2645,6 +2645,8 @@ RULES: tuple[tuple[str, str], ...] = (
         "returns look like percentages (median |r| > 0.5); divided by 100",
         "os retornos parecem porcentagens (mediana |r| > 0.5); foram divididos por 100",
     ),
+    ("dates read as day/month/year", "datas lidas como dia/mês/ano"),
+    ("dates read as month/day/year", "datas lidas como mês/dia/ano"),
     (
         "{n} row(s) with an unreadable timestamp or value dropped",
         "{n} linha(s) com data ou valor ilegível descartada(s)",

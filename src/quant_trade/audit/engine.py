@@ -157,6 +157,24 @@ def _annualised_sharpe(returns: pd.Series, ppy: float) -> float:
     return redflags.annualised_sharpe(returns, ppy)
 
 
+def _ratio_not_measured(returns: pd.Series) -> str | None:
+    """Why a Sharpe-like ratio of ``returns`` cannot be computed, in the words
+    the significance section uses, or ``None`` when it can."""
+    clean = pd.to_numeric(returns, errors="coerce").dropna()
+    if len(clean) < 3:
+        return "fewer than three returns"
+    if float(clean.std(ddof=1)) <= 0:
+        return "zero variance"
+    return None
+
+
+def _sharpe_evidence(returns: pd.Series, ppy: float) -> dict[str, Any]:
+    reason = _ratio_not_measured(returns)
+    if reason is not None:
+        return not_measured(reason)
+    return measured(_annualised_sharpe(returns, ppy))
+
+
 #: Shortest history whose compound annual return is reported.
 MIN_CAGR_DAYS = 365
 
@@ -229,6 +247,12 @@ def _performance(
         # No losing period leaves no downside deviation to divide by; a
         # Sortino of 0 would read as the worst score for the smoothest curve.
         out["sortino"] = not_measured("no losing period; downside deviation is zero")
+    unmeasured = _ratio_not_measured(clean)
+    if unmeasured is not None:
+        # A ratio that could not be computed is not a measured zero.
+        out["sharpe"] = not_measured(unmeasured)
+        if len(clean) < 3:
+            out["sortino"] = not_measured(unmeasured)
     if not trades:
         out["win_rate"] = not_measured("no trades uploaded")
         out["trade_count"] = not_measured("no trades uploaded")
@@ -742,8 +766,8 @@ def _benchmark(
         "strategy_total_return": measured(comparison["strategy_total_return"]),
         "benchmark_total_return": measured(comparison["benchmark_total_return"]),
         "excess_return": measured(comparison["excess_return"]),
-        "strategy_sharpe": measured(comparison["strategy_sharpe"]),
-        "benchmark_sharpe": measured(comparison["benchmark_sharpe"]),
+        "strategy_sharpe": _sharpe_evidence(s_eq["equity"].astype(float).pct_change(), joined_ppy),
+        "benchmark_sharpe": _sharpe_evidence(b_eq["equity"].astype(float).pct_change(), joined_ppy),
         "tracking_error": measured(comparison["tracking_error"]),
         "information_ratio": measured(comparison["information_ratio"]),
         "strategy_max_drawdown": measured(s_mdd),
