@@ -2196,16 +2196,21 @@ the service neither sends nor stores it.
 
 ### Deploying on Railway
 
-1. Create a service from this repository. `railway.json` selects
-   `Dockerfile.web` and the `/ready` check (`healthcheckPath`; `/health`
+1. Create a service from this repository and set, in the service's
+   Settings: Build, Dockerfile path `Dockerfile.web` (the repository root
+   also holds the paper-trading `Dockerfile`, which is not this service);
+   Deploy, healthcheck path `/ready` with a timeout of 120 s (`/health`
    stays as a liveness probe that does not query storage, see "Operator
-   probes and incident admission"); the container listens on `$PORT`.
+   probes and incident admission"), restart policy "on failure" with 5
+   retries. The container listens on `$PORT`.
    Every merge redeploys, and Railway's default draining time (SIGTERM to
    SIGKILL) is 0 s. Set the service's Draining time to 120 s (Settings, or
-   the variable `RAILWAY_DEPLOYMENT_DRAINING_SECONDS=120`); `railway.json`
-   carries `drainingSeconds: 120` too, but services created after Railway
-   deprecated config as code may not read it. The image `exec`s the server so
-   it receives the SIGTERM and finishes the audits and PDFs in flight.
+   the variable `RAILWAY_DEPLOYMENT_DRAINING_SECONDS=120`). The image
+   `exec`s the server so it receives the SIGTERM and finishes the audits and
+   PDFs in flight.
+   These settings used to live in `railway.json`. Railway deprecated config
+   as code (files stop being read on 2026-12-01), so the file was removed
+   and the service's own settings are the only source.
 2. Storage: either add the Railway Postgres plugin and reference its
    variable from the service (`DATABASE_URL=${{Postgres.DATABASE_URL}}`), or
    mount a volume at `/data` and set `DATABASE_URL=sqlite:////data/audit.db`.
