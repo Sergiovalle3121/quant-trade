@@ -69,11 +69,12 @@ COPY_PT: dict[str, Any] = {
     "live_help": (
         "O histórico da conta onde o robô roda (MetaTrader, o CSV que o Myfxbook, o FX Blue "
         "ou um sinal da MQL5 exportam, ou outro dos formatos acima). Dizemos se ela se "
-        "comporta como o backtest e revisamos os depósitos e saques."
+        "comporta como o backtest e revisamos os depósitos e saques. Até 10 MB."
     ),
     "optimization": "Exportação de otimização do MT5 (XML, opcional)",
     "optimization_help": (
-        "Conta as configurações que você testou: o Sharpe deflacionado usa esse número real."
+        "Conta as configurações que você testou: o Sharpe deflacionado usa esse número real. "
+        "Até 10 MB."
     ),
     "equity": (
         "Curva de equity ou série de retornos (CSV ou Excel; obrigatória se você não enviar um "
@@ -82,17 +83,22 @@ COPY_PT: dict[str, Any] = {
     "equity_help": (
         "Colunas: timestamp e equity (ou return), em CSV, texto do Excel ou XLSX. Também a "
         "tabela de rentabilidades mensais de um fundo (um ano por linha, um mês por coluna). "
-        "Até 5 MB."
+        "Até 5 MB (se você soltar aqui um relatório de plataforma, até 10 MB)."
     ),
     "initial_balance": "Saldo inicial (se o relatório não informar)",
     "challenge": "Desafio de prop firm para simular",
     "challenge_help": "Regras lidas no site oficial de cada firma em {as_of}. "
     "O relatório cita a fonte; confirme as regras com a firma antes de pagar o desafio.",
     "trades": "Operações fechadas (CSV, opcional)",
-    "trades_help": "entry_time, exit_time, quantity, entry_price, exit_price, side.",
+    "trades_help": "entry_time, exit_time, quantity, entry_price, exit_price, side. Até 5 MB.",
+    "dates_hint": (
+        "Datas como ano-mês-dia (2026-03-31) e ponto decimal são lidas melhor. Se o seu "
+        "arquivo usa dia/mês/ano, diga isso na descrição."
+    ),
     "benchmark": "Benchmark (CSV, opcional)",
+    "benchmark_help": "Até 5 MB.",
     "variants": "Matriz de variantes (CSV, opcional)",
-    "variants_help": "Uma coluna de retornos por variante testada; habilita o PBO.",
+    "variants_help": "Uma coluna de retornos por variante testada; habilita o PBO. Até 5 MB.",
     "trials": "Quantas configurações ou versões foram testadas antes de escolher esta?",
     "trials_help": (
         "Configurações testadas antes de escolher esta. Se ficar vazio, o relatório usa 1 (o "
@@ -753,6 +759,19 @@ MESSAGES_PT: dict[str, str] = {
         "máximo que aceitamos: otimize de novo com o algoritmo genético ou com faixas de "
         "parâmetros mais curtas e exporte outra vez. Você também pode enviar o relatório sem o "
         "XML e escrever o número de passagens em «Configurações testadas»."
+    ),
+    "empty_upload": (
+        "O arquivo {what} chegou vazio (0 bytes): exporte-o de novo da sua plataforma, "
+        "confira se ele tem conteúdo e envie outra vez."
+    ),
+    "curve_too_large": (
+        "O arquivo da curva de equity passa de {limit}, o máximo que aceitamos para uma "
+        "curva: envie um período mais curto ou dados menos frequentes (por exemplo, diários "
+        "em vez de por minuto)."
+    ),
+    "curve_is_picture": (
+        "O arquivo da curva de equity é uma imagem, não uma tabela: envie a curva em CSV ou "
+        "Excel, com uma coluna de data e outra de equity ou de retorno."
     ),
     "equity_required": (
         "Falta o arquivo: envie o relatório da sua plataforma (MetaTrader, "

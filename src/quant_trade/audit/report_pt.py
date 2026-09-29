@@ -182,8 +182,8 @@ REPORT: dict[str, Any] = {
         ),
         "plateau_by_report": "Escolhida: a que coincide com as entradas do relatório do testador.",
         "plateau_by_best": (
-            "Escolhida: a passada com maior lucro, porque o relatório não traz entradas que "
-            "coincidam com uma passada."
+            "Escolhida: a passagem com maior lucro, porque o relatório não traz entradas que "
+            "coincidam com uma passagem."
         ),
         "plateau_keep": "Do lucro escolhido que os vizinhos conservam (mediana).",
         "plateau_in_profit": "Dos vizinhos que terminam com lucro.",
@@ -212,10 +212,10 @@ REPORT: dict[str, Any] = {
         "forward_rank": (
             "Correlação de postos entre backtest e forward (1 = mesma ordem, 0 = sem relação)."
         ),
-        "forward_top": "Das {n} melhores passadas do backtest terminam o forward com ganho.",
-        "forward_all": "De todas as passadas terminam o forward com ganho.",
-        "forward_chosen": "Das demais passadas ficam abaixo da escolhida no forward.",
-        "forward_held": "As melhores passadas do backtest continuam à frente no período forward.",
+        "forward_top": "Das {n} melhores passagens do backtest terminam o forward com ganho.",
+        "forward_all": "De todas as passagens terminam o forward com ganho.",
+        "forward_chosen": "Das demais passagens ficam abaixo da escolhida no forward.",
+        "forward_held": "As melhores passagens do backtest continuam à frente no período forward.",
         "forward_lost": (
             "A ordem do backtest não se sustenta no período forward. Isso também aparece nas "
             "bandeiras vermelhas."
@@ -981,6 +981,7 @@ REPORT: dict[str, Any] = {
         "colmap": "Como cada coluna do seu arquivo foi lida",
         "optimization": "Exportação de otimização",
         "passes": "configurações testadas",
+        "passes_one": "configuração testada",
         "trials_used": "Tentativas usadas no Sharpe deflacionado",
         "horizon": "1 ano",
         "reasons_detail": "Detalhe técnico de cada dimensão",
@@ -1595,8 +1596,8 @@ REPORT: dict[str, Any] = {
         "tick_model": "Modelagem de preços",
         "trades_per_year": "Operações por ano",
         "chosen_result": "Lucro da configuração escolhida",
-        "passes": "Passadas da otimização",
-        "passes_in_profit": "Passadas com lucro",
+        "passes": "Passagens da otimização",
+        "passes_in_profit": "Passagens com lucro",
         "chosen_top_share": "Posição da escolhida (percentil superior)",
         "neighbours_found": "Vizinhos encontrados",
         "neighbours_in_profit": "Vizinhos com lucro",
@@ -1960,6 +1961,25 @@ VERDICT: dict[str, Any] = {
             "Não foi possível descontar o número de tentativas porque a significância não foi "
             "medida. Com uma curva mais longa é possível calculá-lo."
         ),
+        "multiplicity.NOT_MEASURED.undeclared": (
+            "Não foi declarado quantas configurações foram testadas, então a classe não pode "
+            "passar de B. Ao declarar esse número (mesmo que seja 1), o Rigor pode descontá-lo."
+        ),
+        "multiplicity.NOT_MEASURED.undeclared.fund": (
+            "Não foi declarado quantos fundos ou estratégias o mesmo gestor administra, então a "
+            "classe não pode passar de B. Ao declarar esse número (mesmo que seja 1), o Rigor "
+            "pode descontá-lo."
+        ),
+        "multiplicity.FAIL.undeclared": (
+            "Mesmo contando uma única configuração, o caso mais favorável, o resultado não "
+            "supera o que uma tentativa sem vantagem real daria. Não foi declarado quantas foram "
+            "testadas: com mais de uma, a conclusão seria ainda mais fraca."
+        ),
+        "multiplicity.FAIL.undeclared.fund": (
+            "Mesmo contando um único fundo, o caso mais favorável, o resultado não supera o que "
+            "uma tentativa sem vantagem real daria. Não foi declarado quantos fundos ou "
+            "estratégias o gestor administra: com mais de um, a conclusão seria ainda mais fraca."
+        ),
         "costs.PASS": (
             "As operações se sustentam mesmo que os custos tripliquem. Os custos reais dependem "
             "da sua corretora e da execução."
@@ -2206,7 +2226,7 @@ PLAN: dict[str, Any] = {
             "mesmo que o resultado seja menor, e confira-os em um trecho fora da amostra."
         ),
         "FORWARD_NOT_HELD": (
-            "As melhores passadas do backtest não se destacam com dados novos: otimize menos "
+            "As melhores passagens do backtest não se destacam com dados novos: otimize menos "
             "parâmetros ou com faixas mais amplas, e escolha uma configuração que também "
             "funcione no período forward."
         ),
@@ -3037,7 +3057,7 @@ RULES: tuple[tuple[str, str], ...] = (
     ),
     (
         "{n} repeated pass number(s) counted once",
-        "{n} número(s) de passada repetido(s) contado(s) uma vez",
+        "{n} número(s) de passagem repetido(s) contado(s) uma vez",
     ),
     (
         (
@@ -3045,8 +3065,8 @@ RULES: tuple[tuple[str, str], ...] = (
             "optimisation lists only the passes it evaluated"
         ),
         (
-            "o número de passadas é o de configurações que o otimizador testou; uma otimização "
-            "genética só lista as passadas que avaliou"
+            "o número de passagens é o de configurações que o otimizador testou; uma otimização "
+            "genética só lista as passagens que avaliou"
         ),
     ),
     (
@@ -3121,7 +3141,7 @@ RULES: tuple[tuple[str, str], ...] = (
             "declared count is too low"
         ),
         (
-            "{n} tentativa(s) declarada(s), mas os arquivos mostram {m} variantes ou passadas de "
+            "{n} tentativa(s) declarada(s), mas os arquivos mostram {m} variantes ou passagens de "
             "otimização; o número declarado é baixo demais"
         ),
     ),
@@ -3437,7 +3457,7 @@ RULES: tuple[tuple[str, str], ...] = (
     ),
     (
         "rank of the chosen pass / passes",
-        "posição da passada escolhida / passadas",
+        "posição da passagem escolhida / passagens",
     ),
     (
         "median neighbour profit / chosen profit",
@@ -3445,7 +3465,7 @@ RULES: tuple[tuple[str, str], ...] = (
     ),
     (
         "the chosen pass shows no profit",
-        "a passada escolhida não tem ganho",
+        "a passagem escolhida não tem ganho",
     ),
     (
         "the optimisation did not try the settings one step away (genetic or sparse)",
@@ -3467,7 +3487,7 @@ RULES: tuple[tuple[str, str], ...] = (
     ),
     (
         "needs at least {n} passes with a profit column and a parameter that varies",
-        "precisa de pelo menos {n} passadas com coluna de resultado e um parâmetro que varie",
+        "precisa de pelo menos {n} passagens com coluna de resultado e um parâmetro que varie",
     ),
     (
         "the file is a backtest, not an account history",
@@ -3557,8 +3577,8 @@ RULES: tuple[tuple[str, str], ...] = (
             "cases, against {b} for all passes; rank correlation between the periods {r}"
         ),
         (
-            "as {k} melhores passadas do backtest terminam o período forward com ganho em {a} "
-            "dos casos, contra {b} de todas as passadas; correlação de postos entre os períodos "
+            "as {k} melhores passagens do backtest terminam o período forward com ganho em {a} "
+            "dos casos, contra {b} de todas as passagens; correlação de postos entre os períodos "
             "{r}"
         ),
     ),
@@ -3590,11 +3610,11 @@ RULES: tuple[tuple[str, str], ...] = (
     ),
     (
         "needs at least {n} passes with a back and a forward result",
-        "são necessárias pelo menos {n} passadas com resultado de backtest e de forward",
+        "são necessárias pelo menos {n} passagens com resultado de backtest e de forward",
     ),
     (
         "every pass has the same back or forward result",
-        "todas as passadas têm o mesmo resultado de backtest ou de forward",
+        "todas as passagens têm o mesmo resultado de backtest ou de forward",
     ),
     (
         "from the rows of the forward optimisation export",
@@ -3602,27 +3622,27 @@ RULES: tuple[tuple[str, str], ...] = (
     ),
     (
         "Spearman correlation between the back and the forward result of every pass",
-        "correlação de Spearman entre o resultado de backtest e o de forward de cada passada",
+        "correlação de Spearman entre o resultado de backtest e o de forward de cada passagem",
     ),
     (
         "the best tenth of the passes by back result, at least five",
-        "o melhor décimo das passadas por resultado de backtest, pelo menos cinco",
+        "o melhor décimo das passagens por resultado de backtest, pelo menos cinco",
     ),
     (
         "share of the best backtest passes with a forward profit",
-        "parcela das melhores passadas do backtest com ganho no forward",
+        "parcela das melhores passagens do backtest com ganho no forward",
     ),
     (
         "share of all passes with a forward profit",
-        "parcela de todas as passadas com ganho no forward",
+        "parcela de todas as passagens com ganho no forward",
     ),
     (
         "median forward profit of the best backtest passes",
-        "ganho mediano no forward das melhores passadas do backtest",
+        "ganho mediano no forward das melhores passagens do backtest",
     ),
     (
         "median forward profit of all passes",
-        "ganho mediano no forward de todas as passadas",
+        "ganho mediano no forward de todas as passagens",
     ),
     (
         "the export has no Profit column for the forward period",
@@ -3630,15 +3650,15 @@ RULES: tuple[tuple[str, str], ...] = (
     ),
     (
         "share of the other passes with a lower forward result",
-        "parcela das demais passadas com um resultado forward menor",
+        "parcela das demais passagens com um resultado forward menor",
     ),
     (
         "forward profit of the pass matching the tester report",
-        "ganho no forward da passada que coincide com o relatório do testador",
+        "ganho no forward da passagem que coincide com o relatório do testador",
     ),
     (
         "no pass matches the inputs of the uploaded tester report",
-        "nenhuma passada coincide com as entradas do relatório do testador enviado",
+        "nenhuma passagem coincide com as entradas do relatório do testador enviado",
     ),
     (
         (

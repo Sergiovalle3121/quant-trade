@@ -415,7 +415,7 @@ def preset_label(firm: str, program: str, phase: str, locale: str = "es") -> str
     siblings = sum(1 for r in PRESETS.values() if (r.firm, r.program) == (firm, program))
     parts = [localize(firm, locale), localize(program, locale)]
     if phase and (siblings > 1 or not phase.isdigit()):
-        word = "fase" if locale == "es" else "phase"
+        word = "fase" if locale in ("es", "pt") else "phase"
         parts.append(
             f"{word} {localize(phase, locale)}" if phase[0].isdigit() else localize(phase, locale)
         )

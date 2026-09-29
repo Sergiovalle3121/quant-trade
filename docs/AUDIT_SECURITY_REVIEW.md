@@ -304,6 +304,46 @@ Limits that remain from this pass:
 - The description of the private pages (sign-up, sign-in, recovery,
   comparison) is one fixed sentence per language; they stay `noindex`.
 
+## Account page, sign-up and recovery polish (2026-09-29)
+
+Reviewed against `main` at c6ce500, after a customer-style audit of the
+account page, sign-up and recovery in the three languages. No control was
+relaxed: the CSRF tokens, the session and account-action limits, the
+password check on every account form, `safe_next` and the address logic are
+unchanged. Every change has an offline, deterministic test in
+`tests/test_audit_account_polish.py`.
+
+| # | Finding | Severity | Fix |
+|---|---|---|---|
+| C4 | "Mi cuenta" said the free first report was Disponible when the inbox had already received it on another (deleted) account: the page read `welcome_used(account)` only, the upload also reads `free_claim_taken(welcome_key(email))`. The rule itself held (the upload came out as a preview). | Low (a promise, no second free report) | The indicator reads both, so it shows Usado whenever the upload would refuse for the account or the inbox; an account without reports then offers "Subir un archivo". Nothing else about the free report changed: the device, file and network rules are still applied at upload time only, where they are told as before. |
+| C5 | The e-mail change accepted a mistyped provider (`gmial.com`) without the «¿Quisiste decir…?» question sign-up asks, so confirmation and recovery mail would go to a squatter's server. | Medium | `inbox.suggest_domain` runs on the e-mail change too, after the current password and the two matching addresses and before the DNS check, as on sign-up. The answer is a page (`account_pages.email_typo_page`, `no-store`, no referrer) with the corrected address, a box that keeps the typed one and the password again: the password is never written on a page, and the change still needs it. A kept address goes through every other check (plain, reserved, disposable, DNS, taken); the confirmation flow and the immediate change are unchanged. |
+| C6 | Every sign-up form counted toward the 5 per hour, mistakes and the typo question included: a customer with a typo and a weak password was locked out for an hour and, on a shared IPv4, locked others out; the 429 had no `Retry-After`. | Medium | A sign-up is counted only when the form passed every check, right before the account is created or the address turns out to be taken, so mass sign-ups and address probing stop at 5 as before. Forms sent back count against a separate ceiling of 30 per hour per network (`accounts.MAX_INVALID_SIGNUPS_PER_HOUR`, `signup_invalid` in the `attempts` table), checked before any validation, so the form cannot be used to hammer the DNS check or the password check; a forged form (bad CSRF) is refused before anything is counted. Both refusals carry `Retry-After: 3600`. |
+| C7 | The disposable-inbox list let 17 known services through, some of them aliases of services it blocked (grr.la and pokemail.net are Guerrilla Mail; moakt.cc is moakt). | Medium | 51 domains added (110 in all): the 17 reported and the public aliases of Guerrilla Mail, Mailinator, YOPmail, 10minutemail, temp-mail, moakt and 1secmail; each is checked as an exact or parent domain, as before. A test keeps every entry lower case, a plain domain, and off the list of real providers the typo question suggests. The list is still not exhaustive. |
+| C8 | The account's own address, or its name, was accepted as the password when the name ended in digits (`ana1990@…` with `ana1990`): the digits were stripped from the password but not from the name it was compared with, and the whole address was never compared. | Low | `accounts.common_password` refuses the address itself (however spaced or cased), its name, and its name without its leading or trailing digits, with digits or symbols around them; checked offline at sign-up, password change and reset. Existing passwords are not re-checked. |
+| C9 | A disabled access code was added to the account with "Código añadido" although it gives no credit (`link_code` read the code's id only). | Low | A code added by hand must pass `store.code_usable` (not disabled, not expired, credits left); otherwise the answer is `code_unusable` in the three languages and nothing is linked. A code already on the account keeps `code_already`; an unknown one `code_unknown`. Codes are still stored as hashes and never listed. |
+
+Also changed, texts and layout only: the four parts of the account page keep
+the order of the links (the credits counter links to the buying block when
+it reads 0), the counters are singular with 1, the reports list shows the
+time and the short id of each report, a wrong current password on an
+account form has its own message (`wrong_current`), the refusals of "Mis
+estrategias" are shown, buying by WhatsApp says the sale is final, the
+recovery page introduces the e-mail link first when delivery is ready, the
+preview notice never says a confirmation link was sent while delivery is
+not ready (`welcome_refused_unverified_nomail`, naming
+`AUDIT_OPERATOR_CONTACT` or the contact page), and the `not_included` note
+of the data download follows the page's language.
+
+Limits that remain from this pass:
+
+- The invalid-form ceiling is per network like the sign-up limit: past 30
+  mistakes from one shared IPv4 in an hour, everyone behind it waits the
+  hour. Sign-ups are counted in the database, so a deploy does not reset
+  either counter.
+- The disposable list is a list: a service with a new mirror domain gets
+  through until it is added. cock.li was added as reported, although it is
+  a general anonymous provider more than a ten-minute inbox.
+
 ## Reading of customer files: dates, decimals, an uncomputed Sharpe (2026-09-29)
 
 Reviewed against `main` at c6ce500, from a customer-style audit with local
@@ -370,3 +410,19 @@ The choices, and what stays:
   `AUDIT_QUEUE_SECONDS` (default 30). Raise the first only with more memory.
 - Start the service with `quant-trade audit serve` (the Dockerfile already
   does), so the redacting log configuration is used.
+
+## Customer audit: report wording, upload guidance and refusals (2026-09-29)
+
+Reviewed against `main` at c6ce500. Scope: texts of the report, the upload
+page and the refusals in Spanish, English and Portuguese. No reader,
+threshold, limit or setting changed; no control was relaxed. Tests are
+offline and deterministic (`tests/test_audit_report_polish.py`).
+
+| # | Finding | Severity | Fix |
+|---|---|---|---|
+| P1 | A file that arrived with 0 bytes was answered "a file is missing"; a picture in the curve box was answered "needs a date column". | Low (wording) | `MESSAGES["empty_upload"]` names the box when the browser sent a file name with no bytes and nothing else was uploaded; `MESSAGES["curve_is_picture"]` when the curve box holds a file starting with a PNG, JPEG, GIF or TIFF signature (`PICTURE_SIGNATURES`) and the reader refused it. A PDF is not in the list: a first version listed `%PDF-`, which would have kept a PDF statement dropped in the curve box from the column screen it reached before (caught in review before merge; a test now drops a PDF table there and expects the column screen). Both keep status 400; `_read_limited`, the byte limits and what is accepted are unchanged. The file name is never echoed. |
+| P2 | A curve over the reader's 5 MB limit was told "10 MB" by the field or a byte count by the reader. | Low (wording) | `MESSAGES["curve_too_large"]` states `schema.MAX_UPLOAD_BYTES` as megabytes in both refusals (413 from the field, 400 from the reader). The field limit (`REPORT_FIELDS`, twice `max_upload_bytes`, so a platform report dropped in the curve box is still read as the report) and the reader's limit are unchanged. `UploadTooLarge` now carries the file name and the first chunk read (at most 64 KB, kept in memory only for the refusal, never stored or logged); when `looks_like_platform_report` says the oversized file in the curve box is a platform report, the 413 states the report's 10 MB (`MESSAGES["too_large"]`) instead of the curve's 5 MB. The limit that stopped the read is the same in both cases. |
+| P3 | A Portuguese report posted its comparison to `/compare` with `lang=pt`, which answered in Spanish. | Low | The report posts to `COMPARE_PATH["pt"]`; the three `POST` comparison routes treat `lang=pt` as Portuguese. Links, tokens and the checks on both reports are unchanged. |
+| P4 | A preview of a file the account had already audited said nothing about the earlier report. | Low (product) | `Store.earlier_audit_of_same_files(account_id, audit_id)` looks only among audits linked to that account (`account_audits`), not purged, uploaded before this one, with the same set of SHA-256 digests (SQL prefilter on `equity_sha256` and `created_at`, or on the platform report's digest in `audit_files` when the upload has no curve of its own, then the full digest set, at most 20 candidates; a first version filtered `equity_sha256 IS NULL` for a report upload, which matched every report upload of the account and could miss the earlier one past the 20 candidates, caught in review before merge). `web._account_box` calls it only when the viewer is signed in as the owner of the report being viewed and the report is locked; the note links `/audits/<id>?lang=…` with no token, which that same account opens through its session. No report of another account is ever read for this or named. Nothing changes in what is spent. |
+| P5 | The badge code made from an English or Portuguese verification page linked `/v/<id>` (Spanish). | Low | The link carries `?lang=en` or `?lang=pt` from the page's own language table; Spanish keeps the bare path. The badge, the page's allow-list and the public id are unchanged. |
+| P6 | After the purge, the public page of an audit with undeclared trials fell back to the old "significance was not measured" sentence, because the kept view holds no dimension inputs. | Low (wording) | The allow-list of `store.public_view` gains one boolean per dimension, `undeclared` (`verdict.trials_undeclared` on the two evidence tags), so the page chooses the same fixed sentence before and after the purge. It is a fact the live page already stated in words, never a number, a file, the description or the token; the stored `result_sha256` is still computed from the full result. A view kept before this change has no such key and shows the general sentence. |

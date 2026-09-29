@@ -56,7 +56,15 @@ MAX_FAILED_SIGNINS_PER_EMAIL = 50
 #: Tries an address gets on an e-mail past that e-mail's ceiling, so a
 #: stranger who knows the e-mail cannot lock the owner out.
 SIGNIN_TRIES_PAST_EMAIL_CEILING = 2
+#: Sign-ups per hour per network: forms that passed every check, whether the
+#: account was created or the address turned out to be taken.
 MAX_SIGNUPS_PER_HOUR = 5
+#: Sign-up forms sent back per hour per network (a mistake in the address or
+#: the password, the «¿Quisiste decir…?» question). Six times the sign-ups:
+#: a customer's own mistakes never reach it, and the form cannot be hammered.
+MAX_INVALID_SIGNUPS_PER_HOUR = 30
+#: ``Retry-After`` of a sign-up refused for either limit: the counted hour.
+SIGNUP_RETRY_AFTER_SECONDS = 3600
 MAX_ACCOUNT_ACTIONS_PER_HOUR = 30
 
 #: The free tier: an account gets this many free previews per calendar month
@@ -333,9 +341,19 @@ def common_password(password: str, *, email: str = "") -> bool:
     # symbols around it, or the word repeated.
     core = re.sub(r"^[0-9]+|[0-9]+$", "", compact)
     words = set(COMMON_WORDS)
-    local = email.split("@", 1)[0].lower() if email else ""
+    address = email.strip().lower()
+    local = address.split("@", 1)[0]
+    if address and text in (address, local):
+        return True  # the account's own address, or its name
     if len(local) >= 3:
-        words.add(re.sub(r"[^a-z0-9ñ]+", "", local))
+        name = re.sub(r"[^a-z0-9ñ]+", "", local)
+        words.add(name)
+        # "ana1990@…" with "ana1990" or "ana2024": the name without its digits.
+        bare = re.sub(r"^[0-9]+|[0-9]+$", "", name)
+        if len(bare) >= 3:
+            words.add(bare)
+        if compact == re.sub(r"[\s._\-!@#$%^&*+=?¡¿]+", "", address):
+            return True  # the address written with other separators
     if not core:
         return True  # digits only: dates, phone-like runs and counts fall fast
     if core in words or (_repeats(core) and any(core.startswith(w) for w in words if w)):
@@ -612,6 +630,7 @@ __all__ = [
     "MAX_FAILED_SIGNINS_PER_HOUR",
     "MAX_FAILED_SIGNINS_PER_IP",
     "MAX_ACCOUNT_ACTIONS_PER_HOUR",
+    "MAX_INVALID_SIGNUPS_PER_HOUR",
     "MAX_SIGNUPS_PER_HOUR",
     "MIN_PASSWORD_CHARS",
     "NEXT_EXTRAS_QUERY",

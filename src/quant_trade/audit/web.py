@@ -108,6 +108,7 @@ from quant_trade.audit.report import render, result_sha256
 from quant_trade.audit.retention import RetentionWorker
 from quant_trade.audit.sample import sample_result
 from quant_trade.audit.schema import (
+    MAX_UPLOAD_BYTES,
     AuditResult,
     DeclaredMetadata,
     ParseError,
@@ -196,6 +197,38 @@ MESSAGES: dict[str, dict[str, str]] = {
             "accept: optimise again with the genetic algorithm or narrower parameter "
             "ranges and export it again. You can also upload the report without the "
             'XML and type the number of passes in "Configurations tried".'
+        ),
+    },
+    "empty_upload": {
+        "es": (
+            "El archivo {what} llegó vacío (0 bytes): expórtalo de nuevo desde tu plataforma, "
+            "revisa que tenga contenido y súbelo otra vez."
+        ),
+        "en": (
+            "The {what} file arrived empty (0 bytes): export it again from your platform, "
+            "check that it has content and upload it again."
+        ),
+    },
+    "curve_too_large": {
+        "es": (
+            "El archivo de la curva de equity pesa más de {limit}, el máximo que aceptamos "
+            "para una curva: sube un periodo más corto o datos menos frecuentes (por ejemplo, "
+            "diarios en vez de por minuto)."
+        ),
+        "en": (
+            "The equity curve file is larger than {limit}, the most we accept for a curve: "
+            "upload a shorter period or less frequent data (for example daily instead of "
+            "per minute)."
+        ),
+    },
+    "curve_is_picture": {
+        "es": (
+            "El archivo de la curva de equity es una imagen, no una tabla: sube la curva en "
+            "CSV o Excel, con una columna de fecha y otra de equity o de retorno."
+        ),
+        "en": (
+            "The equity curve file is a picture, not a table: upload the curve as CSV or "
+            "Excel, with a date column and an equity or return column."
         ),
     },
     "equity_required": {
@@ -436,6 +469,17 @@ REPORT_FIELDS = frozenset({"equity", "report", "live", "optimization"})
 #: Bytes a pass takes in an MT5 optimisation export, for the size refusal.
 OPTIMIZATION_PASS_BYTES = 900
 REPORT_SIZE_FACTOR = 2
+#: How a picture begins (PNG, JPEG, GIF, TIFF): named as such when it
+#: arrives in the curve box, which takes tables only. A PDF is not listed:
+#: a PDF statement's table is read through the column screen.
+PICTURE_SIGNATURES = (
+    b"\x89PNG\r\n\x1a\n",
+    b"\xff\xd8\xff",
+    b"GIF87a",
+    b"GIF89a",
+    b"II*\x00",
+    b"MM\x00*",
+)
 
 _HOST = re.compile(r"^[A-Za-z0-9.-]{1,253}(:[0-9]{1,5})?$")
 #: Railway's own addresses; a read there moves to ``AUDIT_BASE_URL`` once it differs.
@@ -847,9 +891,13 @@ class AuditAdmissionMiddleware:
 
 
 class UploadTooLarge(Exception):
-    def __init__(self, what: str) -> None:
+    def __init__(self, what: str, *, filename: str | None = None, head: bytes = b"") -> None:
         super().__init__(what)
         self.what = what
+        #: The file's name and its first bytes, so that the refusal can tell a
+        #: platform report dropped in the curve box from a curve.
+        self.filename = filename
+        self.head = head
 
 
 def hash_token(token: str) -> str:
@@ -1301,6 +1349,15 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             base = "https://" + base[len("http://") :]
         return base
 
+    def _operator_reach(request: Request, locale: str) -> str:
+        """Where to write to the operator: the published address, else the contact page."""
+        from quant_trade.audit.pages import CONTACT_PATHS
+
+        contact = cfg.operator_contact
+        if "@" in contact and " " not in contact:
+            return contact
+        return _site_url(request) + CONTACT_PATHS.get(locale, CONTACT_PATHS["es"])
+
     def _locale(value: str | None) -> str:
         return value if value in LOCALES else "es"
 
@@ -1362,7 +1419,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 break
             size += len(chunk)
             if size > _field_limit(what):
-                raise UploadTooLarge(what)
+                head = chunks[0] if chunks else chunk
+                raise UploadTooLarge(what, filename=upload.filename, head=head)
             chunks.append(chunk)
         data = b"".join(chunks)
         return data or None
@@ -1736,6 +1794,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     signin_email_failures = StoredAttemptLog(db, "signin_email")
     signin_ip_failures = StoredAttemptLog(db, "signin_ip")
     signup_attempts = StoredAttemptLog(db, "signup")
+    signup_mistakes = StoredAttemptLog(db, "signup_invalid")
     recovery_attempts = StoredAttemptLog(db, "recovery")
     two_step_attempts = StoredAttemptLog(db, "two_step")
     passkey_starts = StoredAttemptLog(db, "passkey")
@@ -1949,12 +2008,16 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         "code_already",
         "code_other",
         "code_unknown",
+        "code_unusable",
         "wrong",
+        "wrong_current",
         "csrf",
         "too_many",
         "compare_pick",
         "password_common",
         "password_short",
+        "password_long",
+        "password_bad",
         "file_bad",
         "strategy_full",
         "code_bad",
@@ -2157,6 +2220,10 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             invite = _invite(invite) if _referrals_on() else ""
 
             def again(error: str, status: int, *, typo_of: str = "") -> Response:
+                if status != 429 and error != "csrf" and net:
+                    # A form sent back (a mistake, the typo question) counts
+                    # against its own, higher ceiling, never as a sign-up.
+                    signup_mistakes.hit(net, now)
                 page = account_pages.signup_page(
                     retention_days=cfg.retention_days,
                     locale=locale,
@@ -2169,14 +2236,21 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                     typo_of=typo_of or (clean if email_as_typed else ""),
                     typo_kept=bool(email_as_typed) and not typo_of,
                 )
-                return _anon_page(page, new_csrf, status)
+                answer = _anon_page(page, new_csrf, status)
+                if status == 429:
+                    answer.headers["Retry-After"] = str(acct.SIGNUP_RETRY_AFTER_SECONDS)
+                return answer
 
+            net = ""
+            now = datetime.now(UTC)
             if not _anon_ok(request, csrf):
                 return again("csrf", 400)
-            ip = _client_ip(request, cfg.trusted_proxy_hops)
-            now = datetime.now(UTC)
             # Counted per network: an IPv6 /64 is one household or server.
-            if signup_attempts.hit(acct.network_address(ip), now) >= acct.MAX_SIGNUPS_PER_HOUR:
+            net = acct.network_address(_client_ip(request, cfg.trusted_proxy_hops))
+            if (
+                signup_attempts.count(net, now) >= acct.MAX_SIGNUPS_PER_HOUR
+                or signup_mistakes.count(net, now) >= acct.MAX_INVALID_SIGNUPS_PER_HOUR
+            ):
                 return again("too_many", 429)
             if not acct.valid_email(clean):
                 return again("email_bad", 400)
@@ -2198,6 +2272,10 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             problem = acct.password_problem(password, email=clean)
             if problem:
                 return again(problem, 400)
+            # The form is valid: this is a sign-up, whether the account is
+            # created or the address turns out to be taken.
+            if signup_attempts.hit(net, now) >= acct.MAX_SIGNUPS_PER_HOUR:
+                return again("too_many", 429)
             account = db.create_account(
                 email=clean,
                 password_hash=acct.hash_password(password),
@@ -2551,7 +2629,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             if rp is None:
                 return RedirectResponse(f"{base}?error=passkey_unavailable#llaves", 303)
             if not acct.verify_password(db.password_hash(account.id) or "", current):
-                return RedirectResponse(f"{base}?error=wrong#llaves", status_code=303)
+                return RedirectResponse(f"{base}?error=wrong_current#llaves", status_code=303)
             if len(db.list_passkeys(account.id)) >= pk.MAX_PER_ACCOUNT:
                 return RedirectResponse(f"{base}?error=passkey_full#llaves", status_code=303)
             now = datetime.now(UTC)
@@ -2640,7 +2718,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             base = account_pages.path("account", locale)
             # Like adding one: a borrowed session alone cannot strip them.
             if not acct.verify_password(db.password_hash(account.id) or "", current):
-                return RedirectResponse(f"{base}?error=wrong#llaves", status_code=303)
+                return RedirectResponse(f"{base}?error=wrong_current#llaves", status_code=303)
             if not db.remove_passkey(account.id, credential):
                 return RedirectResponse(f"{base}#llaves", status_code=303)
             _note_event(request, account.id, "passkey_removed")
@@ -2861,7 +2939,12 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                     welcome=(
                         ""
                         if cfg.free_mode or not acct.WELCOME_FULL_REPORT
-                        else ("used" if db.welcome_used(account.id) else "available")
+                        else (
+                            "used"
+                            if db.welcome_used(account.id)
+                            or db.free_claim_taken(inbox.welcome_key(account.email))
+                            else "available"
+                        )
                     ),
                     strategies=db.list_strategies(account.id),
                     recovery_created=db.recovery_key_created(account.id) or "",
@@ -2918,11 +3001,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             payload = {
                 "service": BRAND,
                 "exported_at": now.isoformat().replace("+00:00", "Z"),
-                "not_included": (
-                    "Your password (kept only as a scrypt hash), session and reset tokens and "
-                    "report link tokens (kept only as hashes) and card details (never received: "
-                    "card payments go through Stripe)."
-                ),
+                "not_included": account_pages.COPY[locale]["export_not_included"],
                 "retention_days_for_unpaid_reports_and_ips": cfg.retention_days,
                 **data,
             }
@@ -3190,10 +3269,18 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 return checked
             account, _, locale, _ = checked
             base = account_pages.path("account", locale)
-            code_id = db.code_id(code.strip()[:_CODE_MAX])
+            typed = code.strip()[:_CODE_MAX]
+            code_id = db.code_id(typed)
             if code_id is None:
                 return RedirectResponse(f"{base}?error=code_unknown", status_code=303)
-            outcome = db.link_code(account.id, code_id, at=datetime.now(UTC))
+            now = datetime.now(UTC)
+            if not db.code_usable(typed, now):
+                # Disabled, expired or spent: it would give no credit. One
+                # already on this account keeps its own answer.
+                mine = any(item.code.id == code_id for item in db.account_codes_list(account.id))
+                kind = "code_already" if mine else "code_unusable"
+                return RedirectResponse(f"{base}?error={kind}", status_code=303)
+            outcome = db.link_code(account.id, code_id, at=now)
             if outcome == "linked":
                 return RedirectResponse(f"{base}?done=code_linked", status_code=303)
             return RedirectResponse(f"{base}?error=code_{outcome}", status_code=303)
@@ -3313,7 +3400,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             account, session_hash, locale, _ = checked
             base = account_pages.path("account", locale)
             if not acct.verify_password(db.password_hash(account.id) or "", current):
-                return RedirectResponse(f"{base}?error=wrong", status_code=303)
+                return RedirectResponse(f"{base}?error=wrong_current", status_code=303)
             problem = acct.password_problem(password, email=account.email)
             if problem:
                 shown = problem if problem in account_errors else "wrong"
@@ -3334,6 +3421,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             email_again: Annotated[str, Form(max_length=320)] = "",
             current: Annotated[str, Form(max_length=1024)] = "",
             csrf: Annotated[str, Form(max_length=200)] = "",
+            email_as_typed: Annotated[str, Form(max_length=320)] = "",
             lang: str | None = None,
         ) -> Response:
             checked = _signed_in_action(request, path_locale, lang, csrf)
@@ -3346,8 +3434,12 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 return RedirectResponse(f"{base}?error={error}", status_code=303)
 
             if not acct.verify_password(db.password_hash(account.id) or "", current):
-                return refused("wrong")
-            clean = acct.normalise_email(email)
+                return refused("wrong_current")
+            # "No, my address is the one I typed": the box keeps that address,
+            # which was written twice before the question was asked.
+            clean = acct.normalise_email(email_as_typed or email)
+            if email_as_typed:
+                email_again = clean
             if not acct.valid_email(clean):
                 return refused("email_bad")
             if not acct.simple_email(clean):
@@ -3356,6 +3448,20 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 return refused("email_bad")
             if inbox.is_disposable(clean):
                 return refused("email_disposable")
+            suggested = "" if email_as_typed else inbox.suggest_domain(clean)
+            if suggested and clean == acct.normalise_email(email_again):
+                # A mistyped provider can have mail servers of a stranger's:
+                # the address is confirmed before it replaces the old one.
+                return HTMLResponse(
+                    account_pages.email_typo_page(
+                        locale=locale,
+                        csrf=csrf,
+                        suggested=suggested,
+                        typed=clean,
+                        verification_required=cfg.email_verification_required,
+                    ),
+                    headers={"Cache-Control": "no-store", "Referrer-Policy": "no-referrer"},
+                )
             if cfg.check_email_domains and not app.state.mail_domain_check(clean):
                 return refused("email_no_domain")
             if clean != acct.normalise_email(email_again):
@@ -3473,7 +3579,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             account, _, locale, _ = checked
             if not acct.verify_password(db.password_hash(account.id) or "", current):
                 return RedirectResponse(
-                    account_pages.path("account", locale) + "?error=wrong", status_code=303
+                    account_pages.path("account", locale) + "?error=wrong_current",
+                    status_code=303,
                 )
             db.delete_account(account.id, with_reports=with_reports == "yes")
             response = _signin_redirect(locale, done="deleted")
@@ -3622,7 +3729,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             account, _, locale, _ = checked
             base = account_pages.path("account", locale)
             if not acct.verify_password(db.password_hash(account.id) or "", current):
-                return RedirectResponse(f"{base}?error=wrong#dos-pasos", status_code=303)
+                return RedirectResponse(f"{base}?error=wrong_current#dos-pasos", status_code=303)
             # Without a recovery key a lost phone would lock the account.
             if db.recovery_key_created(account.id) is None:
                 return RedirectResponse(
@@ -3740,7 +3847,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             account, _, locale, _ = checked
             base = account_pages.path("account", locale)
             if not acct.verify_password(db.password_hash(account.id) or "", current):
-                return RedirectResponse(f"{base}?error=wrong#recuperacion", status_code=303)
+                return RedirectResponse(f"{base}?error=wrong_current#recuperacion", status_code=303)
             key = acct.new_recovery_key()
             db.set_recovery_key(account.id, acct.recovery_key_hash(key), at=datetime.now(UTC))
             _note_event(request, account.id, "recovery_key_created")
@@ -4111,6 +4218,27 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 text = message(
                     "optimization_too_large", report_loc, limit=_megabytes(limit), passes=passes
                 )
+            elif exc.what == "equity":
+                # A platform report dropped in the curve box is read as the
+                # report, so it is told the report's limit; a curve is told
+                # the curve reader's own, smaller limit.
+                try:
+                    as_report = looks_like_platform_report(exc.filename, exc.head)
+                except Exception:  # noqa: BLE001 - a truncated head never breaks the refusal
+                    as_report = False
+                if as_report:
+                    text = message(
+                        "too_large",
+                        report_loc,
+                        what=UPLOAD_NAMES["report"][report_loc],
+                        limit=_megabytes(limit),
+                    )
+                else:
+                    text = message(
+                        "curve_too_large",
+                        report_loc,
+                        limit=_megabytes(min(limit, MAX_UPLOAD_BYTES)),
+                    )
             else:
                 text = message(
                     "too_large",
@@ -4120,6 +4248,11 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 )
             return _html_error(request, 413, text, report_loc)
         if not uploads["equity"] and not uploads["report"]:
+            # A file that arrived with no bytes is named as empty, not as missing.
+            for what, sent in (("report", report), ("equity", equity)):
+                if sent is not None and sent.filename:
+                    text = message("empty_upload", report_loc, what=UPLOAD_NAMES[what][report_loc])
+                    return _html_error(request, 400, text, report_loc)
             return _html_error(request, 400, message("equity_required", report_loc), report_loc)
         # A new account's first file is a free full report (once per account,
         # browser and file); then the month's free previews; then a credit;
@@ -4353,6 +4486,17 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             try:
                 inputs = attempt(report_columns)
             except ParseError as exc:
+                curve = uploads["equity"]
+                if curve and not uploads["report"] and curve.startswith(PICTURE_SIGNATURES):
+                    # Refused as before; the sentence says what the file is.
+                    return _html_error(
+                        request, 400, message("curve_is_picture", report_loc), report_loc
+                    )
+                if exc.code == "too_large" and curve and len(curve) > MAX_UPLOAD_BYTES:
+                    text = message(
+                        "curve_too_large", report_loc, limit=_megabytes(MAX_UPLOAD_BYTES)
+                    )
+                    return _html_error(request, 400, text, report_loc)
                 # A "curve" that starts at 0 or crosses it is a list of
                 # results, and a curve file with no value column may be one:
                 # both are offered to name, a result list preselected as such.
@@ -4532,6 +4676,9 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             text = mapping.COPY[locale]["results" if results else "unknown"]
         else:
             text = _sentence(exc.localized(locale))
+        if len(table.samples) < 2 and not chosen:
+            # One row, or none: naming columns cannot help until the file is whole.
+            text = mapping.COPY[locale]["one_row"]
         if _wants_json(request):
             return JSONResponse(
                 {"error": text, "code": exc.code, "columns": table.names}, status_code=422
@@ -4759,6 +4906,10 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             and not record.paid
         ):
             notice = account_pages.COPY[ui][f"welcome_refused_{acct_done[8:]}"]
+            if acct_done[8:] == "unverified" and not cfg.email_delivery_ready:
+                notice = account_pages.COPY[ui]["welcome_refused_unverified_nomail"].format(
+                    contact=_operator_reach(request, ui)
+                )
         elif acct_done == "nocredit" and not record.paid:
             notice = account_pages.COPY[ui]["credit_none"]
         # A rejected code is answered next to the code field, not in this banner.
@@ -4822,7 +4973,13 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         state = "mine" if owner == account.id else ("unsaved" if owner is None else "other")
         now = datetime.now(UTC)
         credits = db.account_credits(account.id, now) if locked else 0
-        return account_pages.report_box(
+        same_file = ""
+        if locked and state == "mine":
+            # Only a report of this same account is ever named or linked.
+            earlier = db.earlier_audit_of_same_files(account.id, record.id)
+            if earlier:
+                same_file = account_pages.same_file_note(locale, f"/audits/{earlier}?lang={locale}")
+        return same_file + account_pages.report_box(
             locale=locale,
             state=state,
             audit_id=record.id,
@@ -5403,7 +5560,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         return _compare_form_page("pt", request=request)
 
     def _compare(link_a: str, link_b: str, lang: str | None, default: str) -> Response:
-        locale = "pt" if default == "pt" else _locale(lang or default)
+        # A Portuguese report posted to another language's address stays Portuguese.
+        locale = "pt" if "pt" in (default, lang) else _locale(lang or default)
         copy = COMPARE_COPY[locale]
         first, second = parse_report_link(link_a), parse_report_link(link_b)
         if first is None or second is None:

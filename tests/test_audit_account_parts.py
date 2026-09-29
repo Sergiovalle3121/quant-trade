@@ -12,7 +12,7 @@ pytest.importorskip("sqlalchemy")
 
 from fastapi.testclient import TestClient  # noqa: E402
 
-from quant_trade.audit import account_pages  # noqa: E402
+from quant_trade.audit import account_pages, theme  # noqa: E402
 from quant_trade.audit.guard import find_claims  # noqa: E402
 from quant_trade.audit.settings import AuditSettings  # noqa: E402
 from quant_trade.audit.store import (  # noqa: E402
@@ -205,9 +205,38 @@ def test_the_bar_sticks_below_the_top_bar_and_scrolls_sideways_on_a_phone() -> N
     assert ".acct-parts.has-alert~.acct-part" in css
 
 
-def test_without_credits_buying_still_comes_before_the_reports() -> None:
-    assert tuple(_parts(_page("es", credits=0))) == ("creditos", "informes", "seguridad", "datos")
-    assert tuple(_parts(_page("es", credits=1))) == PARTS
+def test_the_icons_of_the_buying_block_are_the_size_of_their_text() -> None:
+    # An icon with no rule of its own grows to the width of its box: the
+    # padlock under the card buttons once filled the screen.
+    page = _page("es", credits=0, card_markets=("MX", "US"))
+    buy = page.split("<form class='acct-buy'")[1].split("</form>")[0]
+    padlock = theme.icon("lock")
+    assert f"<p class='muted'>{padlock}" in buy
+    assert theme.icon("chat") in page.split("<form class='acct-buy'")[1].split("</section>")[0]
+    css = account_pages.ACCOUNT_CSS
+    assert ".acct-buy .muted svg,.acct-sec>.muted svg{flex:none;width:16px;height:16px" in css
+    assert ".acct-buy{display:grid;gap:12px" in css
+    # The safety net for every page: an icon the theme draws is never wider
+    # than the text beside it unless a rule of its own says so.
+    assert "viewBox='0 0 24 24'" in padlock and "aria-hidden='true'" in padlock
+    assert ":where(svg[aria-hidden='true'][viewBox='0 0 24 24']){width:1.15em;" in theme.BASE
+
+
+@pytest.mark.parametrize("locale", account_pages.LANGUAGES)
+def test_the_parts_keep_the_order_of_the_links_and_the_counter_leads_to_buying(
+    locale: str,
+) -> None:
+    link = f"<a href='#creditos'>{account_pages.COPY[locale]['credits_buy']}</a>"
+    for credits in (0, 1, 2):
+        page = _page(locale, credits=credits)
+        assert tuple(_parts(page)) == PARTS
+        kpis = page.split("<div class='acct-kpis'>")[1].split("<section")[0]
+        assert (link in kpis) == (credits == 0)
+        assert page.count(link) == (1 if credits == 0 else 0)
+    # Nothing to buy (no card, no chat, or free mode): no call to action.
+    assert link not in _page(locale, credits=0, contact_url="")
+    assert link not in _page(locale, credits=0, free_mode=True)
+    assert link in _page(locale, credits=0, contact_url="", card_markets=("MX",))
 
 
 def _signed_in(tmp_path: Path) -> TestClient:
@@ -242,12 +271,12 @@ def test_a_redirect_to_an_old_fragment_lands_on_a_page_with_its_message(tmp_path
     )
     assert refused.status_code == 303
     location = refused.headers["location"]
-    assert location == "/cuenta?error=wrong#dos-pasos"
+    assert location == "/cuenta?error=wrong_current#dos-pasos"
     landed = client.get(location.split("#")[0]).text
     bar = landed[
         landed.index("<div class='acct-parts") : landed.index("<section class='acct-part'")
     ]
-    assert account_pages.COPY["es"]["wrong"] in bar and "role='alert'" in bar
+    assert account_pages.COPY["es"]["wrong_current"] in bar and "role='alert'" in bar
     assert "id='dos-pasos'" in _parts(landed)["seguridad"]
     for locale, path in ACCOUNT_PATHS.items():
         shown = client.get(path).text
