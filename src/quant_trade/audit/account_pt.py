@@ -98,6 +98,7 @@ COPY_PT: dict[str, str] = {
         "Não foi possível criar uma conta com esse e-mail. Se você já tem uma, entre com sua senha."
     ),
     "wrong": "O e-mail ou a senha não conferem.",
+    "wrong_current": "A senha atual não confere.",
     "too_many": "Tentativas demais. Espere uma hora e tente de novo.",
     "csrf": "O formulário expirou. Recarregue a página e envie de novo.",
     "signed_out": "Você saiu da conta.",
@@ -115,8 +116,13 @@ COPY_PT: dict[str, str] = {
     "credits_help": "Cada crédito desbloqueia um relatório completo.",
     "reports": "Relatórios",
     "paid_reports": "Relatórios completos",
+    "reports_one": "Relatório",
+    "paid_reports_one": "Relatório completo",
+    "credits_one": "Crédito disponível",
+    "credits_buy": "Comprar créditos",
     "new_audit": "Auditar outro arquivo",
     "first_audit": "Enviar meu primeiro arquivo",
+    "upload_audit": "Enviar um arquivo",
     "reports_title": "Seus relatórios",
     "reports_none": (
         "Ainda não há relatórios na sua conta. Envie um arquivo com a sessão iniciada, ou abra "
@@ -167,6 +173,10 @@ COPY_PT: dict[str, str] = {
         "Confirme seu e-mail pelo link que enviamos e seu próximo arquivo receberá o primeiro "
         "relatório completo gratuito. Até lá, isto é uma prévia."
     ),
+    "welcome_refused_unverified_nomail": (
+        "A confirmação de e-mail não está disponível no momento, então isto é uma "
+        "prévia. Para resolver, escreva para nós: {contact}"
+    ),
     "welcome_refused_network": (
         "Esta rede já usou os relatórios completos grátis deste mês, então desta vez é uma "
         "prévia. Seu relatório grátis continua disponível de outra rede ou no mês que vem."
@@ -189,6 +199,10 @@ COPY_PT: dict[str, str] = {
     "code_already": "Esse código já está na sua conta.",
     "code_other": "Esse código já está salvo em outra conta.",
     "code_unknown": "Não encontramos esse código. Confira se está completo.",
+    "code_unusable": (
+        "Esse código não pode mais ser usado: está desativado, vencido ou sem créditos. "
+        "Se você acha que é um engano, escreva para nós."
+    ),
     "col_code": "Código",
     "col_added": "Adicionado",
     "col_left": "Restam",
@@ -278,6 +292,7 @@ COPY_PT: dict[str, str] = {
     "buy_final_sale": (
         "Entendo que o crédito é entregue na hora e que a compra não é reembolsável."
     ),
+    "buy_final_sale_note": "O crédito é entregue na hora e a compra não é reembolsável.",
     "buy_alt": "Prefere pagar pelo WhatsApp?",
     "card_paid": (
         "Pagamento recebido. Seus créditos aparecem aqui assim que a Stripe confirma; se "
@@ -301,6 +316,12 @@ COPY_PT: dict[str, str] = {
         "Nunca inclui sua senha nem os links privados."
     ),
     "export_button": "Baixar meus dados (JSON)",
+    "export_not_included": (
+        "Não estão incluídos: sua senha (guardamos apenas o hash scrypt), os tokens de "
+        "sessão e de redefinição e os dos links de relatórios (guardamos apenas os "
+        "hashes), nem os dados do seu cartão (nunca os recebemos: os pagamentos com "
+        "cartão passam pela Stripe)."
+    ),
     "invite_title": "Convide um colega",
     "invite_help": (
         "Compartilhe seu link pessoal. Quando alguém cria a conta com ele, recebe o primeiro "
@@ -424,6 +445,10 @@ COPY_PT: dict[str, str] = {
     "recover_lead": (
         "Se você guardou sua chave de recuperação, crie uma nova senha aqui mesmo. Se não, "
         "escreva para nós."
+    ),
+    "recover_lead_mail": (
+        "Peça um link por e-mail para criar uma nova senha. Se você guardou sua chave de "
+        "recuperação, também pode usá-la aqui mesmo."
     ),
     "recover_help": (
         "Digite o e-mail da sua conta, a chave de 20 caracteres que você guardou e sua nova "

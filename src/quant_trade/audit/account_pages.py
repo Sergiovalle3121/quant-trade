@@ -140,6 +140,7 @@ COPY: dict[str, dict[str, str]] = {
             "No se pudo crear una cuenta con ese correo. Si ya tienes una, entra con tu contraseña."
         ),
         "wrong": "El correo o la contraseña no coinciden.",
+        "wrong_current": "La contraseña actual no coincide.",
         "too_many": "Demasiados intentos. Espera una hora y vuelve a probar.",
         "csrf": "El formulario caducó. Recarga la página y vuelve a enviarlo.",
         "signed_out": "Saliste de tu cuenta.",
@@ -157,8 +158,13 @@ COPY: dict[str, dict[str, str]] = {
         "credits_help": "Cada crédito desbloquea un informe completo.",
         "reports": "Informes",
         "paid_reports": "Informes completos",
+        "reports_one": "Informe",
+        "paid_reports_one": "Informe completo",
+        "credits_one": "Crédito disponible",
+        "credits_buy": "Comprar créditos",
         "new_audit": "Auditar otro archivo",
         "first_audit": "Subir mi primer archivo",
+        "upload_audit": "Subir un archivo",
         "reports_title": "Tus informes",
         "reports_none": (
             "Aún no hay informes en tu cuenta. Sube un archivo con la sesión iniciada, o abre "
@@ -209,6 +215,10 @@ COPY: dict[str, dict[str, str]] = {
             "Confirma tu correo con el enlace que te enviamos y tu siguiente archivo recibirá "
             "el primer informe completo gratis. Mientras tanto, esto es una vista previa."
         ),
+        "welcome_refused_unverified_nomail": (
+            "La confirmación de correo no está disponible en este momento, así que esto es "
+            "una vista previa. Para resolverlo, escríbenos: {contact}"
+        ),
         "welcome_refused_network": (
             "Esta red ya usó los informes completos gratis de este mes, así que esta vez es una "
             "vista previa. Tu informe gratis sigue disponible desde otra red o el mes próximo."
@@ -231,6 +241,10 @@ COPY: dict[str, dict[str, str]] = {
         "code_already": "Ese código ya está en tu cuenta.",
         "code_other": "Ese código ya está guardado en otra cuenta.",
         "code_unknown": "No encontramos ese código. Revisa que esté completo.",
+        "code_unusable": (
+            "Ese código ya no se puede usar: está desactivado, vencido o sin créditos. Si "
+            "crees que es un error, escríbenos."
+        ),
         "col_code": "Código",
         "col_added": "Añadido",
         "col_left": "Quedan",
@@ -322,6 +336,7 @@ COPY: dict[str, dict[str, str]] = {
         "buy_final_sale": (
             "Entiendo que el crédito se entrega al momento y que la compra no es reembolsable."
         ),
+        "buy_final_sale_note": "El crédito se entrega al momento y la compra no es reembolsable.",
         "buy_alt": "¿Prefieres pagar por WhatsApp?",
         "card_paid": (
             "Pago recibido. Tus créditos aparecen aquí en cuanto Stripe lo confirma; si aún "
@@ -345,6 +360,12 @@ COPY: dict[str, dict[str, str]] = {
             "no se borraron. Nunca incluye tu contraseña ni los enlaces privados."
         ),
         "export_button": "Descargar mis datos (JSON)",
+        "export_not_included": (
+            "No se incluyen: tu contraseña (solo guardamos su hash scrypt), los tokens de "
+            "sesión, de restablecimiento y de los enlaces de informes (solo guardamos sus "
+            "hashes), ni los datos de tu tarjeta (nunca los recibimos: los pagos con "
+            "tarjeta pasan por Stripe)."
+        ),
         "invite_title": "Invita a un colega",
         "invite_help": (
             "Comparte tu enlace personal. Cuando alguien crea su cuenta con él, recibe su "
@@ -471,6 +492,10 @@ COPY: dict[str, dict[str, str]] = {
         "recover_lead": (
             "Si guardaste tu clave de recuperación, pon una contraseña nueva aquí mismo. "
             "Si no, escríbenos."
+        ),
+        "recover_lead_mail": (
+            "Pide un enlace por correo para poner una contraseña nueva. Si guardaste tu clave "
+            "de recuperación, también puedes usarla aquí mismo."
         ),
         "recover_help": (
             "Escribe el correo de tu cuenta, la clave de 20 caracteres que guardaste y tu "
@@ -828,6 +853,7 @@ COPY: dict[str, dict[str, str]] = {
             "in with your password."
         ),
         "wrong": "The e-mail or the password does not match.",
+        "wrong_current": "The current password does not match.",
         "too_many": "Too many attempts. Wait an hour and try again.",
         "csrf": "The form expired. Reload the page and submit it again.",
         "signed_out": "You signed out.",
@@ -845,8 +871,13 @@ COPY: dict[str, dict[str, str]] = {
         "credits_help": "Each credit unlocks one full report.",
         "reports": "Reports",
         "paid_reports": "Full reports",
+        "reports_one": "Report",
+        "paid_reports_one": "Full report",
+        "credits_one": "Credit available",
+        "credits_buy": "Buy credits",
         "new_audit": "Audit another file",
         "first_audit": "Upload my first file",
+        "upload_audit": "Upload a file",
         "reports_title": "Your reports",
         "reports_none": (
             "No reports on your account yet. Upload a file while signed in, or open a report "
@@ -897,6 +928,10 @@ COPY: dict[str, dict[str, str]] = {
             "Confirm your e-mail with the link we sent and your next file will get the free "
             "first full report. Until then, this is a preview."
         ),
+        "welcome_refused_unverified_nomail": (
+            "E-mail confirmation is not available right now, so this is a preview. To sort "
+            "it out, write to us: {contact}"
+        ),
         "welcome_refused_network": (
             "This network already used this month's free full reports, so this time it is a "
             "preview. Your free report is still available from another network or next month."
@@ -919,6 +954,10 @@ COPY: dict[str, dict[str, str]] = {
         "code_already": "That code is already on your account.",
         "code_other": "That code is already saved on another account.",
         "code_unknown": "We could not find that code. Check that it is complete.",
+        "code_unusable": (
+            "That code can no longer be used: it is disabled, expired or out of credits. If "
+            "you think this is a mistake, write to us."
+        ),
         "col_code": "Code",
         "col_added": "Added",
         "col_left": "Left",
@@ -1008,6 +1047,9 @@ COPY: dict[str, dict[str, str]] = {
         "buy_final_sale": (
             "I understand that the credit is delivered at once and the purchase is not refundable."
         ),
+        "buy_final_sale_note": (
+            "The credit is delivered at once and the purchase is not refundable."
+        ),
         "buy_alt": "Prefer to pay on WhatsApp?",
         "card_paid": (
             "Payment received. Your credits show here as soon as Stripe confirms it; if you do "
@@ -1031,6 +1073,11 @@ COPY: dict[str, dict[str, str]] = {
             "It never includes your password or the private links."
         ),
         "export_button": "Download my data (JSON)",
+        "export_not_included": (
+            "Your password (kept only as a scrypt hash), session and reset tokens and "
+            "report link tokens (kept only as hashes) and card details (never received: "
+            "card payments go through Stripe)."
+        ),
         "invite_title": "Invite a colleague",
         "invite_help": (
             "Share your personal link. When someone creates their account with it, gets their "
@@ -1153,6 +1200,10 @@ COPY: dict[str, dict[str, str]] = {
         "recover_title": "With your recovery key",
         "recover_lead": (
             "If you saved your recovery key, set a new password right here. If not, write to us."
+        ),
+        "recover_lead_mail": (
+            "Ask for a link by e-mail to set a new password. If you saved your recovery key, "
+            "you can also use it right here."
         ),
         "recover_help": (
             "Type your account's e-mail, the 20-character key you saved and your new "
@@ -1516,6 +1567,8 @@ background:#fff}
 border-bottom:1px solid var(--border);vertical-align:middle}
 .acct-table th{font-size:.78rem;text-transform:uppercase;letter-spacing:.04em;color:var(--text-2)}
 .acct-scroll{overflow-x:auto}
+.acct-when{display:block;font-size:.8rem;color:var(--text-2);overflow-wrap:anywhere}
+.acct-kpi a{display:inline-block;margin-top:6px;font-size:.86rem;font-weight:600}
 .acct-links{display:flex;gap:6px;flex-wrap:wrap}
 .acct-cls{display:inline-grid;place-items:center;width:30px;height:30px;border-radius:50%;
 font-weight:700;border:2px solid currentColor}
@@ -1984,7 +2037,7 @@ def forgot_page(
     return _shell(
         locale,
         copy["forgot_title"],
-        copy["recover_lead"],
+        copy["recover_lead_mail" if email_request else "recover_lead"],
         body,
         switch=_switch("forgot", locale),
         describe="forgot",
@@ -2215,8 +2268,12 @@ def _reports_table(
                     f"aria-label='{_e(copy['compare_pick_label'])}'>"
                 )
             pick += "</td>"
+        # Two reports of one day are told apart by the time and the short id.
+        hour = item.created_at[11:16] if len(item.created_at) >= 16 else ""
+        when = (f"{hour} UTC · " if hour else "") + item.audit_id[:8]
         rows.append(
-            f"<tr>{pick}<td>{_e(_date(item.created_at))}</td>"
+            f"<tr>{pick}<td>{_e(_date(item.created_at))} "
+            f"<span class='acct-when'>{_e(when)}</span></td>"
             f"<td>{_class_badge(item.overall_class)}</td>"
             f"<td>{status}</td>"
             f"<td>{_e(what)}</td>"
@@ -2567,6 +2624,60 @@ def _email_card(
     )
 
 
+def email_typo_page(
+    *,
+    locale: str,
+    csrf: str,
+    suggested: str,
+    typed: str,
+    verification_required: bool = False,
+) -> str:
+    """The e-mail change asks «¿Quisiste decir…?», as sign-up does.
+
+    The form comes back with the provider's address; the box keeps the one
+    that was typed. The password is asked again: it is never written on a page.
+    """
+    locale = _locale(locale)
+    copy = COPY[locale]
+    base = path("account", locale)
+    fixed = _e(_safe_text(suggested))
+    body = (
+        "<div class='wrap-narrow'>"
+        "<div class='error' role='alert'>"
+        + _e(copy["email_typo"].format(email=_safe_text(suggested)))
+        + "</div>"
+        f"<form class='acct-card' method='post' action='{base}/correo'>"
+        + _hidden("csrf", csrf)
+        + _hidden("email_again", suggested)
+        + _field(
+            copy["email_new"],
+            f"<input type='email' name='email' required maxlength='254' autocomplete='email' "
+            f"autocapitalize='none' spellcheck='false' value='{fixed}'>",
+        )
+        + "<label class='acct-check'><input type='checkbox' name='email_as_typed' "
+        f"value='{_e(_safe_text(typed))}'> "
+        + _e(copy["email_typo_keep"].format(email=_safe_text(typed)))
+        + "</label>"
+        + _field(
+            copy["password_current"],
+            "<input type='password' name='current' required maxlength='256' "
+            "autocomplete='current-password'>",
+        )
+        + f"<button class='btn btn-dark' type='submit'>"
+        f"{_e(copy['email_change_request' if verification_required else 'change_email'])}"
+        "</button></form>"
+        f"<p class='acct-alt'><a href='{base}#correo'>{_e(copy['passkey_back'])}</a></p>"
+        "</div>"
+    )
+    return _shell(
+        locale,
+        copy["change_email"],
+        "",
+        body,
+        switch={lang: path("account", lang) for lang in LANGUAGES},
+    )
+
+
 #: The four parts of "Mi cuenta" and their ids, the same in every language
 #: (like the older ids inside them, which links and redirects still use).
 ACCOUNT_PARTS: dict[str, str] = {
@@ -2587,6 +2698,18 @@ def _parts_nav(copy: dict[str, str], alert: str = "") -> str:
         f"<div class='acct-parts{' has-alert' if alert else ''}'>"
         f"<nav aria-label='{_e(copy['parts_label'])}'>{links}</nav>{alert}</div>"
     )
+
+
+#: The refusals of "Mis estrategias", whose texts live in ``strategies.COPY``.
+STRATEGY_ERRORS = ("file_bad", "strategy_full")
+
+
+def _strategy_alert(locale: str, error: str) -> str:
+    if error not in STRATEGY_ERRORS:
+        return ""
+    from quant_trade.audit.strategies import COPY as SCOPY
+
+    return _alert({key: SCOPY[locale][key] for key in STRATEGY_ERRORS}, error)
 
 
 def _part(copy: dict[str, str], part: str, inner: str) -> str:
@@ -2647,11 +2770,13 @@ def account_page(
         f"<button class='btn btn-ghost btn-sm' type='submit'>{_e(copy['signout_button'])}"
         "</button></form>"
     )
+    # "My first file" goes with the free first report: not when it was used elsewhere.
+    upload_label = "new_audit" if audits else "upload_audit" if welcome == "used" else "first_audit"
     header = (
         "<div class='acct-head'>"
         f"<p class='muted'>{_e(copy['signed_in_as'])} <b>{_e(_safe_text(account.email))}</b></p>"
         f"<div class='inline-form'><a class='btn btn-primary' href='{AUDIT_PATHS[locale]}'>"
-        f"{_e(copy['new_audit'] if audits else copy['first_audit'])}</a>{signout}</div></div>"
+        f"{_e(copy[upload_label])}</a>{signout}</div></div>"
     )
     free_value = copy["free_left_value"].format(left=free_left, limit=free_limit)
     # The free first report leads while it is unused: it is what a new account came for.
@@ -2660,6 +2785,19 @@ def account_page(
         f"<b>{_e(copy['welcome_' + welcome])}</b>"
         f"<span>{_e(copy['welcome_kpi'])}</span></div>"
         if welcome in ("available", "used")
+        else ""
+    )
+    full = sum(1 for a in audits if a.paid)
+    # The parts keep the order of the links; without credits the counter
+    # leads to the buying block, one tap away.
+    can_buy = (
+        (access_codes and bool(contact_url))
+        or card_payments
+        or (bool(card_markets) and price_cents > 0)
+    )
+    buy_link = (
+        f"<a href='#{ACCOUNT_PARTS['credits']}'>{_e(copy['credits_buy'])}</a>"
+        if credits == 0 and can_buy and not free_mode
         else ""
     )
     kpis = (
@@ -2671,12 +2809,14 @@ def account_page(
             if free_limit
             else ""
         )
-        + f"<div class='acct-kpi'><b>{credits}</b><span>{_e(copy['credits'])}. "
-        f"{_e(copy['credits_help'])}</span></div>"
+        + f"<div class='acct-kpi'><b>{credits}</b>"
+        f"<span>{_e(copy['credits_one' if credits == 1 else 'credits'])}. "
+        f"{_e(copy['credits_help'])}</span>{buy_link}</div>"
         + (gift if welcome != "available" else "")
-        + f"<div class='acct-kpi'><b>{len(audits)}</b><span>{_e(copy['reports'])}</span></div>"
-        f"<div class='acct-kpi'><b>{sum(1 for a in audits if a.paid)}</b>"
-        f"<span>{_e(copy['paid_reports'])}</span></div></div>"
+        + f"<div class='acct-kpi'><b>{len(audits)}</b>"
+        f"<span>{_e(copy['reports_one' if len(audits) == 1 else 'reports'])}</span></div>"
+        f"<div class='acct-kpi'><b>{full}</b>"
+        f"<span>{_e(copy['paid_reports_one' if full == 1 else 'paid_reports'])}</span></div></div>"
     )
     reports = (
         f"<section class='acct-sec'><h3>{_e(copy['reports_title'])}</h3>"
@@ -2759,6 +2899,7 @@ def account_page(
                     "<ol class='buy-steps'>"
                     + "".join(f"<li>{_e(step)}</li>" for step in copy["buy_code_how"].split("|"))
                     + f"</ol><p class='muted'>{_e(copy['buy_code_wait'])}</p>"
+                    f"<p class='muted'>{_e(copy['buy_final_sale_note'])}</p>"
                 )
         if card_payments and not card_buy:
             lines += f"<p class='muted'>{_e(copy['buy_card'])}</p>"
@@ -2908,14 +3049,12 @@ def account_page(
     body = (
         # The message stays with the four links, which follow the reader down
         # the page: a redirect that lands on a block lower down still shows it.
-        _parts_nav(copy, _alert(copy, error, flash))
+        _parts_nav(copy, _alert(copy, error, flash) + _strategy_alert(locale, error))
         + (_visit_notice(copy, locale, notice) if notice else "")
         + header
         + kpis
-        # Without credits, how to get more comes before the list.
-        + (credits_part if credits == 0 else "")
         + reports_part
-        + (credits_part if credits > 0 else "")
+        + credits_part
         + security_part
         + _part(copy, "data", data)
     )

@@ -492,7 +492,7 @@ def test_deleting_the_account_keeps_or_removes_reports(tmp_path: Path) -> None:
     audit_id = _audit_id(location)
     csrf = _csrf(client.get("/cuenta").text)
     wrong = client.post("/cuenta/borrar", data={"current": "mala", "csrf": csrf})
-    assert "no coinciden" in wrong.text
+    assert "La contraseña actual no coincide." in wrong.text
     gone = client.post(
         "/cuenta/borrar", data={"current": PASSWORD, "csrf": csrf}, follow_redirects=False
     )
@@ -818,8 +818,9 @@ def test_without_credits_my_account_shows_prices_and_a_ready_message_first(
     assert f"Un informe completo: USD {single}." in page
     assert f"Paquete de 3 créditos: USD {pack}." in page
     assert "wa.me/000?text=" in page
-    # With no credits, buying comes before the list of reports.
-    assert page.index("¿Necesitas créditos?") < page.index("Tus informes")
+    # The parts keep the order of the links; the counter leads to buying.
+    assert page.index("Tus informes") < page.index("¿Necesitas créditos?")
+    assert "<a href='#creditos'>Comprar créditos</a>" in page
     en = client.get("/account").text
     assert f"Pack of 3 credits: USD {pack}." in en
     assert not find_claims(re.sub(r"<[^>]+>", " ", page))
@@ -1249,7 +1250,7 @@ def test_the_price_addresses_open_the_landing_prices(tmp_path: Path) -> None:
 # -- small screens after sign-up ---------------------------------------------------
 def test_a_new_account_is_invited_to_upload_its_first_file(tmp_path: Path) -> None:
     client, _, _ = _client(tmp_path)
-    _signup(client)
+    _signup(client, welcome=True)
     page = client.get("/cuenta").text
     assert "Subir mi primer archivo" in page and "Auditar otro archivo" not in page
     _upload(client)
@@ -3486,7 +3487,7 @@ def test_changing_the_email_refuses_mistakes_and_keeps_the_old_one(tmp_path: Pat
     ):
         if message is None:
             refused = _change_email(client, *args, current="la contraseña equivocada")
-            message = "El correo o la contraseña no coinciden"
+            message = "La contraseña actual no coincide."
         else:
             refused = _change_email(client, *args)
         assert message in refused.text, args
