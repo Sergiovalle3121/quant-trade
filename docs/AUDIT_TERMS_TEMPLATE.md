@@ -58,7 +58,7 @@ acuerdo escrito.
 **Sello y página de verificación.** Si usted publica la verificación, la
 página muestra la clase, las dimensiones, los hashes y un aviso fijo; nunca
 sus archivos, operaciones ni descripción. Puede usar el sello en su web,
-Telegram, foros o vídeos, siempre enlazado a la página de verificación. No
+Telegram, foros o videos, siempre enlazado a la página de verificación. No
 puede presentarlo como garantía de resultados, como respaldo de un producto
 ni junto a afirmaciones de rentabilidad; si lo hace, podemos retirar la
 publicación.

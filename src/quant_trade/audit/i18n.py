@@ -1546,7 +1546,7 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
         "Student's t for the average per trade, trades resampled for the profit factor",
         "rangos al 95 %, cada operación tomada como un resultado independiente: Wilson para "
         "la tasa de acierto, t de Student para el promedio por operación y operaciones "
-        "remuestreadas para el profit factor",
+        "remuestreadas para el factor de beneficio",
     ),
     ("no variants uploaded", "no se subió la matriz de variantes"),
     ("fewer than ten returns", "menos de diez retornos"),

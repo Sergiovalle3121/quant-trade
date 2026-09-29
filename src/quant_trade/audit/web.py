@@ -3467,6 +3467,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 csrf=csrf,
                 email_delivery_ready=cfg.email_delivery_ready,
                 flash=done if done == "email_reset_requested" else "",
+                contact_email=cfg.operator_contact,
             )
             return _anon_page(page, csrf)
 
@@ -3526,6 +3527,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                     error=error,
                     email=clean if acct.valid_email(clean) else "",
                     email_delivery_ready=cfg.email_delivery_ready,
+                    contact_email=cfg.operator_contact,
                 )
                 return _anon_page(page, new_csrf, status)
 
@@ -5176,6 +5178,10 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                     notice=SAMPLE_BANNER[locale],
                     legal_links=True,
                     locale=locale,
+                )
+                # The PDF's own title carries the page's word too, not "sample".
+                page = page.replace(
+                    " · sample</title>", f" · {SAMPLE_PDF_NAMES[locale]}</title>", 1
                 )
                 try:
                     sample_pdfs[key] = pdf_lib.report_pdf(

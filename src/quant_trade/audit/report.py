@@ -45,7 +45,7 @@ from quant_trade.audit.plan import improvement_plan
 from quant_trade.audit.prop_presets import preset_label
 from quant_trade.audit.redflags import flag_title
 from quant_trade.audit.schema import AuditResult, Dimension
-from quant_trade.audit.seo import BRAND, TAGLINE, private_meta
+from quant_trade.audit.seo import BRAND, CHECK_PATH, TAGLINE, private_meta
 from quant_trade.audit.sizing import scale_text as sizing_scale_text
 from quant_trade.audit.streaks import CLUSTERED
 from quant_trade.audit.theme import (
@@ -421,12 +421,12 @@ LABELS: dict[str, dict[str, str]] = {
         "significance": "Significación estadística",
         "multiplicity": "Multiplicidad (número de intentos)",
         "sensitivity": "Sensibilidad del Sharpe deflactado al número de intentos",
-        "bootstrap": "Bootstrap estacionario (por período)",
+        "bootstrap": "Bootstrap estacionario (por periodo)",
         "holdout": "Fuera de muestra declarado",
         "costs": "Costes de operación",
         "benchmark": "Benchmark aportado",
         "cscv": "Sobreajuste por validación cruzada combinatoria (CSCV)",
-        "subperiods": "Subperíodos (años naturales)",
+        "subperiods": "Subperiodos (años naturales)",
         "rolling": "Ventanas móviles",
         "red_flags": "Banderas rojas",
         "not_measured": "No medido",
@@ -1267,7 +1267,7 @@ LABELS: dict[str, dict[str, str]] = {
             "mes, una cifra histórica fija comprobada el {as_of} con los niveles del índice en "
             "FRED ({sources}); no se lee ni se muestra ningún otro dato de esos índices. Son "
             "acciones de EE. UU. y bitcoin: si la estrategia opera otro mercado (divisas, "
-            "materias primas, otro país), tómelos solo como contexto de lo que vivía el "
+            "materias primas, otro país), tómalos solo como contexto de lo que vivía el "
             "mercado, no como su punto de comparación."
         ),
         "crises_no_trades": "sin operaciones cerradas en la ventana",
@@ -1301,7 +1301,7 @@ LABELS: dict[str, dict[str, str]] = {
         "fund_stress_china_oil": "China y caída del petróleo",
         "fund_stress_late_2018": "Final de 2018",
         "fund_stress_covid": "Caída por el covid",
-        "fund_stress_rates_2022": "Inflación y tipos, 2022",
+        "fund_stress_rates_2022": "Inflación y tasas, 2022",
         "fund_stress_crypto_2022": "Invierno cripto 2022",
         "instruments": "¿Funciona en cada instrumento?",
         "ins_intro": (
@@ -1480,7 +1480,7 @@ LABELS: dict[str, dict[str, str]] = {
             "Guarda el enlace de esta página: con él vuelves a tu informe. Si lo subiste con tu "
             "cuenta, también lo tienes en «Mi cuenta»."
         ),
-        "pack": "pack de 3 informes: USD {price:.0f}",
+        "pack": "paquete de 3 informes: USD {price:.0f}",
         "buy_includes": (
             "Todas las cifras de cada sección|PDF para guardar o enviar|"
             "Página pública de verificación para compartir|"
@@ -1672,7 +1672,7 @@ LABELS: dict[str, dict[str, str]] = {
         "kpi_drawdown_closed": "Drawdown máximo (solo cerradas)",
         "kpi_dd_p95_closed": "Drawdown p95 a 1 año (solo cerradas)",
         "kpi_sharpe": "Sharpe anualizado",
-        "kpi_pf": "Profit factor",
+        "kpi_pf": "Factor de beneficio",
         "kpi_trades": "Operaciones · % de aciertos",
         "kpi_breakeven": "Coste extra que lo lleva a cero",
         "kpi_breakeven_negative": "ya pierde sin coste extra",
@@ -1759,6 +1759,7 @@ LABELS: dict[str, dict[str, str]] = {
         "stress_positive": "¿Sigue sobre cero?",
         "original": "Original",
         "stress_count": "de {total} escenarios quedan en cero o por debajo",
+        "stress_count_one": "de {total} escenarios queda en cero o por debajo",
         "top5_share": "Las 5 mejores operaciones suman este múltiplo del resultado neto",
     },
     "en": {
@@ -3080,6 +3081,7 @@ LABELS: dict[str, dict[str, str]] = {
         "stress_positive": "Still above zero?",
         "original": "Original",
         "stress_count": "of {total} scenarios end at zero or below",
+        "stress_count_one": "of {total} scenarios ends at zero or below",
         "top5_share": "The best 5 trades add up to this multiple of the net result",
     },
 }
@@ -3572,7 +3574,7 @@ PLATFORM_LABELS: dict[str, dict[str, str]] = {
         "declared_maximal_drawdown": "Drawdown máximo",
         "declared_relative_drawdown": "Drawdown relativo",
         "declared_sharpe_ratio": "Sharpe",
-        "declared_profit_factor": "Profit factor",
+        "declared_profit_factor": "Factor de beneficio",
         "declared_balance": "Balance",
         "declared_equity": "Equity",
         "declared_final_equity": "Equity final",
@@ -3585,6 +3587,10 @@ PLATFORM_LABELS: dict[str, dict[str, str]] = {
         "parameters": "Valores de los parámetros",
         "spread": "Spread",
         "closing_deals": "Transacciones de cierre",
+        "balance_chain_breaks": "Celdas de balance que no cuadran",
+        "largest_balance_difference": "Mayor diferencia de balance",
+        "reconstructed_final_balance": "Balance final reconstruido",
+        "reported_final_balance": "Balance final reportado",
         "column_symbol": "Columna leída como símbolo",
         "column_side": "Columna leída como lado",
         "column_quantity": "Columna leída como cantidad",
@@ -3639,6 +3645,10 @@ PLATFORM_LABELS: dict[str, dict[str, str]] = {
         "parameters": "Parameter values",
         "spread": "Spread",
         "closing_deals": "Closing deals",
+        "balance_chain_breaks": "Balance cells that do not match",
+        "largest_balance_difference": "Largest balance difference",
+        "reconstructed_final_balance": "Reconstructed final balance",
+        "reported_final_balance": "Reported final balance",
         "column_symbol": "Column read as symbol",
         "column_side": "Column read as side",
         "column_quantity": "Column read as quantity",
@@ -3661,6 +3671,30 @@ def platform_label(key: str, locale: str) -> str:
     """A platform field's name; an unknown key is shown as plain words."""
     names = PLATFORM_LABELS.get(locale, PLATFORM_LABELS["en"])
     return names.get(key) or key.replace("_", " ").capitalize()
+
+
+#: Platform fields stored as raw text that read better rounded; display only.
+_PLATFORM_MONEY_FIELDS = frozenset(
+    {"largest_balance_difference", "reconstructed_final_balance", "reported_final_balance"}
+)
+_PLATFORM_COUNT_FIELDS = frozenset({"balance_chain_breaks"})
+
+
+def platform_value(key: str, value: Any) -> str:
+    """A platform field's value as shown: money with 2 decimals, a count as an integer."""
+    text = str(value)
+    if key not in _PLATFORM_MONEY_FIELDS and key not in _PLATFORM_COUNT_FIELDS:
+        return text
+    try:
+        number = float(text)
+    except ValueError:
+        return text
+    if not math.isfinite(number):
+        return text
+    if key in _PLATFORM_COUNT_FIELDS:
+        return f"{int(number)}" if number == int(number) else text
+    shown = f"{number:,.2f}"
+    return "0.00" if shown == "-0.00" else shown
 
 
 def _is_evidence(value: Any) -> bool:
@@ -4283,9 +4317,9 @@ def _stress_html(
     out = f"<p class='muted'>{_e(labels['stress_intro'])}</p>"
     if measured_rows:
         broken = sum(1 for row in measured_rows if not row.get("stays_positive"))
+        count_text = labels["stress_count_one" if broken == 1 else "stress_count"]
         out += (
-            f"<p><strong>{broken}</strong> "
-            f"{_e(labels['stress_count'].format(total=len(measured_rows)))}.</p>"
+            f"<p><strong>{broken}</strong> {_e(count_text.format(total=len(measured_rows)))}.</p>"
         )
     for title, block, percent in blocks:
         out += f"<h3>{_e(title)}</h3>"
@@ -4856,7 +4890,7 @@ def _source_html(data: dict[str, Any], labels: dict[str, str]) -> str:
             f"<p class='muted'>{_e(labels['platform'])} {_badge('DECLARED')}</p><table>"
             + "".join(
                 f"<tr><td>{_e(platform_label(key, _locale_of(labels)))}</td>"
-                f"<td>{_e(value)}</td></tr>"
+                f"<td>{_e(platform_value(key, value))}</td></tr>"
                 for key, value in metadata.items()
             )
             + "</table>"
@@ -8136,7 +8170,7 @@ def render_html(
             f"{_e(labels['pdf_long'])}</a>"
             f"<noscript> <span class='muted'>{_e(labels['pdf_wait'])}</span></noscript></p>"
             f"<p class='muted pdf-check rise no-print' style='--i:4'>{_e(labels['pdf_check'])} "
-            f"<a href='{'/check' if locale == 'en' else '/comprobar'}'>"
+            f"<a href='{_e(CHECK_PATH.get(locale, CHECK_PATH['es']))}'>"
             f"{_e(labels['pdf_check_link'])}</a></p>"
             if pdf_url and not locked
             else ""
@@ -8165,9 +8199,8 @@ def render_html(
     ]
     if legal_links:
         links += [
-            # The terms exist in Spanish and English; a Portuguese reader gets English.
-            f"<a href='{_e(legal_url(kind, 'en' if locale == 'pt' else locale))}'>"
-            f"{_e(LINK_TEXT[locale][kind])}</a>"
+            # Each report links to the terms and privacy pages of its own language.
+            f"<a href='{_e(legal_url(kind, locale))}'>{_e(LINK_TEXT[locale][kind])}</a>"
             for kind in ("terms", "privacy")
         ]
     footer = (

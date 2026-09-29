@@ -8,7 +8,7 @@ import re
 import pytest
 
 from quant_trade.audit.guard import find_claims
-from quant_trade.audit.method import METHOD_PATH, REFERENCES, dimension_rows
+from quant_trade.audit.method import METHOD_PATH, REFERENCES, dimension_rows, references
 from quant_trade.audit.redflags import FLAG_TITLES
 from quant_trade.audit.seo import PUBLIC_PAGES
 from quant_trade.audit.verdict import DEFAULT_THRESHOLDS, Thresholds
@@ -35,7 +35,20 @@ def test_method_page_lists_the_engines_thresholds_and_every_flag(locale: str) ->
     assert f"{DEFAULT_THRESHOLDS.pbo_max:.2f}" in text
     for titles in FLAG_TITLES.values():
         assert titles[locale] in text
-    assert REFERENCES[0] in text
+    # The authors are joined in the page's own language, never with a Spanish "y".
+    assert references(locale)[0] in text
+    assert ("López de Prado, M. y Zhu" in text) == (locale == "es")
+
+
+def test_references_join_their_authors_in_each_language() -> None:
+    assert references("es") == REFERENCES
+    for locale, word in (("en", "and"), ("pt", "e")):
+        listed = references(locale)
+        assert len(listed) == len(REFERENCES)
+        assert all(" y " not in ref for ref in listed)
+        assert f"Politis, D. N. {word} Romano, J. P. (1994)" in listed[3]
+    client = TestClient(create_app())
+    assert "Politis, D. N. e Romano" in _text(client.get(METHOD_PATH["pt"]).text)
 
 
 def test_dimension_rules_follow_the_thresholds() -> None:

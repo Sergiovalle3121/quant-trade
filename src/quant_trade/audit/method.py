@@ -35,6 +35,16 @@ REFERENCES: tuple[str, ...] = (
 )
 
 
+#: The references join their authors with the Spanish "y"; each page uses its own word.
+_REFERENCE_AND: dict[str, str] = {"es": "y", "en": "and", "pt": "e"}
+
+
+def references(locale: str) -> tuple[str, ...]:
+    """The sources with the authors joined in the page's language."""
+    word = _REFERENCE_AND.get(locale, "y")
+    return tuple(ref.replace(" y ", f" {word} ") for ref in REFERENCES)
+
+
 def method_url(locale: str) -> str:
     return METHOD_PATH.get(locale, METHOD_PATH["es"])
 
@@ -410,4 +420,4 @@ COPY: dict[str, dict[str, object]] = {
 }
 
 
-__all__ = ["COPY", "METHOD_PATH", "REFERENCES", "dimension_rows", "method_url"]
+__all__ = ["COPY", "METHOD_PATH", "REFERENCES", "dimension_rows", "method_url", "references"]
