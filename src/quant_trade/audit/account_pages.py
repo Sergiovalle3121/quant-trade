@@ -1537,6 +1537,14 @@ text-decoration:none}
 font-size:1.7rem}
 .acct-part>h2+.acct-sec{margin-top:0}
 .acct-sec>h3{margin:0 0 10px;font-size:1.35rem}
+.acct-buy{display:grid;gap:12px;max-width:620px}
+.acct-buy>label{font-weight:600;font-size:.92rem}
+.acct-buy .final-sale{display:flex;align-items:flex-start;gap:10px;font-weight:500;
+line-height:1.45}
+.acct-buy .final-sale input{flex:none;width:18px;height:18px;margin:3px 0 0}
+.acct-buy .muted,.acct-sec>.muted a{display:flex;align-items:flex-start;gap:8px}
+.acct-buy .muted{margin:0;font-size:.88rem;line-height:1.5}
+.acct-buy .muted svg,.acct-sec>.muted svg{flex:none;width:16px;height:16px;margin-top:3px}
 .acct-card h4{margin:0 0 14px;font-size:1.17em;font-weight:620;letter-spacing:-.03em;
 line-height:1.08}
 .acct-part,.acct-part [id]{scroll-margin-top:52px}
