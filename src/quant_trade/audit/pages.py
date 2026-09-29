@@ -147,7 +147,7 @@ _COPY: dict[str, dict[str, Any]] = {
         "headline": "Sube tu backtest. Te decimos si es estadísticamente real.",
         "pitch": (
             "La mayoría de los backtests que lucen bien en papel fallan en real por sobreajuste, "
-            "costes no contados o datos con errores. Esta auditoría aplica los estimadores de "
+            "costos no contados o datos con errores. Esta auditoría aplica los estimadores de "
             "Bailey y López de Prado (Sharpe probabilístico, Sharpe deflactado por número de "
             "intentos, bootstrap estacionario) a la curva que subes y te devuelve un veredicto "
             "con cada número etiquetado según su evidencia."
@@ -156,7 +156,7 @@ _COPY: dict[str, dict[str, Any]] = {
         "measure": [
             "Si el Sharpe se distingue de cero dada la longitud, la asimetría y la curtosis.",
             "Cuánto sobrevive después de descontar el número de intentos que declaras.",
-            "Qué pasa a 1x, 2x y 3x el coste de operación, y el coste de equilibrio.",
+            "Qué pasa a 1x, 2x y 3x el costo de operación, y el costo de equilibrio.",
             "Si el tramo fuera de muestra que declaras aguanta.",
             f"{len(FLAG_TITLES)} banderas rojas: datos duplicados, picos, marcas congeladas y más.",
             "Comparación con el benchmark que aportes, si aportas uno.",
@@ -212,7 +212,7 @@ _COPY: dict[str, dict[str, Any]] = {
             "optimización de MT5 se cuentan solas."
         ),
         "cost_bps": (
-            "Coste extra por lado en puntos básicos, además del que ya detalla tu informe "
+            "Costo extra por lado en puntos básicos, además del que ya detalla tu informe "
             "(vacío = 0)"
         ),
         "oos_start": "Inicio del tramo fuera de muestra (opcional)",
@@ -255,7 +255,7 @@ _COPY: dict[str, dict[str, Any]] = {
         "sample_link": "Ver un informe de ejemplo completo (datos sintéticos)",
         "meta_description": (
             "Sube el archivo que ya tienes (MetaTrader, TradingView, NinjaTrader, Python o tu "
-            "curva de equity) y Rigor te dice qué tanto de tu resultado aguanta con costes, "
+            "curva de equity) y Rigor te dice qué tanto de tu resultado aguanta con costos, "
             "cuántas pruebas hubo detrás y si los datos cuadran. Clase de A a D."
         ),
         "sample_description": (
@@ -326,7 +326,7 @@ _COPY: dict[str, dict[str, Any]] = {
         ),
         "price_free_mode": (
             "Ahora mismo el servicio está en modo gratuito: el informe completo se entrega con "
-            "marca de agua y sin coste."
+            "marca de agua y sin costo."
         ),
         "pay_card": (
             "Pago con tarjeta desde el propio informe, procesado por Stripe: lo ves completo "
@@ -782,7 +782,7 @@ _UI: dict[str, dict[str, Any]] = {
         "cta_sample": "Ver un informe de ejemplo",
         "hero_lead": (
             "Sube el backtest o el historial que ya tienes. Rigor lo pone a prueba contra "
-            "costes, pruebas repetidas y datos con errores, y te da una clase de A a D."
+            "costos, pruebas repetidas y datos con errores, y te da una clase de A a D."
         ),
         "mock_cap": "Ilustración con datos sintéticos",
         "mock_is": "Dentro de muestra",
@@ -790,7 +790,7 @@ _UI: dict[str, dict[str, Any]] = {
         "mock_kpis": [
             ("0.97", "Sharpe deflactado"),
             ("120", "Intentos contados"),
-            ("3.2 pb", "Coste de equilibrio"),
+            ("3.2 pb", "Costo de equilibrio"),
         ],
         "chip_trials": "Intentos reales desde el XML de MT5",
         "chip_hash": "Cada número con su evidencia",
@@ -813,7 +813,7 @@ _UI: dict[str, dict[str, Any]] = {
             "points": (
                 "Salió de 120 configuraciones probadas; al descontarlas, su Sharpe ya no llega "
                 "al umbral.",
-                "Con el doble del coste de referencia termina en pérdida.",
+                "Con el doble del costo de referencia termina en pérdida.",
                 "Su cuenta real, de 180 operaciones, queda fuera de lo que su propio backtest "
                 "haría esperar.",
             ),
@@ -826,7 +826,7 @@ _UI: dict[str, dict[str, Any]] = {
                 "ya dibuja una curva preciosa.",
             ),
             (
-                "Costes",
+                "Costos",
                 "Comisión, spread y deslizamiento se comen las ventajas finas. Muchos backtests "
                 "los cuentan como cero.",
             ),
@@ -980,7 +980,7 @@ _UI: dict[str, dict[str, Any]] = {
         ],
         "faq_eyebrow": "Preguntas",
         "final_title": ("Antes de arriesgar dinero en una estrategia,", "mírala con lupa."),
-        "final_lead": "Sube el informe y recibe la clase, las gráficas y su explicación sin coste.",
+        "final_lead": "Sube el informe y recibe la clase, las gráficas y su explicación sin costo.",
         "footer_product": "Producto",
         "footer_legal": "Legal",
         "footer_news": "Novedades",
@@ -1698,7 +1698,7 @@ AUDIENCES: dict[str, dict[str, Any]] = {
                 "El backtest del vendedor se ve perfecto y no sabes si es sobreajuste.",
                 "el informe del probador de MetaTrader 4 o 5 y, si lo tienes, el XML de "
                 "optimización.",
-                "si el resultado aguanta el número de intentos, costes más altos y quitarle sus "
+                "si el resultado aguanta el número de intentos, costos más altos y quitarle sus "
                 "mejores operaciones, y qué preguntarle al vendedor.",
                 "mt5",
             ),
@@ -1710,7 +1710,7 @@ AUDIENCES: dict[str, dict[str, Any]] = {
                 "backtesting.py o vectorbt, el historial en CSV o Excel de cualquier bróker, "
                 "exchange o diario (Interactive Brokers, Tradovate, thinkorswim, Binance y "
                 "más), o tu curva de equity.",
-                "significación, Sharpe deflactado, costes, si sigue funcionando en el periodo "
+                "significación, Sharpe deflactado, costos, si sigue funcionando en el periodo "
                 "reciente y qué capital pide.",
                 "tradingview",
             ),

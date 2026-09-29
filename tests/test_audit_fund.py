@@ -249,7 +249,7 @@ def test_the_upload_form_offers_the_declaration(tmp_path) -> None:  # type: igno
     )
     assert response.status_code == 303
     page = client.get(response.headers["location"]).text
-    assert "Costes declarados en cero" not in page
+    assert "Costos declarados en cero" not in page
 
 
 # --- Grid reading: scale, stray rows, unreadable cells, total headers --------

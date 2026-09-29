@@ -205,7 +205,7 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
     (
         "MetaTrader 4 tester profit already includes swap and commission; costs are not "
         "itemised, so the trade P&L is net",
-        "el beneficio del probador de MetaTrader 4 ya incluye swap y comisión; los costes no "
+        "el beneficio del probador de MetaTrader 4 ya incluye swap y comisión; los costos no "
         "vienen desglosados, así que el resultado de cada operación es neto",
     ),
     (
@@ -284,7 +284,7 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
     ),
     (
         "every trade has zero commission and fees",
-        "todas las operaciones tienen comisión y costes cero",
+        "todas las operaciones tienen comisión y costos cero",
     ),
     # --- Parse warnings: any trade or fill list (universal.py) ---
     (
@@ -301,7 +301,7 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
         "the profit column already subtracts commission (it matches the price move after "
         "costs), so it was read as net",
         "la columna de resultado ya descuenta la comisión (cuadra con el movimiento del "
-        "precio después de costes), así que se leyó como neta",
+        "precio después de costos), así que se leyó como neta",
     ),
     (
         "the file has no profit column: each trade's result is the price move times the "
@@ -321,7 +321,7 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
         "{n} fee(s) charged in another coin than the price were left out of the costs, so "
         "costs are understated",
         "{n} comisión(es) cobradas en otra moneda distinta a la del precio quedaron fuera de "
-        "los costes, así que los costes están subestimados",
+        "los costos, así que los costos están subestimados",
     ),
     (
         "{n} multi-leg trade(s) kept as single trades",
@@ -330,7 +330,7 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
     (
         "this backtesting.py version folds commission into the fill prices; costs are not itemised",
         "esta versión de backtesting.py incluye la comisión en los precios de ejecución; los "
-        "costes no vienen desglosados",
+        "costos no vienen desglosados",
     ),
     (
         "the file holds {n} parameter variants; only the first ({name}) was imported",
@@ -456,7 +456,7 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
         "annualised Sharpe {s} exceeds {t}; almost always a look-ahead or a costless fill "
         "assumption",
         "Sharpe anualizado {s} por encima de {t}; casi siempre indica mirar el futuro "
-        "(look-ahead) o suponer ejecuciones sin coste",
+        "(look-ahead) o suponer ejecuciones sin costo",
     ),
     (
         "annualised Sharpe {s} exceeds {t}; rare outside intraday market making",
@@ -468,7 +468,7 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
     ),
     (
         "no trading cost declared; the cost dimension uses a reference assumption",
-        "no se declaró coste de operación; la dimensión de costes usa un supuesto de referencia",
+        "no se declaró costo de operación; la dimensión de costos usa un supuesto de referencia",
     ),
     (
         "{n} trial(s) declared but the files show {m} variants or optimisation passes; the "
@@ -484,7 +484,7 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
         "client-reported pnl differs from recomputed pnl by {p} of gross; the trades file may "
         "carry costs or a different contract size",
         "el resultado que declara el archivo difiere del recalculado en un {p} del bruto; el "
-        "archivo puede incluir costes o usar otro tamaño de contrato",
+        "archivo puede incluir costos o usar otro tamaño de contrato",
     ),
     (
         "after a loss the next trade is typically {r}x the size used after a win, and {p} of "
@@ -859,7 +859,7 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
     ("a trade result is not a finite number", "un resultado de operación no es un número finito"),
     (
         "closed trades by exit date; net result after the fees the file itemises",
-        "operaciones cerradas por fecha de cierre; resultado neto tras los costes que detalla "
+        "operaciones cerradas por fecha de cierre; resultado neto tras los costos que detalla "
         "el archivo",
     ),
     ("average net result per trade", "resultado neto medio por operación"),
@@ -869,7 +869,7 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
     ),
     (
         "closed trades by entry and exit time; net result after the fees the file itemises",
-        "operaciones cerradas por hora de entrada y de cierre; resultado neto tras los costes "
+        "operaciones cerradas por hora de entrada y de cierre; resultado neto tras los costos "
         "que detalla el archivo",
     ),
     ("median hours a winning trade stays open", "horas medianas que sigue abierta una ganadora"),
@@ -888,11 +888,11 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
     ),
     (
         "after the fees the file itemises per trade",
-        "después de los costes que el archivo detalla por operación",
+        "después de los costos que el archivo detalla por operación",
     ),
     (
         "share of trades with a net profit after the fees the file itemises",
-        "parte de las operaciones con resultado neto positivo, después de los costes que "
+        "parte de las operaciones con resultado neto positivo, después de los costos que "
         "detalla el archivo",
     ),
     ("share of trades with a net profit", "parte de las operaciones con resultado neto positivo"),
@@ -900,7 +900,7 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
     ("the file is not a monthly track record", "el archivo no es un historial mensual"),
     (
         "the fund's own returns after its fees; costs were not measured",
-        "rentabilidades del propio fondo tras sus comisiones; los costes no se midieron",
+        "rentabilidades del propio fondo tras sus comisiones; los costos no se midieron",
     ),
     ("the index the file itself carries", "el índice que trae el propio archivo"),
     (
@@ -911,7 +911,7 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
         "the net-of-fees declaration applies only to a monthly fund track record; costs are "
         "checked as usual",
         "la declaración de rentabilidades netas de comisiones solo vale para el historial "
-        "mensual de un fondo; los costes se revisan como siempre",
+        "mensual de un fondo; los costos se revisan como siempre",
     ),
     ("needs at least {n} monthly returns", "hacen falta al menos {n} rentabilidades mensuales"),
     ("the monthly returns do not vary", "las rentabilidades mensuales no varían"),
@@ -1295,7 +1295,7 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
         "closed trades by the instrument the file names; net result after the fees the file "
         "itemises",
         "operaciones cerradas por el instrumento que indica el archivo; resultado neto tras los "
-        "costes que detalla el archivo",
+        "costos que detalla el archivo",
     ),
     (
         "share with a net profit among trades that follow {n} losses in a row",
@@ -1335,7 +1335,7 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
         "may not describe it",
         "mes a mes, el resultado realizado de las operaciones y el cambio de la equity "
         "tienen una correlación de {c} en {n} meses; puede que las operaciones no sean de "
-        "esta curva, y entonces la dimensión de costes no la describe",
+        "esta curva, y entonces la dimensión de costos no la describe",
     ),
     # --- Not-measured reasons and evidence notes (engine, analytics, costs) ---
     ("no long trades", "no hay operaciones largas"),
@@ -1558,10 +1558,10 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
     ("share of trades with pnl > 0", "proporción de operaciones con resultado > 0"),
     (
         "commission and swap as reported, a positive cost",
-        "comisión y swap del informe, como coste positivo",
+        "comisión y swap del informe, como costo positivo",
     ),
     ("no commission or swap total supplied", "no se aportó el total de comisión o swap"),
-    ("gross pnl minus reported fees", "resultado bruto menos los costes del informe"),
+    ("gross pnl minus reported fees", "resultado bruto menos los costos del informe"),
     (
         "the uploaded history with its best outcomes removed; not a forecast",
         "el historial subido sin sus mejores resultados; no es una previsión",
@@ -1569,7 +1569,7 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
     ("compounded total return of the uploaded curve", "retorno total compuesto de la curva subida"),
     (
         "net result of the closed trades after reported fees",
-        "resultado neto de las operaciones cerradas tras los costes del informe",
+        "resultado neto de las operaciones cerradas tras los costos del informe",
     ),
     ("best five trades / net result", "cinco mejores operaciones / resultado neto"),
     ("the curve is too short or not positive", "la curva es muy corta o no es positiva"),
@@ -1588,7 +1588,7 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
         "Backtest trades resampled with replacement, as many as the live statement holds; "
         "costs itemised per trade subtracted on both sides. Streaks are not preserved.",
         "Operaciones del backtest tomadas al azar con reemplazo, tantas como tiene la cuenta "
-        "real; los costes detallados por operación se restan en ambos lados. No conserva las "
+        "real; los costos detallados por operación se restan en ambos lados. No conserva las "
         "rachas.",
     ),
     (
@@ -1619,7 +1619,7 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
         "Entry times as the file states them (platform or server time); "
         "net result after the fees the file itemises per trade.",
         "Horas de entrada tal como las da el archivo (hora de la plataforma o del servidor); "
-        "resultado neto después de los costes que el archivo detalla por operación.",
+        "resultado neto después de los costos que el archivo detalla por operación.",
     ),
     (
         "average net result per trade, account currency",
@@ -1760,26 +1760,26 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
     ("split failed: {error}", "no se pudo dividir la serie: {error}"),
     (
         "extra cost per side, on top of the report's fees, at which the ledger nets to zero",
-        "coste extra por lado, además de los costes del informe, con el que el resultado "
+        "costo extra por lado, además de los costos del informe, con el que el resultado "
         "queda en cero",
     ),
     (
         "cost per side at which the ledger nets to zero",
-        "coste por lado con el que el resultado queda en cero",
+        "costo por lado con el que el resultado queda en cero",
     ),
     ("no traded notional", "no hay volumen operado"),
     ("undefined", "no definido"),
     (
         "signed total the report itemises; negative is a cost",
-        "total con signo que desglosa el informe; negativo es un coste",
+        "total con signo que desglosa el informe; negativo es un costo",
     ),
     (
         "assumed slippage: the client declared zero cost; charged on top of the fees the "
         "report itemises",
-        "deslizamiento supuesto: el cliente declaró coste cero; se cobra además de los "
-        "costes que desglosa el informe",
+        "deslizamiento supuesto: el cliente declaró costo cero; se cobra además de los "
+        "costos que desglosa el informe",
     ),
-    ("assumed: client declared zero cost", "supuesto: el cliente declaró coste cero"),
+    ("assumed: client declared zero cost", "supuesto: el cliente declaró costo cero"),
     (
         "assumed slippage: an account history's prices are the broker's fills, so the spread "
         "is already in each result; charged on top",
@@ -1788,7 +1788,7 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
     ),
     (
         "declared by the client; charged on top of the fees the report itemises",
-        "declarado por el cliente; se cobra además de los costes que desglosa el informe",
+        "declarado por el cliente; se cobra además de los costos que desglosa el informe",
     ),
     ("inferred from the timestamps", "deducido de las fechas"),
     ("starting balance of the imported report", "balance inicial del informe importado"),
@@ -2045,7 +2045,7 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
     ("uploaded returns are not money", "los retornos subidos no son importes monetarios"),
     (
         "trade currency not stated; monetary P&L and costs use the file's units",
-        "no se indica la moneda de las operaciones; el P/L y los costes monetarios "
+        "no se indica la moneda de las operaciones; el P/L y los costos monetarios "
         "usan las unidades del archivo",
     ),
     (
@@ -2273,7 +2273,7 @@ _SINGULAR: dict[str, tuple[str, str]] = {
         "{n} fee charged in another coin than the price was left out of the costs, so costs "
         "are understated",
         "{n} comisión cobrada en otra moneda distinta a la del precio quedó fuera de los "
-        "costes, así que los costes están subestimados",
+        "costos, así que los costos están subestimados",
     ),
     "{n} multi-leg trade(s) kept as single trades": (
         "{n} multi-leg trade kept as a single trade",

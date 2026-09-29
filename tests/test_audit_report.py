@@ -202,7 +202,7 @@ def test_secondary_analysis_folds_without_hiding_alerts_or_pdf_content() -> None
     assert full.count("<details open class='detail report-detail'") >= 10
     assert "<summary><h2>Rendimiento anualizado" in full
     assert "<section class='detail'" in full
-    assert "<h2>Costes de operación</h2>" in full
+    assert "<h2>Costos de operación</h2>" in full
     assert "<h2>Banderas rojas</h2>" in full
     assert "id='r-next'" in full and "id='r-flags'" in full
     assert "id='r-inputs'" in full and "<h2>No medido</h2>" in full

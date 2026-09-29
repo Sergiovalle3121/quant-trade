@@ -87,7 +87,7 @@ ASSUMPTIONS: dict[str, list[str]] = {
         "Tamaños fijos: sin interés compuesto ni cambios de tamaño tras ganar o perder.",
         "Las operaciones se sortean de forma independiente; la caída del propio historial "
         "cubre las rachas.",
-        "Los costes son los que detalla el archivo subido.",
+        "Los costos son los que detalla el archivo subido.",
         "Las cifras en dinero van al tamaño que usó el archivo; el tamaño relativo se calcula "
         "sobre su balance inicial, sin sumar depósitos posteriores.",
         "Mide las pérdidas del historial; no es una predicción.",

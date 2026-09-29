@@ -113,14 +113,14 @@ INTEGRITY_TEXT: dict[str, dict[str, str]] = {
         "recon_match": "Cuadra dentro de la tolerancia",
         "recon_contradiction": "El saldo final contradice las operaciones",
         "recon_unmeasured": "No se pudo cerrar la conciliación",
-        "recon_net_equation": "Bruto − costes detallados = neto de operaciones cerradas",
+        "recon_net_equation": "Bruto − costos detallados = neto de operaciones cerradas",
         "recon_final_equation": "Capital inicial + flujos conocidos + neto = saldo esperado",
         "recon_unknown": "Sin dato",
         "recon_coverage": "Cobertura y límites",
         "recon_initial": "Capital inicial",
         "recon_flows": "Flujos después del inicio",
         "recon_gross": "Resultado bruto cerrado",
-        "recon_costs": "Costes detallados",
+        "recon_costs": "Costos detallados",
         "recon_net": "Resultado neto cerrado",
         "recon_open": "Valor de posiciones abiertas",
         "recon_expected": "Saldo final esperado",
@@ -353,7 +353,7 @@ LOCKED_GAINS: dict[str, dict[str, str]] = {
         "subperiods": "El resultado año por año",
         "rolling": "Cómo cambia el resultado a lo largo del tiempo",
         "red_flags": "Cada bandera roja con sus cifras y qué hacer",
-        "costs": "Qué pasa con costes más altos",
+        "costs": "Qué pasa con costos más altos",
         "holdout": "El tramo fuera de muestra que declaraste, medido aparte",
         "benchmark": "La comparación con el benchmark que subiste",
     },
@@ -407,7 +407,7 @@ LABELS: dict[str, dict[str, str]] = {
         "title_account": f"{BRAND} · Auditoría de historial de cuenta",
         "fund_net": (
             "Rentabilidades declaradas netas de comisiones: son las cifras del propio fondo "
-            "tras sus comisiones y Rigor no midió los costes."
+            "tras sus comisiones y Rigor no midió los costos."
         ),
         "generated": "Generada",
         "audit_id": "Identificador",
@@ -423,7 +423,7 @@ LABELS: dict[str, dict[str, str]] = {
         "sensitivity": "Sensibilidad del Sharpe deflactado al número de intentos",
         "bootstrap": "Bootstrap estacionario (por periodo)",
         "holdout": "Fuera de muestra declarado",
-        "costs": "Costes de operación",
+        "costs": "Costos de operación",
         "benchmark": "Benchmark aportado",
         "cscv": "Sobreajuste por validación cruzada combinatoria (CSCV)",
         "subperiods": "Subperiodos (años naturales)",
@@ -442,13 +442,13 @@ LABELS: dict[str, dict[str, str]] = {
         "dsr": "Sharpe deflactado (DSR)",
         "multiplier": "Multiplicador",
         "cost_recomputed": (
-            "Esta tabla recalcula cada operación con sus precios y su tamaño: sin coste "
+            "Esta tabla recalcula cada operación con sus precios y su tamaño: sin costo "
             "extra da {table}, {gap} de diferencia con el resultado neto de las operaciones "
             "({trades}), por el redondeo de precios o la conversión de divisa."
         ),
         "bps": "pb por lado",
         "gross": "Bruto",
-        "cost": "Coste",
+        "cost": "Costo",
         "net": "Neto",
         "win_rate": "Aciertos",
         "win_rate_gross": "Aciertos antes de comisiones",
@@ -1506,12 +1506,12 @@ LABELS: dict[str, dict[str, str]] = {
             "hacía esperar."
         ),
         "next_costs": (
-            "Compara el spread y la comisión de tu bróker con los costes que aguanta el "
-            "resultado: con un coste algo mayor que el de referencia, el margen se pierde."
+            "Compara el spread y la comisión de tu bróker con los costos que aguanta el "
+            "resultado: con un costo algo mayor que el de referencia, el margen se pierde."
         ),
         "next_costs_fail": (
-            "Compara el spread y la comisión de tu bróker con el coste de referencia: con ese "
-            "coste las operaciones ya pierden dinero en neto."
+            "Compara el spread y la comisión de tu bróker con el costo de referencia: con ese "
+            "costo las operaciones ya pierden dinero en neto."
         ),
         "next_trials": (
             "Pregunta cuántas configuraciones se probaron antes de elegir esta y con qué "
@@ -1650,7 +1650,7 @@ LABELS: dict[str, dict[str, str]] = {
         "trials_used": "Intentos usados en el Sharpe deflactado",
         "horizon": "1 año",
         "reasons_detail": "Detalle técnico de cada dimensión",
-        "fees": "Costes que detalla el informe",
+        "fees": "Costos que detalla el informe",
         "plan": "Plan para subir de clase",
         "plan_intro": (
             "Lo que las reglas de la auditoría necesitarían ver en cada dimensión abierta, "
@@ -1674,8 +1674,8 @@ LABELS: dict[str, dict[str, str]] = {
         "kpi_sharpe": "Sharpe anualizado",
         "kpi_pf": "Factor de beneficio",
         "kpi_trades": "Operaciones · % de aciertos",
-        "kpi_breakeven": "Coste extra que lo lleva a cero",
-        "kpi_breakeven_negative": "ya pierde sin coste extra",
+        "kpi_breakeven": "Costo extra que lo lleva a cero",
+        "kpi_breakeven_negative": "ya pierde sin costo extra",
         "kpi_stress": "Sin las 5 mejores operaciones",
         "kpi_stress_curve": "Sin los 5 mejores periodos",
         "kpi_hint_return": "cuánto cambió la cuenta en todo el historial",
@@ -3090,7 +3090,7 @@ DIMENSION_TITLES: dict[str, dict[str, str]] = {
     "es": {
         "statistical_significance": "Significación estadística",
         "multiplicity": "Número de configuraciones probadas",
-        "costs": "Costes",
+        "costs": "Costos",
         "out_of_sample": "Fuera de muestra",
         "data_quality": "Calidad de datos y forma de operar",
         "benchmark": "Benchmark",
@@ -3194,7 +3194,7 @@ KEY_LABELS: dict[str, dict[str, str]] = {
         "min_track_record_length": "Historial mínimo necesario",
         "observations_short_by": "Observaciones que faltan",
         "trials": "Intentos",
-        "cost_bps_per_side": "Coste por lado (pb)",
+        "cost_bps_per_side": "Costo por lado (pb)",
         "oos_start": "Inicio fuera de muestra",
         "benchmark_applicable": "Aplica benchmark",
         "overlap_share": "Fechas en común con el benchmark",
@@ -3221,14 +3221,14 @@ KEY_LABELS: dict[str, dict[str, str]] = {
         "dependence_ratio": "Aumento de la varianza por dependencia",
         "effective_observations": "Observaciones efectivas tras dependencia",
         "sharpe_per_period": "Sharpe por periodo",
-        "break_even_bps": "Coste de equilibrio (pb por lado)",
-        "break_even_pips": "Coste de equilibrio (pips por lado)",
-        "reference_pips": "Coste de referencia (pips por lado)",
+        "break_even_bps": "Costo de equilibrio (pb por lado)",
+        "break_even_pips": "Costo de equilibrio (pips por lado)",
+        "reference_pips": "Costo de referencia (pips por lado)",
         "platform_equity_drawdown": "Drawdown con operaciones abiertas (tu plataforma)",
         "commission": "Comisión",
         "swap": "Swap",
-        "break_even_multiple": "Múltiplo de coste de equilibrio",
-        "reference_bps": "Coste de referencia (pb por lado)",
+        "break_even_multiple": "Múltiplo de costo de equilibrio",
+        "reference_bps": "Costo de referencia (pb por lado)",
         "dataset_digest": "Huella del conjunto de datos",
     },
     "en": {
@@ -3768,7 +3768,7 @@ THRESHOLD_LABELS: dict[str, dict[str, str]] = {
         "dsr_pass": "DSR para superar",
         "dsr_weak": "DSR mínimo",
         "pbo_max": "PBO máximo",
-        "cost_pass_multiplier": "múltiplo de coste que debe aguantar",
+        "cost_pass_multiplier": "múltiplo de costo que debe aguantar",
         "oos_sharpe_pass": "Sharpe fuera de muestra mínimo",
         "oos_gap_max": "caída máxima del Sharpe fuera de muestra",
         "benchmark_drawdown_ratio_max": "drawdown máximo frente al benchmark (veces)",
@@ -7286,13 +7286,13 @@ CLASS_LADDER: dict[str, tuple[tuple[str, str], ...]] = {
     "es": (
         (
             "A",
-            "La estadística y el número de intentos superan; costes, fuera de muestra y "
+            "La estadística y el número de intentos superan; costos, fuera de muestra y "
             "benchmark superan o no aplican; los datos no tienen banderas graves ni avisos.",
         ),
         (
             "B",
             "La estadística supera, el número de intentos supera o no se declaró y nada "
-            "falla, pero falta medir o reforzar costes, fuera de muestra, benchmark, calidad "
+            "falla, pero falta medir o reforzar costos, fuera de muestra, benchmark, calidad "
             "de datos o el número de intentos.",
         ),
         (

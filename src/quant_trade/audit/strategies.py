@@ -116,7 +116,7 @@ COPY: dict[str, dict[str, str]] = {
             "tocan, la diferencia cabe en el ruido de la medición; con los mismos datos esta "
             "regla es muy prudente. Si las fechas de dos versiones casi no coinciden, la "
             "diferencia puede venir del mercado de esas fechas y no del cambio. Cada prueba se "
-            "lee con las declaraciones de su propio informe (intentos, costes, fuera de "
+            "lee con las declaraciones de su propio informe (intentos, costos, fuera de "
             "muestra), por eso sus líneas dicen «cambió» y no «mejor» o «peor»."
         ),
     },

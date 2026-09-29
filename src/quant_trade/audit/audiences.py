@@ -179,7 +179,7 @@ AUDIENCE_PAGES: tuple[Audience, ...] = (
                 pains=(
                     "El vendedor enseña una curva casi recta y un factor de beneficio alto, y "
                     "no sabes cuántas configuraciones probó hasta encontrarla.",
-                    "Muchos robots se ven bien en el probador y fallan en real por costes, "
+                    "Muchos robots se ven bien en el probador y fallan en real por costos, "
                     "deslizamiento o datos de baja calidad.",
                     "Un historial de Myfxbook puede inflarse con depósitos o esconder pérdidas "
                     "abiertas que aún no se cerraron.",
@@ -220,7 +220,7 @@ AUDIENCE_PAGES: tuple[Audience, ...] = (
                     (
                         "Pruebas de estrés",
                         "El resultado sin sus mejores operaciones y meses, y qué pasa con el "
-                        "doble y el triple de costes.",
+                        "doble y el triple de costos.",
                     ),
                     (
                         "Backtest frente a cuenta real",
@@ -247,7 +247,7 @@ AUDIENCE_PAGES: tuple[Audience, ...] = (
                     (
                         "¿Una clase A significa que el robot funcionará?",
                         "No. La clase mide cuántas preguntas estadísticas responde el archivo. "
-                        "El futuro depende del mercado, de los costes reales y de cómo se opere.",
+                        "El futuro depende del mercado, de los costos reales y de cómo se opere.",
                     ),
                 ),
             ),
@@ -426,7 +426,7 @@ AUDIENCE_PAGES: tuple[Audience, ...] = (
                 summary=(
                     "Sube la lista de operaciones de TradingView, NinjaTrader, QuantConnect, "
                     "backtesting.py o vectorbt, o tu curva de equity, y mide si tu ventaja "
-                    "resiste el número de intentos, los costes y el periodo reciente."
+                    "resiste el número de intentos, los costos y el periodo reciente."
                 ),
                 pains=(
                     "Probaste decenas de variantes hasta dar con una que se ve bien, y ya no "
@@ -465,8 +465,8 @@ AUDIENCE_PAGES: tuple[Audience, ...] = (
                         "Cuánto sobrevive después de descontar las variantes que probaste.",
                     ),
                     (
-                        "Costes",
-                        "Qué pasa a 1x, 2x y 3x el coste de operación, y el coste de equilibrio.",
+                        "Costos",
+                        "Qué pasa a 1x, 2x y 3x el costo de operación, y el costo de equilibrio.",
                     ),
                     (
                         "¿Sigue funcionando en el periodo reciente?",
@@ -496,7 +496,7 @@ AUDIENCE_PAGES: tuple[Audience, ...] = (
                     ),
                     (
                         "¿Qué pasa si solo tengo una curva de equity?",
-                        "Se audita igual. Sin la lista de operaciones, los costes quedan como "
+                        "Se audita igual. Sin la lista de operaciones, los costos quedan como "
                         "NOT_MEASURED y el informe te dice qué archivo los mediría.",
                     ),
                 ),
@@ -1543,7 +1543,7 @@ AUDIENCE_PAGES: tuple[Audience, ...] = (
                     ),
                     (
                         "Lo que pesan las comisiones",
-                        "Con tus operaciones y sus costes, qué queda con el doble y el triple "
+                        "Con tus operaciones y sus costos, qué queda con el doble y el triple "
                         "de comisiones.",
                     ),
                     (
