@@ -1967,6 +1967,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         "compare_pick",
         "password_common",
         "password_short",
+        "password_long",
+        "password_bad",
         "file_bad",
         "strategy_full",
         "code_bad",

@@ -2794,7 +2794,8 @@ an account never changes what a report says.
   after); a wrong current password on an account form (password, e-mail,
   delete, two-step, recovery key, passkeys) answers `wrong_current` ("La
   contraseña actual no coincide."), never the sign-in's "El correo o la
-  contraseña no coinciden"; 10 failed sign-ins per hour per (address, e-mail) pair, with
+  contraseña no coinciden", and a refused new password says why
+  (`password_short`, `password_long`, `password_bad`, `password_common`); 10 failed sign-ins per hour per (address, e-mail) pair, with
   ceilings of 50 per address and 50 per e-mail (a slow-down against guesses
   spread over many addresses; past the e-mail ceiling an address gets
   `SIGNIN_TRIES_PAST_EMAIL_CEILING = 2` tries on that e-mail, so a stranger

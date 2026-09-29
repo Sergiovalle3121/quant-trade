@@ -362,8 +362,8 @@ COPY: dict[str, dict[str, str]] = {
         "export_button": "Descargar mis datos (JSON)",
         "export_not_included": (
             "No se incluyen: tu contraseña (solo guardamos su hash scrypt), los tokens de "
-            "sesión y de restablecimiento ni los de los enlaces de informes (solo guardamos "
-            "sus hashes), ni los datos de tu tarjeta (nunca los recibimos: los pagos con "
+            "sesión, de restablecimiento y de los enlaces de informes (solo guardamos sus "
+            "hashes), ni los datos de tu tarjeta (nunca los recibimos: los pagos con "
             "tarjeta pasan por Stripe)."
         ),
         "invite_title": "Invita a un colega",

@@ -607,6 +607,38 @@ def test_a_wrong_current_password_is_not_called_a_wrong_email(tmp_path: Path, lo
     assert copy["wrong"] != copy["wrong_current"]
 
 
+@pytest.mark.parametrize("locale", LANGUAGES)
+def test_a_new_password_that_is_refused_says_why(tmp_path: Path, locale: str) -> None:
+    """Every refusal of the new password has its own words, never the sign-in ones."""
+    client, store, _ = _client(tmp_path)
+    _signup(client, "ana@example.com")
+    base = ACCOUNT[locale]
+    copy = account_pages.COPY[locale]
+    refusals = {
+        "x" * (accounts.MAX_PASSWORD_CHARS + 1): "password_long",
+        "una frase larga\x01con control": "password_bad",
+        "abc": "password_short",
+        "contrasena123456": "password_common",
+    }
+    for password, problem in refusals.items():
+        assert accounts.password_problem(password) == problem
+        csrf = _csrf(client.get(base).text)
+        sent = client.post(
+            f"{base}/contrasena",
+            data={"current": PASSWORD, "password": password, "csrf": csrf},
+            follow_redirects=False,
+        )
+        assert sent.headers["location"] == f"{base}?error={problem}", problem
+        page = client.get(f"{base}?error={problem}").text
+        assert f"<div class='error' role='alert'>{account_pages._e(copy[problem])}</div>" in page
+        assert copy["wrong"] not in page
+    # The password did not change.
+    assert accounts.verify_password(
+        store.password_hash(store.find_account("ana@example.com").id),  # type: ignore[attr-defined]
+        PASSWORD,
+    )
+
+
 # -- C12: buying by WhatsApp says the sale is final -----------------------------------
 @pytest.mark.parametrize(
     ("locale", "words"),
