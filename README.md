@@ -198,7 +198,8 @@ trials. The web adds a synthetic sample report (`/ejemplo`), public
 verification pages with a badge (`/v/{id}`), and access codes for selling
 without Stripe (`quant-trade audit codes create --credits N --note X`).
 
-`Dockerfile.web` and `railway.json` deploy the service on Railway in free
+`Dockerfile.web` deploys the service on Railway (the service's settings name
+it as the Dockerfile) in free
 mode (watermarked reports); paid mode switches on only when every Stripe
 variable is set or the owner opts into access codes. `docs/AUDIT_SAAS.md` has the estimators, thresholds,
 assumptions and the deployment steps. The site serves terms (`/terminos`)
