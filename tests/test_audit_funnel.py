@@ -73,7 +73,7 @@ def _upload(client: TestClient) -> str:
 def test_only_listed_tags_count() -> None:
     assert funnel.clean_ref("f4") == "f4"
     assert funnel.clean_ref(" F4 ") == "f4"
-    for channel in ("telegram", "reddit", "discord"):
+    for channel in ("telegram", "reddit", "discord", "dc-en-01", "tg-es-01", "fo-en-03", "hn"):
         assert funnel.clean_ref(channel) == channel
     for bad in ("", None, "zzz", "f4'", "../x", "f" * 40, "<b>", "f4 x"):
         assert funnel.clean_ref(bad) == ""
