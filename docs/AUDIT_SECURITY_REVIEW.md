@@ -304,6 +304,46 @@ Limits that remain from this pass:
 - The description of the private pages (sign-up, sign-in, recovery,
   comparison) is one fixed sentence per language; they stay `noindex`.
 
+## Account page, sign-up and recovery polish (2026-09-29)
+
+Reviewed against `main` at c6ce500, after a customer-style audit of the
+account page, sign-up and recovery in the three languages. No control was
+relaxed: the CSRF tokens, the session and account-action limits, the
+password check on every account form, `safe_next` and the address logic are
+unchanged. Every change has an offline, deterministic test in
+`tests/test_audit_account_polish.py`.
+
+| # | Finding | Severity | Fix |
+|---|---|---|---|
+| C4 | "Mi cuenta" said the free first report was Disponible when the inbox had already received it on another (deleted) account: the page read `welcome_used(account)` only, the upload also reads `free_claim_taken(welcome_key(email))`. The rule itself held (the upload came out as a preview). | Low (a promise, no second free report) | The indicator reads both, so it shows Usado whenever the upload would refuse for the account or the inbox; an account without reports then offers "Subir un archivo". Nothing else about the free report changed: the device, file and network rules are still applied at upload time only, where they are told as before. |
+| C5 | The e-mail change accepted a mistyped provider (`gmial.com`) without the «¿Quisiste decir…?» question sign-up asks, so confirmation and recovery mail would go to a squatter's server. | Medium | `inbox.suggest_domain` runs on the e-mail change too, after the current password and the two matching addresses and before the DNS check, as on sign-up. The answer is a page (`account_pages.email_typo_page`, `no-store`, no referrer) with the corrected address, a box that keeps the typed one and the password again: the password is never written on a page, and the change still needs it. A kept address goes through every other check (plain, reserved, disposable, DNS, taken); the confirmation flow and the immediate change are unchanged. |
+| C6 | Every sign-up form counted toward the 5 per hour, mistakes and the typo question included: a customer with a typo and a weak password was locked out for an hour and, on a shared IPv4, locked others out; the 429 had no `Retry-After`. | Medium | A sign-up is counted only when the form passed every check, right before the account is created or the address turns out to be taken, so mass sign-ups and address probing stop at 5 as before. Forms sent back count against a separate ceiling of 30 per hour per network (`accounts.MAX_INVALID_SIGNUPS_PER_HOUR`, `signup_invalid` in the `attempts` table), checked before any validation, so the form cannot be used to hammer the DNS check or the password check; a forged form (bad CSRF) is refused before anything is counted. Both refusals carry `Retry-After: 3600`. |
+| C7 | The disposable-inbox list let 17 known services through, some of them aliases of services it blocked (grr.la and pokemail.net are Guerrilla Mail; moakt.cc is moakt). | Medium | 51 domains added (110 in all): the 17 reported and the public aliases of Guerrilla Mail, Mailinator, YOPmail, 10minutemail, temp-mail, moakt and 1secmail; each is checked as an exact or parent domain, as before. A test keeps every entry lower case, a plain domain, and off the list of real providers the typo question suggests. The list is still not exhaustive. |
+| C8 | The account's own address, or its name, was accepted as the password when the name ended in digits (`ana1990@…` with `ana1990`): the digits were stripped from the password but not from the name it was compared with, and the whole address was never compared. | Low | `accounts.common_password` refuses the address itself (however spaced or cased), its name, and its name without its leading or trailing digits, with digits or symbols around them; checked offline at sign-up, password change and reset. Existing passwords are not re-checked. |
+| C9 | A disabled access code was added to the account with "Código añadido" although it gives no credit (`link_code` read the code's id only). | Low | A code added by hand must pass `store.code_usable` (not disabled, not expired, credits left); otherwise the answer is `code_unusable` in the three languages and nothing is linked. A code already on the account keeps `code_already`; an unknown one `code_unknown`. Codes are still stored as hashes and never listed. |
+
+Also changed, texts and layout only: the four parts of the account page keep
+the order of the links (the credits counter links to the buying block when
+it reads 0), the counters are singular with 1, the reports list shows the
+time and the short id of each report, a wrong current password on an
+account form has its own message (`wrong_current`), the refusals of "Mis
+estrategias" are shown, buying by WhatsApp says the sale is final, the
+recovery page introduces the e-mail link first when delivery is ready, the
+preview notice never says a confirmation link was sent while delivery is
+not ready (`welcome_refused_unverified_nomail`, naming
+`AUDIT_OPERATOR_CONTACT` or the contact page), and the `not_included` note
+of the data download follows the page's language.
+
+Limits that remain from this pass:
+
+- The invalid-form ceiling is per network like the sign-up limit: past 30
+  mistakes from one shared IPv4 in an hour, everyone behind it waits the
+  hour. Sign-ups are counted in the database, so a deploy does not reset
+  either counter.
+- The disposable list is a list: a service with a new mirror domain gets
+  through until it is added. cock.li was added as reported, although it is
+  a general anonymous provider more than a ten-minute inbox.
+
 ## What the operator sets on Railway
 
 - `AUDIT_BASE_URL=https://<your domain>`: absolute links stop depending on

@@ -1349,6 +1349,15 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             base = "https://" + base[len("http://") :]
         return base
 
+    def _operator_reach(request: Request, locale: str) -> str:
+        """Where to write to the operator: the published address, else the contact page."""
+        from quant_trade.audit.pages import CONTACT_PATHS
+
+        contact = cfg.operator_contact
+        if "@" in contact and " " not in contact:
+            return contact
+        return _site_url(request) + CONTACT_PATHS.get(locale, CONTACT_PATHS["es"])
+
     def _locale(value: str | None) -> str:
         return value if value in LOCALES else "es"
 
@@ -1785,6 +1794,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     signin_email_failures = StoredAttemptLog(db, "signin_email")
     signin_ip_failures = StoredAttemptLog(db, "signin_ip")
     signup_attempts = StoredAttemptLog(db, "signup")
+    signup_mistakes = StoredAttemptLog(db, "signup_invalid")
     recovery_attempts = StoredAttemptLog(db, "recovery")
     two_step_attempts = StoredAttemptLog(db, "two_step")
     passkey_starts = StoredAttemptLog(db, "passkey")
@@ -1998,12 +2008,16 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         "code_already",
         "code_other",
         "code_unknown",
+        "code_unusable",
         "wrong",
+        "wrong_current",
         "csrf",
         "too_many",
         "compare_pick",
         "password_common",
         "password_short",
+        "password_long",
+        "password_bad",
         "file_bad",
         "strategy_full",
         "code_bad",
@@ -2206,6 +2220,10 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             invite = _invite(invite) if _referrals_on() else ""
 
             def again(error: str, status: int, *, typo_of: str = "") -> Response:
+                if status != 429 and error != "csrf" and net:
+                    # A form sent back (a mistake, the typo question) counts
+                    # against its own, higher ceiling, never as a sign-up.
+                    signup_mistakes.hit(net, now)
                 page = account_pages.signup_page(
                     retention_days=cfg.retention_days,
                     locale=locale,
@@ -2218,14 +2236,21 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                     typo_of=typo_of or (clean if email_as_typed else ""),
                     typo_kept=bool(email_as_typed) and not typo_of,
                 )
-                return _anon_page(page, new_csrf, status)
+                answer = _anon_page(page, new_csrf, status)
+                if status == 429:
+                    answer.headers["Retry-After"] = str(acct.SIGNUP_RETRY_AFTER_SECONDS)
+                return answer
 
+            net = ""
+            now = datetime.now(UTC)
             if not _anon_ok(request, csrf):
                 return again("csrf", 400)
-            ip = _client_ip(request, cfg.trusted_proxy_hops)
-            now = datetime.now(UTC)
             # Counted per network: an IPv6 /64 is one household or server.
-            if signup_attempts.hit(acct.network_address(ip), now) >= acct.MAX_SIGNUPS_PER_HOUR:
+            net = acct.network_address(_client_ip(request, cfg.trusted_proxy_hops))
+            if (
+                signup_attempts.count(net, now) >= acct.MAX_SIGNUPS_PER_HOUR
+                or signup_mistakes.count(net, now) >= acct.MAX_INVALID_SIGNUPS_PER_HOUR
+            ):
                 return again("too_many", 429)
             if not acct.valid_email(clean):
                 return again("email_bad", 400)
@@ -2247,6 +2272,10 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             problem = acct.password_problem(password, email=clean)
             if problem:
                 return again(problem, 400)
+            # The form is valid: this is a sign-up, whether the account is
+            # created or the address turns out to be taken.
+            if signup_attempts.hit(net, now) >= acct.MAX_SIGNUPS_PER_HOUR:
+                return again("too_many", 429)
             account = db.create_account(
                 email=clean,
                 password_hash=acct.hash_password(password),
@@ -2600,7 +2629,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             if rp is None:
                 return RedirectResponse(f"{base}?error=passkey_unavailable#llaves", 303)
             if not acct.verify_password(db.password_hash(account.id) or "", current):
-                return RedirectResponse(f"{base}?error=wrong#llaves", status_code=303)
+                return RedirectResponse(f"{base}?error=wrong_current#llaves", status_code=303)
             if len(db.list_passkeys(account.id)) >= pk.MAX_PER_ACCOUNT:
                 return RedirectResponse(f"{base}?error=passkey_full#llaves", status_code=303)
             now = datetime.now(UTC)
@@ -2689,7 +2718,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             base = account_pages.path("account", locale)
             # Like adding one: a borrowed session alone cannot strip them.
             if not acct.verify_password(db.password_hash(account.id) or "", current):
-                return RedirectResponse(f"{base}?error=wrong#llaves", status_code=303)
+                return RedirectResponse(f"{base}?error=wrong_current#llaves", status_code=303)
             if not db.remove_passkey(account.id, credential):
                 return RedirectResponse(f"{base}#llaves", status_code=303)
             _note_event(request, account.id, "passkey_removed")
@@ -2910,7 +2939,12 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                     welcome=(
                         ""
                         if cfg.free_mode or not acct.WELCOME_FULL_REPORT
-                        else ("used" if db.welcome_used(account.id) else "available")
+                        else (
+                            "used"
+                            if db.welcome_used(account.id)
+                            or db.free_claim_taken(inbox.welcome_key(account.email))
+                            else "available"
+                        )
                     ),
                     strategies=db.list_strategies(account.id),
                     recovery_created=db.recovery_key_created(account.id) or "",
@@ -2967,11 +3001,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             payload = {
                 "service": BRAND,
                 "exported_at": now.isoformat().replace("+00:00", "Z"),
-                "not_included": (
-                    "Your password (kept only as a scrypt hash), session and reset tokens and "
-                    "report link tokens (kept only as hashes) and card details (never received: "
-                    "card payments go through Stripe)."
-                ),
+                "not_included": account_pages.COPY[locale]["export_not_included"],
                 "retention_days_for_unpaid_reports_and_ips": cfg.retention_days,
                 **data,
             }
@@ -3239,10 +3269,18 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 return checked
             account, _, locale, _ = checked
             base = account_pages.path("account", locale)
-            code_id = db.code_id(code.strip()[:_CODE_MAX])
+            typed = code.strip()[:_CODE_MAX]
+            code_id = db.code_id(typed)
             if code_id is None:
                 return RedirectResponse(f"{base}?error=code_unknown", status_code=303)
-            outcome = db.link_code(account.id, code_id, at=datetime.now(UTC))
+            now = datetime.now(UTC)
+            if not db.code_usable(typed, now):
+                # Disabled, expired or spent: it would give no credit. One
+                # already on this account keeps its own answer.
+                mine = any(item.code.id == code_id for item in db.account_codes_list(account.id))
+                kind = "code_already" if mine else "code_unusable"
+                return RedirectResponse(f"{base}?error={kind}", status_code=303)
+            outcome = db.link_code(account.id, code_id, at=now)
             if outcome == "linked":
                 return RedirectResponse(f"{base}?done=code_linked", status_code=303)
             return RedirectResponse(f"{base}?error=code_{outcome}", status_code=303)
@@ -3362,7 +3400,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             account, session_hash, locale, _ = checked
             base = account_pages.path("account", locale)
             if not acct.verify_password(db.password_hash(account.id) or "", current):
-                return RedirectResponse(f"{base}?error=wrong", status_code=303)
+                return RedirectResponse(f"{base}?error=wrong_current", status_code=303)
             problem = acct.password_problem(password, email=account.email)
             if problem:
                 shown = problem if problem in account_errors else "wrong"
@@ -3383,6 +3421,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             email_again: Annotated[str, Form(max_length=320)] = "",
             current: Annotated[str, Form(max_length=1024)] = "",
             csrf: Annotated[str, Form(max_length=200)] = "",
+            email_as_typed: Annotated[str, Form(max_length=320)] = "",
             lang: str | None = None,
         ) -> Response:
             checked = _signed_in_action(request, path_locale, lang, csrf)
@@ -3395,8 +3434,12 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 return RedirectResponse(f"{base}?error={error}", status_code=303)
 
             if not acct.verify_password(db.password_hash(account.id) or "", current):
-                return refused("wrong")
-            clean = acct.normalise_email(email)
+                return refused("wrong_current")
+            # "No, my address is the one I typed": the box keeps that address,
+            # which was written twice before the question was asked.
+            clean = acct.normalise_email(email_as_typed or email)
+            if email_as_typed:
+                email_again = clean
             if not acct.valid_email(clean):
                 return refused("email_bad")
             if not acct.simple_email(clean):
@@ -3405,6 +3448,20 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 return refused("email_bad")
             if inbox.is_disposable(clean):
                 return refused("email_disposable")
+            suggested = "" if email_as_typed else inbox.suggest_domain(clean)
+            if suggested and clean == acct.normalise_email(email_again):
+                # A mistyped provider can have mail servers of a stranger's:
+                # the address is confirmed before it replaces the old one.
+                return HTMLResponse(
+                    account_pages.email_typo_page(
+                        locale=locale,
+                        csrf=csrf,
+                        suggested=suggested,
+                        typed=clean,
+                        verification_required=cfg.email_verification_required,
+                    ),
+                    headers={"Cache-Control": "no-store", "Referrer-Policy": "no-referrer"},
+                )
             if cfg.check_email_domains and not app.state.mail_domain_check(clean):
                 return refused("email_no_domain")
             if clean != acct.normalise_email(email_again):
@@ -3522,7 +3579,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             account, _, locale, _ = checked
             if not acct.verify_password(db.password_hash(account.id) or "", current):
                 return RedirectResponse(
-                    account_pages.path("account", locale) + "?error=wrong", status_code=303
+                    account_pages.path("account", locale) + "?error=wrong_current",
+                    status_code=303,
                 )
             db.delete_account(account.id, with_reports=with_reports == "yes")
             response = _signin_redirect(locale, done="deleted")
@@ -3671,7 +3729,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             account, _, locale, _ = checked
             base = account_pages.path("account", locale)
             if not acct.verify_password(db.password_hash(account.id) or "", current):
-                return RedirectResponse(f"{base}?error=wrong#dos-pasos", status_code=303)
+                return RedirectResponse(f"{base}?error=wrong_current#dos-pasos", status_code=303)
             # Without a recovery key a lost phone would lock the account.
             if db.recovery_key_created(account.id) is None:
                 return RedirectResponse(
@@ -3789,7 +3847,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             account, _, locale, _ = checked
             base = account_pages.path("account", locale)
             if not acct.verify_password(db.password_hash(account.id) or "", current):
-                return RedirectResponse(f"{base}?error=wrong#recuperacion", status_code=303)
+                return RedirectResponse(f"{base}?error=wrong_current#recuperacion", status_code=303)
             key = acct.new_recovery_key()
             db.set_recovery_key(account.id, acct.recovery_key_hash(key), at=datetime.now(UTC))
             _note_event(request, account.id, "recovery_key_created")
@@ -4848,6 +4906,10 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             and not record.paid
         ):
             notice = account_pages.COPY[ui][f"welcome_refused_{acct_done[8:]}"]
+            if acct_done[8:] == "unverified" and not cfg.email_delivery_ready:
+                notice = account_pages.COPY[ui]["welcome_refused_unverified_nomail"].format(
+                    contact=_operator_reach(request, ui)
+                )
         elif acct_done == "nocredit" and not record.paid:
             notice = account_pages.COPY[ui]["credit_none"]
         # A rejected code is answered next to the code field, not in this banner.
