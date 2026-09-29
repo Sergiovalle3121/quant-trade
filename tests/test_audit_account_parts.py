@@ -222,9 +222,21 @@ def test_the_icons_of_the_buying_block_are_the_size_of_their_text() -> None:
     assert ":where(svg[aria-hidden='true'][viewBox='0 0 24 24']){width:1.15em;" in theme.BASE
 
 
-def test_without_credits_buying_still_comes_before_the_reports() -> None:
-    assert tuple(_parts(_page("es", credits=0))) == ("creditos", "informes", "seguridad", "datos")
-    assert tuple(_parts(_page("es", credits=1))) == PARTS
+@pytest.mark.parametrize("locale", account_pages.LANGUAGES)
+def test_the_parts_keep_the_order_of_the_links_and_the_counter_leads_to_buying(
+    locale: str,
+) -> None:
+    link = f"<a href='#creditos'>{account_pages.COPY[locale]['credits_buy']}</a>"
+    for credits in (0, 1, 2):
+        page = _page(locale, credits=credits)
+        assert tuple(_parts(page)) == PARTS
+        kpis = page.split("<div class='acct-kpis'>")[1].split("<section")[0]
+        assert (link in kpis) == (credits == 0)
+        assert page.count(link) == (1 if credits == 0 else 0)
+    # Nothing to buy (no card, no chat, or free mode): no call to action.
+    assert link not in _page(locale, credits=0, contact_url="")
+    assert link not in _page(locale, credits=0, free_mode=True)
+    assert link in _page(locale, credits=0, contact_url="", card_markets=("MX",))
 
 
 def _signed_in(tmp_path: Path) -> TestClient:
@@ -259,12 +271,12 @@ def test_a_redirect_to_an_old_fragment_lands_on_a_page_with_its_message(tmp_path
     )
     assert refused.status_code == 303
     location = refused.headers["location"]
-    assert location == "/cuenta?error=wrong#dos-pasos"
+    assert location == "/cuenta?error=wrong_current#dos-pasos"
     landed = client.get(location.split("#")[0]).text
     bar = landed[
         landed.index("<div class='acct-parts") : landed.index("<section class='acct-part'")
     ]
-    assert account_pages.COPY["es"]["wrong"] in bar and "role='alert'" in bar
+    assert account_pages.COPY["es"]["wrong_current"] in bar and "role='alert'" in bar
     assert "id='dos-pasos'" in _parts(landed)["seguridad"]
     for locale, path in ACCOUNT_PATHS.items():
         shown = client.get(path).text

@@ -2495,7 +2495,7 @@ an account never changes what a report says.
   address in `free_previews` is cleared by the retention purge.
   What it does not stop while `AUDIT_EMAIL_VERIFICATION_REQUIRED=false`:
   someone can open several accounts with made-up addresses; the per-network
-  cap and the 5 sign-ups per hour per address only slow that down. Enabling
+  cap and the 5 sign-ups per hour per network only slow that down. Enabling
   SMTP and verified-email gating closes the reward and new-Checkout paths.
 - **Free first full report** (`accounts.WELCOME_FULL_REPORT = True`,
   `WELCOME_REPORTS_PER_IP_PER_MONTH = 3` per IPv6 /64,
@@ -2517,7 +2517,12 @@ an account never changes what a report says.
   on any account, or when the network address reached the monthly cap. The
   `welcome_reports` row outlives the account, so deleting and signing up
   again does not repeat it. The purge clears the address; the device and
-  file hashes stay. "Mi cuenta" shows it as Disponible/Usado. The "file" is
+  file hashes stay. "Mi cuenta" shows it as Disponible/Usado, by the rule
+  the upload applies: Usado when this account had it or when another account
+  on the same inbox had it (`store.free_claim_taken(inbox.welcome_key(...))`),
+  so the page never offers what the upload will refuse; an account without
+  reports then reads "Subir un archivo" instead of "Subir mi primer archivo".
+  The "file" is
   a fingerprint of what it says (`accounts.content_fingerprint`: timestamps
   and returns rounded to 5 decimals), so a trailing newline, other line
   endings or renamed columns do not make a new file. When the account's
@@ -2535,6 +2540,11 @@ an account never changes what a report says.
   say so plainly (confirming unlocks the first free full report and
   purchases), and the notice after sign-up says a confirmation link was sent
   and to check spam (`welcome_confirm`, only while delivery is configured).
+  While delivery is not ready (no provider, or the switch on with the mail
+  not configured) the preview's notice is `welcome_refused_unverified_nomail`
+  instead: confirmation is not available right now, and where to write
+  (`AUDIT_OPERATOR_CONTACT` when it is an address, else the contact page);
+  it never says a link was sent.
   A sign-up that returns to the upload page or to a report shows the same
   notice there (`?done=welcome_confirm`, `?acct=welcome_confirm`), only to a
   signed-in account whose address is still unconfirmed; a sign-up that
@@ -2547,9 +2557,11 @@ an account never changes what a report says.
   quotes, brackets, commas, spaces or IP addresses, 254 characters at most.
   Sign-in, recovery and the reset request keep the older, wider check, so an
   account made before the rule is never locked out. Sign-up and e-mail change refuse addresses
-  on a short list of well-known temporary-inbox services
-  (`inbox.DISPOSABLE_DOMAINS`, exact or parent domain; error
-  `email_disposable`); the list is not exhaustive.
+  on a list of 110 well-known temporary-inbox services and their mirror
+  domains (`inbox.DISPOSABLE_DOMAINS`, exact or parent domain; error
+  `email_disposable`): Guerrilla Mail (grr.la, pokemail.net, sharklasers.com…),
+  Mailinator's public aliases, YOPmail's, 10minutemail, temp-mail, moakt,
+  1secmail and the like; the list is not exhaustive.
   Sign-up and e-mail change also refuse reserved domains (example.com/net/org
   and `.example`, `.test`, `.invalid`, `.localhost`, `.local`) as `email_bad`
   when `AUDIT_ALLOW_RESERVED_EMAILS` is not `true` (the service default).
@@ -2568,7 +2580,12 @@ an account never changes what a report says.
   keeps the typed one, which still goes through every other check. Known
   providers (`inbox.COMMON_PROVIDERS`, e.g. mail.com, gmx.de) are never
   questioned, and neither are short names like aol or live beyond their
-  ending (aon.com stays silent).
+  ending (aon.com stays silent). The e-mail change asks the same question
+  (`account_pages.email_typo_page`) once the current password is right and
+  the two new addresses match: a page with the corrected address, the box
+  that keeps the typed one, and the password again (it is never written on
+  a page); the kept address goes through every other check, and the change
+  itself (immediate, or pending confirmation) is unchanged.
   While e-mail confirmation is off, a shared IPv4 address gets
   `WELCOME_REPORTS_PER_IPV4_UNVERIFIED` (3) free reports a month instead of
   the carrier-sized `WELCOME_REPORTS_PER_IPV4_PER_MONTH` (10).
@@ -2623,7 +2640,9 @@ an account never changes what a report says.
   dates, reports (class, payment, description, upload IP while kept),
   codes (never the code or the owner's note), strategies, free previews,
   the free first report's hashes and IP, and the column maps. Never the
-  password hash, a session, reset or report token. Backs the "Qué
+  password hash, a session, reset or report token; the `not_included` note
+  that says so is in the language of the page it was downloaded from
+  (`export_not_included`), the keys of the file stay in English. Backs the "Qué
   guardamos" block and the right of access in /privacidad. A browser-flagged
   cross-site request is sent back to the account page; a report saved from
   someone else's link shows its description only once paid
@@ -2631,7 +2650,11 @@ an account never changes what a report says.
 - **Mis estrategias** (`audit/strategies.py`, tables `strategies` and
   `strategy_reports`): an account names a strategy and files reports of its
   own list under it (one strategy per report, 50 strategies per account),
-  from the form on "Mi cuenta" or after the fact. `/cuenta/estrategias/<id>`
+  from the form on "Mi cuenta" or after the fact; filing without a name, a
+  report or a strategy comes back to the account with "Elige un informe de
+  tu lista y una estrategia, o escribe un nombre" (`file_bad`), and the
+  51st strategy with `strategy_full`, both read from `strategies.COPY`
+  (`account_pages.STRATEGY_ERRORS`). `/cuenta/estrategias/<id>`
   (EN `/account/strategies/<id>`) lists the versions oldest first with the
   class, annualised Sharpe, deflated Sharpe and max drawdown (full reports
   only; a preview shows its class and the way to unlock). Next to each
@@ -2721,22 +2744,36 @@ an account never changes what a report says.
   `#correo`) stay inside their part, so old links and redirects still land
   on their block. The page's message (`?done=`, `?error=`) is rendered in
   the same bar as the links, so it is in view wherever a redirect lands.
-  With no credits the credits part comes before the reports, as the buying
-  block did before. Tests: `tests/test_audit_account_parts.py`.
+  The four parts always come in the order of the links; with no credits the
+  "Créditos disponibles" counter links "Comprar créditos" to `#creditos`
+  (only when there is a way to buy: chat, card or live card sales, and not
+  in free mode), so buying stays one tap away. The counters read in the
+  singular with 1 ("1 Informe", "1 Informe completo", "1 Crédito
+  disponible"). Tests: `tests/test_audit_account_parts.py`,
+  `tests/test_audit_account_polish.py`.
 - **What lands on an account**: an upload made while signed in; a report
   opened by its link and saved with "Guardar en mi cuenta"; the code that
   unlocked a report while signed in; a code added by hand; a card purchase
   started while signed in (the report, and a pack's code with its credits).
-  A report or a code belongs to one account at most.
+  A report or a code belongs to one account at most. A code added by hand
+  must still be usable (`store.code_usable`: not disabled, not expired,
+  credits left); a disabled, expired or spent code is refused with
+  `code_unusable` and not linked, and one already on the account keeps
+  `code_already`.
 - **Credits**: a locked report of a signed-in customer shows "Desbloquear con
   1 crédito de tu cuenta" when their codes have credits left. The code that
   expires first is spent first; the credit and the unlock share one
   transaction, as with a typed code.
 - **From the list**: each full report links its PDF (`/audits/{id}/pdf`, opened
   by the owner's session without the token) and, when published, its public
-  `/v/` page. The "¿Necesitas créditos?" box shows the single and pack prices
-  from the settings and a WhatsApp link with the request typed; with no
-  credits left it sits above the list.
+  `/v/` page. Each row shows the date with the time (UTC, hours and minutes)
+  and the first 8 characters of the report's id under it, so two reports of
+  one day are told apart (the strategies form shows the same id); on a phone
+  the line wraps under the date. The "¿Necesitas créditos?" box shows the
+  single and pack prices from the settings and a WhatsApp link with the
+  request typed, and says that the credit is delivered at once and the
+  purchase is not refundable (`buy_final_sale_note`), as the card form's box
+  does.
 - **Comparing**: with two or more full reports, "Mis informes" lets the
   customer tick two and open `/cuenta/comparar` (`/account/comparar`), the
   same side-by-side view as `/comparar` without pasting private links. It is
@@ -2746,18 +2783,31 @@ an account never changes what a report says.
   other visitor still needs the token (a wrong one is a 404).
 - **Security**: scrypt password hashes (N=2^14, r=8, p=1, 16-byte salt);
   at sign-up, password change and reset `accounts.common_password` refuses,
-  offline, keyboard and digit runs, repeated units, digits only, and common
-  EN/ES/PT words or the e-mail's name with digits or symbols around them;
+  offline, keyboard and digit runs, repeated units, digits only, common
+  EN/ES/PT words or the e-mail's name (with or without its own digits) with
+  digits or symbols around them, and the address itself however it is
+  spaced or cased;
   sign-up and "Mi cuenta" list what the account keeps and how to delete it;
   session cookie `rigor_session`, 256-bit, `HttpOnly`, `SameSite=Lax`,
   `Secure` on https, 30 days, stored only as SHA-256; CSRF tokens on every
   form (double-submit cookie `rigor_csrf` before sign-in, the session's token
-  after); 10 failed sign-ins per hour per (address, e-mail) pair, with
+  after); a wrong current password on an account form (password, e-mail,
+  delete, two-step, recovery key, passkeys) answers `wrong_current` ("La
+  contraseña actual no coincide."), never the sign-in's "El correo o la
+  contraseña no coinciden"; 10 failed sign-ins per hour per (address, e-mail) pair, with
   ceilings of 50 per address and 50 per e-mail (a slow-down against guesses
   spread over many addresses; past the e-mail ceiling an address gets
   `SIGNIN_TRIES_PAST_EMAIL_CEILING = 2` tries on that e-mail, so a stranger
   who knows it cannot lock the owner out), and 5 sign-ups per hour per
-  address. These counters and the panel's wrong-key limit live in the
+  network (`MAX_SIGNUPS_PER_HOUR`): a sign-up is a form that passed every
+  check, whether the account was created or the address turned out to be
+  taken, so the limit still stops mass sign-ups and address probing. A form
+  sent back (a wrong address or password, the «¿Quisiste decir…?» question)
+  counts against its own ceiling of 30 per hour per network
+  (`MAX_INVALID_SIGNUPS_PER_HOUR`), past which the form answers 429 before
+  checking anything; a customer with a typo and a weak password never spends
+  a sign-up. Both 429 answers carry `Retry-After: 3600`
+  (`SIGNUP_RETRY_AFTER_SECONDS`). These counters and the panel's wrong-key limit live in the
   `attempts` table (keys hashed, rows older than the hour deleted), so a
   deploy does not reset them. A password change or reset signs out the other
   sessions; `next` only returns to `/audits/`, `/cuenta` paths or exactly
@@ -2796,7 +2846,10 @@ an account never changes what a report says.
   from 32 unambiguous ones (100 random bits, `accounts.new_recovery_key`),
   shown once with `Cache-Control: no-store`; only its SHA-256 and date are
   kept, and making a new one replaces the old. Mi cuenta nudges accounts
-  without one. On `/olvide`, e-mail + key + new password sets the password,
+  without one. `/olvide` introduces what it offers in the order the page
+  shows it: the e-mail link first when delivery is ready (`recover_lead_mail`),
+  else the key and writing to the operator (`recover_lead`). On `/olvide`,
+  e-mail + key + new password sets the password,
   spends the key (a delete that names its hash, so it works once) and signs
   out every session. Every try counts toward
   `accounts.MAX_RECOVERY_TRIES_PER_HOUR` (10) per network and per e-mail; an
