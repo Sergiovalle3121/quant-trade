@@ -1247,9 +1247,34 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             return _secure(RedirectResponse(target, status_code=308), path=request.url.path)
         return await call_next(request)
 
+    def _slash_redirect_https(request: Request, response: Any) -> None:
+        """Keep ``https`` on the router's trailing-slash redirect.
+
+        Behind the proxy the socket speaks plain http, so the router answers
+        ``/en/`` with ``Location: http://.../en``. On the site's own host that
+        address is rebuilt from ``AUDIT_BASE_URL``; no forwarded header is read,
+        so a client cannot choose the scheme or the host of the redirect.
+        """
+        if response.status_code != 307 or not cfg.base_url.startswith("https://"):
+            return
+        # The host may carry a port ("host:443"); the site is the same one.
+        host = request.headers.get("host", "").lower()
+        if canonical_host not in (host, host.split(":", 1)[0]):
+            return
+        target = urlsplit(response.headers.get("location", ""))
+        path = request.url.path
+        twin = path.rstrip("/") if path.endswith("/") else f"{path}/"
+        same_site = target.scheme == "http" and target.netloc.lower() == host
+        # The router percent-encodes the path it writes ("gu%C3%ADa").
+        same_path = target.path in (twin, quote(twin))
+        if same_site and same_path and not target.path.startswith("//"):
+            query = f"?{target.query}" if target.query else ""
+            response.headers["location"] = f"{cfg.base_url}{target.path}{query}"
+
     @app.middleware("http")
     async def no_store(request: Request, call_next: Any) -> Any:
         response = await call_next(request)
+        _slash_redirect_https(request, response)
         _funnel_visit(request, response)
         ok = response.status_code == 200
         if (request.url.path.startswith("/static/") or request.url.path in ICON_PATHS) and ok:
@@ -1582,7 +1607,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             pack_price_usd=cfg.pack_price_usd,
             extras_open=bool(extras),
             signed_in=_session(request) is not None,
-            operator=(cfg.operator_name, cfg.operator_address),
+            operator=(cfg.operator_name, cfg.operator_address_for(locale)),
         )
         return HTMLResponse(page)
 
@@ -1694,14 +1719,14 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     def waitlist(
         request: Request, email: Annotated[str, Form()], lang: Annotated[str, Form()] = "es"
     ) -> Response:
-        # The Portuguese landing comes back to itself; its error page is in English.
+        # The Portuguese landing comes back to itself.
         home = "/pt?" if lang == "pt" else f"/?lang={_locale(lang)}&"
-        locale = "en" if lang == "pt" else _locale(lang)
+        locale = "pt" if lang == "pt" else _locale(lang)
         ip = _client_ip(request, cfg.trusted_proxy_hops)
         if waitlist_attempts.hit(ip, datetime.now(UTC)) >= WAITLIST_PER_HOUR_PER_IP:
             return _html_error(request, 429, message("rate_limited", locale), locale)
         if not _valid_email(email):
-            return RedirectResponse(f"{home}error=email", status_code=303)
+            return RedirectResponse(f"{home}error=email#news", status_code=303)
         db.add_waitlist(email, at=datetime.now(UTC))
         return RedirectResponse(f"{home}joined=1#news", status_code=303)
 
@@ -5262,7 +5287,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 None,
             )
             if other is None:
-                raise _not_found()
+                # A missing page, not a missing audit: the ordinary 404 text.
+                raise HTTPException(status_code=404, detail="page_missing")
             return RedirectResponse(guide_url(other.slug, path_locale), status_code=301)
         return HTMLResponse(guide_page(guide, locale=locale, base_url=_site_url(request)))
 
@@ -5279,7 +5305,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 None,
             )
             if other is None:
-                raise _not_found()
+                raise HTTPException(status_code=404, detail="page_missing")
             return RedirectResponse(audience_url(other.slug, path_locale), status_code=301)
         return HTMLResponse(
             audience_page(
@@ -5320,12 +5346,12 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     def guide_en(request: Request, slug: str, lang: str | None = None) -> Response:
         return _guide(request, slug, "en", _locale(lang or "en"))
 
-    def _legal_context() -> LegalContext:
+    def _legal_context(locale: str = "es") -> LegalContext:
         return LegalContext(
             operator_name=cfg.operator_name,
             operator_contact=cfg.operator_contact,
-            operator_address=cfg.operator_address,
-            jurisdiction=cfg.jurisdiction,
+            operator_address=cfg.operator_address_for(locale),
+            jurisdiction=cfg.jurisdiction_for(locale),
             free_mode=cfg.free_mode,
             price_usd=cfg.price_usd,
             card_payments=cfg.card_public,
@@ -5340,7 +5366,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
 
     def _terms(request: Request, locale: str) -> str:
         return legal_page(
-            terms_text(_legal_context(), locale),
+            terms_text(_legal_context(locale), locale),
             locale=locale,
             kind="terms",
             base_url=_site_url(request),
@@ -5348,7 +5374,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
 
     def _privacy(request: Request, locale: str) -> str:
         return legal_page(
-            privacy_text(_legal_context(), locale),
+            privacy_text(_legal_context(locale), locale),
             locale=locale,
             kind="privacy",
             base_url=_site_url(request),

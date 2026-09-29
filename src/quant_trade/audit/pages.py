@@ -1536,8 +1536,8 @@ def _footer(locale: str) -> str:
     return (
         "<footer class='foot'><div class='wrap'><div class='foot-grid'>"
         f"<div>{logo(home)}<p class='tagline'>{_e(TAGLINE[locale])}. {_e(ui['footer_base'])}</p>"
-        f"</div><div><h4>{_e(ui['footer_product'])}</h4><ul>{product}</ul></div>"
-        f"<div><h4>{_e(ui['footer_legal'])}</h4><ul>{legal}</ul></div></div>"
+        f"</div><div><h2>{_e(ui['footer_product'])}</h2><ul>{product}</ul></div>"
+        f"<div><h2>{_e(ui['footer_legal'])}</h2><ul>{legal}</ul></div></div>"
         f"<div class='disclaimer'><strong>{_e(copy['disclaimer'])}.</strong> "
         f"{_e(_disclaimer(locale))}</div></div></footer>"
     )
@@ -2419,7 +2419,8 @@ def _final_cta(
         f"<a class='link-more' href='{_e(sample)}'>{_e(ui['cta_sample'])}{icon('arrow')}</a></div>"
         f"<div class='news center' id='news'><p class='label'>{_e(copy['waitlist_title'])}</p>"
         f"{flash}<form class='inline-form' method='post' action='/waitlist'>"
-        f"<input type='email' name='email' required placeholder='{_e(copy['email'])}' "
+        f"<input type='email' name='email' required maxlength='254' autocomplete='email' "
+        f"placeholder='{_e(copy['email'])}' "
         f"aria-label='{_e(copy['email'])}'><input type='hidden' name='lang' value='{_e(locale)}'>"
         f"<button class='btn btn-ghost' type='submit'>{_e(copy['join'])}</button></form></div>"
         "</div></div></section>"
@@ -2455,7 +2456,7 @@ def landing(
     copy = _COPY[locale]
     meta = _public_meta(copy["title"], copy["meta_description"], locale, _home(locale), base_url)
     sample = _sample_url(locale)
-    err = f"<div class='error'>{_e(error)}</div>" if error else ""
+    err = f"<div class='error' role='alert'>{_e(error)}</div>" if error else ""
     body = (
         _hero(locale, sample)
         + _specs(locale)
@@ -2808,6 +2809,60 @@ def _doc(sections: list[tuple[str, str]], locale: str, *, lead: str = "", aside:
     )
 
 
+#: A short description of its own (under 160 characters) for the pages that
+#: used their title or the whole notice as description.
+PAGE_DESCRIPTIONS: dict[str, dict[str, str]] = {
+    "terms": {
+        "es": (
+            "Términos del servicio de Rigor: qué es el servicio, qué no es, tus archivos, "
+            "precio y pago, y ley aplicable."
+        ),
+        "en": (
+            "Rigor terms of service: what the service is, what it is not, your files, "
+            "price and payment, and governing law."
+        ),
+        "pt": (
+            "Termos do serviço do Rigor: o que é o serviço, o que ele não é, seus arquivos, "
+            "preço e pagamento, e lei aplicável."
+        ),
+    },
+    "privacy": {
+        "es": (
+            "Política de privacidad de Rigor: qué guardamos, qué no guardamos, para qué, "
+            "cuánto tiempo y cuáles son tus derechos."
+        ),
+        "en": (
+            "Rigor privacy policy: what we keep, what we do not keep, what it is used for, "
+            "for how long and what your rights are."
+        ),
+        "pt": (
+            "Política de privacidade do Rigor: o que guardamos, o que não guardamos, para quê, "
+            "por quanto tempo e quais são seus direitos."
+        ),
+    },
+    "compare": {
+        "es": "Compara dos de tus informes de Rigor, lado a lado, para ver qué cambió.",
+        "en": "Compare two of your Rigor reports, side by side, to see what changed.",
+        "pt": "Compare dois dos seus relatórios do Rigor, lado a lado, para ver o que mudou.",
+    },
+    "signup": {
+        "es": "Crea tu cuenta de Rigor para subir tus archivos y guardar tus informes.",
+        "en": "Create your Rigor account to upload your files and keep your reports.",
+        "pt": "Crie sua conta no Rigor para enviar seus arquivos e guardar seus relatórios.",
+    },
+    "signin": {
+        "es": "Entra a tu cuenta de Rigor para ver tus informes, créditos y compras.",
+        "en": "Sign in to your Rigor account to see your reports, credits and purchases.",
+        "pt": "Entre na sua conta do Rigor para ver seus relatórios, créditos e compras.",
+    },
+    "forgot": {
+        "es": "Recupera el acceso a tu cuenta de Rigor y pon una contraseña nueva.",
+        "en": "Get back into your Rigor account and set a new password.",
+        "pt": "Recupere o acesso à sua conta do Rigor e crie uma nova senha.",
+    },
+}
+
+
 def legal_page(
     text: LegalText, *, locale: str = "es", kind: str = "terms", base_url: str = ""
 ) -> str:
@@ -2816,7 +2871,9 @@ def legal_page(
     copy = _COPY[locale]
     ui = _UI[locale]
     path = legal_url(kind, locale).split("?", 1)[0]
-    description = f"{text.title} · {copy['title']}. {_disclaimer(locale)}"
+    description = PAGE_DESCRIPTIONS.get(kind, {}).get(locale) or (
+        f"{text.title} · {copy['title']}. {_disclaimer(locale)}"
+    )
     meta = _public_meta(text.title, description, locale, path, base_url)
     warning = f"<div class='error'>{_e(text.warning)}</div>" if text.warning else ""
     sections = [
@@ -2929,6 +2986,14 @@ CONTACT_COPY: dict[str, dict[str, Any]] = {
 }
 
 
+#: The heading of the contact cards, for screen readers.
+_CONTACT_CHANNELS = {
+    "es": "Cómo escribirnos",
+    "en": "How to write to us",
+    "pt": "Como escrever para nós",
+}
+
+
 def contact_page(
     *, locale: str = "es", email: str = "", contact_url: str = "", base_url: str = ""
 ) -> str:
@@ -2945,6 +3010,8 @@ def contact_page(
     if contact_url:
         cards.append(("chat", words["chat"], words["chat_text"], contact_url, words["open"]))
     channels = (
+        # Read aloud only: the cards' titles are one level below it.
+        f"<h2 class='sr-only'>{_e(_CONTACT_CHANNELS[locale])}</h2>"
         "<div class='cards cards-2'>"
         + "".join(
             f"<div class='card spot'><div class='icon'>{icon(name)}</div><h3>{_e(title)}</h3>"
@@ -3002,7 +3069,12 @@ def compare_page(
     )
     # A comparison reached from Mi cuenta passes its own addresses.
     return _page(
-        copy["title"], locale, body, alternates=alternates or dict(COMPARE_PATH), solid_nav=True
+        copy["title"],
+        locale,
+        body,
+        meta_html=private_meta(copy["title"], locale, PAGE_DESCRIPTIONS["compare"][locale]),
+        alternates=alternates or dict(COMPARE_PATH),
+        solid_nav=True,
     )
 
 
@@ -3090,27 +3162,18 @@ def error_page(message: str, *, locale: str = "es", kind: str = "audit") -> str:
     locale = _locale(locale)
     copy = _COPY[locale]
     ui = _UI[locale]
-    other = "en" if locale == "es" else "es"
     title = _ERROR_TITLES[locale].get(kind, copy["error_title"])
     back = audit_path(locale) if kind == "audit" else _home(locale)
-    # A Portuguese page offers both other languages in the bar, not a third button.
-    switch = (
-        ""
-        if locale == "pt"
-        else f"<a class='btn btn-ghost' href='/?lang={other}' hreflang='{other}'>"
-        f"{_other_name(locale)}</a>"
-    )
+    # The bar offers the other two languages, so the page needs no third button.
     body = (
         _page_hero(ui["error_eyebrow"], title, dot="warn")
         + "<div class='paper page-main'><div class='wrap wrap-narrow'>"
         f"{_error_card(message, locale)}<div class='back-row'>"
         f"<a class='btn btn-dark' href='{_e(back)}'>{_e(copy['back'])}</a>"
         f"<a class='btn btn-ghost' href='{_e(guides_index_url(locale))}'>"
-        f"{_e(GUIDES_COPY[locale]['title'])}</a>{switch}</div></div></div>"
+        f"{_e(GUIDES_COPY[locale]['title'])}</a></div></div></div>"
     )
-    if locale == "pt":
-        return _page(title, locale, body, alternates=LANDING_PATHS, solid_nav=True)
-    return _page(title, locale, body, switch_href=f"/?lang={other}", solid_nav=True)
+    return _page(title, locale, body, alternates=LANDING_PATHS, solid_nav=True)
 
 
 def method_page(*, locale: str = "es", base_url: str = "") -> str:

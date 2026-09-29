@@ -266,6 +266,44 @@ The other changes of this pass are texts only. The terms describe password
 recovery as the site does it: the recovery key, a one-time link sent only to
 a confirmed address when mail is on, and writing to the operator otherwise.
 
+## Customer audit of the public pages (2026-09-28)
+
+Reviewed against `main` at 8a536fb, after a customer-style read of the
+public pages in the three languages. No control was relaxed: the Content
+Security Policy, the other security headers, the rate limits, the client
+address logic, `safe_next` and the redirect from Railway's address are
+unchanged. Every change has an offline, deterministic test in
+`tests/test_audit_customer_audit_fixes.py`.
+
+| # | Finding | Severity | Fix |
+|---|---|---|---|
+| K1 | The governing-law clause of the English and Portuguese terms, and the address on English and Portuguese pages, printed the one value of `AUDIT_JURISDICTION` and `AUDIT_OPERATOR_ADDRESS`, written in Spanish. | High (legal text in the wrong language; no exposure) | Four optional variables, `AUDIT_JURISDICTION_EN`, `AUDIT_JURISDICTION_PT`, `AUDIT_OPERATOR_ADDRESS_EN`, `AUDIT_OPERATOR_ADDRESS_PT`, read like the base ones (one line, 300 characters at most, HTML-escaped where printed). None has a default. An empty one shows the base value. An override only rewords a base value that is set: alone it prints nothing, the draft warning stays and `legal_configured` in `/health` keeps its meaning (the four base variables). |
+| K4 | An address with a trailing slash (`/en/`, `/guias/`, `/soporte/`) answered 307 with `Location: http://...`: the router builds that address from the socket, which speaks plain http behind the proxy. The browser was sent to a plain http address. | Low | The address of that one redirect is rebuilt from `AUDIT_BASE_URL` (`_slash_redirect_https` in `web.py`). It applies only when `AUDIT_BASE_URL` is `https`, the request's `Host` is the site's own (a port after the name, as in `host:443`, is the same site), the answer is a 307 and its target is the same host and the requested path with the slash added or removed. Scheme and host come from configuration; path and query are the ones the router already wrote. See the choice below. |
+| K6 | On sign-up and sign-in, the language switch kept `next` on the upload page of the other language. | Low | `next` moves to the upload page of the target language only when it is one of the three upload pages, with or without the one query `safe_next` accepts (`extras=1`); any other value is kept as it was. The value in the link still goes through `safe_next` when it is read, and a test checks every combination passes it unchanged. |
+| K7 | The news form had no `autocomplete` or `maxlength`; its error redirect had no `#news`; the limit page of the Portuguese form was in English. | Low | `autocomplete='email'` and `maxlength='254'` (the server limit, `_EMAIL_MAX`, is unchanged and still decides). The error redirect adds the fixed fragment `#news`; nothing from the request is echoed. The 429 page is in Portuguese. The limit per address (`WAITLIST_PER_HOUR_PER_IP`) is unchanged. |
+| K3 | An unknown guide or audience page answered 404 with the words of a missing audit. | Low | The 404 carries the fixed key `page_missing`; status, headers and the redirect of a slug from another language are unchanged. |
+
+**K4, the choice.** The other way was to make the server trust
+`X-Forwarded-Proto` (uvicorn's `proxy_headers` with `forwarded_allow_ips`).
+It was not taken: uvicorn trusts by the address of the peer, not by a count
+of hops, and Railway's proxy has no fixed address, so it would mean trusting
+every peer. With that setting uvicorn also replaces the socket address of
+the request with the one in `X-Forwarded-For`, which is the input of
+`client_ip` and of every rate limit: the address logic would change, and a
+request that reached the service without passing the proxy could choose its
+own scheme and address. Building the target from `AUDIT_BASE_URL` reads no
+header the client controls, so `AUDIT_TRUSTED_PROXY_HOPS`, `client_ip` and
+the rate limits work exactly as before (a test sends the limit of the news
+form through `X-Forwarded-For` before and after the redirect). A request
+with another `Host` keeps the router's own answer, as before.
+
+Limits that remain from this pass:
+
+- The rebuilt redirect needs `AUDIT_BASE_URL` set to the `https` address,
+  as production has. With the default base the router's answer is unchanged.
+- The description of the private pages (sign-up, sign-in, recovery,
+  comparison) is one fixed sentence per language; they stay `noindex`.
+
 ## What the operator sets on Railway
 
 - `AUDIT_BASE_URL=https://<your domain>`: absolute links stop depending on

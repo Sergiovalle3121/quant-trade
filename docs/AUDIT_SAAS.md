@@ -24,7 +24,8 @@ never published, is deleted after the retention days if unpaid, and an account
 can be deleted) and the terms (a fix or a new credit when the report misreads the file). One
 point says Rigor sells no bots or signals and that the guard stops any text
 promising results. "Who is behind it" shows `AUDIT_OPERATOR_NAME` and
-`AUDIT_OPERATOR_ADDRESS` only when both are set, and the WhatsApp line only
+`AUDIT_OPERATOR_ADDRESS` (in English and Portuguese, its optional
+`AUDIT_OPERATOR_ADDRESS_EN` or `_PT` wording) only when both are set, and the WhatsApp line only
 with `AUDIT_CONTACT_URL` (`tests/test_audit_landing_trust.py`).
 
 ## Portuguese pages (`audit/portuguese.py`, `/pt`)
@@ -2122,6 +2123,10 @@ with an empty value):
 | `AUDIT_OPERATOR_CONTACT` | empty | Contact for privacy and deletion requests (an e-mail address). |
 | `AUDIT_OPERATOR_ADDRESS` | empty | Postal address of the operator. |
 | `AUDIT_JURISDICTION` | empty | Governing law and courts, for example "Leyes de México; tribunales de la Ciudad de México". |
+| `AUDIT_OPERATOR_ADDRESS_EN` | empty | Optional. The address as the English pages print it (terms, privacy, "who is behind it"). Empty shows `AUDIT_OPERATOR_ADDRESS` as written. |
+| `AUDIT_OPERATOR_ADDRESS_PT` | empty | Optional. The same for the Portuguese pages. |
+| `AUDIT_JURISDICTION_EN` | empty | Optional. Governing law and courts as the English terms print them. Empty shows `AUDIT_JURISDICTION` as written. |
+| `AUDIT_JURISDICTION_PT` | empty | Optional. The same for the Portuguese terms. |
 | `AUDIT_ADMIN_KEY` | empty | Secret for the owner panel at `/panel` (create, list and disable codes from a phone). Shorter than 32 characters or empty turns the panel off (404). |
 | `AUDIT_PANEL_PATH` | `/panel` | Path of the owner panel. Must start with `/`, have 2 to 64 characters from `A-Z a-z 0-9 / _ -`, no `//`, no trailing slash, and a first segment that no public route uses (`/cuenta`, `/pt`, `/audits`, `/static`...). An invalid value falls back to `/panel` and the start-up log says so without printing the value. Never listed in `robots.txt` or the sitemap. |
 | `AUDIT_TRUSTED_PROXY_HOPS` | `0` | Reverse proxies in front of the service. `0` ignores `X-Forwarded-For` (it is client-controlled) and rate-limits the socket address; `N` takes the N-th entry from the right. Railway needs `1`. |
@@ -2215,6 +2220,10 @@ the service neither sends nor stores it.
    Moving `AUDIT_BASE_URL` to another domain later leaves existing passkeys
    behind (see "Passkeys" under customer accounts); sign-in by password,
    code and recovery key is unaffected.
+   With an `https` `AUDIT_BASE_URL`, the redirect of an address written
+   with a trailing slash (`/en/` to `/en`, 307) is built from
+   `AUDIT_BASE_URL` on the site's own host, so it keeps `https` behind the
+   proxy. No forwarded header is read for it.
    Keep the Railway address attached after the move: while `AUDIT_BASE_URL`
    is an `https` custom domain, a GET or HEAD on any `*.up.railway.app`
    host answers 308 to the same path and query on `AUDIT_BASE_URL`, so old
@@ -3174,6 +3183,16 @@ the wording is `legal.LEGAL_UPDATED`; change it with the text.
 
 The operator's name, contact, address and jurisdiction come only from the
 variables above; no default looks like a real person or company.
+The address and the jurisdiction are written in one language, so the English
+and Portuguese pages can print their own wording: `AUDIT_OPERATOR_ADDRESS_EN`,
+`AUDIT_OPERATOR_ADDRESS_PT`, `AUDIT_JURISDICTION_EN` and
+`AUDIT_JURISDICTION_PT` (`AuditSettings.operator_address_for`,
+`jurisdiction_for`). They are optional and have no default: an empty one
+shows the base value, as before. They only reword a base value that is set,
+so `legal_configured` in `/health` still means the four base variables, and
+an override alone shows nothing. The terms, the privacy policy and "who is
+behind it" on the landing are the three places that print these values;
+e-mails and reports print neither (`tests/test_audit_customer_audit_fixes.py`).
 `docs/AUDIT_TERMS_TEMPLATE.md` is the template the texts were written from.
 
 **Have a lawyer in the jurisdiction where the service is sold review both

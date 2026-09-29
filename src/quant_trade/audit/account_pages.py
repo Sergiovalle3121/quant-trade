@@ -1442,6 +1442,9 @@ background:#fff}
 .acct-stores h3{display:flex;align-items:center;margin:0 0 12px;font-size:1rem}
 .acct-stores h3 svg{flex:none;width:30px;height:30px;margin-right:10px;padding:6px;
 border-radius:9px;background:color-mix(in srgb,var(--ok) 10%,#fff);color:var(--ok)}
+.acct-stores h2{display:flex;align-items:center;margin:0 0 14px;font-size:1rem}
+.acct-stores h2 svg{flex:none;width:30px;height:30px;margin-right:10px;padding:6px;
+border-radius:9px;background:color-mix(in srgb,var(--ok) 10%,#fff);color:var(--ok)}
 .acct-stores .acct-list{font-size:.93rem;color:var(--text-2)}
 .acct-sec .acct-stores{margin-top:18px}
 .acct-form{border:1px solid var(--border);border-radius:18px;padding:28px;background:#fff;
@@ -1450,6 +1453,7 @@ box-shadow:0 1px 2px rgba(0,0,0,.04)}
 #invitar .field{max-width:640px}
 #invitar input[readonly]{font-family:var(--mono);font-size:.86rem;background:var(--surface-2);
 text-overflow:ellipsis}
+@media (max-width:620px),(hover:none) and (pointer:coarse){#invitar input[readonly]{font-size:16px}}
 #invitar .invite-actions{display:flex;flex-wrap:wrap;gap:8px}
 #invitar .invite-actions [hidden]{display:none}
 #invitar .btn svg{width:18px;height:18px;margin-right:8px}
@@ -1646,7 +1650,14 @@ def _hidden(name: str, value: str) -> str:
     return f"<input type='hidden' name='{name}' value='{_e(value)}'>"
 
 
-def _shell(locale: str, title: str, lead: str, body: str, *, switch: dict[str, str]) -> str:
+def _shell(
+    locale: str, title: str, lead: str, body: str, *, switch: dict[str, str], describe: str = ""
+) -> str:
+    """``describe`` names the page's own short description (``pages.PAGE_DESCRIPTIONS``)."""
+    from quant_trade.audit.pages import PAGE_DESCRIPTIONS
+    from quant_trade.audit.seo import private_meta
+
+    meta = private_meta(title, locale, PAGE_DESCRIPTIONS[describe][locale]) if describe else ""
     content = (
         _page_hero(COPY[locale]["eyebrow"], title, lead)
         + f"<div class='paper page-main'><div class='wrap'><style>{ACCOUNT_CSS}</style>"
@@ -1655,7 +1666,9 @@ def _shell(locale: str, title: str, lead: str, body: str, *, switch: dict[str, s
     )
     # Customer text (an e-mail, a description) is passed through ``_safe_text``
     # before it gets here; the guard is the last check, as on other pages.
-    return guard_page(_page(title, locale, content, alternates=switch, solid_nav=True))
+    return guard_page(
+        _page(title, locale, content, meta_html=meta, alternates=switch, solid_nav=True)
+    )
 
 
 def _alert(copy: dict[str, str], error: str = "", flash: str = "") -> str:
@@ -1679,7 +1692,7 @@ def _stores_short(copy: dict[str, str], locale: str) -> str:
     from quant_trade.audit.legal import legal_url
 
     return (
-        f"<div class='acct-card acct-stores'><h3>{icon('shield')}{_e(copy['stores_title'])}</h3>"
+        f"<div class='acct-card acct-stores'><h2>{icon('shield')}{_e(copy['stores_title'])}</h2>"
         f"<p class='muted'>{_e(copy['stores_short'])}</p>"
         f"<p><a href='{_e(legal_url('privacy', locale))}'>{_e(copy['stores_more'])}</a></p></div>"
     )
@@ -1712,10 +1725,25 @@ def _q(next_path: str) -> str:
     return quote(next_path, safe="/")
 
 
+#: The upload page of each language: the one ``next`` that has a language.
+_UPLOAD_PATHS = {"es": "/auditar", "en": "/en/audit", "pt": "/pt/auditar"}
+
+
+def _next_for(next_path: str, lang: str) -> str:
+    """``next`` for the screen in ``lang``: an upload page becomes that language's."""
+    page, mark, query = next_path.partition("?")
+    if page in _UPLOAD_PATHS.values() and lang in _UPLOAD_PATHS:
+        return _UPLOAD_PATHS[lang] + mark + query
+    return next_path
+
+
 def _switch(kind: str, locale: str, next_path: str = "") -> dict[str, str]:
     """This screen's address in every language, for the language switch."""
-    query = f"?next={_e(_q(next_path))}" if next_path else ""
-    return {lang: path(kind, lang) + query for lang in LANGUAGES}
+    return {
+        lang: path(kind, lang)
+        + (f"?next={_e(_q(_next_for(next_path, lang)))}" if next_path else "")
+        for lang in LANGUAGES
+    }
 
 
 def _tabs(active: str, locale: str, next_path: str = "") -> str:
@@ -1804,6 +1832,7 @@ def signup_page(
         copy["signup_lead"],
         body,
         switch=_switch("signup", locale, next_path),
+        describe="signup",
     )
 
 
@@ -1853,6 +1882,7 @@ def signin_page(
         copy["signin_lead"],
         body,
         switch=_switch("signin", locale, next_path),
+        describe="signin",
     )
 
 
@@ -1949,6 +1979,7 @@ def forgot_page(
         copy["recover_lead"],
         body,
         switch=_switch("forgot", locale),
+        describe="forgot",
     )
 
 
