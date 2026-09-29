@@ -219,7 +219,7 @@ COPY_PT: dict[str, Any] = {
     ),
     "pay_card": (
         "Pagamento com cartão no próprio relatório, processado pela Stripe: você o vê completo "
-        "na hora, sem esperar um código."
+        "na hora, sem esperar um código. Por enquanto, só no México e nos Estados Unidos."
     ),
     "pay_code": (
         "Pagamento por transferência ou outro meio que combinamos pelo WhatsApp: quando o "
@@ -550,7 +550,8 @@ UI_PT: dict[str, Any] = {
         "O seu arquivo nunca é publicado.",
         (
             "O seu primeiro relatório completo, grátis ao criar a sua conta; depois, "
-            f"{_FREE} prévias grátis por mês. Sem cartão."
+            f"{_FREE} prévias grátis por mês. Sem cobrança: às vezes pedimos para validar um "
+            "cartão, sem custo."
         ),
         "Apagado automaticamente se você não desbloquear o relatório.",
     ],

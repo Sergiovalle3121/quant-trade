@@ -229,6 +229,69 @@ def test_operator_values_are_escaped() -> None:
     assert "<script>" not in page and "&lt;script&gt;" in page
 
 
+def test_the_provider_line_carries_the_street_and_the_phone_when_set() -> None:
+    # A Mexican online seller shows a physical address and a telephone before
+    # the sale; the legal pages print them next to the provider's name.
+    ctx = LegalContext(
+        **{**OPERATOR, "operator_address": "México"},
+        operator_street_address="Calle Falsa 123, 44100 Guadalajara, Jalisco",
+        operator_phone="+52 33 0000 0000",
+    )
+    english = LegalContext(
+        **{**OPERATOR, "operator_address": "Mexico"},
+        operator_street_address="Calle Falsa 123, 44100 Guadalajara, Jalisco",
+        operator_phone="+52 33 0000 0000",
+    )
+    street = "Calle Falsa 123, 44100 Guadalajara, Jalisco"
+    for text, locale, line in (
+        (terms_text(ctx, "es"), "es", f"{street}, México. Contacto: privacidad@"),
+        (privacy_text(ctx, "es"), "es", f"{street}, México. Contacto: privacidad@"),
+        (terms_text(ctx, "pt"), "pt", f"{street}, México. Contato: privacidad@"),
+        (privacy_text(ctx, "pt"), "pt", f"{street}, México. Contato: privacidad@"),
+        (terms_text(english, "en"), "en", f"{street}, Mexico. Contact: privacidad@"),
+        (privacy_text(english, "en"), "en", f"{street}, Mexico. Contact: privacidad@"),
+    ):
+        first = text.sections[0][1][0]
+        assert line in first, (locale, first)
+        phone = ", phone +52 33 0000 0000" if locale == "en" else ", tel. +52 33 0000 0000"
+        assert phone in first, (locale, first)
+        # Only the provider's line carries the phone: "write to" names the e-mail.
+        body = " ".join(" ".join(paragraphs) for _, paragraphs in text.sections[1:])
+        assert "+52 33 0000 0000" not in body, locale
+        assert find_claims(" ".join(" ".join(p) for _, p in text.sections)) == []
+    # Without them the line is as before.
+    plain = terms_text(LegalContext(**OPERATOR), "es").sections[0][1][0]
+    assert plain == (
+        "Operador de Prueba SAS, Calle Falsa 123, Ciudad Ejemplo. "
+        'Contacto: privacidad@operador.example ("nosotros").'
+    )
+
+
+def test_the_street_and_phone_stay_on_the_legal_pages(tmp_path: Path) -> None:
+    client, _ = _client(
+        tmp_path,
+        operator_name="Operador de Prueba SAS",
+        operator_contact="privacidad@operador.example",
+        operator_address="México",
+        operator_address_en="Mexico",
+        jurisdiction="Tribunales de Ciudad Ejemplo",
+        operator_street_address="Calle Falsa 123, 44100 Guadalajara, Jalisco",
+        operator_phone="+52 33 0000 0000",
+    )
+    for path in ("/terminos", "/privacidad", "/terms", "/privacy", "/pt/termos", "/pt/privacidade"):
+        page = client.get(path).text
+        assert "Calle Falsa 123, 44100 Guadalajara, Jalisco" in page, path
+        assert "+52 33 0000 0000" in page, path
+    for path in ("/", "/en", "/pt", "/contacto"):
+        page = client.get(path).text
+        assert "Calle Falsa 123" not in page, path
+    settings = AuditSettings.from_env(
+        {"AUDIT_OPERATOR_STREET_ADDRESS": " Calle 1,  Ciudad ", "AUDIT_OPERATOR_PHONE": "+52 1"}
+    )
+    assert settings.operator_street_address == "Calle 1, Ciudad"
+    assert settings.operator_phone == "+52 1"
+
+
 def test_settings_read_operator_details_without_defaults() -> None:
     empty = AuditSettings.from_env({})
     assert empty.operator_name == "" and not empty.legal_configured

@@ -2198,6 +2198,8 @@ with an empty value):
 | `AUDIT_OPERATOR_ADDRESS_PT` | empty | Optional. The same for the Portuguese pages. |
 | `AUDIT_JURISDICTION_EN` | empty | Optional. Governing law and courts as the English terms print them. Empty shows `AUDIT_JURISDICTION` as written. |
 | `AUDIT_JURISDICTION_PT` | empty | Optional. The same for the Portuguese terms. |
+| `AUDIT_OPERATOR_STREET_ADDRESS` | empty | Optional. Street, number, postal code and city, printed on the terms and privacy pages before the country (`AUDIT_OPERATOR_ADDRESS` in each language). A Mexican online seller must show a physical address before the sale (LFPC art. 76 BIS). The landing keeps showing only the country. |
+| `AUDIT_OPERATOR_PHONE` | empty | Optional. A telephone printed after the contact in the provider's line of the terms and privacy pages (", tel. …" / ", phone …"). |
 | `AUDIT_ADMIN_KEY` | empty | Secret for the owner panel at `/panel` (create, list and disable codes from a phone). Shorter than 32 characters or empty turns the panel off (404). |
 | `AUDIT_PANEL_PATH` | `/panel` | Path of the owner panel. Must start with `/`, have 2 to 64 characters from `A-Z a-z 0-9 / _ -`, no `//`, no trailing slash, and a first segment that no public route uses (`/cuenta`, `/pt`, `/audits`, `/static`...). An invalid value falls back to `/panel` and the start-up log says so without printing the value. Never listed in `robots.txt` or the sitemap. |
 | `AUDIT_TRUSTED_PROXY_HOPS` | `0` | Reverse proxies in front of the service. `0` ignores `X-Forwarded-For` (it is client-controlled) and rate-limits the socket address; `N` takes the N-th entry from the right. Railway needs `1`. |

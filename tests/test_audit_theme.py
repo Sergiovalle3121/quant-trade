@@ -90,7 +90,9 @@ def test_landing_leads_with_the_product_and_real_key_figures() -> None:
         assert ("sintéticos" if locale == "es" else "synthetic") in page
         specs = page.split("class='specs'", 1)[1].split("</div></div>", 1)[0]
         platforms = len({*PLATFORMS, *RECOGNISED_PLATFORMS} - {"CSV"})
-        for count in (len(FLAG_TITLES), len(PRESETS), platforms):
+        firm_challenges = sum(1 for rules in PRESETS.values() if rules.firm != "Generic")
+        assert firm_challenges == len(PRESETS) - 1
+        for count in (len(FLAG_TITLES), firm_challenges, platforms):
             assert f"<b data-count>{count}</b>" in specs
     # One sans family plus the mono; the old serif is gone from pages and static files.
     assert "Instrument Serif" not in STYLE
