@@ -100,6 +100,76 @@ report instead of failing as a malformed CSV. A CSV the parser cannot read
 is explained in the form's language (header row, same number of columns),
 without the parser's English message.
 
+### Dates and numbers in a hand-made file
+
+The curve, trades, benchmark and variants CSVs (`audit/schema.py`) and the
+universal list of trades (`audit/universal.py`) read a customer's own
+spreadsheet, so the order of day and month and the decimal mark are decided
+from the whole file, never cell by cell:
+
+- **Day and month.** A date written year first (`2024-03-15`), with a month
+  name or as an epoch number is read as it always was. For numeric dates
+  (`15/03/2024`, `15.03.2024 10:30`, `3-15-24`) the order is settled once per
+  file (`schema._day_first`): a first number over 12 anywhere makes the file
+  day/month/year, a second number over 12 makes it month/day/year, and a file
+  holding both is refused (`mixed_date_order`) with the two cells named. When
+  every date reads both ways (all days 12 or less), the order under which the
+  dates stay in sequence and evenly spaced (largest gap at most `REGULAR_GAP`
+  times the usual one) is taken only when the other order breaks them: its
+  dates run backwards, or they fall into short runs with a jump of about a
+  year between them (over `BROKEN_GAP` times the usual gap and at least
+  `YEAR_JUMP_DAYS` days), which is what a monthly or quarterly series looks
+  like read the wrong way round. Otherwise the file is refused
+  (`ambiguous_date_order`) and asked for year-month-day: so are twelve
+  monthly rows on the 1st, the first twelve days of one month, and a file
+  with a few days a month whose holes would otherwise hand it to the wrong
+  order (Mar 1-3, Apr 4-6, May 7-9, Jun 10-12 reads as a monthly series the
+  other way round). Refusing beats guessing there, even when one order is the
+  customary one. A list of trades decides from its entry and exit columns
+  together, and an order under which a trade closes before it opens is out.
+  A day-first column is read in one pass (the numeric day/month cells day
+  first, every other cell as before); only a file whose every date reads
+  both ways is parsed twice more to settle the order. The order taken is
+  stated in the report's reading notes ("dates read as day/month/year",
+  "fechas leídas como día/mes/año", "datas lidas como dia/mês/ano"), a
+  factual note with no evidence tag. Platform exports keep their own readers
+  (`importers._parse_times`, which asks for year-month-day when a day/month
+  column is ambiguous and no other column settles it).
+- **Decimal mark of a `;` file.** The universal list of trades used to take a
+  decimal comma from the semicolon alone, which read `109.48` as `10948`. The
+  mark now comes from the mapped amount columns (`universal._semicolon_decimal`):
+  a cell that settles its mark by itself (`109.48`, `109,48`, `1.234,56`,
+  `1,234.56`, `1.234.567`, `0,001`, `1234,567`) decides for the file, and a
+  cell that reads both ways (`1.234`, `1,234`) takes the file's mark. Cells
+  settling both marks refuse the file (`mixed_decimal_marks`); no settled mark
+  while some cell reads both ways refuses it too (`ambiguous_decimal_mark`),
+  with the ask to write numbers as `1234.56`. That second refusal also meets
+  a `;` list whose every marked number reads both ways: index points with a
+  thousands dot (`128.450`, as a WIN trader writes them) or a three-decimal
+  price with a decimal comma (`149,123`), whole quantities and no other
+  decimal cell. The semicolon alone used to make those a decimal comma
+  (`128450`, `149.123`), which is the usual meaning; taking that prior back
+  for `;` files when nothing settles the mark is one line in
+  `_semicolon_decimal` and the owner's call, since it is a guess. Whole
+  numbers need no mark. A
+  comma- or tab-separated file is read as before (a decimal point, with a
+  cell that plainly uses a decimal comma read as such). The curve reader's
+  own column rule is unchanged (below, "Portuguese curves").
+- **A ratio that could not be computed.** With fewer than three returns, or a
+  zero variance, the performance table's Sharpe is `NOT_MEASURED` with the
+  reason the significance section uses ("fewer than three returns", "zero
+  variance"); the Sortino likewise with fewer than three returns, and the
+  benchmark section's two Sharpe ratios the same way. Before, they printed
+  a measured `0.00`. The class does not depend on them.
+
+`tools/rigor_reading_regression.py compare --base-src <other checkout>/src`
+(`--extra <folder>` adds a local folder of files) audits every file of the
+repository (the importer fixtures, the example upload, every synthetic
+generator of `tests/audit_fixtures.py`) plus the new reading cases under
+two source trees and lists every field that differs;
+`tests/test_audit_reading_rules.py` freezes what `main` at c6ce500 read
+from each repository file and checks it still reads the same.
+
 ### Importers and their limits
 
 `audit/importers.py` detects the format by content (standard library only)
@@ -755,7 +825,8 @@ Three details a buyer reading a real MetaTrader report asked about:
   section and the `IMPLAUSIBLE_SHARPE` flag all use the same annualised
   Sharpe (sample standard deviation, the audit's periods per year). The
   platform's own Sharpe is shown apart, as DECLARED, and can differ (MT5
-  computes it another way).
+  computes it another way). With fewer than three returns or a zero variance
+  it is `NOT_MEASURED` (no figure), never a measured 0.
 - Year by year: each calendar year starts from the previous year's last
   value, so the yearly returns compound to the total. A first year that
   holds only the starting point (a fund record's opening value dated

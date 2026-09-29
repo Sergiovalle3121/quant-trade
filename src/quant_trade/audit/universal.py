@@ -1404,6 +1404,77 @@ def _without_numeric_contracts(
     return replace(mapping, columns=columns, names=names)
 
 
+def _own_decimal(text: str) -> str | None:
+    """The decimal mark a number settles by itself, else ``None``.
+
+    With both marks the later one is the decimal (``1.234,56``, ``1,234.56``);
+    a mark that repeats groups thousands, so the other is the decimal
+    (``1.234.567``); a lone mark is the decimal unless exactly three digits
+    follow a group of one to three that does not start with zero (``1.234``
+    and ``1,234`` read both ways; ``0,001`` and ``1234,567`` do not)."""
+    marks = [mark for mark in ".," if mark in text]
+    if not marks:
+        return None
+    if len(marks) == 2:
+        return "." if text.rfind(".") > text.rfind(",") else ","
+    mark = marks[0]
+    if text.count(mark) > 1:
+        return "," if mark == "." else "."
+    whole, _, tail = text.partition(mark)
+    if len(tail) == 3 and 1 <= len(whole) <= 3 and not whole.startswith("0"):
+        return None
+    return mark
+
+
+def _semicolon_decimal(mapping: ColumnMap, rows: list[list[str]]) -> str:
+    """The decimal mark of a semicolon file, read from its number columns.
+
+    A semicolon usually comes with a decimal comma, but a spreadsheet set to
+    another region writes ``109.48`` between semicolons. The numbers decide:
+    the mark any of them settles by itself is the file's, and a number such
+    as ``1.234`` takes it from the rest. A file whose numbers settle both
+    marks, or none while some read both ways, is refused rather than guessed."""
+    columns = {at for role, at in mapping.columns.items() if role in AMOUNT_ROLES}
+    columns.update(mapping.fees)
+    settled: dict[str, str] = {}
+    unsettled: str | None = None
+    for row in rows:
+        for at in columns:
+            if at >= len(row):
+                continue
+            text = re.sub(r"[^\d.,]", "", row[at]).strip(".,")
+            if not any(mark in text for mark in ".,"):
+                continue
+            mark = _own_decimal(text)
+            if mark is None:
+                unsettled = unsettled or text[:20]
+            else:
+                settled.setdefault(mark, text[:20])
+    if len(settled) == 2:
+        raise imp.ReportFormatError(
+            "mixed_decimal_marks",
+            f"the file mixes numbers with a decimal point and with a decimal comma "
+            f"({settled['.']} and {settled[',']}): write every number the same way, with a "
+            "decimal point and no thousands separator (1234.56), and upload it again",
+            f"el archivo mezcla números con punto decimal y con coma decimal ({settled['.']} "
+            f"y {settled[',']}): escribe todos los números de la misma forma, con punto "
+            "decimal y sin separador de miles (1234.56), y vuelve a subir el archivo",
+        )
+    if settled:
+        return next(iter(settled))
+    if unsettled is not None:
+        raise imp.ReportFormatError(
+            "ambiguous_decimal_mark",
+            f"the numbers of the file could be read with a decimal point or with a decimal "
+            f"comma (for example {unsettled}): write them with a decimal point and no "
+            "thousands separator (1234.56) and upload it again",
+            f"los números del archivo pueden llevar punto decimal o coma decimal (por "
+            f"ejemplo {unsettled}): escríbelos con punto decimal y sin separador de miles "
+            "(1234.56) y vuelve a subir el archivo",
+        )
+    return ","
+
+
 def parse(
     header: list[str],
     rows: list[list[str]],
@@ -1413,8 +1484,9 @@ def parse(
     serial_dates: bool = False,
 ) -> imp._Draft:
     """Read a trade or fill table into a draft for ``importers._assemble``."""
-    decimal = "," if delimiter == ";" else "."
-    mapping = _without_numeric_contracts(resolve(header, chosen), rows, chosen, decimal)
+    resolved = resolve(header, chosen)
+    decimal = _semicolon_decimal(resolved, rows) if delimiter == ";" else "."
+    mapping = _without_numeric_contracts(resolved, rows, chosen, decimal)
     draft = imp._Draft(mapping.shape, [])
     for role in ROLES:
         if role == "commission" and mapping.fees:

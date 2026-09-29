@@ -97,6 +97,16 @@ RULES: tuple[tuple[str, str], ...] = (
      "de retorno (uma de: {returns})"),
     ("the {what} file has fewer than two usable rows",
      "o arquivo {what} tem menos de duas linhas utilizáveis"),
+    ("the {what} file mixes day/month/year and month/day/year dates ({sample} and "
+     "{other_sample}): write every date the same way, preferably as year-month-day "
+     "(2024-03-15), and upload it again",
+     "o arquivo {what} mistura datas dia/mês/ano e mês/dia/ano ({sample} e {other_sample}): "
+     "escreva todas as datas do mesmo jeito, de preferência como ano-mês-dia (2024-03-15), "
+     "e envie-o de novo"),
+    ("the {what} file has dates that could be day/month/year or month/day/year (for "
+     "example {sample}): write them as year-month-day (2024-03-15) and upload it again",
+     "o arquivo {what} tem datas que podem ser dia/mês/ano ou mês/dia/ano (por exemplo "
+     "{sample}): escreva-as como ano-mês-dia (2024-03-15) e envie-o de novo"),
     ("the {what} file has a value too large to be real on {when} (over {limit}): check "
      "that the file's values were exported correctly and upload it again",
      "o arquivo {what} tem um valor grande demais para ser real em {when} (acima de "
@@ -304,6 +314,18 @@ RULES: tuple[tuple[str, str], ...] = (
      "{columns}. Indique-as em 'A sua plataforma não aparece ou o arquivo dá erro? Indique "
      "as colunas' no formulário, ou renomeie essas colunas no arquivo (por exemplo Entry "
      "time, Exit time, Quantity, Entry price, Exit price) e envie-o de novo"),
+    ("the file mixes numbers with a decimal point and with a decimal comma ({sample} and "
+     "{other_sample}): write every number the same way, with a decimal point and no "
+     "thousands separator (1234.56), and upload it again",
+     "o arquivo mistura números com ponto decimal e com vírgula decimal ({sample} e "
+     "{other_sample}): escreva todos os números do mesmo jeito, com ponto decimal e sem "
+     "separador de milhar (1234.56), e envie o arquivo de novo"),
+    ("the numbers of the file could be read with a decimal point or with a decimal comma "
+     "(for example {sample}): write them with a decimal point and no thousands separator "
+     "(1234.56) and upload it again",
+     "os números do arquivo podem ter ponto decimal ou vírgula decimal (por exemplo "
+     "{sample}): escreva-os com ponto decimal e sem separador de milhar (1234.56) e envie "
+     "o arquivo de novo"),
     ('the column "{name}" you chose as {field} holds no {kind}',
      'a coluna "{name}" que você escolheu como {field} não tem {kind}'),
     ("Your file: with those columns fewer than two rows have a readable date and figure. "
@@ -342,6 +364,9 @@ _VALUES: dict[str, Callable[[str], str]] = {
     "fields": _fields,
     "kind": lambda value: _KINDS_PT.get(value, value),
     "part": lambda value: _TEST_PARTS_PT.get(value, value),
+    # A cell quoted from the file is shown as it was written.
+    "sample": lambda value: value,
+    "other_sample": lambda value: value,
 }
 
 _PLACEHOLDER = re.compile(r"\{(\w+)\}")

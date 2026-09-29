@@ -468,12 +468,147 @@ def _decimal_comma(texts: pd.Series) -> bool:
     return any(_comma_is_decimal(value) for value in values)
 
 
-def _to_timestamps(series: pd.Series) -> pd.Series:
+#: A date written with numbers only and the year last: "15/03/2024",
+#: "15.03.2024 10:30", "3-15-24". Which of the first two numbers is the day
+#: is decided once for the whole file (``_day_first``), never row by row.
+_NUMERIC_DATE = re.compile(r"^\s*(\d{1,2})([./-])(\d{1,2})\2(\d{4}|\d{2})(?![\d./-])")
+
+DAY_FIRST_NOTE = "dates read as day/month/year"
+MONTH_FIRST_NOTE = "dates read as month/day/year"
+
+#: With every date readable both ways, an order is taken only when its
+#: largest gap is at most ``REGULAR_GAP`` times its usual one while the
+#: other order breaks: its dates run backwards, or they fall into short runs
+#: with a jump of about a year between them (over ``BROKEN_GAP`` times the
+#: usual gap and at least ``YEAR_JUMP_DAYS`` days), which is what a monthly or
+#: quarterly series looks like read the wrong way round. A hole of a few
+#: months in a genuine daily file never settles the order by itself.
+REGULAR_GAP = 5.0
+BROKEN_GAP = 10.0
+YEAR_JUMP_DAYS = 300.0
+
+
+def _numeric_dates(series: pd.Series) -> pd.Series:
+    """Which cells of a text column are numeric day/month dates."""
+    if pd.api.types.is_numeric_dtype(series):
+        return pd.Series(False, index=series.index)
+    found = [isinstance(value, str) and bool(_NUMERIC_DATE.match(value)) for value in series]
+    return pd.Series(found, index=series.index, dtype=bool)
+
+
+def _read_dates(series: pd.Series, *, day_first: bool) -> pd.Series:
+    return pd.to_datetime(series, utc=True, errors="coerce", format="mixed", dayfirst=day_first)
+
+
+def _gap_spread(stamps: pd.Series) -> tuple[float, float] | None:
+    """The largest gap between consecutive dates over the usual one, and that
+    gap in days; ``None`` when the dates are not in order (either way) or
+    too few."""
+    clean = stamps.dropna()
+    if len(clean) < 3 or len(clean) != len(stamps):
+        return None
+    if not (clean.is_monotonic_increasing or clean.is_monotonic_decreasing):
+        return None
+    gaps = clean.diff().dropna().abs().dt.total_seconds()
+    usual = float(gaps.median())
+    if usual <= 0:
+        return None
+    largest = float(gaps.max())
+    return largest / usual, largest / 86_400.0
+
+
+def _day_first(columns: list[pd.Series], *, what: str) -> bool | None:
+    """Whether the numeric dates of a file are day/month/year, decided from
+    every date column of the file at once; ``None`` when it has none.
+
+    A first number over 12 anywhere makes the file day first, a second
+    number over 12 month first, and both in one file is refused. When every
+    date reads both ways the order that leaves the dates in order and
+    evenly spaced is taken only if the other breaks them (backwards, a trade
+    closing before it opens, or runs of days a year apart); otherwise the
+    file is refused rather than guessed.
+    """
+    day_cell: str | None = None
+    month_cell: str | None = None
+    sample: str | None = None
+    for column in columns:
+        for value in column[_numeric_dates(column)]:
+            found = _NUMERIC_DATE.match(value)
+            assert found is not None
+            first, second = int(found.group(1)), int(found.group(3))
+            sample = sample or found.group(0).strip()
+            if first > 12 and second <= 12:
+                day_cell = day_cell or found.group(0).strip()
+            elif second > 12 and first <= 12:
+                month_cell = month_cell or found.group(0).strip()
+    if sample is None:
+        return None
+    if day_cell and month_cell:
+        raise ParseError(
+            f"the {what} file mixes day/month/year and month/day/year dates ({day_cell} and "
+            f"{month_cell}): write every date the same way, preferably as year-month-day "
+            "(2024-03-15), and upload it again",
+            message_es=(
+                f"El archivo {_file_es(what)} mezcla fechas día/mes/año y mes/día/año "
+                f"({day_cell} y {month_cell}): escribe todas las fechas de la misma forma, de "
+                "preferencia como año-mes-día (2024-03-15), y vuelve a subirlo."
+            ),
+            code="mixed_date_order",
+        )
+    if day_cell or month_cell:
+        return day_cell is not None
+    spreads: dict[bool, tuple[float, float] | None] = {}
+    for day_first in (True, False):
+        read = [
+            _read_dates(column[_numeric_dates(column)], day_first=day_first) for column in columns
+        ]
+        # A list of trades gives two columns: no trade may close before it opens.
+        backwards = (
+            len(read) == 2
+            and len(read[0]) == len(read[1])
+            and bool((read[1].to_numpy() < read[0].to_numpy()).any())
+        )
+        spreads[day_first] = None if backwards else _gap_spread(read[0])
+    for day_first in (True, False):
+        own, other = spreads[day_first], spreads[not day_first]
+        if own is None or own[0] > REGULAR_GAP:
+            continue
+        if other is None or (other[0] > BROKEN_GAP and other[1] >= YEAR_JUMP_DAYS):
+            return day_first
+    raise ParseError(
+        f"the {what} file has dates that could be day/month/year or month/day/year (for "
+        f"example {sample}): write them as year-month-day (2024-03-15) and upload it again",
+        message_es=(
+            f"El archivo {_file_es(what)} tiene fechas que pueden ser día/mes/año o "
+            f"mes/día/año (por ejemplo {sample}): escríbelas como año-mes-día (2024-03-15) y "
+            "vuelve a subirlo."
+        ),
+        code="ambiguous_date_order",
+    )
+
+
+def _to_timestamps(series: pd.Series, *, day_first: bool | None = None) -> pd.Series:
+    """A date column as UTC timestamps. ``day_first`` is the file's order for
+    numeric day/month dates (``_day_first``); every other cell, and a file
+    read month first, is read exactly as before that rule existed."""
     if pd.api.types.is_numeric_dtype(series):
         numeric = pd.to_numeric(series, errors="coerce")
         unit = "ms" if numeric.abs().max() > 1e11 else "s"
         return pd.to_datetime(numeric, unit=unit, utc=True, errors="coerce")
-    return pd.to_datetime(series, utc=True, errors="coerce", format="mixed")
+    if not day_first:
+        return pd.to_datetime(series, utc=True, errors="coerce", format="mixed")
+    # One pass over the column: the numeric day/month cells read day first,
+    # every other cell exactly as above ("mixed" reads each cell on its own).
+    numeric_dates = _numeric_dates(series)
+    day_month = _read_dates(series[numeric_dates], day_first=True)
+    others = pd.to_datetime(series[~numeric_dates], utc=True, errors="coerce", format="mixed")
+    return pd.concat([day_month, others]).reindex(series.index)
+
+
+def _date_order_note(day_first: bool | None) -> list[str]:
+    if day_first is None:
+        return []
+    return [DAY_FIRST_NOTE if day_first else MONTH_FIRST_NOTE]
 
 
 def _factsheet_grid(raw: pd.DataFrame) -> Any:
@@ -552,7 +687,9 @@ def parse_equity_csv(data: bytes, *, what: str = "equity") -> IngestedSeries:
     value_col = equity_col if equity_col is not None else return_col
     assert value_col is not None
 
-    timestamps = _to_timestamps(raw[ts_col])
+    day_first = _day_first([raw[ts_col]], what=what)
+    warnings.extend(_date_order_note(day_first))
+    timestamps = _to_timestamps(raw[ts_col], day_first=day_first)
     values, percent = _to_numeric(raw[value_col])
     if source == "returns":
         # "Return %" states the unit as a % sign in the cells does: 1.5 is 1.5 %,
@@ -823,8 +960,10 @@ def parse_trades_csv(data: bytes) -> ParsedTrades:
         if column not in used_columns and any(word in column for word in money_words):
             warnings.append(f"monetary column {column!r} was not used; map or remove it")
 
-    entry_time = _to_timestamps(raw[columns["entry_time"]])
-    exit_time = _to_timestamps(raw[columns["exit_time"]])
+    day_first = _day_first([raw[columns["entry_time"]], raw[columns["exit_time"]]], what="trades")
+    warnings.extend(_date_order_note(day_first))
+    entry_time = _to_timestamps(raw[columns["entry_time"]], day_first=day_first)
+    exit_time = _to_timestamps(raw[columns["exit_time"]], day_first=day_first)
     quantity, _ = _to_numeric(raw[columns["quantity"]])
     entry_price, _ = _to_numeric(raw[columns["entry_price"]])
     exit_price, _ = _to_numeric(raw[columns["exit_price"]])
@@ -959,7 +1098,7 @@ def _parse_variants_csv(
         "selected_variant": not_measured("no selected-variant identifier supplied"),
     }
     if ts_col is not None:
-        stamps = _to_timestamps(raw[ts_col])
+        stamps = _to_timestamps(raw[ts_col], day_first=_day_first([raw[ts_col]], what="variants"))
         if stamps.isna().any() or stamps.duplicated().any() or not stamps.is_monotonic_increasing:
             raise ParseError(
                 "the variants timestamps must be readable, unique and chronological",

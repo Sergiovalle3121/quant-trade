@@ -85,6 +85,8 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
         "returns look like percentages (median |r| > 0.5); divided by 100",
         "los retornos parecen porcentajes (mediana |r| > 0.5); se dividieron entre 100",
     ),
+    ("dates read as day/month/year", "fechas leídas como día/mes/año"),
+    ("dates read as month/day/year", "fechas leídas como mes/día/año"),
     (
         "{n} row(s) with an unreadable timestamp or value dropped",
         "se descartaron {n} fila(s) con fecha o valor ilegible",
