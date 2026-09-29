@@ -803,7 +803,7 @@ GUIDES: tuple[Guide, ...] = (
                 tips=(
                     "No cambies los nombres de las columnas: así se reconoce el formato.",
                     "Si tu versión incluye la columna Commission, la auditoría la usa como "
-                    "coste MEASURED.",
+                    "costo MEASURED.",
                     _BALANCE_ES,
                     _FLOATING_ES,
                 ),
@@ -1441,7 +1441,7 @@ GUIDES: tuple[Guide, ...] = (
                     "Rithmic "
                     "(Completed Orders), Sierra Chart (Trade Activity Log), Binance, Kraken, "
                     "Coinbase y KuCoin (historial de ejecuciones).",
-                    "Los costes de DEGIRO vienen en euros y se restan tal cual, también en "
+                    "Los costos de DEGIRO vienen en euros y se restan tal cual, también en "
                     "acciones que cotizan en otra moneda; el resultado de Trading 212 viene en "
                     "la moneda de tu cuenta y se usa como tal.",
                     "Con una fila por ejecución, las compras y ventas se emparejan por símbolo "
@@ -1452,7 +1452,7 @@ GUIDES: tuple[Guide, ...] = (
                     "MNQ DEC26) usan su valor por punto oficial; para otros futuros u opciones "
                     "conviene una columna Multiplicador.",
                     "Las comisiones cobradas en otra moneda (por ejemplo BNB en un par USDT) "
-                    "quedan fuera de los costes y el informe lo avisa.",
+                    "quedan fuera de los costos y el informe lo avisa.",
                     "En el informe verás qué columna se leyó como qué. Si alguna no se "
                     "reconoce, indícala en «¿Tu plataforma no aparece o su archivo da error? "
                     "Indica sus columnas», justo debajo del campo del informe.",

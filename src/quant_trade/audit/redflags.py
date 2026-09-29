@@ -756,7 +756,7 @@ FLAG_TITLES: dict[str, dict[str, str]] = {
     "MAD_SPIKES": {"es": "Saltos extremos", "en": "Extreme jumps"},
     "IMPLAUSIBLE_SHARPE": {"es": "Sharpe inverosímil", "en": "Implausible Sharpe ratio"},
     "LARGE_GAPS": {"es": "Huecos grandes entre filas", "en": "Large gaps between rows"},
-    "ZERO_DECLARED_COSTS": {"es": "Costes declarados en cero", "en": "Zero declared costs"},
+    "ZERO_DECLARED_COSTS": {"es": "Costos declarados en cero", "en": "Zero declared costs"},
     "TRIALS_BELOW_VARIANTS": {
         "es": "Menos intentos declarados que los que muestran los archivos",
         "en": "Fewer trials declared than the files show",

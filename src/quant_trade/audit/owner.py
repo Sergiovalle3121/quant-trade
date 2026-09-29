@@ -122,8 +122,8 @@ TEXT: dict[str, str] = {
     "funnel_country_cols": "País facturado|Compras live|Entregas|Cobro bruto USD",
     "funnel_contribution": (
         "Contribución = cobro bruto confirmado − devoluciones − comisiones de pago y cambio "
-        "− impuestos sobre esas comisiones − coste variable de informes gratis y pagados "
-        "− infraestructura − soporte − adquisición. NOT_MEASURED hasta registrar esos costes "
+        "− impuestos sobre esas comisiones − costo variable de informes gratis y pagados "
+        "− infraestructura − soporte − adquisición. NOT_MEASURED hasta registrar esos costos "
         "observados por cohorte; el saldo tras devoluciones no es beneficio ni ingreso neto."
     ),
     "funnel_empty": "Todavía no hay nada que contar en estos días.",

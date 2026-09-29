@@ -155,9 +155,9 @@ def dimension_rows(locale: str, t: Thresholds = DEFAULT_THRESHOLDS) -> list[tupl
             f"{t.dsr_weak:.2f}.",
         ),
         (
-            "¿Aguanta los costes de operar?",
-            "Cada operación recalculada a 1x, 2x y 3x el coste, y el coste de equilibrio.",
-            f"Sigue en positivo a {t.cost_pass_multiplier:.0f}x el coste de referencia.",
+            "¿Aguanta los costos de operar?",
+            "Cada operación recalculada a 1x, 2x y 3x el costo, y el costo de equilibrio.",
+            f"Sigue en positivo a {t.cost_pass_multiplier:.0f}x el costo de referencia.",
         ),
         (
             "¿Aguanta el tramo fuera de muestra?",

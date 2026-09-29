@@ -1588,7 +1588,7 @@ def test_strategy_changes_are_called_better_or_worse_only_beyond_the_noise() -> 
     assert lines["Clase: C → B"] == "mejor"
     assert any(word == "sin cambio claro" for word in lines.values())
     # A dimension that was not measured before is not called better.
-    assert not any(k.startswith("Costes") for k in lines)
+    assert not any(k.startswith("Costos") for k in lines)
     pt = dict(what_changed(old, overlap, "pt"))
     assert pt["Classe: C → B"] == "melhor" and "sem mudança clara" in pt.values()
     assert "Significância estatística: Fraca → Passa" in pt

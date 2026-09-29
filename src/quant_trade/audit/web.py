@@ -209,7 +209,7 @@ MESSAGES: dict[str, dict[str, str]] = {
     "invalid_declared": {
         "es": (
             "Algún dato declarado no es válido: el número de intentos debe ser 1 o más, "
-            "el coste no puede ser negativo, el balance inicial debe ser positivo, el reto "
+            "el costo no puede ser negativo, el balance inicial debe ser positivo, el reto "
             "debe ser uno de la lista, la descripción tiene como máximo 2000 caracteres "
             "y la fecha fuera de muestra va como AAAA-MM-DD."
         ),

@@ -153,7 +153,7 @@ def test_figures_carry_their_unit_and_plain_names() -> None:
     # The drop distance says which values matter.
     assert "(-2 o menos: una caída que el azar difícilmente explica)" in page
     # The cost table explains its few cents of difference with the trades' net.
-    assert "sin coste extra da 17,364.00, 5.75 de diferencia" in page
+    assert "sin costo extra da 17,364.00, 5.75 de diferencia" in page
     english = _page("en")
     assert "engine version 0.1.0" in english and "in 1 of every 20" in english
     assert "with no extra cost it gives 17,364.00" in english
@@ -162,7 +162,7 @@ def test_figures_carry_their_unit_and_plain_names() -> None:
 def test_long_and_short_results_are_net_after_itemised_fees() -> None:
     page = _page("es")
     # Long plus short now add up to the trades' net result.
-    assert "después de los costes que el archivo detalla por operación" in page
+    assert "después de los costos que el archivo detalla por operación" in page
     assert "antes de comisión y swap" not in page
 
 
@@ -249,7 +249,7 @@ def test_the_verdict_sentence_speaks_plainly() -> None:
         "Como una sola prueba, el resultado es demasiado constante para explicarse solo por azar"
         in page
     )
-    assert "no con 3 veces ese coste" in page
+    assert "no con 3 veces ese costo" in page
     assert "En el periodo apartado para comprobar (fuera de muestra)" in page
     assert "estadísticamente distinguible" not in page and "se degrada" not in page
     assert "too consistent to be explained by chance alone" in _page("en")

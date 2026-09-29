@@ -558,7 +558,7 @@ DEGIRO_LAYOUTS = {
     "es": (
         "Fecha,Hora,Producto,ISIN,Bolsa de referencia,Centro de ejecución,Número,Precio,,"
         "Valor local,,Valor EUR,Tipo de cambio,Comision AutoFX,"
-        "Costes de transaccion y/o externos EUR,Total EUR,ID Orden,",
+        "Costos de transaccion y/o externos EUR,Total EUR,ID Orden,",
         "{d},{t},{p},{i},NDQ,XNAS,{q},{px},USD,{lv},USD,{v},1.00,{fx},{fee},{tot},{o},",
     ),
     "pt": (
