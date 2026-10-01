@@ -1042,7 +1042,9 @@ Cada enlace a Rigor que publiques lleva al final la etiqueta de su texto:
 usa la etiqueta del sitio (`mql5`, `rankia`, `reddit`, `ff`, `telegram`,
 `discord`, `youtube`, `x`, `instagram`, `facebook`, `linkedin`, `tiktok`, `email`) y en tu
 estado de WhatsApp `w0`. La lista completa está en `audit/funnel.py`
-(`REF_TAGS`) y en `/panel`.
+(`REF_TAGS`) y en `/panel`. Para una publicación por comunidad sirve cualquier etiqueta de
+campaña con la forma plataforma, mercado opcional y número (`dc-us-103`, `tg-mx-161`,
+`dir-04`): cuenta sin cambiar el código (`CAMPAIGN_TAG`).
 
 En `/panel`, «Embudo de ventas» muestra por etiqueta y por día e idioma las
 visitas, las cuentas nuevas, los informes gratis, las vistas previas y los
