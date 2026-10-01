@@ -40,6 +40,27 @@ DIRECT = "directo"
 FUNNEL_DAYS = 30
 MAX_REF_CHARS = 24
 REF_PATTERN = re.compile(r"[a-z0-9][a-z0-9-]{0,23}")
+#: Per-community campaign tags (``dc-us-103``, ``tg-mx-161``, ``dir-04``): a platform
+#: prefix, an optional two-letter market and a 2-3 digit number. They count without a
+#: redeploy, so a new batch of community posts is measured from its first visit.
+CAMPAIGN_TAG = re.compile(r"(dc|tg|rd|fo|fb|yt|nl|ev|x|tv|li|dir|ph|hn)(-[a-z]{2})?-\d{2,3}")
+#: What each campaign prefix stands for, shown next to the tag in /panel.
+CAMPAIGN_PLATFORMS: dict[str, str] = {
+    "dc": "Discord",
+    "tg": "Telegram",
+    "rd": "Reddit",
+    "fo": "Foro",
+    "fb": "Facebook",
+    "yt": "YouTube o pódcast",
+    "nl": "Boletín",
+    "ev": "Evento",
+    "x": "X (Twitter)",
+    "tv": "TradingView u otra red",
+    "li": "LinkedIn",
+    "dir": "Directorio",
+    "ph": "Product Hunt",
+    "hn": "Hacker News",
+}
 
 #: Every tag the funnel counts, with what it stands for. The ids are the
 #: templates of ``docs/AUDIT_LAUNCH_PLAYBOOK.md``; the rest are channels for
@@ -138,7 +159,20 @@ def clean_ref(value: str | None) -> str:
     tag = (value or "").strip().lower()[: MAX_REF_CHARS + 1]
     if not REF_PATTERN.fullmatch(tag):
         return ""
-    return tag if tag in REF_TAGS else ""
+    return tag if is_known_ref(tag) else ""
+
+
+def is_known_ref(tag: str) -> bool:
+    """A tag listed in :data:`REF_TAGS` or shaped like a per-community campaign tag."""
+    return tag in REF_TAGS or CAMPAIGN_TAG.fullmatch(tag) is not None
+
+
+def ref_label(tag: str) -> str:
+    """What a tag stands for in /panel; a campaign tag names its platform."""
+    if tag in REF_TAGS:
+        return REF_TAGS[tag]
+    match = CAMPAIGN_TAG.fullmatch(tag)
+    return f"Campaña · {CAMPAIGN_PLATFORMS[match.group(1)]}" if match else ""
 
 
 def is_person(user_agent: str | None) -> bool:
@@ -223,7 +257,7 @@ class Funnel:
     total: FunnelCounts = field(default_factory=FunnelCounts)
 
     def add(self, stage: str, *, day: str, locale: str, ref: str, amount: int = 1) -> None:
-        ref = ref if ref in REF_TAGS else DIRECT
+        ref = ref if is_known_ref(ref) else DIRECT
         self.by_day.setdefault((day, locale), FunnelCounts()).add(stage, amount)
         self.by_ref.setdefault(ref, FunnelCounts()).add(stage, amount)
         self.by_ref_locale.setdefault((ref, locale), FunnelCounts()).add(stage, amount)
@@ -301,6 +335,9 @@ __all__ = [
     "REF_COOKIE",
     "REF_DAYS",
     "REF_TAGS",
+    "CAMPAIGN_TAG",
+    "is_known_ref",
+    "ref_label",
     "SEEN_COOKIE",
     "STAGES",
     "STAGE_LABELS",

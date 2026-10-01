@@ -14,7 +14,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import TYPE_CHECKING
 
-from quant_trade.audit.funnel import DIRECT, REF_DAYS, REF_TAGS
+from quant_trade.audit.funnel import DIRECT, REF_DAYS, REF_TAGS, ref_label
 from quant_trade.audit.pages import _e, _field, _page, _page_hero
 from quant_trade.audit.settings import DEFAULT_PANEL_PATH
 
@@ -456,7 +456,7 @@ def funnel_section(
         ref_rows = [
             [
                 TEXT["funnel_direct"] if ref == DIRECT else ref,
-                REF_TAGS.get(ref, ""),
+                ref_label(ref),
                 *_counts_cells(counts),
             ]
             for ref, counts in ordered
@@ -492,7 +492,11 @@ def funnel_section(
             + f"<h3>{_e(TEXT['funnel_by_day'])}</h3>"
             + _table(TEXT["funnel_day_cols"], day_rows)
         )
-    tags = ", ".join(f"{tag} ({label})" for tag, label in REF_TAGS.items())
+    tags = ", ".join(f"{tag} ({label})" for tag, label in REF_TAGS.items()) + (
+        ". Además, cualquier etiqueta de campaña por comunidad: plataforma (dc, tg, rd, fo,"
+        " fb, yt, nl, ev, x, tv, li, dir, ph, hn), mercado opcional de dos letras y número"
+        " de 2 o 3 cifras, como dc-us-103, tg-mx-161 o dir-04."
+    )
     country_table = (
         _table(
             TEXT["funnel_country_cols"],

@@ -80,6 +80,22 @@ def test_only_listed_tags_count() -> None:
     assert all(funnel.REF_PATTERN.fullmatch(tag) for tag in funnel.REF_TAGS)
 
 
+def test_campaign_tags_count_without_being_listed() -> None:
+    for tag in ("dc-us-103", "tg-mx-161", "dir-04", "ev-mx-01", "x-us-201", "fo-mx-02"):
+        assert tag not in funnel.REF_TAGS
+        assert funnel.clean_ref(tag) == tag
+        assert funnel.ref_label(tag).startswith("Campaña · ")
+    assert funnel.ref_label("dc-us-103") == "Campaña · Discord"
+    assert funnel.ref_label("telegram") == "Telegram"
+    for bad in ("zz-us-01", "dc-usa-01", "dc-us-1", "dc-us-1234", "dc-us-01x", "-dc-01"):
+        assert funnel.clean_ref(bad) == ""
+    counts = funnel.Funnel()
+    counts.add("visits", day="2026-10-01", locale="es", ref="tg-mx-161")
+    counts.add("visits", day="2026-10-01", locale="es", ref="zz-us-01")
+    assert counts.by_ref["tg-mx-161"].counts["visits"] == 1
+    assert counts.by_ref[funnel.DIRECT].counts["visits"] == 1
+
+
 def test_robots_and_link_previews_are_not_people() -> None:
     assert funnel.is_person(BROWSER["User-Agent"])
     for agent in ("", None, "WhatsApp/2.23", "Googlebot/2.1", "curl/8.0", "TelegramBot"):
