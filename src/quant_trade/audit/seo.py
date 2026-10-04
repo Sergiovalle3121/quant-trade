@@ -16,6 +16,7 @@ import html
 from dataclasses import dataclass, field
 
 from quant_trade.audit.audiences import AUDIENCE_PAGES, audience_url
+from quant_trade.audit.calculator import CALCULATOR_PATH
 from quant_trade.audit.guides import GUIDES, guide_url, guides_index_url
 from quant_trade.audit.method import METHOD_PATH
 
@@ -48,6 +49,7 @@ PUBLIC_PAGES: tuple[dict[str, str], ...] = (
     {lang: guides_index_url(lang) for lang in ("es", "en", "pt")},
     *({lang: guide_url(g.slug, lang) for lang in ("es", "en", "pt")} for g in GUIDES),
     dict(METHOD_PATH),
+    dict(CALCULATOR_PATH),
     *({lang: audience_url(a.slug, lang) for lang in ("es", "en", "pt")} for a in AUDIENCE_PAGES),
     dict(CHECK_PATH),
     {"es": "/terminos", "en": "/terms", "pt": "/pt/termos"},

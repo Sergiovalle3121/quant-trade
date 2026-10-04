@@ -26,6 +26,9 @@ from quant_trade.audit.audiences import (
     Audience,
     audience_url,
 )
+from quant_trade.audit.calculator import COPY as CALCULATOR_COPY
+from quant_trade.audit.calculator import REASONS as CALCULATOR_REASONS
+from quant_trade.audit.calculator import calculator_url, compute, parse_input
 from quant_trade.audit.guides import (
     GUIDES,
     GUIDES_COPY,
@@ -1550,6 +1553,7 @@ def _footer(locale: str) -> str:
         f"<li><a href='{_compare_url(locale)}'>{_e(ui['nav_compare'])}</a></li>"
         f"<li><a href='{_check_url(locale)}'>{_e(ui['footer_check'])}</a></li>"
         f"<li><a href='{_e(method_url(locale))}'>{_e(_method_title(locale))}</a></li>"
+        f"<li><a href='{_e(calculator_url(locale))}'>{_e(CALCULATOR_COPY[locale]['nav'])}</a></li>"
     )
     legal = (
         f"<li><a href='{_e(legal_url('terms', locale))}'>{_e(copy['terms_link'])}</a></li>"
@@ -3282,6 +3286,124 @@ def method_page(*, locale: str = "es", base_url: str = "") -> str:
                 (words["refs_title"], f"<ol class='refs'>{refs}</ol>"),
                 (words["data_title"], bullets(words["data"])),
             ],
+            locale,
+            aside=f"<a class='btn btn-dark btn-sm toc-cta' href='{_e(_form_url(locale))}'>"
+            f"{_e(GUIDES_COPY[locale]['form'])}<span class='go'>{icon('arrow')}</span></a>",
+        )
+        + "</div></div>"
+    )
+    return _page(title, locale, body, meta_html=meta, alternates=alternates, solid_nav=True)
+
+
+def _calculator_result(
+    words: dict[str, Any], locale: str, sharpe: str | None, years: str | None, trials: str | None
+) -> str:
+    """The result block for the submitted numbers, an error, or nothing."""
+    parsed = parse_input(sharpe, years, trials)
+    if parsed is None:
+        return ""
+    if isinstance(parsed, str):
+        return f"<p class='error' role='alert'>{_e(words[parsed])}</p>"
+    result = compute(parsed)
+    if result["status"] != "MEASURED":
+        reason = CALCULATOR_REASONS[locale].get(result["reason"], result["reason"])
+        return (
+            f"<p class='error' role='alert'>{_e(words['not_measured'].format(reason=reason))}</p>"
+        )
+    count = f"{parsed.trials:,}"
+    note = f"<p class='help'>{_badge('DECLARED', locale)} {_e(words['declared_note'])}</p>"
+    if not result["counted"]:
+        rows = "".join(
+            f"<tr><td>{row['trials']:,}</td><td>{row['luck_sharpe']['value']:.2f}</td>"
+            f"<td>{row['years_needed']['value']:.1f}</td></tr>"
+            for row in result["what_if"]
+        )
+        return (
+            f"<p>{_e(words['one_trial'])}</p><table><thead><tr>"
+            f"<th>{_e(words['col_trials'])}</th><th>{_e(words['col_luck'])}</th>"
+            f"<th>{_e(words['col_years'])}</th></tr></thead><tbody>{rows}</tbody></table>" + note
+        )
+    verdict = words["beats" if result["beats_luck"] else "loses"].format(n=count)
+    figures = (
+        (words["luck"].format(n=count), f"{result['luck_sharpe']['value']:.2f}"),
+        (words["after"], f"{result['sharpe_after']['value']:.2f}"),
+        (words["haircut"], f"{result['haircut']['value']:.0%}"),
+        (words["years_needed"], f"{result['years_needed']['value']:.1f}"),
+    )
+    table = "".join(
+        f"<tr><th scope='row'>{_e(label)}</th><td><b>{_e(value)}</b></td></tr>"
+        for label, value in figures
+    )
+    css = "flash" if result["beats_luck"] else "warning"
+    return (
+        f"<p class='{css}' data-calc-verdict>{_e(verdict)}</p>"
+        f"<table class='calc-result'><tbody>{table}</tbody></table>" + note
+    )
+
+
+def calculator_page(
+    *,
+    locale: str = "es",
+    base_url: str = "",
+    sharpe: str | None = None,
+    years: str | None = None,
+    trials: str | None = None,
+) -> str:
+    """The free luck calculator: three declared numbers, the luck section's figures."""
+    locale = _locale(locale)
+    copy = _COPY[locale]
+    words: dict[str, Any] = CALCULATOR_COPY[locale]
+    title = f"{words['title']} · {copy['title']}"
+    meta = _public_meta(title, words["summary"], locale, calculator_url(locale), base_url)
+
+    def field(name: str, value: str | None, step: str) -> str:
+        shown = f" value='{_e(value)}'" if value else ""
+        return (
+            f"<div class='field'><label for='c-{name}'>{_e(words[name])}</label>"
+            f"<input type='number' id='c-{name}' name='{name}' min='0' step='{step}' "
+            f"inputmode='decimal' required{shown}>"
+            f"<p class='help'>{_e(words[name + '_help'])}</p></div>"
+        )
+
+    form = (
+        f"<form method='get' action='{_e(calculator_url(locale))}' class='calc-form'>"
+        "<div class='form-grid'>"
+        + field("sharpe", sharpe, "0.01")
+        + field("years", years, "0.1")
+        + field("trials", trials, "1")
+        + f"</div><button class='btn btn-dark' type='submit'>{_e(words['submit'])}</button></form>"
+    )
+    result = _calculator_result(words, locale, sharpe, years, trials)
+    cta = (
+        f"<p>{_e(words['cta'])}</p><p><a class='btn btn-dark' href='{_e(_form_url(locale))}'>"
+        f"{_e(words['cta_button'])}<span class='go'>{icon('arrow')}</span></a> "
+        f"<a href='{_e(_sample_url(locale))}'>{_e(words['sample_link'])}</a></p>"
+    )
+
+    def bullets(items: list[str], mark: str = "check") -> str:
+        return (
+            f"<ul class='checks{'' if mark == 'check' else ' nots'}'>"
+            + "".join(f"<li>{icon(mark)}<span>{_e(item)}</span></li>" for item in items)
+            + "</ul>"
+        )
+
+    sections = [(words["form_title"], form)]
+    if result:
+        sections.append((words["result_title"], result))
+    sections += [
+        (words["cta_title"], cta),
+        (words["why_title"], bullets(words["why"])),
+        (words["assumptions_title"], bullets(words["assumptions"], "minus")),
+    ]
+    alternates = {lang: calculator_url(lang) for lang in CALCULATOR_COPY}
+    crumbs = f"<a href='{_e(_home(locale))}'>{_e(GUIDES_COPY[locale]['back'])}</a>" + (
+        _language_crumbs(alternates, locale)
+    )
+    body = (
+        _page_hero(words["eyebrow"], words["title"], words["summary"], crumbs)
+        + "<div class='paper page-main'><div class='wrap'>"
+        + _doc(
+            sections,
             locale,
             aside=f"<a class='btn btn-dark btn-sm toc-cta' href='{_e(_form_url(locale))}'>"
             f"{_e(GUIDES_COPY[locale]['form'])}<span class='go'>{icon('arrow')}</span></a>",
