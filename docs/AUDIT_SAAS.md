@@ -2247,7 +2247,8 @@ cause and the Stripe order before requeueing; a previously accepted SMTP
 message can have been lost before the worker marked it sent.
 First and repeat purchase counts use the account linked to the
 report when there is one; that account is not verified as the cardholder.
-Visits estimate browsers observed, not unique people. Older card
+Visits estimate browsers observed, not unique people, on the landing, the case
+pages and the free calculator (`/calculadora`, `/calculator`, `/pt/calculadora`). Older card
 unlocks predating `checkout_orders` need a reconciliation import from Stripe
 before they can be included in purchase totals. Legacy Payment Links only
 create their order when their paid webhook arrives, so they do not provide
