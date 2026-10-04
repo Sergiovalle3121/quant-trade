@@ -88,6 +88,7 @@ from quant_trade.audit.pages import (
     SAMPLE_BANNER,
     audience_page,
     badge_svg,
+    calculator_page,
     check_page,
     compare_page,
     contact_page,
@@ -5427,6 +5428,50 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     @app.get("/pt/metodologia", response_class=HTMLResponse)
     def method_pt(request: Request) -> str:
         return method_page(locale="pt", base_url=_site_url(request))
+
+    def _calculator(
+        request: Request,
+        locale: str,
+        sharpe: str | None,
+        years: str | None,
+        trials: str | None,
+    ) -> str:
+        return calculator_page(
+            locale=locale,
+            base_url=_site_url(request),
+            sharpe=sharpe,
+            years=years,
+            trials=trials,
+        )
+
+    @app.get("/calculadora", response_class=HTMLResponse)
+    def calculator_es(
+        request: Request,
+        lang: str | None = None,
+        sharpe: str | None = None,
+        years: str | None = None,
+        trials: str | None = None,
+    ) -> str:
+        return _calculator(request, _locale(lang or "es"), sharpe, years, trials)
+
+    @app.get("/calculator", response_class=HTMLResponse)
+    def calculator_en(
+        request: Request,
+        lang: str | None = None,
+        sharpe: str | None = None,
+        years: str | None = None,
+        trials: str | None = None,
+    ) -> str:
+        return _calculator(request, _locale(lang or "en"), sharpe, years, trials)
+
+    @app.get("/pt/calculadora", response_class=HTMLResponse)
+    def calculator_pt(
+        request: Request,
+        sharpe: str | None = None,
+        years: str | None = None,
+        trials: str | None = None,
+    ) -> str:
+        return _calculator(request, "pt", sharpe, years, trials)
 
     @app.get("/guides", response_class=HTMLResponse)
     def guides_en(request: Request, lang: str | None = None) -> str:

@@ -3442,7 +3442,15 @@ The methodology page shows the six questions as cards with their pass rule,
 the A-D ladder as coloured class cards, the evidence labels as real badges,
 the red flags as chips and the limits with a red dash. The landing's
 "¿Vas a copiar o invertir con alguien?" card sends people about to copy or
-fund a trader to the provider-account guide. On phones, each row of an
+fund a trader to the provider-account guide.
+
+The free luck calculator (`/calculadora`, `/calculator`, `/pt/calculadora`,
+`audit/calculator.py`) needs no account and no file: the visitor types an
+annual Sharpe, the years it covers and the configurations tried, and the page
+runs the report's luck section (`luck.luck_review`) on those numbers, assuming
+daily returns (252 a year), no skew and normal tails. The inputs are labelled
+Declared and the outputs carry no Measured badge; nothing is stored. It is in
+the sitemap and every footer, and ends with a link to the upload form. On phones, each row of an
 evidence table (`table.metrics.ev`) becomes a card with its name and value,
 then its label and note; the account section's flags are cards too.
 
