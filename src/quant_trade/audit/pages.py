@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import html
 import re
+from collections.abc import Sequence
 from datetime import datetime
 from typing import Any
 
@@ -341,7 +342,7 @@ _COPY: dict[str, dict[str, Any]] = {
         ),
         "pay_card": (
             "Pago con tarjeta desde el propio informe, procesado por Stripe: lo ves completo "
-            "al momento, sin esperar un código. Por ahora solo en México y Estados Unidos."
+            "al momento, sin esperar un código."
         ),
         "pay_code": (
             "Pago por transferencia u otro medio que acordamos por WhatsApp: al confirmarse el "
@@ -651,7 +652,7 @@ _COPY: dict[str, dict[str, Any]] = {
         ),
         "pay_card": (
             "Card payment from the report itself, processed by Stripe: you see it in full at "
-            "once, without waiting for a code. For now, in Mexico and the United States only."
+            "once, without waiting for a code."
         ),
         "pay_code": (
             "Pay by bank transfer or another method we agree on WhatsApp: once the payment is "
@@ -2101,6 +2102,34 @@ def _checks(items: list[str]) -> str:
     )
 
 
+#: Billing countries as the card-payment line names them, in the order they are listed.
+#: Portuguese carries its preposition and article ("no México", "na Espanha").
+_CARD_MARKET_WORDS: dict[str, dict[str, str]] = {
+    "MX": {"es": "México", "en": "Mexico", "pt": "no México"},
+    "US": {"es": "Estados Unidos", "en": "the United States", "pt": "nos Estados Unidos"},
+    "BR": {"es": "Brasil", "en": "Brazil", "pt": "no Brasil"},
+    "ES": {"es": "España", "en": "Spain", "pt": "na Espanha"},
+}
+_CARD_MARKETS_LINE: dict[str, tuple[str, str]] = {
+    "es": (" y ", "Por ahora solo en {places}."),
+    "en": (" and ", "For now, in {places} only."),
+    "pt": (" e ", "Por enquanto, só {places}."),
+}
+
+
+def card_markets_line(markets: Sequence[str], locale: str) -> str:
+    """The sentence naming the countries where card payment is open, or "" for none.
+
+    Only the countries the owner approved (``AUDIT_APPROVED_MARKETS``) are named, so
+    the landing never offers card payment where Checkout would refuse it."""
+    words = [_CARD_MARKET_WORDS[m][locale] for m in ("MX", "US", "BR", "ES") if m in set(markets)]
+    if not words:
+        return ""
+    joiner, template = _CARD_MARKETS_LINE[locale]
+    places = words[0] if len(words) == 1 else ", ".join(words[:-1]) + joiner + words[-1]
+    return template.format(places=places)
+
+
 def _prices_html(
     copy: dict[str, Any],
     locale: str,
@@ -2111,6 +2140,7 @@ def _prices_html(
     card_payments: bool,
     contact_url: str,
     pack_price_usd: float = 0.0,
+    card_markets: Sequence[str] = (),
 ) -> str:
     ui = _UI[locale]
     head = _section_head(ui["pricing_eyebrow"], f"<h2 class='h2'>{_e(copy['prices_title'])}</h2>")
@@ -2127,7 +2157,10 @@ def _prices_html(
     else:
         ways = []
         if card_payments:
-            ways.append(f"<li>{icon('check')}<span>{_e(copy['pay_card'])}</span></li>")
+            card = " ".join(
+                p for p in (copy["pay_card"], card_markets_line(card_markets, locale)) if p
+            )
+            ways.append(f"<li>{icon('check')}<span>{_e(card)}</span></li>")
         if access_codes:
             link = (
                 f" <a href='{_e(contact_url)}' rel='noopener'>{_e(copy['contact'])}</a>"
@@ -2481,6 +2514,7 @@ def landing(
     extras_open: bool = False,
     signed_in: bool | None = None,
     operator: tuple[str, str] = ("", ""),
+    card_markets: Sequence[str] = (),
 ) -> str:
     """The public landing; the upload form lives on its own page (``upload_page``).
 
@@ -2514,6 +2548,7 @@ def landing(
             card_payments=card_payments,
             contact_url=contact_url,
             pack_price_usd=pack_price_usd,
+            card_markets=card_markets,
         )
         + _start_band(locale)
         + _faq_html(copy, locale, retention_days=retention_days)

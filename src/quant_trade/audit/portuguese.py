@@ -219,7 +219,7 @@ COPY_PT: dict[str, Any] = {
     ),
     "pay_card": (
         "Pagamento com cartão no próprio relatório, processado pela Stripe: você o vê completo "
-        "na hora, sem esperar um código. Por enquanto, só no México e nos Estados Unidos."
+        "na hora, sem esperar um código."
     ),
     "pay_code": (
         "Pagamento por transferência ou outro meio que combinamos pelo WhatsApp: quando o "

@@ -1666,6 +1666,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             extras_open=bool(extras),
             signed_in=_session(request) is not None,
             operator=(cfg.operator_name, cfg.operator_address_for(locale)),
+            card_markets=tuple(cfg.approved_markets),
         )
         return HTMLResponse(page)
 
