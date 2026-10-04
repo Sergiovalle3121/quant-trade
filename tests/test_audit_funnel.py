@@ -134,6 +134,15 @@ def test_visits_are_bare_counters_per_day_language_and_tag(tmp_path: Path) -> No
     assert columns == {"day", "locale", "ref", "visits"}
 
 
+def test_calculator_visits_count_with_their_tag(tmp_path: Path) -> None:
+    client, _ = _client(tmp_path)
+    tagged = _browser(client)
+    assert tagged.get("/calculadora?ref=f6").cookies.get(funnel.REF_COOKIE) == "f6"
+    assert _browser(client).get("/calculator").status_code == 200
+    assert _browser(client).get("/pt/calculadora").status_code == 200
+    assert _visits(client) == {("es", "f6"): 1, ("en", ""): 1, ("pt", ""): 1}
+
+
 def test_unknown_tags_robots_and_other_pages_do_not_count(tmp_path: Path) -> None:
     client, _ = _client(tmp_path)
     unknown = client.get("/?ref=spam-tag")

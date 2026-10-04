@@ -58,6 +58,7 @@ from quant_trade.audit import passkeys as pk
 from quant_trade.audit import pdf as pdf_lib
 from quant_trade.audit import strategies as strategies_lib
 from quant_trade.audit.audiences import AUDIENCES_BY_PATH, audience_url
+from quant_trade.audit.calculator import CALCULATOR_PATH
 from quant_trade.audit.compare import (
     COMPARE_PATH,
     compare_form,
@@ -1240,6 +1241,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     for audience_locale, pages_by_slug in AUDIENCES_BY_PATH.items():
         for audience_slug in pages_by_slug:
             visit_paths[audience_url(audience_slug, audience_locale)] = audience_locale
+    # The free calculator is a landing of its own: links on X and from creators point at it.
+    visit_paths.update({path: loc for loc, path in CALCULATOR_PATH.items()})
 
     def _funnel_visit(request: Request, response: Any) -> None:
         """Count a person's visit to the landing or a case page; remember its tag.
