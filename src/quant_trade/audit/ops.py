@@ -75,7 +75,10 @@ class OpsCounter:
     def _flush(self) -> None:
         # The worker and a panel read can flush together; serialize so retrying
         # a failed write cannot count a completed batch twice.
-        with self._flush_lock:
+        # A panel read must not wait behind a worker whose database is unavailable.
+        if not self._flush_lock.acquire(blocking=False):
+            return
+        try:
             with self._lock:
                 batch, self._pending = self._pending, Counter()
             failed: Counter[tuple[str, str, str, str, int]] = Counter()
@@ -100,6 +103,8 @@ class OpsCounter:
                         self.dropped += count
             if failed:
                 logger.warning("operations counters could not be persisted; retry pending")
+        finally:
+            self._flush_lock.release()
 
     def start(self) -> None:
         if self._thread is not None:
@@ -108,6 +113,7 @@ class OpsCounter:
         def loop() -> None:
             while not self._stop.wait(self._interval):
                 self.flush()
+            self.flush()
 
         self._thread = threading.Thread(target=loop, name="audit-ops", daemon=True)
         try:
@@ -119,10 +125,23 @@ class OpsCounter:
 
     def stop(self, timeout: float = 5.0) -> None:
         self._stop.set()
-        if self._thread is not None:
-            self._thread.join(timeout)
+        # Final persistence belongs to a daemon, never the lifespan caller. A
+        # stuck database operation may outlive this budget without blocking restart.
+        if self._thread is None:
+            self._thread = threading.Thread(target=self.flush, name="audit-ops-close", daemon=True)
+            try:
+                self._thread.start()
+            except Exception:
+                self._thread = None
+                self.flush_failed = True
+                logger.warning("operations shutdown persistence unavailable")
+                return
+        self._thread.join(max(0.0, timeout))
+        if not self._thread.is_alive():
             self._thread = None
-        self.flush()
+        else:
+            self.flush_failed = True
+            logger.warning("operations shutdown persistence exceeded time budget")
 
 
 class OpsMiddleware:

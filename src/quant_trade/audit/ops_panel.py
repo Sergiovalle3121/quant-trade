@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from datetime import datetime
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from typing import Any
 
 from quant_trade.audit.ops import percentile_bucket, retention_status
@@ -20,7 +20,10 @@ COST_LABELS = {
 
 
 def amount_cents(text: str) -> int:
-    amount = Decimal(text)
+    try:
+        amount = Decimal(text)
+    except InvalidOperation as exc:
+        raise ValueError("invalid observed cost amount") from exc
     exponent = amount.as_tuple().exponent
     if (
         not amount.is_finite()
@@ -132,6 +135,17 @@ def contribution(gross: int, refunds: int, costs: list[dict[str, Any]]) -> str:
     return f"DECLARED · USD {result / 100:.2f} · margen sobre cobros: {margin}"
 
 
+def cost_notice(*, error: str = "", saved: bool = False) -> str:
+    notice = "<p role='status'>Costo observado guardado.</p>" if saved else ""
+    if error == "unavailable":
+        notice += "<p role='alert'>No se pudo guardar el costo. Inténtalo de nuevo.</p>"
+    elif error:
+        notice += (
+            "<p role='alert'>Revisa período, USD con hasta dos decimales y referencia interna.</p>"
+        )
+    return notice
+
+
 def commercial_section(
     *,
     key: str,
@@ -146,11 +160,7 @@ def commercial_section(
     error: str = "",
     saved: bool = False,
 ) -> str:
-    notice = "<p role='status'>Costo observado guardado.</p>" if saved else ""
-    if error:
-        notice += (
-            "<p role='alert'>Revisa período, USD con hasta dos decimales y referencia interna.</p>"
-        )
+    notice = cost_notice(error=error, saved=saved)
 
     def cost_rows(values: list[dict[str, Any]]) -> list[list[str]]:
         return [

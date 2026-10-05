@@ -636,6 +636,23 @@ a small form that fills in its own link. Rules:
   that a class difference shows which tests changed, not that one version
   will work better.
 
+The existing account picker (`/cuenta/comparar`, `/account/comparar`,
+`/pt/conta/comparar`) uses the signed-in customer's report list; it never exposes
+tokens or consumes credits. A new stored-evidence summary shows the class change,
+which dimensions changed result, and flags that appear or are absent in report 2.
+An absent flag can reflect missing data, not a resolved risk. Classification and
+tests retain their own reports' declarations, including attempts and costs.
+
+Numeric differences are arithmetic (report 2 minus report 1), not significance
+tests or predictions. Sharpe and drawdown differences require both figures to be
+finite and `MEASURED`, the same timezone-aware start/end, positive measured
+frequency within `1e-6` relative tolerance, the same frequency label, and the
+same closed-balance/equity basis. Missing or incompatible context shows
+`NOT_MEASURED` while retaining the side-by-side figures. Drawdown differences
+use percentage points. All text exists in ES/EN/PT and passes the claim guard.
+Paid/full-report rights remain readable if an email later becomes unconfirmed;
+unconfirmed welcome previews and locked reports do not enter the comparison.
+
 ### Stress tests without the best outcomes
 
 `audit/stress.py` removes the best outcomes from what was uploaded and

@@ -76,6 +76,26 @@ _TRIAL_SOURCES: dict[str, str] = {
 
 _RULES_SOURCE: tuple[tuple[str, str], ...] = (
     (
+        "Same dates, frequency and curve type. Differences are arithmetic, "
+        "without a significance test.",
+        "Mismas fechas, frecuencia y tipo de curva. Las diferencias son aritméticas, "
+        "sin prueba de significancia.",
+    ),
+    (
+        "NOT_MEASURED · no numeric difference: dates, frequency or curve type differ, "
+        "or their evidence is missing.",
+        "NOT_MEASURED · sin diferencia numérica: las fechas, frecuencia o tipo de curva "
+        "no coinciden o falta su evidencia.",
+    ),
+    (
+        "Each report retains its own files and declarations. An absent flag may reflect "
+        "missing data; it does not show that the risk disappeared. Classification and tests "
+        "also depend on declared trials and costs.",
+        "Cada informe conserva sus propios archivos y declaraciones. Una bandera ausente "
+        "puede deberse a datos faltantes; no demuestra que el riesgo desapareció. La clase y "
+        "las pruebas dependen también de los intentos y costos declarados.",
+    ),
+    (
         "Confirm your email to receive the first full report free. "
         "If required, you verify a card without a charge.",
         "Confirma tu correo para recibir el primer informe completo gratis. "

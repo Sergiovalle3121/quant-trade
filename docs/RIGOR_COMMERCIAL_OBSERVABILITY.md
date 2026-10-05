@@ -52,6 +52,18 @@ commit acknowledgement can make a retry ambiguous. Use the existing durable
 payment/rights ledger for money and delivery reconciliation. Telemetry failure
 must not change an upload, PDF, purge result or public health response.
 
+On PostgreSQL, operations and cost writes/reads use their own one-connection
+pool (no overflow), with a one-second pool wait, two-second connection and SQL
+statement timeouts, and a 500 ms lock wait. This adds at most one database
+connection per application process; customer transactions keep their existing
+pool and timeout settings. The panel skips its counter flush when another flush
+is already running. SQLite retains the existing engine.
+
+Shutdown gives the daemon at most five seconds to persist its final buffer; it
+never performs synchronous telemetry SQL on the lifespan caller. A stalled flush
+can leave counters unpersisted at process exit, which the private failure state
+reports. Counter totals remain best effort and never substitute for the ledger.
+
 The service's existing `AUDIT_AUTO_PURGE=true` worker records health after each
 run, including the initial run. The private panel distinguishes disabled,
 unmeasured, first/latest attempt failed, recent success and success overdue by
@@ -66,6 +78,10 @@ The existing owner key authorizes the panel form. Submit the exact dates shown
 for either `all` (rolling 30-day business total) or `x` (14-day acquisition
 cohort). Dates are inclusive UTC calendar days. Four category totals are
 required for the *same exact dates and scope*:
+
+Invalid form values and database persistence failures produce distinct private
+messages. A database failure never claims the cost was saved or exposes its
+exception details. The save result remains visible if the metric read also fails.
 
 - `infrastructure`: observed infrastructure and variable usage, including free
   and paid report usage; retain the actual invoice/allocation separately.

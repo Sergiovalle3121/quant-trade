@@ -22,12 +22,32 @@ class OpsStoreMixin:
     _sa: Any
     metadata: Any
     engine: Any
+    ops_engine: Any
     ops_counters: Any
     ops_jobs: Any
     commercial_costs: Any
 
     def define_ops_tables(self) -> None:
         sa = self._sa
+        # One bounded, separate PostgreSQL connection: optional metrics cannot
+        # exhaust the customer pool or wait indefinitely for a locked counter.
+        # SQLite retains the existing engine, including in-memory test databases.
+        self.ops_engine = (
+            sa.create_engine(
+                self.engine.url,
+                future=True,
+                pool_size=1,
+                max_overflow=0,
+                pool_timeout=1,
+                pool_recycle=300,
+                connect_args={
+                    "connect_timeout": 2,
+                    "options": "-c statement_timeout=2000 -c lock_timeout=500",
+                },
+            )
+            if self.engine.dialect.name == "postgresql"
+            else self.engine
+        )
         self.ops_counters = sa.Table(
             "ops_counters",
             self.metadata,
@@ -105,11 +125,11 @@ class OpsStoreMixin:
             ],
             set_={"count": table.c.count + amount},
         )
-        with self.engine.begin() as conn:
+        with self.ops_engine.begin() as conn:
             conn.execute(statement)
 
     def ops_rows(self, since_day: str) -> list[dict[str, Any]]:
-        with self.engine.connect() as conn:
+        with self.ops_engine.connect() as conn:
             return [
                 dict(row)
                 for row in conn.execute(
@@ -149,11 +169,11 @@ class OpsStoreMixin:
                 ),
                 else_=table.c.last_success_at,
             )
-        with self.engine.begin() as conn:
+        with self.ops_engine.begin() as conn:
             conn.execute(insert.on_conflict_do_update(index_elements=[table.c.name], set_=updates))
 
     def ops_job(self, name: str = "retention") -> dict[str, Any] | None:
-        with self.engine.connect() as conn:
+        with self.ops_engine.connect() as conn:
             row = (
                 conn.execute(self._sa.select(self.ops_jobs).where(self.ops_jobs.c.name == name))
                 .mappings()
@@ -197,7 +217,7 @@ class OpsStoreMixin:
             source_reference=source_reference,
             updated_at=stamp(at),
         )
-        with self.engine.begin() as conn:
+        with self.ops_engine.begin() as conn:
             conn.execute(
                 insert.on_conflict_do_update(
                     index_elements=[
@@ -218,7 +238,7 @@ class OpsStoreMixin:
         self, period_start: str, period_end: str, scope: str = "all"
     ) -> list[dict[str, Any]]:
         table = self.commercial_costs
-        with self.engine.connect() as conn:
+        with self.ops_engine.connect() as conn:
             return [
                 dict(row)
                 for row in conn.execute(
@@ -252,7 +272,7 @@ class OpsStoreMixin:
             )
         )
         out: dict[str, int] = {}
-        with self.engine.connect() as conn:
+        with self.ops_engine.connect() as conn:
             out["signups"] = int(
                 conn.execute(sa.select(sa.func.count()).select_from(cohort.subquery())).scalar()
                 or 0

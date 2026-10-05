@@ -61,6 +61,10 @@ test settings, not deployment defaults.
 
 ## Scenarios
 
+- Exhaustion of the separate telemetry pool times out in one second while a
+  customer-pool query still succeeds. PostgreSQL cancels a deliberately slow
+  telemetry statement after two seconds; its lock timeout is 500 ms. Customer
+  transaction settings remain unchanged.
 - Atomic operations-counter updates from 1, 2, 4 and 8 concurrent workers.
 - Exhaustion of four credits across sixteen simultaneous attempts, followed by
   sixteen duplicate unlock attempts that consume exactly one additional credit.
@@ -131,6 +135,14 @@ PDF binaries are download artifacts rather than database blobs; the database
 restore check verifies their recorded fingerprint and the report source.
 External Stripe requests and delivered emails were again zero.
 
+After isolating the telemetry pool and bounding worker shutdown, the eleven
+counter/pool/credit/schema/restore checks passed in 24.34 s on the same local
+server. A new fifty-audit expanded run passed in 109.60 s: zero internal errors,
+zero lost credits, all five rejection cases preserved credits, a genuine PDF
+download succeeded, and restore recovered 50 reports and 13 credits with all
+51 tables equal. Its restore took 3.436 s. This remains local synthetic QA,
+not a Railway capacity measurement or a production-data recovery test.
+
 The initial upload check used 500 equity rows, 100 bootstrap samples, two analysis slots
 and a 30-second queue. It checks exact credit conservation, completed report
 counts and persisted operation counters. Its observed durations describe that
@@ -155,7 +167,7 @@ marketing conversion or trading returns.
 `.github/workflows/rigor-postgres-qa.yml` provisions a disposable PostgreSQL 16
 service bound to loopback on Ubuntu 24.04. It uses PostgreSQL 16 client tools,
 native WeasyPrint libraries and ephemeral synthetic credentials, with no
-production secrets. It runs the ten counter/credit/schema/restore checks and the
+production secrets. It runs the eleven counter/pool/credit/schema/restore checks and the
 50-audit expanded scenario, and uploads JSON, JUnit and the synthetic PDF.
 The workflow follows GitHub's [PostgreSQL service-container configuration](https://docs.github.com/en/actions/tutorials/use-containerized-services/create-postgresql-service-containers).
 

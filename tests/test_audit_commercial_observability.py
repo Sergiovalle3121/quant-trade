@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import asyncio
+import threading
+import time
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -87,6 +89,37 @@ def test_worker_or_flush_failure_cannot_break_application_lifecycle(monkeypatch)
     monkeypatch.setattr(counter, "_flush", unavailable)
     counter.stop()
     assert counter.flush_failed
+
+
+@pytest.mark.parametrize("started", [False, True])
+def test_shutdown_and_panel_flush_do_not_wait_for_a_stuck_writer(started: bool) -> None:
+    entered, release = threading.Event(), threading.Event()
+
+    class StuckStore:
+        def count_ops(self, **values: Any) -> None:
+            entered.set()
+            assert release.wait(5)
+
+    counter = OpsCounter(StuckStore(), interval_seconds=0.001)
+    counter.observe("audit", "success", 1)
+    if started:
+        counter.start()
+        assert entered.wait(2)
+        before = time.monotonic()
+        counter.flush()  # the private panel cannot queue behind a blocked writer
+        assert time.monotonic() - before < 0.2
+    before = time.monotonic()
+    try:
+        counter.stop(timeout=0.03)
+        assert time.monotonic() - before < 0.5
+        assert entered.wait(2)
+        assert counter.flush_failed
+        assert counter._thread is not None and counter._thread.is_alive()
+    finally:
+        release.set()
+        if counter._thread is not None:
+            counter._thread.join(2)
+    assert counter._thread is not None and not counter._thread.is_alive()
 
 
 def test_buffer_is_bounded_and_histograms_do_not_invent_exact_times(tmp_path, monkeypatch) -> None:
@@ -269,10 +302,45 @@ def test_operational_data_remains_private_and_does_not_change_health(tmp_path, m
         assert page.headers["Cache-Control"] == "no-store"
 
 
-@pytest.mark.parametrize("amount", ["-1", "NaN", "Infinity", "1.001", "1e1000"])
+@pytest.mark.parametrize("amount", ["-1", "NaN", "Infinity", "1.001", "1e1000", "invalid"])
 def test_cost_amount_cannot_round_or_accept_unbounded_values(amount) -> None:
     with pytest.raises(ValueError):
         amount_cents(amount)
+
+
+def test_cost_persistence_failure_is_not_a_validation_error(tmp_path, monkeypatch) -> None:
+    app = _app(tmp_path)
+    store = app.state.store
+    today = datetime.now(UTC).date().isoformat()
+
+    def unavailable(**values: Any) -> None:
+        raise OSError("secret connection details")
+
+    monkeypatch.setattr(store, "record_commercial_cost", unavailable)
+    data = {
+        "key": KEY,
+        "action": "cost_record",
+        "cost_start": today,
+        "cost_end": today,
+        "cost_scope": "all",
+        "cost_category": "infrastructure",
+        "cost_amount": "1.23",
+        "cost_reference": "QA-cost",
+    }
+    with TestClient(app) as client:
+        page = client.post("/panel", data=data)
+        assert page.status_code == 200
+        assert "No se pudo guardar el costo" in page.text
+        assert "Revisa período" not in page.text and "secret connection" not in page.text
+        assert "Costo observado guardado" not in page.text
+        # Validation is before persistence, including malformed decimals.
+        invalid = client.post("/panel", data={**data, "cost_amount": "invalid"})
+        assert "Revisa período" in invalid.text
+        assert "No se pudo guardar el costo" not in invalid.text
+        monkeypatch.setattr(store, "ops_rows", lambda *a: (_ for _ in ()).throw(OSError()))
+        hidden = client.post("/panel", data=data)
+        assert "consulta de telemetría no disponible" in hidden.text
+        assert "No se pudo guardar el costo" in hidden.text
 
 
 def test_costs_require_exact_windows_explicit_zeros_and_authorized_operator(tmp_path) -> None:

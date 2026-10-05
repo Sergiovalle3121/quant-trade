@@ -83,6 +83,7 @@ def local_databases():
     yield create
     for store in stores:
         store.engine.dispose()
+        store.ops_engine.dispose()
     with psycopg.connect(_dsn(admin), autocommit=True) as conn:
         for name in names:
             # Names are generated above, and the admin endpoint is loopback only.
@@ -97,6 +98,27 @@ def _evidence(name: str, values: dict[str, Any]) -> None:
         (target / f"{name}.json").write_text(
             json.dumps(values, indent=2, sort_keys=True) + "\n", encoding="utf-8"
         )
+
+
+def test_postgres_telemetry_pool_and_sql_waits_are_bounded(local_databases) -> None:
+    _, store = local_databases()
+    assert store is not None and store.ops_engine is not store.engine
+    with store.ops_engine.connect() as telemetry:
+        assert telemetry.execute(sa.text("SHOW statement_timeout")).scalar_one() == "2s"
+        assert telemetry.execute(sa.text("SHOW lock_timeout")).scalar_one() == "500ms"
+        before = time.monotonic()
+        with pytest.raises(sa.exc.TimeoutError):
+            store.ops_rows("2026-01-01")
+        assert time.monotonic() - before < 2.5
+        # Saturated telemetry cannot take a connection from the customer pool.
+        with store.engine.connect() as customer:
+            assert customer.execute(sa.text("SELECT 1")).scalar_one() == 1
+            assert customer.execute(sa.text("SHOW statement_timeout")).scalar_one() == "0"
+    with store.ops_engine.connect() as telemetry:
+        before = time.monotonic()
+        with pytest.raises(sa.exc.DBAPIError):
+            telemetry.execute(sa.text("SELECT pg_sleep(5)"))
+        assert time.monotonic() - before < 3.5
 
 
 def _audit(store: Store, audit_id: str) -> None:

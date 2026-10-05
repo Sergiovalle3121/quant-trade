@@ -1274,6 +1274,27 @@
       "expected_at": "FORENSICS_CORPUS_MANIFEST (a local file outside the repository)",
       "why_not_committed": "it names local paths of files that are themselves not committed; docs/AUDIT_FORENSICS.md Appendix A carries its public content",
       "consequence": "the split into calibration and reserved files (tests/forensics_corpus.py::split) can be recomputed from Appendix A, but the manifest bytes themselves cannot be checked here"
+    },
+    {
+      "sha256": "80379b2c04d51c30225532e0ae04509899141e9957ed096fe749d7fd9df8f82f",
+      "names": "PostgreSQL 17.11 EDB Windows binary archive used by docs/LOCAL_POSTGRES_QA.md",
+      "expected_at": "../pg/ (local, outside the checkout)",
+      "why_not_committed": "Third-party binary distribution kept outside the source repository",
+      "consequence": "Local archive fingerprint is not reproducible from source; obtain the same EDB archive to verify its bytes. The committed runner independently repeats QA with installed PostgreSQL."
+    },
+    {
+      "sha256": "eb0ef66b6c674b00525076a1d14b83f0d940c95f2389489cf3590f9f8c962986",
+      "names": "Synthetic expanded-staging PDF downloaded in docs/LOCAL_POSTGRES_QA.md",
+      "expected_at": "../qa-extended/ (local, outside the checkout)",
+      "why_not_committed": "Generated synthetic QA output stays outside source control under the report policy",
+      "consequence": "This exact PDF depends on runtime and generated report identifiers. The committed staging runner verifies new PDF downloads; its output need not hash to this one."
+    },
+    {
+      "sha256": "5f7c483ed09fc505ecd3446893510718c723df83e698a0dc4fa5984782a55ff0",
+      "names": "Byte-preserved synthetic report HTML restored in docs/LOCAL_POSTGRES_QA.md",
+      "expected_at": "../qa-extended/ (local, outside the checkout)",
+      "why_not_committed": "Generated synthetic QA output stays outside source control under the report policy",
+      "consequence": "The local snapshot records one generated report. CI repeats byte-for-byte restore comparison with new synthetic identifiers, so it cannot recreate these exact HTML bytes."
     }
   ]
 }

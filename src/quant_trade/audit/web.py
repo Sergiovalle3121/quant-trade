@@ -74,7 +74,12 @@ from quant_trade.audit.importers import detect_format
 from quant_trade.audit.legal import LEGAL_UPDATED, LegalContext, privacy_text, terms_text
 from quant_trade.audit.market import MarketData
 from quant_trade.audit.ops import OpsCounter, OpsMiddleware
-from quant_trade.audit.ops_panel import amount_cents, commercial_section, operations_section
+from quant_trade.audit.ops_panel import (
+    amount_cents,
+    commercial_section,
+    cost_notice,
+    operations_section,
+)
 from quant_trade.audit.owner import (
     MAX_CREDITS,
     MAX_EXPIRES_DAYS,
@@ -1559,8 +1564,11 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                     at=now,
                 )
                 cost_saved = True
-            except Exception:
+            except ValueError:
                 cost_error = "invalid"
+            except Exception:
+                cost_error = "unavailable"
+                logger.warning("observed cost persistence unavailable")
         if action == "create":
             try:
                 total = int(credits)
@@ -1634,6 +1642,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             private_ops = (
                 "<p>Operación y costos: NOT_MEASURED; consulta de telemetría no disponible.</p>"
             )
+            private_ops += cost_notice(error=cost_error, saved=cost_saved)
         return HTMLResponse(
             panel_page(
                 key=key,

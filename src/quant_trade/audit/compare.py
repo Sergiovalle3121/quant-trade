@@ -16,6 +16,7 @@ import re
 from typing import Any
 from urllib.parse import parse_qs, urlsplit
 
+from quant_trade.audit.comparison_delta import change_summary
 from quant_trade.audit.guard import assert_report_clean
 from quant_trade.audit.report import LABELS, STATUS_TEXT, _dimension_title, _kpi_list, source_name
 from quant_trade.audit.theme import class_ring
@@ -186,6 +187,8 @@ COMPARE_CSS = (
     "letter-spacing:.08em}.cmp-card p{margin:4px 0 0;font-size:.86rem;color:var(--text-2)}"
     "@media (max-width:620px){.cmp-head{grid-template-columns:minmax(0,1fr)}}"
     ".cmp td.diff{font-weight:600}"
+    ".cmp-summary{border:1px solid var(--border);border-radius:18px;padding:18px;"
+    "background:#fff;margin:24px 0}.cmp-summary h2{margin-top:0}"
     # On a phone the two report columns keep their badges inside the card.
     "@media screen and (max-width:620px){.cmp th,.cmp td{padding:10px 8px}"
     ".cmp th:first-child,.cmp td:first-child{padding-left:12px;width:42%}"
@@ -276,6 +279,7 @@ def comparison_body(
     header = f"<tr><th></th><th>{_e(copy['report_a'])}</th><th>{_e(copy['report_b'])}</th></tr>"
     return (
         head
+        + change_summary(a, b, locale)
         + f"<h2>{_e(copy['dimensions'])}</h2><table class='cmp'>{header}{dim_rows}</table>"
         + f"<h2>{_e(copy['figures'])}</h2><table class='cmp'>{header}{figure_rows}</table>"
         + f"<p class='muted'>{_e(copy['note'])}</p>"
