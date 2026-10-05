@@ -25,7 +25,7 @@ jobs:
           ruff format --check src/quant_trade/personal_paper tests/test_personal_paper*.py
           mypy src/quant_trade/personal_paper
       - name: Offline causal and recovery tests
-        run: pytest -q tests/test_personal_paper*.py tests/test_execution_safety.py --junitxml=state/paper-tests.xml
+        run: pytest -q tests/test_personal_paper_engine.py tests/test_personal_paper_worker.py tests/test_personal_paper_fetch.py tests/test_personal_paper_economic.py tests/test_personal_paper_backup.py tests/test_execution_safety.py --junitxml=state/paper-tests.xml
       - name: Reproducible synthetic CLI and restart
         run: |
           python -m quant_trade.personal_paper demo-data --output state/demo

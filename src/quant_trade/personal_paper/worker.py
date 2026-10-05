@@ -32,7 +32,7 @@ def worker_lease(path: Path):
             handle.flush()
         handle.seek(0)
         if os.name == "nt":
-            import msvcrt
+            msvcrt: Any = importlib.import_module("msvcrt")
 
             try:
                 msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
