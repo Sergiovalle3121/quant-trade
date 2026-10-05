@@ -259,6 +259,7 @@ def _fill_target(
     volumes: dict[str, float],
     when: str,
     config: dict[str, Any],
+    quote_input_sha256: str | None = None,
 ) -> None:
     if set(target) != set(UNIVERSE) or not all(math.isfinite(float(v)) for v in target.values()):
         raise PersonalPaperError("execution target must be complete and finite")
@@ -366,6 +367,7 @@ def _fill_target(
                 "fee_usd": fee,
                 "cost_evidence": "ASSUMPTION",
                 "real_money_approved": False,
+                **({"quote_input_sha256": quote_input_sha256} if quote_input_sha256 else {}),
             },
         )
         book["costs_usd"] += fee
@@ -502,6 +504,9 @@ def _register(
         "portfolios": PORTFOLIOS,
         "cost_multipliers": list(COST_MULTIPLIERS),
         "cost_evidence": "ASSUMPTION",
+        "development_liquidity_basis": "previous_closed_session_volume_proxy"
+        if mode == "development"
+        else None,
         "real_money_approved": False,
         "closed_sessions": 0,
         "calendar_checked": False,
@@ -640,7 +645,7 @@ def run(
             stored_dates = {r[0] for r in store.db.execute("SELECT timestamp FROM bars")}
             if not stored_dates <= {pd.Timestamp(d).isoformat() for d in dates}:
                 raise PersonalPaperError("previously observed sessions were removed")
-            for date in dates:
+            for session_index, date in enumerate(dates):
                 stamp = pd.Timestamp(date)
                 observation = fx_at(fx, stamp)
                 frame = panel[panel.timestamp == date]
@@ -664,7 +669,15 @@ def run(
                     continue
                 prices = {str(r.symbol): float(r.close) for r in frame.itertuples()}
                 opens = {str(r.symbol): float(r.open) for r in frame.itertuples()}
-                volumes = {str(r.symbol): float(r.volume) for r in frame.itertuples()}
+                # Today's full-day volume is unknown at its opening. This is a
+                # declared sizing proxy from the immediately preceding closed
+                # session, not observed executable opening liquidity.
+                previous_frame = (
+                    panel[panel.timestamp == dates[session_index - 1]]
+                    if mode == "development"
+                    else frame
+                )
+                volumes = {str(r.symbol): float(r.volume) for r in previous_frame.itertuples()}
                 for key, book in books.items():
                     if book["day_date"] != str(stamp.date()):
                         book["day_start_mxn"] = _equity(book, book["last_prices"]) * book["last_fx"]
@@ -771,7 +784,10 @@ def _execute_quotes(
     if not required <= set(quotes) or set(quotes.symbol) != set(UNIVERSE) or len(quotes) != 5:
         raise PersonalPaperError("quotes require one complete universe and observable liquidity")
     prices, volumes = {}, {}
+    quote_rows: list[dict[str, Any]] = []
     for row in quotes.itertuples():
+        if not isinstance(row.source, str) or not row.source.strip():
+            raise PersonalPaperError("quote source must be a non-empty string")
         for name in ("price", "available_volume"):
             value = float(getattr(row, name))
             if not math.isfinite(value) or value <= 0:
@@ -786,12 +802,24 @@ def _execute_quotes(
             closed <= opened
             or not opened <= observed <= received <= now < closed
             or (now - observed).total_seconds() > OPEN_WINDOW_SECONDS
-            or not str(row.source).strip()
         ):
             raise PersonalPaperError("quote/session observation is stale or invalid")
         prices[str(row.symbol)], volumes[str(row.symbol)] = (
             float(row.price),
             float(row.available_volume),
+        )
+        quote_rows.append(
+            {
+                "symbol": str(row.symbol),
+                "price_usd": float(row.price),
+                "available_volume": float(row.available_volume),
+                "source": row.source.strip(),
+                "observed_at_utc": observed.isoformat(),
+                "received_at_utc": received.isoformat(),
+                "session_open_utc": opened.isoformat(),
+                "session_close_utc": closed.isoformat(),
+                "previous_session_date": str(row.previous_session_date),
+            }
         )
     if any(
         quotes[c].nunique() != 1
@@ -814,7 +842,35 @@ def _execute_quotes(
         or str(prior.iloc[-1].session_open_utc.date()) != previous_date
     ):
         raise PersonalPaperError("quote session is not confirmed by the exchange calendar")
+    if config["price_basis"] == "raw_with_actions":
+        validate_actions(quotes)
+        actions = {
+            str(row.symbol): {
+                "dividend": float(row.dividend),
+                "split_ratio": float(row.split_ratio),
+            }
+            for row in quotes.itertuples()
+        }
+        for quote in quote_rows:
+            quote.update(actions[quote["symbol"]])
     observation = fx_at(fx, now)
+    quote_inputs = {
+        "quotes": sorted(quote_rows, key=lambda row: row["symbol"]),
+        "fx": observation,
+    }
+    quote_input_sha = digest(quote_inputs)
+    if not any(
+        json.loads(row[0]).get("quote_input_sha256") == quote_input_sha
+        for row in store.db.execute("SELECT value FROM events WHERE kind='quote_observation'")
+    ):
+        store.event(
+            "quote_observation",
+            {
+                "quote_input_sha256": quote_input_sha,
+                "inputs": quote_inputs,
+                "recorded_at_utc": now.isoformat(),
+            },
+        )
     for key, book in books.items():
         if book["day_date"] != str(opened.date()):
             book["day_start_mxn"] = _equity(book, book["last_prices"]) * book["last_fx"]
@@ -844,7 +900,17 @@ def _execute_quotes(
             continue
         if book["pending_session_date"] != previous_date:
             raise PersonalPaperError("quote is not the next session of the frozen decision")
-        _fill_target(store, key, book, book["pending"], prices, volumes, now.isoformat(), config)
+        _fill_target(
+            store,
+            key,
+            book,
+            book["pending"],
+            prices,
+            volumes,
+            now.isoformat(),
+            config,
+            quote_input_sha,
+        )
         book["pending"] = None
         _risk(book, prices, observation["usd_mxn"], config, store, key, now.isoformat())
         store.seal_book(key, book)

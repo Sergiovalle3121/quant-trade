@@ -38,6 +38,15 @@ python -m compileall -q src tests
 pytest -q
 ```
 
+## Private ETF paper simulator
+
+The optional `personal-paper` extra provides a separate local simulator with frozen ETF
+allocations, a quarterly control, 1x/2x/3x hypothetical costs, persistent risk pauses and
+verified recovery. It does not add public web routes or connect to a broker. Historical
+replays remain development evidence; economic review cannot approve real-money trading.
+See [the private simulator runbook](docs/PERSONAL_PAPER.md) for commands, assumptions,
+budget tracking and the prospective observation protocol.
+
 ## Sample backtests
 
 ```bash

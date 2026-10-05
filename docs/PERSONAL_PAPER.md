@@ -26,6 +26,10 @@ Costos hipotéticos por lado: comisión 5, deslizamiento 5 y spread 2 puntos bá
 como reducción de efectivo. Los escenarios 2× y 3× multiplican todos esos cargos. Las fracciones
 tienen paso de 0.000001 participaciones; la liquidez limita una orden al 0.01% del volumen de la
 barra admitida. Una orden incompleta expira: no se inventa liquidez ni se acumula una deuda.
+En desarrollo, una ejecución al precio de apertura usa el volumen de la sesión anterior cerrada
+como aproximación conservada en el manifest; el volumen total del día de ejecución todavía no
+era conocido en esa apertura. Esta aproximación no prueba que hubiera liquidez disponible al
+abrir. En prospectivo se exige el volumen de la cotización de un minuto observada.
 
 Al alcanzar un drawdown de **5% en MXN**, o una pérdida diaria de 2%, se persiste una pausa
 de nuevas compras; se siguen registrando valores y se permiten reducciones. Reiniciar el proceso
@@ -117,6 +121,9 @@ ID determinista. El diario forma una cadena de hashes y reconcilia efectivo y ca
 fills y acciones corporativas; los estados, curvas, manifest e inputs consumidos también tienen
 anclas. Un crash hace rollback; el siguiente intento vuelve a verificar antes de continuar. Esto
 detecta ediciones accidentales, no constituye una firma criptográfica frente al propietario del disco.
+Las cotizaciones prospectivas admitidas conservan fuente, horas de precio/recepción, precio,
+volumen, acciones corporativas y FX en un evento con hash; cada fill referencia ese evento.
+Una cotización incompleta o una fuente ausente se rechaza sin dejar una ejecución parcial.
 
 Se rechazan valores no finitos, símbolos faltantes, calendarios incoherentes, gaps injustificados,
 precios/actions/FX previamente consumidos que cambien o sesiones eliminadas. Una revisión de
@@ -146,7 +153,8 @@ sesenta cierres nuevos y tres ciclos con fills efectivos para cada candidata y e
 una pausa o ventanas de apertura perdidas pueden retrasarlo mucho más de noventa días. No se
 fuerzan operaciones para completar ese indicador. No es un dictamen de rentabilidad.
 
-La revisión económica exige al menos 252 sesiones prospectivas y cobertura completa explícita
+La revisión económica exige 252 intervalos completos entre cierres prospectivos (253 cierres
+nuevos) y cobertura completa explícita
 de gastos de infraestructura, datos y FX/transferencia, incluyendo ceros declarados. Compara con
 el control en MXN en 1×/2×, usa bootstrap pareado de bloques de veinte sesiones, 10,000 muestras,
 semilla 20261005, ajuste para dos candidatas y el historial de ensayos del ledger congelado. Si

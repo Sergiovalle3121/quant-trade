@@ -74,6 +74,66 @@ def test_replay_fractional_causal_fills_reconciles_and_is_idempotent(inputs, tmp
     assert len(result["manifest"]["historical_trial_ids"]) >= 109
 
 
+@pytest.mark.parametrize("sessions", [66, 67])
+def test_open_fill_never_uses_that_sessions_future_full_day_volume(inputs, tmp_path, sessions):
+    panel = pd.read_csv(inputs[1])
+    dates = panel.timestamp.unique()[:sessions]
+    panel = panel[panel.timestamp.isin(dates)].copy()
+    panel.to_csv(inputs[1], index=False)
+    before = engine.run(*inputs)
+    first_fill_time = pd.Timestamp(dates[64]).isoformat()
+    baseline_fills = [
+        f for f in event_values(inputs[3], "fill") if f["timestamp"] == first_fill_time
+    ]
+    assert len(baseline_fills) == 45
+    panel.loc[panel.timestamp == dates[64], "volume"] = 0
+    altered_data = tmp_path / "changed_future_full_day_volume.csv"
+    panel.to_csv(altered_data, index=False)
+    alternate_database = tmp_path / "alternate.sqlite"
+    after = engine.run(inputs[0], altered_data, inputs[2], alternate_database)
+    alternate_fills = [
+        f for f in event_values(alternate_database, "fill") if f["timestamp"] == first_fill_time
+    ]
+    assert alternate_fills == baseline_fills
+    assert after["books"] == before["books"]
+    assert before["manifest"]["development_liquidity_basis"] == (
+        "previous_closed_session_volume_proxy"
+    )
+
+
+@pytest.mark.parametrize("sessions", [66, 67])
+def test_zero_previous_closed_session_volume_prevents_open_fill(inputs, sessions):
+    panel = pd.read_csv(inputs[1])
+    dates = panel.timestamp.unique()[:sessions]
+    panel = panel[panel.timestamp.isin(dates)].copy()
+    panel.loc[panel.timestamp == dates[63], "volume"] = 0
+    panel.to_csv(inputs[1], index=False)
+    engine.run(*inputs)
+    first_fill_time = pd.Timestamp(dates[64]).isoformat()
+    assert not any(
+        event["timestamp"] == first_fill_time for event in event_values(inputs[3], "fill")
+    )
+    initial_orders = [
+        event for event in event_values(inputs[3], "order") if event["timestamp"] == first_fill_time
+    ]
+    assert len(initial_orders) == 45
+    assert all(event["status"] == "expired" for event in initial_orders)
+    with sqlite3.connect(inputs[3]) as connection:
+        initial_curves = [
+            json.loads(row[0])
+            for row in connection.execute(
+                "SELECT value FROM curves WHERE timestamp=?", (first_fill_time,)
+            )
+        ]
+    assert len(initial_curves) == 9
+    assert all(
+        curve["costs_usd"] == 0
+        and curve["cash_usd"] == curve["equity_usd"] == 1000
+        and curve["rebalance_count"] == 0
+        for curve in initial_curves
+    )
+
+
 def test_transaction_crash_rolls_back_orders_cash_and_bars(inputs, monkeypatch):
     original = engine._snapshot
 
@@ -801,3 +861,164 @@ def test_market_quotes_require_actual_receipt_timestamp(inputs):
             )
     finally:
         store.close()
+
+
+@pytest.mark.parametrize(
+    "source_fault", ["missing_column", "null", "empty", "whitespace", "numeric"]
+)
+def test_invalid_quote_source_never_fills_or_persists_partial_batch(inputs, source_fault):
+    calendar, quotes, last, nextdate = prospective_fixture(inputs)
+    engine.run(
+        *inputs,
+        mode="prospective",
+        calendar_path=calendar,
+        now_utc=(last + pd.Timedelta(hours=10)).isoformat(),
+    )
+    before = engine.run(
+        *inputs,
+        mode="prospective",
+        calendar_path=calendar,
+        now_utc=(last + pd.Timedelta(hours=22)).isoformat(),
+    )
+    frame = pd.read_csv(quotes)
+    if source_fault == "missing_column":
+        frame = frame.drop(columns="source")
+    elif source_fault == "numeric":
+        frame["source"] = 123
+    else:
+        frame.loc[frame.index[-1], "source"] = {
+            "null": np.nan,
+            "empty": "",
+            "whitespace": "   ",
+        }[source_fault]
+    frame.to_csv(quotes, index=False)
+    with pytest.raises(PersonalPaperError, match="quote source|quotes require"):
+        engine.run(
+            *inputs,
+            mode="prospective",
+            calendar_path=calendar,
+            quotes_path=quotes,
+            now_utc=(nextdate + pd.Timedelta(hours=14, minutes=2)).isoformat(),
+        )
+    assert not event_values(inputs[3], "fill")
+    assert not event_values(inputs[3], "quote_observation")
+    after = engine.status(inputs[3])
+    assert after["books"] == before["books"]
+    assert after["manifest"] == before["manifest"]
+
+
+@pytest.mark.parametrize("raw_actions", [False, True])
+def test_quote_inputs_are_anchored_allowlisted_and_idempotent(inputs, raw_actions):
+    calendar, quotes, last, nextdate = prospective_fixture(inputs)
+    if raw_actions:
+        config = yaml.safe_load(inputs[0].read_text())
+        config["price_basis"] = "raw_with_actions"
+        inputs[0].write_text(yaml.safe_dump(config), encoding="utf-8")
+        for path in (inputs[1], quotes):
+            frame = pd.read_csv(path)
+            frame["dividend"], frame["split_ratio"] = 0.0, 1.0
+            frame.to_csv(path, index=False)
+    engine.run(
+        *inputs,
+        mode="prospective",
+        calendar_path=calendar,
+        now_utc=(last + pd.Timedelta(hours=10)).isoformat(),
+    )
+    engine.run(
+        *inputs,
+        mode="prospective",
+        calendar_path=calendar,
+        now_utc=(last + pd.Timedelta(hours=22)).isoformat(),
+    )
+    frame = pd.read_csv(quotes)
+    frame["irrelevant_note"] = "excluded from execution provenance"
+    frame.to_csv(quotes, index=False)
+    before = engine.run(
+        *inputs,
+        mode="prospective",
+        calendar_path=calendar,
+        quotes_path=quotes,
+        now_utc=(nextdate + pd.Timedelta(hours=14, minutes=2)).isoformat(),
+    )
+    observations = event_values(inputs[3], "quote_observation")
+    assert len(observations) == 1
+    evidence = observations[0]
+    assert evidence["quote_input_sha256"] == engine.digest(evidence["inputs"])
+    expected_fields = {
+        "symbol",
+        "price_usd",
+        "available_volume",
+        "source",
+        "observed_at_utc",
+        "received_at_utc",
+        "session_open_utc",
+        "session_close_utc",
+        "previous_session_date",
+    }
+    if raw_actions:
+        expected_fields |= {"dividend", "split_ratio"}
+    observed_quotes = evidence["inputs"]["quotes"]
+    assert [quote["symbol"] for quote in observed_quotes] == sorted(engine.UNIVERSE)
+    assert all(set(quote) == expected_fields for quote in observed_quotes)
+    assert all(
+        quote["price_usd"] > 0
+        and quote["available_volume"] == 1_000_000
+        and quote["source"] == "SYNTHETIC_FIXTURE"
+        and quote["observed_at_utc"] == quote["received_at_utc"]
+        for quote in observed_quotes
+    )
+    if raw_actions:
+        assert all(
+            quote["dividend"] == 0 and quote["split_ratio"] == 1 for quote in observed_quotes
+        )
+    assert evidence["inputs"]["fx"]["usd_mxn"] == 20
+    assert set(evidence["inputs"]["fx"]) == {"usd_mxn", "source", "timestamp"}
+    fills = event_values(inputs[3], "fill")
+    assert len(fills) == 45
+    assert all(fill["quote_input_sha256"] == evidence["quote_input_sha256"] for fill in fills)
+    frame.iloc[::-1].to_csv(quotes, index=False)
+    after = engine.run(
+        *inputs,
+        mode="prospective",
+        calendar_path=calendar,
+        quotes_path=quotes,
+        now_utc=(nextdate + pd.Timedelta(hours=14, minutes=3)).isoformat(),
+    )
+    assert event_values(inputs[3], "quote_observation") == observations
+    assert event_values(inputs[3], "fill") == fills
+    assert after["books"] == before["books"]
+
+
+def test_quote_observation_rolls_back_together_with_failed_execution(inputs, monkeypatch):
+    calendar, quotes, last, nextdate = prospective_fixture(inputs)
+    engine.run(
+        *inputs,
+        mode="prospective",
+        calendar_path=calendar,
+        now_utc=(last + pd.Timedelta(hours=10)).isoformat(),
+    )
+    before = engine.run(
+        *inputs,
+        mode="prospective",
+        calendar_path=calendar,
+        now_utc=(last + pd.Timedelta(hours=22)).isoformat(),
+    )
+    original = engine._fill_target
+
+    def crash(*args, **kwargs):
+        original(*args, **kwargs)
+        raise RuntimeError("simulated failure after quote and first fills")
+
+    monkeypatch.setattr(engine, "_fill_target", crash)
+    with pytest.raises(RuntimeError, match="simulated failure"):
+        engine.run(
+            *inputs,
+            mode="prospective",
+            calendar_path=calendar,
+            quotes_path=quotes,
+            now_utc=(nextdate + pd.Timedelta(hours=14, minutes=2)).isoformat(),
+        )
+    assert not event_values(inputs[3], "fill")
+    assert not event_values(inputs[3], "order")
+    assert not event_values(inputs[3], "quote_observation")
+    assert engine.status(inputs[3])["books"] == before["books"]
