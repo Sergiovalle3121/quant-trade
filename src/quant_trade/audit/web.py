@@ -57,6 +57,7 @@ from quant_trade.audit import (
 from quant_trade.audit import passkeys as pk
 from quant_trade.audit import pdf as pdf_lib
 from quant_trade.audit import strategies as strategies_lib
+from quant_trade.audit.articles import article_url, find_article
 from quant_trade.audit.audiences import AUDIENCES_BY_PATH, audience_url
 from quant_trade.audit.calculator import CALCULATOR_PATH
 from quant_trade.audit.compare import (
@@ -87,6 +88,8 @@ from quant_trade.audit.pages import (
     AUDIT_PATHS,
     LANDING_PATHS,
     SAMPLE_BANNER,
+    article_page,
+    articles_index_page,
     audience_page,
     badge_svg,
     calculator_page,
@@ -5573,6 +5576,41 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     @app.get("/guides/{slug}", response_class=HTMLResponse)
     def guide_en(request: Request, slug: str, lang: str | None = None) -> Response:
         return _guide(request, slug, "en", _locale(lang or "en"))
+
+    @app.get("/articulos", response_class=HTMLResponse)
+    def articles_es(request: Request, lang: str | None = None) -> str:
+        return articles_index_page(locale=_locale(lang or "es"), base_url=_site_url(request))
+
+    @app.get("/articles", response_class=HTMLResponse)
+    def articles_en(request: Request, lang: str | None = None) -> str:
+        return articles_index_page(locale=_locale(lang or "en"), base_url=_site_url(request))
+
+    @app.get("/pt/artigos", response_class=HTMLResponse)
+    def articles_pt(request: Request) -> str:
+        return articles_index_page(locale="pt", base_url=_site_url(request))
+
+    def _article(request: Request, slug: str, path_locale: str, locale: str) -> Response:
+        found = find_article(slug, path_locale)
+        if found is None:
+            # A missing page, not a missing audit: the ordinary 404 text.
+            raise HTTPException(status_code=404, detail="page_missing")
+        article, slug_locale = found
+        if slug_locale != path_locale:
+            # An article's slug in another language moves to this language's own.
+            return RedirectResponse(article_url(article.key, path_locale), status_code=301)
+        return HTMLResponse(article_page(article, locale=locale, base_url=_site_url(request)))
+
+    @app.get("/articulos/{slug}", response_class=HTMLResponse)
+    def article_es(request: Request, slug: str, lang: str | None = None) -> Response:
+        return _article(request, slug, "es", _locale(lang or "es"))
+
+    @app.get("/articles/{slug}", response_class=HTMLResponse)
+    def article_en(request: Request, slug: str, lang: str | None = None) -> Response:
+        return _article(request, slug, "en", _locale(lang or "en"))
+
+    @app.get("/pt/artigos/{slug}", response_class=HTMLResponse)
+    def article_pt(request: Request, slug: str) -> Response:
+        return _article(request, slug, "pt", "pt")
 
     def _legal_context(locale: str = "es") -> LegalContext:
         return LegalContext(

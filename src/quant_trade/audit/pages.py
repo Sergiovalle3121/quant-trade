@@ -17,6 +17,14 @@ from datetime import datetime
 from typing import Any
 
 from quant_trade.audit.accounts import FREE_PREVIEWS_PER_MONTH as _FREE
+from quant_trade.audit.articles import (
+    ARTICLES,
+    ARTICLES_COPY,
+    Article,
+    article_url,
+    articles_index_url,
+    related_links,
+)
 from quant_trade.audit.audiences import (
     AUDIENCE_COPY,
     AUDIENCE_PAGES,
@@ -3525,7 +3533,9 @@ def guides_index_page(*, locale: str = "es", base_url: str = "") -> str:
         + "<div class='paper page-main'><div class='wrap'>"
         f"{groups}<div class='back-row'>"
         f"<a class='btn btn-dark' href='{_e(_form_url(locale))}'>{_e(words['form'])}"
-        f"<span class='go'>{icon('arrow')}</span></a></div></div></div>"
+        f"<span class='go'>{icon('arrow')}</span></a>"
+        f"<a class='link-more' href='{_e(articles_index_url(locale))}'>"
+        f"{_e(words['articles'])}{icon('arrow')}</a></div></div></div>"
     )
     return _page(
         f"{words['title']} · {copy['title']}",
@@ -3577,6 +3587,85 @@ def guide_page(guide: Guide, *, locale: str = "es", base_url: str = "") -> str:
         alternates=alternates,
         solid_nav=True,
     )
+
+
+def _articles_cta(locale: str) -> str:
+    """The closing buttons of the article pages: the free calculator and the form."""
+    words = ARTICLES_COPY[locale]
+    return (
+        "<div class='back-row'>"
+        f"<a class='btn btn-dark' href='{_e(calculator_url(locale))}'>{_e(words['calculator'])}"
+        f"<span class='go'>{icon('arrow')}</span></a>"
+        f"<a class='link-more' href='{_e(_form_url(locale))}'>{_e(words['report'])}"
+        f"{icon('arrow')}</a></div>"
+    )
+
+
+def articles_index_page(*, locale: str = "es", base_url: str = "") -> str:
+    """The list of articles about backtests."""
+    locale = _locale(locale)
+    copy = _COPY[locale]
+    words = ARTICLES_COPY[locale]
+    alternates = {lang: articles_index_url(lang) for lang in ("es", "en", "pt")}
+    title = f"{words['title']} · {copy['title']}"
+    meta = _public_meta(title, words["summary"], locale, articles_index_url(locale), base_url)
+    items = "".join(
+        f"<li data-reveal style='--i:{i % 2}'><a href='{_e(article_url(a.key, locale))}'>"
+        f"<b>{_e(a.text[locale].title)}{icon('arrow')}</b>"
+        f"<span>{_e(a.text[locale].summary)}</span></a></li>"
+        for i, a in enumerate(ARTICLES)
+    )
+    crumbs = f"<a href='{_e(_home(locale))}'>{_e(words['back'])}</a>" + _language_crumbs(
+        alternates, locale
+    )
+    body = (
+        _page_hero(words["eyebrow"], words["title"], words["intro"], crumbs)
+        + "<div class='paper page-main'><div class='wrap'>"
+        f"<ul class='guide-list guides'>{items}</ul>" + _articles_cta(locale) + "</div></div>"
+    )
+    return _page(title, locale, body, meta_html=meta, alternates=alternates, solid_nav=True)
+
+
+def article_page(article: Article, *, locale: str = "es", base_url: str = "") -> str:
+    """One article: its sections, questions, related pages and a closing call."""
+    locale = _locale(locale)
+    copy = _COPY[locale]
+    words = ARTICLES_COPY[locale]
+    text = article.text[locale]
+    alternates = {lang: article_url(article.key, lang) for lang in ("es", "en", "pt")}
+    title = f"{text.title} · {copy['title']}"
+    meta = _public_meta(title, text.summary, locale, article_url(article.key, locale), base_url)
+    sections = [
+        (section.heading, "".join(f"<p>{_e(paragraph)}</p>" for paragraph in section.paragraphs))
+        for section in text.sections
+    ]
+    if text.faq:
+        faq = "".join(f"<h3>{_e(q)}</h3><p>{_e(a)}</p>" for q, a in text.faq)
+        sections.append((words["faq"], faq))
+    links = related_links(article, locale)
+    if links:
+        related = "".join(
+            f"<li><a href='{_e(href)}'><span>{_e(label)}</span>{icon('arrow')}</a></li>"
+            for label, href in links
+        )
+        sections.append((words["related"], f"<ul class='aud-others'>{related}</ul>"))
+    crumbs = f"<a href='{_e(articles_index_url(locale))}'>{_e(words['all'])}</a>" + (
+        _language_crumbs(alternates, locale)
+    )
+    body = (
+        _page_hero(words["eyebrow"], text.title, text.summary, crumbs)
+        + "<div class='paper page-main'><div class='wrap'>"
+        + _doc(
+            sections,
+            locale,
+            lead=f"<p>{_e(text.intro)}</p>",
+            aside=f"<a class='btn btn-dark btn-sm toc-cta' href='{_e(calculator_url(locale))}'>"
+            f"{_e(words['calculator'])}<span class='go'>{icon('arrow')}</span></a>",
+        )
+        + f"<section class='article-cta'><h2>{_e(words['cta_title'])}</h2>"
+        f"<p>{_e(words['cta_text'])}</p>{_articles_cta(locale)}</section></div></div>"
+    )
+    return _page(title, locale, body, meta_html=meta, alternates=alternates, solid_nav=True)
 
 
 def audience_page(
