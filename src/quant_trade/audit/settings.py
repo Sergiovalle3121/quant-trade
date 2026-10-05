@@ -135,6 +135,22 @@ def _text(value: str) -> str:
     return " ".join(value.split())[:300]
 
 
+_GOOGLE_FILE = re.compile(r"google[0-9a-f]{8,32}\.html")
+_BING_CODE = re.compile(r"[0-9A-F]{32}")
+
+
+def _google_file(value: str) -> str:
+    """The Search Console file name, or "" when it is not one."""
+    name = value.strip().lstrip("/")
+    return name if _GOOGLE_FILE.fullmatch(name) else ""
+
+
+def _bing_code(value: str) -> str:
+    """The Bing Webmaster code, or "" when it is not one."""
+    code = value.strip().upper()
+    return code if _BING_CODE.fullmatch(code) else ""
+
+
 @dataclass(frozen=True)
 class AuditSettings:
     database_url: str = DEFAULT_DATABASE_URL
@@ -198,6 +214,11 @@ class AuditSettings:
     operator_contact: str = ""
     operator_address: str = ""
     jurisdiction: str = ""
+    #: Search-engine ownership checks the owner copies from Google Search
+    #: Console (the HTML-file method, e.g. ``google1a2b3c4d5e6f7a8b.html``) and
+    #: Bing Webmaster Tools (the ``BingSiteAuth.xml`` code). Empty serves nothing.
+    google_verification_file: str = ""
+    bing_site_auth: str = ""
     #: Optional wording of the address and the jurisdiction for the English and
     #: Portuguese pages. Empty means the base value above is shown as written.
     operator_address_en: str = ""
@@ -452,6 +473,8 @@ class AuditSettings:
             operator_contact=_text(env.get("AUDIT_OPERATOR_CONTACT", "")),
             operator_address=_text(env.get("AUDIT_OPERATOR_ADDRESS", "")),
             jurisdiction=_text(env.get("AUDIT_JURISDICTION", "")),
+            google_verification_file=_google_file(env.get("AUDIT_GOOGLE_VERIFICATION_FILE", "")),
+            bing_site_auth=_bing_code(env.get("AUDIT_BING_SITE_AUTH", "")),
             operator_address_en=_text(env.get("AUDIT_OPERATOR_ADDRESS_EN", "")),
             operator_address_pt=_text(env.get("AUDIT_OPERATOR_ADDRESS_PT", "")),
             jurisdiction_en=_text(env.get("AUDIT_JURISDICTION_EN", "")),

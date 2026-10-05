@@ -2203,6 +2203,8 @@ with an empty value):
 | `AUDIT_ADMIN_KEY` | empty | Secret for the owner panel at `/panel` (create, list and disable codes from a phone). Shorter than 32 characters or empty turns the panel off (404). |
 | `AUDIT_PANEL_PATH` | `/panel` | Path of the owner panel. Must start with `/`, have 2 to 64 characters from `A-Z a-z 0-9 / _ -`, no `//`, no trailing slash, and a first segment that no public route uses (`/cuenta`, `/pt`, `/audits`, `/static`...). An invalid value falls back to `/panel` and the start-up log says so without printing the value. Never listed in `robots.txt` or the sitemap. |
 | `AUDIT_TRUSTED_PROXY_HOPS` | `0` | Reverse proxies in front of the service. `0` ignores `X-Forwarded-For` (it is client-controlled) and rate-limits the socket address; `N` takes the N-th entry from the right. Railway needs `1`. |
+| `AUDIT_GOOGLE_VERIFICATION_FILE` | empty | Google Search Console's HTML-file check, e.g. `google1a2b3c4d5e6f7a8b.html`. When set, that path answers with the line Google expects. Anything else is ignored. |
+| `AUDIT_BING_SITE_AUTH` | empty | Bing Webmaster Tools' 32-character code, served as `/BingSiteAuth.xml`. Anything else is ignored. |
 
 Checkout creates a database order before calling Stripe. The order freezes the
 plan, USD amount and report id, and its id is the Stripe idempotency key. A

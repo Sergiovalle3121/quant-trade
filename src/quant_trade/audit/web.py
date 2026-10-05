@@ -1633,6 +1633,28 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     def robots(request: Request) -> str:
         return robots_txt(_site_url(request))
 
+    # Search-engine ownership checks: each exists only while its variable is set.
+    if cfg.google_verification_file:
+        google_body = f"google-site-verification: {cfg.google_verification_file}"
+
+        def google_verification() -> Response:
+            return PlainTextResponse(google_body)
+
+        app.add_api_route(
+            f"/{cfg.google_verification_file}",
+            google_verification,
+            methods=["GET"],
+            include_in_schema=False,
+        )
+    if cfg.bing_site_auth:
+        bing_body = (
+            f'<?xml version="1.0"?>\n<users>\n\t<user>{cfg.bing_site_auth}</user>\n</users>\n'
+        )
+
+        @app.get("/BingSiteAuth.xml", include_in_schema=False)
+        def bing_verification() -> Response:
+            return Response(content=bing_body, media_type="application/xml")
+
     @app.get("/sitemap.xml")
     def sitemap(request: Request) -> Response:
         return Response(content=sitemap_xml(_site_url(request)), media_type="application/xml")
