@@ -217,13 +217,18 @@ def _validated_weights(signals: pd.DataFrame, strategy: str) -> dict[str, float]
         raise PersonalPaperError("a signal generated non-finite weights")
     cap = float(PORTFOLIOS[strategy]["max_weight_per_asset"])
     values = {s: min(cap, max(0.0, v)) for s, v in originals.items()}
-    gross = sum(values.values())
+    gross = math.fsum(values[symbol] for symbol in sorted(values))
     scale = min(1.0, 0.95 / gross) if gross else 1.0
     return {s: w * scale for s, w in values.items()}
 
 
 def _equity(book: dict[str, Any], prices: dict[str, float]) -> float:
-    return float(book["cash_usd"] + sum(q * prices[s] for s, q in book["positions"].items()))
+    return math.fsum(
+        [
+            book["cash_usd"],
+            *(book["positions"][symbol] * prices[symbol] for symbol in sorted(book["positions"])),
+        ]
+    )
 
 
 def _risk(
@@ -269,7 +274,9 @@ def _fill_target(
     # against this lower bound so costs cannot push new holdings over their cap.
     equity_floor = equity * (1 - 2 * fee_fraction)
     cap = float(PORTFOLIOS[book["portfolio"]]["max_weight_per_asset"])
-    current_gross = sum(q * prices[s] for s, q in book["positions"].items())
+    current_gross = math.fsum(
+        book["positions"][symbol] * prices[symbol] for symbol in sorted(book["positions"])
+    )
     minimum = book["initial_cash_usd"] * 0.005
     weights = {
         s: min(
@@ -278,7 +285,7 @@ def _fill_target(
         )
         for s in UNIVERSE
     }
-    gross = sum(weights.values())
+    gross = math.fsum(weights[symbol] for symbol in sorted(weights))
     if gross > 0.95:
         weights = {s: w * 0.95 / gross for s, w in weights.items()}
     orders = []
@@ -300,8 +307,11 @@ def _fill_target(
     for delta, sym, risk_reduction in sorted(orders):
         if delta > 0:
             current_equity = _equity(book, prices)
-            held_values = {s: q * prices[s] for s, q in book["positions"].items()}
-            gross_value = sum(held_values.values())
+            held_values = {
+                symbol: book["positions"][symbol] * prices[symbol]
+                for symbol in sorted(book["positions"])
+            }
+            gross_value = math.fsum(held_values.values())
             if (
                 any(v > cap * current_equity + 1e-8 for v in held_values.values())
                 or gross_value > 0.95 * current_equity + 1e-8
@@ -447,6 +457,7 @@ def _register(
         return manifest
     ledger = Path(__file__).resolve().parents[3] / "docs/real_data_evidence/trial_ledger.jsonl"
     trials = [json.loads(line) for line in ledger.read_text(encoding="utf-8").splitlines() if line]
+    git_worktree_dirty: bool | None = None
     try:
         git_commit = subprocess.run(
             ["git", "rev-parse", "HEAD"],
@@ -455,6 +466,15 @@ def _register(
             text=True,
             check=True,
         ).stdout.strip()
+        git_worktree_dirty = bool(
+            subprocess.run(
+                ["git", "status", "--porcelain", "--untracked-files=normal"],
+                cwd=ledger.parents[2],
+                capture_output=True,
+                text=True,
+                check=True,
+            ).stdout.strip()
+        )
     except (OSError, subprocess.CalledProcessError):
         git_commit = "UNAVAILABLE"
     manifest = {
@@ -471,6 +491,7 @@ def _register(
         "economic_protocol": protocol,
         "economic_protocol_sha256": protocol_sha,
         "git_commit": git_commit,
+        "git_worktree_dirty": git_worktree_dirty,
         "dataset_sha256": file_hash(data_path),
         "fx_sha256": file_hash(fx_path),
         "dataset_versions": [file_hash(data_path)],

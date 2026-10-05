@@ -132,6 +132,8 @@ versión si se cambia la metodología; no borrar evidencia desfavorable.
 Una ejecución de mercado prospectiva requiere calendario validado en todas sus iteraciones.
 El registro conserva las versiones exactas del runtime, dependencias y criterios económicos;
 actualizarlas exige preservar el experimento original y registrar uno nuevo.
+El manifest distingue el commit observado de `git_worktree_dirty`; el hash sellado identifica
+los bytes ejecutados. Publicar un commit después del registro no reescribe esos metadatos.
 
 ```powershell
 python -m quant_trade.personal_paper pause --database state/personal/prospective.sqlite --reason "Revisar calidad de datos"

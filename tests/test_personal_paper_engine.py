@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import json
+import math
 import sqlite3
+from itertools import permutations
 from pathlib import Path
+from types import SimpleNamespace
 
 import numpy as np
 import pandas as pd
@@ -49,6 +52,44 @@ def event_values(database, kind):
                 "SELECT value FROM events WHERE kind=? ORDER BY sequence", (kind,)
             )
         ]
+
+
+def test_equity_is_exactly_independent_of_position_insertion_and_json_order():
+    prices = dict.fromkeys(engine.UNIVERSE, 1.0)
+    quantities = dict(zip(engine.UNIVERSE, [0.1, 0.2, 0.3, 0.4, 0.5], strict=True))
+    for symbols in permutations(engine.UNIVERSE):
+        book = {"cash_usd": 0.0, "positions": {symbol: quantities[symbol] for symbol in symbols}}
+        assert engine._equity(book, prices) == 1.5
+        restarted = json.loads(json.dumps(book, sort_keys=True))
+        assert engine._equity(restarted, prices) == engine._equity(book, prices)
+
+
+def test_equity_preserves_cash_and_position_fractions_in_one_sum():
+    half_ulp = math.ulp(1000.0) / 2
+    book = {"cash_usd": half_ulp, "positions": {"GLD": 1000.0, "IWM": half_ulp}}
+    assert engine._equity(book, {"GLD": 1.0, "IWM": 1.0}) == math.nextafter(1000.0, math.inf)
+
+
+@pytest.mark.parametrize("dirty", [False, True])
+def test_registration_records_git_worktree_dirty_without_rewriting_metadata(
+    inputs, monkeypatch, dirty
+):
+    def git_result(command, **kwargs):
+        if command == ["git", "rev-parse", "HEAD"]:
+            return SimpleNamespace(stdout="observed-commit\n")
+        assert command == ["git", "status", "--porcelain", "--untracked-files=normal"]
+        return SimpleNamespace(stdout=" M source.py\n" if dirty else "")
+
+    monkeypatch.setattr(engine.subprocess, "run", git_result)
+    result = engine.run(*inputs)
+    assert result["manifest"]["git_commit"] == "observed-commit"
+    assert result["manifest"]["git_worktree_dirty"] is dirty
+
+    def unavailable(*args, **kwargs):
+        raise OSError("Git became unavailable after registration")
+
+    monkeypatch.setattr(engine.subprocess, "run", unavailable)
+    assert engine.run(*inputs)["manifest"]["git_worktree_dirty"] is dirty
 
 
 def test_replay_fractional_causal_fills_reconciles_and_is_idempotent(inputs, tmp_path):
