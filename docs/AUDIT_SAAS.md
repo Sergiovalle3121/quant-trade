@@ -3242,7 +3242,14 @@ the intro, the sections as `h2` and paragraphs, the questions as `h3`, the
 related pages (the free calculator, an export guide, an audience page or
 the method, each in the page's language) and a closing call to the free
 calculator and the free first report, worded without a promise. The guides
-index links the articles index in each language so crawlers reach it.
+index links the articles index in each language so crawlers reach it. The
+three articles are `ea-sobreoptimizado` (how to tell whether an expert
+advisor is overfitted before buying it), `backtest-costos-reales` (spread,
+commission, slippage and swap, and the break-even cost) and
+`leer-informe-probador-mt5` (reading the MT5 strategy tester report and
+what it leaves out); every figure in them comes from the calculator's own
+table (the best of N configurations with no edge), never from an outside
+study.
 
 To add an article: append one dictionary to `ARTICLES_DATA` with every text
 in Spanish, English and Portuguese (no Spanish words on the Portuguese
