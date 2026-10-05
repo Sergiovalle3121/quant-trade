@@ -1655,8 +1655,27 @@ def _status_chip(status: str, locale: str) -> str:
     return f"<span class='badge {_e(status)}'>{_e(text)}</span>"
 
 
-def _hero(locale: str, sample: str) -> str:
+def _hero(locale: str, sample: str, *, email_confirmation: bool = False) -> str:
     ui = _UI[locale]
+    confirmation = {
+        "es": (
+            "Confirma tu correo para recibir el primer informe completo gratis. "
+            "Si se requiere, validas una tarjeta sin cargo."
+        ),
+        "en": (
+            "Confirm your email to receive the first full report free. "
+            "If required, you verify a card without a charge."
+        ),
+        "pt": (
+            "Confirme seu e-mail para receber o primeiro relatório completo grátis. "
+            "Se necessário, valide um cartão sem cobrança."
+        ),
+    }
+    confirmation_html = (
+        f"<p class='muted welcome-confirmation'>{_e(confirmation[locale])}</p>"
+        if email_confirmation
+        else ""
+    )
     trust = "".join(f"<li>{icon(name)}{_e(text)}</li>" for name, text in ui["trust"])
     # Text on the left, the report on the right: the first screen shows the product.
     return (
@@ -1671,6 +1690,7 @@ def _hero(locale: str, sample: str) -> str:
         f"<a class='btn btn-primary btn-lg' href='{audit_path(locale)}'>{_e(ui['cta'])}"
         f"<span class='go'>{icon('arrow')}</span></a>"
         f"<a class='link-more' href='{_e(sample)}'>{_e(ui['cta_sample'])}{icon('arrow')}</a></div>"
+        f"{confirmation_html}"
         f"<ul class='trust rise' style='--i:5'>{trust}</ul></div>"
         + _mock(locale)
         + "</div></div></section>"
@@ -2519,6 +2539,7 @@ def landing(
     signed_in: bool | None = None,
     operator: tuple[str, str] = ("", ""),
     card_markets: Sequence[str] = (),
+    email_confirmation: bool = False,
 ) -> str:
     """The public landing; the upload form lives on its own page (``upload_page``).
 
@@ -2530,7 +2551,7 @@ def landing(
     sample = _sample_url(locale)
     err = f"<div class='error' role='alert'>{_e(error)}</div>" if error else ""
     body = (
-        _hero(locale, sample)
+        _hero(locale, sample, email_confirmation=email_confirmation)
         + _specs(locale)
         + _audiences(locale)
         + _problems(locale)

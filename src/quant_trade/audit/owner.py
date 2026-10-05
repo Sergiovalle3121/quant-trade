@@ -536,6 +536,7 @@ def panel_page(
     accounts: int = 0,
     funnel: str = "",
     panel_path: str = PANEL_PATH,
+    observability: str = "",
 ) -> str:
     """The panel after a correct key: the create form, a new code once, the list."""
     shown = ""
@@ -596,6 +597,7 @@ def panel_page(
             key, mail_issues, mail_warning_counts or {"dead": 0, "overdue": 0}, panel_path
         )
         + funnel
+        + observability
         + create
         + listing
         + reset

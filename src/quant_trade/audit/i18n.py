@@ -75,6 +75,12 @@ _TRIAL_SOURCES: dict[str, str] = {
 }
 
 _RULES_SOURCE: tuple[tuple[str, str], ...] = (
+    (
+        "Confirm your email to receive the first full report free. "
+        "If required, you verify a card without a charge.",
+        "Confirma tu correo para recibir el primer informe completo gratis. "
+        "Si se requiere, validas una tarjeta sin cargo.",
+    ),
     # --- Parse warnings: equity, trades and benchmark CSV (schema.py) ---
     ("both {a} and {b} present; using {c}", "hay columnas {a} y {b}; se usa {c}"),
     (

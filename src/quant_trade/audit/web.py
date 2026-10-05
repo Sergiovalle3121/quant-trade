@@ -73,6 +73,8 @@ from quant_trade.audit.guides import GUIDES_BY_PATH, guide_url
 from quant_trade.audit.importers import detect_format
 from quant_trade.audit.legal import LEGAL_UPDATED, LegalContext, privacy_text, terms_text
 from quant_trade.audit.market import MarketData
+from quant_trade.audit.ops import OpsCounter, OpsMiddleware
+from quant_trade.audit.ops_panel import amount_cents, commercial_section, operations_section
 from quant_trade.audit.owner import (
     MAX_CREDITS,
     MAX_EXPIRES_DAYS,
@@ -1097,6 +1099,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     db = store or make_store(cfg.database_url)
     retention = RetentionWorker(db, retention_days=cfg.retention_days)
     visits = funnel.VisitCounter(db)
+    operations = OpsCounter(db)
     mail_worker = mail_lib.MailWorker(db, cfg)
 
     @contextlib.asynccontextmanager
@@ -1104,12 +1107,14 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         if cfg.auto_purge:
             retention.start()
         visits.start()
+        operations.start()
         mail_worker.start()
         try:
             yield
         finally:
             retention.stop()
             visits.stop()
+            operations.stop()
             mail_worker.stop()
 
     app = FastAPI(
@@ -1123,6 +1128,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     app.state.store = db
     app.state.retention = retention
     app.state.visits = visits
+    app.state.operations = operations
     app.state.mail_worker = mail_worker
     app.state.checkout_factory = payments.stripe_checkout
     app.state.account_checkout_factory = payments.stripe_account_checkout
@@ -1235,6 +1241,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         paused=pause_new_audits,
         reject=_admission_response,
     )
+    app.add_middleware(OpsMiddleware, counter=operations)
 
     #: Where a visit counts for the owner's funnel, and in which language.
     visit_paths: dict[str, str] = {path: loc for loc, path in LANDING_PATHS.items()}
@@ -1515,6 +1522,12 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         code_id: Annotated[str, Form()] = "",
         email: Annotated[str, Form(max_length=320)] = "",
         mail_id: Annotated[str, Form(max_length=64)] = "",
+        cost_start: Annotated[str, Form(max_length=10)] = "",
+        cost_end: Annotated[str, Form(max_length=10)] = "",
+        cost_scope: Annotated[str, Form(max_length=8)] = "all",
+        cost_category: Annotated[str, Form(max_length=32)] = "",
+        cost_amount: Annotated[str, Form(max_length=20)] = "",
+        cost_reference: Annotated[str, Form(max_length=80)] = "",
     ) -> Response:
         """The owner panel. The key comes in the body on every request, is
         compared in constant time, and wrong keys are limited per address."""
@@ -1532,6 +1545,22 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 login_page(error="wrong_key", panel_path=app.state.panel_path), status_code=403
             )
         new_code = flash = error = ""
+        cost_error = ""
+        cost_saved = False
+        if action == "cost_record":
+            try:
+                db.record_commercial_cost(
+                    period_start=cost_start,
+                    period_end=cost_end,
+                    scope=cost_scope,
+                    category=cost_category,
+                    amount_usd_cents=amount_cents(cost_amount),
+                    source_reference=cost_reference.strip(),
+                    at=now,
+                )
+                cost_saved = True
+            except Exception:
+                cost_error = "invalid"
         if action == "create":
             try:
                 total = int(credits)
@@ -1573,6 +1602,38 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 reset_path = account_pages.path("reset", account.locale)
                 reset_link = f"{_site_url(request)}{reset_path}?token={secret}"
         visits.flush()
+        private_ops = ""
+        try:
+            operations.flush()
+            start_day = funnel.since_day(now)
+            end_day = funnel.day_of(now)
+            x_start = funnel.since_day(now, days=14)
+            totals = funnel.build(db.funnel_events(start_day)).total.counts
+            private_ops = operations_section(
+                db.ops_rows(start_day),
+                db.ops_job(),
+                enabled=cfg.auto_purge,
+                at=now,
+                dropped=operations.dropped,
+                flush_failed=operations.flush_failed,
+            ) + commercial_section(
+                key=key,
+                panel_path=app.state.panel_path,
+                start=start_day,
+                end=end_day,
+                counts=dict(totals),
+                costs=db.commercial_cost_rows(start_day, end_day),
+                x_start=x_start,
+                x_counts=db.x_cohort_counts(x_start, end_day),
+                x_costs=db.commercial_cost_rows(x_start, end_day, "x"),
+                error=cost_error,
+                saved=cost_saved,
+            )
+        except Exception:
+            logger.warning("private operations view unavailable")
+            private_ops = (
+                "<p>Operación y costos: NOT_MEASURED; consulta de telemetría no disponible.</p>"
+            )
         return HTMLResponse(
             panel_page(
                 key=key,
@@ -1594,6 +1655,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                     country_rows=db.funnel_country_events(funnel.since_day(now)),
                 ),
                 panel_path=app.state.panel_path,
+                observability=private_ops,
             )
         )
 
@@ -1693,6 +1755,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             signed_in=_session(request) is not None,
             operator=(cfg.operator_name, cfg.operator_address_for(locale)),
             card_markets=tuple(cfg.approved_markets),
+            email_confirmation=cfg.email_verification_required,
         )
         return HTMLResponse(page)
 
@@ -4183,6 +4246,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     ) -> Response:
         # The report's language, which the refusals below also speak.
         report_loc = _report_locale(locale)
+        request.state.ops_locale = report_loc
         if _cross_site(request):
             return _html_error(request, 403, message("cross_site", report_loc), report_loc)
         if consent.lower() not in ("on", "yes", "true", "1"):
@@ -4596,12 +4660,35 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
 
         # The slot bounds CPU and memory: a burst of uploads waits here and,
         # past the queue time, is told the service is busy instead of piling up.
+        queued_at = time.monotonic()
         if not await _take_slot(audit_slots, cfg.audit_queue_seconds):
+            operations.observe("queue", "busy", time.monotonic() - queued_at, locale=report_loc)
             return _html_error(request, 503, message("busy", report_loc), report_loc)
+        operations.observe("queue", "success", time.monotonic() - queued_at, locale=report_loc)
+        audit_started = time.monotonic()
         try:
             outcome = await run_in_threadpool(parse_and_audit)
+        except Exception:
+            operations.observe(
+                "audit", "error", time.monotonic() - audit_started, locale=report_loc
+            )
+            raise
         finally:
             audit_slots.release()
+        audit_outcome = (
+            "success"
+            if isinstance(outcome, tuple)
+            else (
+                "error"
+                if outcome.status_code >= 500
+                else "invalid"
+                if outcome.status_code == 400
+                else "denied"
+            )
+        )
+        operations.observe(
+            "audit", audit_outcome, time.monotonic() - audit_started, locale=report_loc
+        )
         if not isinstance(outcome, tuple):
             if gate_account is not None:
                 db.release_free(reservation)
@@ -4821,6 +4908,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     ) -> Response:
         record = _load(audit_id, token, request)
         locale = _view_locale(record, lang)
+        request.state.ops_locale = locale
         if not record.paid and not cfg.free_mode:
             raise HTTPException(status_code=402, detail="payment_required")
         key = (record.id, locale, bool(record.paid))

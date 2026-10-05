@@ -4197,3 +4197,18 @@ class, evidence tag or reader changed. Tests: `tests/test_audit_report_polish.py
   report's digest in `audit_files` when the upload has no curve of its
   own). Nothing changes in what is spent: the upload is a preview as
   before. The note appears only to the signed-in owner of both reports.
+
+### Private operations and observed commercial costs (2026-10-05)
+
+The owner panel adds 30-day upload/audit/queue/PDF counters and approximate
+latency histograms, persistent retention attempt/success health (overdue after
+36 hours), observed USD cost totals and a first-touch X acquisition cohort over
+14 days. These are additive tables; public health and payment/rights contracts
+remain unchanged. Customer requests buffer aggregate telemetry without SQL
+writes, and failed telemetry cannot block delivery. Costs and contribution are
+`DECLARED`; absent categories/windows remain `NOT_MEASURED`. See
+[RIGOR_COMMERCIAL_OBSERVABILITY.md](RIGOR_COMMERCIAL_OBSERVABILITY.md) for exact
+measurement definitions, privacy, staged rollout and additive rollback, and
+[LOCAL_POSTGRES_QA.md](LOCAL_POSTGRES_QA.md) for isolated PostgreSQL evidence.
+The public CTA now explains email confirmation in ES/EN/PT when that gate is
+enabled. No audit dimension, red flag, threshold or verdict changes.

@@ -25,9 +25,22 @@ DAY_SECONDS = 24 * 60 * 60
 def run_retention(store: Any, *, retention_days: int, now: datetime | None = None) -> int:
     """One purge run; returns how many unpaid audits were purged."""
     at = now or datetime.now(UTC)
-    count = int(store.purge_expired(at, retention_days=retention_days))
+    try:
+        count = int(store.purge_expired(at, retention_days=retention_days))
+    except Exception:
+        _record_health(store, at, success=False)
+        raise
+    _record_health(store, at, success=True, count=count)
     logger.info("retention purge: %d audit(s) older than %d day(s)", count, retention_days)
     return count
+
+
+def _record_health(store: Any, at: datetime, *, success: bool, count: int = 0) -> None:
+    try:
+        store.record_ops_job(at=at, success=success, deleted_count=count)
+    except Exception:
+        # A monitoring outage never rolls back a purge or changes readiness.
+        logger.warning("could not persist retention health")
 
 
 class RetentionWorker:
