@@ -3237,8 +3237,10 @@ plain dictionaries with the shape `{"key", "slug": {es, en, pt}, "title":
 "paragraphs": [..]}], ..}, "faq": {es: [{"q", "a"}], ..}, "related":
 [{"kind": "calculator"} | {"kind": "guide", "slug": ..} | {"kind":
 "audience", "slug": ..} | {"kind": "method"}]}`; `Article.from_dict` builds
-the dataclasses from it and refuses an unknown related kind. A page shows
-the intro, the sections as `h2` and paragraphs, the questions as `h3`, the
+the dataclasses from it and refuses an unknown related kind or a guide or
+audience slug that does not exist, so a typo fails at import, not on a
+page. A page shows the intro, the sections as `h2` and paragraphs, the
+questions as `h3`, the
 related pages (the free calculator, an export guide, an audience page or
 the method, each in the page's language) and a closing call to the free
 calculator and the free first report, worded without a promise. The guides

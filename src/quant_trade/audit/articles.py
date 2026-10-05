@@ -81,9 +81,14 @@ class Article:
         related = tuple(
             {str(k): str(v) for k, v in link.items()} for link in data.get("related", ())
         )
+        audience_slugs = {page.slug for page in AUDIENCE_PAGES}
         for link in related:
             if link.get("kind") not in RELATED_KINDS:
                 raise ValueError(f"article {data['key']}: unknown related kind {link!r}")
+            if link["kind"] == "guide" and link.get("slug") not in GUIDES_BY_SLUG:
+                raise ValueError(f"article {data['key']}: unknown guide {link!r}")
+            if link["kind"] == "audience" and link.get("slug") not in audience_slugs:
+                raise ValueError(f"article {data['key']}: unknown audience page {link!r}")
         return cls(
             key=str(data["key"]),
             slug={locale: str(data["slug"][locale]) for locale in LOCALES},
@@ -104,7 +109,7 @@ ARTICLES_COPY: dict[str, dict[str, str]] = {
             "Artículos cortos sobre backtests: sobreoptimización, costos reales y cómo leer "
             "el informe del probador de estrategias. Sin registro."
         ),
-        "intro": "Lecturas cortas sobre qué mirar en un backtest antes de fiarte de él.",
+        "intro": "Lecturas cortas sobre qué mirar en un backtest antes de confiar en él.",
         "related": "Relacionado",
         "faq": "Preguntas frecuentes",
         "calculator": "Probar la calculadora gratis",
@@ -121,8 +126,8 @@ ARTICLES_COPY: dict[str, dict[str, str]] = {
         "eyebrow": "Articles",
         "title": "Articles about backtests",
         "summary": (
-            "Short articles about backtests: overfitting, real costs and how to read the "
-            "strategy tester report. No sign-up needed."
+            "Short articles about backtests: overfitting, real costs and how to read the strategy "
+            "tester report. No sign-up needed to read them."
         ),
         "intro": "Short reads on what to look at in a backtest before you trust it.",
         "related": "Related",
@@ -182,7 +187,7 @@ ARTICLES_DATA: tuple[dict[str, Any], ...] = (
             ),
             "en": (
                 "What the MT5 optimiser does, why the best of many configurations looks good by "
-                "luck, and how to measure it on the XML before paying for a robot."
+                "luck, and how to measure it in the XML before paying for a robot."
             ),
             "pt": (
                 "O que o otimizador do MT5 faz, por que a melhor de muitas configurações parece "
@@ -223,7 +228,7 @@ ARTICLES_DATA: tuple[dict[str, Any], ...] = (
                         (
                             "El optimizador de MT4 y MT5 recorre miles de combinaciones de "
                             "parámetros y guarda el resultado de cada una. Un rango de 1 a 50 en "
-                            "el periodo de una media móvil y otro de 10 a 100 en el stop ya da "
+                            "el periodo de una media móvil y otro de 1 a 100 en el stop ya da "
                             "cinco mil combinaciones. El optimizador no entiende el mercado: solo "
                             "mide qué combinación habría dado el mejor resultado en ese historial "
                             "exacto."
@@ -350,7 +355,7 @@ ARTICLES_DATA: tuple[dict[str, Any], ...] = (
                         (
                             "The MT4 and MT5 optimiser walks through thousands of parameter "
                             "combinations and stores the result of each one. A range of 1 to 50 on "
-                            "a moving-average period and 10 to 100 on the stop already gives five "
+                            "a moving-average period and 1 to 100 on the stop already gives five "
                             "thousand combinations. The optimiser knows nothing about the market: "
                             "it only measures which combination would have done best on that exact "
                             "history."
@@ -479,7 +484,7 @@ ARTICLES_DATA: tuple[dict[str, Any], ...] = (
                         (
                             "O otimizador do MT4 e do MT5 percorre milhares de combinações de "
                             "parâmetros e guarda o resultado de cada uma. Um intervalo de 1 a 50 "
-                            "no período de uma média móvel e outro de 10 a 100 no stop já dá cinco "
+                            "no período de uma média móvel e outro de 1 a 100 no stop já dá cinco "
                             "mil combinações. O otimizador não entende o mercado: ele só mede qual "
                             "combinação teria dado o melhor resultado naquele histórico exato."
                         ),
@@ -591,7 +596,7 @@ ARTICLES_DATA: tuple[dict[str, Any], ...] = (
                             "Se você envia o relatório e o XML para uma auditoria, o Rigor conta "
                             "as configurações testadas, calcula o Sharpe deflacionado, roda de "
                             "novo os custos a 1x, 2x e 3x com o custo de equilíbrio e revisa o "
-                            "trecho fora da amostra que você declarar. Cada número sai etiquetado "
+                            "trecho fora da amostra que você declarar. Cada número sai marcado "
                             "como Medido, Declarado ou Não medido, para você saber o que vem do "
                             "arquivo e o que vem do vendedor."
                         ),
@@ -713,15 +718,15 @@ ARTICLES_DATA: tuple[dict[str, Any], ...] = (
         "summary": {
             "es": (
                 "Qué costos descuenta un backtest serio, por qué el costo cero favorece al corto "
-                "plazo y cómo medir el costo de equilibrio con tu estado de cuenta."
+                "plazo y cómo estimar tu costo real con tu estado de cuenta."
             ),
             "en": (
                 "Which costs a serious backtest deducts, why zero cost flatters short-term "
-                "strategies and how to measure your break-even cost from a broker statement."
+                "strategies and how to estimate your real cost from a broker statement."
             ),
             "pt": (
                 "Quais custos um backtest sério desconta, por que o custo zero favorece o curto "
-                "prazo e como medir o custo de equilíbrio com o extrato da corretora."
+                "prazo e como estimar o seu custo real com o extrato da corretora."
             ),
         },
         "intro": {
@@ -817,11 +822,11 @@ ARTICLES_DATA: tuple[dict[str, Any], ...] = (
                             "la misma unidad que tu costo: puntos, pips o moneda de la cuenta."
                         ),
                         (
-                            "Repórtalo junto al costo real: a tres veces ese costo hay espacio "
-                            "para un spread peor; apenas por encima, el resultado depende de que "
-                            "el bróker no cambie nada. Rigor mide esto en cada auditoría: el "
-                            "resultado a 1x, 2x y 3x y el costo de equilibrio, etiquetados como "
-                            "Medido, Declarado o No medido."
+                            "Repórtalo junto al costo real: si el costo de equilibrio triplica tu "
+                            "costo real, hay espacio para un spread peor; si apenas lo supera, el "
+                            "resultado depende de que el bróker no cambie nada. Rigor mide esto en "
+                            "cada auditoría: el resultado a 1x, 2x y 3x y el costo de equilibrio, "
+                            "etiquetados como Medido, Declarado o No medido."
                         ),
                     ],
                 },
@@ -883,8 +888,8 @@ ARTICLES_DATA: tuple[dict[str, Any], ...] = (
                         (
                             "Slippage is the difference between the price you asked for and the "
                             "price you were filled at; it appears when the market moves before the "
-                            "fill, above all on stops. Swap is what you pay or receive for holding "
-                            "a position from one day to the next."
+                            "fill, especially on stops. Swap is what you pay or receive for "
+                            "holding a position from one day to the next."
                         ),
                     ],
                 },
@@ -915,7 +920,7 @@ ARTICLES_DATA: tuple[dict[str, Any], ...] = (
                         ),
                         (
                             "The 2x and 3x runs exist because the real cost is not constant: the "
-                            "spread opens up on news, slippage grows with volatility and the "
+                            "spread widens on news, slippage grows with volatility and the "
                             "broker can change its conditions. Those runs measure how much margin "
                             "you have before the cost catches up with the signal."
                         ),
@@ -932,11 +937,11 @@ ARTICLES_DATA: tuple[dict[str, Any], ...] = (
                             "currency."
                         ),
                         (
-                            "Report it next to the real cost: at three times that cost there is "
-                            "room for a worse spread; barely above it, the result depends on the "
-                            "broker changing nothing. Rigor measures this in every audit: the "
-                            "result at 1x, 2x and 3x and the break-even cost, tagged Measured, "
-                            "Declared or Not measured."
+                            "Report it next to the real cost: if the break-even cost is three "
+                            "times your real cost, there is room for a worse spread; if it is "
+                            "barely above it, the result depends on the broker changing nothing. "
+                            "Rigor measures this in every audit: the result at 1x, 2x and 3x and "
+                            "the break-even cost, tagged Measured, Declared or Not measured."
                         ),
                     ],
                 },
@@ -954,8 +959,8 @@ ARTICLES_DATA: tuple[dict[str, Any], ...] = (
                             "Spread and slippage sit inside the fill price. For the spread, note "
                             "the gap between buy and sell during the hours your strategy trades "
                             "and take the median over several days. For slippage, compare the "
-                            "requested price with the filled price in your order history, above "
-                            "all on stops. Add both to the fixed part: that is your 1x cost."
+                            "requested price with the filled price in your order history, "
+                            "especially on stops. Add both to the fixed part: that is your 1x cost."
                         ),
                     ],
                 },
@@ -1043,11 +1048,11 @@ ARTICLES_DATA: tuple[dict[str, Any], ...] = (
                             "mesma unidade do seu custo: pontos, pips ou moeda da conta."
                         ),
                         (
-                            "Reporte-o ao lado do custo real: a três vezes esse custo há espaço "
-                            "para um spread pior; um pouco acima dele, o resultado depende de a "
-                            "corretora não mudar nada. O Rigor mede isso em cada auditoria: o "
-                            "resultado a 1x, 2x e 3x e o custo de equilíbrio, marcados como "
-                            "Medido, Declarado ou Não medido."
+                            "Reporte-o ao lado do custo real: se o custo de equilíbrio for o "
+                            "triplo do seu custo real, há espaço para um spread pior; se ficar só "
+                            "um pouco acima, o resultado depende de a corretora não mudar nada. O "
+                            "Rigor mede isso em cada auditoria: o resultado a 1x, 2x e 3x e o "
+                            "custo de equilíbrio, marcados como Medido, Declarado ou Não medido."
                         ),
                     ],
                 },
@@ -1089,8 +1094,8 @@ ARTICLES_DATA: tuple[dict[str, Any], ...] = (
                         (
                             "Ignorar o swap em posições overnight. Uma estratégia que mantém "
                             "posições por dias ou semanas paga swap toda noite, e em alguns "
-                            "instrumentos ele soma mais do que o spread. Confira que o swap do "
-                            "testador coincide com o da sua corretora."
+                            "instrumentos ele soma mais do que o spread. Confira se o swap do "
+                            "testador bate com o da sua corretora."
                         ),
                     ],
                 },
@@ -1242,9 +1247,9 @@ ARTICLES_DATA: tuple[dict[str, Any], ...] = (
                 "máximo (drawdown) y un Sharpe que el propio probador calcula. Esos cinco números "
                 "se leen en un minuto. Lo que el informe no trae importa casi más: no dice cuántas "
                 "configuraciones probaste antes de esta, qué costos supuso, si los datos tenían "
-                "huecos ni si alguna parte del periodo quedó fuera de la optimización. Esta guía "
-                "explica cada número, los que se malinterpretan y qué agregar antes de confiar en "
-                "el resultado."
+                "huecos ni si alguna parte del periodo quedó fuera de la optimización. Este "
+                "artículo explica cada número, los que se malinterpretan y qué agregar antes de "
+                "confiar en el resultado."
             ),
             "en": (
                 "The MT5 Strategy Tester report summarises a single run: how many trades the robot "
@@ -1254,8 +1259,8 @@ ARTICLES_DATA: tuple[dict[str, Any], ...] = (
                 "computes itself. Those five numbers take a minute to read. What the report leaves "
                 "out matters almost more: it does not say how many configurations you tried before "
                 "this one, which costs it assumed, whether the data had holes, or whether any part "
-                "of the period was kept out of the optimisation. This guide explains each number, "
-                "the ones that get misread and what to add before trusting the result."
+                "of the period was kept out of the optimisation. This article explains each "
+                "number, the ones that get misread and what to add before trusting the result."
             ),
             "pt": (
                 "O relatório do testador de estratégias do MT5 resume uma única rodada: quantas "
@@ -1265,8 +1270,9 @@ ARTICLES_DATA: tuple[dict[str, Any], ...] = (
                 "próprio testador calcula. Esses cinco números se leem em um minuto. O que o "
                 "relatório deixa de fora importa quase mais: ele não diz quantas configurações "
                 "você testou antes desta, quais custos assumiu, se os dados tinham buracos, nem se "
-                "alguma parte do período ficou fora da otimização. Este guia explica cada número, "
-                "os que são mal interpretados e o que acrescentar antes de confiar no resultado."
+                "alguma parte do período ficou fora da otimização. Este artigo explica cada "
+                "número, os que são mal interpretados e o que acrescentar antes de confiar no "
+                "resultado."
             ),
         },
         "sections": {
@@ -1275,10 +1281,11 @@ ARTICLES_DATA: tuple[dict[str, Any], ...] = (
                     "heading": "Qué trae el informe y de dónde sale",
                     "paragraphs": [
                         (
-                            "El informe se guarda desde la pestaña Backtest: clic derecho, Guardar "
-                            "como informe, en HTML o XML. Arriba va el encabezado con experto, "
-                            "símbolo, periodo, parámetros, depósito inicial y apalancamiento; "
-                            "abajo, los resultados y la curva de balance y equidad."
+                            "El informe se guarda desde la pestaña Backtest: clic derecho, "
+                            "Informe, HTML u Open XML (en versiones antiguas, Guardar como "
+                            "informe). Arriba va el encabezado con experto, símbolo, periodo, "
+                            "parámetros, depósito inicial y apalancamiento; abajo, los resultados "
+                            "y la curva de balance y equidad."
                         ),
                         (
                             "Todo describe una sola corrida, con una sola configuración, sobre un "
@@ -1331,12 +1338,12 @@ ARTICLES_DATA: tuple[dict[str, Any], ...] = (
                     "heading": "Modo de ticks y calidad del modelado",
                     "paragraphs": [
                         (
-                            "MT5 tiene cuatro modos: cada tick, cada tick basado en ticks reales, "
-                            "OHLC de 1 minuto y solo precios de apertura. Sin ticks reales, el "
-                            "probador fabrica el recorrido del precio dentro de cada minuto a "
-                            "partir de las barras, y los stops se ejecutan sobre ese camino "
-                            "inventado. Con ticks reales rellena con ticks generados donde faltan; "
-                            "el informe muestra el total, no cuáles eran reales."
+                            "MT5 tiene cuatro modos de ticks: cada tick, cada tick basado en ticks "
+                            "reales, OHLC de 1 minuto y solo precios de apertura. Sin ticks "
+                            "reales, el probador fabrica el recorrido del precio dentro de cada "
+                            "minuto a partir de las barras, y los stops se ejecutan sobre ese "
+                            "camino inventado. Con ticks reales rellena con ticks generados donde "
+                            "faltan; el informe muestra el total, no cuáles eran reales."
                         ),
                         (
                             "OHLC de 1 minuto y solo apertura sirven para explorar, no para el "
@@ -1400,10 +1407,10 @@ ARTICLES_DATA: tuple[dict[str, Any], ...] = (
                     "heading": "What the report contains and where it comes from",
                     "paragraphs": [
                         (
-                            "The report is saved from the Backtest tab: right-click, Save as "
-                            "Report, in HTML or XML. At the top is the header with expert, symbol, "
-                            "period, inputs, initial deposit and leverage; below it, the results "
-                            "and the balance and equity curve."
+                            "The report is saved from the Backtest tab: right-click, Report, HTML "
+                            "or Open XML (older builds: Save as Report). At the top is the header "
+                            "with expert, symbol, period, inputs, initial deposit and leverage; "
+                            "below it, the results and the balance and equity curve."
                         ),
                         (
                             "Everything describes one run, with one configuration, over one date "
@@ -1447,8 +1454,8 @@ ARTICLES_DATA: tuple[dict[str, Any], ...] = (
                         (
                             "The report's Sharpe does not say which returns it used or whether it "
                             "is annualised, so it is not comparable with a Sharpe computed on "
-                            "daily returns, like the one in Rigor's calculator. It serves to "
-                            "compare runs in the same tester, nothing more."
+                            "daily returns, like the one in Rigor's calculator. It is only useful "
+                            "for comparing runs in the same tester."
                         ),
                     ],
                 },
@@ -1456,8 +1463,8 @@ ARTICLES_DATA: tuple[dict[str, Any], ...] = (
                     "heading": "Tick mode and modelling quality",
                     "paragraphs": [
                         (
-                            "MT5 has four modes: every tick, every tick based on real ticks, 1 "
-                            "minute OHLC and open prices only. Without real ticks, the tester "
+                            "MT5 has four tick modes: every tick, every tick based on real ticks, "
+                            "1 minute OHLC and open prices only. Without real ticks, the tester "
                             "fabricates the price path inside each minute from the bars, and the "
                             "stops are filled on that invented path. With real ticks it fills in "
                             "generated ones where they are missing; the report shows the total, "
@@ -1526,9 +1533,10 @@ ARTICLES_DATA: tuple[dict[str, Any], ...] = (
                     "paragraphs": [
                         (
                             "O relatório é salvo na aba Backtest: clique com o botão direito, "
-                            "Salvar como relatório, em HTML ou XML. No topo vem o cabeçalho com "
-                            "expert, símbolo, período, parâmetros, depósito inicial e alavancagem; "
-                            "abaixo, os resultados e a curva de saldo e patrimônio."
+                            "Report, HTML ou Open XML (versões antigas: Save as Report). No topo "
+                            "vem o cabeçalho com expert, símbolo, período, parâmetros, depósito "
+                            "inicial e alavancagem; abaixo, os resultados e a curva de saldo e "
+                            "patrimônio."
                         ),
                         (
                             "Tudo descreve uma única rodada, com uma única configuração, sobre um "
@@ -1581,12 +1589,12 @@ ARTICLES_DATA: tuple[dict[str, Any], ...] = (
                     "heading": "Modo de ticks e qualidade da modelagem",
                     "paragraphs": [
                         (
-                            "O MT5 tem quatro modos: cada tick, cada tick com base em ticks reais, "
-                            "OHLC de 1 minuto e só preços de abertura. Sem ticks reais, o testador "
-                            "fabrica o caminho do preço dentro de cada minuto a partir das barras, "
-                            "e os stops são executados sobre esse caminho inventado. Com ticks "
-                            "reais ele preenche com ticks gerados onde faltam; o relatório mostra "
-                            "o total, não quais eram reais."
+                            "O MT5 tem quatro modos de ticks: cada tick, cada tick com base em "
+                            "ticks reais, OHLC de 1 minuto e só preços de abertura. Sem ticks "
+                            "reais, o testador fabrica o caminho do preço dentro de cada minuto a "
+                            "partir das barras, e os stops são executados sobre esse caminho "
+                            "inventado. Com ticks reais ele preenche com ticks gerados onde "
+                            "faltam; o relatório mostra o total, não quais eram reais."
                         ),
                         (
                             "OHLC de 1 minuto e só abertura servem para explorar, não para o "
@@ -1660,10 +1668,10 @@ ARTICLES_DATA: tuple[dict[str, Any], ...] = (
                 {
                     "q": "¿Qué significa Calidad del historial 100%?",
                     "a": (
-                        "Que no faltaron barras de un minuto en el periodo. No dice si esas barras "
-                        "traen precios congelados, picos falsos o duplicados, ni si los ticks de "
-                        "cada minuto eran reales o generados. Mide cobertura, no calidad de los "
-                        "precios."
+                        "Que no faltaron barras de un minuto y que ninguna tenía volumen 1 con "
+                        "precios distintos, lo único que MT5 cuenta como dato incorrecto. No dice "
+                        "si esas barras traen precios congelados, picos falsos o duplicados, ni si "
+                        "los ticks de cada minuto eran reales o generados."
                     ),
                 },
                 {
@@ -1689,10 +1697,10 @@ ARTICLES_DATA: tuple[dict[str, Any], ...] = (
                 {
                     "q": "What does History Quality 100% mean?",
                     "a": (
-                        "That no one-minute bars were missing in the period. It does not say "
-                        "whether those bars carry frozen prices, false spikes or duplicates, or "
-                        "whether the ticks in each minute were real or generated. It measures "
-                        "coverage, not the quality of the prices."
+                        "That no one-minute bars were missing and none had a volume of 1 with "
+                        "differing OHLC, the only thing MT5 counts as incorrect data. It does not "
+                        "say whether those bars carry frozen prices, false spikes or duplicates, "
+                        "or whether the ticks in each minute were real or generated."
                     ),
                 },
                 {
@@ -1718,10 +1726,10 @@ ARTICLES_DATA: tuple[dict[str, Any], ...] = (
                 {
                     "q": "O que significa Qualidade do histórico 100%?",
                     "a": (
-                        "Que não faltaram barras de um minuto no período. Não diz se essas barras "
-                        "trazem preços congelados, picos falsos ou duplicatas, nem se os ticks de "
-                        "cada minuto eram reais ou gerados. Mede cobertura, não a qualidade dos "
-                        "preços."
+                        "Que não faltaram barras de um minuto e nenhuma tinha volume 1 com preços "
+                        "diferentes, a única coisa que o MT5 conta como dado incorreto. Não diz se "
+                        "essas barras trazem preços congelados, picos falsos ou duplicatas, nem se "
+                        "os ticks de cada minuto eram reais ou gerados."
                     ),
                 },
                 {

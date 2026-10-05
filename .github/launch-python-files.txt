@@ -1,14 +1,19 @@
 src/quant_trade/audit/account_pages.py
 src/quant_trade/audit/account_pt.py
 src/quant_trade/audit/accounts.py
+src/quant_trade/audit/articles.py
+src/quant_trade/audit/audiences.py
+src/quant_trade/audit/calculator.py
 src/quant_trade/audit/compare.py
 src/quant_trade/audit/engine.py
 src/quant_trade/audit/errors_pt.py
 src/quant_trade/audit/funnel.py
+src/quant_trade/audit/guides.py
 src/quant_trade/audit/i18n.py
 src/quant_trade/audit/importers.py
 src/quant_trade/audit/legal.py
 src/quant_trade/audit/mail.py
+src/quant_trade/audit/method.py
 src/quant_trade/audit/owner.py
 src/quant_trade/audit/pages.py
 src/quant_trade/audit/payments.py
@@ -28,6 +33,7 @@ src/quant_trade/audit/web.py
 tests/audit_fixtures.py
 tests/forgery_lab.py
 tests/test_audit_access_codes.py
+tests/test_audit_articles.py
 tests/test_audit_card_payments.py
 tests/test_audit_checkout_language.py
 tests/test_audit_email_delivery.py

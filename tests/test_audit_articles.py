@@ -31,9 +31,11 @@ from quant_trade.audit.calculator import calculator_url  # noqa: E402
 from quant_trade.audit.guard import find_claims  # noqa: E402
 from quant_trade.audit.guides import GUIDES_COPY, guides_index_url  # noqa: E402
 from quant_trade.audit.pages import audit_path  # noqa: E402
+from quant_trade.audit.redflags import FLAG_TITLES  # noqa: E402
 from quant_trade.audit.seo import PUBLIC_PAGES  # noqa: E402
 from quant_trade.audit.settings import AuditSettings  # noqa: E402
 from quant_trade.audit.store import make_store  # noqa: E402
+from quant_trade.audit.theme import STYLE as THEME_CSS  # noqa: E402
 from quant_trade.audit.web import ENGLISH_ROOTS, create_app  # noqa: E402
 
 BASE = "https://audit.example"
@@ -136,10 +138,22 @@ def test_every_article_exists_in_every_language_and_passes_the_guard() -> None:
             assert find_claims(words) == [], (locale, words)
 
 
-def test_an_unknown_related_kind_is_refused() -> None:
-    bad = {**ARTICLES_DATA[0], "related": [{"kind": "shop"}]}
-    with pytest.raises(ValueError, match="shop"):
-        Article.from_dict(bad)
+def test_an_unknown_related_kind_or_slug_is_refused() -> None:
+    for link, message in (
+        ({"kind": "shop"}, "unknown related kind"),
+        ({"kind": "guide", "slug": "nope"}, "unknown guide"),
+        ({"kind": "guide"}, "unknown guide"),
+        ({"kind": "audience", "slug": "nadie"}, "unknown audience page"),
+    ):
+        bad = {**ARTICLES_DATA[0], "related": [link]}
+        with pytest.raises(ValueError, match=message):
+            Article.from_dict(bad)
+
+
+def test_the_red_flag_count_in_the_mt5_article_follows_the_catalog() -> None:
+    article = next(a for a in ARTICLES if a.key == "leer-informe-probador-mt5")
+    for locale in LOCALES:
+        assert f" {len(FLAG_TITLES)} " in " ".join(_texts(article, locale)), locale
 
 
 def test_the_resolver_finds_a_slug_from_any_language() -> None:
@@ -193,7 +207,9 @@ def test_article_pages_render_with_metadata_and_a_language_switch(tmp_path: Path
             assert f"href='{audit_path(locale)}'" in text
             assert html.escape(ARTICLES_COPY[locale]["calculator"], quote=True) in text
             assert html.escape(ARTICLES_COPY[locale]["report"], quote=True) in text
+            assert "<section class='article-cta'><h2>" in text
             assert find_claims(text) == []
+    assert ".article-cta{" in THEME_CSS and ".article-cta h2{" in THEME_CSS
 
 
 def test_portuguese_article_pages_have_no_spanish_left(tmp_path: Path) -> None:
