@@ -27,6 +27,18 @@ data = [
   "requests>=2.31",
 ]
 
+personal-paper = [
+  "numpy==2.2.6",
+  "pandas==3.0.3",
+  "PyYAML==6.0.3",
+  "yfinance==1.5.1",
+  "exchange-calendars==4.13.2",
+  "korean_lunar_calendar==0.4.0",
+  "pyluach==2.3.0",
+  "toolz==1.1.0",
+  "tzdata==2026.5",
+]
+
 crypto = [
   "ccxt>=4.0",
 ]

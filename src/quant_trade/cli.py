@@ -26,6 +26,7 @@ from quant_trade.datalake.cli import app as datalake_app
 from quant_trade.logging_config import configure_logging
 from quant_trade.opportunities.cli import opportunities_app
 from quant_trade.ops.cli import ops_app
+from quant_trade.personal_paper.cli import app as personal_paper_app
 from quant_trade.research.crypto_lowcap.cli import crypto_lowcap_app
 from quant_trade.research.experiment_config import load_experiment_config
 from quant_trade.research.grid_search import run_grid_search
@@ -58,6 +59,7 @@ app.add_typer(v8_app, name="v8")
 app.add_typer(v9_app, name="v9")
 app.add_typer(crypto_lowcap_app, name="crypto-lowcap")
 app.add_typer(audit_app, name="audit")
+app.add_typer(personal_paper_app, name="personal-paper")
 console = Console()
 
 

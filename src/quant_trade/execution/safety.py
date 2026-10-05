@@ -52,8 +52,8 @@ def validate_order_safety(
     symbol = order.symbol.upper().strip()
     if order.side not in {"buy", "sell"}:
         raise BrokerSafetyError("order side must be buy or sell")
-    if order.quantity <= 0:
-        raise BrokerSafetyError("order quantity must be positive")
+    if isinstance(order.quantity, bool) or not math.isfinite(order.quantity) or order.quantity <= 0:
+        raise BrokerSafetyError("order quantity must be finite and positive")
     if order.order_type not in {"market", "limit"}:
         raise BrokerSafetyError("only market and limit orders are supported")
     if order.stop_price is not None:
