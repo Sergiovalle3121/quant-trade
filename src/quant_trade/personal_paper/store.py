@@ -15,6 +15,32 @@ _READ_SCHEMA = {
     "events": {"sequence", "kind", "value", "previous_sha", "sha"},
     "curves": {"timestamp", "book", "value"},
 }
+_WRITE_COLUMNS = {
+    "meta": (("key", "TEXT", 0, None, 1), ("value", "TEXT", 1, None, 0)),
+    "books": (("id", "TEXT", 0, None, 1), ("value", "TEXT", 1, None, 0)),
+    "bars": (("timestamp", "TEXT", 0, None, 1), ("sha", "TEXT", 1, None, 0)),
+    "events": (
+        ("sequence", "INTEGER", 0, None, 1),
+        ("kind", "TEXT", 1, None, 0),
+        ("value", "TEXT", 1, None, 0),
+        ("previous_sha", "TEXT", 1, None, 0),
+        ("sha", "TEXT", 1, None, 0),
+    ),
+    "curves": (
+        ("timestamp", "TEXT", 1, None, 1),
+        ("book", "TEXT", 1, None, 2),
+        ("value", "TEXT", 1, None, 0),
+    ),
+}
+_CREATE_SCHEMA = (
+    "CREATE TABLE meta(key TEXT PRIMARY KEY, value TEXT NOT NULL)",
+    "CREATE TABLE books(id TEXT PRIMARY KEY, value TEXT NOT NULL)",
+    "CREATE TABLE bars(timestamp TEXT PRIMARY KEY, sha TEXT NOT NULL)",
+    "CREATE TABLE events(sequence INTEGER PRIMARY KEY, kind TEXT NOT NULL, "
+    "value TEXT NOT NULL, previous_sha TEXT NOT NULL, sha TEXT NOT NULL UNIQUE)",
+    "CREATE TABLE curves(timestamp TEXT NOT NULL, book TEXT NOT NULL, value TEXT NOT NULL, "
+    "PRIMARY KEY(timestamp,book))",
+)
 
 
 class PaperStore:
@@ -45,26 +71,86 @@ class PaperStore:
                     "paper database cannot be read or its schema is invalid"
                 ) from exc
             return
-        path.parent.mkdir(parents=True, exist_ok=True)
-        self.db = sqlite3.connect(path, timeout=0, isolation_level=None)
-        self.db.row_factory = sqlite3.Row
+        connection = None
         try:
+            existed = path.exists()
+            if existed:
+                preflight = sqlite3.connect(
+                    path.resolve().as_uri() + "?mode=ro", uri=True, timeout=0, isolation_level=None
+                )
+                try:
+                    self._validate_write_schema(preflight)
+                finally:
+                    preflight.close()
+            path.parent.mkdir(parents=True, exist_ok=True)
+            connection = sqlite3.connect(
+                path.resolve().as_uri() + ("?mode=rw" if existed else "?mode=rwc"),
+                uri=True,
+                timeout=0,
+                isolation_level=None,
+            )
+            self.db = connection
+            self.db.row_factory = sqlite3.Row
+            self.db.execute("BEGIN IMMEDIATE")
+            try:
+                # Revalidate under SQLite's writer lease: a preflight alone
+                # cannot protect a database changed before the writer opens.
+                if not self._validate_write_schema(self.db):
+                    for statement in _CREATE_SCHEMA:
+                        self.db.execute(statement)
+                self.db.execute("COMMIT")
+            except BaseException:
+                if self.db.in_transaction:
+                    self.db.execute("ROLLBACK")
+                raise
             self.db.execute("PRAGMA journal_mode=WAL")
             self.db.execute("PRAGMA synchronous=FULL")
-            self.db.executescript("""
-                CREATE TABLE IF NOT EXISTS meta(key TEXT PRIMARY KEY, value TEXT NOT NULL);
-                CREATE TABLE IF NOT EXISTS books(id TEXT PRIMARY KEY, value TEXT NOT NULL);
-                CREATE TABLE IF NOT EXISTS bars(timestamp TEXT PRIMARY KEY, sha TEXT NOT NULL);
-                CREATE TABLE IF NOT EXISTS events(
-                    sequence INTEGER PRIMARY KEY, kind TEXT NOT NULL, value TEXT NOT NULL,
-                    previous_sha TEXT NOT NULL, sha TEXT NOT NULL UNIQUE);
-                CREATE TABLE IF NOT EXISTS curves(
-                    timestamp TEXT NOT NULL, book TEXT NOT NULL, value TEXT NOT NULL,
-                    PRIMARY KEY(timestamp,book));
-            """)
-        except sqlite3.OperationalError as exc:
-            self.db.close()
-            raise PersonalPaperError("another writer owns the paper database") from exc
+        except BaseException as exc:
+            if connection is not None:
+                connection.close()
+            if isinstance(exc, sqlite3.DatabaseError):
+                if getattr(exc, "sqlite_errorcode", None) in (
+                    sqlite3.SQLITE_BUSY,
+                    sqlite3.SQLITE_LOCKED,
+                ):
+                    raise PersonalPaperError("another writer owns the paper database") from exc
+                raise PersonalPaperError(
+                    "paper writer cannot open or initialize this database"
+                ) from exc
+            raise
+
+    @staticmethod
+    def _validate_write_schema(connection: sqlite3.Connection) -> bool:
+        objects = [
+            row
+            for row in connection.execute("SELECT type,name,tbl_name FROM sqlite_master")
+            if not row[1].startswith("sqlite_")
+        ]
+        if not objects:
+            return False
+        tables = {row[1] for row in objects if row[0] == "table"}
+        if tables != _WRITE_COLUMNS.keys() or any(
+            row[0] not in {"table", "index"} or row[2] not in _WRITE_COLUMNS for row in objects
+        ):
+            raise PersonalPaperError("paper writer refuses an unrelated or incompatible schema")
+        for table, expected in _WRITE_COLUMNS.items():
+            rows = connection.execute(f"PRAGMA table_xinfo({table})").fetchall()
+            columns = tuple((row[1], row[2].upper(), row[3], row[4], row[5]) for row in rows)
+            if columns != expected or any(row[6] != 0 for row in rows):
+                raise PersonalPaperError("paper writer refuses an unrelated or incompatible schema")
+        unique_hash = any(
+            index[2]
+            and not index[4]
+            and [
+                row[2]
+                for row in connection.execute("SELECT * FROM pragma_index_info(?)", (index[1],))
+            ]
+            == ["sha"]
+            for index in connection.execute("PRAGMA index_list(events)")
+        )
+        if not unique_hash:
+            raise PersonalPaperError("paper writer refuses an unrelated or incompatible schema")
+        return True
 
     def _validate_read_schema(self) -> None:
         tables = {

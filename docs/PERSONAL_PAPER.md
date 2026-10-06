@@ -217,3 +217,24 @@ operativo sin inflar el diario de posiciones. Los límites, estrategias, costos 
 criterios económicos permanecen congelados; las correcciones de código exigen
 una base nueva para un experimento posterior. Pruebas offline:
 `test_personal_paper_read_only.py` y `test_personal_paper_pause_idempotency.py`.
+
+## Protección del destino de escritura
+
+El escritor inspecciona una ruta existente con `mode=ro` antes de abrirla para
+escritura, conservando también datos ajenos confirmados en WAL. Admite destinos
+nuevos, archivos de cero bytes, SQLite vacía y el esquema completo del bot. Exige
+las cinco tablas originales, sus columnas y tipos, claves primarias, `NOT NULL` y
+el hash único del diario; conserva autoíndices, estadísticas de SQLite e índices
+sobre tablas propias. Rechaza bases ajenas, parciales, vistas y triggers adicionales
+antes de cambiar su esquema o modo de diario.
+
+Al adquirir `BEGIN IMMEDIATE`, vuelve a validar la conexión definitiva y crea
+las tablas nuevas dentro de una sola transacción. Una interrupción hace rollback
+de toda la inicialización; el siguiente intento puede usar la misma base vacía.
+Después del commit activa WAL y sincronización FULL. Esta protección cubre errores
+de ruta e inicializadores concurrentes del bot; el propietario del disco puede
+reemplazar archivos fuera de sus bloqueos. Los respaldos conservan el esquema y
+se verifican igual que antes. La suite offline `test_personal_paper_writer_guard.py`
+prueba las rutas reales de `run` y `pause` con fuentes sintéticas, incluido WAL vivo
+y conservado después de un crash. Cada experimento nuevo sigue sellando el código;
+el replay histórico permanece asociado a su versión original.
