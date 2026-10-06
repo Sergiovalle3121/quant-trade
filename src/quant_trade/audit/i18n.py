@@ -76,6 +76,72 @@ _TRIAL_SOURCES: dict[str, str] = {
 
 _RULES_SOURCE: tuple[tuple[str, str], ...] = (
     (
+        "The data context is missing or its format is invalid.",
+        "Falta el contexto de los datos o su formato no es válido.",
+    ),
+    (
+        "The history's start or end timestamp is missing.",
+        "Falta la fecha inicial o final del historial.",
+    ),
+    (
+        "The history's start or end timestamp cannot be read.",
+        "No se puede leer la fecha inicial o final del historial.",
+    ),
+    (
+        "The history's timestamps do not include a time zone.",
+        "Las fechas del historial no incluyen zona horaria.",
+    ),
+    (
+        "The end timestamp must be later than the start timestamp.",
+        "La fecha final debe ser posterior a la inicial.",
+    ),
+    (
+        "The start or end dates and times of the two histories do not match.",
+        "Las fechas y horas de inicio o fin de los dos historiales no coinciden.",
+    ),
+    (
+        "Frequency needs a positive number with MEASURED evidence.",
+        "La frecuencia necesita un número positivo con evidencia MEASURED.",
+    ),
+    (
+        "The frequency value is not a positive, finite number.",
+        "El valor de la frecuencia no es un número positivo y finito.",
+    ),
+    (
+        "The measured frequencies of the two histories do not match.",
+        "Las frecuencias medidas de los dos historiales no coinciden.",
+    ),
+    (
+        "The history is missing a valid frequency label.",
+        "Falta una etiqueta de frecuencia válida para el historial.",
+    ),
+    (
+        "The frequency labels of the two histories do not match.",
+        "Las etiquetas de frecuencia de los dos historiales no coinciden.",
+    ),
+    (
+        "The history must identify an equity curve or a closed-trade balance.",
+        "Falta indicar si el historial es una curva de equity o de balance cerrado.",
+    ),
+    (
+        "One history uses equity and the other uses a closed-trade balance. "
+        "A closed-trade balance does not show open positions.",
+        "Un historial usa equity y el otro, balance de operaciones cerradas. "
+        "El balance cerrado no muestra las posiciones abiertas.",
+    ),
+    (
+        "The figure needs MEASURED evidence in both reports.",
+        "La cifra necesita evidencia MEASURED en ambos informes.",
+    ),
+    (
+        "The figure does not contain a valid, finite numeric value.",
+        "La cifra no contiene un valor numérico finito válido.",
+    ),
+    (
+        "The difference exceeds the numeric range that can be represented.",
+        "La diferencia excede el rango numérico que se puede representar.",
+    ),
+    (
         "Same dates, frequency and curve type. Differences are arithmetic, "
         "without a significance test.",
         "Mismas fechas, frecuencia y tipo de curva. Las diferencias son aritméticas, "

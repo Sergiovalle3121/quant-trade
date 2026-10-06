@@ -152,6 +152,28 @@ No push, merge or deploy is performed by the local implementation/tests.
 
 ## Offline validation
 
+Private report comparison explains why a numeric difference is unavailable,
+using fixed ES/EN/PT messages and report indices only. It distinguishes missing
+or invalid date/time evidence, absent time zones, inverted or different windows,
+missing/nonpositive/nonfinite measured frequencies, missing/different frequency
+labels, and equity versus closed-trade balance. Closed-trade balance omits open
+positions. Equal timestamp instants remain comparable across time-zone offsets;
+the existing relative frequency tolerance of `1e-6` remains unchanged.
+
+Sharpe and drawdown evidence are checked independently: a missing `MEASURED`
+tag, invalid value or overflowing difference withholds only the affected delta
+when the context otherwise matches. Numeric strings, booleans, nonfinite values
+and oversized integers are rejected. Both curve-type fields must be booleans;
+both frequency labels must be nonempty strings. Two missing labels are incomplete
+evidence, rather than a matching frequency. Malformed input/performance containers
+fail closed without rendering their contents or raising numeric-overflow errors.
+
+Differences remain arithmetic (report 2 minus report 1; drawdown in percentage
+points), without significance tests, rankings or future-result claims. These
+checks use stored results, preserve existing classifications and permissions,
+and do not change credits or stored inputs. Diagnostics never echo timestamps,
+labels, file names, cells, account identifiers or other free-form values.
+
 Run the existing account/payment/rights/PDF/retention tests and the new
 `tests/test_audit_commercial_observability.py`. The opt-in PostgreSQL suite
 validates atomic counters, concurrent credit retry, additive schema preservation
