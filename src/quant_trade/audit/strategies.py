@@ -23,12 +23,14 @@ money: every sentence is fixed text that passes the profit-claim guard.
 from __future__ import annotations
 
 import json
+import math
+from collections.abc import Mapping
 from datetime import datetime
 from typing import Any
 
 from quant_trade.audit.account_pt import STRATEGIES_PT
 from quant_trade.audit.portuguese import DIMENSION_TITLES_PT, STATUS_TEXT_PT
-from quant_trade.audit.report import STATUS_TEXT, _dimension_title
+from quant_trade.audit.report import STATUS_TEXT, _dimension_title, evidence_label
 from quant_trade.audit.verdict import DIMENSION_ORDER
 
 #: Better classes first.
@@ -207,28 +209,55 @@ COPY: dict[str, dict[str, str]] = {
 COPY["pt"] = STRATEGIES_PT
 
 
-def _value(block: Any) -> float | None:
-    """The number of an evidence-tagged figure, or ``None`` when not measured."""
-    if not isinstance(block, dict) or block.get("evidence") == "NOT_MEASURED":
+def _mapping(value: Any) -> Mapping[str, Any]:
+    return value if isinstance(value, Mapping) else {}
+
+
+def _finite_number(value: Any) -> float | None:
+    if isinstance(value, bool) or not isinstance(value, int | float):
         return None
-    value = block.get("value")
-    return float(value) if isinstance(value, int | float) else None
+    try:
+        number = float(value)
+    except (ValueError, OverflowError):
+        return None
+    return number if math.isfinite(number) else None
+
+
+def _value(block: Any) -> float | None:
+    """A finite measured or declared figure; never infer an absent evidence tag."""
+    block = _mapping(block)
+    if block.get("evidence") not in ("MEASURED", "DECLARED"):
+        return None
+    return _finite_number(block.get("value"))
 
 
 def _number(field: Any) -> float | None:
     """A bare number, or the value of an evidence-tagged one."""
-    if isinstance(field, dict):
-        return _value(field)
-    return float(field) if isinstance(field, int | float) else None
+    if isinstance(field, Mapping):
+        return _value(field) if field.get("evidence") == "MEASURED" else None
+    return _finite_number(field)
+
+
+def headline_evidence(result: dict[str, Any]) -> dict[str, tuple[float | None, str]]:
+    """The displayed value and retained provenance of each version-table figure."""
+    out = {}
+    for name, section, field in (
+        ("sharpe", "performance", "sharpe"),
+        ("dsr", "multiplicity", "dsr_at_trials_used"),
+        ("max_drawdown", "performance", "max_drawdown"),
+    ):
+        block = _mapping(_mapping(result.get(section)).get(field))
+        value = _value(block)
+        if value is not None and name != "sharpe" and not math.isfinite(100 * value):
+            value = None
+        tag = str(block["evidence"]) if value is not None else "NOT_MEASURED"
+        out[name] = (value, tag)
+    return out
 
 
 def headline(result: dict[str, Any]) -> dict[str, float | None]:
     """The three figures a version row shows."""
-    return {
-        "sharpe": _value((result.get("performance") or {}).get("sharpe")),
-        "dsr": _value((result.get("multiplicity") or {}).get("dsr_at_trials_used")),
-        "max_drawdown": _value((result.get("performance") or {}).get("max_drawdown")),
-    }
+    return {name: value for name, (value, _) in headline_evidence(result).items()}
 
 
 def _rank_word(before: int, after: int) -> str:
@@ -251,27 +280,38 @@ MIN_SHARED_SPAN = 0.8
 FREQUENCY_TOLERANCE = 0.10
 
 
-def _same_frequency(inputs_a: dict[str, Any], inputs_b: dict[str, Any]) -> bool:
+def _same_frequency(inputs_a: Mapping[str, Any], inputs_b: Mapping[str, Any]) -> bool:
+    inputs_a, inputs_b = _mapping(inputs_a), _mapping(inputs_b)
     label_a, label_b = inputs_a.get("frequency_label"), inputs_b.get("frequency_label")
-    if label_a and label_b:
-        return bool(label_a == label_b)
     freq_a = _number(inputs_a.get("periods_per_year"))
     freq_b = _number(inputs_b.get("periods_per_year"))
-    if not freq_a or not freq_b:
-        return True
+    if freq_a is None or freq_b is None or freq_a <= 0 or freq_b <= 0:
+        return False
+    if label_a is not None and (not isinstance(label_a, str) or not label_a.strip()):
+        return False
+    if label_b is not None and (not isinstance(label_b, str) or not label_b.strip()):
+        return False
+    if label_a is not None and label_b is not None:
+        return label_a == label_b
     return abs(freq_a - freq_b) <= FREQUENCY_TOLERANCE * max(freq_a, freq_b)
 
 
-def _span(inputs: dict[str, Any]) -> tuple[datetime, datetime] | None:
+def _span(inputs: Mapping[str, Any]) -> tuple[datetime, datetime] | None:
+    inputs = _mapping(inputs)
     try:
-        first = datetime.fromisoformat(str(inputs["first_timestamp"]).replace("Z", "+00:00"))
-        last = datetime.fromisoformat(str(inputs["last_timestamp"]).replace("Z", "+00:00"))
-    except (KeyError, ValueError):
+        first_text, last_text = inputs["first_timestamp"], inputs["last_timestamp"]
+        if not isinstance(first_text, str) or not isinstance(last_text, str):
+            return None
+        first = datetime.fromisoformat(first_text.replace("Z", "+00:00"))
+        last = datetime.fromisoformat(last_text.replace("Z", "+00:00"))
+        if first.tzinfo is None or last.tzinfo is None:
+            return None
+        return (first, last) if last > first else None
+    except (KeyError, ValueError, TypeError, OverflowError):
         return None
-    return (first, last) if last > first else None
 
 
-def shared_share(inputs_a: dict[str, Any], inputs_b: dict[str, Any]) -> float | None:
+def shared_share(inputs_a: Mapping[str, Any], inputs_b: Mapping[str, Any]) -> float | None:
     """The shared dates as a share of the shorter history, or ``None`` if unknown."""
     span_a, span_b = _span(inputs_a), _span(inputs_b)
     if span_a is None or span_b is None:
@@ -284,19 +324,41 @@ def shared_share(inputs_a: dict[str, Any], inputs_b: dict[str, Any]) -> float | 
 def sharpe_change(before: dict[str, Any], after: dict[str, Any]) -> str:
     """``better``/``worse`` only when the bootstrap 5-95 % bands do not overlap,
     on the same data frequency and mostly the same dates."""
-    inputs_a, inputs_b = before.get("inputs") or {}, after.get("inputs") or {}
+    inputs_a, inputs_b = _mapping(before.get("inputs")), _mapping(after.get("inputs"))
+    curves = (inputs_a.get("balance_only"), inputs_b.get("balance_only"))
+    if not all(isinstance(curve, bool) for curve in curves) or curves[0] != curves[1]:
+        return "unclear"
+    if any(
+        (frequency := _number(inputs.get("periods_per_year"))) is None or frequency <= 0
+        for inputs in (inputs_a, inputs_b)
+    ):
+        return "unclear"
     if not _same_frequency(inputs_a, inputs_b):
         return "different_frequency"
     share = shared_share(inputs_a, inputs_b)
-    if share is not None and share < MIN_SHARED_SPAN:
+    if share is None:
+        return "unclear"
+    if share < MIN_SHARED_SPAN:
         return "different_periods"
-    band_a = ((before.get("bootstrap") or {}).get("sharpe_per_period")) or {}
-    band_b = ((after.get("bootstrap") or {}).get("sharpe_per_period")) or {}
+    for result in (before, after):
+        metric = _mapping(_mapping(result.get("performance")).get("sharpe"))
+        if metric.get("evidence") != "MEASURED" or _value(metric) is None:
+            return "unclear"
+    band_a = _mapping(_mapping(before.get("bootstrap")).get("sharpe_per_period"))
+    band_b = _mapping(_mapping(after.get("bootstrap")).get("sharpe_per_period"))
+    if any(
+        _mapping(band.get(bound)).get("evidence") != "MEASURED"
+        for band in (band_a, band_b)
+        for bound in ("p5", "p95")
+    ):
+        return "unclear"
     low_a, high_a = _value(band_a.get("p5")), _value(band_a.get("p95"))
     low_b, high_b = _value(band_b.get("p5")), _value(band_b.get("p95"))
     if None in (low_a, high_a, low_b, high_b):
         return "unclear"
     assert low_a is not None and high_a is not None and low_b is not None and high_b is not None
+    if low_a > high_a or low_b > high_b:
+        return "unclear"
     if low_b > high_a:
         return "better"
     if high_b < low_a:
@@ -336,11 +398,17 @@ def what_changed(
                     copy["changed"],
                 )
             )
-    sharpe_a, sharpe_b = headline(before)["sharpe"], headline(after)["sharpe"]
+    (sharpe_a, tag_a), (sharpe_b, tag_b) = (
+        headline_evidence(before)["sharpe"],
+        headline_evidence(after)["sharpe"],
+    )
     if sharpe_a is not None and sharpe_b is not None:
         lines.append(
             (
-                copy["sharpe_line"].format(a=f"{sharpe_a:.2f}", b=f"{sharpe_b:.2f}"),
+                copy["sharpe_line"].format(
+                    a=f"{sharpe_a:.2f} · {evidence_label(tag_a, locale)}",
+                    b=f"{sharpe_b:.2f} · {evidence_label(tag_b, locale)}",
+                ),
                 copy[sharpe_change(before, after)],
             )
         )
@@ -359,7 +427,11 @@ def load_result(result_json: str | None) -> dict[str, Any] | None:
 
 def figures_text(values: dict[str, float | None]) -> tuple[str, str, str]:
     """The three headline figures as shown in the table (``—`` when not measured)."""
-    sharpe, dsr, drawdown = values["sharpe"], values["dsr"], values["max_drawdown"]
+    sharpe, dsr, drawdown = (
+        _finite_number(values.get(key)) for key in ("sharpe", "dsr", "max_drawdown")
+    )
+    dsr = dsr if dsr is not None and math.isfinite(100 * dsr) else None
+    drawdown = drawdown if drawdown is not None and math.isfinite(100 * drawdown) else None
     return (
         f"{sharpe:.2f}" if sharpe is not None else "—",
         f"{dsr:.0%}" if dsr is not None else "—",
@@ -373,6 +445,7 @@ __all__ = [
     "class_change",
     "figures_text",
     "headline",
+    "headline_evidence",
     "load_result",
     "sharpe_change",
     "what_changed",
