@@ -4009,6 +4009,12 @@ KPI_CSS = (
     ".kpi.xlong b{font-size:clamp(.85rem,1.5vw,1.2rem)}"
     ".kpi b{overflow-wrap:anywhere}"
     ".kpi span{display:block;margin-top:6px;color:var(--text-2);font-size:.82rem}"
+    ".kpi .badge{display:inline-flex;width:fit-content;margin-top:8px;font-size:.66rem}"
+    ".kpi .badge.MEASURED{color:var(--ok)}.kpi .badge.DECLARED{color:var(--warn)}"
+    ".kpi .badge.NOT_MEASURED{color:var(--text-3)}"
+    ".pc-kpi .badge{display:inline-block;margin-top:6pt;font-size:6.5pt}"
+    ".pc-kpi .badge.MEASURED{color:var(--ok)}.pc-kpi .badge.DECLARED{color:var(--warn)}"
+    ".pc-kpi .badge.NOT_MEASURED{color:var(--text-3)}"
     ".kpi small{display:block;margin-top:3px;color:var(--text-2);font-size:.72rem;"
     "line-height:1.35;opacity:.85}"
     ".kpi.bad b{color:var(--bad)}.kpi.good b{color:var(--ok)}"
@@ -4173,10 +4179,67 @@ def _kpi_hint(label: str, labels: dict[str, str], data: dict[str, Any] | None = 
     return ""
 
 
+def _kpi_evidence(label: str, labels: dict[str, str], data: dict[str, Any]) -> str:
+    """Keep the provenance of all numeric components shown in one tile."""
+    perf, stats, costs = (data.get(key) or {} for key in ("performance", "trade_stats", "costs"))
+    closed = bool((data.get("inputs") or {}).get("balance_only"))
+    sources = {
+        labels["kpi_return"]: [perf.get("total_return")],
+        labels["kpi_drawdown_closed" if closed else "kpi_drawdown"]: [perf.get("max_drawdown")],
+        labels["kpi_dd_platform"]: [perf.get("platform_equity_drawdown")],
+        labels["kpi_dd_p95_closed" if closed else "kpi_dd_p95"]: [
+            ((data.get("risk") or {}).get("max_drawdown") or {}).get("p95")
+        ],
+        labels["kpi_sharpe"]: [perf.get("sharpe")],
+        labels["kpi_pf"]: [stats.get("profit_factor")],
+        labels["kpi_trades"]: [stats.get("trade_count"), stats.get("win_rate")],
+    }
+    if label.startswith(labels["kpi_breakeven"] + " ("):
+        bps, pips = costs.get("break_even_bps"), costs.get("break_even_pips")
+        sources[label] = [bps]
+        if (_ev_value(bps) or 0) > 0 and _ev_value(pips) is not None:
+            sources[label].append(pips)
+    for section, scenario, key in (
+        ("trades", "best_5_trades", "kpi_stress"),
+        ("returns", "best_5_periods", "kpi_stress_curve"),
+    ):
+        block = (data.get("stress") or {}).get(section) or {}
+        row = next((row for row in block.get("rows", []) if row.get("scenario") == scenario), None)
+        sources[labels[key]] = [row.get("result") if row else None]
+        if _ev_value(block.get("original")) is not None:
+            sources[labels[key]].append(block["original"])
+    tags = []
+    for block in sources.get(label, []):
+        if not isinstance(block, dict) or block.get("evidence") not in ("MEASURED", "DECLARED"):
+            return "NOT_MEASURED"
+        value = block.get("value")
+        if isinstance(value, bool) or not isinstance(value, int | float):
+            return "NOT_MEASURED"
+        try:
+            if not math.isfinite(float(value)):
+                return "NOT_MEASURED"
+        except (ValueError, OverflowError):
+            return "NOT_MEASURED"
+        tags.append(block["evidence"])
+    return "DECLARED" if "DECLARED" in tags else "MEASURED" if tags else "NOT_MEASURED"
+
+
 def _kpis_html(data: dict[str, Any], labels: dict[str, str], *, locked: bool) -> str:
     kpis = _kpi_list(data, labels)
     if not kpis:
         return ""
+    if locked:
+        # The break-even label can contain a paid figure in pips or its sign.
+        kpis = [
+            (
+                labels["kpi_breakeven"]
+                if label.startswith(labels["kpi_breakeven"] + " (")
+                else label,
+                shown,
+                tone,
+            )
+            for label, shown, tone in kpis
+        ]
     tiles = "".join(
         # A locked figure is a way in: tapping it goes to the unlock box.
         f"<a class='kpi locked' href='#unlock' "
@@ -4184,7 +4247,8 @@ def _kpis_html(data: dict[str, Any], labels: dict[str, str], *, locked: bool) ->
         f"<b aria-hidden='true'>{icon('lock')}<i></i></b><span>{_e(label)}</span></a>"
         if locked
         else f"<div class='kpi {tone}{_kpi_size(shown)}'><b>{_e(shown)}</b>"
-        f"<span>{_e(label)}</span>{_kpi_hint(label, labels, data)}</div>"
+        f"<span>{_e(label)}</span>{_kpi_hint(label, labels, data)}"
+        f"{_badge(_kpi_evidence(label, labels, data))}</div>"
         for label, shown, tone in kpis
     )
     note = f"<p class='muted'>{_e(labels['kpis_locked'])}</p>" if locked else ""
@@ -8378,7 +8442,8 @@ def _pdf_cover(
         if name in by_name
     )
     kpis = "".join(
-        f"<div class='pc-kpi {tone}'><b>{_e(shown)}</b><span>{_e(label)}</span></div>"
+        f"<div class='pc-kpi {tone}'><b>{_e(shown)}</b><span>{_e(label)}</span>"
+        f"{_badge(_kpi_evidence(label, labels, data))}</div>"
         for label, shown, tone in _kpi_list(data, labels)[:4]
     )
     keep = "next_keep_fund" if _fund_record(data) else "next_keep"
