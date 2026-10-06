@@ -4229,3 +4229,13 @@ measurement definitions, privacy, staged rollout and additive rollback, and
 [LOCAL_POSTGRES_QA.md](LOCAL_POSTGRES_QA.md) for isolated PostgreSQL evidence.
 The public CTA now explains email confirmation in ES/EN/PT when that gate is
 enabled. No audit dimension, red flag, threshold or verdict changes.
+
+### Optional column preferences and report delivery (2026-10-06)
+
+After creating an audit, remembering the customer's column mapping is optional.
+A failure in that preference step no longer prevents the report's redirect or
+JSON response, token delivery and account linkage after a code was redeemed.
+The operator receives a fixed warning without exception text, SQL parameters or
+customer data. Successful preferences remain reusable; parsing and audit-storage
+failures keep their existing refusals. Credit rules, prices and permissions are
+unchanged. Offline regression tests: `tests/test_audit_column_map_resilience.py`.

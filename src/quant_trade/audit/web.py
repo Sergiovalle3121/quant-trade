@@ -4704,12 +4704,18 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             return outcome
         audit_id, token, paid = outcome
         if mapper and report_columns and uploads["report"]:
-            table = mapping.read_table(uploads["report"])
-            chosen = mapping.usable_mapping(report_columns, table) if table else {}
-            if table is not None and chosen:
-                db.save_column_map(
-                    mapper, mapping.header_signature(table.header), mapping.dumps(chosen), at=now
-                )
+            try:
+                table = mapping.read_table(uploads["report"])
+                chosen = mapping.usable_mapping(report_columns, table) if table else {}
+                if table is not None and chosen:
+                    db.save_column_map(
+                        mapper,
+                        mapping.header_signature(table.header),
+                        mapping.dumps(chosen),
+                        at=now,
+                    )
+            except Exception:  # an optional preference never blocks a completed report
+                logger.warning("could not save upload column mapping")
         credit_used = False
         welcomed = False
         if gate_account is not None and paid:
