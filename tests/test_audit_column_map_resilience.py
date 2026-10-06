@@ -1,4 +1,4 @@
-"""Optional column preferences must not strand an already paid audit."""
+"""Optional column preferences must not block imports or paid delivery."""
 
 from __future__ import annotations
 
@@ -117,6 +117,64 @@ def test_successful_column_preference_is_saved_and_reused(tmp_path, monkeypatch)
         assert again.status_code == 303
         assert store.count_audits() == 2
         assert store.get_access_code(code).credits_used == 1
+
+
+@pytest.mark.parametrize("locale", ["es", "en", "pt"])
+@pytest.mark.parametrize("json_response", [False, True])
+def test_preference_lookup_failure_offers_mapping_without_spending_credits(
+    tmp_path, monkeypatch, caplog, locale: str, json_response: bool
+) -> None:
+    with _client(tmp_path, monkeypatch) as client:
+        signed_in(client)
+        store = client.app.state.store
+        account = store.find_account("tester@example.com")
+        assert account is not None
+        code, _ = store.create_access_code(credits=1, note="synthetic", at=datetime.now(UTC))
+        private_detail = "synthetic SQL params password-value customer@example.test"
+
+        def failed_lookup(*args: Any, **kwargs: Any) -> None:
+            raise RuntimeError(private_detail)
+
+        monkeypatch.setattr(store, "column_map", failed_lookup)
+        response = client.post(
+            "/audits",
+            files=_files(),
+            data={"consent": "on", "locale": locale, "access_code": code},
+            headers={"Accept": "application/json"} if json_response else {},
+            follow_redirects=False,
+        )
+        assert response.status_code == 422
+        assert private_detail not in response.text
+        if json_response:
+            assert response.json()["columns"] == HEADERS
+            assert response.json()["code"] in mapping.MAPPABLE_CODES
+        else:
+            assert f"<html lang='{locale}'" in response.text
+            assert "name='col_date'" in response.text and "name='col_balance'" in response.text
+            assert f"name='locale' value='{locale}'" in response.text
+            assert f"name='access_code' value='{code}'" in response.text
+        assert store.count_audits() == 0
+        assert store.get_access_code(code).credits_used == 0
+        assert store.account_audits_list(account.id) == []
+        assert (
+            store.free_previews_since(datetime(2000, 1, 1, tzinfo=UTC), account_id=account.id) == 0
+        )
+
+        # Choosing columns explicitly still succeeds even while preferences are unavailable.
+        completed = client.post(
+            "/audits",
+            files=_files(),
+            data={"consent": "on", "locale": locale, "access_code": code, **CHOSEN},
+            follow_redirects=False,
+        )
+        assert completed.status_code == 303
+        assert client.get(completed.headers["location"]).status_code == 200
+        assert store.count_audits() == 1
+        assert store.get_access_code(code).credits_used == 1
+        assert len(store.account_audits_list(account.id)) == 1
+    assert "could not read upload column mapping" in caplog.text
+    assert private_detail not in caplog.text
+    assert "password-value" not in caplog.text and "customer@example.test" not in caplog.text
 
 
 def test_audit_storage_failure_is_not_swallowed_by_optional_preference_guard(

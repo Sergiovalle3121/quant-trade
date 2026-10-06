@@ -4629,16 +4629,19 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                     )
                 # The columns this account chose before for the same header;
                 # a PDF's rows are always shown, never read on a saved choice.
-                saved = (
-                    mapping.usable_mapping(
-                        mapping.loads(
-                            db.column_map(mapper, mapping.header_signature(table.header))
-                        ),
-                        table,
-                    )
-                    if mapper and not report_columns and not table.pdf
-                    else {}
-                )
+                saved: dict[str, str] = {}
+                if mapper and not report_columns and not table.pdf:
+                    try:
+                        saved = mapping.usable_mapping(
+                            mapping.loads(
+                                db.column_map(mapper, mapping.header_signature(table.header))
+                            ),
+                            table,
+                        )
+                    except Exception:
+                        # Preferences are optional. Offer explicit columns without
+                        # logging database errors that can contain customer data.
+                        logger.warning("could not read upload column mapping")
                 if saved:
                     try:
                         inputs = attempt(saved)

@@ -4239,3 +4239,7 @@ The operator receives a fixed warning without exception text, SQL parameters or
 customer data. Successful preferences remain reusable; parsing and audit-storage
 failures keep their existing refusals. Credit rules, prices and permissions are
 unchanged. Offline regression tests: `tests/test_audit_column_map_resilience.py`.
+Reading a saved preference is optional too: if its lookup fails, the customer
+can still name the columns in HTML or JSON, in ES/EN/PT, without spending a
+credit or a free preview. An explicit selection then follows the existing audit
+and payment path. The lookup warning also excludes exception text and SQL data.
