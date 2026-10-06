@@ -182,6 +182,17 @@ provenance makes it `NOT_MEASURED`. Trade count plus win rate uses both sources;
 break-even cost includes the pips source only when pips appear in its label.
 Reference costs used solely for color do not alter the figure's evidence.
 
+Blocked numeric comparisons include short, fixed ES/EN/PT steps for reviewing
+the original evidence: check dates/time zones, actual observation spacing, curve
+type, import warnings or numeric units in the original export and individual
+report. The steps preserve the original files, windows, frequencies and existing
+reports; they never prescribe trimming a period, forcing an annual frequency,
+editing stored JSON or changing a classification. Distinct periods/frequencies
+remain separate histories. A link reuses the existing localized export-guide
+index; it creates no new audit, consumes no credits and changes no account right.
+Repeated steps are deduplicated by reason code, report index and metric, keeping
+each report/metric context. Fully comparable measured figures need no such steps.
+
 Run the existing account/payment/rights/PDF/retention tests and the new
 `tests/test_audit_commercial_observability.py`. The opt-in PostgreSQL suite
 validates atomic counters, concurrent credit retry, additive schema preservation

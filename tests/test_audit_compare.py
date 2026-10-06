@@ -17,7 +17,7 @@ pytest.importorskip("sqlalchemy")
 from fastapi.testclient import TestClient  # noqa: E402
 
 from quant_trade.audit.compare import COPY, comparison_body, parse_report_link  # noqa: E402
-from quant_trade.audit.comparison_delta import REASONS  # noqa: E402
+from quant_trade.audit.comparison_delta import ACTION_COPY, EVIDENCE_STEPS, REASONS  # noqa: E402
 from quant_trade.audit.guard import find_claims  # noqa: E402
 from quant_trade.audit.report import LABELS, evidence_label  # noqa: E402
 from quant_trade.audit.settings import AuditSettings  # noqa: E402
@@ -245,6 +245,24 @@ def test_native_csv_format_and_parseable_dates_keep_fixed_card_labels() -> None:
     body = comparison_body(a, b, href_a="/synthetic-a", href_b="/synthetic-b", locale="en")
     assert body.count("File: CSV") == 2
     assert body.count("2024-01-01 → 2024-12-31") == 2
+
+
+@pytest.mark.parametrize(
+    "locale,guides", [("es", "/guias"), ("en", "/guides"), ("pt", "/pt/guias")]
+)
+def test_comparison_steps_link_existing_export_guides_and_keep_original_results(
+    locale: str, guides: str
+) -> None:
+    a, b = _stored_result(), _stored_result()
+    b["inputs"]["first_timestamp"] = "2024-01-02T00:00:00Z"
+    b["performance"]["sharpe"]["value"] = 0.8
+    original = deepcopy((a, b))
+    body = comparison_body(a, b, href_a="/synthetic-a", href_b="/synthetic-b", locale=locale)
+    assert ACTION_COPY[locale]["title"] in body
+    assert EVIDENCE_STEPS[locale]["dates_different"] in body
+    assert f"href='{guides}'" in body
+    assert ">0.50<" in body and ">0.80<" in body and "+0.300" not in body
+    assert (a, b) == original and find_claims(body) == []
 
 
 def test_finite_but_overflowing_percentage_is_not_rendered_as_infinity() -> None:

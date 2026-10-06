@@ -12,8 +12,12 @@ from audit_fixtures import csv_bytes, positive_drift, signed_in
 from fastapi.testclient import TestClient
 
 from quant_trade.audit.comparison_delta import (
+    ACTION_COPY,
     COPY,
+    EVIDENCE_STEPS,
     REASONS,
+    ComparabilityDiagnostic,
+    ComparisonIssue,
     change_summary,
     comparability_diagnostic,
     comparable_window,
@@ -51,6 +55,17 @@ def test_comparison_notes_have_registered_spanish_rules() -> None:
         assert spanish(COPY["en"][key]) == COPY["es"][key]
     for key, english in REASONS["en"].items():
         assert spanish(english) == REASONS["es"][key]
+    for key, english in EVIDENCE_STEPS["en"].items():
+        assert spanish(english) == EVIDENCE_STEPS["es"][key]
+    for key, english in ACTION_COPY["en"].items():
+        assert spanish(english) == ACTION_COPY["es"][key]
+
+
+def test_all_fixed_steps_have_an_existing_reason_and_pass_the_claim_guard() -> None:
+    for locale in ("es", "en", "pt"):
+        assert EVIDENCE_STEPS[locale].keys() == REASONS[locale].keys()
+        assert all(find_claims(text) == [] for text in EVIDENCE_STEPS[locale].values())
+        assert all(find_claims(text) == [] for text in ACTION_COPY[locale].values())
 
 
 @pytest.mark.parametrize("locale", ["es", "en", "pt"])
@@ -67,6 +82,7 @@ def test_summary_counts_evidence_changes_without_claiming_significance(locale: s
     assert "D → C" in summary and "+0.300" in summary and "+2.00 pp" in summary
     assert COPY[locale]["dimensions"].format(n=1) in summary
     assert COPY[locale]["compatible"] in summary
+    assert ACTION_COPY[locale]["title"] not in summary
     assert find_claims(summary) == []
     assert (a, b) == original
 
@@ -138,6 +154,8 @@ def test_diagnostic_explains_the_specific_context_failure(field, value, reason) 
     for locale in ("es", "en", "pt"):
         summary = change_summary(a, b, locale)
         assert REASONS[locale][reason] in unescape(summary)
+        assert EVIDENCE_STEPS[locale][reason] in unescape(summary)
+        assert ACTION_COPY[locale]["notice"] in unescape(summary)
         assert find_claims(summary) == []
     assert (a, b) == original
 
@@ -217,6 +235,35 @@ def test_diagnostics_do_not_echo_untrusted_context_values() -> None:
     summary = change_summary(a, b, "en")
     assert all(value not in summary for value in ("secret-token", "private-file", "secret-db-url"))
     assert find_claims(summary) == []
+
+
+@pytest.mark.parametrize("locale", ["es", "en", "pt"])
+def test_evidence_steps_deduplicate_only_identical_issue_context(locale, monkeypatch) -> None:
+    a, b = _result(), _result()
+    for result in (a, b):
+        result["performance"]["sharpe"]["evidence"] = "DECLARED"
+    b["performance"]["max_drawdown"]["evidence"] = "DECLARED"
+    diagnostic = comparability_diagnostic(a, b)
+    assert diagnostic.issues == (
+        ComparisonIssue("metric_unmeasured", 1, "sharpe"),
+        ComparisonIssue("metric_unmeasured", 2, "sharpe"),
+        ComparisonIssue("metric_unmeasured", 2, "max_drawdown"),
+    )
+    original = deepcopy((a, b))
+    duplicate = ComparabilityDiagnostic((diagnostic.issues[0], *diagnostic.issues))
+    monkeypatch.setattr(
+        "quant_trade.audit.comparison_delta.comparability_diagnostic", lambda *args: duplicate
+    )
+    summary = change_summary(a, b, locale)
+    actions = unescape(
+        summary.split("<section class='cmp-actions'", 1)[1].split("</section>", 1)[0]
+    )
+    assert actions.count("<li>") == 3
+    assert actions.count(EVIDENCE_STEPS[locale]["metric_unmeasured"]) == 3
+    assert COPY[locale]["report"].format(n=1) in actions
+    assert actions.count(COPY[locale]["report"].format(n=2)) == 2
+    assert "Sharpe" in actions
+    assert (a, b) == original and find_claims(summary) == []
 
 
 def test_private_comparison_keeps_customer_rights_and_consumes_no_credits(tmp_path) -> None:

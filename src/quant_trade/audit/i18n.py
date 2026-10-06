@@ -75,6 +75,115 @@ _TRIAL_SOURCES: dict[str, str] = {
 }
 
 _RULES_SOURCE: tuple[tuple[str, str], ...] = (
+    # Private comparison: fixed steps for reviewing original evidence.
+    (
+        "What to check now",
+        "Qué revisar ahora",
+    ),
+    (
+        "These steps review evidence. Keep the originals and these reports; their results "
+        "stay unchanged.",
+        "Estas indicaciones revisan evidencia. Conserva los originales y estos informes; "
+        "sus resultados siguen iguales.",
+    ),
+    (
+        "See export guides",
+        "Ver guías de exportación",
+    ),
+    (
+        "Open the individual report and review its import warnings alongside the original export.",
+        "Abre el informe individual y revisa sus advertencias de importación junto a la "
+        "exportación original.",
+    ),
+    (
+        "Find the date column in the original export and check that the history retains "
+        "its start and end.",
+        "Busca la columna de fecha en la exportación original y comprueba que el "
+        "historial conserve su inicio y fin.",
+    ),
+    (
+        "Check the date format and interpretation in the original file and the import warnings.",
+        "Comprueba el formato y la interpretación de las fechas en el archivo original y "
+        "en las advertencias de importación.",
+    ),
+    (
+        "Check the time zone used for the export; confirm the hour offset with the "
+        "platform documentation.",
+        "Consulta la zona horaria usada al exportar; confirma el desfase de las horas con "
+        "la documentación de la plataforma.",
+    ),
+    (
+        "Review the start and end dates in the original export and the interpretation "
+        "stated in the report.",
+        "Revisa las fechas inicial y final en la exportación original y la interpretación "
+        "indicada en el informe.",
+    ),
+    (
+        "Check the periods of both original files. If they differ, keep both reports and "
+        "read them separately.",
+        "Comprueba los períodos de ambos archivos originales. Si son distintos, conserva "
+        "ambos informes y léelos por separado.",
+    ),
+    (
+        "Review the dates and spacing between rows in the original history; the audit "
+        "infers frequency from those data.",
+        "Revisa las fechas y la separación entre filas del historial original; la "
+        "auditoría infiere la frecuencia de esos datos.",
+    ),
+    (
+        "Check the original file's time continuity and review warnings about dates and "
+        "discarded rows.",
+        "Verifica la continuidad temporal del archivo original y revisa las advertencias "
+        "sobre fechas y filas descartadas.",
+    ),
+    (
+        "Check the observation frequency of both original exports. If it differs, read "
+        "the figures separately.",
+        "Comprueba la frecuencia de observaciones de ambas exportaciones originales. Si "
+        "es distinta, lee las cifras por separado.",
+    ),
+    (
+        "Check the inferred frequency in each individual report and its warnings; keep "
+        "the original export for review.",
+        "Consulta la frecuencia inferida en cada informe individual y sus advertencias; "
+        "conserva la exportación original para revisarla.",
+    ),
+    (
+        "Check the periodicity described by each report against the original file; keep "
+        "both labels as displayed.",
+        "Comprueba qué periodicidad describe cada informe con el archivo original; mantén "
+        "ambas etiquetas tal como se muestran.",
+    ),
+    (
+        "Identify whether the original export's values include open positions or only "
+        "closed trades.",
+        "Identifica en la exportación original si los valores incluyen posiciones "
+        "abiertas o sólo operaciones cerradas.",
+    ),
+    (
+        "Check which curve each file exports. If you have an original equity curve from "
+        "the same history, keep it alongside the closed-trade balance.",
+        "Revisa qué curva exporta cada archivo. Si tienes una curva de equity original "
+        "del mismo historial, consérvala junto al balance cerrado.",
+    ),
+    (
+        "Open the figure's section in its individual report and check which evidence is "
+        "missing against the original history.",
+        "Abre la sección de la cifra en su informe individual y revisa qué evidencia "
+        "falta; contrástala con el historial original.",
+    ),
+    (
+        "Check units and numeric format in the original export and review the individual "
+        "report's warnings.",
+        "Comprueba unidades y formato numérico en la exportación original y revisa las "
+        "advertencias del informe individual.",
+    ),
+    (
+        "Check both reports' units and figures against their original files; keep the "
+        "difference unmeasured while reviewing.",
+        "Contrasta las unidades y las cifras de ambos informes con sus archivos "
+        "originales; conserva la diferencia como no medida mientras se revisa.",
+    ),
     (
         "The data context is missing or its format is invalid.",
         "Falta el contexto de los datos o su formato no es válido.",

@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
+from quant_trade.audit.guides import guides_index_url
 from quant_trade.audit.redflags import flag_title
 from quant_trade.audit.report import LABELS, _dimension_title
 from quant_trade.audit.verdict import DIMENSION_ORDER
@@ -164,6 +165,234 @@ REASONS = {
 }
 
 
+ACTION_COPY = {
+    "es": {
+        "title": "Qué revisar ahora",
+        "notice": (
+            "Estas indicaciones revisan evidencia. Conserva los originales y estos informes; "
+            "sus resultados siguen iguales."
+        ),
+        "guides": "Ver guías de exportación",
+    },
+    "en": {
+        "title": "What to check now",
+        "notice": (
+            "These steps review evidence. Keep the originals and these reports; "
+            "their results stay unchanged."
+        ),
+        "guides": "See export guides",
+    },
+    "pt": {
+        "title": "O que revisar agora",
+        "notice": (
+            "Estas orientações revisam evidências. Preserve os originais e estes relatórios; "
+            "seus resultados continuam iguais."
+        ),
+        "guides": "Ver guias de exportação",
+    },
+}
+
+EVIDENCE_STEPS = {
+    "es": {
+        "context_invalid": (
+            "Abre el informe individual y revisa sus advertencias de importación "
+            "junto a la exportación original."
+        ),
+        "dates_missing": (
+            "Busca la columna de fecha en la exportación original y comprueba que el "
+            "historial conserve su inicio y fin."
+        ),
+        "dates_invalid": (
+            "Comprueba el formato y la interpretación de las fechas en el archivo original "
+            "y en las advertencias de importación."
+        ),
+        "dates_timezone": (
+            "Consulta la zona horaria usada al exportar; confirma el desfase de las horas "
+            "con la documentación de la plataforma."
+        ),
+        "dates_order": (
+            "Revisa las fechas inicial y final en la exportación original y la "
+            "interpretación indicada en el informe."
+        ),
+        "dates_different": (
+            "Comprueba los períodos de ambos archivos originales. Si son distintos, "
+            "conserva ambos informes y léelos por separado."
+        ),
+        "frequency_missing": (
+            "Revisa las fechas y la separación entre filas del historial original; "
+            "la auditoría infiere la frecuencia de esos datos."
+        ),
+        "frequency_invalid": (
+            "Verifica la continuidad temporal del archivo original y revisa las "
+            "advertencias sobre fechas y filas descartadas."
+        ),
+        "frequency_different": (
+            "Comprueba la frecuencia de observaciones de ambas exportaciones originales. "
+            "Si es distinta, lee las cifras por separado."
+        ),
+        "label_missing": (
+            "Consulta la frecuencia inferida en cada informe individual y sus advertencias; "
+            "conserva la exportación original para revisarla."
+        ),
+        "label_different": (
+            "Comprueba qué periodicidad describe cada informe con el archivo original; "
+            "mantén ambas etiquetas tal como se muestran."
+        ),
+        "curve_invalid": (
+            "Identifica en la exportación original si los valores incluyen posiciones "
+            "abiertas o sólo operaciones cerradas."
+        ),
+        "curve_different": (
+            "Revisa qué curva exporta cada archivo. Si tienes una curva de equity original "
+            "del mismo historial, consérvala junto al balance cerrado."
+        ),
+        "metric_unmeasured": (
+            "Abre la sección de la cifra en su informe individual y revisa qué evidencia "
+            "falta; contrástala con el historial original."
+        ),
+        "metric_invalid": (
+            "Comprueba unidades y formato numérico en la exportación original y revisa "
+            "las advertencias del informe individual."
+        ),
+        "difference_invalid": (
+            "Contrasta las unidades y las cifras de ambos informes con sus archivos "
+            "originales; conserva la diferencia como no medida mientras se revisa."
+        ),
+    },
+    "en": {
+        "context_invalid": (
+            "Open the individual report and review its import warnings alongside "
+            "the original export."
+        ),
+        "dates_missing": (
+            "Find the date column in the original export and check that the history "
+            "retains its start and end."
+        ),
+        "dates_invalid": (
+            "Check the date format and interpretation in the original file and the import warnings."
+        ),
+        "dates_timezone": (
+            "Check the time zone used for the export; confirm the hour offset "
+            "with the platform documentation."
+        ),
+        "dates_order": (
+            "Review the start and end dates in the original export and "
+            "the interpretation stated in the report."
+        ),
+        "dates_different": (
+            "Check the periods of both original files. If they differ, "
+            "keep both reports and read them separately."
+        ),
+        "frequency_missing": (
+            "Review the dates and spacing between rows in the original history; "
+            "the audit infers frequency from those data."
+        ),
+        "frequency_invalid": (
+            "Check the original file's time continuity and review "
+            "warnings about dates and discarded rows."
+        ),
+        "frequency_different": (
+            "Check the observation frequency of both original exports. "
+            "If it differs, read the figures separately."
+        ),
+        "label_missing": (
+            "Check the inferred frequency in each individual report and its warnings; "
+            "keep the original export for review."
+        ),
+        "label_different": (
+            "Check the periodicity described by each report against the original file; "
+            "keep both labels as displayed."
+        ),
+        "curve_invalid": (
+            "Identify whether the original export's values include "
+            "open positions or only closed trades."
+        ),
+        "curve_different": (
+            "Check which curve each file exports. If you have an original equity curve "
+            "from the same history, keep it alongside the closed-trade balance."
+        ),
+        "metric_unmeasured": (
+            "Open the figure's section in its individual report and check "
+            "which evidence is missing against the original history."
+        ),
+        "metric_invalid": (
+            "Check units and numeric format in the original export and review "
+            "the individual report's warnings."
+        ),
+        "difference_invalid": (
+            "Check both reports' units and figures against their original files; "
+            "keep the difference unmeasured while reviewing."
+        ),
+    },
+    "pt": {
+        "context_invalid": (
+            "Abra o relatório individual e revise os avisos de importação "
+            "junto à exportação original."
+        ),
+        "dates_missing": (
+            "Localize a coluna de data na exportação original e confira se o "
+            "histórico preserva seu início e fim."
+        ),
+        "dates_invalid": (
+            "Confira o formato e a interpretação das datas no arquivo original "
+            "e nos avisos de importação."
+        ),
+        "dates_timezone": (
+            "Consulte o fuso horário usado na exportação; confirme o deslocamento "
+            "das horas com a documentação da plataforma."
+        ),
+        "dates_order": (
+            "Revise as datas inicial e final na exportação original "
+            "e a interpretação indicada no relatório."
+        ),
+        "dates_different": (
+            "Confira os períodos dos dois arquivos originais. Se forem diferentes, "
+            "preserve ambos os relatórios e leia-os separadamente."
+        ),
+        "frequency_missing": (
+            "Revise as datas e o intervalo entre linhas do histórico original; "
+            "a auditoria infere a frequência desses dados."
+        ),
+        "frequency_invalid": (
+            "Confira a continuidade temporal do arquivo original e revise "
+            "os avisos sobre datas e linhas descartadas."
+        ),
+        "frequency_different": (
+            "Confira a frequência das observações nas duas exportações originais. "
+            "Se for diferente, leia os números separadamente."
+        ),
+        "label_missing": (
+            "Consulte a frequência inferida em cada relatório individual e seus avisos; "
+            "preserve a exportação original para revisão."
+        ),
+        "label_different": (
+            "Confira a periodicidade descrita por cada relatório com o arquivo original; "
+            "mantenha ambas as etiquetas como são exibidas."
+        ),
+        "curve_invalid": (
+            "Identifique na exportação original se os valores incluem "
+            "posições abertas ou apenas operações fechadas."
+        ),
+        "curve_different": (
+            "Confira qual curva cada arquivo exporta. Se tiver uma curva de equity original "
+            "do mesmo histórico, preserve-a junto ao saldo fechado."
+        ),
+        "metric_unmeasured": (
+            "Abra a seção do número no relatório individual e revise qual evidência "
+            "falta; confira com o histórico original."
+        ),
+        "metric_invalid": (
+            "Confira as unidades e o formato numérico na exportação original "
+            "e revise os avisos do relatório individual."
+        ),
+        "difference_invalid": (
+            "Confira as unidades e os números dos dois relatórios com seus arquivos "
+            "originais; mantenha a diferença não medida durante a revisão."
+        ),
+    },
+}
+
+
 @dataclass(frozen=True)
 class ComparisonIssue:
     """A fixed reason code; only report indices and fixed metric names are retained."""
@@ -297,6 +526,41 @@ def comparable_window(a: dict[str, Any], b: dict[str, Any]) -> bool:
     return comparability_diagnostic(a, b).window_comparable
 
 
+def _evidence_actions(diagnostic: ComparabilityDiagnostic, a: dict[str, Any], locale: str) -> str:
+    steps = []
+    seen = set()
+    for issue in diagnostic.issues:
+        key = (issue.code, issue.report, issue.metric)
+        if key in seen:
+            continue
+        seen.add(key)
+        text = EVIDENCE_STEPS[locale][issue.code]
+        if issue.report is not None:
+            text = f"{COPY[locale]['report'].format(n=issue.report)}: {text}"
+        if issue.metric is not None:
+            closed = _mapping(a.get("inputs")).get("balance_only") is True
+            label = (
+                "kpi_sharpe"
+                if issue.metric == "sharpe"
+                else "kpi_drawdown_closed"
+                if closed
+                else "kpi_drawdown"
+            )
+            text = f"{LABELS[locale][label]} · {text}"
+        steps.append(f"<li>{html.escape(text, quote=True)}</li>")
+    if not steps:
+        return ""
+    copy = ACTION_COPY[locale]
+    return (
+        "<section class='cmp-actions' aria-labelledby='comparison-evidence-actions'>"
+        f"<h4 id='comparison-evidence-actions'>{html.escape(copy['title'])}</h4>"
+        f"<p class='muted'>{html.escape(copy['notice'])}</p><ol>"
+        + "".join(steps)
+        + f"</ol><p><a href='{guides_index_url(locale)}'>{html.escape(copy['guides'])}</a></p>"
+        + "</section>"
+    )
+
+
 def change_summary(a: dict[str, Any], b: dict[str, Any], locale: str) -> str:
     """Read stored results only; all text is escaped, no account/credit writes."""
     locale = locale if locale in COPY else "es"
@@ -373,6 +637,7 @@ def change_summary(a: dict[str, Any], b: dict[str, Any], locale: str) -> str:
             if reasons
             else ""
         )
+        + _evidence_actions(diagnostic, a, locale)
         + (
             "<ul>" + "".join(deltas) + "</ul>"
             if deltas
