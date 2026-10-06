@@ -50,6 +50,18 @@ El registro se creó mientras la reparación final estaba sin commit. Su metadat
 `b7dcad8`, mientras los hashes sellados corresponden al código publicado `4c39e97`. Se mantiene
 esa diferencia explícita; no se reescribe el manifest antiguo.
 
+Las estructuras canónicas públicas que esos dos primeros hashes identifican
+se conservan en `configs/provenance/archives/`: el mapa de fuentes Windows de
+`4c39e97` y el protocolo económico. Cada archivo contiene exactamente los bytes
+JSON canónicos que producen el hash indicado arriba, sin salto de línea final.
+El mapa usa los nombres con separador Windows que selló esa ejecución; sus
+once hashes de archivos se reconstruyeron desde los blobs Git de `4c39e97`.
+El protocolo coincide con el sello conservado. Son estructuras de código y
+criterios, sin precios, clientes, posiciones ni base de datos. Permiten que el
+guard de procedencia resuelva los hashes sin cambiar su techo, excepciones ni
+el resultado del ensayo. Los datos y el manifest privado siguen fuera de Git;
+estos archivos no sustituyen esos inputs ni acreditan rendimiento futuro.
+
 La liquidez de desarrollo usa volumen de la sesión previa cerrada como proxy; no mide la
 liquidez disponible en la apertura. Las fracciones y costos son supuestos. El dividendo se
 acredita hipotéticamente en fecha ex, sin modelar la fecha de pago ni impuestos.
