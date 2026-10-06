@@ -8,11 +8,43 @@ from typing import Any
 
 from quant_trade.personal_paper.config import PersonalPaperError, canonical, digest
 
+_READ_SCHEMA = {
+    "meta": {"key", "value"},
+    "books": {"id", "value"},
+    "bars": {"timestamp", "sha"},
+    "events": {"sequence", "kind", "value", "previous_sha", "sha"},
+    "curves": {"timestamp", "book", "value"},
+}
+
 
 class PaperStore:
     """SQLite WAL + FULL fsync; the write transaction is the single-writer lease."""
 
-    def __init__(self, path: Path) -> None:
+    def __init__(self, path: Path, *, read_only: bool = False) -> None:
+        self.read_only = read_only
+        if read_only:
+            connection = None
+            try:
+                # Preserve source data while including committed WAL. SQLite may
+                # maintain WAL sidecars; immutable mode would hide new WAL rows.
+                connection = sqlite3.connect(
+                    path.resolve().as_uri() + "?mode=ro",
+                    uri=True,
+                    timeout=0,
+                    isolation_level=None,
+                )
+                self.db = connection
+                self.db.row_factory = sqlite3.Row
+                self._validate_read_schema()
+            except (sqlite3.DatabaseError, PersonalPaperError) as exc:
+                if connection is not None:
+                    connection.close()
+                if isinstance(exc, PersonalPaperError):
+                    raise
+                raise PersonalPaperError(
+                    "paper database cannot be read or its schema is invalid"
+                ) from exc
+            return
         path.parent.mkdir(parents=True, exist_ok=True)
         self.db = sqlite3.connect(path, timeout=0, isolation_level=None)
         self.db.row_factory = sqlite3.Row
@@ -34,6 +66,17 @@ class PaperStore:
             self.db.close()
             raise PersonalPaperError("another writer owns the paper database") from exc
 
+    def _validate_read_schema(self) -> None:
+        tables = {
+            row[0] for row in self.db.execute("SELECT name FROM sqlite_master WHERE type='table'")
+        }
+        if not _READ_SCHEMA.keys() <= tables:
+            raise PersonalPaperError("paper database schema is absent or incompatible")
+        for table, expected in _READ_SCHEMA.items():
+            columns = {row[1] for row in self.db.execute(f"PRAGMA table_info({table})")}
+            if not expected <= columns:
+                raise PersonalPaperError("paper database schema is absent or incompatible")
+
     @contextmanager
     def reading(self):
         if self.db.in_transaction:
@@ -47,6 +90,8 @@ class PaperStore:
 
     @contextmanager
     def writing(self):
+        if self.read_only:
+            raise PersonalPaperError("paper database is read-only; writing is forbidden")
         try:
             self.db.execute("BEGIN IMMEDIATE")
         except sqlite3.OperationalError as exc:

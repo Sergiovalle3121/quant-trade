@@ -940,7 +940,7 @@ def _execute_quotes(
 def status(database: Path, *, now_utc: str | None = None) -> dict[str, Any]:
     if not database.exists():
         raise PersonalPaperError("paper database does not exist; run initializes it")
-    store = PaperStore(database)
+    store = PaperStore(database, read_only=True)
     try:
         with store.reading():
             store.verify()
@@ -993,7 +993,23 @@ def pause(database: Path, reason: str, *, now_utc: str | None = None) -> None:
     try:
         with store.writing():
             store.verify()
-            for key, book in store.books().items():
+            books = store.books()
+            last_control = store.db.execute(
+                "SELECT kind,value FROM events "
+                "WHERE kind IN ('manual_pause','reviewed_resume') "
+                "ORDER BY sequence DESC LIMIT 1"
+            ).fetchone()
+            if (
+                books
+                and all(book["paused"] for book in books.values())
+                and last_control is not None
+                and last_control["kind"] == "manual_pause"
+                and json.loads(last_control["value"])["reason"] == reason
+            ):
+                return
+            for key, book in books.items():
+                if book["paused"]:
+                    continue  # preserve the first cause until a reviewed resume
                 book["paused"], book["pause_reason"] = True, reason
                 store.seal_book(key, book)
             store.event("manual_pause", {"reason": reason, "timestamp": now_utc or clock()})
@@ -1029,7 +1045,7 @@ def resume(database: Path, review: str, *, now_utc: str | None = None) -> None:
 def export(database: Path, output_dir: Path) -> dict[str, str]:
     if not database.exists():
         raise PersonalPaperError("paper database does not exist")
-    store = PaperStore(database)
+    store = PaperStore(database, read_only=True)
     try:
         with store.reading():
             store.verify()

@@ -188,3 +188,32 @@ El [resumen de validación conservada](PERSONAL_PAPER_VALIDATION_20261005.md) pu
 alternativas del replay de desarrollo, sus límites y los pasos pendientes para observación nueva.
 Cambiar el código del worker requiere registrar una versión nueva; no se reutiliza ni reescribe
 la base del replay congelado para adaptar su evidencia al software posterior.
+
+## Diagnósticos de lectura y solicitudes de pausa
+
+`status`, la lectura fuente de `export` y la revisión económica abren SQLite con
+URI `mode=ro`, sin inicializar tablas, crear el directorio de la fuente ni cambiar
+su modo de diario. Una ruta a otra base, un esquema incompleto o un archivo que
+no sea SQLite se rechaza con un error de dominio. La salida CSV/JSON solicitada
+por `export` sólo se crea después de verificar un registro válido. El lector
+conserva una instantánea transaccional y lee los commits del WAL en la siguiente
+transacción; no usa `immutable`, que podría omitir observaciones aún en el WAL.
+SQLite puede crear sus auxiliares `-wal`/`-shm` dentro del directorio existente
+de una fuente WAL. `mode=ro` protege los datos, esquema y modo del diario de la
+fuente; no promete ausencia de archivos auxiliares ni evita sus requisitos de
+acceso. La revisión conserva los datos confirmados en WAL.
+
+La solicitud de pausa sólo sella las carteras activas que pasan a pausadas.
+Una cartera ya pausada conserva su primera causa hasta una revisión para
+reanudar. Un motivo adicional se registra como `manual_pause`; reiterar el mismo
+último motivo mientras todas siguen pausadas no duplica estados ni solicitudes,
+incluso después de reiniciar o valorar nuevamente. Una reanudación revisada
+permite registrar una pausa posterior por la misma razón. La transacción hace
+rollback completo si se interrumpe antes de terminar.
+
+El presupuesto sigue publicando `BUDGET_PAUSED` y su hora de comprobación en cada
+iteración bloqueada, sin consultar proveedores. Esto actualiza el diagnóstico
+operativo sin inflar el diario de posiciones. Los límites, estrategias, costos y
+criterios económicos permanecen congelados; las correcciones de código exigen
+una base nueva para un experimento posterior. Pruebas offline:
+`test_personal_paper_read_only.py` y `test_personal_paper_pause_idempotency.py`.
