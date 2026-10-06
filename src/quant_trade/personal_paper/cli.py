@@ -24,7 +24,11 @@ def _print(value: Any) -> None:
             "quotes": value["worker"]["quotes"],
             "budget": value["worker"]["budget"],
             "paused_books": [k for k, b in value["books"].items() if b["paused"]],
+            "pause_reasons": {
+                k: b.get("pause_reason") for k, b in value["books"].items() if b["paused"]
+            },
             "max_drawdown": max(b["drawdown"] for b in value["books"].values()),
+            "warning": value.get("warning"),
             "real_money_approved": False,
         }
     if isinstance(value, dict) and "manifest" in value:

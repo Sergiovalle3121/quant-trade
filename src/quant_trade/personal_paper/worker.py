@@ -62,7 +62,10 @@ def budget_review(path: Path | None, now: pd.Timestamp, ceiling: float) -> dict[
             "ceiling_mxn": ceiling,
             "note": "No paid services are provisioned; economic review needs expense coverage.",
         }
-    rows = pd.read_csv(path)
+    try:
+        rows = pd.read_csv(path)
+    except pd.errors.EmptyDataError:
+        rows = pd.DataFrame(columns=["start", "end", "category", "amount_mxn"])
     if not {"start", "end", "category", "amount_mxn"} <= set(rows):
         raise PersonalPaperError("expense CSV requires start,end,category,amount_mxn")
     rows["start"] = rows.start.map(engine.utc)
@@ -78,7 +81,14 @@ def budget_review(path: Path | None, now: pd.Timestamp, ceiling: float) -> dict[
         )
     month = now.normalize().replace(day=1)
     following = month + pd.offsets.MonthBegin(1)
-    total = float(rows.loc[(rows.start < following) & (rows.end > month), "amount_mxn"].sum())
+    monthly = rows.loc[(rows.start < following) & (rows.end > month)]
+    if monthly.empty:
+        return {
+            "status": "UNOBSERVED",
+            "ceiling_mxn": ceiling,
+            "note": "No declared expenses overlap the current UTC month; coverage is unobserved.",
+        }
+    total = float(monthly.amount_mxn.sum())
     return {
         "status": "OVER_BUDGET" if total > ceiling else "WITHIN_DECLARED_BUDGET",
         "observed_mxn": total,
@@ -112,6 +122,16 @@ def _cached_snapshot(cache: Path, now: pd.Timestamp) -> Path | None:
     return path
 
 
+def _publish_status(cache: Path, result: dict[str, Any], checked_at: pd.Timestamp) -> None:
+    """Replace only a completely written operational observation."""
+    payload = {**result, "checked_at_utc": checked_at.tz_convert("UTC").isoformat()}
+    encoded = json.dumps(payload, indent=2, allow_nan=False)
+    cache.mkdir(parents=True, exist_ok=True)
+    temporary = cache / "worker_status.tmp"
+    temporary.write_text(encoded, encoding="utf-8")
+    temporary.replace(cache / "worker_status.json")
+
+
 def run_once(
     config: Path,
     database: Path,
@@ -130,7 +150,9 @@ def run_once(
         if budget["status"] == "OVER_BUDGET":
             if database.exists():
                 engine.pause(database, "observed monthly budget exceeded")
-            return {"status": "BUDGET_PAUSED", "budget": budget, "real_money_approved": False}
+            result = {"status": "BUDGET_PAUSED", "budget": budget, "real_money_approved": False}
+            _publish_status(cache, result, now)
+            return result
         snapshot = _cached_snapshot(cache, now) or fetch.fetch_snapshot(start, cache)
         result = engine.run(
             config,
@@ -157,8 +179,5 @@ def run_once(
             "budget": budget,
             "quote_limitations": "Delayed 1m prices; missed opening windows expire.",
         }
-        cache.mkdir(parents=True, exist_ok=True)
-        temporary = cache / "worker_status.tmp"
-        temporary.write_text(json.dumps(result, indent=2, allow_nan=False), encoding="utf-8")
-        temporary.replace(cache / "worker_status.json")
+        _publish_status(cache, result, now)
         return result

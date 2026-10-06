@@ -102,7 +102,12 @@ python -m quant_trade.personal_paper worker --config configs/personal/etf_privat
 
 Valida hashes del cache, refresca una vez al día y después de un cierre nuevo, registra únicamente
 observaciones posteriores al sello y busca precios de apertura cuando corresponde. Guarda
-`worker_status.json` privado. Repetirlo mediante un programador local cada minuto permite observar
+`worker_status.json` privado mediante reemplazo atómico, también cuando se detiene por presupuesto.
+El archivo contiene `checked_at_utc`; representa la última iteración que publicó estado, no un
+heartbeat ni una aprobación económica. Si falla el proveedor, consultar también la fecha,
+los logs y el código de salida: el archivo puede conservar el estado anterior. El resumen CLI
+conserva el aviso de simulación y las causas de pausa de cada cartera.
+Repetirlo mediante un programador local cada minuto permite observar
 la apertura; el equipo debe estar encendido y conectado. El wrapper PowerShell incluido ejecuta
 una iteración, conserva logs y devuelve un código de error. No registra por sí mismo una tarea ni
 contrata infraestructura. Las zonas horarias y días festivos los determina el calendario, no una
@@ -111,7 +116,10 @@ hora mexicana fija. Tampoco configurar una tarea de Railway que modifique el ser
 El presupuesto configurado es 500 MXN/mes; no se crean servicios de pago. `--expenses archivo.csv`
 admite `start,end,category,amount_mxn` con horas UTC. Suma conservadoramente todos los gastos
 que tocan el mes; por encima del límite pausa compras y bloquea la siguiente recolección. Sin ese
-registro el estado es `UNOBSERVED`, no gasto cero. Mantener costos externos reales por separado.
+registro el estado es `UNOBSERVED`, no gasto cero. Un CSV vacío o sin gastos que intersecten el
+mes vigente también es `UNOBSERVED`; un cero explícito del mes sí se conserva como cero declarado.
+`WITHIN_DECLARED_BUDGET` sólo describe las filas vigentes recibidas, no acredita que el registro
+esté completo. Mantener costos externos reales por separado.
 
 ## Estado, recuperación y evaluación
 
@@ -175,3 +183,8 @@ aunque se declaran tres comparaciones; faltan los momentos de las otras combinac
 generador actual ya registra todas las combinaciones, pero eso no completa evidencia histórica
 ausente. La revisión económica permanece inconclusa mientras esa evidencia no sea auditable;
 no inventa Sharpes ni reescribe los resultados para completar el contador.
+
+El [resumen de validación conservada](PERSONAL_PAPER_VALIDATION_20261005.md) publica las nueve
+alternativas del replay de desarrollo, sus límites y los pasos pendientes para observación nueva.
+Cambiar el código del worker requiere registrar una versión nueva; no se reutiliza ni reescribe
+la base del replay congelado para adaptar su evidencia al software posterior.
