@@ -174,6 +174,14 @@ checks use stored results, preserve existing classifications and permissions,
 and do not change credits or stored inputs. Diagnostics never echo timestamps,
 labels, file names, cells, account identifiers or other free-form values.
 
+Every comparison KPI cell displays its own standard, localized evidence badge.
+Valid declared values stay `DECLARED`; absent or invalid figures stay
+`NOT_MEASURED`. A compound figure is `MEASURED` only when all numbers it displays
+are measured. Any declared component makes the cell `DECLARED`; absent or unknown
+provenance makes it `NOT_MEASURED`. Trade count plus win rate uses both sources;
+break-even cost includes the pips source only when pips appear in its label.
+Reference costs used solely for color do not alter the figure's evidence.
+
 Run the existing account/payment/rights/PDF/retention tests and the new
 `tests/test_audit_commercial_observability.py`. The opt-in PostgreSQL suite
 validates atomic counters, concurrent credit retry, additive schema preservation

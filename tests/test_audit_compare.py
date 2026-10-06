@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+import re
 from copy import deepcopy
-from html import unescape
+from html import escape, unescape
 from pathlib import Path
 from typing import Any
 
@@ -18,6 +19,7 @@ from fastapi.testclient import TestClient  # noqa: E402
 from quant_trade.audit.compare import COPY, comparison_body, parse_report_link  # noqa: E402
 from quant_trade.audit.comparison_delta import REASONS  # noqa: E402
 from quant_trade.audit.guard import find_claims  # noqa: E402
+from quant_trade.audit.report import LABELS, evidence_label  # noqa: E402
 from quant_trade.audit.settings import AuditSettings  # noqa: E402
 from quant_trade.audit.store import make_store  # noqa: E402
 from quant_trade.audit.web import create_app  # noqa: E402
@@ -42,6 +44,142 @@ def _stored_result() -> dict[str, Any]:
         "verdict": {"overall": "D", "dimensions": [{"name": "costs", "status": "FAIL"}]},
         "red_flags": [],
     }
+
+
+def _figure_cells(body: str, label: str) -> list[str]:
+    row = re.search(rf"<tr><td>{re.escape(escape(label))}</td>(.*?)</tr>", body, re.DOTALL)
+    assert row is not None
+    return re.findall(r"<td[^>]*>(.*?)</td>", row.group(1), re.DOTALL)
+
+
+def _assert_badge(cell: str, tag: str, locale: str) -> None:
+    assert f"class='badge {tag}'>{evidence_label(tag, locale)}</span>" in cell
+    assert cell.count("class='badge ") == 1
+
+
+@pytest.mark.parametrize("locale", ["es", "en", "pt"])
+def test_equal_figures_show_each_reports_own_evidence_and_missing_is_not_measured(
+    locale: str,
+) -> None:
+    a, b = _stored_result(), _stored_result()
+    b["performance"]["sharpe"]["evidence"] = "DECLARED"
+    b["performance"]["max_drawdown"] = {"evidence": "MEASURED", "value": None}
+    original = deepcopy((a, b))
+    body = comparison_body(a, b, href_a="/synthetic-a", href_b="/synthetic-b", locale=locale)
+    left, right = _figure_cells(body, LABELS[locale]["kpi_sharpe"])
+    assert ">0.50<" in left and ">0.50<" in right
+    _assert_badge(left, "MEASURED", locale)
+    _assert_badge(right, "DECLARED", locale)
+    left, right = _figure_cells(body, LABELS[locale]["kpi_drawdown"])
+    _assert_badge(left, "MEASURED", locale)
+    _assert_badge(right, "NOT_MEASURED", locale)
+    assert ">—<" in right and ">0.0%<" not in right
+    assert (a, b) == original and find_claims(body) == []
+
+
+@pytest.mark.parametrize("locale", ["es", "en", "pt"])
+@pytest.mark.parametrize(
+    "count_tag,rate_tag,expected",
+    [
+        ("MEASURED", "MEASURED", "MEASURED"),
+        ("MEASURED", "DECLARED", "DECLARED"),
+        ("DECLARED", "MEASURED", "DECLARED"),
+        ("DECLARED", "DECLARED", "DECLARED"),
+        ("MEASURED", "NOT_MEASURED", "NOT_MEASURED"),
+    ],
+)
+def test_trade_count_and_win_rate_use_the_lower_evidence_of_both_sources(
+    locale: str, count_tag: str, rate_tag: str, expected: str
+) -> None:
+    a, b = _stored_result(), _stored_result()
+    a["trade_stats"] = {
+        "trade_count": {"evidence": "MEASURED", "value": 20},
+        "win_rate": {"evidence": "MEASURED", "value": 0.5},
+    }
+    b["trade_stats"] = {
+        "trade_count": {"evidence": count_tag, "value": 20},
+        "win_rate": {"evidence": rate_tag, "value": 0.5},
+    }
+    original = deepcopy((a, b))
+    body = comparison_body(a, b, href_a="/synthetic-a", href_b="/synthetic-b", locale=locale)
+    left, right = _figure_cells(body, LABELS[locale]["kpi_trades"])
+    _assert_badge(left, "MEASURED", locale)
+    _assert_badge(right, expected, locale)
+    assert (
+        ">—<" in right
+        if expected == "NOT_MEASURED"
+        else ">20 · 50%<" in left and ">20 · 50%<" in right
+    )
+    assert (a, b) == original
+
+
+@pytest.mark.parametrize("locale", ["es", "en", "pt"])
+@pytest.mark.parametrize("bps,expected", [(5.0, "DECLARED"), (0.0, "MEASURED")])
+def test_break_even_evidence_includes_pips_only_when_that_number_is_displayed(
+    locale: str, bps: float, expected: str
+) -> None:
+    a, b = _stored_result(), _stored_result()
+    for result in (a, b):
+        result["costs"] = {
+            "break_even_bps": {"evidence": "MEASURED", "value": bps},
+            "break_even_pips": {"evidence": "DECLARED", "value": 1.5},
+            "reference_bps": {"evidence": "DECLARED", "value": 2.0},
+        }
+    label = LABELS[locale]["kpi_breakeven"]
+    label += (
+        f" ({LABELS[locale]['bps_side']}; 1.5 pips)"
+        if bps > 0
+        else f" ({LABELS[locale]['kpi_breakeven_negative']})"
+    )
+    original = deepcopy((a, b))
+    body = comparison_body(a, b, href_a="/synthetic-a", href_b="/synthetic-b", locale=locale)
+    for cell in _figure_cells(body, label):
+        _assert_badge(cell, expected, locale)
+    assert (a, b) == original
+
+
+@pytest.mark.parametrize("locale", ["es", "en", "pt"])
+@pytest.mark.parametrize("tag", ["MEASURED", "DECLARED"])
+@pytest.mark.parametrize("closed", [False, True])
+def test_all_valid_key_figures_keep_their_source_evidence(
+    locale: str, tag: str, closed: bool
+) -> None:
+    def evidence(value: float) -> dict[str, Any]:
+        return {"evidence": tag, "value": value}
+
+    a = _stored_result()
+    a["inputs"]["balance_only"] = closed
+    a["performance"] = {
+        "total_return": evidence(0.05),
+        "max_drawdown": evidence(-0.1),
+        "platform_equity_drawdown": evidence(-0.2),
+        "sharpe": evidence(0.5),
+    }
+    a["trade_stats"] = {
+        "profit_factor": evidence(1.4),
+        "trade_count": evidence(20),
+        "win_rate": evidence(0.5),
+    }
+    a["risk"] = {"max_drawdown": {"p95": evidence(0.18)}}
+    a["costs"] = {
+        "break_even_bps": evidence(5),
+        "break_even_pips": evidence(1.5),
+        "reference_bps": evidence(2),
+    }
+    a["stress"] = {
+        "trades": {"rows": [{"scenario": "best_5_trades", "result": evidence(10)}]},
+        "returns": {"rows": [{"scenario": "best_5_periods", "result": evidence(0.01)}]},
+    }
+    b = deepcopy(a)
+    original = deepcopy((a, b))
+    body = comparison_body(a, b, href_a="/synthetic-a", href_b="/synthetic-b", locale=locale)
+    figures = body.rsplit("<table class='cmp'>", 1)[1].split("</table>", 1)[0]
+    cells = re.findall(r"<tr><td>[^<]+</td>(.*?)</tr>", figures, re.DOTALL)
+    assert len(cells) == 10
+    for row in cells:
+        for cell in re.findall(r"<td[^>]*>(.*?)</td>", row, re.DOTALL):
+            _assert_badge(cell, tag, locale)
+    assert (a, b) == original and find_claims(body) == []
 
 
 @pytest.mark.parametrize("locale", ["es", "en", "pt"])

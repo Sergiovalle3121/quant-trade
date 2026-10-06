@@ -28,6 +28,7 @@ from quant_trade.audit.report import (
     STATUS_TEXT,
     _dimension_title,
     _kpi_list,
+    evidence_label,
 )
 from quant_trade.audit.theme import class_ring
 from quant_trade.audit.verdict import DIMENSION_ORDER
@@ -342,6 +343,67 @@ def _display_data(data: dict[str, Any]) -> dict[str, Any]:
     return out
 
 
+def _combined_evidence(*blocks: Any) -> str:
+    tags = [_mapping(block).get("evidence") for block in blocks]
+    if not tags or any(tag not in ("MEASURED", "DECLARED") for tag in tags):
+        return "NOT_MEASURED"
+    if any(_mapping(block).get("value") is None for block in blocks):
+        return "NOT_MEASURED"
+    return "DECLARED" if "DECLARED" in tags else "MEASURED"
+
+
+def _kpi_cells(data: dict[str, Any], labels: dict[str, str]) -> dict[str, tuple[str, str]]:
+    """Preserve the evidence of every numeric source used in a displayed figure."""
+    display = _display_data(data)
+    perf, stats, costs = (display[name] for name in ("performance", "trade_stats", "costs"))
+    closed = display["inputs"]["balance_only"]
+    sources = {
+        labels[key]: _combined_evidence(block)
+        for key, block in (
+            ("kpi_return", perf["total_return"]),
+            ("kpi_drawdown_closed" if closed else "kpi_drawdown", perf["max_drawdown"]),
+            ("kpi_dd_platform", perf["platform_equity_drawdown"]),
+            (
+                "kpi_dd_p95_closed" if closed else "kpi_dd_p95",
+                display["risk"]["max_drawdown"]["p95"],
+            ),
+            ("kpi_sharpe", perf["sharpe"]),
+            ("kpi_pf", stats["profit_factor"]),
+        )
+    }
+    sources[labels["kpi_trades"]] = _combined_evidence(stats["trade_count"], stats["win_rate"])
+    bps, pips = costs["break_even_bps"], costs["break_even_pips"]
+    if bps["value"] is not None:
+        label = f"{labels['kpi_breakeven']} ({labels['kpi_breakeven_negative']})"
+        blocks = [bps]
+        if bps["value"] > 0:
+            label = f"{labels['kpi_breakeven']} ({labels['bps_side']})"
+            if pips["value"] is not None:
+                label = (
+                    f"{labels['kpi_breakeven']} ({labels['bps_side']}; {pips['value']:,.1f} pips)"
+                )
+                blocks.append(pips)
+        sources[label] = _combined_evidence(*blocks)
+    for section, key in (("trades", "kpi_stress"), ("returns", "kpi_stress_curve")):
+        rows = display["stress"][section]["rows"]
+        sources[labels[key]] = _combined_evidence(rows[0]["result"]) if rows else "NOT_MEASURED"
+    cells = {}
+    for label, shown, _ in _kpi_list(display, labels):
+        tag = sources.get(label, "NOT_MEASURED")
+        cells[label] = (shown if tag != "NOT_MEASURED" else "—", tag)
+    for key in ("kpi_sharpe", "kpi_drawdown_closed" if closed else "kpi_drawdown"):
+        cells.setdefault(labels[key], ("—", "NOT_MEASURED"))
+    return cells
+
+
+def _figure_cell(value: tuple[str, str] | None, locale: str, different: bool) -> str:
+    shown, tag = value or ("—", "NOT_MEASURED")
+    return (
+        f"<td{' class=diff' if different else ''}><span>{_e(shown)}</span> "
+        f"<span class='badge {_e(tag)}'>{_e(evidence_label(tag, locale))}</span></td>"
+    )
+
+
 def comparison_body(
     a: dict[str, Any], b: dict[str, Any], *, href_a: str, href_b: str, locale: str
 ) -> str:
@@ -363,21 +425,12 @@ def comparison_body(
         f"<td>{_status_cell(dims_b.get(name, 'NOT_MEASURED'), locale)}</td></tr>"
         for name in DIMENSION_ORDER
     )
-    kpis_a, kpis_b = [
-        {label: shown for label, shown, _ in _kpi_list(_display_data(data), labels)}
-        for data in (a, b)
-    ]
-    for data, kpis in ((a, kpis_a), (b, kpis_b)):
-        closed = _mapping(data.get("inputs")).get("balance_only") is True
-        kpis.setdefault(labels["kpi_sharpe"], "NOT_MEASURED")
-        kpis.setdefault(labels["kpi_drawdown_closed" if closed else "kpi_drawdown"], "NOT_MEASURED")
+    kpis_a, kpis_b = [_kpi_cells(data, labels) for data in (a, b)]
     order = list(kpis_a) + [label for label in kpis_b if label not in kpis_a]
     figure_rows = "".join(
         f"<tr><td>{_e(label)}</td>"
-        f"<td{' class=diff' if kpis_a.get(label) != kpis_b.get(label) else ''}>"
-        f"{_e(kpis_a.get(label, 'NOT_MEASURED'))}</td>"
-        f"<td{' class=diff' if kpis_a.get(label) != kpis_b.get(label) else ''}>"
-        f"{_e(kpis_b.get(label, 'NOT_MEASURED'))}</td></tr>"
+        f"{_figure_cell(kpis_a.get(label), locale, kpis_a.get(label) != kpis_b.get(label))}"
+        f"{_figure_cell(kpis_b.get(label), locale, kpis_a.get(label) != kpis_b.get(label))}</tr>"
         for label in order
     )
     header = f"<tr><th></th><th>{_e(copy['report_a'])}</th><th>{_e(copy['report_b'])}</th></tr>"
