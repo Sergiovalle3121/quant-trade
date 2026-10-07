@@ -1,0 +1,9 @@
+schema_version: 1
+experiment_id: personal_etf_risk_profile_v1
+capital_mxn: 20000
+monthly_host_budget_mxn: 500
+data_kind: market
+price_basis: raw_with_actions
+max_drawdown: 0.05
+max_daily_loss: 0.02
+costs: {commission_bps: 5, slippage_bps: 5, spread_bps: 2}

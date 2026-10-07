@@ -23,10 +23,12 @@ coincurve==21.0.0
 cryptography==49.0.0
 curl_cffi==0.15.0
 dnspython==2.8.0
+exchange_calendars==4.13.2
 frozenlist==1.8.0
 idna==3.18
 iniconfig==2.3.0
 jmespath==1.1.0
+korean_lunar_calendar==0.4.0
 librt==0.12.0
 markdown-it-py==4.2.0
 mdurl==0.1.2
@@ -53,6 +55,7 @@ pycares==5.0.1
 pycparser==3.0
 pydantic==2.13.4
 pydantic_core==2.46.4
+pyluach==2.3.0
 pypdfium2==5.13.0
 pytest==9.1.1
 python-dateutil==2.9.0.post0
@@ -65,10 +68,12 @@ segno==1.6.6
 shellingham==1.5.4
 six==1.17.0
 soupsieve==2.8.4
+toolz==1.1.0
 typer==0.26.8
 types-PyYAML==6.0.12.20260518
 typing-inspection==0.4.2
 typing_extensions==4.16.0
+tzdata==2026.5
 urllib3==2.7.0
 webauthn==3.0.1
 websockets==16.0

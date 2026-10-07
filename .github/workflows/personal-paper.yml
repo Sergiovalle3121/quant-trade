@@ -1,0 +1,46 @@
+name: Private paper simulator
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  offline-paper:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python-version: ["3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install private research dependencies
+        run: python -m pip install -c requirements.lock.txt -e ".[dev,personal-paper]"
+      - name: Check the private implementation
+        run: |
+          ruff check src/quant_trade/personal_paper tests/test_personal_paper*.py
+          ruff format --check src/quant_trade/personal_paper tests/test_personal_paper*.py
+          mypy src/quant_trade/personal_paper
+      - name: Offline causal and recovery tests
+        run: pytest -q tests/test_personal_paper_engine.py tests/test_personal_paper_worker.py tests/test_personal_paper_cli.py tests/test_personal_paper_fetch.py tests/test_personal_paper_economic.py tests/test_personal_paper_backup.py tests/test_personal_paper_pause_idempotency.py tests/test_personal_paper_read_only.py tests/test_personal_paper_writer_guard.py tests/test_execution_safety.py --junitxml=state/paper-tests.xml
+      - name: Reproducible synthetic CLI and restart
+        run: |
+          python -m quant_trade.personal_paper demo-data --output state/demo
+          python -m quant_trade.personal_paper run --config configs/personal/synthetic_demo.yaml --data state/demo/synthetic_ohlcv.csv --fx state/demo/synthetic_fx.csv --database state/paper.sqlite
+          python -m quant_trade.personal_paper run --config configs/personal/synthetic_demo.yaml --data state/demo/synthetic_ohlcv.csv --fx state/demo/synthetic_fx.csv --database state/paper.sqlite
+          python -m quant_trade.personal_paper pause --database state/paper.sqlite --reason "CI persistent pause"
+          python -m quant_trade.personal_paper backup --database state/paper.sqlite --output state/restore.sqlite
+          python -m quant_trade.personal_paper status --database state/restore.sqlite
+          python -m quant_trade.personal_paper economic-review --database state/paper.sqlite --output state/evidence
+      - name: Preserve synthetic diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: paper-synthetic-${{ matrix.os }}-${{ matrix.python-version }}
+          path: |
+            state/paper-tests.xml
+            state/evidence/
+          if-no-files-found: error
