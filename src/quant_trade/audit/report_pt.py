@@ -791,14 +791,22 @@ REPORT: dict[str, Any] = {
         ),
         "reading": "Leitura do seu arquivo",
         "reading_intro": (
-            "Antes de analisar qualquer coisa, recontamos suas operações linha por linha e "
-            "comparamos com o resumo que sua plataforma imprime."
+            "Comparamos os totais disponíveis no resumo da sua plataforma com os valores "
+            "calculados a partir das linhas do arquivo."
         ),
         "reading_platform": "Sua plataforma",
         "reading_rows": "Lido das linhas",
         "reading_ok": "Coincide",
         "reading_bad": "Não coincide",
-        "reading_all_ok": "Tudo coincide: a análise parte dos mesmos números que você vê.",
+        "reading_all_ok": "Os valores comparados coincidem dentro da tolerância de leitura.",
+        "reading_scope": (
+            "Esta conferência usa valores do mesmo arquivo. Não verifica valores ausentes "
+            "nem autentica o histórico."
+        ),
+        "reading_closing_rows": (
+            "Neste total de MT5 contamos linhas de fechamento; uma posição fechada em "
+            "várias partes pode ter vários fechamentos."
+        ),
         "reading_some_bad": (
             "Algo não coincide. Revise os avisos de leitura mais abaixo e, se achar que lemos "
             "seu arquivo errado, escreva para nós com o identificador do relatório."

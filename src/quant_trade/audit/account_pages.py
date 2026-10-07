@@ -3593,8 +3593,9 @@ def strategy_page(
     ``printable`` is the PDF summary: the same content without forms or
     buttons, with the date it was made.
     """
+    from quant_trade.audit.report import evidence_label
     from quant_trade.audit.strategies import COPY as SCOPY
-    from quant_trade.audit.strategies import figures_text, headline, what_changed
+    from quant_trade.audit.strategies import figures_text, headline_evidence, what_changed
 
     locale = _locale(locale)
     copy = SCOPY[locale]
@@ -3611,9 +3612,18 @@ def strategy_page(
     for number, (item, result) in enumerate(versions, start=1):
         full = comparable(item, free_mode=free_mode) and result is not None
         if full and result is not None:
+            evidence = headline_evidence(result)
             cells = "".join(
-                f"<td class='strat-fig' data-label='{_e(copy[key])}'>{_e(text)}</td>"
-                for key, text in zip(figure_keys, figures_text(headline(result)), strict=True)
+                f"<td class='strat-fig' data-label='{_e(copy[key])}'>"
+                f"<span>{_e(text)}</span> "
+                f"<span class='badge {_e(evidence[field][1])}'>"
+                f"{_e(evidence_label(evidence[field][1], locale))}</span></td>"
+                for key, field, text in zip(
+                    figure_keys,
+                    ("sharpe", "dsr", "max_drawdown"),
+                    figures_text({name: value for name, (value, _) in evidence.items()}),
+                    strict=True,
+                )
             )
         else:
             cells = (
@@ -3804,6 +3814,9 @@ color:var(--text-2);font-size:.85rem}
 .page-hero .lead{font-size:10pt;max-width:none;margin:0}
 .page-main{padding:14pt 0 0}
 .strat-table{font-size:8.5pt}
+.strat-table .strat-date{white-space:nowrap;overflow-wrap:normal}
+.strat-table .strat-fig>span:first-child{display:block;white-space:nowrap;overflow-wrap:normal}
+.strat-table .strat-fig .badge{margin-top:3pt}
 .strat-table .acct-cls{display:inline-block;width:22px;height:22px;line-height:19px;
 text-align:center;font-size:9pt}
 .strat-change{break-inside:avoid;padding:12pt 14pt;margin:10pt 0}

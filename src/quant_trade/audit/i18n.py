@@ -75,6 +75,207 @@ _TRIAL_SOURCES: dict[str, str] = {
 }
 
 _RULES_SOURCE: tuple[tuple[str, str], ...] = (
+    # Private comparison: fixed steps for reviewing original evidence.
+    (
+        "What to check now",
+        "Qué revisar ahora",
+    ),
+    (
+        "These steps review evidence. Keep the originals and these reports; their results "
+        "stay unchanged.",
+        "Estas indicaciones revisan evidencia. Conserva los originales y estos informes; "
+        "sus resultados siguen iguales.",
+    ),
+    (
+        "See export guides",
+        "Ver guías de exportación",
+    ),
+    (
+        "Open the individual report and review its import warnings alongside the original export.",
+        "Abre el informe individual y revisa sus advertencias de importación junto a la "
+        "exportación original.",
+    ),
+    (
+        "Find the date column in the original export and check that the history retains "
+        "its start and end.",
+        "Busca la columna de fecha en la exportación original y comprueba que el "
+        "historial conserve su inicio y fin.",
+    ),
+    (
+        "Check the date format and interpretation in the original file and the import warnings.",
+        "Comprueba el formato y la interpretación de las fechas en el archivo original y "
+        "en las advertencias de importación.",
+    ),
+    (
+        "Check the time zone used for the export; confirm the hour offset with the "
+        "platform documentation.",
+        "Consulta la zona horaria usada al exportar; confirma el desfase de las horas con "
+        "la documentación de la plataforma.",
+    ),
+    (
+        "Review the start and end dates in the original export and the interpretation "
+        "stated in the report.",
+        "Revisa las fechas inicial y final en la exportación original y la interpretación "
+        "indicada en el informe.",
+    ),
+    (
+        "Check the periods of both original files. If they differ, keep both reports and "
+        "read them separately.",
+        "Comprueba los períodos de ambos archivos originales. Si son distintos, conserva "
+        "ambos informes y léelos por separado.",
+    ),
+    (
+        "Review the dates and spacing between rows in the original history; the audit "
+        "infers frequency from those data.",
+        "Revisa las fechas y la separación entre filas del historial original; la "
+        "auditoría infiere la frecuencia de esos datos.",
+    ),
+    (
+        "Check the original file's time continuity and review warnings about dates and "
+        "discarded rows.",
+        "Verifica la continuidad temporal del archivo original y revisa las advertencias "
+        "sobre fechas y filas descartadas.",
+    ),
+    (
+        "Check the observation frequency of both original exports. If it differs, read "
+        "the figures separately.",
+        "Comprueba la frecuencia de observaciones de ambas exportaciones originales. Si "
+        "es distinta, lee las cifras por separado.",
+    ),
+    (
+        "Check the inferred frequency in each individual report and its warnings; keep "
+        "the original export for review.",
+        "Consulta la frecuencia inferida en cada informe individual y sus advertencias; "
+        "conserva la exportación original para revisarla.",
+    ),
+    (
+        "Check the periodicity described by each report against the original file; keep "
+        "both labels as displayed.",
+        "Comprueba qué periodicidad describe cada informe con el archivo original; mantén "
+        "ambas etiquetas tal como se muestran.",
+    ),
+    (
+        "Identify whether the original export's values include open positions or only "
+        "closed trades.",
+        "Identifica en la exportación original si los valores incluyen posiciones "
+        "abiertas o sólo operaciones cerradas.",
+    ),
+    (
+        "Check which curve each file exports. If you have an original equity curve from "
+        "the same history, keep it alongside the closed-trade balance.",
+        "Revisa qué curva exporta cada archivo. Si tienes una curva de equity original "
+        "del mismo historial, consérvala junto al balance cerrado.",
+    ),
+    (
+        "Open the figure's section in its individual report and check which evidence is "
+        "missing against the original history.",
+        "Abre la sección de la cifra en su informe individual y revisa qué evidencia "
+        "falta; contrástala con el historial original.",
+    ),
+    (
+        "Check units and numeric format in the original export and review the individual "
+        "report's warnings.",
+        "Comprueba unidades y formato numérico en la exportación original y revisa las "
+        "advertencias del informe individual.",
+    ),
+    (
+        "Check both reports' units and figures against their original files; keep the "
+        "difference unmeasured while reviewing.",
+        "Contrasta las unidades y las cifras de ambos informes con sus archivos "
+        "originales; conserva la diferencia como no medida mientras se revisa.",
+    ),
+    (
+        "The data context is missing or its format is invalid.",
+        "Falta el contexto de los datos o su formato no es válido.",
+    ),
+    (
+        "The history's start or end timestamp is missing.",
+        "Falta la fecha inicial o final del historial.",
+    ),
+    (
+        "The history's start or end timestamp cannot be read.",
+        "No se puede leer la fecha inicial o final del historial.",
+    ),
+    (
+        "The history's timestamps do not include a time zone.",
+        "Las fechas del historial no incluyen zona horaria.",
+    ),
+    (
+        "The end timestamp must be later than the start timestamp.",
+        "La fecha final debe ser posterior a la inicial.",
+    ),
+    (
+        "The start or end dates and times of the two histories do not match.",
+        "Las fechas y horas de inicio o fin de los dos historiales no coinciden.",
+    ),
+    (
+        "Frequency needs a positive number with MEASURED evidence.",
+        "La frecuencia necesita un número positivo con evidencia MEASURED.",
+    ),
+    (
+        "The frequency value is not a positive, finite number.",
+        "El valor de la frecuencia no es un número positivo y finito.",
+    ),
+    (
+        "The measured frequencies of the two histories do not match.",
+        "Las frecuencias medidas de los dos historiales no coinciden.",
+    ),
+    (
+        "The history is missing a valid frequency label.",
+        "Falta una etiqueta de frecuencia válida para el historial.",
+    ),
+    (
+        "The frequency labels of the two histories do not match.",
+        "Las etiquetas de frecuencia de los dos historiales no coinciden.",
+    ),
+    (
+        "The history must identify an equity curve or a closed-trade balance.",
+        "Falta indicar si el historial es una curva de equity o de balance cerrado.",
+    ),
+    (
+        "One history uses equity and the other uses a closed-trade balance. "
+        "A closed-trade balance does not show open positions.",
+        "Un historial usa equity y el otro, balance de operaciones cerradas. "
+        "El balance cerrado no muestra las posiciones abiertas.",
+    ),
+    (
+        "The figure needs MEASURED evidence in both reports.",
+        "La cifra necesita evidencia MEASURED en ambos informes.",
+    ),
+    (
+        "The figure does not contain a valid, finite numeric value.",
+        "La cifra no contiene un valor numérico finito válido.",
+    ),
+    (
+        "The difference exceeds the numeric range that can be represented.",
+        "La diferencia excede el rango numérico que se puede representar.",
+    ),
+    (
+        "Same dates, frequency and curve type. Differences are arithmetic, "
+        "without a significance test.",
+        "Mismas fechas, frecuencia y tipo de curva. Las diferencias son aritméticas, "
+        "sin prueba de significancia.",
+    ),
+    (
+        "NOT_MEASURED · no numeric difference: dates, frequency or curve type differ, "
+        "or their evidence is missing.",
+        "NOT_MEASURED · sin diferencia numérica: las fechas, frecuencia o tipo de curva "
+        "no coinciden o falta su evidencia.",
+    ),
+    (
+        "Each report retains its own files and declarations. An absent flag may reflect "
+        "missing data; it does not show that the risk disappeared. Classification and tests "
+        "also depend on declared trials and costs.",
+        "Cada informe conserva sus propios archivos y declaraciones. Una bandera ausente "
+        "puede deberse a datos faltantes; no demuestra que el riesgo desapareció. La clase y "
+        "las pruebas dependen también de los intentos y costos declarados.",
+    ),
+    (
+        "Confirm your email to receive the first full report free. "
+        "If required, you verify a card without a charge.",
+        "Confirma tu correo para recibir el primer informe completo gratis. "
+        "Si se requiere, validas una tarjeta sin cargo.",
+    ),
     # --- Parse warnings: equity, trades and benchmark CSV (schema.py) ---
     ("both {a} and {b} present; using {c}", "hay columnas {a} y {b}; se usa {c}"),
     (

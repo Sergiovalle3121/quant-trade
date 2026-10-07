@@ -636,6 +636,23 @@ a small form that fills in its own link. Rules:
   that a class difference shows which tests changed, not that one version
   will work better.
 
+The existing account picker (`/cuenta/comparar`, `/account/comparar`,
+`/pt/conta/comparar`) uses the signed-in customer's report list; it never exposes
+tokens or consumes credits. A new stored-evidence summary shows the class change,
+which dimensions changed result, and flags that appear or are absent in report 2.
+An absent flag can reflect missing data, not a resolved risk. Classification and
+tests retain their own reports' declarations, including attempts and costs.
+
+Numeric differences are arithmetic (report 2 minus report 1), not significance
+tests or predictions. Sharpe and drawdown differences require both figures to be
+finite and `MEASURED`, the same timezone-aware start/end, positive measured
+frequency within `1e-6` relative tolerance, the same frequency label, and the
+same closed-balance/equity basis. Missing or incompatible context shows
+`NOT_MEASURED` while retaining the side-by-side figures. Drawdown differences
+use percentage points. All text exists in ES/EN/PT and passes the claim guard.
+Paid/full-report rights remain readable if an email later becomes unconfirmed;
+unconfirmed welcome previews and locked reports do not enter the comparison.
+
 ### Stress tests without the best outcomes
 
 `audit/stress.py` removes the best outcomes from what was uploaded and
@@ -4197,3 +4214,32 @@ class, evidence tag or reader changed. Tests: `tests/test_audit_report_polish.py
   report's digest in `audit_files` when the upload has no curve of its
   own). Nothing changes in what is spent: the upload is a preview as
   before. The note appears only to the signed-in owner of both reports.
+
+### Private operations and observed commercial costs (2026-10-05)
+
+The owner panel adds 30-day upload/audit/queue/PDF counters and approximate
+latency histograms, persistent retention attempt/success health (overdue after
+36 hours), observed USD cost totals and a first-touch X acquisition cohort over
+14 days. These are additive tables; public health and payment/rights contracts
+remain unchanged. Customer requests buffer aggregate telemetry without SQL
+writes, and failed telemetry cannot block delivery. Costs and contribution are
+`DECLARED`; absent categories/windows remain `NOT_MEASURED`. See
+[RIGOR_COMMERCIAL_OBSERVABILITY.md](RIGOR_COMMERCIAL_OBSERVABILITY.md) for exact
+measurement definitions, privacy, staged rollout and additive rollback, and
+[LOCAL_POSTGRES_QA.md](LOCAL_POSTGRES_QA.md) for isolated PostgreSQL evidence.
+The public CTA now explains email confirmation in ES/EN/PT when that gate is
+enabled. No audit dimension, red flag, threshold or verdict changes.
+
+### Optional column preferences and report delivery (2026-10-06)
+
+After creating an audit, remembering the customer's column mapping is optional.
+A failure in that preference step no longer prevents the report's redirect or
+JSON response, token delivery and account linkage after a code was redeemed.
+The operator receives a fixed warning without exception text, SQL parameters or
+customer data. Successful preferences remain reusable; parsing and audit-storage
+failures keep their existing refusals. Credit rules, prices and permissions are
+unchanged. Offline regression tests: `tests/test_audit_column_map_resilience.py`.
+Reading a saved preference is optional too: if its lookup fails, the customer
+can still name the columns in HTML or JSON, in ES/EN/PT, without spending a
+credit or a free preview. An explicit selection then follows the existing audit
+and payment path. The lookup warning also excludes exception text and SQL data.

@@ -880,6 +880,7 @@ padding:18px 22px;background:#fff;border:1px solid var(--border);border-radius:1
 .recon-k{font-weight:600;letter-spacing:-.01em}
 .recon-v{display:flex;align-items:center;gap:18px}
 .recon-v span{display:grid;gap:2px;text-align:right;min-width:92px}
+.recon-v .badge{display:inline-flex;min-width:0;justify-self:end;gap:6px;white-space:nowrap}
 .recon-v small{white-space:nowrap;font:500 .62rem var(--mono);letter-spacing:.12em;text-transform:uppercase;
 color:var(--text-3)}
 .recon-v b{font-size:1.35rem;font-weight:600;letter-spacing:-.03em;font-variant-numeric:tabular-nums}
@@ -917,7 +918,8 @@ gap:8px 20px;padding-left:20px;color:var(--text-2)}
 .forensic-signal{background:#fff;border-color:#999}}
 @media (max-width:620px){.recon-row{grid-template-columns:minmax(0,1fr) auto;gap:12px 16px;padding:16px}
 .recon-v{grid-column:1/-1;grid-row:2;justify-content:flex-start}
-.recon-v span{text-align:left;min-width:0}}
+.recon-v span{text-align:left;min-width:0}
+.recon-v .badge{justify-self:start}}
 @media (max-width:620px){.verdict{flex-direction:column;align-items:flex-start;gap:22px}}
 .report-main{padding:clamp(48px,7vw,88px) 0 clamp(64px,9vw,112px)}
 .rsec{margin:0 0 clamp(48px,6vw,72px)}
@@ -1310,8 +1312,12 @@ PRINT = """
 @media print{
 .recon-row{padding:12px 18px;gap:16px;break-inside:avoid;box-shadow:none!important}
 .recon-v span{min-width:0}
+.recon-v>span{display:block}
+.recon-v>span>small,.recon-v>span>b{display:block}
 .metrics .val{padding-right:14px}.tbar-track{width:calc(100% - 100px)}.facts{display:block}.fact{break-inside:avoid;display:inline-block;vertical-align:top;width:31.5%;margin:0 1.5% 8px 0;padding:12px 14px}.fact b{font-size:20pt!important}.fact p{font-size:9pt;margin-top:4px}.facts.pairs .fact{width:48%;margin-right:2%}.metrics .c-v{width:17%}
 .recon-v i{margin:0 16px}.recon-row .badge{margin-left:18px}
+.recon-row .recon-v .badge{display:inline-block;margin-left:0;justify-self:auto;text-align:left}
+.recon-row .recon-v .badge::before{display:inline-block;margin-right:6px;vertical-align:middle}
 :root,.hero,.page-hero,.report-hero,.lockbox,.verdict{--bg:#fff;--surface:#fff;--surface-2:#f4f4f6;
 --surface-solid:#fff;--text:#000;--text-2:#333;--text-3:#555;--border:#ddd;--border-2:#ccc;
 --ok:#17742f;--warn:#9a5200;--bad:#c42b21;color-scheme:light}
