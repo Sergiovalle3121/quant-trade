@@ -121,6 +121,62 @@ def test_postgres_telemetry_pool_and_sql_waits_are_bounded(local_databases) -> N
         assert time.monotonic() - before < 3.5
 
 
+def test_postgres_telemetry_limits_keep_url_options_and_end_with_transaction(
+    local_databases,
+) -> None:
+    url, _ = local_databases(initialise=False)
+    with_options = url.update_query_dict({"options": "-c search_path=public"})
+    store = make_store(with_options.render_as_string(hide_password=False))
+    try:
+        for engine in (store.engine, store.ops_engine):
+            with engine.connect() as conn:
+                assert conn.execute(sa.text("SHOW search_path")).scalar_one() == "public"
+        with store.ops_engine.connect() as telemetry:
+            assert telemetry.execute(sa.text("SHOW statement_timeout")).scalar_one() == "2s"
+            telemetry.commit()
+            # A new transaction on the same connection is bounded again.
+            assert telemetry.execute(sa.text("SHOW lock_timeout")).scalar_one() == "500ms"
+        # Outside a telemetry transaction the pooled server session has no limit,
+        # so a transaction pooler cannot hand it to another client.
+        raw = store.ops_engine.raw_connection()
+        try:
+            cursor = raw.cursor()
+            cursor.execute("SHOW statement_timeout")
+            assert cursor.fetchone()[0] == "0"
+            cursor.close()
+        finally:
+            raw.close()
+        store.count_ops(
+            day="2026-01-01", locale="es", operation="pdf", outcome="success", bucket_ms=100
+        )
+        assert store.ops_rows("2026-01-01")[0]["count"] == 1
+    finally:
+        store.engine.dispose()
+        store.ops_engine.dispose()
+
+
+def test_postgres_replicas_starting_together_all_create_the_schema(local_databases) -> None:
+    url, _ = local_databases(initialise=False)
+    target = url.render_as_string(hide_password=False)
+    workers = 4
+    ready = threading.Barrier(workers)
+
+    def start(_: int) -> Store:
+        ready.wait(timeout=30)
+        return Store(target)
+
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        stores = list(pool.map(start, range(workers)))
+    try:
+        for store in stores:
+            assert store.ops_job() is None
+            assert store.count_accounts() == 0
+    finally:
+        for store in stores:
+            store.engine.dispose()
+            store.ops_engine.dispose()
+
+
 def _audit(store: Store, audit_id: str) -> None:
     data = b"timestamp,equity\n2026-01-01,10000\n2026-01-02,10001\n"
     store.create_audit(

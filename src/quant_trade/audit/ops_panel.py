@@ -53,6 +53,7 @@ def operations_section(
     at: datetime,
     dropped: int = 0,
     flush_failed: bool = False,
+    since: datetime | None = None,
 ) -> str:
     groups: dict[tuple[str, str], list[dict[str, Any]]] = defaultdict(list)
     for row in rows:
@@ -72,7 +73,7 @@ def operations_section(
                 percentile_bucket(successes, 0.95),
             ]
         )
-    status = retention_status(job, enabled=enabled, at=at)
+    status = retention_status(job, enabled=enabled, at=at, since=since)
     labels = {
         "disabled": "Automática apagada: requiere purga manual",
         "not_measured": "NOT_MEASURED: aún sin éxito registrado",

@@ -16,6 +16,20 @@ def stamp(value: datetime) -> str:
     return value.astimezone(UTC).isoformat().replace("+00:00", "Z")
 
 
+def bound_ops_transaction(conn: Any) -> None:
+    """Telemetry waits at most 2 s per statement and 0.5 s per lock.
+
+    Set per transaction (``SET LOCAL``), not as a startup ``options``
+    parameter: that would replace any ``options`` in ``DATABASE_URL`` (such as
+    search_path), PgBouncer rejects it, and the limits end with the transaction
+    instead of following a pooled server connection.
+    """
+    conn.exec_driver_sql(
+        "SELECT set_config('statement_timeout', '2000', true), "
+        "set_config('lock_timeout', '500', true)"
+    )
+
+
 class OpsStoreMixin:
     """Tables created with the existing Store metadata; old columns never change."""
 
@@ -40,14 +54,16 @@ class OpsStoreMixin:
                 max_overflow=0,
                 pool_timeout=1,
                 pool_recycle=300,
-                connect_args={
-                    "connect_timeout": 2,
-                    "options": "-c statement_timeout=2000 -c lock_timeout=500",
-                },
+                # A connection left over from a PostgreSQL restart is replaced,
+                # not reported to the panel as missing telemetry.
+                pool_pre_ping=True,
+                connect_args={"connect_timeout": 2},
             )
             if self.engine.dialect.name == "postgresql"
             else self.engine
         )
+        if self.ops_engine is not self.engine:
+            sa.event.listen(self.ops_engine, "begin", bound_ops_transaction)
         self.ops_counters = sa.Table(
             "ops_counters",
             self.metadata,
