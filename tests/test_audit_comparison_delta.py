@@ -24,6 +24,7 @@ from quant_trade.audit.comparison_delta import (
 )
 from quant_trade.audit.guard import find_claims
 from quant_trade.audit.i18n import spanish
+from quant_trade.audit.report import evidence_label, localize_tags, localize_text_nodes
 from quant_trade.audit.settings import AuditSettings
 from quant_trade.audit.store import make_store
 from quant_trade.audit.web import create_app
@@ -225,6 +226,26 @@ def test_metric_failure_explains_only_that_delta_and_preserves_the_other(block, 
     summary = change_summary(a, b, "en")
     assert REASONS["en"][reason] in summary
     assert "+2.00 pp" in summary and "private-token" not in summary
+
+
+@pytest.mark.parametrize(
+    "locale,wording",
+    [("es", "evidencia medida"), ("en", "Measured evidence"), ("pt", "evidência medida")],
+)
+def test_reasons_read_naturally_once_evidence_codes_become_words(locale, wording) -> None:
+    # A page shows MEASURED as its badge noun ("Medido"), which cannot follow
+    # "evidencia"/"evidência": Spanish and Portuguese say it in agreeing words.
+    for key in ("frequency_missing", "metric_unmeasured"):
+        shown = localize_tags(REASONS[locale][key], locale)
+        assert wording in shown, key
+        assert "evidencia Medido" not in shown and "evidência Medido" not in shown
+    a, b = _result(), _result()
+    b["performance"]["sharpe"]["evidence"] = "DECLARED"
+    page = unescape(localize_text_nodes(change_summary(a, b, locale), locale))
+    # The reason keeps its own evidence tag after it.
+    reason = localize_tags(REASONS[locale]["metric_unmeasured"], locale)
+    assert f"{reason} · {evidence_label('NOT_MEASURED', locale)}" in page
+    assert find_claims(page) == []
 
 
 def test_diagnostics_do_not_echo_untrusted_context_values() -> None:
