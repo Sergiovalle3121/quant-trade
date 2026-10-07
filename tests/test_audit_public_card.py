@@ -122,6 +122,15 @@ def test_source_shortening_cannot_introduce_a_guard_hit() -> None:
         public_card_svg(claim)
 
 
+def test_wide_attribution_fits_inside_the_card() -> None:
+    source = "W" * 100
+    root = ET.fromstring(public_card_svg(PublicClaim(source_handle=source, source_url=source)))
+    lines = [node for node in root.findall(".//s:text", NS) if source in (node.text or "")]
+    assert len(lines) == 2
+    for node in lines:
+        assert len(node.text) * int(node.attrib["font-size"]) <= 1120
+
+
 @pytest.mark.parametrize(
     "kwargs",
     [

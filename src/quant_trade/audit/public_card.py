@@ -258,7 +258,10 @@ def public_card_svg(claim: PublicClaim) -> str:
         visible = source[:99] + "…" if len(source) > 100 else source
         if find_claims(visible):
             raise ValueError("shortened source contains unsupported wording")
-        text(40, y, f"{evidence} · {copy['source']}: {visible or copy['missing']}", 15)
+        attribution = f"{evidence} · {copy['source']}: {visible or copy['missing']}"
+        # Reserve a full em per character, including wide glyphs in source text.
+        # Long URLs shrink instead of being cropped in a raster export.
+        text(40, y, attribution, min(15, 1120 // len(attribution)))
         parts.append("</g>")
 
     fields = (
