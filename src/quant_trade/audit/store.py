@@ -34,6 +34,8 @@ from quant_trade.audit.store_ops import OpsStoreMixin
 from quant_trade.evidence.canonical_json import canonical_dumps, sha256_of_text
 
 REQUIRE_WEB = 'audit web requires: python -m pip install -e ".[web]"'
+#: PostgreSQL advisory-lock key held while a starting process creates tables.
+SCHEMA_LOCK_KEY = int.from_bytes(b"rigorddl", "big")
 
 #: No 0/O or 1/I/L: a code read aloud over the phone survives.
 CODE_ALPHABET = "23456789ABCDEFGHJKMNPQRSTUVWXYZ"
@@ -949,9 +951,18 @@ class Store(OpsStoreMixin):
         )
         store_hooks.define_tables(self)  # the continuous track record's tables
         self.define_ops_tables()
-        self.metadata.create_all(self.engine)
-        self.email_outbox_due_index.create(self.engine, checkfirst=True)
-        self.email_outbox_lease_index.create(self.engine, checkfirst=True)
+        with self.engine.begin() as conn:
+            if self.engine.dialect.name == "postgresql":
+                # Replicas starting together take turns: without the lock the
+                # second can hit UniqueViolation on pg_type and abort startup.
+                # The lock ends with this transaction; then checkfirst sees
+                # the tables the first replica committed.
+                conn.execute(
+                    sa.text("SELECT pg_advisory_xact_lock(:key)"), {"key": SCHEMA_LOCK_KEY}
+                )
+            self.metadata.create_all(conn)
+            self.email_outbox_due_index.create(conn, checkfirst=True)
+            self.email_outbox_lease_index.create(conn, checkfirst=True)
 
     # -- column maps -------------------------------------------------------
     def save_column_map(

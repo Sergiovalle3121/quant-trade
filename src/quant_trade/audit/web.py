@@ -1134,6 +1134,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     app.state.retention = retention
     app.state.visits = visits
     app.state.operations = operations
+    # From here a daily purge is expected: no success after 36 h is overdue.
+    app.state.started_at = datetime.now(UTC)
     app.state.mail_worker = mail_worker
     app.state.checkout_factory = payments.stripe_checkout
     app.state.account_checkout_factory = payments.stripe_account_checkout
@@ -1610,21 +1612,30 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 reset_path = account_pages.path("reset", account.locale)
                 reset_link = f"{_site_url(request)}{reset_path}?token={secret}"
         visits.flush()
-        private_ops = ""
+        start_day = funnel.since_day(now)
+        end_day = funnel.day_of(now)
+        x_start = funnel.since_day(now, days=14)
+        # Two independent blocks: a slow or failed cost query must never hide
+        # the retention warning, and the reverse.
         try:
             operations.flush()
-            start_day = funnel.since_day(now)
-            end_day = funnel.day_of(now)
-            x_start = funnel.since_day(now, days=14)
-            totals = funnel.build(db.funnel_events(start_day)).total.counts
-            private_ops = operations_section(
+            operations_html = operations_section(
                 db.ops_rows(start_day),
                 db.ops_job(),
                 enabled=cfg.auto_purge,
                 at=now,
                 dropped=operations.dropped,
                 flush_failed=operations.flush_failed,
-            ) + commercial_section(
+                since=app.state.started_at,
+            )
+        except Exception:
+            logger.warning("private operations view unavailable")
+            operations_html = (
+                "<p>Operación: NOT_MEASURED; consulta de telemetría no disponible.</p>"
+            )
+        try:
+            totals = funnel.build(db.funnel_events(start_day)).total.counts
+            commercial_html = commercial_section(
                 key=key,
                 panel_path=app.state.panel_path,
                 start=start_day,
@@ -1638,11 +1649,10 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 saved=cost_saved,
             )
         except Exception:
-            logger.warning("private operations view unavailable")
-            private_ops = (
-                "<p>Operación y costos: NOT_MEASURED; consulta de telemetría no disponible.</p>"
-            )
-            private_ops += cost_notice(error=cost_error, saved=cost_saved)
+            logger.warning("private commercial view unavailable")
+            commercial_html = "<p>Costos: NOT_MEASURED; consulta comercial no disponible.</p>"
+            commercial_html += cost_notice(error=cost_error, saved=cost_saved)
+        private_ops = operations_html + commercial_html
         return HTMLResponse(
             panel_page(
                 key=key,

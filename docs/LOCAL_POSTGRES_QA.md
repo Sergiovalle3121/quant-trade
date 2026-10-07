@@ -64,7 +64,11 @@ test settings, not deployment defaults.
 - Exhaustion of the separate telemetry pool times out in one second while a
   customer-pool query still succeeds. PostgreSQL cancels a deliberately slow
   telemetry statement after two seconds; its lock timeout is 500 ms. Customer
-  transaction settings remain unchanged.
+  transaction settings remain unchanged. Both limits are per transaction: an
+  `options` value in the database URL (`search_path`) is kept, and a raw pooled
+  connection outside a telemetry transaction carries no limit.
+- Four application processes created at the same moment on an empty database
+  all start; the schema advisory lock serializes table creation.
 - Atomic operations-counter updates from 1, 2, 4 and 8 concurrent workers.
 - Exhaustion of four credits across sixteen simultaneous attempts, followed by
   sixteen duplicate unlock attempts that consume exactly one additional credit.

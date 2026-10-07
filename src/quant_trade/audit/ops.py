@@ -212,14 +212,40 @@ def percentile_bucket(rows: list[dict[str, Any]], q: float) -> str:
     return "NOT_MEASURED"
 
 
-def retention_status(row: dict[str, Any] | None, *, enabled: bool, at: datetime) -> str:
+RETENTION_OVERDUE = timedelta(hours=36)
+
+
+def _stored_utc(value: Any) -> datetime | None:
+    """A stored stamp as UTC; naive text is UTC (``stamp`` writes UTC), unreadable is absent."""
+    if not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return parsed.replace(tzinfo=UTC) if parsed.tzinfo is None else parsed.astimezone(UTC)
+
+
+def retention_status(
+    row: dict[str, Any] | None,
+    *,
+    enabled: bool,
+    at: datetime,
+    since: datetime | None = None,
+) -> str:
+    """``since`` is when this process began expecting a purge (its start).
+
+    With no readable success for more than 36 h after it, the job is overdue,
+    not unmeasured: a health write that always fails cannot hide forever.
+    """
     if not enabled:
         return "disabled"
-    if not row:
-        return "not_measured"
-    if not row.get("last_success_at"):
+    row, now = row or {}, at.astimezone(UTC)
+    success = _stored_utc(row.get("last_success_at"))
+    if success is None:
+        if since is not None and now - since.astimezone(UTC) > RETENTION_OVERDUE:
+            return "overdue"
         return "failed" if row.get("error_code") else "not_measured"
-    success = datetime.fromisoformat(str(row["last_success_at"]).replace("Z", "+00:00"))
-    if at.astimezone(UTC) - success > timedelta(hours=36):
+    if now - success > RETENTION_OVERDUE:
         return "overdue"
     return "failed" if row.get("error_code") else "ok"
