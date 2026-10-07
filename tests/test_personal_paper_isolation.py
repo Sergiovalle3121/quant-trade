@@ -99,16 +99,24 @@ def test_personal_paper_group_resolves_lazily_through_the_main_cli(tmp_path: Pat
 
 
 def test_main_cli_help_keeps_personal_paper_after_audit():
+    import typer
+
     from quant_trade.cli import app
 
     result = CliRunner().invoke(app, ["personal-paper", "--help"])
     assert result.exit_code == 0, result.output
     for command in ("run", "worker", "status", "pause", "resume", "export", "backup"):
         assert command in result.output
-    root = CliRunner().invoke(app, ["--help"], terminal_width=200)
+    # Order comes from the group itself: Rich adds ANSI styling to rendered help
+    # when GITHUB_ACTIONS or FORCE_COLOR is set, so the text is not compared.
+    group = typer.main.get_command(app)
+    names = group.list_commands(typer.Context(group))
+    assert names.count("personal-paper") == 1
+    assert names.index("personal-paper") == names.index("audit") + 1
+    assert names.index("personal-paper") < names.index("allocation")
+    root = CliRunner().invoke(app, ["--help"])
     assert root.exit_code == 0, root.output
-    assert root.output.index(" audit ") < root.output.index(" personal-paper ")
-    assert root.output.index(" personal-paper ") < root.output.index(" allocation ")
+    assert "personal-paper" in root.output
 
 
 def test_python_module_entry_point_still_runs(tmp_path: Path):
