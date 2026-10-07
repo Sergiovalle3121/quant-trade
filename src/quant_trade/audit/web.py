@@ -57,6 +57,7 @@ from quant_trade.audit import (
 from quant_trade.audit import passkeys as pk
 from quant_trade.audit import pdf as pdf_lib
 from quant_trade.audit import strategies as strategies_lib
+from quant_trade.audit.articles import article_url, find_article
 from quant_trade.audit.audiences import AUDIENCES_BY_PATH, audience_url
 from quant_trade.audit.calculator import CALCULATOR_PATH
 from quant_trade.audit.compare import (
@@ -67,8 +68,10 @@ from quant_trade.audit.compare import (
     parse_report_link,
 )
 from quant_trade.audit.compare import COPY as COMPARE_COPY
+from quant_trade.audit.completed_count import CompletedAuditCounter
 from quant_trade.audit.engine import run_audit
 from quant_trade.audit.errors_pt import FILES_PT
+from quant_trade.audit.examples import EXAMPLES_PATH
 from quant_trade.audit.guides import GUIDES_BY_PATH, guide_url
 from quant_trade.audit.importers import detect_format
 from quant_trade.audit.legal import LEGAL_UPDATED, LegalContext, privacy_text, terms_text
@@ -94,6 +97,8 @@ from quant_trade.audit.pages import (
     AUDIT_PATHS,
     LANDING_PATHS,
     SAMPLE_BANNER,
+    article_page,
+    articles_index_page,
     audience_page,
     badge_svg,
     calculator_page,
@@ -101,6 +106,7 @@ from quant_trade.audit.pages import (
     compare_page,
     contact_page,
     error_page,
+    examples_page,
     guide_page,
     guides_index_page,
     landing,
@@ -108,6 +114,7 @@ from quant_trade.audit.pages import (
     method_page,
     sample_meta,
     upload_page,
+    verification_card_svg,
     verification_page,
 )
 from quant_trade.audit.payments import stripe_checkout
@@ -130,6 +137,7 @@ from quant_trade.audit.seo import (
     NOINDEX,
     PUBLIC_PAGES,
     is_private_path,
+    og_image_name,
     robots_txt,
     sitemap_xml,
 )
@@ -1102,6 +1110,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     # Checked once: WeasyPrint needs Pango, which a bare install may lack.
     pdf_ok = pdf_lib.available()
     db = store or make_store(cfg.database_url)
+    completed_counter = CompletedAuditCounter(db, excluded_ids=cfg.stripe_test_audits)
     retention = RetentionWorker(db, retention_days=cfg.retention_days)
     visits = funnel.VisitCounter(db)
     operations = OpsCounter(db)
@@ -1131,6 +1140,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     )
     app.state.settings = cfg
     app.state.store = db
+    app.state.completed_counter = completed_counter
     app.state.retention = retention
     app.state.visits = visits
     app.state.operations = operations
@@ -1257,6 +1267,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             visit_paths[audience_url(audience_slug, audience_locale)] = audience_locale
     # The free calculator is a landing of its own: links on X and from creators point at it.
     visit_paths.update({path: loc for loc, path in CALCULATOR_PATH.items()})
+    visit_paths.update({path: loc for loc, path in EXAMPLES_PATH.items()})
 
     def _funnel_visit(request: Request, response: Any) -> None:
         """Count a person's visit to the landing or a case page; remember its tag.
@@ -1275,6 +1286,9 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         if arrived and not kept:
             _cookie(response, funnel.REF_COOKIE, arrived, max_age=funnel.REF_DAYS * 86400)
         locale = visit_paths.get(path)
+        # Only the active HTML publication is a visit; previews are not people.
+        if re.fullmatch(r"/v/[^/]+", path):
+            locale = _report_locale(request.query_params.get("lang"))
         if locale is None or not funnel.is_person(request.headers.get("user-agent")):
             return
         if request.headers.get("sec-purpose") or request.headers.get("purpose"):
@@ -1346,7 +1360,12 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         if (request.url.path.startswith("/static/") or request.url.path in ICON_PATHS) and ok:
             response.headers["Cache-Control"] = STATIC_CACHE_CONTROL
         else:
-            public = request.url.path.startswith("/v/") and ok
+            public = (
+                request.url.path.startswith("/v/")
+                and not re.fullmatch(r"/v/[^/]+", request.url.path)
+                and ok
+                and "set-cookie" not in response.headers
+            )
             response.headers["Cache-Control"] = PUBLIC_CACHE_CONTROL if public else "no-store"
         return _secure(response, path=request.url.path)
 
@@ -1775,6 +1794,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             operator=(cfg.operator_name, cfg.operator_address_for(locale)),
             card_markets=tuple(cfg.approved_markets),
             email_confirmation=cfg.email_verification_required,
+            completed_audits=completed_counter.get(),
         )
         return HTMLResponse(page)
 
@@ -4213,6 +4233,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             variants_csv=uploads["variants"],
             files=extra_files,
             access_code=access_code,
+            public_count_eligible=True,
         )
         return result.audit_id, token, paid
 
@@ -4882,6 +4903,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         )
         redeemable = not record.paid and cfg.access_codes_enabled
         publishable = record.paid or cfg.free_mode
+        publication = db.publication_for_audit(record.id)
         pack_code, pack_left = (
             payments.pack_for(db, cfg, record.stripe_session_id) if record.paid else ("", 0)
         )
@@ -4898,6 +4920,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             pay_links=(link_single, link_pack, f"{base}{query}&pay=done") if link_single else None,
             redeem_url=f"{base}/redeem{query}" if redeemable else None,
             publish_url=f"{base}/publish{query}" if publishable else None,
+            public_id=publication.public_id if publication else None,
             notice=(
                 notice
                 or {
@@ -5431,6 +5454,24 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         )
         return Response(content=svg, media_type="image/svg+xml")
 
+    @app.get("/v/{public_id}/card.svg")
+    def verification_card(public_id: str, lang: str | None = None) -> Response:
+        publication, _, data, _ = _published(public_id)
+        svg = verification_card_svg(
+            data, public_id=publication.public_id, locale=_report_locale(lang)
+        )
+        return Response(content=svg, media_type="image/svg+xml")
+
+    @app.get("/v/{public_id}/card.png")
+    def verification_card_png(public_id: str, lang: str | None = None) -> Response:
+        # Social crawlers need a raster image. The existing class card contains
+        # fixed copy only; the SVG above also carries the audit date and public id.
+        _, _, data, _ = _published(public_id)
+        overall = str(data["verdict"]["overall"])
+        if overall not in ("A", "B", "C", "D"):
+            raise _not_found()
+        return static(og_image_name(f"class-{overall}", _report_locale(lang)))
+
     @app.get("/v/{public_id}", response_class=HTMLResponse)
     def verification(request: Request, public_id: str, lang: str | None = None) -> str:
         publication, _, data, digest = _published(public_id)
@@ -5689,6 +5730,53 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     @app.get("/guides/{slug}", response_class=HTMLResponse)
     def guide_en(request: Request, slug: str, lang: str | None = None) -> Response:
         return _guide(request, slug, "en", _locale(lang or "en"))
+
+    @app.get("/ejemplos", response_class=HTMLResponse)
+    def examples_es(request: Request) -> str:
+        return examples_page(locale="es", base_url=_site_url(request))
+
+    @app.get("/en/examples", response_class=HTMLResponse)
+    def examples_en(request: Request) -> str:
+        return examples_page(locale="en", base_url=_site_url(request))
+
+    @app.get("/pt/exemplos", response_class=HTMLResponse)
+    def examples_pt(request: Request) -> str:
+        return examples_page(locale="pt", base_url=_site_url(request))
+
+    @app.get("/articulos", response_class=HTMLResponse)
+    def articles_es(request: Request, lang: str | None = None) -> str:
+        return articles_index_page(locale=_locale(lang or "es"), base_url=_site_url(request))
+
+    @app.get("/articles", response_class=HTMLResponse)
+    def articles_en(request: Request, lang: str | None = None) -> str:
+        return articles_index_page(locale=_locale(lang or "en"), base_url=_site_url(request))
+
+    @app.get("/pt/artigos", response_class=HTMLResponse)
+    def articles_pt(request: Request) -> str:
+        return articles_index_page(locale="pt", base_url=_site_url(request))
+
+    def _article(request: Request, slug: str, path_locale: str, locale: str) -> Response:
+        found = find_article(slug, path_locale)
+        if found is None:
+            # A missing page, not a missing audit: the ordinary 404 text.
+            raise HTTPException(status_code=404, detail="page_missing")
+        article, slug_locale = found
+        if slug_locale != path_locale:
+            # An article's slug in another language moves to this language's own.
+            return RedirectResponse(article_url(article.key, path_locale), status_code=301)
+        return HTMLResponse(article_page(article, locale=locale, base_url=_site_url(request)))
+
+    @app.get("/articulos/{slug}", response_class=HTMLResponse)
+    def article_es(request: Request, slug: str, lang: str | None = None) -> Response:
+        return _article(request, slug, "es", _locale(lang or "es"))
+
+    @app.get("/articles/{slug}", response_class=HTMLResponse)
+    def article_en(request: Request, slug: str, lang: str | None = None) -> Response:
+        return _article(request, slug, "en", _locale(lang or "en"))
+
+    @app.get("/pt/artigos/{slug}", response_class=HTMLResponse)
+    def article_pt(request: Request, slug: str) -> Response:
+        return _article(request, slug, "pt", "pt")
 
     def _legal_context(locale: str = "es") -> LegalContext:
         return LegalContext(

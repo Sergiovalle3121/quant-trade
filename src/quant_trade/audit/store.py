@@ -435,6 +435,14 @@ class Store(OpsStoreMixin):
             sa.Column("sha256", sa.String(64), nullable=False),
             sa.Column("data", sa.LargeBinary),
         )
+        # Only explicitly identified customer uploads contribute to the public
+        # counter. An additive table leaves legacy rows and test fixtures out
+        # without guessing their provenance or migrating existing columns.
+        self.audit_count_eligibility = sa.Table(
+            "audit_count_eligibility",
+            self.metadata,
+            sa.Column("audit_id", sa.String(64), primary_key=True),
+        )
         self.waitlist = sa.Table(
             "waitlist",
             self.metadata,
@@ -1015,6 +1023,7 @@ class Store(OpsStoreMixin):
         variants_csv: bytes | None = None,
         files: dict[str, bytes] | None = None,
         access_code: str | None = None,
+        public_count_eligible: bool = False,
     ) -> bool:
         """Insert an audit. ``files`` maps a digest name (``report.html``,
         ``optimization.xml``) to its bytes; its hash comes from ``digests``.
@@ -1022,6 +1031,10 @@ class Store(OpsStoreMixin):
         With ``access_code`` one credit is redeemed in the same transaction
         and the audit is born paid. Returns whether it is paid; a code that is
         unknown, used up, expired or disabled simply yields ``False``.
+
+        ``public_count_eligible`` must only be set for customer uploads after
+        the engine and renderer finish. Existing rows, samples and callers
+        such as test fixtures are not retroactively treated as customer work.
         """
         with self.engine.begin() as conn:
             code_id = self._redeem(conn, access_code, at=created_at) if access_code else None
@@ -1057,6 +1070,14 @@ class Store(OpsStoreMixin):
                         audit_id=audit_id, name=name, sha256=digests[name], data=data
                     )
                 )
+            if (
+                public_count_eligible
+                and audit_id != "sample"
+                and overall_class in ("A", "B", "C", "D")
+                and result_json
+                and report_html
+            ):
+                conn.execute(self.audit_count_eligibility.insert().values(audit_id=audit_id))
         return code_id is not None
 
     def get_audit(self, audit_id: str, *, with_blobs: bool = False) -> AuditRecord | None:
@@ -2421,6 +2442,33 @@ class Store(OpsStoreMixin):
             value = conn.execute(sa.select(sa.func.count()).select_from(self.audits)).scalar()
         return int(value or 0)
 
+    def count_completed_audits(self, *, excluded_ids: Sequence[str] = ()) -> int:
+        """Completed, explicitly eligible uploads still present in this store.
+
+        No result payload is fetched. The reserved sample id and supplied
+        operator test ids are excluded even if accidentally marked eligible.
+        A purged eligible audit remains completed; a deleted audit contributes
+        nothing. Legacy rows without provenance are deliberately not counted.
+        """
+        sa, audits = self._sa, self.audits
+        eligible = self.audit_count_eligibility
+        completed = sa.or_(
+            sa.and_(audits.c.result_json != "", audits.c.report_html != ""),
+            audits.c.purged_at.is_not(None),
+        )
+        statement = (
+            sa.select(sa.func.count())
+            .select_from(audits.join(eligible, eligible.c.audit_id == audits.c.id))
+            .where(audits.c.id != "sample")
+            .where(audits.c.overall_class.in_(("A", "B", "C", "D")))
+            .where(completed)
+        )
+        if excluded_ids:
+            statement = statement.where(audits.c.id.not_in(tuple(excluded_ids)))
+        with self.engine.connect() as conn:
+            value = conn.execute(statement).scalar()
+        return int(value or 0)
+
     # -- access codes ------------------------------------------------------
     def create_access_code(
         self,
@@ -2842,6 +2890,11 @@ class Store(OpsStoreMixin):
                 self.publication_views.delete().where(self.publication_views.c.audit_id == audit_id)
             )
             conn.execute(self.audit_files.delete().where(self.audit_files.c.audit_id == audit_id))
+            conn.execute(
+                self.audit_count_eligibility.delete().where(
+                    self.audit_count_eligibility.c.audit_id == audit_id
+                )
+            )
             conn.execute(self.issued_files.delete().where(self.issued_files.c.audit_id == audit_id))
             conn.execute(
                 self.account_audits.delete().where(self.account_audits.c.audit_id == audit_id)

@@ -94,6 +94,8 @@ REF_TAGS: dict[str, str] = {
     "discord": "Discord",
     "youtube": "YouTube",
     "x": "X (Twitter)",
+    "share": "Verificación pública compartida",
+    "ejemplos": "Ejemplos de cifras públicas",
     "instagram": "Instagram",
     "facebook": "Facebook",
     "linkedin": "LinkedIn",

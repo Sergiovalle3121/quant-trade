@@ -73,6 +73,7 @@ GUIDES_COPY: dict[str, dict[str, str]] = {
         "all": "Todas las guías",
         "form": "Ir al formulario",
         "back": "Volver al inicio",
+        "articles": "Artículos sobre backtests",
     },
     "en": {
         "title": "Guides to export your file",
@@ -90,6 +91,7 @@ GUIDES_COPY: dict[str, dict[str, str]] = {
         "all": "All guides",
         "form": "Go to the form",
         "back": "Back to the home page",
+        "articles": "Articles about backtests",
     },
     "pt": {
         "title": "Guias para exportar o seu arquivo",
@@ -108,6 +110,7 @@ GUIDES_COPY: dict[str, dict[str, str]] = {
         "all": "Todos os guias",
         "form": "Ir ao formulário",
         "back": "Voltar ao início",
+        "articles": "Artigos sobre backtests",
     },
 }
 

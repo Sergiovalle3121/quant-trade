@@ -15,8 +15,10 @@ from __future__ import annotations
 import html
 from dataclasses import dataclass, field
 
+from quant_trade.audit.articles import ARTICLES, article_url, articles_index_url
 from quant_trade.audit.audiences import AUDIENCE_PAGES, audience_url
 from quant_trade.audit.calculator import CALCULATOR_PATH
+from quant_trade.audit.examples import EXAMPLES_PATH
 from quant_trade.audit.guides import GUIDES, guide_url, guides_index_url
 from quant_trade.audit.method import METHOD_PATH
 
@@ -46,8 +48,11 @@ CHECK_PATH: dict[str, str] = {"es": "/comprobar", "en": "/check", "pt": "/pt/com
 PUBLIC_PAGES: tuple[dict[str, str], ...] = (
     {"es": "/", "en": "/en", "pt": "/pt"},
     {"es": "/ejemplo", "en": "/sample", "pt": "/pt/exemplo"},
+    dict(EXAMPLES_PATH),
     {lang: guides_index_url(lang) for lang in ("es", "en", "pt")},
+    {lang: articles_index_url(lang) for lang in ("es", "en", "pt")},
     *({lang: guide_url(g.slug, lang) for lang in ("es", "en", "pt")} for g in GUIDES),
+    *({lang: article_url(a.key, lang) for lang in ("es", "en", "pt")} for a in ARTICLES),
     dict(METHOD_PATH),
     dict(CALCULATOR_PATH),
     *({lang: audience_url(a.slug, lang) for lang in ("es", "en", "pt")} for a in AUDIENCE_PAGES),
@@ -125,6 +130,8 @@ class PageMeta:
     #: Which share card to show (see ``OG_KINDS``); "" is the site card.
     image: str = ""
     image_alt: str = ""
+    #: A same-site image path for a publication; empty uses the static card.
+    image_path: str = ""
 
 
 #: Pixel size of the share images in ``static/`` (tools/make_og_images.py).
@@ -196,7 +203,11 @@ def head_meta(meta: PageMeta, *, base_url: str = "") -> str:
     base = base_url.rstrip("/")
     if base:
         # Messaging apps need an absolute URL to show a picture with the link.
-        image = f"{base}/static/{og_image_name(meta.image, meta.locale)}"
+        image = (
+            f"{base}{meta.image_path}"
+            if meta.image_path
+            else f"{base}/static/{og_image_name(meta.image, meta.locale)}"
+        )
         tags += [
             f"<meta property='og:image' content='{_e(image)}'>",
             "<meta property='og:image:type' content='image/png'>",
