@@ -30,6 +30,7 @@ from typing import Any
 
 from quant_trade.audit import store_hooks
 from quant_trade.audit.schema import AuditResult
+from quant_trade.audit.store_ops import OpsStoreMixin
 from quant_trade.evidence.canonical_json import canonical_dumps, sha256_of_text
 
 REQUIRE_WEB = 'audit web requires: python -m pip install -e ".[web]"'
@@ -384,7 +385,7 @@ class _RedeemRace(RuntimeError):
     """Raised inside a transaction to roll back a credit spent for nothing."""
 
 
-class Store:
+class Store(OpsStoreMixin):
     """One engine, a few tables, a handful of small transactions."""
 
     def __init__(self, url: str) -> None:
@@ -947,6 +948,7 @@ class Store:
             sa.Column("created_at", sa.String(40), nullable=False),
         )
         store_hooks.define_tables(self)  # the continuous track record's tables
+        self.define_ops_tables()
         self.metadata.create_all(self.engine)
         self.email_outbox_due_index.create(self.engine, checkfirst=True)
         self.email_outbox_lease_index.create(self.engine, checkfirst=True)

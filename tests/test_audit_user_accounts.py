@@ -1568,7 +1568,12 @@ def test_strategy_changes_are_called_better_or_worse_only_beyond_the_noise() -> 
             "p95": {"value": high, "evidence": "MEASURED"},
         }
         return {
-            "inputs": {"periods_per_year": 252},
+            "inputs": {
+                "periods_per_year": {"value": 252, "evidence": "MEASURED"},
+                "first_timestamp": "2020-01-01T00:00:00Z",
+                "last_timestamp": "2021-01-01T00:00:00Z",
+                "balance_only": False,
+            },
             "verdict": {
                 "overall": overall,
                 "dimensions": [{"name": k, "status": v} for k, v in dims.items()],
@@ -1583,7 +1588,10 @@ def test_strategy_changes_are_called_better_or_worse_only_beyond_the_noise() -> 
     apart = result("B", 0.07, 0.11, {"statistical_significance": "PASS"})
     assert sharpe_change(old, overlap) == "unclear"
     assert sharpe_change(old, apart) == "better" and sharpe_change(apart, old) == "worse"
-    daily_vs_hourly = dict(apart, inputs={"periods_per_year": 6048})
+    daily_vs_hourly = dict(
+        apart,
+        inputs=dict(apart["inputs"], periods_per_year={"value": 6048, "evidence": "MEASURED"}),
+    )
     assert sharpe_change(old, daily_vs_hourly) == "different_frequency"
     lines = dict(what_changed(old, overlap, "es"))
     assert lines["Clase: C → B"] == "mejor"
@@ -1596,7 +1604,7 @@ def test_strategy_changes_are_called_better_or_worse_only_beyond_the_noise() -> 
     # Dimension lines say "changed": each report carries its own declarations.
     assert lines["Significación estadística: Débil → Supera"] == "cambió"
     # Dates that barely overlap: the market of those dates could explain it.
-    dated = {"periods_per_year": 252, "first_timestamp": "2020-01-01T00:00:00Z"}
+    dated = dict(old["inputs"])
     early = dict(old, inputs=dict(dated, last_timestamp="2021-01-01T00:00:00Z"))
     late = dict(
         apart,

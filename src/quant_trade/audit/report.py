@@ -1457,14 +1457,22 @@ LABELS: dict[str, dict[str, str]] = {
         ),
         "reading": "Lectura de tu archivo",
         "reading_intro": (
-            "Antes de analizar nada, volvimos a contar tus operaciones fila por fila y lo "
-            "comparamos con el resumen que imprime tu plataforma."
+            "Comparamos los totales disponibles en el resumen de tu plataforma con las "
+            "cifras calculadas desde las filas del archivo."
         ),
         "reading_platform": "Tu plataforma",
         "reading_rows": "Leído de las filas",
         "reading_ok": "Coincide",
         "reading_bad": "No coincide",
-        "reading_all_ok": "Todo coincide: el análisis parte de los mismos números que ves tú.",
+        "reading_all_ok": "Las cifras comparadas coinciden dentro de la tolerancia de lectura.",
+        "reading_scope": (
+            "Este cotejo usa cifras del mismo archivo. No verifica cifras ausentes ni "
+            "autentica el historial."
+        ),
+        "reading_closing_rows": (
+            "En este total de MT5 contamos filas de cierre; una posición cerrada en varias "
+            "partes puede tener varios cierres."
+        ),
         "reading_some_bad": (
             "Algo no coincide. Revisa los avisos de lectura más abajo y, si crees que leímos "
             "mal tu archivo, escríbenos con el identificador del informe."
@@ -2784,14 +2792,22 @@ LABELS: dict[str, dict[str, str]] = {
         ),
         "reading": "How your file was read",
         "reading_intro": (
-            "Before analysing anything, we re-counted your trades row by row and compared "
-            "them with the summary your platform prints."
+            "We compare the available totals in your platform's summary with the figures "
+            "calculated from the file's rows."
         ),
         "reading_platform": "Your platform",
         "reading_rows": "Read from the rows",
         "reading_ok": "Matches",
         "reading_bad": "Does not match",
-        "reading_all_ok": "Everything matches: the analysis starts from the same numbers you see.",
+        "reading_all_ok": "The compared figures match within the reading tolerance.",
+        "reading_scope": (
+            "This check uses figures from the same file. It does not verify missing figures "
+            "or authenticate the history."
+        ),
+        "reading_closing_rows": (
+            "For this MT5 total we count closing rows; a position closed in several parts "
+            "can have several closes."
+        ),
         "reading_some_bad": (
             "Something does not match. Check the reading notes further down and, if you think "
             "your file was misread, write to us with the report id."
@@ -4009,6 +4025,12 @@ KPI_CSS = (
     ".kpi.xlong b{font-size:clamp(.85rem,1.5vw,1.2rem)}"
     ".kpi b{overflow-wrap:anywhere}"
     ".kpi span{display:block;margin-top:6px;color:var(--text-2);font-size:.82rem}"
+    ".kpi .badge{display:inline-flex;width:fit-content;margin-top:8px;font-size:.66rem}"
+    ".kpi .badge.MEASURED{color:var(--ok)}.kpi .badge.DECLARED{color:var(--warn)}"
+    ".kpi .badge.NOT_MEASURED{color:var(--text-3)}"
+    ".pc-kpi .badge{display:inline-block;margin-top:6pt;font-size:6.5pt}"
+    ".pc-kpi .badge.MEASURED{color:var(--ok)}.pc-kpi .badge.DECLARED{color:var(--warn)}"
+    ".pc-kpi .badge.NOT_MEASURED{color:var(--text-3)}"
     ".kpi small{display:block;margin-top:3px;color:var(--text-2);font-size:.72rem;"
     "line-height:1.35;opacity:.85}"
     ".kpi.bad b{color:var(--bad)}.kpi.good b{color:var(--ok)}"
@@ -4173,10 +4195,67 @@ def _kpi_hint(label: str, labels: dict[str, str], data: dict[str, Any] | None = 
     return ""
 
 
+def _kpi_evidence(label: str, labels: dict[str, str], data: dict[str, Any]) -> str:
+    """Keep the provenance of all numeric components shown in one tile."""
+    perf, stats, costs = (data.get(key) or {} for key in ("performance", "trade_stats", "costs"))
+    closed = bool((data.get("inputs") or {}).get("balance_only"))
+    sources = {
+        labels["kpi_return"]: [perf.get("total_return")],
+        labels["kpi_drawdown_closed" if closed else "kpi_drawdown"]: [perf.get("max_drawdown")],
+        labels["kpi_dd_platform"]: [perf.get("platform_equity_drawdown")],
+        labels["kpi_dd_p95_closed" if closed else "kpi_dd_p95"]: [
+            ((data.get("risk") or {}).get("max_drawdown") or {}).get("p95")
+        ],
+        labels["kpi_sharpe"]: [perf.get("sharpe")],
+        labels["kpi_pf"]: [stats.get("profit_factor")],
+        labels["kpi_trades"]: [stats.get("trade_count"), stats.get("win_rate")],
+    }
+    if label.startswith(labels["kpi_breakeven"] + " ("):
+        bps, pips = costs.get("break_even_bps"), costs.get("break_even_pips")
+        sources[label] = [bps]
+        if (_ev_value(bps) or 0) > 0 and _ev_value(pips) is not None:
+            sources[label].append(pips)
+    for section, scenario, key in (
+        ("trades", "best_5_trades", "kpi_stress"),
+        ("returns", "best_5_periods", "kpi_stress_curve"),
+    ):
+        block = (data.get("stress") or {}).get(section) or {}
+        row = next((row for row in block.get("rows", []) if row.get("scenario") == scenario), None)
+        sources[labels[key]] = [row.get("result") if row else None]
+        if _ev_value(block.get("original")) is not None:
+            sources[labels[key]].append(block["original"])
+    tags = []
+    for block in sources.get(label, []):
+        if not isinstance(block, dict) or block.get("evidence") not in ("MEASURED", "DECLARED"):
+            return "NOT_MEASURED"
+        value = block.get("value")
+        if isinstance(value, bool) or not isinstance(value, int | float):
+            return "NOT_MEASURED"
+        try:
+            if not math.isfinite(float(value)):
+                return "NOT_MEASURED"
+        except (ValueError, OverflowError):
+            return "NOT_MEASURED"
+        tags.append(block["evidence"])
+    return "DECLARED" if "DECLARED" in tags else "MEASURED" if tags else "NOT_MEASURED"
+
+
 def _kpis_html(data: dict[str, Any], labels: dict[str, str], *, locked: bool) -> str:
     kpis = _kpi_list(data, labels)
     if not kpis:
         return ""
+    if locked:
+        # The break-even label can contain a paid figure in pips or its sign.
+        kpis = [
+            (
+                labels["kpi_breakeven"]
+                if label.startswith(labels["kpi_breakeven"] + " (")
+                else label,
+                shown,
+                tone,
+            )
+            for label, shown, tone in kpis
+        ]
     tiles = "".join(
         # A locked figure is a way in: tapping it goes to the unlock box.
         f"<a class='kpi locked' href='#unlock' "
@@ -4184,7 +4263,8 @@ def _kpis_html(data: dict[str, Any], labels: dict[str, str], *, locked: bool) ->
         f"<b aria-hidden='true'>{icon('lock')}<i></i></b><span>{_e(label)}</span></a>"
         if locked
         else f"<div class='kpi {tone}{_kpi_size(shown)}'><b>{_e(shown)}</b>"
-        f"<span>{_e(label)}</span>{_kpi_hint(label, labels, data)}</div>"
+        f"<span>{_e(label)}</span>{_kpi_hint(label, labels, data)}"
+        f"{_badge(_kpi_evidence(label, labels, data))}</div>"
         for label, shown, tone in kpis
     )
     note = f"<p class='muted'>{_e(labels['kpis_locked'])}</p>" if locked else ""
@@ -5295,37 +5375,73 @@ def _lead_number(text: object) -> float | None:
     Read as the importers read it, so ``'1 279,20'`` from a terminal set to
     Spanish or Portuguese is 1279.20 too.
     """
-    number = lead_number(str(text or ""))
-    if number is not None:
-        return number
-    match = re.match(r"\s*(-?[\d\s]+(?:\.\d+)?)", str(text or ""))
-    if not match:
+    if isinstance(text, bool) or not isinstance(text, (str, int, float)):
         return None
     try:
-        return float(match.group(1).replace(" ", "").replace("\u00a0", ""))
+        source = str(text)
     except ValueError:
         return None
+    number = lead_number(source)
+    if number is not None:
+        return _reading_number(number)
+    match = re.match(r"\s*(-?[\d\s]+(?:\.\d+)?)", source)
+    if not match or re.match(r"[eE][+-]?\d", source[match.end() :]):
+        # An overflowing exponent must not fall back to its mantissa (1e309 -> 1).
+        return None
+    try:
+        number = float(match.group(1).replace(" ", "").replace("\u00a0", ""))
+    except (OverflowError, ValueError):
+        return None
+    return _reading_number(number)
+
+
+def _reading_number(value: object, *, count: bool = False) -> float | None:
+    """A finite figure, or a non-negative whole count, for the file-reading check."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    try:
+        number = float(value)
+    except (OverflowError, ValueError):
+        return None
+    if not math.isfinite(number) or (count and (number < 0 or not number.is_integer())):
+        return None
+    return number
+
+
+def _reading_measured(block: object, *, count: bool = False) -> float | None:
+    if not isinstance(block, dict) or block.get("evidence") != "MEASURED":
+        return None
+    return _reading_number(block.get("value"), count=count)
+
+
+def _reading_metadata(data: dict[str, Any]) -> dict[str, Any]:
+    inputs = data.get("inputs")
+    meta = inputs.get("report_metadata") if isinstance(inputs, dict) else None
+    return meta if isinstance(meta, dict) else {}
 
 
 def _reading_rows(data: dict[str, Any]) -> list[tuple[str, float, float, bool]]:
     """``(label key, platform value, value read from the rows, matches)``."""
-    meta = (data.get("inputs") or {}).get("report_metadata") or {}
-    stats = data.get("trade_stats") or {}
+    meta = _reading_metadata(data)
+    stats = data.get("trade_stats")
+    if not isinstance(stats, dict):
+        return []
     rows = []
-    for meta_key, stat_key, tolerance, _count in READING_CHECKS:
-        declared = _lead_number(meta.get(meta_key))
-        measured = _ev_value(stats.get(stat_key))
-        closing = _lead_number(meta.get("closing_deals"))
-        if stat_key == "trade_count" and closing is not None and closing == declared:
-            # MetaTrader counts each partial close as a trade: its figure is
-            # the file's own closing deals, one per row of the Deals table.
-            measured = closing
+    for meta_key, stat_key, tolerance, count in READING_CHECKS:
+        declared = _reading_number(_lead_number(meta.get(meta_key)), count=count)
+        measured = _reading_measured(stats.get(stat_key), count=count)
         if declared is None or measured is None:
             continue
+        closing = _reading_number(_lead_number(meta.get("closing_deals")), count=True)
+        if stat_key == "trade_count" and closing is not None and closing == declared:
+            # MetaTrader counts each partial close as a trade: its figure is
+            # the importer's own closing deals, one per row of the Deals table.
+            # This override still requires a valid measured position count.
+            measured = closing
         if stat_key == "net_pnl":
             # Each printed trade result is rounded to the cent, the platform's
             # total is not: up to half a cent per trade is rounding.
-            trades = _ev_value(stats.get("trade_count")) or 0
+            trades = _reading_measured(stats.get("trade_count"), count=True) or 0
             tolerance = max(tolerance, 0.005 * trades)
         rows.append((stat_key, declared, measured, abs(declared - measured) <= tolerance))
     return rows
@@ -5345,20 +5461,30 @@ def _reading_html(data: dict[str, Any], labels: dict[str, str]) -> str:
         f"<div class='recon-row {'ok' if ok else 'bad'}'>"
         f"<div class='recon-k'>{_e(_key_label(key, labels))}</div>"
         f"<div class='recon-v'><span><small>{_e(labels['reading_platform'])}</small>"
-        f"<b>{_e(number(key, declared))}</b></span>"
+        f"<b>{_e(number(key, declared))}</b>{_badge('DECLARED')}</span>"
         f"<i aria-hidden='true'>{'=' if ok else '≠'}</i>"
         f"<span><small>{_e(labels['reading_rows'])}</small>"
-        f"<b>{_e(number(key, measured))}</b></span></div>"
+        f"<b>{_e(number(key, measured))}</b>{_badge('MEASURED')}</span></div>"
         f"<span class='badge {'PASS' if ok else 'FAIL'}'>"
         f"{_e(labels['reading_ok'] if ok else labels['reading_bad'])}</span></div>"
         for key, declared, measured, ok in rows
     )
     all_ok = all(ok for *_, ok in rows)
+    stats = data.get("trade_stats")
+    positions = (
+        _reading_measured(stats.get("trade_count"), count=True) if isinstance(stats, dict) else None
+    )
+    closing_note = (
+        f"<p class='muted'>{_e(labels['reading_closing_rows'])}</p>"
+        if any(key == "trade_count" and measured != positions for key, _, measured, _ in rows)
+        else ""
+    )
     return (
         f"<p class='muted'>{_e(labels['reading_intro'])}</p>"
         f"<div class='recon'>{body}</div>"
         f"<p class='recon-foot {'ok' if all_ok else 'bad'}'>"
         f"{_e(labels['reading_all_ok' if all_ok else 'reading_some_bad'])}</p>"
+        f"{closing_note}<p class='muted'>{_e(labels['reading_scope'])}</p>"
     )
 
 
@@ -8378,7 +8504,8 @@ def _pdf_cover(
         if name in by_name
     )
     kpis = "".join(
-        f"<div class='pc-kpi {tone}'><b>{_e(shown)}</b><span>{_e(label)}</span></div>"
+        f"<div class='pc-kpi {tone}'><b>{_e(shown)}</b><span>{_e(label)}</span>"
+        f"{_badge(_kpi_evidence(label, labels, data))}</div>"
         for label, shown, tone in _kpi_list(data, labels)[:4]
     )
     keep = "next_keep_fund" if _fund_record(data) else "next_keep"

@@ -1,0 +1,85 @@
+name: Rigor PostgreSQL staging QA
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "src/quant_trade/audit/**"
+      - "tests/audit_fixtures.py"
+      - "tests/test_audit_ops_postgres.py"
+      - "scripts/qa/**"
+      - "pyproject.toml"
+      - "requirements.lock.txt"
+      - "Dockerfile.web"
+      - ".github/workflows/rigor-postgres-qa.yml"
+  push:
+    paths:
+      - "src/quant_trade/audit/**"
+      - "tests/audit_fixtures.py"
+      - "tests/test_audit_ops_postgres.py"
+      - "scripts/qa/**"
+      - "pyproject.toml"
+      - "requirements.lock.txt"
+      - "Dockerfile.web"
+      - ".github/workflows/rigor-postgres-qa.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  postgres-staging:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: rigor_qa
+          # A disposable service credential, never a production secret.
+          POSTGRES_PASSWORD: rigor_qa_ci_synthetic
+          POSTGRES_DB: postgres
+        ports:
+          - "127.0.0.1:5432:5432"
+        options: >-
+          --health-cmd "pg_isready -U rigor_qa -d postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      QA_POSTGRES_URL: postgresql+psycopg://rigor_qa:rigor_qa_ci_synthetic@127.0.0.1:5432/postgres
+      QA_PG_BIN: /usr/lib/postgresql/16/bin
+      QA_REPORT_DIR: ${{ github.workspace }}/qa-results/postgres
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install PostgreSQL client and native PDF libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            postgresql-client-16 libpango-1.0-0 libpangoft2-1.0-0 \
+            libharfbuzz0b libharfbuzz-subset0 fonts-dejavu-core
+      - name: Install application and test dependencies
+        run: python -m pip install -e ".[dev,web]" -c requirements.lock.txt
+      - name: PostgreSQL counters, credits, schema and synthetic restore
+        run: |
+          python -m pytest tests/test_audit_ops_postgres.py \
+            -k "not bounded_upload" --basetemp=qa-results/unit-temp \
+            --junitxml=qa-results/postgres/postgres-junit.xml -q -ra
+      - name: Fifty bounded audits, real PDF and full report restore
+        run: |
+          python scripts/qa/run_postgres_staging.py \
+            --audits 50 --bootstrap 1000 --slots 2 \
+            --pg-bin "$QA_PG_BIN" --report-dir qa-results/extended
+      - name: Upload synthetic QA evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rigor-postgres-qa-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            qa-results/**/*.json
+            qa-results/**/*.xml
+            qa-results/extended/synthetic-real-report.pdf
+          if-no-files-found: warn
+          retention-days: 14

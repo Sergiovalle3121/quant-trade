@@ -12,12 +12,24 @@ every text is fixed and passes the profit-claim guard in every language.
 from __future__ import annotations
 
 import html
+import math
 import re
+from collections.abc import Mapping
+from datetime import datetime
 from typing import Any
 from urllib.parse import parse_qs, urlsplit
 
+from quant_trade.audit.comparison_delta import change_summary
 from quant_trade.audit.guard import assert_report_clean
-from quant_trade.audit.report import LABELS, STATUS_TEXT, _dimension_title, _kpi_list, source_name
+from quant_trade.audit.report import (
+    LABELS,
+    PDF_ROWS_WARNING,
+    SOURCE_NAMES,
+    STATUS_TEXT,
+    _dimension_title,
+    _kpi_list,
+    evidence_label,
+)
 from quant_trade.audit.theme import class_ring
 from quant_trade.audit.verdict import DIMENSION_ORDER
 
@@ -186,6 +198,8 @@ COMPARE_CSS = (
     "letter-spacing:.08em}.cmp-card p{margin:4px 0 0;font-size:.86rem;color:var(--text-2)}"
     "@media (max-width:620px){.cmp-head{grid-template-columns:minmax(0,1fr)}}"
     ".cmp td.diff{font-weight:600}"
+    ".cmp-summary{border:1px solid var(--border);border-radius:18px;padding:18px;"
+    "background:#fff;margin:24px 0}.cmp-summary h2{margin-top:0}"
     # On a phone the two report columns keep their badges inside the card.
     "@media screen and (max-width:620px){.cmp th,.cmp td{padding:10px 8px}"
     ".cmp th:first-child,.cmp td:first-child{padding-left:12px;width:42%}"
@@ -227,10 +241,25 @@ def _status_cell(status: str, locale: str) -> str:
 
 def _card(data: dict[str, Any], name: str, href: str, locale: str) -> str:
     copy = COPY[locale]
-    inputs = data.get("inputs") or {}
-    first = str(inputs.get("first_timestamp", ""))[:10]
-    last = str(inputs.get("last_timestamp", ""))[:10]
-    source = source_name(inputs, "CSV")
+    inputs = _mapping(data.get("inputs"))
+    first = _display_date(inputs.get("first_timestamp"))
+    last = _display_date(inputs.get("last_timestamp"))
+    source_format = inputs.get("source_format")
+    warnings = inputs.get("parse_warnings")
+    pdf = inputs.get("source_is_pdf") is True or (
+        isinstance(warnings, list)
+        and any(isinstance(item, str) and item.endswith(PDF_ROWS_WARNING) for item in warnings)
+    )
+    if pdf:
+        source = "PDF"
+    elif isinstance(data.get("inputs"), Mapping) and source_format in (None, "csv"):
+        source = "CSV"
+    else:
+        source = (
+            SOURCE_NAMES.get(source_format, "NOT_MEASURED")
+            if isinstance(source_format, str)
+            else "NOT_MEASURED"
+        )
     overall = str(data["verdict"]["overall"])
     return (
         "<div class='cmp-card'>" + class_ring(overall) + f"<div><div class='k'>{_e(name)}</div>"
@@ -238,6 +267,140 @@ def _card(data: dict[str, Any], name: str, href: str, locale: str) -> str:
         f"<p>{_e(copy['period'])}: {_e(first)} → {_e(last)} · {_e(copy['source'])}: "
         f"{_e(source)}</p>"
         f"<p><a href='{_e(href)}'>{_e(copy['open'])}</a></p></div></div>"
+    )
+
+
+def _mapping(value: Any) -> Mapping[str, Any]:
+    return value if isinstance(value, Mapping) else {}
+
+
+def _display_date(value: Any) -> str:
+    if not isinstance(value, str):
+        return "NOT_MEASURED"
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00")).date().isoformat()
+    except ValueError:
+        return "NOT_MEASURED"
+
+
+def _display_evidence(block: Any, *, percent: bool = False) -> dict[str, Any]:
+    """A numeric tile keeps its existing evidence or becomes unavailable."""
+    block = _mapping(block)
+    evidence, value = block.get("evidence"), block.get("value")
+    unavailable = {"evidence": "NOT_MEASURED", "value": None}
+    if evidence not in ("MEASURED", "DECLARED") or isinstance(value, bool):
+        return unavailable
+    if not isinstance(value, int | float):
+        return unavailable
+    try:
+        number = float(value)
+    except (ValueError, OverflowError):
+        return unavailable
+    if not math.isfinite(number) or (percent and not math.isfinite(100 * number)):
+        return unavailable
+    return {"evidence": evidence, "value": number}
+
+
+def _display_data(data: dict[str, Any]) -> dict[str, Any]:
+    """Copy only fields needed by KPI rendering; diagnostics use the original."""
+    out: dict[str, Any] = {
+        "inputs": {"balance_only": _mapping(data.get("inputs")).get("balance_only") is True},
+        "red_flags": [
+            {"code": "HIDDEN_FLOATING_DRAWDOWN"}
+            for flag in data.get("red_flags", [])
+            if isinstance(flag, Mapping) and flag.get("code") == "HIDDEN_FLOATING_DRAWDOWN"
+        ],
+    }
+    for section, fields in (
+        ("performance", ("total_return", "max_drawdown", "platform_equity_drawdown", "sharpe")),
+        ("trade_stats", ("profit_factor", "trade_count", "win_rate")),
+        ("costs", ("break_even_bps", "reference_bps", "break_even_pips")),
+    ):
+        values = _mapping(data.get(section))
+        out[section] = {
+            field: _display_evidence(
+                values.get(field),
+                percent=field
+                in ("total_return", "max_drawdown", "platform_equity_drawdown", "win_rate"),
+            )
+            for field in fields
+        }
+    risk = _mapping(_mapping(data.get("risk")).get("max_drawdown"))
+    out["risk"] = {"max_drawdown": {"p95": _display_evidence(risk.get("p95"), percent=True)}}
+    out["stress"] = {}
+    for section, scenario in (("trades", "best_5_trades"), ("returns", "best_5_periods")):
+        rows = _mapping(_mapping(data.get("stress")).get(section)).get("rows")
+        out["stress"][section] = {
+            "rows": [
+                {
+                    "scenario": scenario,
+                    "result": _display_evidence(row.get("result"), percent=section == "returns"),
+                }
+                for row in (rows if isinstance(rows, list) else [])
+                if isinstance(row, Mapping) and row.get("scenario") == scenario
+            ]
+        }
+    return out
+
+
+def _combined_evidence(*blocks: Any) -> str:
+    tags = [_mapping(block).get("evidence") for block in blocks]
+    if not tags or any(tag not in ("MEASURED", "DECLARED") for tag in tags):
+        return "NOT_MEASURED"
+    if any(_mapping(block).get("value") is None for block in blocks):
+        return "NOT_MEASURED"
+    return "DECLARED" if "DECLARED" in tags else "MEASURED"
+
+
+def _kpi_cells(data: dict[str, Any], labels: dict[str, str]) -> dict[str, tuple[str, str]]:
+    """Preserve the evidence of every numeric source used in a displayed figure."""
+    display = _display_data(data)
+    perf, stats, costs = (display[name] for name in ("performance", "trade_stats", "costs"))
+    closed = display["inputs"]["balance_only"]
+    sources = {
+        labels[key]: _combined_evidence(block)
+        for key, block in (
+            ("kpi_return", perf["total_return"]),
+            ("kpi_drawdown_closed" if closed else "kpi_drawdown", perf["max_drawdown"]),
+            ("kpi_dd_platform", perf["platform_equity_drawdown"]),
+            (
+                "kpi_dd_p95_closed" if closed else "kpi_dd_p95",
+                display["risk"]["max_drawdown"]["p95"],
+            ),
+            ("kpi_sharpe", perf["sharpe"]),
+            ("kpi_pf", stats["profit_factor"]),
+        )
+    }
+    sources[labels["kpi_trades"]] = _combined_evidence(stats["trade_count"], stats["win_rate"])
+    bps, pips = costs["break_even_bps"], costs["break_even_pips"]
+    if bps["value"] is not None:
+        label = f"{labels['kpi_breakeven']} ({labels['kpi_breakeven_negative']})"
+        blocks = [bps]
+        if bps["value"] > 0:
+            label = f"{labels['kpi_breakeven']} ({labels['bps_side']})"
+            if pips["value"] is not None:
+                label = (
+                    f"{labels['kpi_breakeven']} ({labels['bps_side']}; {pips['value']:,.1f} pips)"
+                )
+                blocks.append(pips)
+        sources[label] = _combined_evidence(*blocks)
+    for section, key in (("trades", "kpi_stress"), ("returns", "kpi_stress_curve")):
+        rows = display["stress"][section]["rows"]
+        sources[labels[key]] = _combined_evidence(rows[0]["result"]) if rows else "NOT_MEASURED"
+    cells = {}
+    for label, shown, _ in _kpi_list(display, labels):
+        tag = sources.get(label, "NOT_MEASURED")
+        cells[label] = (shown if tag != "NOT_MEASURED" else "—", tag)
+    for key in ("kpi_sharpe", "kpi_drawdown_closed" if closed else "kpi_drawdown"):
+        cells.setdefault(labels[key], ("—", "NOT_MEASURED"))
+    return cells
+
+
+def _figure_cell(value: tuple[str, str] | None, locale: str, different: bool) -> str:
+    shown, tag = value or ("—", "NOT_MEASURED")
+    return (
+        f"<td{' class=diff' if different else ''}><span>{_e(shown)}</span> "
+        f"<span class='badge {_e(tag)}'>{_e(evidence_label(tag, locale))}</span></td>"
     )
 
 
@@ -262,20 +425,18 @@ def comparison_body(
         f"<td>{_status_cell(dims_b.get(name, 'NOT_MEASURED'), locale)}</td></tr>"
         for name in DIMENSION_ORDER
     )
-    kpis_a = {label: shown for label, shown, _ in _kpi_list(a, labels)}
-    kpis_b = {label: shown for label, shown, _ in _kpi_list(b, labels)}
+    kpis_a, kpis_b = [_kpi_cells(data, labels) for data in (a, b)]
     order = list(kpis_a) + [label for label in kpis_b if label not in kpis_a]
     figure_rows = "".join(
         f"<tr><td>{_e(label)}</td>"
-        f"<td{' class=diff' if kpis_a.get(label) != kpis_b.get(label) else ''}>"
-        f"{_e(kpis_a.get(label, '—'))}</td>"
-        f"<td{' class=diff' if kpis_a.get(label) != kpis_b.get(label) else ''}>"
-        f"{_e(kpis_b.get(label, '—'))}</td></tr>"
+        f"{_figure_cell(kpis_a.get(label), locale, kpis_a.get(label) != kpis_b.get(label))}"
+        f"{_figure_cell(kpis_b.get(label), locale, kpis_a.get(label) != kpis_b.get(label))}</tr>"
         for label in order
     )
     header = f"<tr><th></th><th>{_e(copy['report_a'])}</th><th>{_e(copy['report_b'])}</th></tr>"
     return (
         head
+        + change_summary(a, b, locale)
         + f"<h2>{_e(copy['dimensions'])}</h2><table class='cmp'>{header}{dim_rows}</table>"
         + f"<h2>{_e(copy['figures'])}</h2><table class='cmp'>{header}{figure_rows}</table>"
         + f"<p class='muted'>{_e(copy['note'])}</p>"

@@ -901,9 +901,9 @@ def test_a_long_price_note_drops_under_the_price() -> None:
     assert "@media screen{.price-amount{display:flex;flex-wrap:wrap;align-items:baseline" in STYLE
 
 
-@pytest.mark.parametrize("locale", ["es", "en"])
+@pytest.mark.parametrize("locale", ["es", "en", "pt"])
 def test_the_pdf_opens_on_a_one_page_summary_that_the_screen_never_shows(locale: str) -> None:
-    from quant_trade.audit.report import render_html
+    from quant_trade.audit.report import evidence_label, render_html
     from quant_trade.audit.sample import sample_result
 
     result = sample_result(locale, bootstrap_samples=60)
@@ -912,8 +912,18 @@ def test_the_pdf_opens_on_a_one_page_summary_that_the_screen_never_shows(locale:
     # The class ring is SVG (WeasyPrint draws no conic gradient), then the verdict's
     # headline, every dimension with its badge, the key figures and the first steps.
     assert "<svg class='pc-ring'" in cover and ">C</text>" in cover
-    assert cover.count('<span class="badge ') == 6
-    assert cover.count("<div class='pc-kpi ") == 4
+    dimensions = cover.split("<ul class='pc-dims'>", 1)[1].split("</ul>", 1)[0]
+    assert dimensions.count('<span class="badge ') == 6
+    figures = re.findall(r"<div class='pc-kpi [^']*'>(.*?)</div>", cover, re.DOTALL)
+    assert len(figures) == 4
+    # Evidence badges on figures are separate from the six dimension verdicts.
+    for figure in figures:
+        assert figure.count('<span class="badge ') == 1
+        badge = re.search(
+            r'<span class="badge (MEASURED|DECLARED|NOT_MEASURED)">([^<]+)</span>', figure
+        )
+        assert badge is not None
+        assert badge.group(2) == evidence_label(badge.group(1), locale)
     assert 1 <= cover.count("<li>") - 6 <= 3
     # A page notice (the sample's "synthetic data") repeats on the cover.
     assert "<p class='pc-notice'>Synthetic sample.</p>" in cover
