@@ -39,6 +39,13 @@ from quant_trade.audit.audiences import (
 from quant_trade.audit.calculator import COPY as CALCULATOR_COPY
 from quant_trade.audit.calculator import REASONS as CALCULATOR_REASONS
 from quant_trade.audit.calculator import calculator_url, compute, parse_input
+from quant_trade.audit.completed_count import completed_count_html
+from quant_trade.audit.examples import (
+    EXAMPLES_COPY,
+    EXAMPLES_PATH,
+    examples_content,
+    examples_url,
+)
 from quant_trade.audit.guides import (
     GUIDES,
     GUIDES_COPY,
@@ -86,6 +93,7 @@ from quant_trade.audit.seo import (
     private_meta,
 )
 from quant_trade.audit.settings import PACK_CREDITS
+from quant_trade.audit.sharing import share_block
 from quant_trade.audit.theme import (
     CLASS_COLOURS,
     SCRIPT_TAG,
@@ -1565,6 +1573,7 @@ def _footer(locale: str) -> str:
     product = (
         f"<li><a href='{home}#how'>{_e(ui['nav_how'])}</a></li>"
         f"<li><a href='{_sample_url(locale)}'>{_e(ui['nav_sample'])}</a></li>"
+        f"<li><a href='{examples_url(locale)}'>{_e(EXAMPLES_COPY[locale]['nav'])}</a></li>"
         f"<li><a href='{sample}.pdf' download>{_e(ui['footer_sample_pdf'])}</a></li>"
         f"<li><a href='{home}#pricing'>{_e(ui['nav_pricing'])}</a></li>"
         f"<li><a href='{_e(guides_index_url(locale))}'>{_e(ui['nav_guides'])}</a></li>"
@@ -2557,6 +2566,7 @@ def landing(
     operator: tuple[str, str] = ("", ""),
     card_markets: Sequence[str] = (),
     email_confirmation: bool = False,
+    completed_audits: int | None = None,
 ) -> str:
     """The public landing; the upload form lives on its own page (``upload_page``).
 
@@ -2567,8 +2577,10 @@ def landing(
     meta = _public_meta(copy["title"], copy["meta_description"], locale, _home(locale), base_url)
     sample = _sample_url(locale)
     err = f"<div class='error' role='alert'>{_e(error)}</div>" if error else ""
+    count_html = completed_count_html(completed_audits, locale)
     body = (
         _hero(locale, sample, email_confirmation=email_confirmation)
+        + ("<div class='wrap'>" + count_html + "</div>" if count_html else "")
         + _specs(locale)
         + _audiences(locale)
         + _problems(locale)
@@ -2870,7 +2882,9 @@ def verification_page(
         f"<pre><code id='badge-code'>{_e(snippet)}</code></pre>"
         f"<div class='copy-row'><button class='btn btn-dark btn-sm' type='button' "
         f"data-copy='badge-code' data-done='{_e(ui['v_copied'])}' hidden>{_e(ui['v_copy'])}"
-        "</button></div></section></div></div>"
+        "</button></div></section>"
+        + share_block(overall=overall, public_id=public_id, locale=locale)
+        + "</div></div>"
     )
     return _page(
         title,
@@ -3492,7 +3506,7 @@ def calculator_page(
         f"<form method='get' action='{_e(calculator_url(locale))}' class='calc-form'>"
         "<div class='form-grid'>"
         + field("sharpe", sharpe, "0.01")
-        + field("years", years, "0.1")
+        + field("years", years, "any")
         + field("trials", trials, "1")
         + f"</div><button class='btn btn-dark' type='submit'>{_e(words['submit'])}</button></form>"
     )
@@ -3679,6 +3693,28 @@ def _articles_cta(locale: str) -> str:
         f"<a class='link-more' href='{_e(_form_url(locale))}'>{_e(words['report'])}"
         f"{icon('arrow')}</a></div>"
     )
+
+
+def examples_page(*, locale: str = "es", base_url: str = "") -> str:
+    """Public declarations with the existing card arithmetic and report CTA."""
+    locale = _locale(locale)
+    words = EXAMPLES_COPY[locale]
+    title = f"{words['title']} · {BRAND}"
+    meta = _public_meta(title, words["summary"], locale, examples_url(locale), base_url)
+    crumbs = f"<a href='{_home(locale)}'>{_e(words['back'])}</a>" + _language_crumbs(
+        EXAMPLES_PATH, locale
+    )
+    cta = CALCULATOR_COPY[locale]
+    body = (
+        _page_hero(words["eyebrow"], words["title"], words["intro"], crumbs)
+        + "<div class='paper page-main'><div class='wrap wrap-mid'>"
+        + examples_content(locale)
+        + f"<section class='article-cta'><h2>{_e(cta['cta_title'])}</h2>"
+        f"<p>{_e(cta['cta'])}</p><a class='btn btn-dark' href='{_form_url(locale)}'>"
+        f"{_e(cta['cta_button'])}<span class='go'>{icon('arrow')}</span></a></section>"
+        "</div></div>"
+    )
+    return _page(title, locale, body, meta_html=meta, alternates=EXAMPLES_PATH, solid_nav=True)
 
 
 def articles_index_page(*, locale: str = "es", base_url: str = "") -> str:

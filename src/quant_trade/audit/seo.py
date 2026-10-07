@@ -18,6 +18,7 @@ from dataclasses import dataclass, field
 from quant_trade.audit.articles import ARTICLES, article_url, articles_index_url
 from quant_trade.audit.audiences import AUDIENCE_PAGES, audience_url
 from quant_trade.audit.calculator import CALCULATOR_PATH
+from quant_trade.audit.examples import EXAMPLES_PATH
 from quant_trade.audit.guides import GUIDES, guide_url, guides_index_url
 from quant_trade.audit.method import METHOD_PATH
 
@@ -47,6 +48,7 @@ CHECK_PATH: dict[str, str] = {"es": "/comprobar", "en": "/check", "pt": "/pt/com
 PUBLIC_PAGES: tuple[dict[str, str], ...] = (
     {"es": "/", "en": "/en", "pt": "/pt"},
     {"es": "/ejemplo", "en": "/sample", "pt": "/pt/exemplo"},
+    dict(EXAMPLES_PATH),
     {lang: guides_index_url(lang) for lang in ("es", "en", "pt")},
     {lang: articles_index_url(lang) for lang in ("es", "en", "pt")},
     *({lang: guide_url(g.slug, lang) for lang in ("es", "en", "pt")} for g in GUIDES),

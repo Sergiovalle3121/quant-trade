@@ -68,8 +68,10 @@ from quant_trade.audit.compare import (
     parse_report_link,
 )
 from quant_trade.audit.compare import COPY as COMPARE_COPY
+from quant_trade.audit.completed_count import CompletedAuditCounter
 from quant_trade.audit.engine import run_audit
 from quant_trade.audit.errors_pt import FILES_PT
+from quant_trade.audit.examples import EXAMPLES_PATH
 from quant_trade.audit.guides import GUIDES_BY_PATH, guide_url
 from quant_trade.audit.importers import detect_format
 from quant_trade.audit.legal import LEGAL_UPDATED, LegalContext, privacy_text, terms_text
@@ -104,6 +106,7 @@ from quant_trade.audit.pages import (
     compare_page,
     contact_page,
     error_page,
+    examples_page,
     guide_page,
     guides_index_page,
     landing,
@@ -1107,6 +1110,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     # Checked once: WeasyPrint needs Pango, which a bare install may lack.
     pdf_ok = pdf_lib.available()
     db = store or make_store(cfg.database_url)
+    completed_counter = CompletedAuditCounter(db, excluded_ids=cfg.stripe_test_audits)
     retention = RetentionWorker(db, retention_days=cfg.retention_days)
     visits = funnel.VisitCounter(db)
     operations = OpsCounter(db)
@@ -1136,6 +1140,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     )
     app.state.settings = cfg
     app.state.store = db
+    app.state.completed_counter = completed_counter
     app.state.retention = retention
     app.state.visits = visits
     app.state.operations = operations
@@ -1260,6 +1265,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             visit_paths[audience_url(audience_slug, audience_locale)] = audience_locale
     # The free calculator is a landing of its own: links on X and from creators point at it.
     visit_paths.update({path: loc for loc, path in CALCULATOR_PATH.items()})
+    visit_paths.update({path: loc for loc, path in EXAMPLES_PATH.items()})
 
     def _funnel_visit(request: Request, response: Any) -> None:
         """Count a person's visit to the landing or a case page; remember its tag.
@@ -1278,6 +1284,9 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         if arrived and not kept:
             _cookie(response, funnel.REF_COOKIE, arrived, max_age=funnel.REF_DAYS * 86400)
         locale = visit_paths.get(path)
+        # Only the active HTML publication is a visit; previews are not people.
+        if re.fullmatch(r"/v/[^/]+", path):
+            locale = _report_locale(request.query_params.get("lang"))
         if locale is None or not funnel.is_person(request.headers.get("user-agent")):
             return
         if request.headers.get("sec-purpose") or request.headers.get("purpose"):
@@ -1349,7 +1358,12 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         if (request.url.path.startswith("/static/") or request.url.path in ICON_PATHS) and ok:
             response.headers["Cache-Control"] = STATIC_CACHE_CONTROL
         else:
-            public = request.url.path.startswith("/v/") and ok
+            public = (
+                request.url.path.startswith("/v/")
+                and not re.fullmatch(r"/v/[^/]+", request.url.path)
+                and ok
+                and "set-cookie" not in response.headers
+            )
             response.headers["Cache-Control"] = PUBLIC_CACHE_CONTROL if public else "no-store"
         return _secure(response, path=request.url.path)
 
@@ -1770,6 +1784,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             operator=(cfg.operator_name, cfg.operator_address_for(locale)),
             card_markets=tuple(cfg.approved_markets),
             email_confirmation=cfg.email_verification_required,
+            completed_audits=completed_counter.get(),
         )
         return HTMLResponse(page)
 
@@ -4208,6 +4223,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             variants_csv=uploads["variants"],
             files=extra_files,
             access_code=access_code,
+            public_count_eligible=True,
         )
         return result.audit_id, token, paid
 
@@ -4877,6 +4893,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         )
         redeemable = not record.paid and cfg.access_codes_enabled
         publishable = record.paid or cfg.free_mode
+        publication = db.publication_for_audit(record.id)
         pack_code, pack_left = (
             payments.pack_for(db, cfg, record.stripe_session_id) if record.paid else ("", 0)
         )
@@ -4893,6 +4910,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             pay_links=(link_single, link_pack, f"{base}{query}&pay=done") if link_single else None,
             redeem_url=f"{base}/redeem{query}" if redeemable else None,
             publish_url=f"{base}/publish{query}" if publishable else None,
+            public_id=publication.public_id if publication else None,
             notice=(
                 notice
                 or {
@@ -5702,6 +5720,18 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     @app.get("/guides/{slug}", response_class=HTMLResponse)
     def guide_en(request: Request, slug: str, lang: str | None = None) -> Response:
         return _guide(request, slug, "en", _locale(lang or "en"))
+
+    @app.get("/ejemplos", response_class=HTMLResponse)
+    def examples_es(request: Request) -> str:
+        return examples_page(locale="es", base_url=_site_url(request))
+
+    @app.get("/en/examples", response_class=HTMLResponse)
+    def examples_en(request: Request) -> str:
+        return examples_page(locale="en", base_url=_site_url(request))
+
+    @app.get("/pt/exemplos", response_class=HTMLResponse)
+    def examples_pt(request: Request) -> str:
+        return examples_page(locale="pt", base_url=_site_url(request))
 
     @app.get("/articulos", response_class=HTMLResponse)
     def articles_es(request: Request, lang: str | None = None) -> str:

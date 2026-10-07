@@ -4336,3 +4336,51 @@ Reading a saved preference is optional too: if its lookup fails, the customer
 can still name the columns in HTML or JSON, in ES/EN/PT, without spending a
 credit or a free preview. An explicit selection then follows the existing audit
 and payment path. The lookup warning also excludes exception text and SQL data.
+
+### Sharing, public examples and the completed-audit count (2026-10-07)
+
+- **Active publications.** The public verification and its owner's published
+  report offer localized suggested text, clipboard copying with a selection
+  fallback, an X intent and the existing SVG card preview. `sharing.py` accepts
+  only the class, public id and locale; it never receives a private report URL,
+  token or client text. Shared links use `https://rigorscore.com/v/<id>?ref=share`
+  (and `lang=en`/`lang=pt` as appropriate). A private or withdrawn report has no
+  share block. Published views kept by the existing purge remain shareable.
+- **Attribution.** `share` and `ejemplos` are named tags in `funnel.REF_TAGS`.
+  Adding these bare names requires this deploy: there is no runtime setting
+  for arbitrary tags. Existing campaign-shaped names, such as `x-es-103`,
+  already work without another deploy. Active `/v/<id>` HTML and the examples
+  pages count like the calculator: people only, once per browser/day, first
+  tag kept for 30 days; bots, prefetches and card/badge requests do not add
+  visits. Public HTML uses `no-store` so caches cannot bypass attribution;
+  images keep their existing short cache unless a response sets a cookie.
+- **Public examples.** `/ejemplos`, `/en/examples` and `/pt/exemplos` are in the
+  footer and multilingual sitemap. `examples.py` imports the SVG renderer and
+  calculator arithmetic. No source is fetched and no audit class is assigned.
+  All inputs and arithmetic derived from them remain `DECLARED`; unavailable
+  evidence is `NOT_MEASURED`. Nine weeks is explicitly approximated as `9/52`
+  years, and the calculator accepts fractional years. Three weeks of strategy
+  development is not treated as backtest history. The first case has no
+  declared Sharpe/history/trial count, so its calculator link does not invent
+  those inputs. All calculator links carry `ref=ejemplos`.
+- **Conservative measured count.** Only completed customer uploads explicitly
+  marked in the additive `audit_count_eligibility` table contribute. The engine
+  and renderer must finish before that mark is written, in the audit insert's
+  transaction. Samples, fixtures, incomplete records and configured operator
+  test ids (`AUDIT_STRIPE_TEST_AUDITS`, read only) are excluded. Historical rows
+  have no reliable test/customer provenance and are deliberately not backfilled.
+  Manual test uploads through the public form must be identified in that
+  existing exclusion list or run against an isolated test database; the site
+  cannot infer that intent from a file. This is a conservative subset of the
+  stored completions, not a historical lifetime total. Existing purged
+  completions can count; deletion also removes the new eligibility metadata.
+  No retention or account policy changes. One aggregate query is cached per
+  application instance for 600 seconds, including failures. Failed reads hide
+  the count. Below 25 nothing is rendered; at 25 or more the count carries
+  `MEASURED`, displayed using the site's existing localized evidence labels.
+
+Offline regressions: `test_audit_sharing.py`, `test_audit_share_funnel.py`,
+`test_audit_examples.py`, `test_audit_completed_count.py`, plus the existing
+public-page, card, calculator, funnel, SEO and report tests. On the Windows
+laptop exclude `test_audit_pdf.py`, `test_audit_pdf_origin_label.py` and
+`test_audit_pdf_statements.py`: native WeasyPrint dependencies are unavailable.
