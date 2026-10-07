@@ -3243,6 +3243,43 @@ Launch basics (2026-09-28, `tests/test_audit_launch_basics.py`):
   "ejemplo" and "exemplo" instead of the report id "sample". The report and
   its numbers are untouched.
 
+### Articles about backtests (`audit/articles.py`)
+
+Short articles for readers who arrive from a search engine, at `/articulos`,
+`/articles` and `/pt/artigos` (`ARTICLES_PATH`), one page per article under
+them (`/articulos/<slug>`, `/articles/<slug>`, `/pt/artigos/<slug>`, each
+language with its own slug). The copy lives in `ARTICLES_DATA`, a tuple of
+plain dictionaries with the shape `{"key", "slug": {es, en, pt}, "title":
+{..}, "summary": {..}, "intro": {..}, "sections": {es: [{"heading",
+"paragraphs": [..]}], ..}, "faq": {es: [{"q", "a"}], ..}, "related":
+[{"kind": "calculator"} | {"kind": "guide", "slug": ..} | {"kind":
+"audience", "slug": ..} | {"kind": "method"}]}`; `Article.from_dict` builds
+the dataclasses from it and refuses an unknown related kind or a guide or
+audience slug that does not exist, so a typo fails at import, not on a
+page. A page shows the intro, the sections as `h2` and paragraphs, the
+questions as `h3`, the
+related pages (the free calculator, an export guide, an audience page or
+the method, each in the page's language) and a closing call to the free
+calculator and the free first report, worded without a promise. The guides
+index links the articles index in each language so crawlers reach it. The
+three articles are `ea-sobreoptimizado` (how to tell whether an expert
+advisor is overfitted before buying it), `backtest-costos-reales` (spread,
+commission, slippage and swap, and the break-even cost) and
+`leer-informe-probador-mt5` (reading the MT5 strategy tester report and
+what it leaves out); every figure in them comes from the calculator's own
+table (the best of N configurations with no edge), never from an outside
+study.
+
+To add an article: append one dictionary to `ARTICLES_DATA` with every text
+in Spanish, English and Portuguese (no Spanish words on the Portuguese
+page), slugs in the three languages and the related pages by their Spanish
+slug; run `tests/test_audit_articles.py`, which checks the shape, runs the
+profit-claim guard over every text and every rendered page, and checks the
+metadata, the `hreflang` alternates, the 301 of a slug from another
+language and the 404 of an unknown one. `seo.PUBLIC_PAGES` reads
+`ARTICLES`, so the sitemap, the canonical links and `web.ENGLISH_ROOTS` pick
+the new page up with no further change.
+
 ### Terms and privacy
 
 No refunds (sergio's decision, 2026-09-28, replacing the 2026-09-24 refund
