@@ -15,8 +15,9 @@ from dataclasses import dataclass
 from typing import Any
 
 from quant_trade.audit.audiences import AUDIENCE_PAGES, audience_url
-from quant_trade.audit.calculator import CALCULATOR_PATH
+from quant_trade.audit.calculator import CALCULATOR_PATH, PERIODS_PER_YEAR, CalculatorInput, compute
 from quant_trade.audit.calculator import COPY as CALCULATOR_COPY
+from quant_trade.audit.examples import EXAMPLES_COPY, EXAMPLES_PATH
 from quant_trade.audit.guides import GUIDES_BY_SLUG, guide_url
 from quant_trade.audit.method import COPY as METHOD_COPY
 from quant_trade.audit.method import METHOD_PATH
@@ -25,7 +26,80 @@ LOCALES: tuple[str, ...] = ("es", "en", "pt")
 
 #: The pages an article may point to: the free calculator, an export guide
 #: (by its Spanish slug), an audience page (by its Spanish slug) or the method.
-RELATED_KINDS: frozenset[str] = frozenset({"calculator", "guide", "audience", "method"})
+RELATED_KINDS: frozenset[str] = frozenset(
+    {"calculator", "guide", "audience", "method", "contact", "samples"}
+)
+
+#: Illustrative declarations, never measurements of a client's file. The same
+#: calculator supplies the prose example and every cell of the comparison table.
+LUCK_EXAMPLE_INPUT = CalculatorInput(sharpe=1.8, years=3, trials=100)
+LUCK_TABLE_INPUTS = tuple(
+    CalculatorInput(sharpe=LUCK_EXAMPLE_INPUT.sharpe, years=years, trials=trials)
+    for trials in (10, 100, 1000)
+    for years in (1, 3, 5)
+)
+_EXAMPLE_LUCK = compute(LUCK_EXAMPLE_INPUT)["luck_sharpe"]["value"]
+INDEPENDENT_LUCK_EXAMPLE = {
+    "es": (
+        f"DECLARED · Supongamos {LUCK_EXAMPLE_INPUT.trials} variantes independientes y "
+        f"{LUCK_EXAMPLE_INPUT.years:g} años de rendimientos diarios, con "
+        f"{PERIODS_PER_YEAR:g} periodos al año y un Sharpe anual declarado de "
+        f"{LUCK_EXAMPLE_INPUT.sharpe:g}. La calculadora sitúa el Sharpe esperado de la mejor "
+        f"variante sin habilidad en {_EXAMPLE_LUCK:.2f}. Es una cuenta bajo supuestos de "
+        "asimetría nula y colas normales, no una medición de una cartera."
+    ),
+    "en": (
+        f"DECLARED · Assume {LUCK_EXAMPLE_INPUT.trials} independent variants and "
+        f"{LUCK_EXAMPLE_INPUT.years:g} years of daily returns, with "
+        f"{PERIODS_PER_YEAR:g} periods per year and a declared annual Sharpe of "
+        f"{LUCK_EXAMPLE_INPUT.sharpe:g}. The calculator puts the expected Sharpe of the best "
+        f"unskilled variant at {_EXAMPLE_LUCK:.2f}. This calculation assumes no skew and "
+        "normal tails; it is not a measurement of a portfolio."
+    ),
+    "pt": (
+        f"DECLARED · Suponha {LUCK_EXAMPLE_INPUT.trials} variantes independentes e "
+        f"{LUCK_EXAMPLE_INPUT.years:g} anos de retornos diários, com "
+        f"{PERIODS_PER_YEAR:g} períodos por ano e Sharpe anual declarado de "
+        f"{LUCK_EXAMPLE_INPUT.sharpe:g}. A calculadora situa o Sharpe esperado da melhor "
+        f"variante sem habilidade em {_EXAMPLE_LUCK:.2f}. É uma conta sob suposições de "
+        "assimetria nula e caudas normais, não uma medição de uma carteira."
+    ),
+}
+
+LUCK_TABLE_COPY = {
+    "es": (
+        "Sharpe esperado por suerte",
+        "Intentos",
+        "Años",
+        "Sharpe por suerte",
+        "DECLARED · Entradas ilustrativas y resultados calculados; no son datos de un archivo.",
+    ),
+    "en": (
+        "Expected Sharpe from luck",
+        "Trials",
+        "Years",
+        "Sharpe from luck",
+        "DECLARED · Illustrative inputs and computed results; these are not file measurements.",
+    ),
+    "pt": (
+        "Sharpe esperado por sorte",
+        "Tentativas",
+        "Anos",
+        "Sharpe por sorte",
+        "DECLARED · Entradas ilustrativas e resultados calculados; não são dados de um arquivo.",
+    ),
+}
+
+#: Editorial dates, not generated at request time. Existing prose was published
+#: on 2026-10-05; the institutional articles are dated to this brief.
+ARTICLE_PUBLICATION_DATES = {
+    "ea-sobreoptimizado": "2026-10-05",
+    "backtest-costos-reales": "2026-10-05",
+    "leer-informe-probador-mt5": "2026-10-05",
+    "auditoria-independiente-backtest": "2026-10-07",
+    "sharpe-deflactado-track-record": "2026-10-07",
+    "auditar-cartera-modelo-senales": "2026-10-07",
+}
 
 
 @dataclass(frozen=True)
@@ -1760,10 +1834,1705 @@ ARTICLES_DATA: tuple[dict[str, Any], ...] = (
             },
         ],
     },
+    {
+        "key": "auditoria-independiente-backtest",
+        "slug": {
+            "es": "auditoria-independiente-backtest",
+            "en": "independent-backtest-audit",
+            "pt": "auditoria-independente-backtest",
+        },
+        "title": {
+            "es": "Auditoría independiente de un backtest: qué revisa que una réplica no",
+            "en": (
+                "Independent backtest audit: what a statistical review checks that a "
+                "replication does not"
+            ),
+            "pt": (
+                "Auditoria independente de um backtest: o que uma revisão estatística examina "
+                "além da réplica"
+            ),
+        },
+        "summary": {
+            "es": (
+                "Qué examina una revisión estadística de un backtest, cómo trata la selección "
+                "de variantes y qué distingue los datos medidos de las declaraciones."
+            ),
+            "en": (
+                "What a statistical backtest review examines, how it handles variant selection, "
+                "and why measured evidence differs from a declaration."
+            ),
+            "pt": (
+                "O que uma revisão estatística de um backtest examina, como trata a seleção de "
+                "variantes e por que uma medição difere de uma declaração."
+            ),
+        },
+        "intro": {
+            "es": (
+                "Una réplica pregunta si las mismas reglas, datos y supuestos reproducen una "
+                "trayectoria. Una auditoría estadística pregunta qué evidencia contiene esa "
+                "trayectoria una vez consideradas la incertidumbre, la selección y la "
+                "información que falta. Son trabajos complementarios. Una réplica puede "
+                "reproducir exactamente una elección ajustada al historial; una revisión "
+                "estadística puede detectar debilidades sin reconstruir la lógica que produjo "
+                "las operaciones. Rigor analiza los archivos entregados y las declaraciones que "
+                "los acompañan. Ese alcance importa cuando una gestora compara investigaciones "
+                "o un proveedor prepara la documentación de una señal para otra persona."
+            ),
+            "en": (
+                "A replication asks whether the same rules, data and assumptions reproduce a "
+                "track record. A statistical audit asks what evidence that record contains "
+                "after accounting for uncertainty, selection and missing information. These are "
+                "complementary tasks. Replication can reproduce a choice fitted to historical "
+                "data exactly; statistical review can identify weaknesses without rebuilding "
+                "the logic behind the trades. Rigor analyses the supplied files and the "
+                "declarations that accompany them. That scope matters when a fund compares "
+                "research projects or a signal provider prepares a record for someone else's "
+                "review."
+            ),
+            "pt": (
+                "Uma réplica pergunta se as mesmas regras, dados e premissas reproduzem uma "
+                "trajetória. Uma auditoria estatística pergunta que evidência essa trajetória "
+                "contém depois de considerar incerteza, seleção e informação ausente. São "
+                "trabalhos complementares. Uma réplica pode reproduzir exatamente uma escolha "
+                "ajustada ao histórico; uma revisão estatística pode identificar fragilidades "
+                "sem reconstruir a lógica que gerou as operações. O Rigor analisa os arquivos "
+                "enviados e as declarações que os acompanham. Esse escopo importa quando uma "
+                "gestora compara pesquisas ou um fornecedor prepara a documentação de um sinal "
+                "para outra pessoa."
+            ),
+        },
+        "sections": {
+            "es": [
+                {
+                    "heading": "Qué significa independiente en esta revisión",
+                    "paragraphs": [
+                        (
+                            "La independencia empieza por separar el análisis del producto "
+                            "evaluado. Rigor no vende robots ni señales, y el precio del "
+                            "informe no depende de la clase obtenida. Su metodología publica "
+                            "las preguntas, las reglas de evaluación y las limitaciones. Esto "
+                            "permite discutir una conclusión concreta y el archivo que la "
+                            "sostiene. No convierte al auditor en observador de todo el proceso "
+                            "de investigación: los ensayos descartados, las modificaciones "
+                            "anteriores y las decisiones no registradas pueden quedar fuera de "
+                            "los materiales entregados."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Evidencia estadística frente al azar",
+                    "paragraphs": [
+                        (
+                            "La primera comprobación estudia cuánto respaldo tiene el Sharpe "
+                            "observado. El Sharpe probabilístico considera la longitud de la "
+                            "serie, la asimetría y la curtosis. El informe también examina "
+                            "dependencia temporal y remuestrea bloques de retornos mediante "
+                            "bootstrap estacionario. Los bloques conservan parte de la "
+                            "estructura local que se perdería al mezclar observaciones "
+                            "aisladas. El resultado sigue dependiendo de la muestra recibida y "
+                            "del método. Una serie corta, irregular o dominada por episodios "
+                            "concretos exige leer la incertidumbre junto con la cifra "
+                            "principal; repetir el cálculo no elimina esa incertidumbre."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Selección entre variantes",
+                    "paragraphs": [
+                        (
+                            "La siguiente pregunta es cuántas oportunidades hubo de encontrar "
+                            "una curva llamativa. El Sharpe deflactado compara el resultado con "
+                            "una referencia que aumenta al considerar más intentos. Rigor "
+                            "utiliza el mayor conteo entre la declaración y la evidencia de "
+                            "variantes o pasadas de optimización entregadas. Cuando hay una "
+                            "matriz de variantes, puede estudiar además el sobreajuste mediante "
+                            "validación cruzada combinatoria. La curva ganadora aislada no "
+                            "cuenta la historia de las alternativas descartadas."
+                        ),
+                        (
+                            f"{INDEPENDENT_LUCK_EXAMPLE['es']} "
+                            "La calculadora ilustra la selección bajo sus supuestos; no mide "
+                            "una estrategia del lector. La independencia entre intentos es una "
+                            "simplificación: variantes parecidas pueden compartir gran parte de "
+                            "su comportamiento. Tampoco permite reconstruir búsquedas "
+                            "anteriores que nadie documentó."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Sensibilidad a los costos",
+                    "paragraphs": [
+                        (
+                            "La comprobación de costos recalcula operaciones con distintos "
+                            "niveles de fricción y estudia el costo de equilibrio. Necesita "
+                            "detalles de operaciones y supuestos identificables. Una curva neta "
+                            "por sí sola no permite separar comisión, diferencial y "
+                            "deslizamiento ni deducir cómo cambiarían con otro volumen. Si "
+                            "faltan las operaciones, esta parte puede quedar sin medir aunque "
+                            "otras estadísticas sí se calculen. La diferencia es relevante para "
+                            "una réplica: reproducir la misma hipótesis de costos confirma "
+                            "coherencia del cálculo, pero deja abierta la sensibilidad a "
+                            "hipótesis diferentes."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Comportamiento fuera de muestra",
+                    "paragraphs": [
+                        (
+                            "El informe compara el tramo posterior a la fecha declarada como "
+                            "inicio fuera de muestra con el tramo anterior. Examina su Sharpe y "
+                            "la distancia entre ambos. La fecha es una declaración del cliente; "
+                            "el archivo por sí solo no demuestra que se eligiera antes de "
+                            "conocer los resultados. Cambiar reglas después de mirar ese tramo "
+                            "altera su interpretación aunque las fechas sigan intactas. Si "
+                            "falta la fecha o los tramos no contienen datos suficientes, el "
+                            "informe indica la limitación en lugar de fabricar una comparación."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Calidad de los datos",
+                    "paragraphs": [
+                        (
+                            "Otra dimensión busca señales de problemas en los materiales: "
+                            "duplicados, saltos, valores congelados, depósitos y patrones "
+                            "asociados a martingala o rejilla, entre otros. Una bandera "
+                            "requiere examinar la causa y el contexto; no reconstruye "
+                            "automáticamente el historial original. La ausencia de banderas "
+                            "tampoco establece la procedencia del archivo. Rigor lee lo "
+                            "entregado y no contrasta registros con un bróker. Para una "
+                            "gestora, conservar el export original y explicar transformaciones "
+                            "facilita responder a observaciones concretas sin confundir "
+                            "limpieza estadística con autenticidad de origen."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Comparación con un benchmark",
+                    "paragraphs": [
+                        (
+                            "La revisión compara la serie con el benchmark entregado mediante "
+                            "exceso de retorno, relación entre drawdowns y ratio de "
+                            "información. Las fechas deben solaparse lo suficiente para "
+                            "sostener la comparación. Elegir una referencia pertinente sigue "
+                            "siendo una decisión de investigación que conviene documentar: "
+                            "comparar con una exposición distinta puede responder otra "
+                            "pregunta. Sin el benchmark o sin un solapamiento suficiente, no se "
+                            "puede inferir la comparación a partir del nombre de la estrategia. "
+                            "La dimensión recoge esa ausencia y no la sustituye por una "
+                            "expectativa."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Medido, declarado y pendiente de datos",
+                    "paragraphs": [
+                        (
+                            "MEASURED, o Medido, significa que el informe calculó el dato desde "
+                            "el archivo recibido. DECLARED, o Declarado, identifica lo que "
+                            "indicó el cliente o su plataforma y que el análisis no puede "
+                            "comprobar. NOT_MEASURED indica información insuficiente para esa "
+                            "medición. Estas etiquetas se aplican a cada dato: un Sharpe "
+                            "calculado puede coexistir con un número de intentos declarado. "
+                            "Medir una operación matemática no convierte sus premisas en hechos "
+                            "observados. Al compartir el informe, conserva las etiquetas y las "
+                            "limitaciones junto a las conclusiones, también cuando el resultado "
+                            "complique la presentación inicial."
+                        ),
+                    ],
+                },
+            ],
+            "en": [
+                {
+                    "heading": "What independent means in this review",
+                    "paragraphs": [
+                        (
+                            "Independence starts with separating the analysis from the product "
+                            "being examined. Rigor sells no robots or signals, and the report "
+                            "price does not depend on the resulting class. Its methodology "
+                            "publishes the questions, assessment rules and limitations. That "
+                            "makes it possible to discuss a particular conclusion and the file "
+                            "supporting it. It does not make the reviewer an observer of the "
+                            "entire research process: discarded experiments, earlier changes "
+                            "and unrecorded decisions can remain outside the materials "
+                            "supplied. Documenting those gaps is part of reading the review."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Statistical evidence against chance",
+                    "paragraphs": [
+                        (
+                            "The first check examines the support for the observed Sharpe "
+                            "ratio. The probabilistic Sharpe ratio accounts for record length, "
+                            "skewness and kurtosis. The report also examines serial dependence "
+                            "and resamples return blocks with a stationary bootstrap. Blocks "
+                            "preserve some local structure that shuffling isolated observations "
+                            "would discard. The result still depends on the supplied sample and "
+                            "the method. A short, irregular record or a record dominated by "
+                            "particular episodes calls for reading uncertainty alongside the "
+                            "headline figure. Repeating the same calculation does not remove "
+                            "that uncertainty or add observations."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Selection across variants",
+                    "paragraphs": [
+                        (
+                            "The next question is how many opportunities existed to find an "
+                            "attractive curve. The deflated Sharpe ratio compares the result "
+                            "with a reference that rises as more trials are considered. Rigor "
+                            "uses the largest count supported by the declaration, uploaded "
+                            "variants or optimisation passes. With a variants matrix, it can "
+                            "also examine overfitting through combinatorial cross-validation. "
+                            "The winning curve alone does not describe the discarded "
+                            "alternatives or the decisions that selected it for publication."
+                        ),
+                        (
+                            f"{INDEPENDENT_LUCK_EXAMPLE['en']} "
+                            "The calculator illustrates selection under its assumptions; it "
+                            "does not measure the reader's strategy. Independence across trials "
+                            "is a simplification: similar variants can share much of their "
+                            "behaviour. Nor can this example reconstruct earlier searches that "
+                            "nobody documented."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Sensitivity to trading costs",
+                    "paragraphs": [
+                        (
+                            "The cost check recalculates trades at different friction levels "
+                            "and examines the break-even cost. It requires trade details and "
+                            "identifiable assumptions. A net return curve alone cannot separate "
+                            "commission, spread and slippage or establish how they would change "
+                            "at another size. If trades are missing, this section can remain "
+                            "unmeasured even when other statistics are available. The "
+                            "distinction matters for replication: reproducing the same cost "
+                            "assumption establishes consistency of the calculation, while "
+                            "sensitivity to different assumptions remains a separate question. "
+                            "Cost labels should accompany any comparison between records."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Behaviour outside the fitting sample",
+                    "paragraphs": [
+                        (
+                            "The report compares the period after the declared out-of-sample "
+                            "start with the preceding period. It examines their Sharpe ratios "
+                            "and the gap between them. The date is a client declaration; the "
+                            "file alone cannot establish that it was chosen before the results "
+                            "were seen. Changing rules after looking at that period changes its "
+                            "interpretation even when the dates remain intact. If the date is "
+                            "missing or either part lacks enough observations, the report "
+                            "identifies the limitation instead of constructing a comparison "
+                            "from an unsuitable split."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Data quality",
+                    "paragraphs": [
+                        (
+                            "Another dimension looks for problems in the materials: duplicates, "
+                            "spikes, frozen marks, deposits and patterns associated with "
+                            "martingale or grid behaviour, among others. A flag calls for "
+                            "examining its cause and context; it does not automatically "
+                            "reconstruct the original history. The absence of flags does not "
+                            "establish the file's provenance either. Rigor reads what is "
+                            "supplied and does not reconcile records with a broker. Keeping the "
+                            "original export and explaining transformations helps a fund "
+                            "respond to specific observations without confusing statistical "
+                            "cleanliness with evidence of origin."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Comparison with a benchmark",
+                    "paragraphs": [
+                        (
+                            "The review compares the record with the supplied benchmark using "
+                            "excess return, the drawdown ratio and the information ratio. Dates "
+                            "must overlap sufficiently to support that comparison. Choosing a "
+                            "relevant reference remains a research decision worth documenting: "
+                            "comparison with a different exposure may answer a different "
+                            "question. Without the benchmark or sufficient overlap, the "
+                            "comparison cannot be inferred from the strategy name. The "
+                            "dimension records the missing evidence instead of replacing it "
+                            "with an expectation. A benchmark comparison describes the supplied "
+                            "period, including its particular market conditions."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Measured, declared and awaiting data",
+                    "paragraphs": [
+                        (
+                            "MEASURED means the report computed a value from the supplied file. "
+                            "DECLARED identifies something stated by the client or platform "
+                            "that the analysis cannot establish. NOT_MEASURED indicates "
+                            "insufficient information for that measurement. These labels apply "
+                            "to individual values: a computed Sharpe can sit alongside a "
+                            "declared trial count. Measuring a mathematical operation does not "
+                            "turn its premises into observed facts. When sharing the report, "
+                            "keep the labels and limitations next to the conclusions, including "
+                            "when a finding makes the original presentation harder to support "
+                            "or leaves a question unresolved."
+                        ),
+                    ],
+                },
+            ],
+            "pt": [
+                {
+                    "heading": "O que significa independente nesta revisão",
+                    "paragraphs": [
+                        (
+                            "A independência começa por separar a análise do produto examinado. "
+                            "O Rigor não vende robôs nem sinais, e o preço do relatório não "
+                            "depende da classe obtida. Sua metodologia publica as perguntas, as "
+                            "regras de avaliação e as limitações. Isso permite discutir uma "
+                            "conclusão específica e o arquivo que a sustenta. Não transforma o "
+                            "auditor em observador de todo o processo de pesquisa: testes "
+                            "descartados, alterações anteriores e decisões sem registro podem "
+                            "ficar fora dos materiais enviados. Documentar essas lacunas faz "
+                            "parte da leitura."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Evidência estatística diante do acaso",
+                    "paragraphs": [
+                        (
+                            "A primeira análise examina o suporte para o Sharpe observado. O "
+                            "Sharpe probabilístico considera o comprimento da série, a "
+                            "assimetria e a curtose. O relatório também examina dependência "
+                            "temporal e reamostra blocos de retornos por bootstrap "
+                            "estacionário. Os blocos preservam parte da estrutura local que "
+                            "seria perdida ao embaralhar observações isoladas. O resultado "
+                            "continua dependente da amostra recebida e do método. Uma série "
+                            "curta, irregular ou dominada por episódios específicos exige ler a "
+                            "incerteza junto com o número principal. Repetir o cálculo não "
+                            "elimina essa incerteza nem acrescenta observações."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Seleção entre variantes",
+                    "paragraphs": [
+                        (
+                            "A pergunta seguinte é quantas oportunidades existiram para "
+                            "encontrar uma curva chamativa. O Sharpe deflacionado compara o "
+                            "resultado com uma referência que aumenta ao considerar mais "
+                            "tentativas. O Rigor usa a maior contagem entre a declaração e a "
+                            "evidência de variantes ou passagens de otimização enviadas. Quando "
+                            "existe uma matriz de variantes, também pode examinar sobreajuste "
+                            "por validação cruzada combinatória. A curva vencedora isolada não "
+                            "descreve as alternativas descartadas nem as decisões que a "
+                            "selecionaram para publicação."
+                        ),
+                        (
+                            f"{INDEPENDENT_LUCK_EXAMPLE['pt']} "
+                            "A calculadora ilustra a seleção sob suas premissas; não mede uma "
+                            "estratégia do leitor. A independência entre tentativas é uma "
+                            "simplificação: variantes semelhantes podem compartilhar boa parte "
+                            "do comportamento. O exemplo também não reconstrói buscas "
+                            "anteriores que ninguém documentou."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Sensibilidade aos custos",
+                    "paragraphs": [
+                        (
+                            "A análise de custos recalcula operações com diferentes níveis de "
+                            "fricção e examina o custo de equilíbrio. Ela exige detalhes das "
+                            "operações e premissas identificáveis. Uma curva líquida isolada "
+                            "não separa comissão, spread e slippage nem estabelece como "
+                            "mudariam com outro volume. Sem as operações, essa seção pode ficar "
+                            "sem medição mesmo quando outras estatísticas estão disponíveis. A "
+                            "distinção importa para a réplica: reproduzir a mesma hipótese de "
+                            "custos estabelece consistência do cálculo, enquanto a "
+                            "sensibilidade a outras hipóteses continua sendo uma pergunta "
+                            "separada. Os rótulos dos custos devem acompanhar as comparações."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Comportamento fora da amostra",
+                    "paragraphs": [
+                        (
+                            "O relatório compara o período posterior à data declarada como "
+                            "início fora da amostra com o período anterior. Examina seu Sharpe "
+                            "e a distância entre ambos. A data é uma declaração do cliente; o "
+                            "arquivo sozinho não demonstra que foi escolhida antes de conhecer "
+                            "os resultados. Alterar regras depois de observar aquele período "
+                            "muda sua interpretação mesmo quando as datas continuam intactas. "
+                            "Se falta a data ou algum trecho tem observações insuficientes, o "
+                            "relatório identifica a limitação em vez de construir uma "
+                            "comparação a partir de uma divisão inadequada."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Qualidade dos dados",
+                    "paragraphs": [
+                        (
+                            "Outra dimensão procura problemas nos materiais: duplicados, "
+                            "saltos, valores congelados, depósitos e padrões associados a "
+                            "martingale ou grade, entre outros. Uma bandeira exige examinar sua "
+                            "causa e seu contexto; não reconstrói automaticamente o histórico "
+                            "original. A ausência de bandeiras também não estabelece a origem "
+                            "do arquivo. O Rigor lê o material enviado e não confere registros "
+                            "com uma corretora. Preservar a exportação original e explicar "
+                            "transformações ajuda uma gestora a responder a observações "
+                            "específicas sem confundir limpeza estatística com evidência de "
+                            "origem."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Comparação com um benchmark",
+                    "paragraphs": [
+                        (
+                            "A revisão compara a série com o benchmark enviado usando excesso "
+                            "de retorno, razão de drawdown e razão de informação. As datas "
+                            "precisam coincidir o suficiente para sustentar a comparação. "
+                            "Escolher uma referência pertinente continua sendo uma decisão de "
+                            "pesquisa que merece documentação: comparar com uma exposição "
+                            "diferente pode responder a outra pergunta. Sem o benchmark ou sem "
+                            "sobreposição suficiente, não se pode deduzir a comparação pelo "
+                            "nome da estratégia. A dimensão registra a informação ausente em "
+                            "vez de substituí-la por uma expectativa sobre o comportamento do "
+                            "modelo."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Medido, declarado e sem dados suficientes",
+                    "paragraphs": [
+                        (
+                            "MEASURED, ou Medido, significa que o relatório calculou o valor a "
+                            "partir do arquivo recebido. DECLARED, ou Declarado, identifica "
+                            "algo informado pelo cliente ou pela plataforma que a análise não "
+                            "pode comprovar. NOT_MEASURED indica informação insuficiente para "
+                            "aquela medição. As etiquetas se aplicam a cada valor: um Sharpe "
+                            "calculado pode aparecer junto de uma contagem de tentativas "
+                            "declarada. Medir uma operação matemática não transforma suas "
+                            "premissas em fatos observados. Ao compartilhar o relatório, "
+                            "preserve as etiquetas e limitações junto das conclusões, inclusive "
+                            "quando uma observação dificulta sustentar a apresentação inicial."
+                        ),
+                    ],
+                },
+            ],
+        },
+        "faq": {
+            "es": [
+                {
+                    "q": "¿La revisión reconstruye la estrategia?",
+                    "a": (
+                        "No. Analiza los archivos recibidos y las declaraciones asociadas. "
+                        "Reconstruir la señal o repetir el backtest requiere reglas, código y "
+                        "datos que esta revisión no reconstruye."
+                    ),
+                },
+                {
+                    "q": "¿Un dato medido describe resultados futuros?",
+                    "a": (
+                        "No. Describe un cálculo sobre el material entregado. Las dependencias, "
+                        "los supuestos y la información ausente siguen limitando su "
+                        "interpretación; el informe no recomienda comprar, vender ni invertir."
+                    ),
+                },
+            ],
+            "en": [
+                {
+                    "q": "Does the review rebuild the strategy?",
+                    "a": (
+                        "No. It analyses the received files and associated declarations. "
+                        "Rebuilding the signal or repeating the backtest requires rules, code "
+                        "and data that this review does not reconstruct."
+                    ),
+                },
+                {
+                    "q": "Does a measured value describe future results?",
+                    "a": (
+                        "No. It describes a calculation on the supplied material. Dependencies, "
+                        "assumptions and missing information still limit its interpretation; "
+                        "the report does not recommend buying, selling or investing."
+                    ),
+                },
+            ],
+            "pt": [
+                {
+                    "q": "A revisão reconstrói a estratégia?",
+                    "a": (
+                        "Não. Analisa os arquivos recebidos e as declarações associadas. "
+                        "Reconstruir o sinal ou repetir o backtest exige regras, código e dados "
+                        "que esta revisão não reconstrói."
+                    ),
+                },
+                {
+                    "q": "Um valor medido descreve resultados futuros?",
+                    "a": (
+                        "Não. Descreve um cálculo sobre o material enviado. Dependências, "
+                        "premissas e informação ausente continuam limitando sua interpretação; "
+                        "o relatório não recomenda comprar, vender ou investir."
+                    ),
+                },
+            ],
+        },
+        "related": [
+            {
+                "kind": "calculator",
+            },
+            {
+                "kind": "method",
+            },
+            {
+                "kind": "audience",
+                "slug": "inversores-gestores-fondos",
+            },
+        ],
+    },
+    {
+        "key": "sharpe-deflactado-track-record",
+        "slug": {
+            "es": "sharpe-deflactado-track-record",
+            "en": "deflated-sharpe-ratio-track-record",
+            "pt": "sharpe-deflacionado-historico",
+        },
+        "title": {
+            "es": "Sharpe deflactado, explicado para quienes publican historiales",
+            "en": ("Deflated Sharpe ratio, explained for people who publish track records"),
+            "pt": "Sharpe deflacionado, explicado para quem publica históricos",
+        },
+        "summary": {
+            "es": (
+                "Cómo cambia la lectura del Sharpe al contar los intentos, qué calcula Rigor "
+                "y dónde limita el supuesto de independencia."
+            ),
+            "en": (
+                "How counting research attempts changes a Sharpe ratio's interpretation, what "
+                "Rigor calculates and where independence assumptions matter."
+            ),
+            "pt": (
+                "Como contar as tentativas muda a leitura do Sharpe, o que o Rigor calcula e "
+                "onde o pressuposto de independência limita a análise."
+            ),
+        },
+        "intro": {
+            "es": (
+                "Un historial publicado suele mostrar la versión que sobrevivió a la "
+                "investigación. El lector ve su Sharpe, pero rara vez ve las configuraciones "
+                "descartadas, las ventanas cambiadas o los universos que se probaron antes de "
+                "elegirla. El Sharpe deflactado aborda esa selección: pregunta cuánto "
+                "respaldo estadístico conserva el Sharpe observado frente a una referencia "
+                "que incorpora la búsqueda. El cálculo describe la evidencia del historial "
+                "disponible; no establece cómo se comportará el modelo después de publicarlo."
+            ),
+            "en": (
+                "A published track record usually shows the version that survived the "
+                "research process. Readers see its Sharpe ratio, but rarely see the discarded "
+                "settings, revised windows or alternative universes tried before it was "
+                "selected. The deflated Sharpe ratio addresses that selection: it asks how "
+                "much statistical support the observed Sharpe retains against a benchmark "
+                "that accounts for the search. The calculation describes evidence in the "
+                "available history; it does not establish how the model will behave after "
+                "publication."
+            ),
+            "pt": (
+                "Um histórico publicado costuma mostrar a versão que sobreviveu à pesquisa. O "
+                "leitor vê seu Sharpe, mas raramente vê as configurações descartadas, as "
+                "janelas alteradas ou os universos testados antes da escolha. O Sharpe "
+                "deflacionado aborda essa seleção: pergunta quanto respaldo estatístico o "
+                "Sharpe observado conserva diante de uma referência que incorpora a busca. O "
+                "cálculo descreve a evidência do histórico disponível; não estabelece como o "
+                "modelo se comportará depois da publicação."
+            ),
+        },
+        "sections": {
+            "es": [
+                {
+                    "heading": "Qué mide el Sharpe deflactado",
+                    "paragraphs": [
+                        (
+                            "El Sharpe resume el rendimiento medio en relación con su "
+                            "dispersión. Su estimación tiene incertidumbre: depende de cuánto "
+                            "historial existe, de la asimetría y de las colas de la "
+                            "distribución. El Sharpe probabilístico evalúa el observado "
+                            "frente a una referencia. El Sharpe deflactado, o DSR, utiliza "
+                            "como referencia el máximo Sharpe esperado entre intentos sin "
+                            "ventaja, considerando cuántos se hicieron y la dispersión de sus "
+                            "estimaciones."
+                        ),
+                        (
+                            "El DSR se expresa como una probabilidad estadística bajo esos "
+                            "supuestos, no como un Sharpe anual ajustado. Tampoco es la "
+                            "probabilidad de que el próximo periodo sea positivo."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "El registro de intentos forma parte del resultado",
+                    "paragraphs": [
+                        (
+                            "Cada cambio considerado al escoger la versión final puede "
+                            "ampliar la búsqueda: parámetros, reglas de entrada, filtros, "
+                            "instrumentos y fechas. Guardar solo el archivo elegido oculta "
+                            "ese contexto. Conserve el registro del optimizador, las "
+                            "variantes descartadas y la fecha en que fijó el criterio de "
+                            "selección."
+                        ),
+                        (
+                            "Rigor utiliza el mayor conteo entre la declaración y los conteos "
+                            "que aportan los archivos compatibles. Si el total proviene de "
+                            "una estimación del autor, conserva su condición de Declarado. "
+                            "Contar columnas o pasadas del archivo aporta evidencia Medida "
+                            "sobre ese archivo, aunque no prueba que nunca existieran ensayos "
+                            "anteriores."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "La calculadora expresa la búsqueda en unidades de Sharpe",
+                    "paragraphs": [
+                        (
+                            "La calculadora pública comparte el cálculo de suerte del "
+                            "informe. Muestra el Sharpe esperado de la mejor configuración "
+                            "sin ventaja, el Sharpe restante después de una corrección de "
+                            "Bonferroni y la duración de historial en que esa referencia "
+                            "quedaría por debajo del Sharpe introducido. Son medidas "
+                            "relacionadas con la selección; ninguna de ellas es la "
+                            "probabilidad DSR."
+                        ),
+                        (
+                            "La corrección de Bonferroni ajusta el valor p por el número de "
+                            "intentos y lo transforma de nuevo a unidades de Sharpe. La "
+                            "duración calculada mantiene los supuestos y el Sharpe del "
+                            "escenario: no es un plazo que baste esperar para resolver la "
+                            "incertidumbre."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Cómo leer la tabla de escenarios",
+                    "paragraphs": [
+                        (
+                            "La tabla combina distintos conteos de intentos y duraciones, "
+                            "manteniendo el Sharpe supuesto. Sus entradas y resultados se "
+                            "etiquetan como Declarado: son escenarios de la calculadora, no "
+                            "mediciones de una cartera. La cifra de cada celda corresponde al "
+                            "Sharpe esperado por suerte, no a un DSR ni al rendimiento de una "
+                            "estrategia."
+                        ),
+                        (
+                            "Compare primero una duración fija al aumentar la búsqueda. "
+                            "Después, mantenga el conteo y cambie la duración. Así separa el "
+                            "efecto de seleccionar entre más variantes del efecto de estimar "
+                            "con más historial. Un escenario describe la relación bajo "
+                            "supuestos diarios y normales; no sustituye la distribución que "
+                            "tendría el archivo de un cliente."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Dónde limita la independencia",
+                    "paragraphs": [
+                        (
+                            "La referencia de máximo esperado trata los intentos como "
+                            "independientes. En una búsqueda real, configuraciones cercanas "
+                            "suelen compartir señales, posiciones y rendimientos. El conteo "
+                            "bruto y el número efectivo de intentos independientes pueden "
+                            "diferir. No reduzca el conteo hasta obtener una lectura deseada: "
+                            "describa la dependencia y muestre la sensibilidad a otros "
+                            "conteos. La calculadora no estima esa correlación a partir de "
+                            "los campos que recibe."
+                        ),
+                        (
+                            "También puede haber dependencia entre rendimientos consecutivos "
+                            "del mismo historial. Eso afecta la información que aporta cada "
+                            "observación y es distinto de la correlación entre variantes. El "
+                            "informe incorpora ajustes de dependencia en su análisis "
+                            "estadístico; aun así, la calidad de los datos y la "
+                            "representación del proceso de búsqueda siguen limitando la "
+                            "interpretación."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Medido y Declarado responden a preguntas diferentes",
+                    "paragraphs": [
+                        (
+                            "Medido identifica una cantidad obtenida del archivo entregado o "
+                            "un cálculo sobre él. Declarado identifica información "
+                            "suministrada por el autor que el archivo no establece. No medido "
+                            "señala que falta evidencia para realizar una comprobación. Una "
+                            "estadística calculada puede depender de un conteo declarado; por "
+                            "eso hay que leer las etiquetas de los insumos junto con el "
+                            "resultado."
+                        ),
+                        (
+                            "En la calculadora no hay archivo: el Sharpe, la duración y el "
+                            "conteo son supuestos aportados por quien la usa. En el informe, "
+                            "la serie permite medir momentos y revisar su estructura "
+                            "temporal. Esa diferencia de evidencia explica por qué una "
+                            "ilustración pública y un análisis de datos reales pueden arrojar "
+                            "lecturas diferentes."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Qué publicar junto al historial",
+                    "paragraphs": [
+                        (
+                            "Presente el periodo analizado, la frecuencia, el tratamiento de "
+                            "costos y la separación entre investigación y evaluación fuera de "
+                            "muestra. Añada cómo obtuvo el conteo de intentos y qué parte de "
+                            "la búsqueda no pudo reconstruir."
+                        ),
+                        (
+                            "El lector necesita esas condiciones para interpretar el DSR. Un "
+                            "resultado favorable en multiplicidad deja pendientes la calidad "
+                            "de datos, la exposición, los costos y la estabilidad temporal. "
+                            "Vincule la metodología y entregue las limitaciones con el mismo "
+                            "historial que muestra al comité. La revisión estadística aporta "
+                            "preguntas documentadas; no reemplaza la decisión de inversión."
+                        ),
+                    ],
+                },
+            ],
+            "en": [
+                {
+                    "heading": "What the deflated Sharpe ratio measures",
+                    "paragraphs": [
+                        (
+                            "The Sharpe ratio summarizes average return relative to its "
+                            "dispersion. Its estimate is uncertain: the uncertainty depends "
+                            "on history length, skewness and the tails of the return "
+                            "distribution. The probabilistic Sharpe ratio evaluates the "
+                            "observed estimate against a benchmark. The deflated Sharpe "
+                            "ratio, or DSR, uses the expected maximum Sharpe among unskilled "
+                            "attempts as that benchmark, accounting for how many attempts "
+                            "were made and how dispersed their estimates are."
+                        ),
+                        (
+                            "DSR is expressed as a statistical probability under those "
+                            "assumptions, not as an adjusted annual Sharpe ratio. It is also "
+                            "not the probability that the next period will be positive."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "The research ledger belongs with the result",
+                    "paragraphs": [
+                        (
+                            "Each choice considered when selecting the final version can "
+                            "extend the search: parameters, entry rules, filters, instruments "
+                            "and dates. Keeping only the selected file hides that context. "
+                            "Retain the optimizer log, discarded variants and the date when "
+                            "you fixed the selection criterion."
+                        ),
+                        (
+                            "Rigor uses the largest count among the declaration and counts "
+                            "supported by compatible files. If the total comes from the "
+                            "author's estimate, it remains Declared. Counting columns or "
+                            "optimizer passes provides Measured evidence about that file, "
+                            "although it does not establish that no earlier experiments "
+                            "existed."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "The calculator expresses the search in Sharpe units",
+                    "paragraphs": [
+                        (
+                            "The public calculator shares the report's luck calculation. It "
+                            "shows the expected Sharpe of the best unskilled configuration, "
+                            "the Sharpe remaining after a Bonferroni correction and the "
+                            "history length at which that benchmark would fall below the "
+                            "entered Sharpe. These quantities concern selection; none of them "
+                            "is the DSR probability."
+                        ),
+                        (
+                            "The Bonferroni correction adjusts the p-value for the number of "
+                            "attempts and converts it back into Sharpe units. The calculated "
+                            "history length holds the scenario's assumptions and Sharpe "
+                            "constant: it is not a waiting period that resolves uncertainty. "
+                            "Changing the history, costs or research search requires "
+                            "reassessing the evidence."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "How to read the scenario table",
+                    "paragraphs": [
+                        (
+                            "The table combines different trial counts and history lengths "
+                            "while holding the assumed Sharpe constant. Its inputs and "
+                            "outputs are labelled Declared: they are calculator scenarios, "
+                            "not measurements of a portfolio. Each cell reports the expected "
+                            "luck Sharpe, not a DSR or a strategy's return."
+                        ),
+                        (
+                            "First compare a fixed history length as the search expands. Then "
+                            "hold the trial count constant and change the length. This "
+                            "separates the effect of selecting among more variants from the "
+                            "effect of estimating with more history. A scenario describes "
+                            "that relationship under daily, normal-return assumptions; it "
+                            "does not substitute for the distribution in a client's file."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Where independence becomes a limitation",
+                    "paragraphs": [
+                        (
+                            "The expected-maximum benchmark treats attempts as independent. "
+                            "In a research search, nearby configurations often share signals, "
+                            "positions and returns. The raw count and the effective number of "
+                            "independent attempts can differ. Do not reduce the count until "
+                            "the reading looks desirable: describe the dependence and show "
+                            "sensitivity to other counts. The calculator does not estimate "
+                            "that correlation from the fields it receives."
+                        ),
+                        (
+                            "Consecutive returns within the same history can also be "
+                            "dependent. That affects how much information each observation "
+                            "contributes and is distinct from correlation between variants. "
+                            "The report incorporates dependence adjustments into its "
+                            "statistical analysis; even so, data quality and how faithfully "
+                            "the search process is represented continue to limit "
+                            "interpretation."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Measured and Declared answer different questions",
+                    "paragraphs": [
+                        (
+                            "Measured identifies a quantity obtained from the supplied file "
+                            "or a calculation using it. Declared identifies information "
+                            "supplied by the author that the file does not establish. Not "
+                            "measured indicates missing evidence for a check. A calculated "
+                            "statistic can depend on a declared trial count, so read the "
+                            "labels on the inputs alongside the result."
+                        ),
+                        (
+                            "The calculator has no file: Sharpe, duration and trial count are "
+                            "assumptions supplied by its user. In the report, the series "
+                            "allows return moments to be measured and its time structure to "
+                            "be examined. That difference in evidence explains why a public "
+                            "illustration and an analysis of actual data can produce "
+                            "different readings."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "What to publish alongside the track record",
+                    "paragraphs": [
+                        (
+                            "State the period examined, observation frequency, cost treatment "
+                            "and separation between research and out-of-sample evaluation. "
+                            "Add how the trial count was obtained and which part of the "
+                            "search you could not reconstruct. If a variants matrix exists, "
+                            "retain its dates and the relationship between each column and "
+                            "the version tested."
+                        ),
+                        (
+                            "Readers need those conditions to interpret DSR. A favorable "
+                            "multiplicity result still leaves data quality, exposure, costs "
+                            "and stability over time to examine. Link the methodology and "
+                            "deliver the limitations with the same history you show the "
+                            "committee. Statistical review contributes documented questions; "
+                            "it does not replace the investment decision or settle whether "
+                            "the proposed implementation matches the supplied series."
+                        ),
+                    ],
+                },
+            ],
+            "pt": [
+                {
+                    "heading": "O que mede o Sharpe deflacionado",
+                    "paragraphs": [
+                        (
+                            "O Sharpe resume o retorno médio em relação à sua dispersão. Sua "
+                            "estimativa tem incerteza: ela depende da duração do histórico, "
+                            "da assimetria e das caudas da distribuição. O Sharpe "
+                            "probabilístico avalia a estimativa observada diante de uma "
+                            "referência. O Sharpe deflacionado, ou DSR, usa como referência o "
+                            "máximo Sharpe esperado entre tentativas sem vantagem, "
+                            "considerando quantas foram feitas e a dispersão das estimativas."
+                        ),
+                        (
+                            "O DSR é expresso como uma probabilidade estatística sob esses "
+                            "pressupostos, não como um Sharpe anual ajustado. Também não é a "
+                            "probabilidade de o próximo período ser positivo."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "O registro de tentativas acompanha o resultado",
+                    "paragraphs": [
+                        (
+                            "Cada escolha considerada ao selecionar a versão final pode "
+                            "ampliar a busca: parâmetros, regras de entrada, filtros, "
+                            "instrumentos e datas. Guardar apenas o arquivo escolhido esconde "
+                            "esse contexto. Conserve o registro do otimizador, as variantes "
+                            "descartadas e a data em que fixou o critério de seleção."
+                        ),
+                        (
+                            "O Rigor usa a maior contagem entre a declaração e as contagens "
+                            "sustentadas pelos arquivos compatíveis. Se o total vem de uma "
+                            "estimativa do autor, permanece Declarado. Contar colunas ou "
+                            "passagens fornece evidência Medida sobre aquele arquivo, embora "
+                            "não estabeleça que nunca existiram experimentos anteriores."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "A calculadora expressa a busca em unidades de Sharpe",
+                    "paragraphs": [
+                        (
+                            "A calculadora pública compartilha o cálculo de sorte do "
+                            "relatório. Ela mostra o Sharpe esperado da melhor configuração "
+                            "sem vantagem, o Sharpe restante depois da correção de Bonferroni "
+                            "e a duração do histórico em que essa referência ficaria abaixo "
+                            "do Sharpe informado. Essas medidas tratam da seleção; nenhuma "
+                            "delas é a probabilidade DSR."
+                        ),
+                        (
+                            "A correção de Bonferroni ajusta o valor p pelo número de "
+                            "tentativas e o transforma novamente em unidades de Sharpe. A "
+                            "duração calculada mantém os pressupostos e o Sharpe do cenário: "
+                            "não é um prazo de espera que resolve a incerteza. Alterar o "
+                            "histórico, os custos ou a busca exige reavaliar a evidência."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Como ler a tabela de cenários",
+                    "paragraphs": [
+                        (
+                            "A tabela combina diferentes contagens de tentativas e durações, "
+                            "mantendo o Sharpe pressuposto. Suas entradas e seus resultados "
+                            "recebem a etiqueta Declarado: são cenários da calculadora, não "
+                            "medições de uma carteira. Cada célula apresenta o Sharpe "
+                            "esperado por sorte, não um DSR nem o retorno de uma estratégia."
+                        ),
+                        (
+                            "Compare primeiro uma duração fixa enquanto a busca aumenta. "
+                            "Depois mantenha a contagem e altere a duração. Assim você separa "
+                            "o efeito de selecionar entre mais variantes do efeito de estimar "
+                            "com mais histórico. Um cenário descreve essa relação sob "
+                            "pressupostos de retornos diários e normais; não substitui a "
+                            "distribuição que existiria no arquivo de um cliente."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Onde a independência limita a leitura",
+                    "paragraphs": [
+                        (
+                            "A referência de máximo esperado trata as tentativas como "
+                            "independentes. Na pesquisa, configurações próximas costumam "
+                            "compartilhar sinais, posições e retornos. A contagem bruta e o "
+                            "número efetivo de tentativas independentes podem diferir. Não "
+                            "reduza a contagem até obter uma leitura desejada: descreva a "
+                            "dependência e apresente sensibilidade a outras contagens. A "
+                            "calculadora não estima essa correlação com os campos recebidos."
+                        ),
+                        (
+                            "Também pode haver dependência entre retornos consecutivos do "
+                            "mesmo histórico. Isso afeta a informação que cada observação "
+                            "oferece e é diferente da correlação entre variantes. O relatório "
+                            "incorpora ajustes de dependência na análise estatística; ainda "
+                            "assim, a qualidade dos dados e a representação do processo de "
+                            "busca continuam limitando a interpretação."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Medido e Declarado respondem a perguntas diferentes",
+                    "paragraphs": [
+                        (
+                            "Medido identifica uma quantidade obtida do arquivo entregue ou "
+                            "um cálculo feito com ele. Declarado identifica informação "
+                            "fornecida pelo autor que o arquivo não estabelece. Não medido "
+                            "indica falta de evidência para uma análise. Uma estatística "
+                            "calculada pode depender de uma contagem declarada; portanto, "
+                            "leia as etiquetas das entradas junto com o resultado."
+                        ),
+                        (
+                            "Na calculadora não há arquivo: Sharpe, duração e contagem são "
+                            "pressupostos fornecidos pelo usuário. No relatório, a série "
+                            "permite medir os momentos dos retornos e examinar a estrutura "
+                            "temporal. Essa diferença de evidência explica por que uma "
+                            "ilustração pública e uma análise de dados reais podem produzir "
+                            "leituras diferentes."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "O que publicar junto com o histórico",
+                    "paragraphs": [
+                        (
+                            "Informe o período analisado, a frequência, o tratamento dos "
+                            "custos e a separação entre pesquisa e avaliação fora da amostra. "
+                            "Acrescente como obteve a contagem de tentativas e qual parte da "
+                            "busca não conseguiu reconstruir. Se houver uma matriz de "
+                            "variantes, preserve suas datas e a relação entre cada coluna e a "
+                            "versão testada."
+                        ),
+                        (
+                            "O leitor precisa dessas condições para interpretar o DSR. Um "
+                            "resultado favorável em multiplicidade ainda deixa questões sobre "
+                            "qualidade dos dados, exposição, custos e estabilidade ao longo "
+                            "do tempo. Inclua a metodologia e entregue as limitações com o "
+                            "mesmo histórico apresentado ao comitê. A revisão estatística "
+                            "contribui com perguntas documentadas; não substitui a decisão de "
+                            "investimento nem determina se a implementação proposta "
+                            "corresponde à série entregue."
+                        ),
+                    ],
+                },
+            ],
+        },
+        "faq": {
+            "es": [
+                {
+                    "q": "¿El Sharpe restante de la calculadora es el DSR?",
+                    "a": (
+                        "No. Es un Sharpe después de una corrección de Bonferroni. El DSR es "
+                        "una probabilidad estadística frente a una referencia de selección; "
+                        "son cantidades diferentes."
+                    ),
+                },
+                {
+                    "q": "¿Qué hago si desconozco el número de intentos?",
+                    "a": (
+                        "Declare la incertidumbre y presente escenarios con otros conteos. "
+                        "Reúna registros y variantes antes de interpretar la cifra como una "
+                        "descripción de toda la investigación."
+                    ),
+                },
+            ],
+            "en": [
+                {
+                    "q": "Is the calculator's remaining Sharpe the DSR?",
+                    "a": (
+                        "No. It is a Sharpe after a Bonferroni correction. DSR is a "
+                        "statistical probability against a selection benchmark; these are "
+                        "different quantities."
+                    ),
+                },
+                {
+                    "q": "What if the number of attempts is unknown?",
+                    "a": (
+                        "Declare that uncertainty and present scenarios with other counts. "
+                        "Gather logs and variants before interpreting the figure as a "
+                        "description of the entire research process."
+                    ),
+                },
+            ],
+            "pt": [
+                {
+                    "q": "O Sharpe restante da calculadora é o DSR?",
+                    "a": (
+                        "Não. É um Sharpe após uma correção de Bonferroni. O DSR é uma "
+                        "probabilidade estatística diante de uma referência de seleção; são "
+                        "quantidades diferentes."
+                    ),
+                },
+                {
+                    "q": "O que fazer se o número de tentativas for desconhecido?",
+                    "a": (
+                        "Declare a incerteza e apresente cenários com outras contagens. Reúna "
+                        "registros e variantes antes de interpretar a cifra como uma "
+                        "descrição de toda a pesquisa."
+                    ),
+                },
+            ],
+        },
+        "related": [
+            {
+                "kind": "calculator",
+            },
+            {
+                "kind": "method",
+            },
+        ],
+    },
+    {
+        "key": "auditar-cartera-modelo-senales",
+        "slug": {
+            "es": "auditar-cartera-modelo-senales",
+            "en": "audit-model-portfolio-signal-track-record",
+            "pt": "auditar-carteira-modelo-sinais",
+        },
+        "title": {
+            "es": (
+                "Cómo auditar una cartera modelo o un historial de señales antes de presentarlo a "
+                "inversores"
+            ),
+            "en": (
+                "How to audit a model portfolio or signal track record before showing it to "
+                "investors"
+            ),
+            "pt": (
+                "Como auditar uma carteira modelo ou um histórico de sinais antes de apresentá-lo "
+                "a investidores"
+            ),
+        },
+        "summary": {
+            "es": (
+                "Qué serie de rendimientos entregar, cómo documentar costos y benchmark, y qué "
+                "puede responder una revisión estadística del archivo."
+            ),
+            "en": (
+                "What return series to supply, how to document costs and the benchmark, and what "
+                "a statistical review of the file can answer."
+            ),
+            "pt": (
+                "Qual série de retornos enviar, como documentar custos e benchmark e o que uma "
+                "revisão estatística do arquivo pode responder."
+            ),
+        },
+        "intro": {
+            "es": (
+                "Antes de presentar una cartera modelo o un historial de señales, conviene saber "
+                "qué "
+                "preguntas soporta el archivo que acompaña a la curva. Un historial puede "
+                "describir "
+                "una simulación, una cartera teórica publicada o una cuenta con operaciones. Esas "
+                "fuentes no son intercambiables, aunque sus gráficos se parezcan. Una revisión "
+                "estadística examina los rendimientos aportados y distingue lo calculado de lo "
+                "declarado. No reconstruye el proceso de inversión ni transforma una simulación en "
+                "operaciones observadas. La preparación empieza por delimitar qué representa cada "
+                "periodo y qué información falta para interpretar el conjunto."
+            ),
+            "en": (
+                "Before presenting a model portfolio or signal track record, establish which "
+                "questions the file behind the chart can support. A record may describe a "
+                "simulation, a published theoretical portfolio or an account containing trades. "
+                "Those sources are not interchangeable, even when their charts look similar. A "
+                "statistical review examines the supplied returns and distinguishes calculations "
+                "from declarations. It does not reconstruct the investment process or turn a "
+                "simulation into observed transactions. Preparation starts by defining what each "
+                "period represents and which information is missing from the interpretation of "
+                "the complete history."
+            ),
+            "pt": (
+                "Antes de apresentar uma carteira modelo ou um histórico de sinais, convém saber "
+                "quais perguntas o arquivo por trás da curva permite responder. Um histórico pode "
+                "descrever uma simulação, uma carteira teórica publicada ou uma conta com "
+                "operações. Essas fontes não são intercambiáveis, mesmo quando seus gráficos "
+                "parecem semelhantes. Uma revisão estatística examina os retornos fornecidos e "
+                "distingue o que foi calculado do que foi declarado. Não reconstrói o processo "
+                "de investimento nem transforma uma simulação em operações observadas. A "
+                "preparação começa por delimitar o significado de cada período e as informações "
+                "que faltam para interpretar o conjunto."
+            ),
+        },
+        "sections": {
+            "es": [
+                {
+                    "heading": "Delimita el historial que quieres revisar",
+                    "paragraphs": [
+                        (
+                            "Anota si la serie corresponde a una cartera modelo, a señales "
+                            "publicadas "
+                            "o al registro exportado de una cuenta. Describe la moneda, el "
+                            "calendario "
+                            "y la frecuencia, junto con las fechas en que cambió el proceso. Si el "
+                            "historial une etapas simuladas y observadas, conserva esa separación "
+                            "en la documentación. Un cambio de universo, de regla de rebalanceo o "
+                            "de tratamiento de dividendos puede alterar la interpretación aunque "
+                            "la curva permanezca continua."
+                        ),
+                        (
+                            "Conserva el archivo de origen y una explicación de las "
+                            "transformaciones "
+                            "que hiciste antes de enviarlo. Si calculaste rendimientos a partir "
+                            "del valor de una cartera, explica cómo trataste aportaciones y "
+                            "retiradas. Una subida causada por una aportación no representa un "
+                            "rendimiento de la estrategia. La revisión del archivo no descubre "
+                            "por sí sola movimientos que nunca se incluyeron."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Entrega rendimientos por periodo, con fechas",
+                    "paragraphs": [
+                        (
+                            "Para una cartera sin listado de operaciones, prepara una serie "
+                            "fechada de rendimientos por periodo o del valor de la cartera. El "
+                            "formulario admite CSV o Excel. Usa encabezados claros, conserva la "
+                            "frecuencia original y distingue retornos por periodo de cifras "
+                            "acumuladas. Explica la unidad empleada, incluido si los rendimientos "
+                            "están expresados como decimales o porcentajes. No rellenes huecos "
+                            "para que la curva parezca continua: documenta por qué faltan."
+                        ),
+                        (
+                            "Si entregas operaciones, el lector universal necesita columnas "
+                            "que permitan interpretarlas: fechas de entrada y salida, cantidad "
+                            "y precios para operaciones cerradas, o fecha, cantidad, precio y "
+                            "sentido para ejecuciones. La guía de exportación explica el mapeo. "
+                            "Ese archivo responde preguntas distintas de una serie agregada. "
+                            "No presupongas que un historial de cierres incluye posiciones "
+                            "abiertas, distribuciones o todos los gastos de la cartera."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Separa bruto, neto y benchmark",
+                    "paragraphs": [
+                        (
+                            "Identifica qué versión de rendimientos entregas: bruta o neta. "
+                            "Conserva ambas por separado cuando existan y enumera comisiones, "
+                            "gastos y supuestos de deslizamiento aplicados. Que una etiqueta "
+                            "diga neto no permite medir los costos que faltan. La declaración "
+                            "de rendimientos de un fondo netos de comisiones tiene un alcance "
+                            "concreto en el formulario; no sustituye el desglose de ejecución "
+                            "de una señal. Tampoco supone una comparación automática entre "
+                            "las versiones bruta y neta."
+                        ),
+                        (
+                            "Aporta el benchmark como serie fechada en CSV en Opciones avanzadas. "
+                            "Documenta moneda, frecuencia y tratamiento de distribuciones, y "
+                            "explica por qué sirve de referencia. La comparación usa las fechas "
+                            "compatibles disponibles, no una cifra de portada de otro periodo. "
+                            "Un benchmark elegido después de mirar el resultado también forma "
+                            "parte de las decisiones de investigación que conviene revelar."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Qué preguntas puede responder el informe",
+                    "paragraphs": [
+                        (
+                            "Con datos suficientes, el informe examina la incertidumbre "
+                            "estadística, la concentración del resultado en los mejores "
+                            "periodos y las diferencias del tramo reciente frente al resto. "
+                            "La selección entre variantes importa: aporta el número de "
+                            "intentos y su procedencia para contextualizar el Sharpe deflactado. "
+                            "Si ese recuento procede de tu explicación, sigue siendo una "
+                            "declaración, aunque el cálculo que lo utiliza sea reproducible."
+                        ),
+                        (
+                            "Las etiquetas MEDIDO, DECLARADO y NO MEDIDO ayudan a leer esa "
+                            "frontera. MEDIDO identifica un cálculo sobre los datos aportados; "
+                            "DECLARADO identifica información del autor; NO MEDIDO indica "
+                            "evidencia insuficiente para una comprobación. La comparación "
+                            "con un benchmark depende de su serie y las pruebas de costos "
+                            "dependen del detalle disponible. Una sección ausente no debe "
+                            "interpretarse como una conclusión favorable sobre ella."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Qué no responde sin el archivo",
+                    "paragraphs": [
+                        (
+                            "Una captura o una rentabilidad acumulada no permite reconstruir "
+                            "el orden de los rendimientos, sus huecos ni la dependencia entre "
+                            "periodos. Sin la serie, Rigor no puede concluir si ese historial "
+                            "resiste las comprobaciones estadísticas. Sin operaciones y "
+                            "costos, tampoco puede medir todos los efectos de ejecución. "
+                            "Los límites deben acompañar al resultado cuando se comparte."
+                        ),
+                        (
+                            "Incluso con el archivo, la auditoría no demuestra que una señal "
+                            "se publicara antes de cada movimiento, que una cuenta pertenezca "
+                            "a quien la presenta o que todos los intentos descartados estén "
+                            "declarados. No reconstruye el código, no recomienda asignaciones "
+                            "y no promete resultados futuros. La revisión estadística del "
+                            "material recibido tiene un alcance distinto de una revisión "
+                            "operativa, jurídica o de titularidad."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Prepara la conversación y revisa un ejemplo",
+                    "paragraphs": [
+                        (
+                            "Usa el contacto enlazado al final para describir la fuente, la "
+                            "frecuencia y los archivos disponibles antes de delimitar la "
+                            "revisión. No hace falta incluir credenciales ni código de "
+                            "acceso. La página de ejemplos muestra la estructura de un "
+                            "informe con datos sintéticos: sirve para anticipar el formato, "
+                            "no para inferir una conclusión sobre tu cartera. Cuando "
+                            "presentes el informe, conserva junto a él el periodo analizado, "
+                            "las declaraciones y los apartados sin medir."
+                        ),
+                    ],
+                },
+            ],
+            "en": [
+                {
+                    "heading": "Define the record under review",
+                    "paragraphs": [
+                        (
+                            "State whether the series represents a model portfolio, published "
+                            "signals or an account export. Describe the currency, calendar and "
+                            "frequency, together with dates when the process changed. If the "
+                            "history joins simulated and observed stages, preserve that "
+                            "distinction in the documentation. A change in the investment "
+                            "universe, rebalance rule or treatment of distributions can alter "
+                            "the interpretation even when the chart remains continuous."
+                        ),
+                        (
+                            "Keep the original file and an explanation of any transformations "
+                            "you made before supplying it. If returns were calculated from "
+                            "portfolio values, explain the treatment of contributions and "
+                            "withdrawals. A rise caused by an external contribution is not "
+                            "a strategy return. Reviewing the file cannot independently "
+                            "discover movements that were never included in the supplied "
+                            "record or recover a valuation policy that was not documented."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Supply dated returns for each period",
+                    "paragraphs": [
+                        (
+                            "For a portfolio without a trade list, prepare dated period "
+                            "returns or portfolio values. The upload form accepts CSV or "
+                            "Excel. Use clear column headings, preserve the original "
+                            "frequency and distinguish period returns from cumulative "
+                            "figures. Explain the units, including whether returns are "
+                            "expressed as decimals or percentages. Do not fill gaps just "
+                            "to make the curve look continuous: document why they are missing."
+                        ),
+                        (
+                            "For trades, the universal reader needs columns that make the "
+                            "records interpretable: entry and exit times, quantity and "
+                            "prices for closed trades, or time, quantity, price and "
+                            "direction for fills. The export guide explains column mapping. "
+                            "That file answers different questions from an aggregated "
+                            "return series. Do not assume a list of closed trades includes "
+                            "open positions, distributions or every expense incurred by "
+                            "the portfolio throughout its history."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Separate gross, net and benchmark series",
+                    "paragraphs": [
+                        (
+                            "Identify which return version you supply: gross or net. Keep "
+                            "both separately when available and list the fees, expenses "
+                            "and slippage assumptions applied. A net label does not "
+                            "measure missing costs. The declaration that a fund's returns "
+                            "are net of fees has a specific scope in the upload form; "
+                            "it does not replace the execution cost breakdown for a "
+                            "signal. Nor does supplying these descriptions imply an "
+                            "automatic comparison between gross and net versions."
+                        ),
+                        (
+                            "Supply the benchmark as a dated CSV series under Advanced "
+                            "options. Document its currency, frequency and distribution "
+                            "treatment, and explain why it is an appropriate reference. "
+                            "The comparison uses the compatible dates available, not "
+                            "a headline figure covering a different period. Choosing a "
+                            "benchmark after inspecting the result is also a research "
+                            "decision that belongs in the accompanying account of the process."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "What the report can answer",
+                    "paragraphs": [
+                        (
+                            "Where sufficient data are available, the report examines "
+                            "statistical uncertainty, concentration in the best periods "
+                            "and differences between the recent segment and the rest. "
+                            "Selection among variants matters: supply the number of "
+                            "research attempts and its source to contextualise the "
+                            "deflated Sharpe. If that count comes from your explanation, "
+                            "it remains a declaration even when the calculation using "
+                            "it can be reproduced from the recorded inputs."
+                        ),
+                        (
+                            "The labels MEASURED, DECLARED and NOT MEASURED explain that "
+                            "boundary. MEASURED identifies a calculation on the supplied "
+                            "data; DECLARED identifies information supplied by the author; "
+                            "NOT MEASURED indicates insufficient evidence for a check. "
+                            "Benchmark comparison depends on the benchmark series, while "
+                            "cost tests depend on the detail available. An absent section "
+                            "should not be interpreted as a favourable conclusion about "
+                            "the question that section would otherwise address."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "What cannot be answered without the file",
+                    "paragraphs": [
+                        (
+                            "A screenshot or cumulative return does not establish the "
+                            "ordering of returns, gaps in the history or dependence "
+                            "between periods. Without the series, Rigor cannot conclude "
+                            "whether that record withstands the statistical checks. "
+                            "Without trades and costs, it cannot measure every execution "
+                            "effect either. These limits should accompany the result "
+                            "whenever it is shared with someone who did not supply the data."
+                        ),
+                        (
+                            "Even with the file, the audit does not establish that a "
+                            "signal was published before each market move, that an "
+                            "account belongs to its presenter or that every discarded "
+                            "attempt was disclosed. It does not reconstruct the code, "
+                            "recommend allocations or promise future results. A "
+                            "statistical review of received material has a different "
+                            "scope from an operational, legal or ownership review. "
+                            "Those questions require their own evidence and procedures."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Prepare the conversation and inspect an example",
+                    "paragraphs": [
+                        (
+                            "Use the contact link below to describe the source, frequency "
+                            "and available files before defining the review. Credentials "
+                            "and access codes are not needed for that conversation. "
+                            "The examples page shows the structure of a report made "
+                            "with synthetic data: it helps you understand the format, "
+                            "not infer a conclusion about your portfolio. When you "
+                            "present your own report, keep the analysed period, "
+                            "declarations and unmeasured sections alongside it so "
+                            "the reader can see the limits of the supporting evidence."
+                        ),
+                    ],
+                },
+            ],
+            "pt": [
+                {
+                    "heading": "Delimite o histórico que será revisado",
+                    "paragraphs": [
+                        (
+                            "Informe se a série corresponde a uma carteira modelo, a "
+                            "sinais publicados ou ao registro exportado de uma conta. "
+                            "Descreva moeda, calendário e frequência, junto com as "
+                            "datas em que o processo mudou. Se o histórico reúne "
+                            "etapas simuladas e observadas, preserve essa separação "
+                            "na documentação. Uma mudança de universo, regra de "
+                            "rebalanceamento ou tratamento de dividendos pode alterar "
+                            "a interpretação mesmo que a curva permaneça contínua."
+                        ),
+                        (
+                            "Guarde o arquivo de origem e uma explicação das "
+                            "transformações feitas antes do envio. Se calculou "
+                            "retornos a partir do valor da carteira, explique "
+                            "como tratou aportes e retiradas. Uma alta causada "
+                            "por um aporte não representa retorno da estratégia. "
+                            "A revisão do arquivo não descobre sozinha movimentos "
+                            "que nunca foram incluídos nem recupera uma política "
+                            "de avaliação que não foi documentada."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Envie retornos por período, com datas",
+                    "paragraphs": [
+                        (
+                            "Para uma carteira sem lista de operações, prepare uma "
+                            "série datada de retornos por período ou do valor da "
+                            "carteira. O formulário aceita CSV ou Excel. Use nomes "
+                            "claros nas colunas, preserve a frequência original e "
+                            "distinga retornos por período de valores acumulados. "
+                            "Explique a unidade utilizada, incluindo se os retornos "
+                            "estão em decimais ou percentuais. Não preencha lacunas "
+                            "para a curva parecer contínua: documente o motivo delas."
+                        ),
+                        (
+                            "Se enviar operações, o leitor universal precisa de "
+                            "colunas que permitam interpretá-las: datas de entrada "
+                            "e saída, quantidade e preços para operações fechadas, "
+                            "ou data, quantidade, preço e sentido para execuções. "
+                            "O guia de exportação explica o mapeamento. Esse "
+                            "arquivo responde a perguntas diferentes de uma "
+                            "série agregada. Não suponha que um histórico de "
+                            "fechamentos inclua posições abertas, distribuições "
+                            "ou todas as despesas da carteira."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Separe bruto, líquido e benchmark",
+                    "paragraphs": [
+                        (
+                            "Identifique qual versão de retornos está enviando: "
+                            "bruta ou líquida. Guarde ambas separadamente quando "
+                            "existirem e liste taxas, despesas e hipóteses de "
+                            "slippage aplicadas. Uma etiqueta dizendo líquido "
+                            "não permite medir custos ausentes. A declaração "
+                            "de retornos de um fundo líquidos de taxas tem "
+                            "um alcance específico no formulário; não substitui "
+                            "o detalhamento de execução de um sinal. Também "
+                            "não significa uma comparação automática entre "
+                            "as versões bruta e líquida."
+                        ),
+                        (
+                            "Forneça o benchmark como série datada em CSV nas "
+                            "Opções avançadas. Documente moeda, frequência e "
+                            "tratamento de distribuições, explicando por que "
+                            "ele serve como referência. A comparação usa "
+                            "as datas compatíveis disponíveis, não um valor "
+                            "de destaque referente a outro período. Um "
+                            "benchmark escolhido depois de observar o "
+                            "resultado também faz parte das decisões "
+                            "de pesquisa que convém revelar."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Quais perguntas o relatório pode responder",
+                    "paragraphs": [
+                        (
+                            "Com dados suficientes, o relatório examina a "
+                            "incerteza estatística, a concentração do resultado "
+                            "nos melhores períodos e as diferenças entre o "
+                            "trecho recente e o restante. A seleção entre "
+                            "variantes importa: indique o número de tentativas "
+                            "e sua origem para contextualizar o Sharpe "
+                            "deflacionado. Se a contagem vem da sua "
+                            "explicação, continua sendo uma declaração, "
+                            "mesmo que o cálculo que a utiliza seja reproduzível."
+                        ),
+                        (
+                            "As etiquetas MEDIDO, DECLARADO e NÃO MEDIDO "
+                            "ajudam a interpretar essa fronteira. MEDIDO "
+                            "identifica um cálculo sobre os dados fornecidos; "
+                            "DECLARADO identifica informação do autor; NÃO "
+                            "MEDIDO indica evidência insuficiente para uma "
+                            "checagem. A comparação com um benchmark depende "
+                            "da sua série, e os testes de custos dependem "
+                            "do detalhe disponível. Uma seção ausente não "
+                            "deve ser interpretada como uma conclusão "
+                            "favorável sobre a questão que ela abordaria."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "O que não responde sem o arquivo",
+                    "paragraphs": [
+                        (
+                            "Uma captura de tela ou um retorno acumulado "
+                            "não permite reconstruir a ordem dos retornos, "
+                            "as lacunas ou a dependência entre períodos. "
+                            "Sem a série, o Rigor não pode concluir se "
+                            "aquele histórico resiste às checagens "
+                            "estatísticas. Sem operações e custos, também "
+                            "não pode medir todos os efeitos da execução. "
+                            "Esses limites devem acompanhar o resultado "
+                            "sempre que ele for compartilhado."
+                        ),
+                        (
+                            "Mesmo com o arquivo, a auditoria não demonstra "
+                            "que um sinal foi publicado antes de cada "
+                            "movimento do mercado, que uma conta pertence "
+                            "a quem a apresenta ou que todas as tentativas "
+                            "descartadas foram declaradas. Não reconstrói "
+                            "o código, não recomenda alocações e não "
+                            "promete resultados futuros. A revisão "
+                            "estatística do material recebido tem um "
+                            "alcance diferente de uma revisão operacional, "
+                            "jurídica ou de titularidade."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Prepare a conversa e examine um exemplo",
+                    "paragraphs": [
+                        (
+                            "Use o contato ao final para descrever a "
+                            "origem, a frequência e os arquivos disponíveis "
+                            "antes de delimitar a revisão. Não é necessário "
+                            "incluir credenciais ou códigos de acesso. A "
+                            "página de exemplos mostra a estrutura de um "
+                            "relatório com dados sintéticos: serve para "
+                            "antecipar o formato, não para inferir uma "
+                            "conclusão sobre sua carteira. Ao apresentar "
+                            "o relatório, preserve junto dele o período "
+                            "analisado, as declarações e as seções sem "
+                            "medir, para que o leitor compreenda o "
+                            "alcance das evidências disponíveis."
+                        ),
+                    ],
+                },
+            ],
+        },
+        "faq": {
+            "es": [
+                {
+                    "q": "¿Puedo empezar sin entregar el código de la señal?",
+                    "a": (
+                        "Sí. La auditoría estadística parte del archivo de rendimientos o de "
+                        "operaciones. El código y la lógica de la señal no se reconstruyen."
+                    ),
+                },
+                {
+                    "q": "¿El ejemplo permite anticipar la clase de mi historial?",
+                    "a": (
+                        "No. El ejemplo usa datos sintéticos para mostrar el formato. La clase y "
+                        "los límites de tu informe dependen del material que aportes."
+                    ),
+                },
+            ],
+            "en": [
+                {
+                    "q": "Can we start without supplying the signal's code?",
+                    "a": (
+                        "Yes. The statistical audit starts from a return or trade file. It does "
+                        "not reconstruct the code or the signal's logic."
+                    ),
+                },
+                {
+                    "q": "Can the example predict the class of our record?",
+                    "a": (
+                        "No. The example uses synthetic data to show the format. Your report's "
+                        "class and limits depend on the material you supply."
+                    ),
+                },
+            ],
+            "pt": [
+                {
+                    "q": "Posso começar sem fornecer o código do sinal?",
+                    "a": (
+                        "Sim. A auditoria estatística parte do arquivo de retornos ou operações. "
+                        "O código e a lógica do sinal não são reconstruídos."
+                    ),
+                },
+                {
+                    "q": "O exemplo permite antecipar a classe do meu histórico?",
+                    "a": (
+                        "Não. O exemplo usa dados sintéticos para mostrar o formato. A classe e "
+                        "os limites do seu relatório dependem do material fornecido."
+                    ),
+                },
+            ],
+        },
+        "related": [
+            {"kind": "contact"},
+            {"kind": "samples"},
+            {"kind": "audience", "slug": "gestoras-y-senales"},
+        ],
+    },
 )
 
 ARTICLES: tuple[Article, ...] = tuple(Article.from_dict(data) for data in ARTICLES_DATA)
 ARTICLES_BY_KEY: dict[str, Article] = {article.key: article for article in ARTICLES}
+#: Reuse published answers verbatim; the index renders these same pairs visibly.
+INDEX_FAQ_SOURCES = (
+    ("ea-sobreoptimizado", 1),
+    ("ea-sobreoptimizado", 2),
+    ("backtest-costos-reales", 1),
+    ("backtest-costos-reales", 0),
+)
 #: Articles by their path segment in each language.
 ARTICLES_BY_SLUG: dict[str, dict[str, Article]] = {
     locale: {article.slug_for(locale): article for article in ARTICLES} for locale in LOCALES
@@ -1772,6 +3541,10 @@ ARTICLES_BY_SLUG: dict[str, dict[str, Article]] = {
 
 def articles_index_url(locale: str) -> str:
     return ARTICLES_PATH.get(locale, ARTICLES_PATH["es"])
+
+
+def articles_index_faq(locale: str) -> tuple[tuple[str, str], ...]:
+    return tuple(ARTICLES_BY_KEY[key].text[locale].faq[index] for key, index in INDEX_FAQ_SOURCES)
 
 
 def article_url(key: str, locale: str) -> str:
@@ -1806,6 +3579,13 @@ def related_links(article: Article, locale: str) -> tuple[tuple[str, str], ...]:
         elif kind == "guide":
             guide = GUIDES_BY_SLUG[link["slug"]]
             links.append((guide.text[locale].title, guide_url(guide.slug, locale)))
+        elif kind == "contact":
+            # Imported here to avoid the pages -> articles import cycle.
+            from quant_trade.audit.pages import CONTACT_COPY, CONTACT_PATHS
+
+            links.append((CONTACT_COPY[locale]["eyebrow"], CONTACT_PATHS[locale]))
+        elif kind == "samples":
+            links.append((EXAMPLES_COPY[locale]["title"], EXAMPLES_PATH[locale]))
         else:
             page = next(p for p in AUDIENCE_PAGES if p.slug == link["slug"])
             links.append((page.text[locale].title, audience_url(page.slug, locale)))

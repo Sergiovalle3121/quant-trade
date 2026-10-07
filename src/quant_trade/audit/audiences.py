@@ -45,6 +45,8 @@ class Audience:
     #: bring the live account and the optimisation XML).
     open_extras: bool = False
     slug_pt: str = ""
+    #: Institutional visitors start by discussing the supplied record.
+    contact_cta: bool = False
 
     def slug_for(self, locale: str) -> str:
         if locale == "pt":
@@ -1738,6 +1740,233 @@ AUDIENCE_PAGES: tuple[Audience, ...] = (
                         "Precisa da senha da minha corretora?",
                         "Não. Só o arquivo que você mesmo exporta; o Rigor não se conecta a "
                         "nenhuma corretora.",
+                    ),
+                ),
+            ),
+        },
+    ),
+    Audience(
+        slug="gestoras-y-senales",
+        slug_en="funds-and-signal-providers",
+        slug_pt="gestoras-e-sinais",
+        icon="chart",
+        contact_cta=True,
+        text={
+            "es": AudienceText(
+                title=(
+                    "Gestoras y proveedores de señales: revisar el historial antes de presentarlo"
+                ),
+                summary=(
+                    "Auditoría estadística del historial de una cartera modelo, fondo o señal: "
+                    "qué entregar, qué mide el informe y qué queda sin medir."
+                ),
+                pains=(
+                    "La curva elegida no muestra cuántas versiones del modelo se descartaron.",
+                    "Una presentación puede mezclar resultados brutos, netos y simulados sin "
+                    "explicar qué representa cada tramo.",
+                    "Quien recibe el historial necesita distinguir cálculos sobre el archivo "
+                    "de supuestos aportados por su autor.",
+                ),
+                uploads=(
+                    (
+                        "Una serie de rendimientos por periodo, con fechas y frecuencia "
+                        "consistente, o el valor de la cartera a lo largo del tiempo, en CSV o "
+                        "Excel.",
+                        "",
+                    ),
+                    (
+                        "Identifica si la serie es bruta o neta y qué costos incluye. Conserva "
+                        "ambas versiones por separado y explica cambios de metodología y flujos "
+                        "externos.",
+                        "",
+                    ),
+                    (
+                        "El benchmark como serie fechada en CSV en Opciones avanzadas, y los "
+                        "intentos de investigación documentados para contextualizar la selección.",
+                        "",
+                    ),
+                ),
+                checks=(
+                    (
+                        "Evidencia y selección",
+                        "El informe distingue MEDIDO, DECLARADO y NO MEDIDO; el Sharpe "
+                        "deflactado depende también del número de intentos aportado.",
+                    ),
+                    (
+                        "Comportamiento del historial",
+                        "Examina incertidumbre, concentración en los mejores periodos y "
+                        "diferencias entre el tramo reciente y el resto, según los datos "
+                        "disponibles.",
+                    ),
+                    (
+                        "Comparación y costos",
+                        "Con un benchmark compatible, compara los periodos coincidentes. Los "
+                        "costos necesitan evidencia propia: llamar neta a una serie sigue siendo "
+                        "una declaración del proveedor.",
+                    ),
+                ),
+                limits=(
+                    "Rigor analiza archivos aportados; no reconstruye la señal ni ejecuta su "
+                    "código.",
+                    "No se conecta al bróker, no contrasta la titularidad de activos y no "
+                    "sustituye una revisión legal u operativa.",
+                    "No recomienda inversiones ni promete resultados futuros. Sin el archivo "
+                    "no puede emitir conclusiones sobre ese historial.",
+                ),
+                faq=(
+                    (
+                        "¿Sirve para una cartera modelo sin operaciones?",
+                        "La serie fechada permite revisar sus rendimientos. Sin operaciones "
+                        "y costos desglosados, algunas preguntas de ejecución quedan sin medir.",
+                    ),
+                    (
+                        "¿Qué conviene aclarar antes de enviar el archivo?",
+                        "Indica frecuencia, moneda, tratamiento de comisiones, benchmark y "
+                        "fechas de cambios del modelo. Contacta con Rigor para delimitar el "
+                        "material.",
+                    ),
+                ),
+            ),
+            "en": AudienceText(
+                title="Funds and signal providers: review the record before presenting it",
+                summary=(
+                    "A statistical audit of a model portfolio, fund or signal track record: "
+                    "what to supply, what the report measures and what remains unmeasured."
+                ),
+                pains=(
+                    "The selected curve does not show how many model versions were discarded.",
+                    "A presentation can mix gross, net and simulated results without explaining "
+                    "what each part represents.",
+                    "The reader needs to distinguish calculations on the file from assumptions "
+                    "supplied by its author.",
+                ),
+                uploads=(
+                    (
+                        "A dated series of period returns at a consistent frequency, or the "
+                        "portfolio value over time, as CSV or Excel.",
+                        "",
+                    ),
+                    (
+                        "Identify whether the series is gross or net and which costs it includes. "
+                        "Keep both versions separately and explain methodology changes and "
+                        "external flows.",
+                        "",
+                    ),
+                    (
+                        "A dated benchmark CSV under Advanced options, and documented research "
+                        "attempts to put the selection in context.",
+                        "",
+                    ),
+                ),
+                checks=(
+                    (
+                        "Evidence and selection",
+                        "The report distinguishes MEASURED, DECLARED and NOT MEASURED; the "
+                        "deflated Sharpe also depends on the supplied number of research attempts.",
+                    ),
+                    (
+                        "Behaviour within the history",
+                        "It examines uncertainty, concentration in the best periods and "
+                        "differences between the recent period and the rest, as the supplied data "
+                        "allow.",
+                    ),
+                    (
+                        "Comparison and costs",
+                        "With a compatible benchmark, it compares matching periods. Costs need "
+                        "their own evidence: calling a series net remains the provider's "
+                        "declaration.",
+                    ),
+                ),
+                limits=(
+                    "Rigor analyses supplied files; it does not reconstruct the signal or run its "
+                    "code.",
+                    "It does not connect to the broker, establish asset ownership or replace "
+                    "legal or operational review.",
+                    "It recommends no investments and promises no future results. Without the "
+                    "file it cannot reach conclusions about that record.",
+                ),
+                faq=(
+                    (
+                        "Does it work for a model portfolio without trades?",
+                        "A dated series supports a review of its returns. Without trades and "
+                        "itemised costs, some execution questions remain unmeasured.",
+                    ),
+                    (
+                        "What should we clarify before supplying the file?",
+                        "State the frequency, currency, fee treatment, benchmark and model "
+                        "change dates. Contact Rigor to define the material under review.",
+                    ),
+                ),
+            ),
+            "pt": AudienceText(
+                title=(
+                    "Gestoras e fornecedores de sinais: revisar o histórico antes de apresentá-lo"
+                ),
+                summary=(
+                    "Auditoria estatística do histórico de uma carteira modelo, fundo ou sinal: "
+                    "o que enviar, o que o relatório mede e o que fica sem medir."
+                ),
+                pains=(
+                    "A curva escolhida não mostra quantas versões do modelo foram descartadas.",
+                    "Uma apresentação pode misturar resultados brutos, líquidos e simulados "
+                    "sem explicar o que cada trecho representa.",
+                    "Quem recebe o histórico precisa distinguir cálculos sobre o arquivo "
+                    "de hipóteses fornecidas pelo autor.",
+                ),
+                uploads=(
+                    (
+                        "Uma série de retornos por período, com datas e frequência consistente, "
+                        "ou o valor da carteira ao longo do tempo, em CSV ou Excel.",
+                        "",
+                    ),
+                    (
+                        "Identifique se a série é bruta ou líquida e quais custos inclui. "
+                        "Guarde ambas separadamente e explique mudanças de metodologia e fluxos "
+                        "externos.",
+                        "",
+                    ),
+                    (
+                        "O benchmark como série datada em CSV nas Opções avançadas, e as "
+                        "tentativas de pesquisa documentadas para contextualizar a seleção.",
+                        "",
+                    ),
+                ),
+                checks=(
+                    (
+                        "Evidência e seleção",
+                        "O relatório distingue MEDIDO, DECLARADO e NÃO MEDIDO; o Sharpe "
+                        "deflacionado também depende do número de tentativas informado.",
+                    ),
+                    (
+                        "Comportamento do histórico",
+                        "Examina incerteza, concentração nos melhores períodos e diferenças "
+                        "entre o trecho recente e o restante, conforme os dados disponíveis.",
+                    ),
+                    (
+                        "Comparação e custos",
+                        "Com um benchmark compatível, compara os períodos coincidentes. Os "
+                        "custos precisam de evidência própria: chamar uma série de líquida "
+                        "continua sendo uma declaração do fornecedor.",
+                    ),
+                ),
+                limits=(
+                    "O Rigor analisa arquivos fornecidos; não reconstrói o sinal nem executa seu "
+                    "código.",
+                    "Não se conecta à corretora, não estabelece a titularidade dos ativos "
+                    "e não substitui uma revisão jurídica ou operacional.",
+                    "Não recomenda investimentos nem promete resultados futuros. Sem o "
+                    "arquivo, não pode concluir nada sobre aquele histórico.",
+                ),
+                faq=(
+                    (
+                        "Serve para uma carteira modelo sem operações?",
+                        "A série datada permite revisar seus retornos. Sem operações e custos "
+                        "detalhados, algumas questões de execução ficam sem medir.",
+                    ),
+                    (
+                        "O que esclarecer antes de enviar o arquivo?",
+                        "Informe frequência, moeda, tratamento das taxas, benchmark e datas "
+                        "de mudanças do modelo. Contate o Rigor para delimitar o material.",
                     ),
                 ),
             ),

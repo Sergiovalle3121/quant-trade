@@ -13,9 +13,19 @@ search results.
 from __future__ import annotations
 
 import html
+import json
 from dataclasses import dataclass, field
+from typing import Any
 
-from quant_trade.audit.articles import ARTICLES, article_url, articles_index_url
+from quant_trade.audit.articles import (
+    ARTICLE_PUBLICATION_DATES,
+    ARTICLES,
+    ARTICLES_COPY,
+    Article,
+    article_url,
+    articles_index_faq,
+    articles_index_url,
+)
 from quant_trade.audit.audiences import AUDIENCE_PAGES, audience_url
 from quant_trade.audit.calculator import CALCULATOR_PATH
 from quant_trade.audit.examples import EXAMPLES_PATH
@@ -138,12 +148,13 @@ class PageMeta:
 OG_IMAGE_SIZE = (1200, 630)
 #: The share cards: the site card, the sample, one per class for a published
 #: verification page and one per audience page. Each card shows fixed texts only,
-#: never a figure from a client's file.
+#: never a figure from a client's file. Contact-led institutional pages reuse
+#: the site card instead of referring to a card asset that does not exist.
 OG_KINDS: tuple[str, ...] = (
     "",
     "sample",
     *(f"class-{overall}" for overall in "ABCD"),
-    *(f"for-{audience.slug}" for audience in AUDIENCE_PAGES),
+    *(f"for-{audience.slug}" for audience in AUDIENCE_PAGES if not audience.contact_cta),
 )
 
 
@@ -151,7 +162,7 @@ OG_KINDS: tuple[str, ...] = (
 #: audience cards; its verification and sample cards wait for a Portuguese class
 #: sentence and notice, and show the English card until then.
 OG_PARTIAL_KINDS: dict[str, tuple[str, ...]] = {
-    "pt": ("", *(f"for-{audience.slug}" for audience in AUDIENCE_PAGES))
+    "pt": ("", *(f"for-{audience.slug}" for audience in AUDIENCE_PAGES if not audience.contact_cta))
 }
 
 
@@ -174,6 +185,69 @@ OG_IMAGES: tuple[str, ...] = tuple(
 
 def _e(value: object) -> str:
     return html.escape(str(value), quote=True)
+
+
+def _json_ld(value: dict[str, Any]) -> str:
+    """A non-executable JSON data block, safe even for script-closing text.
+
+    HTML entities are not decoded in script raw text. Escape HTML delimiters
+    as JSON unicode sequences here; visible copies use ``html.escape``.
+    """
+    payload = json.dumps(value, ensure_ascii=True, allow_nan=False).replace("<", "\\u003c")
+    payload = payload.replace(">", "\\u003e").replace("&", "\\u0026")
+    return f"<script type='application/ld+json'>{payload}</script>"
+
+
+def article_structured_data(article: Article, locale: str, base_url: str) -> str:
+    """Only editorial fields and the public breadcrumb; never arbitrary data."""
+    base = base_url.rstrip("/")
+    published = ARTICLE_PUBLICATION_DATES[article.key]
+    detail = _json_ld(
+        {
+            "@context": "https://schema.org",
+            "@type": "Article",
+            "headline": article.text[locale].title,
+            "datePublished": published,
+            "dateModified": published,
+            "inLanguage": locale,
+            "author": {"@type": "Person", "name": "Sergio Valle"},
+            "publisher": {"@type": "Organization", "name": BRAND},
+            "mainEntityOfPage": base + article_url(article.key, locale),
+        }
+    )
+    home = {"es": "/", "en": "/en", "pt": "/pt"}[locale]
+    crumbs = (
+        ({"es": "Inicio", "en": "Home", "pt": "Início"}[locale], home),
+        (ARTICLES_COPY[locale]["eyebrow"], articles_index_url(locale)),
+        (article.text[locale].title, article_url(article.key, locale)),
+    )
+    return detail + _json_ld(
+        {
+            "@context": "https://schema.org",
+            "@type": "BreadcrumbList",
+            "itemListElement": [
+                {"@type": "ListItem", "position": position, "name": name, "item": base + path}
+                for position, (name, path) in enumerate(crumbs, start=1)
+            ],
+        }
+    )
+
+
+def articles_faq_structured_data(locale: str) -> str:
+    return _json_ld(
+        {
+            "@context": "https://schema.org",
+            "@type": "FAQPage",
+            "mainEntity": [
+                {
+                    "@type": "Question",
+                    "name": question,
+                    "acceptedAnswer": {"@type": "Answer", "text": answer},
+                }
+                for question, answer in articles_index_faq(locale)
+            ],
+        }
+    )
 
 
 def page_paths(path: str) -> dict[str, str]:

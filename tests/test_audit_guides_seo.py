@@ -300,7 +300,8 @@ def test_shared_links_carry_a_preview_image_in_the_page_language(tmp_path: Path)
     from quant_trade.audit.seo import OG_IMAGES
 
     # Spanish and English have every card; Portuguese the site and audience ones.
-    assert len(OG_IMAGES) == 2 * (2 + 4 + len(AUDIENCE_PAGES)) + 1 + len(AUDIENCE_PAGES)
+    with_cards = sum(not audience.contact_cta for audience in AUDIENCE_PAGES)
+    assert len(OG_IMAGES) == 2 * (2 + 4 + with_cards) + 1 + with_cards
     for name in OG_IMAGES:
         response = client.get(f"/static/{name}")
         assert response.status_code == 200

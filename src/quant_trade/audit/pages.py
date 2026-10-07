@@ -21,8 +21,12 @@ from quant_trade.audit.accounts import FREE_PREVIEWS_PER_MONTH as _FREE
 from quant_trade.audit.articles import (
     ARTICLES,
     ARTICLES_COPY,
+    INDEPENDENT_LUCK_EXAMPLE,
+    LUCK_TABLE_COPY,
+    LUCK_TABLE_INPUTS,
     Article,
     article_url,
+    articles_index_faq,
     articles_index_url,
     related_links,
 )
@@ -88,6 +92,8 @@ from quant_trade.audit.seo import (
     OG_IMAGE_SIZE,
     TAGLINE,
     PageMeta,
+    article_structured_data,
+    articles_faq_structured_data,
     head_meta,
     page_paths,
     private_meta,
@@ -3727,6 +3733,7 @@ def articles_index_page(*, locale: str = "es", base_url: str = "") -> str:
     alternates = {lang: articles_index_url(lang) for lang in ("es", "en", "pt")}
     title = f"{words['title']} · {copy['title']}"
     meta = _public_meta(title, words["summary"], locale, articles_index_url(locale), base_url)
+    meta += articles_faq_structured_data(locale)
     items = "".join(
         f"<li data-reveal style='--i:{i % 2}'><a href='{_e(article_url(a.key, locale))}'>"
         f"<b>{_e(a.text[locale].title)}{icon('arrow')}</b>"
@@ -3736,10 +3743,17 @@ def articles_index_page(*, locale: str = "es", base_url: str = "") -> str:
     crumbs = f"<a href='{_e(_home(locale))}'>{_e(words['back'])}</a>" + _language_crumbs(
         alternates, locale
     )
+    faq = "".join(
+        f"<details><summary>{_e(question)}</summary><p>{_e(answer)}</p></details>"
+        for question, answer in articles_index_faq(locale)
+    )
     body = (
         _page_hero(words["eyebrow"], words["title"], words["intro"], crumbs)
         + "<div class='paper page-main'><div class='wrap'>"
-        f"<ul class='guide-list guides'>{items}</ul>" + _articles_cta(locale) + "</div></div>"
+        f"<ul class='guide-list guides'>{items}</ul>"
+        f"<section><h2>{_e(words['faq'])}</h2><div class='faq'>{faq}</div></section>"
+        + _articles_cta(locale)
+        + "</div></div>"
     )
     return _page(title, locale, body, meta_html=meta, alternates=alternates, solid_nav=True)
 
@@ -3753,10 +3767,26 @@ def article_page(article: Article, *, locale: str = "es", base_url: str = "") ->
     alternates = {lang: article_url(article.key, lang) for lang in ("es", "en", "pt")}
     title = f"{text.title} · {copy['title']}"
     meta = _public_meta(title, text.summary, locale, article_url(article.key, locale), base_url)
+    meta += article_structured_data(article, locale, base_url)
     sections = [
         (section.heading, "".join(f"<p>{_e(paragraph)}</p>" for paragraph in section.paragraphs))
         for section in text.sections
     ]
+    if article.key == "sharpe-deflactado-track-record":
+        heading, trials, years, luck, note = LUCK_TABLE_COPY[locale]
+        rows = "".join(
+            f"<tr><th scope='row'>DECLARED · {value.trials:,}</th>"
+            f"<td>DECLARED · {value.years:g}</td>"
+            f"<td>DECLARED · {compute(value)['luck_sharpe']['value']:.2f}</td></tr>"
+            for value in LUCK_TABLE_INPUTS
+        )
+        table = (
+            f"<p>{_e(INDEPENDENT_LUCK_EXAMPLE[locale])}</p>"
+            f"<table class='article-luck'><caption>{_e(note)}</caption>"
+            f"<thead><tr><th scope='col'>{_e(trials)}</th><th scope='col'>{_e(years)}</th>"
+            f"<th scope='col'>{_e(luck)}</th></tr></thead><tbody>{rows}</tbody></table>"
+        )
+        sections.insert(4, (heading, table))
     if text.faq:
         faq = "".join(f"<h3>{_e(q)}</h3><p>{_e(a)}</p>" for q, a in text.faq)
         sections.append((words["faq"], faq))
@@ -3840,9 +3870,13 @@ def audience_page(
     )
     # Robot buyers land on the form with the live-account box already open.
     start = audit_path(locale) + ("?extras=1" if audience.open_extras else "")
+    start_label = words["start"]
+    if audience.contact_cta:
+        start = CONTACT_PATHS[locale]
+        start_label = CONTACT_COPY[locale]["eyebrow"]
     buttons = (
         "<div class='hero-cta'>"
-        f"<a class='btn btn-dark' href='{_e(start)}'>{_e(words['start'])}"
+        f"<a class='btn btn-dark' href='{_e(start)}'>{_e(start_label)}"
         f"<span class='go'>{icon('arrow')}</span></a>"
         f"<a class='link-more' href='{_e(sample)}'>{_e(words['sample'])}{icon('arrow')}</a>"
         "</div>"
@@ -3860,14 +3894,19 @@ def audience_page(
                 (words["uploads"], f"<ul class='checks'>{uploads}</ul>"),
                 (words["checks"], f"<ul class='checks aud-checks'>{checks}</ul>"),
                 (words["limits"], f"<ul class='checks'>{limits}</ul>"),
-                (words["price"], f"<div class='aud-price'><p>{_e(price)}</p>{buttons}</div>"),
+                (
+                    start_label if audience.contact_cta else words["price"],
+                    buttons
+                    if audience.contact_cta
+                    else f"<div class='aud-price'><p>{_e(price)}</p>{buttons}</div>",
+                ),
                 (words["faq"], f"<div class='faq'>{faq}</div>"),
                 (words["others"], f"<ul class='aud-others'>{others}</ul>"),
             ],
             locale,
             lead=buttons,
             aside=f"<a class='btn btn-dark btn-sm toc-cta' href='{_e(start)}'>"
-            f"{_e(words['start'])}<span class='go'>{icon('arrow')}</span></a>",
+            f"{_e(start_label)}<span class='go'>{icon('arrow')}</span></a>",
         )
         + "</div></div>"
     )
