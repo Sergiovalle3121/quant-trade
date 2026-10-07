@@ -10,7 +10,9 @@ depends on it.
 
 from __future__ import annotations
 
+import json
 from collections.abc import Callable
+from dataclasses import fields
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Annotated, Any
@@ -80,6 +82,87 @@ def _print_verdict(payload: dict[str, Any]) -> None:
     if flags:
         listed = ", ".join(f"{flag['code']}({flag['severity']})" for flag in flags)
         console.print(f"red flags: {listed}")
+
+
+def _claim_json_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    """Reject duplicate keys instead of silently replacing a declared value."""
+    payload: dict[str, Any] = {}
+    for name, value in pairs:
+        if name in payload:
+            raise ValueError("duplicate JSON field")
+        payload[name] = value
+    return payload
+
+
+def _reject_json_constant(_: str) -> None:
+    raise ValueError("non-finite JSON value")
+
+
+def _same_local_file(left: Path, right: Path) -> bool:
+    return left.resolve() == right.resolve() or (
+        left.exists() and right.exists() and left.samefile(right)
+    )
+
+
+@audit_app.command("public-card")
+def public_card(
+    json_input: Annotated[Path, typer.Option("--json", help="UTF-8 public claim JSON object")],
+    out: Annotated[Path, typer.Option("--out", help="Output SVG path")],
+    png: Annotated[
+        bool, typer.Option("--png", help="Also export a sibling PNG when CairoSVG is available")
+    ] = False,
+) -> None:
+    """Render declared public figures as a card; missing evidence stays explicit."""
+    from quant_trade.audit.guard import AuditReportError
+    from quant_trade.audit.public_card import PublicClaim, public_card_svg
+
+    if out.suffix.lower() != ".svg":
+        raise typer.BadParameter("--out must use the .svg extension")
+    png_path = out.with_suffix(".png")
+    try:
+        collision = _same_local_file(json_input, out) or (
+            png and (_same_local_file(json_input, png_path) or _same_local_file(out, png_path))
+        )
+    except (OSError, RuntimeError, ValueError) as exc:
+        raise typer.BadParameter("cannot resolve the input and output paths") from exc
+    if collision:
+        raise typer.BadParameter("input and output files must be different")
+    try:
+        payload = json.loads(
+            json_input.read_text(encoding="utf-8"),
+            object_pairs_hook=_claim_json_object,
+            parse_constant=_reject_json_constant,
+        )
+    except (OSError, UnicodeError, ValueError, RecursionError) as exc:
+        raise typer.BadParameter("cannot read a valid UTF-8 public claim JSON object") from exc
+    allowed = {field.name for field in fields(PublicClaim)}
+    if not isinstance(payload, dict) or set(payload) - allowed:
+        raise typer.BadParameter("public claim JSON must be an object with known fields only")
+    try:
+        svg = public_card_svg(PublicClaim(**payload))
+    except (TypeError, ValueError, AuditReportError) as exc:
+        raise typer.BadParameter("public claim contains invalid or unsupported values") from exc
+    try:
+        atomic_write_text(out, svg)
+    except (OSError, ValueError) as exc:
+        raise typer.BadParameter("cannot write the output SVG") from exc
+    typer.echo("SVG written.")
+    if not png:
+        return
+    try:
+        import cairosvg
+
+        png_bytes = cairosvg.svg2png(bytestring=svg.encode("utf-8"))
+    except (ImportError, OSError, RuntimeError, ValueError):
+        typer.echo(
+            "PNG conversion unavailable; SVG kept. Open the SVG in Inkscape and export it as PNG."
+        )
+        return
+    try:
+        png_path.write_bytes(png_bytes)
+    except (OSError, ValueError) as exc:
+        raise typer.BadParameter("cannot write the PNG; SVG kept") from exc
+    typer.echo("PNG written.")
 
 
 @audit_app.command("run")

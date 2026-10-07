@@ -12,11 +12,20 @@ from __future__ import annotations
 
 import html
 import re
+import textwrap
 from collections.abc import Sequence
 from datetime import datetime
 from typing import Any
 
 from quant_trade.audit.accounts import FREE_PREVIEWS_PER_MONTH as _FREE
+from quant_trade.audit.articles import (
+    ARTICLES,
+    ARTICLES_COPY,
+    Article,
+    article_url,
+    articles_index_url,
+    related_links,
+)
 from quant_trade.audit.audiences import (
     AUDIENCE_COPY,
     AUDIENCE_PAGES,
@@ -30,6 +39,13 @@ from quant_trade.audit.audiences import (
 from quant_trade.audit.calculator import COPY as CALCULATOR_COPY
 from quant_trade.audit.calculator import REASONS as CALCULATOR_REASONS
 from quant_trade.audit.calculator import calculator_url, compute, parse_input
+from quant_trade.audit.completed_count import completed_count_html
+from quant_trade.audit.examples import (
+    EXAMPLES_COPY,
+    EXAMPLES_PATH,
+    examples_content,
+    examples_url,
+)
 from quant_trade.audit.guides import (
     GUIDES,
     GUIDES_COPY,
@@ -67,8 +83,17 @@ from quant_trade.audit.report import (
     localize_text_nodes,
     source_name,
 )
-from quant_trade.audit.seo import BRAND, TAGLINE, PageMeta, head_meta, page_paths, private_meta
+from quant_trade.audit.seo import (
+    BRAND,
+    OG_IMAGE_SIZE,
+    TAGLINE,
+    PageMeta,
+    head_meta,
+    page_paths,
+    private_meta,
+)
 from quant_trade.audit.settings import PACK_CREDITS
+from quant_trade.audit.sharing import share_block
 from quant_trade.audit.theme import (
     CLASS_COLOURS,
     SCRIPT_TAG,
@@ -1548,6 +1573,7 @@ def _footer(locale: str) -> str:
     product = (
         f"<li><a href='{home}#how'>{_e(ui['nav_how'])}</a></li>"
         f"<li><a href='{_sample_url(locale)}'>{_e(ui['nav_sample'])}</a></li>"
+        f"<li><a href='{examples_url(locale)}'>{_e(EXAMPLES_COPY[locale]['nav'])}</a></li>"
         f"<li><a href='{sample}.pdf' download>{_e(ui['footer_sample_pdf'])}</a></li>"
         f"<li><a href='{home}#pricing'>{_e(ui['nav_pricing'])}</a></li>"
         f"<li><a href='{_e(guides_index_url(locale))}'>{_e(ui['nav_guides'])}</a></li>"
@@ -2540,6 +2566,7 @@ def landing(
     operator: tuple[str, str] = ("", ""),
     card_markets: Sequence[str] = (),
     email_confirmation: bool = False,
+    completed_audits: int | None = None,
 ) -> str:
     """The public landing; the upload form lives on its own page (``upload_page``).
 
@@ -2552,8 +2579,10 @@ def landing(
     meta = _public_meta(copy["title"], copy["meta_description"], locale, _home(locale), base_url)
     sample = _sample_url(locale)
     err = f"<div class='error' role='alert'>{_e(error)}</div>" if error else ""
+    count_html = completed_count_html(completed_audits, locale)
     body = (
         _hero(locale, sample, email_confirmation=email_confirmation and not free_mode)
+        + ("<div class='wrap'>" + count_html + "</div>" if count_html else "")
         + _specs(locale)
         + _audiences(locale)
         + _problems(locale)
@@ -2816,8 +2845,7 @@ def verification_page(
             locale=locale,
             paths=alternates,
             index=False,
-            # The class card: class, its fixed sentence and the fixed notice, nothing else.
-            image=f"class-{overall}",
+            image_path=f"/v/{public_id}/card.png?lang={locale}",
             image_alt=f"{BRAND} · {cls_label} {overall}",
         ),
         base_url=base_url,
@@ -2856,7 +2884,9 @@ def verification_page(
         f"<pre><code id='badge-code'>{_e(snippet)}</code></pre>"
         f"<div class='copy-row'><button class='btn btn-dark btn-sm' type='button' "
         f"data-copy='badge-code' data-done='{_e(ui['v_copied'])}' hidden>{_e(ui['v_copy'])}"
-        "</button></div></section></div></div>"
+        "</button></div></section>"
+        + share_block(overall=overall, public_id=public_id, locale=locale)
+        + "</div></div>"
     )
     return _page(
         title,
@@ -2865,6 +2895,57 @@ def verification_page(
         meta_html=meta,
         alternates=alternates,
         solid_nav=True,
+    )
+
+
+def verification_card_svg(result: dict[str, Any], *, public_id: str, locale: str = "es") -> str:
+    """A share image using a subset of the verification page's allow-list.
+
+    Only the class, audit date and public id are read. All other words are
+    fixed page copy: no client prose, figures, trades, files or private ids.
+    The same fields survive a published audit's retention purge.
+    """
+    locale = _locale(locale)
+    copy = _COPY[locale]
+    overall = str(result["verdict"]["overall"])
+    audited = str(result.get("generated_at_utc", ""))[:10]
+    label = f"{CLASS_WORD[locale]} {overall}"
+    title = f"{BRAND} · {label}"
+    notice = BADGE_NOTICE[locale]
+    description = f"{copy['v_audited']}: {audited}. ID {public_id}. {notice}"
+    colour = CLASS_COLOURS.get(overall, "#a3a3aa")
+    width, height = OG_IMAGE_SIZE
+    font = "Inter,Segoe UI,Roboto,Helvetica,Arial,sans-serif"
+    sentence = "".join(
+        f"<tspan x='350' y='{260 + index * 38}'>{_e(line)}</tspan>"
+        for index, line in enumerate(textwrap.wrap(class_text(overall, locale), width=47))
+    )
+    footer = "".join(
+        f"<tspan x='56' y='{548 + index * 28}'>{_e(line)}</tspan>"
+        for index, line in enumerate(textwrap.wrap(notice, width=100))
+    )
+    return (
+        f"<svg xmlns='http://www.w3.org/2000/svg' width='{width}' height='{height}' "
+        f"viewBox='0 0 {width} {height}' role='img' "
+        f"aria-labelledby='verification-card-title verification-card-desc' lang='{locale}'>"
+        f"<title id='verification-card-title'>{_e(title)}</title>"
+        f"<desc id='verification-card-desc'>{_e(description)}</desc>"
+        f"<rect width='{width}' height='{height}' fill='#0b0b0d'/>"
+        f"<g font-family='{font}'>"
+        f"<text x='56' y='87' font-size='48' font-weight='650' fill='#f4f4f6'>{BRAND}</text>"
+        f"<text x='56' y='132' font-size='26' fill='#a3a3aa'>{_e(copy['v_title'])}</text>"
+        f"<rect x='56' y='186' width='240' height='228' rx='28' "
+        f"fill='#141416' stroke='{colour}' stroke-width='3'/>"
+        f"<text x='176' y='355' text-anchor='middle' font-size='166' font-weight='600' "
+        f"fill='{colour}'>{_e(overall)}</text>"
+        f"<text x='350' y='207' font-size='26' font-weight='650' "
+        f"fill='{colour}'>{_e(label)}</text>"
+        f"<text font-size='28' fill='#f4f4f6'>{sentence}</text>"
+        f"<text x='56' y='466' font-size='21' fill='#a3a3aa'>"
+        f"{_e(copy['v_audited'])}: {_e(audited)} · ID {_e(public_id)}</text>"
+        "<path d='M56 506H1144' stroke='#2a2a2f'/>"
+        f"<text font-size='19' fill='#a3a3aa'>{footer}</text>"
+        "</g></svg>"
     )
 
 
@@ -3427,7 +3508,7 @@ def calculator_page(
         f"<form method='get' action='{_e(calculator_url(locale))}' class='calc-form'>"
         "<div class='form-grid'>"
         + field("sharpe", sharpe, "0.01")
-        + field("years", years, "0.1")
+        + field("years", years, "any")
         + field("trials", trials, "1")
         + f"</div><button class='btn btn-dark' type='submit'>{_e(words['submit'])}</button></form>"
     )
@@ -3548,7 +3629,9 @@ def guides_index_page(*, locale: str = "es", base_url: str = "") -> str:
         + "<div class='paper page-main'><div class='wrap'>"
         f"{groups}<div class='back-row'>"
         f"<a class='btn btn-dark' href='{_e(_form_url(locale))}'>{_e(words['form'])}"
-        f"<span class='go'>{icon('arrow')}</span></a></div></div></div>"
+        f"<span class='go'>{icon('arrow')}</span></a>"
+        f"<a class='link-more' href='{_e(articles_index_url(locale))}'>"
+        f"{_e(words['articles'])}{icon('arrow')}</a></div></div></div>"
     )
     return _page(
         f"{words['title']} · {copy['title']}",
@@ -3600,6 +3683,107 @@ def guide_page(guide: Guide, *, locale: str = "es", base_url: str = "") -> str:
         alternates=alternates,
         solid_nav=True,
     )
+
+
+def _articles_cta(locale: str) -> str:
+    """The closing buttons of the article pages: the free calculator and the form."""
+    words = ARTICLES_COPY[locale]
+    return (
+        "<div class='back-row'>"
+        f"<a class='btn btn-dark' href='{_e(calculator_url(locale))}'>{_e(words['calculator'])}"
+        f"<span class='go'>{icon('arrow')}</span></a>"
+        f"<a class='link-more' href='{_e(_form_url(locale))}'>{_e(words['report'])}"
+        f"{icon('arrow')}</a></div>"
+    )
+
+
+def examples_page(*, locale: str = "es", base_url: str = "") -> str:
+    """Public declarations with the existing card arithmetic and report CTA."""
+    locale = _locale(locale)
+    words = EXAMPLES_COPY[locale]
+    title = f"{words['title']} · {BRAND}"
+    meta = _public_meta(title, words["summary"], locale, examples_url(locale), base_url)
+    crumbs = f"<a href='{_home(locale)}'>{_e(words['back'])}</a>" + _language_crumbs(
+        EXAMPLES_PATH, locale
+    )
+    cta = CALCULATOR_COPY[locale]
+    body = (
+        _page_hero(words["eyebrow"], words["title"], words["intro"], crumbs)
+        + "<div class='paper page-main'><div class='wrap wrap-mid'>"
+        + examples_content(locale)
+        + f"<section class='article-cta'><h2>{_e(cta['cta_title'])}</h2>"
+        f"<p>{_e(cta['cta'])}</p><a class='btn btn-dark' href='{_form_url(locale)}'>"
+        f"{_e(cta['cta_button'])}<span class='go'>{icon('arrow')}</span></a></section>"
+        "</div></div>"
+    )
+    return _page(title, locale, body, meta_html=meta, alternates=EXAMPLES_PATH, solid_nav=True)
+
+
+def articles_index_page(*, locale: str = "es", base_url: str = "") -> str:
+    """The list of articles about backtests."""
+    locale = _locale(locale)
+    copy = _COPY[locale]
+    words = ARTICLES_COPY[locale]
+    alternates = {lang: articles_index_url(lang) for lang in ("es", "en", "pt")}
+    title = f"{words['title']} · {copy['title']}"
+    meta = _public_meta(title, words["summary"], locale, articles_index_url(locale), base_url)
+    items = "".join(
+        f"<li data-reveal style='--i:{i % 2}'><a href='{_e(article_url(a.key, locale))}'>"
+        f"<b>{_e(a.text[locale].title)}{icon('arrow')}</b>"
+        f"<span>{_e(a.text[locale].summary)}</span></a></li>"
+        for i, a in enumerate(ARTICLES)
+    )
+    crumbs = f"<a href='{_e(_home(locale))}'>{_e(words['back'])}</a>" + _language_crumbs(
+        alternates, locale
+    )
+    body = (
+        _page_hero(words["eyebrow"], words["title"], words["intro"], crumbs)
+        + "<div class='paper page-main'><div class='wrap'>"
+        f"<ul class='guide-list guides'>{items}</ul>" + _articles_cta(locale) + "</div></div>"
+    )
+    return _page(title, locale, body, meta_html=meta, alternates=alternates, solid_nav=True)
+
+
+def article_page(article: Article, *, locale: str = "es", base_url: str = "") -> str:
+    """One article: its sections, questions, related pages and a closing call."""
+    locale = _locale(locale)
+    copy = _COPY[locale]
+    words = ARTICLES_COPY[locale]
+    text = article.text[locale]
+    alternates = {lang: article_url(article.key, lang) for lang in ("es", "en", "pt")}
+    title = f"{text.title} · {copy['title']}"
+    meta = _public_meta(title, text.summary, locale, article_url(article.key, locale), base_url)
+    sections = [
+        (section.heading, "".join(f"<p>{_e(paragraph)}</p>" for paragraph in section.paragraphs))
+        for section in text.sections
+    ]
+    if text.faq:
+        faq = "".join(f"<h3>{_e(q)}</h3><p>{_e(a)}</p>" for q, a in text.faq)
+        sections.append((words["faq"], faq))
+    links = related_links(article, locale)
+    if links:
+        related = "".join(
+            f"<li><a href='{_e(href)}'><span>{_e(label)}</span>{icon('arrow')}</a></li>"
+            for label, href in links
+        )
+        sections.append((words["related"], f"<ul class='aud-others'>{related}</ul>"))
+    crumbs = f"<a href='{_e(articles_index_url(locale))}'>{_e(words['all'])}</a>" + (
+        _language_crumbs(alternates, locale)
+    )
+    body = (
+        _page_hero(words["eyebrow"], text.title, text.summary, crumbs)
+        + "<div class='paper page-main'><div class='wrap'>"
+        + _doc(
+            sections,
+            locale,
+            lead=f"<p>{_e(text.intro)}</p>",
+            aside=f"<a class='btn btn-dark btn-sm toc-cta' href='{_e(calculator_url(locale))}'>"
+            f"{_e(words['calculator'])}<span class='go'>{icon('arrow')}</span></a>",
+        )
+        + f"<section class='article-cta'><h2>{_e(words['cta_title'])}</h2>"
+        f"<p>{_e(words['cta_text'])}</p>{_articles_cta(locale)}</section></div></div>"
+    )
+    return _page(title, locale, body, meta_html=meta, alternates=alternates, solid_nav=True)
 
 
 def audience_page(
@@ -3710,5 +3894,6 @@ __all__ = [
     "legal_page",
     "method_page",
     "sample_meta",
+    "verification_card_svg",
     "verification_page",
 ]

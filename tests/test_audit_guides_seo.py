@@ -242,13 +242,13 @@ def test_verification_page_previews_class_and_date_and_nothing_private(tmp_path:
     head = text.split("</head>")[0]
     for secret in (SECRET_DESCRIPTION, token, audit_id):
         assert secret not in head
-    # The picture is the fixed card for its class: no figure from the file is on it.
-    card = f"og-class-{overall.group(1)}-es.png"
-    assert _meta(text, "og:image") == f"{BASE.rstrip('/')}/static/{card}"
+    # The PNG preview carries its class and fixed copy under a publication-gated URL.
+    assert _meta(text, "og:image") == f"{BASE}/v/{public_id}/card.png?lang=es"
+    assert _meta(text, "og:image:type") == "image/png"
     assert _meta(text, "og:image:alt") == f"Rigor · Clase {overall.group(1)}"
     english = client.get(f"/v/{public_id}?lang=en").text
     assert f"Class {overall.group(1)}" in (_meta(english, "og:title") or "")
-    assert (_meta(english, "og:image") or "").endswith(f"og-class-{overall.group(1)}-en.png")
+    assert _meta(english, "og:image") == f"{BASE}/v/{public_id}/card.png?lang=en"
     assert find_claims(text) == [] and find_claims(english) == []
 
 

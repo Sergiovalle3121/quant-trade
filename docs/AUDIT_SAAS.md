@@ -14,6 +14,62 @@ title and badge. A new name must pass the
 guard in both languages and must not suggest verification, certification,
 approval, earnings or passing a challenge (`tests/test_audit_brand.py`).
 
+## Public figures card (`audit/public_card.py`)
+
+`quant-trade audit public-card --json claim.json --out card.svg [--png]`
+creates an accessible SVG for a public post in Spanish (default), English
+or Portuguese. It does not fetch the source, inspect a backtest file, assign
+an audit class, endorse the post or predict future results. All supplied
+figures are `DECLARED`; calculations remain `DECLARED` and explicitly say
+they are computed from declarations. Missing inputs and unsupported
+approximations appear as `NOT_MEASURED` with a reason. Costs, out-of-sample
+evidence and data quality remain unmeasured.
+
+The JSON fields are `source_handle`, `source_url`, `trades`, `win_rate`,
+`profit_factor`, `sharpe` (annualised), `years`, `trials`, `target_r`,
+`stop_r` and `locale` (`es`, `en`, `pt`). All numbers are optional; use a
+proportion for `win_rate`, for example `0.71`, not `71`. Example:
+
+```json
+{"source_handle":"@example","source_url":"https://example.org/post","trades":45,"win_rate":0.71,"profit_factor":3.24,"sharpe":1.9,"years":3,"trials":100,"target_r":2,"stop_r":1,"locale":"es"}
+```
+
+Wilson uses the declared proportion directly, without inventing an integer
+win count from a rounded post. Its interval assumes independent trades.
+The coin comparison uses the same expected maximum of normals as `luck.py`,
+for independent fair coins and assumed searches of 20 and 100; it requires
+at least 20 trades (ten expected successes and failures). It is an
+approximation, not an exact binomial maximum. Sharpe luck imports the
+calculator's daily/normal assumptions and the existing sampling-variance
+and expected-maximum functions: 252 observations/year, independent trials,
+at least 0.1 years. It uses the declared Sharpe's dispersion when available;
+otherwise it explicitly uses the zero-Sharpe null model's dispersion.
+Break-even assumes each trade ends at the stated target or stop, before
+costs. The 45-trade/0.71 example yields about 56.5–82.2% Wilson and 68.9%
+best-of-100 coins; 100 trials over three years yields about 1.47 at declared
+Sharpe 1.9, or 1.46 with null dispersion.
+
+Inputs must be finite; counts are positive integers up to 10,000,000,
+other magnitudes are bounded at 1,000,000, and years/target/stop must be
+positive. Unknown or duplicate JSON fields and unsupported claim wording
+in attribution are refused. Source text is escaped and never executed.
+`--png` also writes a sibling PNG if CairoSVG and its native libraries are
+available. Otherwise the SVG is kept and the command explains conversion
+with Inkscape; no rasterizer is installed or started by the command.
+
+Published verifications also expose `/v/{public_id}/card.svg`, using only
+class, audit date, public ID and fixed copy from the verification allow-list.
+Their per-publication Open Graph/Twitter image URL is
+`/v/{public_id}/card.png`; it serves the existing class PNG for compatibility
+with image consumers, without a runtime rasterizer. It contains the class
+and fixed notice; the SVG additionally shows date and ID. The Portuguese
+PNG retains the existing English class-asset fallback; the SVG is Portuguese.
+Both image routes
+use the page's publication gate. As required by `AGENTS.md`, a published
+verification survives retention purge; a missing retained view returns 410,
+and a withdrawn publication returns 404. This deliberately follows the
+repository lifecycle rather than making every purged publication return 410.
+
 ## Why trust it (`pages.TRUST_COPY`, landing `#confianza`)
 
 The landing has a section for a first-time visitor, "Trabajo real, no humo"
@@ -3243,6 +3299,43 @@ Launch basics (2026-09-28, `tests/test_audit_launch_basics.py`):
   "ejemplo" and "exemplo" instead of the report id "sample". The report and
   its numbers are untouched.
 
+### Articles about backtests (`audit/articles.py`)
+
+Short articles for readers who arrive from a search engine, at `/articulos`,
+`/articles` and `/pt/artigos` (`ARTICLES_PATH`), one page per article under
+them (`/articulos/<slug>`, `/articles/<slug>`, `/pt/artigos/<slug>`, each
+language with its own slug). The copy lives in `ARTICLES_DATA`, a tuple of
+plain dictionaries with the shape `{"key", "slug": {es, en, pt}, "title":
+{..}, "summary": {..}, "intro": {..}, "sections": {es: [{"heading",
+"paragraphs": [..]}], ..}, "faq": {es: [{"q", "a"}], ..}, "related":
+[{"kind": "calculator"} | {"kind": "guide", "slug": ..} | {"kind":
+"audience", "slug": ..} | {"kind": "method"}]}`; `Article.from_dict` builds
+the dataclasses from it and refuses an unknown related kind or a guide or
+audience slug that does not exist, so a typo fails at import, not on a
+page. A page shows the intro, the sections as `h2` and paragraphs, the
+questions as `h3`, the
+related pages (the free calculator, an export guide, an audience page or
+the method, each in the page's language) and a closing call to the free
+calculator and the free first report, worded without a promise. The guides
+index links the articles index in each language so crawlers reach it. The
+three articles are `ea-sobreoptimizado` (how to tell whether an expert
+advisor is overfitted before buying it), `backtest-costos-reales` (spread,
+commission, slippage and swap, and the break-even cost) and
+`leer-informe-probador-mt5` (reading the MT5 strategy tester report and
+what it leaves out); every figure in them comes from the calculator's own
+table (the best of N configurations with no edge), never from an outside
+study.
+
+To add an article: append one dictionary to `ARTICLES_DATA` with every text
+in Spanish, English and Portuguese (no Spanish words on the Portuguese
+page), slugs in the three languages and the related pages by their Spanish
+slug; run `tests/test_audit_articles.py`, which checks the shape, runs the
+profit-claim guard over every text and every rendered page, and checks the
+metadata, the `hreflang` alternates, the 301 of a slug from another
+language and the 404 of an unknown one. `seo.PUBLIC_PAGES` reads
+`ARTICLES`, so the sitemap, the canonical links and `web.ENGLISH_ROOTS` pick
+the new page up with no further change.
+
 ### Terms and privacy
 
 No refunds (sergio's decision, 2026-09-28, replacing the 2026-09-24 refund
@@ -4243,3 +4336,51 @@ Reading a saved preference is optional too: if its lookup fails, the customer
 can still name the columns in HTML or JSON, in ES/EN/PT, without spending a
 credit or a free preview. An explicit selection then follows the existing audit
 and payment path. The lookup warning also excludes exception text and SQL data.
+
+### Sharing, public examples and the completed-audit count (2026-10-07)
+
+- **Active publications.** The public verification and its owner's published
+  report offer localized suggested text, clipboard copying with a selection
+  fallback, an X intent and the existing SVG card preview. `sharing.py` accepts
+  only the class, public id and locale; it never receives a private report URL,
+  token or client text. Shared links use `https://rigorscore.com/v/<id>?ref=share`
+  (and `lang=en`/`lang=pt` as appropriate). A private or withdrawn report has no
+  share block. Published views kept by the existing purge remain shareable.
+- **Attribution.** `share` and `ejemplos` are named tags in `funnel.REF_TAGS`.
+  Adding these bare names requires this deploy: there is no runtime setting
+  for arbitrary tags. Existing campaign-shaped names, such as `x-es-103`,
+  already work without another deploy. Active `/v/<id>` HTML and the examples
+  pages count like the calculator: people only, once per browser/day, first
+  tag kept for 30 days; bots, prefetches and card/badge requests do not add
+  visits. Public HTML uses `no-store` so caches cannot bypass attribution;
+  images keep their existing short cache unless a response sets a cookie.
+- **Public examples.** `/ejemplos`, `/en/examples` and `/pt/exemplos` are in the
+  footer and multilingual sitemap. `examples.py` imports the SVG renderer and
+  calculator arithmetic. No source is fetched and no audit class is assigned.
+  All inputs and arithmetic derived from them remain `DECLARED`; unavailable
+  evidence is `NOT_MEASURED`. Nine weeks is explicitly approximated as `9/52`
+  years, and the calculator accepts fractional years. Three weeks of strategy
+  development is not treated as backtest history. The first case has no
+  declared Sharpe/history/trial count, so its calculator link does not invent
+  those inputs. All calculator links carry `ref=ejemplos`.
+- **Conservative measured count.** Only completed customer uploads explicitly
+  marked in the additive `audit_count_eligibility` table contribute. The engine
+  and renderer must finish before that mark is written, in the audit insert's
+  transaction. Samples, fixtures, incomplete records and configured operator
+  test ids (`AUDIT_STRIPE_TEST_AUDITS`, read only) are excluded. Historical rows
+  have no reliable test/customer provenance and are deliberately not backfilled.
+  Manual test uploads through the public form must be identified in that
+  existing exclusion list or run against an isolated test database; the site
+  cannot infer that intent from a file. This is a conservative subset of the
+  stored completions, not a historical lifetime total. Existing purged
+  completions can count; deletion also removes the new eligibility metadata.
+  No retention or account policy changes. One aggregate query is cached per
+  application instance for 600 seconds, including failures. Failed reads hide
+  the count. Below 25 nothing is rendered; at 25 or more the count carries
+  `MEASURED`, displayed using the site's existing localized evidence labels.
+
+Offline regressions: `test_audit_sharing.py`, `test_audit_share_funnel.py`,
+`test_audit_examples.py`, `test_audit_completed_count.py`, plus the existing
+public-page, card, calculator, funnel, SEO and report tests. On the Windows
+laptop exclude `test_audit_pdf.py`, `test_audit_pdf_origin_label.py` and
+`test_audit_pdf_statements.py`: native WeasyPrint dependencies are unavailable.

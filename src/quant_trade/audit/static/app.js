@@ -165,17 +165,37 @@
       });
     }
 
-    // Copy buttons (the badge code and the invitation URL).
+    // Copy buttons, with a selection fallback when clipboard access is unavailable.
     d.querySelectorAll("[data-copy]").forEach(function (button) {
       var target = d.getElementById(button.getAttribute("data-copy"));
-      if (!target || !navigator.clipboard) return;
+      if (!target) return;
       button.hidden = false;
       button.addEventListener("click", function () {
-        navigator.clipboard.writeText(target.value || target.textContent || "").then(function () {
+        var section = button.closest("[data-public-share]");
+        var status = section && section.querySelector("[data-copy-status]");
+        function selectText() {
+          if (target.select) {
+            target.focus();
+            target.select();
+            target.setSelectionRange(0, target.value.length);
+          } else {
+            var range = d.createRange();
+            range.selectNodeContents(target);
+            var selection = window.getSelection();
+            if (selection) { selection.removeAllRanges(); selection.addRange(range); }
+          }
+          if (status) status.textContent = button.getAttribute("data-fallback") || "";
+        }
+        function copied() {
           var label = button.textContent;
           button.textContent = button.getAttribute("data-done") || label;
+          if (status) status.textContent = button.textContent;
           setTimeout(function () { button.textContent = label; }, 1800);
-        });
+        }
+        if (!navigator.clipboard || !navigator.clipboard.writeText) { selectText(); return; }
+        try {
+          navigator.clipboard.writeText(target.value || target.textContent || "").then(copied, selectText);
+        } catch (_) { selectText(); }
       });
     });
 

@@ -102,7 +102,8 @@ def test_publish_shows_only_the_allowed_fields(tmp_path: Path) -> None:
 
     page = client.get(f"/v/{public_id}")
     assert page.status_code == 200
-    assert page.headers["cache-control"] == "public, max-age=300"
+    # Every HTML visit reaches attribution; only its static images are cached.
+    assert page.headers["cache-control"] == "no-store"
     text = page.text
     assert VERIFICATION_NOTICE["es"] in text
     assert "Significación estadística" in text

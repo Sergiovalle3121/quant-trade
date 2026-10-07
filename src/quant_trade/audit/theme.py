@@ -1261,6 +1261,10 @@ background:var(--text);transform:scaleY(0);transition:transform .35s var(--ease)
 .toc ol a.on::before{transform:scaleY(1)}
 .toc-cta{margin-top:24px}
 .doc-foot{margin-top:40px}
+.article-cta{max-width:760px;margin-top:clamp(40px,6vw,64px)}
+.article-cta h2{font-size:1.4rem;font-weight:620;letter-spacing:-.03em;margin:0 0 8px}
+.article-cta p{color:var(--text-2);margin:0}
+.article-cta .back-row{margin-top:20px}
 @media (max-width:980px){.doc{grid-template-columns:minmax(0,1fr)}.toc{display:none}}
 .page-main{padding:clamp(52px,7vw,96px) 0 clamp(72px,10vw,128px)}
 .back-row{display:flex;flex-wrap:wrap;gap:12px;margin-top:44px}

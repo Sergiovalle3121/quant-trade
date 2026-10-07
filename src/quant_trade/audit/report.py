@@ -47,6 +47,7 @@ from quant_trade.audit.prop_presets import preset_label
 from quant_trade.audit.redflags import flag_title
 from quant_trade.audit.schema import AuditResult, Dimension
 from quant_trade.audit.seo import BRAND, CHECK_PATH, TAGLINE, private_meta
+from quant_trade.audit.sharing import share_block
 from quant_trade.audit.sizing import scale_text as sizing_scale_text
 from quant_trade.audit.streaks import CLUSTERED
 from quant_trade.audit.theme import (
@@ -7552,6 +7553,7 @@ def render_html(
     market_choices: tuple[str, ...] = (),
     redeem_url: str | None = None,
     publish_url: str | None = None,
+    public_id: str | None = None,
     notice: str | None = None,
     contact_url: str | None = None,
     legal_links: bool = False,
@@ -7752,7 +7754,11 @@ def render_html(
             "</form>"
         )
     publish_html = ""
-    if publish_url and not locked:
+    if public_id and not locked:
+        publish_html = share_block(
+            overall=str(data["verdict"]["overall"]), public_id=public_id, locale=locale
+        )
+    elif publish_url and not locked:
         publish_html = (
             f"<form class='publish' method='post' action='{_e(publish_url)}'>"
             f"<p class='muted'>{_e(labels['publish_help'])}</p>"
@@ -8634,6 +8640,7 @@ def render(
     market_choices: tuple[str, ...] = (),
     redeem_url: str | None = None,
     publish_url: str | None = None,
+    public_id: str | None = None,
     notice: str | None = None,
     contact_url: str | None = None,
     legal_links: bool = False,
@@ -8660,6 +8667,7 @@ def render(
         market_choices=market_choices,
         redeem_url=redeem_url,
         publish_url=publish_url,
+        public_id=public_id,
         notice=notice,
         contact_url=contact_url,
         legal_links=legal_links,
