@@ -95,7 +95,7 @@ COPY_PT: dict[str, Any] = {
         "Datas como ano-mês-dia (2026-03-31) e ponto decimal são lidas melhor. Se o seu "
         "arquivo usa dia/mês/ano, diga isso na descrição."
     ),
-    "benchmark": "Benchmark (CSV, opcional)",
+    "benchmark": "Benchmark (CSV/XLSX, opcional)",
     "benchmark_help": "Até 5 MB.",
     "variants": "Matriz de variantes (CSV, opcional)",
     "variants_help": "Uma coluna de retornos por variante testada; habilita o PBO. Até 5 MB.",

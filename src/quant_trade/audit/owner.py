@@ -42,6 +42,7 @@ TEXT: dict[str, str] = {
     "login_lead": "Escribe tu clave de administrador para crear y ver códigos de acceso.",
     "key": "Clave de administrador",
     "enter": "Entrar",
+    "public_card": "Tarjeta pública",
     "wrong_key": "La clave no es correcta.",
     "too_many": "Demasiados intentos con una clave incorrecta. Espera una hora.",
     "create_title": "Crear un código",
@@ -590,6 +591,9 @@ def panel_page(
         err
         + shown
         + notice
+        + f"<form method='post' action='{_e(panel_path)}'>{_key_field(key)}"
+        + "<input type='hidden' name='action' value='public_card'>"
+        + f"<button class='btn btn-ghost' type='submit'>{_e(TEXT['public_card'])}</button></form>"
         + _refused_table(refused)
         + _orders_table(orders)
         + _refunds_table(refunds)

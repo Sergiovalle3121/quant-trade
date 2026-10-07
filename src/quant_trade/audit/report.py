@@ -47,6 +47,7 @@ from quant_trade.audit.prop_presets import preset_label
 from quant_trade.audit.redflags import flag_title
 from quant_trade.audit.schema import AuditResult, Dimension
 from quant_trade.audit.seo import BRAND, CHECK_PATH, TAGLINE, private_meta
+from quant_trade.audit.series_ui import series_report
 from quant_trade.audit.sharing import share_block
 from quant_trade.audit.sizing import scale_text as sizing_scale_text
 from quant_trade.audit.streaks import CLUSTERED
@@ -3937,13 +3938,21 @@ def _charts_html(data: dict[str, Any], locale: str) -> str:
     if not series:
         return ""
     note = series.get("note") if series.get("note") != "as uploaded" else None
-    if note and locale == "es":
+    if series.get("opening_equity") is not None and note:
+        note = localize(note, locale)
+    elif note and locale == "es":
         note = "Balance reconstruido con operaciones cerradas: no muestra el drawdown flotante."
     elif note and locale == "pt":
         note = "Saldo reconstruído com operações fechadas: não mostra o drawdown flutuante."
     figures = [
         charts.equity_chart(series["timestamps"], series["equity"], locale=locale, note=note),
-        charts.drawdown_chart(series["timestamps"], series["equity"], locale=locale, note=note),
+        charts.drawdown_chart(
+            series["timestamps"],
+            series["equity"],
+            locale=locale,
+            note=note,
+            opening_equity=series.get("opening_equity"),
+        ),
     ]
     risk = data.get("risk") or {}
     fan = risk.get("fan")
@@ -3959,7 +3968,15 @@ def _charts_html(data: dict[str, Any], locale: str) -> str:
         # rebuilt from the curve here would repeat it and differ by rounding.
         figures.append(
             charts.monthly_heatmap(
-                series["month_end_timestamps"], series["month_end_equity"], locale=locale
+                series["month_end_timestamps"],
+                series["month_end_equity"],
+                locale=locale,
+                period_months=[
+                    charts.MonthlyReturn(row["year"], row["month"], row["value"]["value"])
+                    for row in series["period_months"]
+                ]
+                if "period_months" in series
+                else None,
             )
         )
     return "".join(figures)
@@ -7859,8 +7876,12 @@ def render_html(
             )
 
     cost = data["costs"]
-    cost_html = _status_line(cost, labels) + _evidence_rows(cost, labels, skip={"rows"})
-    if cost.get("rows"):
+    cost_html = (
+        series_report(data, locale)
+        if cost.get("kind") == "period_returns"
+        else _status_line(cost, labels) + _evidence_rows(cost, labels, skip={"rows"})
+    )
+    if cost.get("rows") and cost.get("kind") != "period_returns":
         cost_html += (
             f"<div class='tscroll'><table><tr><th>{_e(labels['multiplier'])}</th>"
             f"<th>{_e(labels['bps'])}</th>"
@@ -7882,7 +7903,14 @@ def render_html(
 
     bench_html = (
         _status_line(data["benchmark"], labels)
-        + _evidence_rows(data["benchmark"], labels, skip=set())
+        + _evidence_rows(
+            data["benchmark"],
+            labels,
+            # The localized return-series block presents these declarations.
+            skip={"source", "strategy_frequency", "benchmark_frequency", "periods_per_year"}
+            if data["inputs"].get("return_series")
+            else set(),
+        )
         + _alpha_html(data["benchmark"], labels)
     )
     cscv_html = _status_line(data["cscv"], labels) + _evidence_rows(

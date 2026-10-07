@@ -38,7 +38,7 @@ from quant_trade.audit.audiences import (
 )
 from quant_trade.audit.calculator import COPY as CALCULATOR_COPY
 from quant_trade.audit.calculator import REASONS as CALCULATOR_REASONS
-from quant_trade.audit.calculator import calculator_url, compute, parse_input
+from quant_trade.audit.calculator import calculator_copy, calculator_url, compute, parse_input
 from quant_trade.audit.completed_count import completed_count_html
 from quant_trade.audit.examples import (
     EXAMPLES_COPY,
@@ -92,6 +92,7 @@ from quant_trade.audit.seo import (
     page_paths,
     private_meta,
 )
+from quant_trade.audit.series_ui import institutional_block, series_fields
 from quant_trade.audit.settings import PACK_CREDITS
 from quant_trade.audit.sharing import share_block
 from quant_trade.audit.theme import (
@@ -239,7 +240,7 @@ _COPY: dict[str, dict[str, Any]] = {
             "Se leen mejor las fechas como año-mes-día (2026-03-31) y el punto decimal. Si tu "
             "archivo usa día/mes/año, dilo en la descripción."
         ),
-        "benchmark": "Benchmark (CSV, opcional)",
+        "benchmark": "Benchmark (CSV/XLSX, opcional)",
         "benchmark_help": "Hasta 5 MB.",
         "variants": "Matriz de variantes (CSV, opcional)",
         "variants_help": (
@@ -558,7 +559,7 @@ _COPY: dict[str, dict[str, Any]] = {
             "Dates as year-month-day (2026-03-31) and a decimal point read best. If your file "
             "uses day/month/year, say so in the description."
         ),
-        "benchmark": "Benchmark (CSV, optional)",
+        "benchmark": "Benchmark (CSV/XLSX, optional)",
         "benchmark_help": "Up to 5 MB.",
         "variants": "Variant matrix (CSV, optional)",
         "variants_help": "One return column per variant tried; enables the PBO. Up to 5 MB.",
@@ -2400,7 +2401,13 @@ def _upload_form(
             locale,
         )
         + "<div class='form-grid'>"
-        + _drop("benchmark", copy["benchmark"], ".csv,text/csv", _e(copy["benchmark_help"]), locale)
+        + _drop(
+            "benchmark",
+            copy["benchmark"],
+            ".csv,.xlsx,text/csv",
+            _e(copy["benchmark_help"]),
+            locale,
+        )
         + _drop("variants", copy["variants"], ".csv,text/csv", _e(copy["variants_help"]), locale)
         + _field(
             copy["cost_bps"],
@@ -2459,6 +2466,7 @@ def _upload_form(
             f"{_e(copy['equity_help'])}<br>{_e(copy['dates_hint'])}",
             locale,
         )
+        + series_fields(locale)
         # Declared trials decide whether multiplicity can pass (verdict.assess_multiplicity),
         # so the field sits in the main form, not under the advanced options.
         + _field(
@@ -2585,6 +2593,9 @@ def landing(
         + ("<div class='wrap'>" + count_html + "</div>" if count_html else "")
         + _specs(locale)
         + _audiences(locale)
+        + "<div class='section light'><div class='wrap'>"
+        + institutional_block(locale, CONTACT_PATHS[locale])
+        + "</div></div>"
         + _problems(locale)
         + _dimensions(locale, copy)
         + _how_html(copy, locale)
@@ -3435,10 +3446,15 @@ def method_page(*, locale: str = "es", base_url: str = "") -> str:
 
 
 def _calculator_result(
-    words: dict[str, Any], locale: str, sharpe: str | None, years: str | None, trials: str | None
+    words: dict[str, Any],
+    locale: str,
+    sharpe: str | None,
+    years: str | None,
+    trials: str | None,
+    periods_per_year: str | None = "252",
 ) -> str:
     """The result block for the submitted numbers, an error, or nothing."""
-    parsed = parse_input(sharpe, years, trials)
+    parsed = parse_input(sharpe, years, trials, periods_per_year)
     if parsed is None:
         return ""
     if isinstance(parsed, str):
@@ -3487,11 +3503,18 @@ def calculator_page(
     sharpe: str | None = None,
     years: str | None = None,
     trials: str | None = None,
+    periods_per_year: str | None = "252",
 ) -> str:
-    """The free luck calculator: three declared numbers, the luck section's figures."""
+    """The free luck calculator: declared figures and frequency, the luck section's result."""
     locale = _locale(locale)
     copy = _COPY[locale]
-    words: dict[str, Any] = CALCULATOR_COPY[locale]
+    try:
+        frequency = float(periods_per_year) if periods_per_year is not None else 252.0
+    except (TypeError, ValueError):
+        frequency = 252.0
+    if frequency not in (252, 52, 12):
+        frequency = 252.0
+    words = calculator_copy(locale, frequency)
     title = f"{words['title']} · {copy['title']}"
     meta = _public_meta(title, words["summary"], locale, calculator_url(locale), base_url)
 
@@ -3504,15 +3527,27 @@ def calculator_page(
             f"<p class='help'>{_e(words[name + '_help'])}</p></div>"
         )
 
+    options = "".join(
+        f"<option value='{periods}'{' selected' if periods == frequency else ''}>"
+        f"{_e(label)}</option>"
+        for periods, label in words["frequency_options"].items()
+    )
+    frequency_field = (
+        f"<div class='field'><label for='c-periods_per_year'>{_e(words['frequency'])} "
+        f"{_badge('DECLARED', locale)}</label>"
+        f"<select id='c-periods_per_year' name='periods_per_year'>{options}</select>"
+        f"<p class='help'>{_e(words['frequency_help'])}</p></div>"
+    )
     form = (
         f"<form method='get' action='{_e(calculator_url(locale))}' class='calc-form'>"
         "<div class='form-grid'>"
         + field("sharpe", sharpe, "0.01")
         + field("years", years, "any")
         + field("trials", trials, "1")
+        + frequency_field
         + f"</div><button class='btn btn-dark' type='submit'>{_e(words['submit'])}</button></form>"
     )
-    result = _calculator_result(words, locale, sharpe, years, trials)
+    result = _calculator_result(words, locale, sharpe, years, trials, periods_per_year)
     cta = (
         f"<p>{_e(words['cta'])}</p><p><a class='btn btn-dark' href='{_e(_form_url(locale))}'>"
         f"{_e(words['cta_button'])}<span class='go'>{icon('arrow')}</span></a> "

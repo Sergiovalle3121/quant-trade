@@ -45,6 +45,7 @@ from quant_trade.audit import (
     funnel,
     inbox,
     mapping,
+    owner_card,
     payments,
     track_seal_pages,
     universal,
@@ -122,6 +123,7 @@ from quant_trade.audit.portuguese import MESSAGES_PT, link_locale
 from quant_trade.audit.prop_presets import DEFAULT_PRESET
 from quant_trade.audit.report import render, result_sha256
 from quant_trade.audit.retention import RetentionWorker
+from quant_trade.audit.return_series import is_return_series
 from quant_trade.audit.sample import sample_result
 from quant_trade.audit.schema import (
     MAX_UPLOAD_BYTES,
@@ -1570,6 +1572,10 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             return HTMLResponse(
                 login_page(error="wrong_key", panel_path=app.state.panel_path), status_code=403
             )
+        if action == "public_card":
+            if _cross_site(request):
+                return _html_error(request, 403, message("cross_site", "es"), "es")
+            return HTMLResponse(owner_card.page(key=key, panel_path=app.state.panel_path))
         new_code = flash = error = ""
         cost_error = ""
         cost_saved = False
@@ -1696,6 +1702,93 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 observability=private_ops,
             )
         )
+
+    def owner_public_card_missing() -> Response:
+        raise _not_found()
+
+    async def owner_public_card(request: Request) -> Response:
+        """The same owner-key POST authentication as the panel, without persistence."""
+        if not cfg.admin_enabled:
+            raise _not_found()
+        form = await request.form(max_files=0, max_fields=20, max_part_size=8192)
+        key = form.get("key")
+        if not isinstance(key, str) or not key or len(key) > 256:
+            raise _not_found()
+        locale = _report_locale(str(form.get("locale") or "es"))
+        if _cross_site(request):
+            return _html_error(request, 403, message("cross_site", locale), locale)
+        ip = _client_ip(request, cfg.trusted_proxy_hops)
+        now = datetime.now(UTC)
+        if await run_in_threadpool(panel_failures.count, ip, now) >= MAX_FAILED_LOGINS_PER_HOUR:
+            return HTMLResponse(
+                login_page(error="too_many", panel_path=app.state.panel_path), status_code=429
+            )
+        if not hmac.compare_digest(key.encode(), cfg.admin_key.encode()):
+            await run_in_threadpool(panel_failures.hit, ip, now)
+            return HTMLResponse(
+                login_page(error="wrong_key", panel_path=app.state.panel_path), status_code=403
+            )
+
+        def generate() -> Response:
+            def page(
+                *,
+                claim: Any = None,
+                svg: str = "",
+                error: str = "",
+                png: bool = False,
+                status: int = 200,
+            ) -> Response:
+                return HTMLResponse(
+                    owner_card.page(
+                        key=key,
+                        panel_path=app.state.panel_path,
+                        locale=locale,
+                        claim=claim,
+                        svg=svg,
+                        error=error,
+                        png_enabled=png,
+                    ),
+                    status_code=status,
+                )
+
+            allowed = {*owner_card.FORM_FIELDS, "key", "action"}
+            if (
+                set(form) - allowed
+                or len(form.multi_items()) != len(form)
+                or any(not isinstance(value, str) for value in form.values())
+            ):
+                return page(error="invalid", status=400)
+            action = form.get("action") or ""
+            if not action:
+                return page()
+            if action not in ("preview", "svg", "png"):
+                return page(error="invalid", status=400)
+            values = {name: str(form.get(name, "")) for name in owner_card.FORM_FIELDS}
+            values["locale"] = str(form.get("locale") or "es")
+            try:
+                claim, svg = owner_card.render_form(values)
+            except owner_card.ClaimInputError as exc:
+                return page(error=str(exc), status=400)
+            if action == "svg":
+                return Response(
+                    content=svg,
+                    media_type="image/svg+xml",
+                    headers={"Content-Disposition": 'attachment; filename="rigor-public-card.svg"'},
+                )
+            if action == "png":
+                png = owner_card.svg_to_png(svg)
+                if png is not None:
+                    return Response(
+                        content=png,
+                        media_type="image/png",
+                        headers={
+                            "Content-Disposition": 'attachment; filename="rigor-public-card.png"'
+                        },
+                    )
+                return page(claim=claim, svg=svg)
+            return page(claim=claim, svg=svg, png=owner_card.png_available())
+
+        return await run_in_threadpool(generate)
 
     @app.get("/static/{name:path}")
     def static(name: str) -> Response:
@@ -4299,6 +4392,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         initial_balance: Annotated[str, Form()] = "",
         access_code: Annotated[str, Form()] = "",
         net_of_fees: Annotated[str, Form(max_length=8)] = "",
+        return_frequency: Annotated[str, Form(max_length=16)] = "",
+        return_unit: Annotated[str, Form(max_length=16)] = "",
     ) -> Response:
         # The report's language, which the refusals below also speak.
         report_loc = _report_locale(locale)
@@ -4529,16 +4624,30 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 initial_balance=_positive_or_none(initial_balance),
                 challenge=challenge.strip() or None,
                 net_of_fees=net_of_fees.lower() in ("on", "yes", "true", "1"),
+                return_frequency=return_frequency.strip() or None,
+                return_unit=return_unit.strip() or None,
             )
         except (ValidationError, ValueError):
             return _html_error(request, 400, message("invalid_declared", report_loc), report_loc)
         report_filename = report.filename if report is not None and uploads["report"] else None
+        # The primary picker accepts period-return CSV/XLSX tables too. Content
+        # detection comes before platform sniffing, and uses the curve reader's
+        # existing size and workbook limits.
+        return_table = False
+        if bool(uploads["report"]) != bool(uploads["equity"]):
+            candidate = uploads["equity"] or uploads["report"]
+            if candidate:
+                return_table = await run_in_threadpool(is_return_series, candidate)
+            if return_table and uploads["report"]:
+                uploads["equity"], uploads["report"] = uploads["report"], None
+                report_filename = None
         # A platform report dropped in the equity-curve field is read as the
         # report, instead of failing as a malformed CSV.
         equity_name = equity.filename if equity is not None else None
         if (
             uploads["equity"]
             and not uploads["report"]
+            and not return_table
             and looks_like_platform_report(equity_name, uploads["equity"])
         ):
             uploads["report"], uploads["equity"] = uploads["equity"], None
@@ -4580,6 +4689,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             "initial_balance": initial_balance,
             "access_code": access_code,
             "net_of_fees": net_of_fees,
+            "return_frequency": return_frequency,
+            "return_unit": return_unit,
         }
 
         def build(columns: dict[str, str] | None) -> Any:
@@ -5627,6 +5738,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         sharpe: str | None,
         years: str | None,
         trials: str | None,
+        periods_per_year: str | None,
     ) -> str:
         return calculator_page(
             locale=locale,
@@ -5634,6 +5746,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             sharpe=sharpe,
             years=years,
             trials=trials,
+            periods_per_year=periods_per_year,
         )
 
     @app.get("/calculadora", response_class=HTMLResponse)
@@ -5643,8 +5756,9 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         sharpe: str | None = None,
         years: str | None = None,
         trials: str | None = None,
+        periods_per_year: str | None = None,
     ) -> str:
-        return _calculator(request, _locale(lang or "es"), sharpe, years, trials)
+        return _calculator(request, _locale(lang or "es"), sharpe, years, trials, periods_per_year)
 
     @app.get("/calculator", response_class=HTMLResponse)
     def calculator_en(
@@ -5653,8 +5767,9 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         sharpe: str | None = None,
         years: str | None = None,
         trials: str | None = None,
+        periods_per_year: str | None = None,
     ) -> str:
-        return _calculator(request, _locale(lang or "en"), sharpe, years, trials)
+        return _calculator(request, _locale(lang or "en"), sharpe, years, trials, periods_per_year)
 
     @app.get("/pt/calculadora", response_class=HTMLResponse)
     def calculator_pt(
@@ -5662,8 +5777,9 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         sharpe: str | None = None,
         years: str | None = None,
         trials: str | None = None,
+        periods_per_year: str | None = None,
     ) -> str:
-        return _calculator(request, "pt", sharpe, years, trials)
+        return _calculator(request, "pt", sharpe, years, trials, periods_per_year)
 
     @app.get("/guides", response_class=HTMLResponse)
     def guides_en(request: Request, lang: str | None = None) -> str:
@@ -6199,6 +6315,19 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         panel_at = str(app.state.panel_path)
         app.add_api_route(panel_at, panel_login, methods=["GET"], response_class=HTMLResponse)
         app.add_api_route(panel_at, panel, methods=["POST"], response_class=HTMLResponse)
+        app.add_api_route(
+            panel_at + "/public-card",
+            owner_public_card_missing,
+            methods=["GET"],
+            include_in_schema=False,
+        )
+        app.add_api_route(
+            panel_at + "/public-card",
+            owner_public_card,
+            methods=["POST"],
+            response_class=HTMLResponse,
+            include_in_schema=False,
+        )
 
     # Hidden features mount here with the app's own closures; each module's
     # switch is a constant, and while it is off nothing is registered.

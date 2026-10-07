@@ -4396,3 +4396,67 @@ Offline regressions: `test_audit_sharing.py`, `test_audit_share_funnel.py`,
 public-page, card, calculator, funnel, SEO and report tests. On the Windows
 laptop exclude `test_audit_pdf.py`, `test_audit_pdf_origin_label.py` and
 `test_audit_pdf_statements.py`: native WeasyPrint dependencies are unavailable.
+
+### Institutional period returns and private card form (2026-10-07)
+
+CSV and XLSX uploads accept a dated `return` column, or `gross_return` and/or
+`net_return`. Example with six **synthetic** monthly observations in fractions:
+
+```csv
+date,gross_return,net_return
+2024-01-31,0.012,0.010
+2024-02-29,-0.006,-0.008
+2024-03-31,0.022,0.020
+2024-04-30,0.004,0.002
+2024-05-31,-0.013,-0.015
+2024-06-30,0.017,0.015
+```
+
+- Upload through the main file or equity field; benchmark accepts the same
+  shape. An explicit equity column retains the existing equity-curve path.
+  The first return is included; the compounded index has an implicit unit
+  opening value with **no invented opening date**. Net is used when supplied,
+  otherwise `return`, otherwise gross. With both gross/net columns the report
+  also presents each series and their sample-deviation annualised Sharpe.
+- The form can confirm `return_frequency=daily|weekly|monthly` and
+  `return_unit=fraction|percent`. Regular dates infer 252/52/12 periods per
+  year respectively. Conflicting declarations are rejected. Unknown frequency
+  needs a declaration. `%` markers or a percent header identify percentages;
+  absent markers, median absolute values above 0.5 imply percent, otherwise
+  fractions. This is a **DECLARED interpretation**, not measured provenance;
+  use the form override for ambiguous small percentages or large fractions.
+  Mixed marked/unmarked nonzero values are rejected. The report records unit,
+  frequency, confirmation, gross/net basis and benchmark source as DECLARED.
+- Calculations use every supplied return, with sample Sharpe scaled by the
+  square root of 252/52/12. Luck uses that convention and period count divided
+  by frequency for duration. The public calculator has the same selector,
+  default 252, and accepts `periods_per_year=12` or `52` in links. Its inputs
+  remain declarations, as do public-card assumptions. The existing minimum
+  dated span for reporting CAGR remains conservative.
+- Benchmark comparison checks frequency before an exact-date join and retains
+  the existing 90% overlap threshold. Different frequencies are NOT_MEASURED;
+  they are not resampled into agreement, including the fund section. Jensen
+  alpha and analyses needing a period opening date or an intra-period path
+  are NOT_MEASURED when only these period returns were supplied. No daily
+  observations, trade counts or monetary P&L are reconstructed.
+- Cost sensitivity compounds `gross - k*(gross - net)` for declared multipliers
+  1, 2 and 3. The gross/net difference is a **declared cost reference**; resulting
+  totals and Sharpes are MEASURED. Net above gross invalidates this interpretation;
+  stress below a complete period loss is NOT_MEASURED. Without trades this does
+  not satisfy the existing trade-cost audit dimension or change its thresholds.
+- The existing private owner panel links to **Tarjeta pública**. The repository
+  authenticates each panel POST with the owner key; it has no owner session.
+  The new form preserves that mechanism, cross-site rejection and rate limits.
+  It shares `PublicClaim` limits and the claims guard with the CLI, converts
+  percentage hit rate to a fraction, and returns inline/downloadable SVG.
+  Optional CairoSVG converts only the freshly generated SVG into PNG in memory;
+  otherwise localized instructions explain external conversion. This operation
+  writes neither database records nor files. No new login/session subsystem.
+- The institutional landing block exists in ES/EN/PT and links to the existing
+  localized contact form. No contact delivery or account behavior changes.
+
+Offline regression coverage: `test_audit_return_series.py`,
+`test_audit_period_analysis.py`, `test_audit_frequency.py`,
+`test_audit_series_ui.py`, `test_audit_series_integration.py`,
+`test_audit_owner_card.py` and the related existing importer/engine/report tests.
+Keep the three PDF exclusions above on the Windows laptop.

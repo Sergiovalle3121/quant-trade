@@ -7,8 +7,8 @@ and gets the same three figures the report's luck section shows
 show, the Sharpe left after the Bonferroni haircut, and the years of history
 at which that luck falls below the observed Sharpe.
 
-There is no file, so the calculator assumes what the report measures: daily
-returns (252 a year) with no skew and normal tails. Every input is the
+There is no file, so the calculator assumes what the report measures: returns
+at the declared frequency, with no skew and normal tails. Every input is the
 visitor's own claim, labelled Declared on the page, and every output is
 computed from it. Nothing is stored. The page needs no account and links to
 the upload form, where the same figures come from the real returns.
@@ -32,6 +32,7 @@ CALCULATOR_PATH: dict[str, str] = {
 
 #: Daily returns, as most strategy testers export.
 PERIODS_PER_YEAR = 252.0
+SUPPORTED_PERIODS_PER_YEAR = (252, 52, 12)
 #: Normal returns: no skew, kurtosis 3. Fat tails and negative skew widen
 #: the Sharpe's spread, so the real figure is usually worse than this one.
 SKEW = 0.0
@@ -52,10 +53,14 @@ class CalculatorInput:
     sharpe: float
     years: float
     trials: int
+    periods_per_year: float = PERIODS_PER_YEAR
 
 
 def parse_input(
-    sharpe: str | None, years: str | None, trials: str | None
+    sharpe: str | None,
+    years: str | None,
+    trials: str | None,
+    periods_per_year: str | None = None,
 ) -> CalculatorInput | str | None:
     """The three fields as numbers, ``None`` when the form is empty, or the
     key of the error to show when a field is missing or out of range."""
@@ -75,20 +80,28 @@ def parse_input(
         return "error_years"
     if not TRIALS_RANGE[0] <= n <= TRIALS_RANGE[1]:
         return "error_trials"
-    return CalculatorInput(sharpe=sr, years=yrs, trials=n)
+    try:
+        frequency = float(periods_per_year) if periods_per_year is not None else PERIODS_PER_YEAR
+    except (TypeError, ValueError):
+        return "error_frequency"
+    if frequency not in SUPPORTED_PERIODS_PER_YEAR:
+        return "error_frequency"
+    return CalculatorInput(sharpe=sr, years=yrs, trials=n, periods_per_year=frequency)
 
 
 def compute(value: CalculatorInput) -> dict[str, Any]:
     """The luck section's figures for the declared Sharpe, span and search."""
-    observations = max(2, round(value.years * PERIODS_PER_YEAR))
-    per_period = value.sharpe / math.sqrt(PERIODS_PER_YEAR)
+    if value.periods_per_year not in SUPPORTED_PERIODS_PER_YEAR:
+        raise ValueError("unsupported return frequency")
+    observations = max(2, round(value.years * value.periods_per_year))
+    per_period = value.sharpe / math.sqrt(value.periods_per_year)
     variance = sharpe_sampling_variance(per_period, SKEW, KURTOSIS, observations)
     return luck_review(
         {"sharpe_per_period": per_period, "observations": observations},
         trials=value.trials,
         trials_source="declared",
         sharpe_variance=variance,
-        periods_per_year=PERIODS_PER_YEAR,
+        periods_per_year=value.periods_per_year,
         span_years=value.years,
     )
 
@@ -107,6 +120,17 @@ COPY: dict[str, dict[str, Any]] = {
         "sharpe_help": "El que muestra tu plataforma, anualizado. Por ejemplo 1.8.",
         "years": "Años de historial",
         "years_help": "Del primer al último día del backtest. Por ejemplo 3 o 0.5.",
+        "frequency": "Frecuencia de los rendimientos",
+        "frequency_help": "Usa la frecuencia de tu serie. Es una declaración, no una medición.",
+        "frequency_options": {
+            252: "Diaria · 252 periodos/año (DECLARED)",
+            52: "Semanal · 52 periodos/año (DECLARED)",
+            12: "Mensual · 12 periodos/año (DECLARED)",
+        },
+        "frequency_assumption": (
+            "{frequency}. Se suponen rendimientos sin asimetría y con colas normales. Las colas "
+            "gruesas y la asimetría negativa hacen que el resultado real sea más exigente."
+        ),
         "trials": "Configuraciones probadas",
         "trials_help": (
             "Cada combinación de parámetros que corriste, cada versión que descartaste y cada "
@@ -116,7 +140,8 @@ COPY: dict[str, dict[str, Any]] = {
         "submit": "Calcular",
         "result_title": "Resultado",
         "declared_note": (
-            "Las tres cifras de entrada son Declaradas: las escribiste tú y no vemos tu archivo."
+            "Las cifras y la frecuencia de entrada son Declaradas: las escribiste tú y no "
+            "vemos tu archivo."
         ),
         "luck": "Sharpe que daría la pura suerte con {n} configuraciones",
         "after": "Sharpe que queda después del descuento",
@@ -144,9 +169,11 @@ COPY: dict[str, dict[str, Any]] = {
         "error_sharpe": "El Sharpe debe estar entre 0.05 y 10.",
         "error_years": "Los años deben estar entre 0.1 y 50.",
         "error_trials": "Las configuraciones deben estar entre 1 y 10,000,000.",
+        "error_frequency": "Elige una frecuencia diaria, semanal o mensual.",
         "cta_title": "Con tu archivo, las cifras son medidas",
         "cta": (
-            "La calculadora supone datos diarios con rendimientos normales. Tu archivo tiene "
+            "La calculadora usa la frecuencia que declaras y supone rendimientos normales. "
+            "Tu archivo tiene "
             "asimetría, colas, costos y huecos de datos reales, y el informe los mide, junto "
             "con el número de pasadas del optimizador de MT5 cuando lo subes. Tu primer "
             "informe completo es gratis al crear cuenta."
@@ -188,6 +215,17 @@ COPY: dict[str, dict[str, Any]] = {
         "sharpe_help": "The one your platform shows, annualised. For example 1.8.",
         "years": "Years of history",
         "years_help": "From the backtest's first to its last day. For example 3 or 0.5.",
+        "frequency": "Return frequency",
+        "frequency_help": "Use your series frequency. This is a declaration, not a measurement.",
+        "frequency_options": {
+            252: "Daily · 252 periods/year (DECLARED)",
+            52: "Weekly · 52 periods/year (DECLARED)",
+            12: "Monthly · 12 periods/year (DECLARED)",
+        },
+        "frequency_assumption": (
+            "{frequency}. Returns are assumed to have no skew and normal tails. Fat tails "
+            "and negative skew make the real result stricter."
+        ),
         "trials": "Configurations tried",
         "trials_help": (
             "Every parameter combination you ran, every version you dropped and every optimizer "
@@ -196,7 +234,8 @@ COPY: dict[str, dict[str, Any]] = {
         "submit": "Calculate",
         "result_title": "Result",
         "declared_note": (
-            "The three inputs are Declared: you typed them and we do not see your file."
+            "The input figures and frequency are Declared: you typed them and we do not "
+            "see your file."
         ),
         "luck": "Sharpe that pure luck would show with {n} configurations",
         "after": "Sharpe left after the haircut",
@@ -224,9 +263,11 @@ COPY: dict[str, dict[str, Any]] = {
         "error_sharpe": "The Sharpe must be between 0.05 and 10.",
         "error_years": "The years must be between 0.1 and 50.",
         "error_trials": "The configurations must be between 1 and 10,000,000.",
+        "error_frequency": "Choose a daily, weekly or monthly frequency.",
         "cta_title": "With your file, the figures are measured",
         "cta": (
-            "The calculator assumes daily data with normal returns. Your file has real skew, "
+            "The calculator uses your declared frequency and assumes normal returns. "
+            "Your file has real skew, "
             "tails, costs and data gaps, and the report measures them, along with the number "
             "of MT5 optimizer passes when you upload it. Your first full report is free with "
             "an account."
@@ -267,6 +308,17 @@ COPY: dict[str, dict[str, Any]] = {
         "sharpe_help": "O que a sua plataforma mostra, anualizado. Por exemplo 1.8.",
         "years": "Anos de histórico",
         "years_help": "Do primeiro ao último dia do backtest. Por exemplo 3 ou 0.5.",
+        "frequency": "Frequência dos retornos",
+        "frequency_help": "Use a frequência da sua série. É uma declaração, não uma medição.",
+        "frequency_options": {
+            252: "Diária · 252 períodos/ano (DECLARED)",
+            52: "Semanal · 52 períodos/ano (DECLARED)",
+            12: "Mensal · 12 períodos/ano (DECLARED)",
+        },
+        "frequency_assumption": (
+            "{frequency}. Supõem-se retornos sem assimetria e com caudas normais. Caudas "
+            "grossas e assimetria negativa tornam o resultado real mais exigente."
+        ),
         "trials": "Configurações testadas",
         "trials_help": (
             "Cada combinação de parâmetros que você rodou, cada versão descartada e cada "
@@ -276,7 +328,8 @@ COPY: dict[str, dict[str, Any]] = {
         "submit": "Calcular",
         "result_title": "Resultado",
         "declared_note": (
-            "Os três números de entrada são Declarados: você os digitou e não vemos o seu arquivo."
+            "Os números e a frequência de entrada são Declarados: você os digitou e não "
+            "vemos o seu arquivo."
         ),
         "luck": "Sharpe que a pura sorte mostraria com {n} configurações",
         "after": "Sharpe que sobra depois do desconto",
@@ -304,9 +357,11 @@ COPY: dict[str, dict[str, Any]] = {
         "error_sharpe": "O Sharpe deve estar entre 0.05 e 10.",
         "error_years": "Os anos devem estar entre 0.1 e 50.",
         "error_trials": "As configurações devem estar entre 1 e 10.000.000.",
+        "error_frequency": "Escolha uma frequência diária, semanal ou mensal.",
         "cta_title": "Com o seu arquivo, os números são medidos",
         "cta": (
-            "A calculadora supõe dados diários com retornos normais. O seu arquivo tem "
+            "A calculadora usa a frequência que você declara e supõe retornos normais. "
+            "O seu arquivo tem "
             "assimetria, caudas, custos e falhas de dados reais, e o relatório os mede, junto "
             "com o número de passagens do otimizador do MT5 quando você o envia. O seu "
             "primeiro relatório completo é grátis ao criar a conta."
@@ -348,10 +403,24 @@ REASONS: dict[str, dict[str, str]] = {
     },
 }
 
+
+def calculator_copy(locale: str, periods_per_year: float = PERIODS_PER_YEAR) -> dict[str, Any]:
+    """Localised assumptions for the frequency actually used in the calculation."""
+    if periods_per_year not in SUPPORTED_PERIODS_PER_YEAR:
+        raise ValueError("unsupported return frequency")
+    copy = dict(COPY.get(locale, COPY["es"]))
+    assumption = copy["frequency_assumption"].format(
+        frequency=copy["frequency_options"][periods_per_year]
+    )
+    copy["assumptions"] = [assumption, *copy["assumptions"][1:]]
+    return copy
+
+
 __all__ = [
     "CALCULATOR_PATH",
     "COPY",
     "CalculatorInput",
+    "calculator_copy",
     "calculator_url",
     "compute",
     "parse_input",

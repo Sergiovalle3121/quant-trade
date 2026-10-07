@@ -69,6 +69,7 @@ from quant_trade.audit.schema import (
     MAX_REPORT_BYTES,
     MAX_ROWS,
     MAX_TRADES,
+    IngestedSeries,
     ParsedTrades,
     ParseError,
     printed_step,
@@ -199,6 +200,30 @@ class ImportedReport:
     #: Deposits (positive) and withdrawals (negative) the file lists, in time
     #: order, including those before the first trade and after the last.
     cash_flows: list[tuple[datetime, float]] = field(default_factory=list)
+
+
+def is_return_series(data: bytes) -> bool:
+    """Whether CSV/XLSX content is a dated table of period returns."""
+    from quant_trade.audit.return_series import is_return_series as detect
+
+    return detect(data)
+
+
+def import_return_series(
+    data: bytes,
+    *,
+    frequency: str | None = None,
+    unit: str | None = None,
+    what: str = "equity",
+) -> IngestedSeries:
+    """Read a return table without manufacturing trades or a dated starting row.
+
+    Unlike ``import_report``, this returns a series, not a trade ledger. The
+    selected unit and frequency remain declarations in ``return_metadata``.
+    """
+    from quant_trade.audit.return_series import import_return_series as parse
+
+    return parse(data, frequency=frequency, unit=unit, what=what)
 
 
 @dataclass(frozen=True)
