@@ -318,7 +318,7 @@ def test_only_the_panel_uses_the_first_segment_of_its_path(tmp_path: Path, panel
     first = panel_path.split("/")[1].lower()
     paths = [str(getattr(route, "path", "")) for route in client.app.routes]  # type: ignore[attr-defined]
     shared = {path for path in paths if path.lower().split("/")[1:2] == [first]}
-    assert shared == {panel_path}
+    assert shared == {panel_path, panel_path + "/public-card"}
 
 
 @pytest.mark.parametrize("panel_path", [DEFAULT_PANEL_PATH, CUSTOM])

@@ -217,6 +217,9 @@ class DeclaredMetadata(BaseModel):
     #: record only; ``engine.fund_record`` decides, and anything else keeps
     #: the cost check).
     net_of_fees: bool = False
+    #: The period and unit conventions for an uploaded return table.
+    return_frequency: Literal["daily", "weekly", "monthly"] | None = None
+    return_unit: Literal["fraction", "percent"] | None = None
     #: Prop-firm challenge preset to simulate; ``None`` means the default preset.
     challenge: str | None = Field(None, max_length=64)
 
@@ -263,6 +266,8 @@ class IngestedSeries:
     #: reads it, and so does the benchmark dimension when no benchmark file
     #: was uploaded (``engine._file_benchmark``).
     benchmark: pd.DataFrame | None = None
+    #: Explicit return tables keep their first return without an invented date.
+    return_metadata: dict[str, Any] = field(default_factory=dict)
 
     @property
     def observations(self) -> int:
@@ -1345,6 +1350,8 @@ def build_inputs(
         MT5_TESTER_HTML,
         MT5_TESTER_XLSX,
         import_report,
+        import_return_series,
+        is_return_series,
         optimization_mismatch,
         parse_optimization,
     )
@@ -1354,6 +1361,10 @@ def build_inputs(
     trades = None
     extra: dict[str, Any] = {}
     imported = None
+    # The main upload field accepts a return table as well as a platform
+    # report. It has no trades, and must never enter the trade-list reader.
+    if report_bytes and not equity_bytes and is_return_series(report_bytes):
+        equity_bytes, report_bytes = report_bytes, None
     if report_bytes:
         if trades_bytes:
             raise ParseError(
@@ -1391,7 +1402,13 @@ def build_inputs(
         if variants_in_report.isdigit() and int(variants_in_report) > 1:
             extra["report_variants"] = int(variants_in_report)
     if equity_bytes:
-        equity = parse_equity_csv(equity_bytes)
+        equity = (
+            import_return_series(
+                equity_bytes, frequency=declared.return_frequency, unit=declared.return_unit
+            )
+            if is_return_series(equity_bytes)
+            else parse_equity_csv(equity_bytes)
+        )
         digests["equity.csv"] = sha256_of_bytes(equity_bytes)
         warnings[:0] = [f"equity: {w}" for w in equity.warnings]
         if imported is not None:
@@ -1419,7 +1436,11 @@ def build_inputs(
             extra["reported_fees"] = {"itemised_costs": -sum(trades.fees)}
     benchmark = None
     if benchmark_bytes:
-        benchmark = parse_equity_csv(benchmark_bytes, what="benchmark")
+        benchmark = (
+            import_return_series(benchmark_bytes, what="benchmark")
+            if is_return_series(benchmark_bytes)
+            else parse_equity_csv(benchmark_bytes, what="benchmark")
+        )
         digests["benchmark.csv"] = sha256_of_bytes(benchmark_bytes)
         warnings.extend(f"benchmark: {w}" for w in benchmark.warnings)
     variants = None
@@ -1489,6 +1510,11 @@ def build_inputs(
     if "live_trades" in extra:
         _refuse_future_trades(extra["live_trades"], "live", cutoff)
     ppy, label = infer_frequency(equity.frame["timestamp"])
+    if equity.return_metadata:
+        ppy = float(equity.return_metadata["periods_per_year"])
+        label = {"daily": "daily_trading", "weekly": "weekly", "monthly": "monthly"}[
+            equity.return_metadata["frequency_label"]
+        ]
     return AuditInputs(
         equity=equity,
         declared=declared,

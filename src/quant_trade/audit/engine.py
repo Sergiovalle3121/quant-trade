@@ -58,6 +58,7 @@ from quant_trade.audit import timing as timing_lib
 from quant_trade.audit.guard import find_claims, scan_client_text
 from quant_trade.audit.importers import lead_number
 from quant_trade.audit.prop_presets import DEFAULT_PRESET, get_preset
+from quant_trade.audit.return_series import frame_returns, return_performance
 from quant_trade.audit.schema import (
     DECLARED,
     MEASURED,
@@ -212,8 +213,14 @@ def _performance(
     returns: pd.Series,
     ppy: float,
     metadata: dict[str, str],
+    *,
+    period_returns: bool = False,
 ) -> dict[str, Any]:
-    metrics = calculate_performance(frame[["timestamp", "equity"]], trades)
+    metrics = (
+        return_performance(frame, ppy)
+        if period_returns
+        else calculate_performance(frame[["timestamp", "equity"]], trades)
+    )
     # The same Sharpe as the significance section and the red flags (sample
     # standard deviation), so the report never prints two different values.
     metrics["sharpe"] = _annualised_sharpe(returns, ppy)
@@ -233,6 +240,10 @@ def _performance(
         "trade_count",
     )
     out = {key: measured(metrics[key]) for key in keys}
+    if period_returns and not math.isfinite(float(metrics["cagr"])):
+        from quant_trade.audit.period_analysis import REASONS
+
+        out["cagr"] = not_measured(REASONS["numeric_range"]["en"])
     platform_dd = platform_equity_drawdown(metadata)
     if platform_dd is not None:
         out["platform_equity_drawdown"] = declared(
@@ -610,7 +621,16 @@ def _bootstrap(returns: pd.Series, *, samples: int, seed: int) -> dict[str, Any]
     }
 
 
-def _subperiods(frame: pd.DataFrame) -> list[dict[str, Any]]:
+def _subperiods(frame: pd.DataFrame, *, period_returns: bool = False) -> list[dict[str, Any]]:
+    if period_returns:
+        return [
+            {
+                "year": int(year),
+                "return": measured(return_performance(part, 1)["total_return"]),
+                "max_drawdown": measured(return_performance(part, 1)["max_drawdown"]),
+            }
+            for year, part in frame.groupby(frame["timestamp"].dt.year)
+        ]
     table = subperiod_analysis(frame[["timestamp", "equity"]])
     years = pd.to_datetime(frame["timestamp"], utc=True).dt.year
     if len(table) > 1 and int((years == int(table["year"].iloc[0])).sum()) == 1:
@@ -628,14 +648,35 @@ def _subperiods(frame: pd.DataFrame) -> list[dict[str, Any]]:
     ]
 
 
-def _rolling(frame: pd.DataFrame, ppy: float) -> list[dict[str, Any]]:
+def _rolling(
+    frame: pd.DataFrame, ppy: float, *, period_returns: bool = False
+) -> list[dict[str, Any]]:
     n = len(frame)
     candidates = sorted({max(2, round(ppy / 4)), max(2, round(ppy / 2)), max(2, round(ppy))})
     windows = tuple(w for w in candidates if w <= n // 2)
     if not windows:
         return []
-    table = rolling_metrics(frame[["timestamp", "equity"]], windows, periods_per_year=ppy)
     out: list[dict[str, Any]] = []
+    if period_returns:
+
+        def period_drawdown(values: np.ndarray) -> float:
+            curve = np.r_[1.0, np.cumprod(1 + values)]
+            return float((curve / np.maximum.accumulate(curve) - 1).min())
+
+        values = frame_returns(frame)
+        for window in windows:
+            changes = (1 + values).rolling(window).apply(np.prod, raw=True).dropna() - 1
+            drawdowns = values.rolling(window).apply(period_drawdown, raw=True).dropna()
+            out.append(
+                {
+                    "window": window,
+                    "min_return": measured(changes.min()),
+                    "min_drawdown": measured(drawdowns.min()),
+                    "share_negative": measured(float((changes < 0).mean())),
+                }
+            )
+        return out
+    table = rolling_metrics(frame[["timestamp", "equity"]], windows, periods_per_year=ppy)
     for w in windows:
         ret = table[f"rolling_{w}_return"].dropna()
         dd = table[f"rolling_{w}_drawdown"].dropna()
@@ -653,17 +694,17 @@ def _rolling(frame: pd.DataFrame, ppy: float) -> list[dict[str, Any]]:
 
 
 def _side_stats(frame: pd.DataFrame, ppy: float) -> dict[str, Any]:
-    returns = frame["equity"].astype(float).pct_change().dropna()
+    returns = frame_returns(frame)
     return {
         "observations": measured(int(len(returns))),
         "sharpe_annualised": measured(_annualised_sharpe(returns, ppy)),
         "psr": measured(probabilistic_sharpe_ratio(returns)),
-        "total_return": measured(float(frame["equity"].iloc[-1] / frame["equity"].iloc[0] - 1)),
+        "total_return": measured(float((1 + returns).prod() - 1)),
     }
 
 
 def _holdout(
-    frame: pd.DataFrame, oos_start: datetime | None, ppy: float
+    frame: pd.DataFrame, oos_start: datetime | None, ppy: float, *, period_returns: bool = False
 ) -> tuple[dict[str, Any], float | None, float | None, str | None]:
     if oos_start is None:
         reason = "no out-of-sample start declared"
@@ -682,18 +723,25 @@ def _holdout(
         return {"status": "NOT_MEASURED", "reason": reason, **base}, None, None, reason
     try:
         train, test = date_based_split(
-            frame[["timestamp", "equity"]], first, start - pd.Timedelta(nanoseconds=1), start, last
+            frame if period_returns else frame[["timestamp", "equity"]],
+            first,
+            start - pd.Timedelta(nanoseconds=1),
+            start,
+            last,
         )
     except ValueError as exc:
         reason = f"split failed: {exc}"
         return {"status": "NOT_MEASURED", "reason": reason, **base}, None, None, reason
     # The out-of-sample side starts from the last in-sample close, so the
     # move onto its first row is counted (a crash on that day is its own).
-    test = pd.concat([train.tail(1), test], ignore_index=True)
-    if len(train) < HOLDOUT_MIN_OBSERVATIONS + 1 or len(test) < HOLDOUT_MIN_OBSERVATIONS + 1:
+    if not period_returns:
+        test = pd.concat([train.tail(1), test], ignore_index=True)
+    required = HOLDOUT_MIN_OBSERVATIONS + (0 if period_returns else 1)
+    if len(train) < required or len(test) < required:
         reason = (
             f"a side has fewer than {HOLDOUT_MIN_OBSERVATIONS} returns "
-            f"(in-sample {max(len(train) - 1, 0)}, out-of-sample {max(len(test) - 1, 0)})"
+            f"(in-sample {max(len(train) - (not period_returns), 0)}, "
+            f"out-of-sample {max(len(test) - (not period_returns), 0)})"
         )
         return {"status": "NOT_MEASURED", "reason": reason, **base}, None, None, reason
     in_sample = _side_stats(train, ppy)
@@ -717,7 +765,17 @@ def _benchmark(
     rates: pd.Series | None = None,
     local_cash: LocalCashRates | None = None,
     other_currency: bool = False,
+    ppy: float | None = None,
 ) -> tuple[dict[str, Any], dict[str, float | None], str | None]:
+    if strategy.return_metadata or (benchmark is not None and benchmark.return_metadata):
+        from quant_trade.audit.period_analysis import period_benchmark
+
+        return period_benchmark(
+            strategy,
+            benchmark,
+            ppy or float(periods_per_year(strategy.frame["timestamp"])),
+            min_overlap=BENCHMARK_MIN_OVERLAP,
+        )
     empty: dict[str, float | None] = {
         "excess_return": None,
         "drawdown_ratio": None,
@@ -896,11 +954,13 @@ def _file_benchmark(equity: IngestedSeries) -> IngestedSeries | None:
     by_stamp = rows.drop_duplicates("timestamp", keep="last").set_index("timestamp")["ret"]
     frame = equity.frame[["timestamp"]].copy()
     ret = frame["timestamp"].map(by_stamp).astype(float).to_numpy().copy()
+    if equity.return_metadata and (not bool(np.isfinite(ret).all()) or bool((ret <= -1.0).any())):
+        return None
     if len(ret) < 3 or not bool(np.isfinite(ret[1:]).all()) or bool((ret[1:] <= -1.0).any()):
         return None
     ret[0] = ret[0] if np.isfinite(ret[0]) and ret[0] > -1.0 else 0.0
     frame["equity"] = 100.0 * np.cumprod(1.0 + ret)
-    frame["ret"] = frame["equity"].pct_change()
+    frame["ret"] = ret if equity.return_metadata else frame["equity"].pct_change()
     return replace(equity, frame=frame, source="equity", benchmark=None, warnings=[])
 
 
@@ -909,6 +969,14 @@ def _fund_benchmark(inputs: AuditInputs) -> tuple[pd.Series | None, str]:
     file first (the customer chose it), else the one the fund's file carries.
     The benchmark dimension reads the same index through :func:`_file_benchmark`."""
     if inputs.benchmark is not None:
+        if inputs.equity.return_metadata or inputs.benchmark.return_metadata:
+            from quant_trade.audit.period_analysis import period_benchmark
+
+            comparison, _, _ = period_benchmark(
+                inputs.equity, inputs.benchmark, inputs.periods_per_year
+            )
+            if comparison["status"] != "MEASURED":
+                return None, "upload"
         return fund_lib.monthly_returns(inputs.benchmark.frame), "upload"
     if inputs.equity.benchmark is not None:
         return fund_lib.benchmark_months(inputs.equity.benchmark), "file"
@@ -917,7 +985,9 @@ def _fund_benchmark(inputs: AuditInputs) -> tuple[pd.Series | None, str]:
 
 def net_of_fees(inputs: AuditInputs) -> bool:
     """The client's net-of-fees declaration, honoured only on a fund record."""
-    return inputs.declared.net_of_fees and fund_record(inputs)
+    return (
+        inputs.declared.net_of_fees or inputs.equity.return_metadata.get("basis") == "net"
+    ) and fund_record(inputs)
 
 
 def _real_fills(inputs: AuditInputs) -> bool:
@@ -928,6 +998,10 @@ def _real_fills(inputs: AuditInputs) -> bool:
 def _costs(
     inputs: AuditInputs,
 ) -> tuple[dict[str, Any], list[cost_lib.RecostRow] | None, float | None, bool, list[float] | None]:
+    if inputs.equity.return_metadata:
+        from quant_trade.audit.period_analysis import period_costs
+
+        return period_costs(inputs.equity, inputs.periods_per_year), None, None, False, None
     if inputs.trades is None:
         return {"status": "NOT_MEASURED", "reason": "no trades uploaded"}, None, None, False, None
     fees_reported = inputs.trades.reports_fees
@@ -1457,7 +1531,9 @@ def _round(value: float) -> float:
     return float(f"{value:.10g}")
 
 
-def _series(frame: pd.DataFrame, *, balance_only: bool) -> dict[str, Any]:
+def _series(
+    frame: pd.DataFrame, *, balance_only: bool, period_returns: bool = False
+) -> dict[str, Any]:
     """What the charts need, small enough to store: the curve downsampled
     with its extremes kept, and the month-end closes for the heatmap."""
     stamps = pd.to_datetime(frame["timestamp"], utc=True)
@@ -1473,7 +1549,12 @@ def _series(frame: pd.DataFrame, *, balance_only: bool) -> dict[str, Any]:
         if balance_only
         else "as uploaded"
     )
+    if period_returns:
+        from quant_trade.audit.period_analysis import REASONS
+
+        note = REASONS["period_curve"]["en"]
     return {
+        **({"opening_equity": 1.0} if period_returns else {}),
         "evidence": MEASURED,
         "note": note,
         "points_total": int(len(frame)),
@@ -1481,7 +1562,63 @@ def _series(frame: pd.DataFrame, *, balance_only: bool) -> dict[str, Any]:
         "equity": [_round(equity[i]) for i in keep],
         "month_end_timestamps": [_iso(stamps.iloc[i]) for i in month_end],
         "month_end_equity": [_round(equity[i]) for i in month_end],
+        **(
+            {
+                "period_months": [
+                    {
+                        "year": int(year),
+                        "month": int(month),
+                        "value": measured(float((1 + part["ret"]).prod() - 1)),
+                    }
+                    for (year, month), part in frame.groupby([stamps.dt.year, stamps.dt.month])
+                ]
+            }
+            if period_returns
+            else {}
+        ),
     }
+
+
+def _return_series_inputs(inputs: AuditInputs) -> dict[str, Any]:
+    """Evidence for interpreting the uploaded numbers; never elevate labels to measurements."""
+    from quant_trade.audit.period_analysis import REASONS
+
+    metadata = inputs.equity.return_metadata
+    result = {
+        "frequency": declared(metadata["frequency_label"]),
+        "periods_per_year": declared(inputs.periods_per_year),
+        "unit": declared(metadata["unit"]),
+        "basis": declared(metadata["basis"]),
+        "frequency_confirmed": declared(metadata["frequency_confirmed"]),
+        "unit_confirmed": declared(metadata["unit_confirmed"]),
+        "benchmark_source": declared(
+            "uploaded file"
+            if inputs.benchmark
+            else "embedded column"
+            if inputs.equity.benchmark is not None
+            else "not supplied"
+        ),
+    }
+    if inputs.benchmark and inputs.benchmark.return_metadata:
+        result["benchmark_periods_per_year"] = declared(
+            inputs.benchmark.return_metadata["periods_per_year"]
+        )
+    for name in ("gross", "net"):
+        column = f"{name}_ret"
+        if column in inputs.equity.frame:
+            frame = inputs.equity.frame[["timestamp", column]].rename(columns={column: "ret"})
+            with np.errstate(over="ignore", invalid="ignore", divide="ignore"):
+                metrics = return_performance(frame, inputs.periods_per_year)
+            result[name] = {
+                "unit": declared(metadata[f"{name}_unit"]),
+                "total_return": (
+                    measured(metrics["total_return"])
+                    if math.isfinite(float(metrics["total_return"]))
+                    else not_measured(REASONS["numeric_range"]["en"])
+                ),
+                "sharpe": _sharpe_evidence(frame["ret"], inputs.periods_per_year),
+            }
+    return result
 
 
 def _seal(inputs: AuditInputs, *, audit_id: str, now: datetime, holdout_ok: bool) -> dict[str, Any]:
@@ -1548,7 +1685,10 @@ def run_audit(
     trades = inputs.trades.trades if inputs.trades is not None else []
     trials_used, trials_evidence, trials_source = trial_count(inputs)
 
-    performance = _performance(frame, trades, returns, ppy, inputs.report_metadata or {})
+    period_returns = bool(inputs.equity.return_metadata)
+    performance = _performance(
+        frame, trades, returns, ppy, inputs.report_metadata or {}, period_returns=period_returns
+    )
     significance, moments = _significance(returns)
     significance["autocorrelation_adjusted"] = autocorrelation_adjusted_sharpe(returns, ppy)
     significance["dependence"] = dependence_adjusted_psr(returns)
@@ -1575,13 +1715,22 @@ def run_audit(
             else None
         ),
         periods_per_year=ppy,
-        span_years=(frame["timestamp"].iloc[-1] - frame["timestamp"].iloc[0]).days / 365.25,
+        span_years=(
+            len(returns) / ppy
+            if period_returns
+            else (frame["timestamp"].iloc[-1] - frame["timestamp"].iloc[0]).days / 365.25
+        ),
     )
-    ride = ride_lib.ride_review(frame)
+    from quant_trade.audit.period_analysis import REASONS as PERIOD_REASONS
+
+    period_path = {"status": "NOT_MEASURED", "reason": PERIOD_REASONS["period_path"]["en"]}
+    ride = dict(period_path) if period_returns else ride_lib.ride_review(frame)
     bootstrap = _bootstrap(returns, samples=bootstrap_samples, seed=seed)
-    subperiods = _subperiods(frame)
-    rolling = _rolling(frame, ppy)
-    holdout, oos_sharpe, gap, holdout_reason = _holdout(frame, inputs.declared.oos_start, ppy)
+    subperiods = _subperiods(frame, period_returns=period_returns)
+    rolling = _rolling(frame, ppy, period_returns=period_returns)
+    holdout, oos_sharpe, gap, holdout_reason = _holdout(
+        frame, inputs.declared.oos_start, ppy, period_returns=period_returns
+    )
     if holdout_reason == "no out-of-sample start declared" and fund_record(inputs):
         # A fund's record has no optimisation to end; what it lacks is the date
         # since when the manager's process has not changed.
@@ -1595,11 +1744,24 @@ def run_audit(
         bill_rates,
         _local_cash_rates(inputs, market),
         _other_currency(inputs),
+        ppy=ppy,
     )
     if file_benchmark is not None and benchmark.get("status") == "MEASURED":
-        benchmark["source"] = "file"
+        benchmark["source"] = declared("embedded column") if period_returns else "file"
         share = benchmark["overlap_share"]["value"]
         benchmark["overlap_share"] = measured(share, FILE_BENCHMARK_NOTE)
+    elif (
+        period_returns
+        and inputs.benchmark is None
+        and inputs.equity.benchmark is not None
+        and file_benchmark is None
+    ):
+        benchmark_reason = PERIOD_REASONS["invalid_returns"]["en"]
+        benchmark = {
+            "status": "NOT_MEASURED",
+            "reason": benchmark_reason,
+            "source": declared("embedded column"),
+        }
     cscv, pbo = _cscv(inputs.variants)
     if inputs.variant_validation is not None:
         cscv["source_validation"] = inputs.variant_validation
@@ -1694,7 +1856,11 @@ def run_audit(
     )
     flags.extend(recent_flags)
     try:
-        shift = breaks_lib.mean_shift(inputs.equity.frame, inputs.periods_per_year)
+        shift = (
+            dict(period_path)
+            if period_returns
+            else breaks_lib.mean_shift(inputs.equity.frame, inputs.periods_per_year)
+        )
     except Exception:  # noqa: BLE001 (an informational block must never stop an audit)
         shift = {"status": "NOT_MEASURED", "reason": breaks_lib.FLAT}
     behaviour = (
@@ -1704,7 +1870,7 @@ def run_audit(
     )
     seal = _seal(inputs, audit_id=identifier, now=clock, holdout_ok=holdout_reason is None)
     trade_stats = _trade_stats(inputs)
-    stress_tests = _stress(inputs, frame)
+    stress_tests = dict(period_path) if period_returns else _stress(inputs, frame)
     capital = (
         sizing_lib.capital_review(
             inputs.trades.trades,
@@ -1741,16 +1907,20 @@ def run_audit(
     # curve (a backtest, a trade history) gets them on their own.
     crises = (
         None
-        if fund.get("status") == "MEASURED"
+        if fund.get("status") == "MEASURED" or period_returns
         else crises_lib.curve_crises(
             inputs.equity.frame, bench_months, from_trades=inputs.balance_only
         )
     )
-    holding = None if fund.get("status") == "MEASURED" else _holding(inputs, market)
-    cash_rate = _cash_rate(inputs, market, bill_rates)
-    vix_regime = _vix_regime(inputs, market)
+    holding = (
+        None if fund.get("status") == "MEASURED" or period_returns else _holding(inputs, market)
+    )
+    cash_rate = dict(period_path) if period_returns else _cash_rate(inputs, market, bill_rates)
+    vix_regime = dict(period_path) if period_returns else _vix_regime(inputs, market)
     # A fund's table rarely names its currency; converting it as dollars would mislead.
-    in_currencies = None if fund.get("status") == "MEASURED" else _currency(inputs, market)
+    in_currencies = (
+        None if fund.get("status") == "MEASURED" or period_returns else _currency(inputs, market)
+    )
     instruments = (
         instruments_lib.instrument_review(
             inputs.trades.trades,
@@ -1775,7 +1945,11 @@ def run_audit(
     if live and live.get("new_symbols"):
         live["new_symbols"] = [_safe_text(s) for s in live["new_symbols"]]
     risk = _risk(returns, ppy, samples=risk_samples, seed=seed)
-    challenge = _challenge(inputs, samples=challenge_samples, seed=seed)
+    challenge = (
+        dict(period_path)
+        if period_returns
+        else _challenge(inputs, samples=challenge_samples, seed=seed)
+    )
 
     plain_psr = float(moments["psr"]) if moments is not None else None
     adjusted_psr = significance["dependence"]["psr"]
@@ -1844,7 +2018,7 @@ def run_audit(
         thresholds=thresholds,
         account=_real_fills(inputs),
         fund=fund_record(inputs),
-        own_index=benchmark.get("source") == "file",
+        own_index=file_benchmark is not None and benchmark.get("status") == "MEASURED",
     )
     mintrl = significance.get("min_track_record_length", {})
     mintrl_value = mintrl.get("value") if mintrl.get("evidence") == MEASURED else None
@@ -1904,7 +2078,10 @@ def run_audit(
             "observations": measured(int(len(returns))),
             "first_timestamp": _iso(frame["timestamp"].iloc[0]),
             "last_timestamp": _iso(frame["timestamp"].iloc[-1]),
-            "periods_per_year": measured(ppy, "inferred from the timestamps"),
+            "periods_per_year": declared(ppy)
+            if period_returns
+            else measured(ppy, "inferred from the timestamps"),
+            **({"return_series": _return_series_inputs(inputs)} if period_returns else {}),
             "frequency_label": inputs.frequency_label,
             "parse_warnings": [_safe_text(w) for w in inputs.warnings]
             + (
@@ -1961,7 +2138,7 @@ def run_audit(
         verdict=final,
         reconciliation=reconciliation,
         forensics=inputs.forensics,
-        series=_series(frame, balance_only=inputs.balance_only),
+        series=_series(frame, balance_only=inputs.balance_only, period_returns=period_returns),
         trade_stats=trade_stats,
         stress=stress_tests,
         timing=timing,

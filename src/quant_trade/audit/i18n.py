@@ -2664,6 +2664,15 @@ def _reason_portuguese(text: str) -> str | None:
     return "; ".join(parts)
 
 
+def _period_translation(text: str, locale: str) -> str | None:
+    from quant_trade.audit.period_analysis import REASONS as PERIOD_REASONS
+
+    for translations in PERIOD_REASONS.values():
+        if text == translations["en"]:
+            return translations.get(locale, text)
+    return None
+
+
 def _render(text: str, locale: str) -> str | None:
     """``text`` as a rule writes it in ``locale``, or ``None`` when no rule knows it.
 
@@ -2671,7 +2680,7 @@ def _render(text: str, locale: str) -> str | None:
     singular sentence.
     """
     if locale == "pt":
-        return _render_portuguese(text)
+        return _render_portuguese(text) or _period_translation(text, locale)
     head, sep, rest = text.partition(": ")
     if sep and head in _PREFIXES:
         inner = _render(rest, locale)
@@ -2692,7 +2701,7 @@ def _render(text: str, locale: str) -> str | None:
             chosen = singular[1] if singular else template
             return chosen.format(**_translate_values(values))
         return singular[0].format(**values) if singular else text
-    return None
+    return _period_translation(text, locale)
 
 
 def spanish(text: str) -> str | None:

@@ -118,6 +118,12 @@ MONTHS = {
     "en": ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"),
 }
 
+PERIOD_MONTH_DESC = {
+    "es": "Rendimientos por periodo del archivo, compuestos por mes según su fecha.",
+    "en": "Periodic returns from the file, compounded by the month of their date.",
+    "pt": "Retornos por período do arquivo, compostos pelo mês da sua data.",
+}
+
 #: Styles the report embeds once; the charts also work without them.
 CHART_CSS = """
 figure.chart{margin:1em 0;padding:0}
@@ -489,12 +495,22 @@ def drawdown_chart(
     evidence: str = "MEASURED",
     note: str | None = None,
     max_points: int = DEFAULT_MAX_POINTS,
+    opening_equity: float | None = None,
 ) -> str:
-    """The underwater curve, computed from ``equity``, as an area below zero."""
+    """The underwater curve, computed from ``equity``, as an area below zero.
+
+    For compounded periodic returns, ``opening_equity`` includes the first
+    period's loss in the running peak without inserting an observation date.
+    """
     texts = _texts(locale)
     _check_evidence(evidence)
     times, values = _clean_series(timestamps, equity)
-    dd_all = drawdown_series(values)
+    if opening_equity is not None:
+        if not _finite(opening_equity) or opening_equity <= 0:
+            raise ValueError("opening_equity must be finite and positive")
+        dd_all = drawdown_series([opening_equity, *values])[1:]
+    else:
+        dd_all = drawdown_series(values)
     pairs = [(t, d) for t, d in zip(times, dd_all, strict=True) if _finite(d)]
     if len(pairs) < 2:
         return _insufficient("drawdown", texts["drawdown_title"], locale)
@@ -625,17 +641,28 @@ def monthly_heatmap(
     locale: str = "es",
     evidence: str = "MEASURED",
     note: str | None = None,
+    period_months: list[MonthlyReturn] | None = None,
 ) -> str:
     """Monthly returns as an HTML table shaded blue (up) and red (down).
 
     Each cell prints its value, so the shading is never the only encoding,
     and carries a native tooltip. The last column compounds the year's
-    months that have data.
+    months that have data. ``period_months`` supplies precomputed returns,
+    including the first period, without inferring another opening date.
     """
     texts = _texts(locale)
     _check_evidence(evidence)
     months = MONTHS.get(locale, MONTHS["es"])
-    rows = monthly_returns(timestamps, equity)
+    rows = monthly_returns(timestamps, equity) if period_months is None else period_months
+    if period_months is not None:
+        seen = set()
+        for row in rows:
+            key = (row.year, row.month)
+            if not (1 <= row.year <= 9999 and 1 <= row.month <= 12 and _finite(row.value)):
+                raise ValueError("period_months must contain valid months and finite returns")
+            if key in seen:
+                raise ValueError("period_months must not contain duplicate months")
+            seen.add(key)
     if not rows:
         return _insufficient("monthly", texts["monthly_title"], locale)
     by_year: dict[int, dict[int, float]] = {}
@@ -668,9 +695,14 @@ def monthly_heatmap(
             f"<strong>{_e(_fmt_signed_percent(total))}</strong></td>"
         )
         body.append(f"<tr><th>{year}</th>{''.join(cells)}</tr>")
+    description = (
+        texts["monthly_desc"]
+        if period_months is None
+        else PERIOD_MONTH_DESC.get(locale, PERIOD_MONTH_DESC["es"])
+    )
     table = (
         f'<div class="chart-scroll"><table class="monthly">'
-        f"<caption class='sr-only'>{_e(texts['monthly_desc'])}</caption>"
+        f"<caption class='sr-only'>{_e(description)}</caption>"
         f"{head}{''.join(body)}</table></div>"
     )
     caption = texts["monthly_title"] + "."

@@ -58,7 +58,7 @@ def luck_review(
     trials: int,
     trials_source: str,
     sharpe_variance: float | None,
-    periods_per_year: float,
+    periods_per_year: float = 252.0,
     span_years: float,
 ) -> dict[str, Any]:
     """The observed Sharpe next to what ``trials`` unskilled tries would show."""
@@ -72,6 +72,7 @@ def luck_review(
         span_years * 365.25 < MIN_SPAN_DAYS
         or n < MIN_OBSERVATIONS
         or periods_per_year <= 0
+        or not math.isfinite(periods_per_year)
         or sharpe_variance <= 0
     ):
         return _not_measured("too short a history to discount")

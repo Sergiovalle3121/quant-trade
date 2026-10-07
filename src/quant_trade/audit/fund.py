@@ -128,6 +128,13 @@ def monthly_returns(frame: pd.DataFrame) -> pd.Series:
     "month" that spans two or three. On a series with several points a month
     (a daily benchmark), a final month seen only in part is left out, so it
     is never compared with a full month of the fund."""
+    if "ret" in frame and not frame.empty and pd.notna(frame["ret"].iloc[0]):
+        supplied = frame.set_index("timestamp")["ret"].astype(float).sort_index()
+        # A monthly return is supplied for each listed month, including the
+        # first. Its opening index is implicit, not an extra dated NAV row.
+        # Missing months remain missing; they are never turned into zeroes.
+        if int(supplied.resample("ME").count().max()) <= 1:
+            return ((1 + supplied).resample("ME").prod(min_count=1) - 1).dropna()
     equity = frame.set_index("timestamp")["equity"].astype(float).sort_index()
     month_end = equity.resample("ME").last()
     months = len(month_end)
@@ -290,6 +297,8 @@ def fund_review(
         stamps = stamps.tz_convert("UTC").tz_localize(None)
     periods = stamps.to_period("M")
     span = int((periods.max() - periods.min()).n)
+    if "ret" in frame and not frame.empty and pd.notna(frame["ret"].iloc[0]):
+        span += 1
     if len(series) < MIN_MONTHS:
         return {"status": "NOT_MEASURED", "reason": f"needs at least {MIN_MONTHS} monthly returns"}
     r = series.to_numpy(dtype=float)
