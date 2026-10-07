@@ -49,3 +49,13 @@ def test_order_safety_rejects_oversized_and_short_flags() -> None:
             BrokerConfig(),
             account,
         )
+
+
+@pytest.mark.parametrize("quantity", [float("nan"), float("inf"), -float("inf"), True])
+def test_order_safety_cannot_bypass_limits_with_nonfinite_quantity(quantity) -> None:
+    account = BrokerAccount("alpaca_paper", "x****", "USD", 1000, 1000, 1000, "active", True)
+    order = BrokerOrderRequest(
+        "SPY", "buy", quantity, "limit", "day", "invalid-quantity", limit_price=100.0
+    )
+    with pytest.raises(BrokerSafetyError, match="finite and positive"):
+        validate_order_safety(order, BrokerConfig(allow_fractional=True), account)

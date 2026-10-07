@@ -87,7 +87,7 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - name: Install dependencies
-        run: python -m pip install -e ".[dev,web]"
+        run: python -m pip install -c requirements.lock.txt -e ".[dev,web,personal-paper]"
       - name: Compile smoke check
         run: python -m compileall -q src tests
       - name: Pytest
