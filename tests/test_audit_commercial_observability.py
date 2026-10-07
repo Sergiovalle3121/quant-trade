@@ -563,7 +563,24 @@ def test_email_confirmation_note_is_localized_and_conditional() -> None:
     }
     for locale, note in expected.items():
         assert note is not None
-        page = landing(locale=locale, email_confirmation=True)
+        page = landing(locale=locale, free_mode=False, email_confirmation=True)
         assert note in page and "welcome-confirmation" in page
         assert find_claims(page) == []
-        assert "welcome-confirmation" not in landing(locale=locale, email_confirmation=False)
+        assert "welcome-confirmation" not in landing(
+            locale=locale, free_mode=False, email_confirmation=False
+        )
+        # Free mode has no free first report waiting for a confirmed address.
+        free = landing(locale=locale, free_mode=True, email_confirmation=True)
+        assert "welcome-confirmation" not in free and note not in free
+
+
+@pytest.mark.parametrize("free_mode", [True, False])
+def test_landing_shows_the_confirmation_note_only_when_it_applies(
+    tmp_path: Path, free_mode: bool
+) -> None:
+    app = _app(tmp_path, free_mode=free_mode, email_verification_required=True)
+    with TestClient(app) as client:
+        for home in ("/", "/en", "/pt"):
+            page = client.get(home)
+            assert page.status_code == 200
+            assert ("welcome-confirmation" in page.text) is not free_mode, home

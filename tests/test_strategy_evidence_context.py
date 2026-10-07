@@ -277,3 +277,25 @@ def test_printable_dates_and_figures_keep_print_only_unbroken_layout(locale: str
         ".strat-table .strat-fig .badge{margin-top:3pt}",
     ):
         assert rule in printed and rule not in screen
+
+
+@pytest.mark.parametrize("locale", ["es", "en", "pt"])
+def test_phone_figures_line_up_beside_their_label_and_evidence(locale: str) -> None:
+    # On a phone each figure is a labelled row: name, evidence badge, then the value
+    # against the right edge, so the three values line up whatever the badge says.
+    cells = _figure_cells(_page(_result(), locale))
+    assert len(cells) == 3
+    badge = f"<span class='badge MEASURED'>{evidence_label('MEASURED', locale)}</span>"
+    assert all(re.fullmatch(rf"<span>[^<]+</span> {badge}", cell) for cell in cells)
+    screen, printed = STRATEGY_CSS.split("@media print{", maxsplit=1)
+    phone = screen[screen.index("@media (max-width:620px){") :]
+    for rule in (
+        ".strat-table .strat-fig{display:grid;grid-template-columns:minmax(0,1fr) auto auto;",
+        ".strat-table .strat-fig::before{content:attr(data-label);grid-area:1/1;",
+        ".strat-table .strat-fig .badge{grid-area:1/2;margin:0}",
+        ".strat-table .strat-fig>span:first-child{grid-area:1/3;text-align:right}",
+    ):
+        assert rule in phone and rule not in printed, rule
+    # Spread across the row, a third child left the value floating in the middle.
+    figure = phone[phone.index(".strat-table .strat-fig{") :]
+    assert "space-between" not in figure[: figure.index("}")]

@@ -210,7 +210,7 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
     ),
     (
         "Frequency needs a positive number with MEASURED evidence.",
-        "La frecuencia necesita un número positivo con evidencia MEASURED.",
+        "La frecuencia necesita un número positivo con evidencia medida.",
     ),
     (
         "The frequency value is not a positive, finite number.",
@@ -240,7 +240,7 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
     ),
     (
         "The figure needs MEASURED evidence in both reports.",
-        "La cifra necesita evidencia MEASURED en ambos informes.",
+        "La cifra necesita evidencia medida en ambos informes.",
     ),
     (
         "The figure does not contain a valid, finite numeric value.",

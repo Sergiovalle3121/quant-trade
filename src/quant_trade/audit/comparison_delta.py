@@ -102,7 +102,7 @@ REASONS = {
         "dates_different": (
             "Las fechas y horas de inicio o fin de los dos historiales no coinciden."
         ),
-        "frequency_missing": "La frecuencia necesita un número positivo con evidencia MEASURED.",
+        "frequency_missing": "La frecuencia necesita un número positivo con evidencia medida.",
         "frequency_invalid": "El valor de la frecuencia no es un número positivo y finito.",
         "frequency_different": "Las frecuencias medidas de los dos historiales no coinciden.",
         "label_missing": "Falta una etiqueta de frecuencia válida para el historial.",
@@ -114,7 +114,7 @@ REASONS = {
             "Un historial usa equity y el otro, balance de operaciones cerradas. "
             "El balance cerrado no muestra las posiciones abiertas."
         ),
-        "metric_unmeasured": "La cifra necesita evidencia MEASURED en ambos informes.",
+        "metric_unmeasured": "La cifra necesita evidencia medida en ambos informes.",
         "metric_invalid": "La cifra no contiene un valor numérico finito válido.",
         "difference_invalid": "La diferencia excede el rango numérico que se puede representar.",
     },
@@ -146,7 +146,7 @@ REASONS = {
         "dates_timezone": "As datas do histórico não incluem fuso horário.",
         "dates_order": "A data final deve ser posterior à inicial.",
         "dates_different": "As datas e horas de início ou fim dos dois históricos não coincidem.",
-        "frequency_missing": "A frequência exige um número positivo com evidência MEASURED.",
+        "frequency_missing": "A frequência exige um número positivo com evidência medida.",
         "frequency_invalid": "O valor da frequência não é um número positivo e finito.",
         "frequency_different": "As frequências medidas dos dois históricos não coincidem.",
         "label_missing": "Falta uma etiqueta de frequência válida para o histórico.",
@@ -158,7 +158,7 @@ REASONS = {
             "Um histórico usa equity e o outro, saldo de operações fechadas. "
             "O saldo fechado não mostra as posições abertas."
         ),
-        "metric_unmeasured": "O número exige evidência MEASURED nos dois relatórios.",
+        "metric_unmeasured": "O número exige evidência medida nos dois relatórios.",
         "metric_invalid": "O número não contém um valor numérico finito válido.",
         "difference_invalid": "A diferença excede o intervalo numérico que pode ser representado.",
     },

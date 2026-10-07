@@ -1793,7 +1793,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             signed_in=_session(request) is not None,
             operator=(cfg.operator_name, cfg.operator_address_for(locale)),
             card_markets=tuple(cfg.approved_markets),
-            email_confirmation=cfg.email_verification_required,
+            # The note promises the free first report after confirming the address.
+            email_confirmation=cfg.email_verification_required and acct.WELCOME_FULL_REPORT,
             completed_audits=completed_counter.get(),
         )
         return HTMLResponse(page)
@@ -4182,6 +4183,21 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         if reference and reference.startswith(CODE_REFERENCE_PREFIX):
             db.link_code(session[0].id, reference[len(CODE_REFERENCE_PREFIX) :], at=now)
 
+    def _link_delivered(request: Request, audit_id: str, *, via: str) -> None:
+        """:func:`_link_to_session` for a report that is already stored or paid.
+
+        A code or credit may already be spent, so a failure here must not turn
+        the answer into a 500 that hides the report's id and token; the account
+        list is the part that can lag. The log line carries no request data.
+        """
+        try:
+            record = db.get_audit(audit_id)
+            _link_to_session(
+                request, audit_id, record.stripe_session_id if record else None, via=via
+            )
+        except Exception:  # the delivered report matters more than the account list
+            logger.warning("could not link a delivered report to the account")
+
     def _run_and_store(
         inputs: Any,
         ip: str,
@@ -4786,10 +4802,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             if free_preview:
                 db.record_free_preview(audit_id, gate_account.id, client_ip=net, at=now)
         if paid or _session(request) is not None:
-            linked = db.get_audit(audit_id)
-            _link_to_session(
-                request, audit_id, linked.stripe_session_id if linked else None, via=VIA_UPLOAD
-            )
+            _link_delivered(request, audit_id, via=VIA_UPLOAD)
         location = f"/audits/{audit_id}?token={token}"
         if welcomed:
             location += "&acct=welcome"
@@ -5212,7 +5225,10 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             return RedirectResponse(f"{back}&lang={locale}", status_code=303)
         applied = db.redeem_with_account(record.id, account_id, at=now)
         if applied:
-            db.link_audit(account_id, record.id, at=now, via=VIA_PAID)
+            try:
+                db.link_audit(account_id, record.id, at=now, via=VIA_PAID)
+            except Exception:  # the credit is spent and the report already on the list
+                logger.warning("could not link a delivered report to the account")
         done = "credit" if applied else "nocredit"
         return RedirectResponse(f"{back}&lang={locale}&acct={done}", status_code=303)
 
@@ -5382,13 +5398,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             return _html_error(request, 429, message("rate_limited", locale), locale)
         applied = db.redeem_for_audit(audit_id, code.strip()[:_CODE_MAX], at=now)
         if applied:
-            paid_record = db.get_audit(audit_id)
-            _link_to_session(
-                request,
-                audit_id,
-                paid_record.stripe_session_id if paid_record else None,
-                via=VIA_PAID,
-            )
+            _link_delivered(request, audit_id, via=VIA_PAID)
         outcome = "applied" if applied else "rejected"
         if _wants_json(request):
             return JSONResponse({"access_code": outcome})

@@ -2571,7 +2571,9 @@ def landing(
     """The public landing; the upload form lives on its own page (``upload_page``).
 
     ``extras_open`` and ``signed_in`` are accepted for old callers and not used here.
-    ``operator`` (name, address) is shown under "who is behind it" when both are set."""
+    ``operator`` (name, address) is shown under "who is behind it" when both are set.
+    ``email_confirmation`` notes that the free first report waits for a confirmed
+    address; free mode has no such report, so the note is never shown there."""
     locale = _locale(locale)
     copy = _COPY[locale]
     meta = _public_meta(copy["title"], copy["meta_description"], locale, _home(locale), base_url)
@@ -2579,7 +2581,7 @@ def landing(
     err = f"<div class='error' role='alert'>{_e(error)}</div>" if error else ""
     count_html = completed_count_html(completed_audits, locale)
     body = (
-        _hero(locale, sample, email_confirmation=email_confirmation)
+        _hero(locale, sample, email_confirmation=email_confirmation and not free_mode)
         + ("<div class='wrap'>" + count_html + "</div>" if count_html else "")
         + _specs(locale)
         + _audiences(locale)
