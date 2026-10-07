@@ -989,7 +989,7 @@ def status(database: Path, *, now_utc: str | None = None) -> dict[str, Any]:
 def pause(database: Path, reason: str, *, now_utc: str | None = None) -> None:
     if not reason.strip() or not database.exists():
         raise PersonalPaperError("pause requires an existing database and reason")
-    store = PaperStore(database)
+    store = PaperStore(database, require_registration=True)
     try:
         with store.writing():
             store.verify()
@@ -1020,7 +1020,7 @@ def pause(database: Path, reason: str, *, now_utc: str | None = None) -> None:
 def resume(database: Path, review: str, *, now_utc: str | None = None) -> None:
     if len(review.strip()) < 20 or not database.exists():
         raise PersonalPaperError("resume requires a written review of at least 20 characters")
-    store = PaperStore(database)
+    store = PaperStore(database, require_registration=True)
     try:
         with store.writing():
             store.verify()

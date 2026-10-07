@@ -4,12 +4,13 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Any
 
 import typer
 import yaml
 from rich.console import Console
 from rich.table import Table
+from typer.core import TyperGroup
 
 from quant_trade.audit.cli import audit_app
 from quant_trade.backtest.engine import BacktestEngine
@@ -26,7 +27,6 @@ from quant_trade.datalake.cli import app as datalake_app
 from quant_trade.logging_config import configure_logging
 from quant_trade.opportunities.cli import opportunities_app
 from quant_trade.ops.cli import ops_app
-from quant_trade.personal_paper.cli import app as personal_paper_app
 from quant_trade.research.crypto_lowcap.cli import crypto_lowcap_app
 from quant_trade.research.experiment_config import load_experiment_config
 from quant_trade.research.grid_search import run_grid_search
@@ -36,7 +36,34 @@ from quant_trade.strategies import STRATEGY_REGISTRY, get_strategy
 from quant_trade.v8.cli import v8_app
 from quant_trade.v9.cli import v9_app
 
-app = typer.Typer(help="Research-only quantitative trading tooling.")
+PERSONAL_PAPER_COMMAND = "personal-paper"
+
+
+class _LazyPersonalPaperGroup(TyperGroup):
+    """Import the private paper simulator only when ``personal-paper`` is used.
+
+    ``quant-trade audit serve`` starts the public web service through this CLI;
+    resolving ``audit`` must not import ``quant_trade.personal_paper``.
+    """
+
+    def list_commands(self, ctx: typer.Context) -> list[str]:
+        names = [name for name in super().list_commands(ctx) if name != PERSONAL_PAPER_COMMAND]
+        # Same help position as the former eager registration, right after audit.
+        position = names.index("audit") + 1 if "audit" in names else len(names)
+        names.insert(position, PERSONAL_PAPER_COMMAND)
+        return names
+
+    def get_command(self, ctx: typer.Context, cmd_name: str) -> Any:
+        if cmd_name == PERSONAL_PAPER_COMMAND and cmd_name not in self.commands:
+            from quant_trade.personal_paper.cli import app as personal_paper_app
+
+            command = typer.main.get_group(personal_paper_app)
+            command.name = cmd_name
+            self.add_command(command, cmd_name)
+        return super().get_command(ctx, cmd_name)
+
+
+app = typer.Typer(help="Research-only quantitative trading tooling.", cls=_LazyPersonalPaperGroup)
 data_app = typer.Typer(help="Historical data ingestion and validation.")
 research_app = typer.Typer(help="Multi-asset research lab commands.")
 selection_app = typer.Typer(help="Strategy candidate selection commands.")
@@ -59,7 +86,7 @@ app.add_typer(v8_app, name="v8")
 app.add_typer(v9_app, name="v9")
 app.add_typer(crypto_lowcap_app, name="crypto-lowcap")
 app.add_typer(audit_app, name="audit")
-app.add_typer(personal_paper_app, name="personal-paper")
+# personal-paper is registered lazily by _LazyPersonalPaperGroup.
 console = Console()
 
 

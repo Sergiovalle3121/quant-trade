@@ -19,5 +19,12 @@ if ($ExpensesPath) {
     $taskArguments += @("--expenses", (Resolve-Path -LiteralPath $ExpensesPath).Path)
 }
 $taskLog = Join-Path $taskState ("worker-" + (Get-Date -Format "yyyyMMdd") + ".log")
-& $taskPython @taskArguments 2>&1 | Out-File -FilePath $taskLog -Append -Encoding utf8
-exit $LASTEXITCODE
+# Windows PowerShell 5.1 turns each redirected stderr line of a native command
+# into an error record; under "Stop" the first warning would abort the wrapper,
+# truncate the log and hide the worker's exit code. Only this call continues.
+$ErrorActionPreference = "Continue"
+& $taskPython @taskArguments 2>&1 | ForEach-Object { "$_" } |
+    Out-File -FilePath $taskLog -Append -Encoding utf8
+$taskExitCode = $LASTEXITCODE
+$ErrorActionPreference = "Stop"
+exit $taskExitCode
