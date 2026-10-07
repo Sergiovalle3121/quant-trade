@@ -3801,10 +3801,12 @@ align-items:center;padding:14px 16px;margin-bottom:10px;border:1px solid var(--b
 border-radius:16px;background:var(--surface)}
 .strat-table td{padding:0;border:0}
 .strat-table .strat-fig,.strat-table .strat-locked,.strat-table .strat-rm{grid-column:1/-1}
-.strat-table .strat-fig{display:flex;justify-content:space-between;gap:12px;
-padding-top:8px;border-top:1px solid var(--border)}
-.strat-table .strat-fig::before{content:attr(data-label);font-family:var(--sans);
+.strat-table .strat-fig{display:grid;grid-template-columns:minmax(0,1fr) auto auto;
+gap:4px 10px;align-items:center;padding-top:8px;border-top:1px solid var(--border)}
+.strat-table .strat-fig::before{content:attr(data-label);grid-area:1/1;font-family:var(--sans);
 color:var(--text-2);font-size:.85rem}
+.strat-table .strat-fig .badge{grid-area:1/2;margin:0}
+.strat-table .strat-fig>span:first-child{grid-area:1/3;text-align:right}
 .strat-table .strat-rm{text-align:left}
 .strat-table .strat-rm .btn{width:100%;justify-content:center}
 .strat-change li{flex-direction:column;align-items:flex-start;gap:6px}}
