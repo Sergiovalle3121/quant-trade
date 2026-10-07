@@ -129,23 +129,129 @@ def test_month_without_declared_expenses_is_unobserved(tmp_path, coverage: str):
     assert "observed_mxn" not in result
 
 
-def test_explicit_zero_for_current_month_is_observed(tmp_path):
-    path = tmp_path / "expenses.csv"
+def _expenses(path, rows) -> None:
     pd.DataFrame(
         [
-            {
-                "start": "2026-10-01T00:00:00Z",
-                "end": "2026-11-01T00:00:00Z",
-                "category": "infrastructure",
-                "amount_mxn": 0,
-            }
-        ]
+            {"start": start, "end": end, "category": category, "amount_mxn": amount}
+            for start, end, category, amount in rows
+        ],
+        columns=["start", "end", "category", "amount_mxn"],
     ).to_csv(path, index=False)
+
+
+def _covered_month(amount: float = 0) -> list[tuple[str, str, str, float]]:
+    return [
+        ("2026-10-01T00:00:00Z", "2026-11-01T00:00:00Z", category, amount)
+        for category in ("infrastructure", "data", "fx_transfer")
+    ]
+
+
+def test_explicit_zero_for_current_month_is_observed(tmp_path):
+    path = tmp_path / "expenses.csv"
+    _expenses(path, _covered_month())
     assert budget_review(path, pd.Timestamp("2026-10-05T00:00:00Z"), 500) == {
         "status": "WITHIN_DECLARED_BUDGET",
         "observed_mxn": 0.0,
         "ceiling_mxn": 500,
     }
+
+
+def test_contiguous_daily_rows_through_now_are_complete(tmp_path):
+    path = tmp_path / "expenses.csv"
+    days = pd.date_range("2026-10-01", "2026-10-06", freq="D", tz="UTC")
+    _expenses(
+        path,
+        [
+            (start.isoformat(), end.isoformat(), category, 1)
+            for category in ("infrastructure", "data", "fx_transfer")
+            for start, end in zip(days[:-1], days[1:], strict=True)
+        ],
+    )
+    result = budget_review(path, pd.Timestamp("2026-10-05T12:00:00Z"), 500)
+    assert result == {"status": "WITHIN_DECLARED_BUDGET", "observed_mxn": 15.0, "ceiling_mxn": 500}
+
+
+@pytest.mark.parametrize(
+    ("rows", "uncovered"),
+    [
+        # Only one declared category: the others are unobserved, not zero.
+        (
+            [("2026-10-01T00:00:00Z", "2026-11-01T00:00:00Z", "infrastructure", 0)],
+            ["data", "fx_transfer"],
+        ),
+        # A missing day inside the month to date.
+        (
+            [
+                *_covered_month()[1:],
+                ("2026-10-01T00:00:00Z", "2026-10-02T00:00:00Z", "infrastructure", 10),
+                ("2026-10-03T00:00:00Z", "2026-11-01T00:00:00Z", "infrastructure", 10),
+            ],
+            ["infrastructure"],
+        ),
+        # Coverage that stops before the current UTC time.
+        (
+            [
+                *_covered_month()[:2],
+                ("2026-10-01T00:00:00Z", "2026-10-05T00:00:00Z", "fx_transfer", 3),
+            ],
+            ["fx_transfer"],
+        ),
+        # Coverage that starts after the month begins.
+        (
+            [
+                *_covered_month()[:2],
+                ("2026-10-02T00:00:00Z", "2026-11-01T00:00:00Z", "fx_transfer", 3),
+            ],
+            ["fx_transfer"],
+        ),
+        # A category label outside the frozen set does not cover a frozen one.
+        (
+            [*_covered_month()[:2], ("2026-10-01T00:00:00Z", "2026-11-01T00:00:00Z", "fx", 0)],
+            ["fx_transfer"],
+        ),
+    ],
+    ids=["one-category", "gap-day", "ends-early", "starts-late", "unknown-label"],
+)
+def test_partial_coverage_is_never_within_declared_budget(tmp_path, rows, uncovered):
+    path = tmp_path / "expenses.csv"
+    _expenses(path, rows)
+    result = budget_review(path, pd.Timestamp("2026-10-05T12:00:00Z"), 500)
+    assert result["status"] == "PARTIALLY_OBSERVED"
+    assert result["uncovered_categories"] == uncovered
+    assert result["observed_mxn"] == pytest.approx(sum(row[3] for row in rows))
+    assert result["ceiling_mxn"] == 500 and "note" in result
+
+
+def test_partial_coverage_already_over_the_ceiling_still_pauses(tmp_path):
+    path = tmp_path / "expenses.csv"
+    _expenses(path, [("2026-10-01T00:00:00Z", "2026-10-02T00:00:00Z", "data", 501)])
+    assert budget_review(path, pd.Timestamp("2026-10-05T12:00:00Z"), 500) == {
+        "status": "OVER_BUDGET",
+        "observed_mxn": 501.0,
+        "ceiling_mxn": 500,
+    }
+
+
+def test_partially_observed_budget_does_not_block_collection(tmp_path, monkeypatch):
+    path = tmp_path / "expenses.csv"
+    now = pd.Timestamp(datetime.now(UTC))
+    start, end = now.normalize().replace(day=1), now + pd.Timedelta(hours=1)
+    _expenses(path, [(start.isoformat(), end.isoformat(), "infrastructure", 1)])
+    calls = []
+
+    def stop(*args, **kwargs):
+        calls.append(args)
+        raise PersonalPaperError("synthetic provider stop")
+
+    monkeypatch.setattr(worker.fetch, "fetch_snapshot", stop)
+    with pytest.raises(PersonalPaperError, match="synthetic provider stop"):
+        run_once(
+            Path("configs/personal/etf_private_v1.yaml"),
+            tmp_path / "paper.sqlite",
+            tmp_path / "cache",
+            expenses=path,
+        )
+    assert len(calls) == 1  # partial coverage is reported, not converted into a pause
 
 
 def test_over_budget_pauses_existing_database_before_publishing(tmp_path, monkeypatch):

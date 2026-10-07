@@ -5,7 +5,7 @@ from __future__ import annotations
 import importlib
 import json
 import os
-from contextlib import contextmanager
+from contextlib import contextmanager, suppress
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -16,10 +16,12 @@ import pandas as pd
 from quant_trade.personal_paper import engine, fetch
 from quant_trade.personal_paper.config import (
     PersonalPaperError,
+    UnregisteredPaperDatabase,
     file_hash,
     load_config,
     validate_runtime,
 )
+from quant_trade.personal_paper.economic import COST_CATEGORIES
 
 
 @contextmanager
@@ -89,11 +91,34 @@ def budget_review(path: Path | None, now: pd.Timestamp, ceiling: float) -> dict[
             "note": "No declared expenses overlap the current UTC month; coverage is unobserved.",
         }
     total = float(monthly.amount_mxn.sum())
-    return {
-        "status": "OVER_BUDGET" if total > ceiling else "WITHIN_DECLARED_BUDGET",
-        "observed_mxn": total,
-        "ceiling_mxn": ceiling,
-    }
+    if total > ceiling:
+        return {"status": "OVER_BUDGET", "observed_mxn": total, "ceiling_mxn": ceiling}
+    uncovered = _uncovered_categories(monthly, month, min(now, following))
+    if uncovered:
+        # A partial record is a lower bound, never evidence of staying within budget.
+        return {
+            "status": "PARTIALLY_OBSERVED",
+            "observed_mxn": total,
+            "ceiling_mxn": ceiling,
+            "uncovered_categories": uncovered,
+            "note": "Declared expenses miss a category or day of the current UTC month to date.",
+        }
+    return {"status": "WITHIN_DECLARED_BUDGET", "observed_mxn": total, "ceiling_mxn": ceiling}
+
+
+def _uncovered_categories(rows: pd.DataFrame, start: pd.Timestamp, end: pd.Timestamp) -> list[str]:
+    """Categories whose half-open intervals leave any part of [start, end) undeclared."""
+    uncovered = []
+    for category in COST_CATEGORIES:
+        selected = rows.loc[rows.category == category].sort_values("start")
+        cursor = start
+        for row in selected.itertuples(index=False):
+            if row.start > cursor:
+                break
+            cursor = max(cursor, row.end)
+        if selected.empty or cursor < end:
+            uncovered.append(category)
+    return uncovered
 
 
 def _cached_snapshot(cache: Path, now: pd.Timestamp) -> Path | None:
@@ -149,7 +174,9 @@ def run_once(
         budget = budget_review(expenses, now, frozen["monthly_host_budget_mxn"])
         if budget["status"] == "OVER_BUDGET":
             if database.exists():
-                engine.pause(database, "observed monthly budget exceeded")
+                # An unregistered file has no sealed books; this gate still blocks collection.
+                with suppress(UnregisteredPaperDatabase):
+                    engine.pause(database, "observed monthly budget exceeded")
             result = {"status": "BUDGET_PAUSED", "budget": budget, "real_money_approved": False}
             _publish_status(cache, result, now)
             return result

@@ -108,7 +108,11 @@ def status_command(database: Annotated[Path, typer.Option()]) -> None:
 def pause_command(
     database: Annotated[Path, typer.Option()], reason: Annotated[str, typer.Option()]
 ) -> None:
-    engine.pause(database, reason)
+    try:
+        engine.pause(database, reason)
+    except PersonalPaperError as exc:
+        typer.echo(f"Paper pause refused: {exc}", err=True)
+        raise typer.Exit(2) from exc
     _print(engine.status(database))
 
 
@@ -117,7 +121,11 @@ def resume_command(
     database: Annotated[Path, typer.Option()],
     review: Annotated[str, typer.Option(help="Written human review, at least 20 characters")],
 ) -> None:
-    engine.resume(database, review)
+    try:
+        engine.resume(database, review)
+    except PersonalPaperError as exc:
+        typer.echo(f"Paper resume refused: {exc}", err=True)
+        raise typer.Exit(2) from exc
     _print(engine.status(database))
 
 
