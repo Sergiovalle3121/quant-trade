@@ -6,7 +6,12 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
-from quant_trade.personal_paper.config import PersonalPaperError, canonical, digest
+from quant_trade.personal_paper.config import (
+    PersonalPaperError,
+    UnregisteredPaperDatabase,
+    canonical,
+    digest,
+)
 
 _READ_SCHEMA = {
     "meta": {"key", "value"},
@@ -46,7 +51,9 @@ _CREATE_SCHEMA = (
 class PaperStore:
     """SQLite WAL + FULL fsync; the write transaction is the single-writer lease."""
 
-    def __init__(self, path: Path, *, read_only: bool = False) -> None:
+    def __init__(
+        self, path: Path, *, read_only: bool = False, require_registration: bool = False
+    ) -> None:
         self.read_only = read_only
         if read_only:
             connection = None
@@ -74,12 +81,16 @@ class PaperStore:
         connection = None
         try:
             existed = path.exists()
+            if require_registration and not existed:
+                raise UnregisteredPaperDatabase("paper database does not exist; run initializes it")
             if existed:
                 preflight = sqlite3.connect(
                     path.resolve().as_uri() + "?mode=ro", uri=True, timeout=0, isolation_level=None
                 )
                 try:
-                    self._validate_write_schema(preflight)
+                    initialized = self._validate_write_schema(preflight)
+                    if require_registration:
+                        self._require_registration(preflight, initialized)
                 finally:
                     preflight.close()
             path.parent.mkdir(parents=True, exist_ok=True)
@@ -95,7 +106,12 @@ class PaperStore:
             try:
                 # Revalidate under SQLite's writer lease: a preflight alone
                 # cannot protect a database changed before the writer opens.
-                if not self._validate_write_schema(self.db):
+                initialized = self._validate_write_schema(self.db)
+                if require_registration:
+                    # Control commands never create tables or switch the journal
+                    # of a file that ``run`` has not sealed.
+                    self._require_registration(self.db, initialized)
+                if not initialized:
                     for statement in _CREATE_SCHEMA:
                         self.db.execute(statement)
                 self.db.execute("COMMIT")
@@ -151,6 +167,15 @@ class PaperStore:
         if not unique_hash:
             raise PersonalPaperError("paper writer refuses an unrelated or incompatible schema")
         return True
+
+    @staticmethod
+    def _require_registration(connection: sqlite3.Connection, initialized: bool) -> None:
+        if not initialized or (
+            connection.execute("SELECT 1 FROM meta WHERE key='manifest'").fetchone() is None
+        ):
+            raise UnregisteredPaperDatabase(
+                "paper database is empty or unregistered; run initializes it"
+            )
 
     def _validate_read_schema(self) -> None:
         tables = {

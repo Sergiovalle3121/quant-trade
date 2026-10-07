@@ -43,6 +43,10 @@ class PersonalPaperError(RuntimeError):
     """A paper input or persisted record failed a conservative check."""
 
 
+class UnregisteredPaperDatabase(PersonalPaperError):
+    """A control command found no sealed registration; only ``run`` initializes one."""
+
+
 def canonical(value: Any) -> str:
     return json.dumps(value, sort_keys=True, separators=(",", ":"), allow_nan=False)
 

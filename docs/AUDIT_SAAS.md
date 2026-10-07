@@ -4337,6 +4337,18 @@ can still name the columns in HTML or JSON, in ES/EN/PT, without spending a
 credit or a free preview. An explicit selection then follows the existing audit
 and payment path. The lookup warning also excludes exception text and SQL data.
 
+### Owner panel and startup hardening (2026-10-07)
+
+Private-panel and startup fixes only; no customer page, price, right, audit
+dimension, red flag or verdict changes. The panel reads operations/retention
+and costs as two independent blocks, so a failed cost query no longer hides the
+36-hour retention warning. Retention with no success ever is overdue after the
+process has run 36 hours; naive stored times read as UTC and unreadable ones as
+no success. PostgreSQL startup creates tables under an advisory lock, and the
+telemetry engine sets its timeouts per transaction instead of overriding the
+URL's `options`. See
+[RIGOR_COMMERCIAL_OBSERVABILITY.md](RIGOR_COMMERCIAL_OBSERVABILITY.md).
+
 ### Sharing, public examples and the completed-audit count (2026-10-07)
 
 - **Active publications.** The public verification and its owner's published

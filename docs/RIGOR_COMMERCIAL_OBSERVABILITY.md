@@ -13,7 +13,10 @@ email/card-verification gates are unchanged.
 ## Additive schema and privacy
 
 `Store.metadata.create_all()` creates three tables using the existing startup
-pattern. No existing table, column, ledger or customer blob is rewritten.
+pattern. No existing table, column, ledger or customer blob is rewritten. On
+PostgreSQL, startup table creation runs in one transaction holding a fixed
+advisory lock, so replicas starting together take turns instead of failing on
+a duplicate type; the second sees the committed tables and creates nothing.
 
 | Table | Persistent values | Purpose |
 | --- | --- | --- |
@@ -56,8 +59,13 @@ On PostgreSQL, operations and cost writes/reads use their own one-connection
 pool (no overflow), with a one-second pool wait, two-second connection and SQL
 statement timeouts, and a 500 ms lock wait. This adds at most one database
 connection per application process; customer transactions keep their existing
-pool and timeout settings. The panel skips its counter flush when another flush
-is already running. SQLite retains the existing engine.
+pool and timeout settings. The statement and lock limits are set at the start
+of each telemetry transaction (`SET LOCAL` through `set_config`), not as a
+connection `options` parameter: an `options` value in `DATABASE_URL` (such as
+`search_path`) is kept, PgBouncer accepts the connection, and the limits end
+with the transaction. The pool tests a connection before use, so a connection
+left over from a PostgreSQL restart is replaced. The panel skips its counter
+flush when another flush is already running. SQLite retains the existing engine.
 
 Shutdown gives the daemon at most five seconds to persist its final buffer; it
 never performs synchronous telemetry SQL on the lifespan caller. A stalled flush
@@ -67,8 +75,12 @@ reports. Counter totals remain best effort and never substitute for the ledger.
 The service's existing `AUDIT_AUTO_PURGE=true` worker records health after each
 run, including the initial run. The private panel distinguishes disabled,
 unmeasured, first/latest attempt failed, recent success and success overdue by
-**more than 36 hours**. A late replica cannot regress the latest attempt or
-success timestamp. Failed monitoring writes never roll back a completed purge.
+**more than 36 hours**. With no recorded success at all, the status is overdue
+once the serving process has run for more than 36 hours (for example, when the
+health write itself always fails); before that it stays unmeasured or failed.
+A stored time without an offset is read as UTC, the format the service writes;
+an unreadable stored time counts as no success. A late replica cannot regress
+the latest attempt or success timestamp. Failed monitoring writes never roll back a completed purge.
 This status observes service-worker runs; it does not confirm a separate CLI
 purge. Existing retention-delete authorization remains unchanged.
 
@@ -82,6 +94,9 @@ required for the *same exact dates and scope*:
 Invalid form values and database persistence failures produce distinct private
 messages. A database failure never claims the cost was saved or exposes its
 exception details. The save result remains visible if the metric read also fails.
+The operations/retention block and the cost/contribution block are read
+separately: a failed or slow cost query shows `NOT_MEASURED` for costs only and
+never hides the retention warning, and the reverse.
 
 - `infrastructure`: observed infrastructure and variable usage, including free
   and paid report usage; retain the actual invoice/allocation separately.

@@ -82,7 +82,10 @@ python -m quant_trade.personal_paper run --config configs/personal/synthetic_dem
 python -m quant_trade.personal_paper status --database state/demo.sqlite
 ```
 
-El grupo equivalente `quant-trade personal-paper` contiene los mismos comandos. Para recoger un
+El grupo equivalente `quant-trade personal-paper` contiene los mismos comandos. La CLI principal
+lo registra de forma diferida: sólo importa este módulo al invocar, listar o completar ese grupo.
+`quant-trade audit serve`, que arranca el servicio web público, no carga el simulador; la prueba
+`test_personal_paper_isolation.py` lo verifica. Para recoger un
 snapshot privado de desarrollo y estudiar datos conocidos:
 
 ```powershell
@@ -109,7 +112,9 @@ los logs y el código de salida: el archivo puede conservar el estado anterior. 
 conserva el aviso de simulación y las causas de pausa de cada cartera.
 Repetirlo mediante un programador local cada minuto permite observar
 la apertura; el equipo debe estar encendido y conectado. El wrapper PowerShell incluido ejecuta
-una iteración, conserva logs y devuelve un código de error. No registra por sí mismo una tarea ni
+una iteración, conserva logs y devuelve el código de salida del worker. Funciona con Windows
+PowerShell 5.1 y PowerShell 7: un aviso en stderr se registra en el log sin abortar el wrapper ni
+ocultar ese código. No registra por sí mismo una tarea ni
 contrata infraestructura. Las zonas horarias y días festivos los determina el calendario, no una
 hora mexicana fija. Tampoco configurar una tarea de Railway que modifique el servicio público.
 
@@ -118,8 +123,12 @@ admite `start,end,category,amount_mxn` con horas UTC. Suma conservadoramente tod
 que tocan el mes; por encima del límite pausa compras y bloquea la siguiente recolección. Sin ese
 registro el estado es `UNOBSERVED`, no gasto cero. Un CSV vacío o sin gastos que intersecten el
 mes vigente también es `UNOBSERVED`; un cero explícito del mes sí se conserva como cero declarado.
-`WITHIN_DECLARED_BUDGET` sólo describe las filas vigentes recibidas, no acredita que el registro
-esté completo. Mantener costos externos reales por separado.
+`WITHIN_DECLARED_BUDGET` exige que las tres categorías `infrastructure`, `data` y `fx_transfer`
+cubran sin huecos desde el inicio del mes UTC hasta la hora de la comprobación, con ceros
+explícitos cuando no hubo gasto. Si falta una categoría, un día o el tramo más reciente, el estado
+es `PARTIALLY_OBSERVED`: lista `uncovered_categories` y su suma es sólo una cota inferior. Una suma
+parcial que ya supera el límite sigue siendo `OVER_BUDGET` y pausa. Esto describe las filas
+recibidas, no acredita que el registro sea veraz. Mantener costos externos reales por separado.
 
 ## Estado, recuperación y evaluación
 
@@ -211,12 +220,32 @@ incluso después de reiniciar o valorar nuevamente. Una reanudación revisada
 permite registrar una pausa posterior por la misma razón. La transacción hace
 rollback completo si se interrumpe antes de terminar.
 
+`pause` y `resume` sólo actúan sobre una base ya sellada por `run`. Un archivo de
+cero bytes, una SQLite vacía o el esquema del bot sin manifest se rechazan con
+`UnregisteredPaperDatabase` antes de cualquier escritura: no crean tablas, no
+cambian el modo de diario ni registran solicitudes. El rechazo comprueba la base
+en modo `mode=ro` y de nuevo bajo el lease del escritor. La CLI informa
+`Paper pause refused`/`Paper resume refused` con código 2, y `run` puede inicializar
+después el mismo archivo vacío. Si el presupuesto se excede y la ruta del worker
+contiene un archivo así, no hay carteras que pausar: el worker publica igualmente
+`BUDGET_PAUSED` y no recolecta. Una base ajena sigue deteniendo el worker.
+
+Estos rechazos y el estado `PARTIALLY_OBSERVED` cambian archivos incluidos en el
+hash sellado (`config.py`, `store.py`, `engine.py` y `worker.py`); `cli.py` no
+forma parte de ese hash. Una base sellada con código anterior conserva `status`,
+`export`, `pause` y `resume`, pero `run` y `worker` la rechazan por cambio de
+código: la siguiente observación se registra en una base nueva, sin reescribir
+la anterior ni el replay conservado de `4c39e97`.
+
 El presupuesto sigue publicando `BUDGET_PAUSED` y su hora de comprobación en cada
 iteración bloqueada, sin consultar proveedores. Esto actualiza el diagnóstico
 operativo sin inflar el diario de posiciones. Los límites, estrategias, costos y
 criterios económicos permanecen congelados; las correcciones de código exigen
 una base nueva para un experimento posterior. Pruebas offline:
-`test_personal_paper_read_only.py` y `test_personal_paper_pause_idempotency.py`.
+`test_personal_paper_read_only.py`, `test_personal_paper_pause_idempotency.py`,
+`test_personal_paper_controls.py` y `test_personal_paper_limits.py`; esta última
+fija los techos de capital, presupuesto, drawdown, pérdida diaria y costos, y el
+rechazo de cualquier fill que produzca efectivo negativo o una posición corta.
 
 ## Protección del destino de escritura
 

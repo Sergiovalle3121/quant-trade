@@ -286,6 +286,112 @@ def test_retention_health_write_failure_does_not_rollback_purge(tmp_path, monkey
     assert store.ops_job() is None
 
 
+def test_retention_without_any_success_is_overdue_36_hours_after_process_start() -> None:
+    failed = {"last_success_at": None, "error_code": "purge_failed"}
+    early, late = NOW - timedelta(hours=36), NOW - timedelta(hours=36, seconds=1)
+    assert retention_status(None, enabled=True, at=NOW) == "not_measured"
+    assert retention_status(None, enabled=True, at=NOW, since=early) == "not_measured"
+    assert retention_status(None, enabled=True, at=NOW, since=late) == "overdue"
+    assert retention_status(failed, enabled=True, at=NOW, since=early) == "failed"
+    assert retention_status(failed, enabled=True, at=NOW, since=late) == "overdue"
+    assert retention_status(None, enabled=False, at=NOW, since=late) == "disabled"
+    # A recent success is what counts, however long the process has run.
+    recent = {"last_success_at": stamp(NOW - timedelta(hours=1)), "error_code": ""}
+    assert retention_status(recent, enabled=True, at=NOW, since=late) == "ok"
+
+
+@pytest.mark.parametrize(
+    ("stored", "since", "expected"),
+    [
+        ("2026-10-05T00:00:00", None, "ok"),  # naive text is the UTC that stamp() writes
+        ("2026-10-03T23:59:59", None, "overdue"),
+        ("2026-10-05T07:00:00-05:00", None, "ok"),
+        ("not-a-time", None, "not_measured"),
+        ("not-a-time", NOW - timedelta(hours=37), "overdue"),
+    ],
+)
+def test_retention_reads_naive_stamps_as_utc_and_unreadable_ones_as_absent(
+    stored, since, expected
+) -> None:
+    row = {"last_success_at": stored, "error_code": ""}
+    assert retention_status(row, enabled=True, at=NOW, since=since) == expected
+
+
+def test_panel_shows_36_hour_warning_even_when_commercial_queries_fail(
+    tmp_path, monkeypatch
+) -> None:
+    warning = "Atención: más de 36 horas sin éxito"
+    app = _app(tmp_path, auto_purge=True)
+    store = app.state.store
+    # The worker would purge at startup and hide the old success.
+    monkeypatch.setattr(app.state.retention, "start", lambda: None)
+    store.record_ops_job(at=datetime.now(UTC) - timedelta(hours=37), success=True)
+    with TestClient(app) as client:
+        page = client.post("/panel", data={"key": KEY})
+        assert warning in page.text and "id='commercial'" in page.text
+
+        def unavailable(*a: Any, **kw: Any) -> Any:
+            raise OSError("secret connection details")
+
+        monkeypatch.setattr(store, "x_cohort_counts", unavailable)
+        page = client.post("/panel", data={"key": KEY})
+        assert page.status_code == 200
+        assert warning in page.text and "id='operations'" in page.text
+        # The panel renders NOT_MEASURED in Spanish.
+        assert "Costos: No medido; consulta comercial no disponible." in page.text
+        assert "id='commercial'" not in page.text and "secret connection" not in page.text
+
+
+def test_panel_flags_retention_that_never_succeeded_after_36_hours(tmp_path, monkeypatch) -> None:
+    app = _app(tmp_path, auto_purge=True)
+    monkeypatch.setattr(app.state.retention, "start", lambda: None)
+    with TestClient(app) as client:
+        page = client.post("/panel", data={"key": KEY})
+        assert "No medido: aún sin éxito registrado" in page.text
+        app.state.started_at = datetime.now(UTC) - timedelta(hours=37)
+        page = client.post("/panel", data={"key": KEY})
+        assert "Atención: más de 36 horas sin éxito" in page.text
+
+
+def test_telemetry_engine_keeps_url_options_and_limits_each_transaction() -> None:
+    pytest.importorskip("psycopg")
+    import sqlalchemy as sa
+
+    from quant_trade.audit.store_ops import OpsStoreMixin, bound_ops_transaction
+
+    class Offline(Exception):
+        pass
+
+    probe: Any = OpsStoreMixin()
+    probe._sa, probe.metadata = sa, sa.MetaData()
+    probe.engine = sa.create_engine(
+        "postgresql+psycopg://qa:qa@127.0.0.1:9/qa?options=-c%20search_path%3Drigor"
+    )
+    probe.define_ops_tables()
+    seen: dict[str, Any] = {}
+
+    def capture(dialect: Any, record: Any, cargs: Any, cparams: dict[str, Any]) -> None:
+        seen.update(cparams)
+        raise Offline  # nothing is contacted
+
+    sa.event.listen(probe.ops_engine, "do_connect", capture)
+    with pytest.raises(Offline):
+        probe.ops_engine.connect()
+    assert seen["options"] == "-c search_path=rigor"
+    assert seen["connect_timeout"] == 2
+    assert sa.event.contains(probe.ops_engine, "begin", bound_ops_transaction)
+    assert not sa.event.contains(probe.engine, "begin", bound_ops_transaction)
+    sql: list[str] = []
+
+    class Conn:
+        def exec_driver_sql(self, statement: str) -> None:
+            sql.append(statement)
+
+    bound_ops_transaction(Conn())
+    assert "'statement_timeout', '2000', true" in sql[0]
+    assert "'lock_timeout', '500', true" in sql[0]
+
+
 def test_operational_data_remains_private_and_does_not_change_health(tmp_path, monkeypatch) -> None:
     monkeypatch.setattr(pdf_lib, "available", lambda: True)
     app = _app(tmp_path)
@@ -341,6 +447,8 @@ def test_cost_persistence_failure_is_not_a_validation_error(tmp_path, monkeypatc
         hidden = client.post("/panel", data=data)
         assert "consulta de telemetría no disponible" in hidden.text
         assert "No se pudo guardar el costo" in hidden.text
+        # The cost block is read on its own when operations are unavailable.
+        assert "id='commercial'" in hidden.text
 
 
 def test_costs_require_exact_windows_explicit_zeros_and_authorized_operator(tmp_path) -> None:

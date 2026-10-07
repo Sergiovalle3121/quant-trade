@@ -13,6 +13,8 @@ on:
       - "requirements.lock.txt"
       - "pyproject.toml"
       - "src/quant_trade/audit/**"
+      - "src/quant_trade/cli.py"
+      - "src/quant_trade/personal_paper/**"
       - ".github/workflows/docker-build.yml"
 
 concurrency: quant-trade-docker-build
