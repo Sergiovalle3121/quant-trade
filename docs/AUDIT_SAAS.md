@@ -14,6 +14,62 @@ title and badge. A new name must pass the
 guard in both languages and must not suggest verification, certification,
 approval, earnings or passing a challenge (`tests/test_audit_brand.py`).
 
+## Public figures card (`audit/public_card.py`)
+
+`quant-trade audit public-card --json claim.json --out card.svg [--png]`
+creates an accessible SVG for a public post in Spanish (default), English
+or Portuguese. It does not fetch the source, inspect a backtest file, assign
+an audit class, endorse the post or predict future results. All supplied
+figures are `DECLARED`; calculations remain `DECLARED` and explicitly say
+they are computed from declarations. Missing inputs and unsupported
+approximations appear as `NOT_MEASURED` with a reason. Costs, out-of-sample
+evidence and data quality remain unmeasured.
+
+The JSON fields are `source_handle`, `source_url`, `trades`, `win_rate`,
+`profit_factor`, `sharpe` (annualised), `years`, `trials`, `target_r`,
+`stop_r` and `locale` (`es`, `en`, `pt`). All numbers are optional; use a
+proportion for `win_rate`, for example `0.71`, not `71`. Example:
+
+```json
+{"source_handle":"@example","source_url":"https://example.org/post","trades":45,"win_rate":0.71,"profit_factor":3.24,"sharpe":1.9,"years":3,"trials":100,"target_r":2,"stop_r":1,"locale":"es"}
+```
+
+Wilson uses the declared proportion directly, without inventing an integer
+win count from a rounded post. Its interval assumes independent trades.
+The coin comparison uses the same expected maximum of normals as `luck.py`,
+for independent fair coins and assumed searches of 20 and 100; it requires
+at least 20 trades (ten expected successes and failures). It is an
+approximation, not an exact binomial maximum. Sharpe luck imports the
+calculator's daily/normal assumptions and the existing sampling-variance
+and expected-maximum functions: 252 observations/year, independent trials,
+at least 0.1 years. It uses the declared Sharpe's dispersion when available;
+otherwise it explicitly uses the zero-Sharpe null model's dispersion.
+Break-even assumes each trade ends at the stated target or stop, before
+costs. The 45-trade/0.71 example yields about 56.5–82.2% Wilson and 68.9%
+best-of-100 coins; 100 trials over three years yields about 1.47 at declared
+Sharpe 1.9, or 1.46 with null dispersion.
+
+Inputs must be finite; counts are positive integers up to 10,000,000,
+other magnitudes are bounded at 1,000,000, and years/target/stop must be
+positive. Unknown or duplicate JSON fields and unsupported claim wording
+in attribution are refused. Source text is escaped and never executed.
+`--png` also writes a sibling PNG if CairoSVG and its native libraries are
+available. Otherwise the SVG is kept and the command explains conversion
+with Inkscape; no rasterizer is installed or started by the command.
+
+Published verifications also expose `/v/{public_id}/card.svg`, using only
+class, audit date, public ID and fixed copy from the verification allow-list.
+Their per-publication Open Graph/Twitter image URL is
+`/v/{public_id}/card.png`; it serves the existing class PNG for compatibility
+with image consumers, without a runtime rasterizer. It contains the class
+and fixed notice; the SVG additionally shows date and ID. The Portuguese
+PNG retains the existing English class-asset fallback; the SVG is Portuguese.
+Both image routes
+use the page's publication gate. As required by `AGENTS.md`, a published
+verification survives retention purge; a missing retained view returns 410,
+and a withdrawn publication returns 404. This deliberately follows the
+repository lifecycle rather than making every purged publication return 410.
+
 ## Why trust it (`pages.TRUST_COPY`, landing `#confianza`)
 
 The landing has a section for a first-time visitor, "Trabajo real, no humo"

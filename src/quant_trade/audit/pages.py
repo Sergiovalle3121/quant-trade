@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import html
 import re
+import textwrap
 from collections.abc import Sequence
 from datetime import datetime
 from typing import Any
@@ -67,7 +68,15 @@ from quant_trade.audit.report import (
     localize_text_nodes,
     source_name,
 )
-from quant_trade.audit.seo import BRAND, TAGLINE, PageMeta, head_meta, page_paths, private_meta
+from quant_trade.audit.seo import (
+    BRAND,
+    OG_IMAGE_SIZE,
+    TAGLINE,
+    PageMeta,
+    head_meta,
+    page_paths,
+    private_meta,
+)
 from quant_trade.audit.settings import PACK_CREDITS
 from quant_trade.audit.theme import (
     CLASS_COLOURS,
@@ -2793,8 +2802,7 @@ def verification_page(
             locale=locale,
             paths=alternates,
             index=False,
-            # The class card: class, its fixed sentence and the fixed notice, nothing else.
-            image=f"class-{overall}",
+            image_path=f"/v/{public_id}/card.png?lang={locale}",
             image_alt=f"{BRAND} · {cls_label} {overall}",
         ),
         base_url=base_url,
@@ -2842,6 +2850,57 @@ def verification_page(
         meta_html=meta,
         alternates=alternates,
         solid_nav=True,
+    )
+
+
+def verification_card_svg(result: dict[str, Any], *, public_id: str, locale: str = "es") -> str:
+    """A share image using a subset of the verification page's allow-list.
+
+    Only the class, audit date and public id are read. All other words are
+    fixed page copy: no client prose, figures, trades, files or private ids.
+    The same fields survive a published audit's retention purge.
+    """
+    locale = _locale(locale)
+    copy = _COPY[locale]
+    overall = str(result["verdict"]["overall"])
+    audited = str(result.get("generated_at_utc", ""))[:10]
+    label = f"{CLASS_WORD[locale]} {overall}"
+    title = f"{BRAND} · {label}"
+    notice = BADGE_NOTICE[locale]
+    description = f"{copy['v_audited']}: {audited}. ID {public_id}. {notice}"
+    colour = CLASS_COLOURS.get(overall, "#a3a3aa")
+    width, height = OG_IMAGE_SIZE
+    font = "Inter,Segoe UI,Roboto,Helvetica,Arial,sans-serif"
+    sentence = "".join(
+        f"<tspan x='350' y='{260 + index * 38}'>{_e(line)}</tspan>"
+        for index, line in enumerate(textwrap.wrap(class_text(overall, locale), width=47))
+    )
+    footer = "".join(
+        f"<tspan x='56' y='{548 + index * 28}'>{_e(line)}</tspan>"
+        for index, line in enumerate(textwrap.wrap(notice, width=100))
+    )
+    return (
+        f"<svg xmlns='http://www.w3.org/2000/svg' width='{width}' height='{height}' "
+        f"viewBox='0 0 {width} {height}' role='img' "
+        f"aria-labelledby='verification-card-title verification-card-desc' lang='{locale}'>"
+        f"<title id='verification-card-title'>{_e(title)}</title>"
+        f"<desc id='verification-card-desc'>{_e(description)}</desc>"
+        f"<rect width='{width}' height='{height}' fill='#0b0b0d'/>"
+        f"<g font-family='{font}'>"
+        f"<text x='56' y='87' font-size='48' font-weight='650' fill='#f4f4f6'>{BRAND}</text>"
+        f"<text x='56' y='132' font-size='26' fill='#a3a3aa'>{_e(copy['v_title'])}</text>"
+        f"<rect x='56' y='186' width='240' height='228' rx='28' "
+        f"fill='#141416' stroke='{colour}' stroke-width='3'/>"
+        f"<text x='176' y='355' text-anchor='middle' font-size='166' font-weight='600' "
+        f"fill='{colour}'>{_e(overall)}</text>"
+        f"<text x='350' y='207' font-size='26' font-weight='650' "
+        f"fill='{colour}'>{_e(label)}</text>"
+        f"<text font-size='28' fill='#f4f4f6'>{sentence}</text>"
+        f"<text x='56' y='466' font-size='21' fill='#a3a3aa'>"
+        f"{_e(copy['v_audited'])}: {_e(audited)} · ID {_e(public_id)}</text>"
+        "<path d='M56 506H1144' stroke='#2a2a2f'/>"
+        f"<text font-size='19' fill='#a3a3aa'>{footer}</text>"
+        "</g></svg>"
     )
 
 
@@ -3687,5 +3746,6 @@ __all__ = [
     "legal_page",
     "method_page",
     "sample_meta",
+    "verification_card_svg",
     "verification_page",
 ]

@@ -125,6 +125,8 @@ class PageMeta:
     #: Which share card to show (see ``OG_KINDS``); "" is the site card.
     image: str = ""
     image_alt: str = ""
+    #: A same-site image path for a publication; empty uses the static card.
+    image_path: str = ""
 
 
 #: Pixel size of the share images in ``static/`` (tools/make_og_images.py).
@@ -196,7 +198,11 @@ def head_meta(meta: PageMeta, *, base_url: str = "") -> str:
     base = base_url.rstrip("/")
     if base:
         # Messaging apps need an absolute URL to show a picture with the link.
-        image = f"{base}/static/{og_image_name(meta.image, meta.locale)}"
+        image = (
+            f"{base}{meta.image_path}"
+            if meta.image_path
+            else f"{base}/static/{og_image_name(meta.image, meta.locale)}"
+        )
         tags += [
             f"<meta property='og:image' content='{_e(image)}'>",
             "<meta property='og:image:type' content='image/png'>",

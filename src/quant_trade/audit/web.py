@@ -101,6 +101,7 @@ from quant_trade.audit.pages import (
     method_page,
     sample_meta,
     upload_page,
+    verification_card_svg,
     verification_page,
 )
 from quant_trade.audit.payments import stripe_checkout
@@ -123,6 +124,7 @@ from quant_trade.audit.seo import (
     NOINDEX,
     PUBLIC_PAGES,
     is_private_path,
+    og_image_name,
     robots_txt,
     sitemap_xml,
 )
@@ -5314,6 +5316,24 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             locale=_report_locale(lang),
         )
         return Response(content=svg, media_type="image/svg+xml")
+
+    @app.get("/v/{public_id}/card.svg")
+    def verification_card(public_id: str, lang: str | None = None) -> Response:
+        publication, _, data, _ = _published(public_id)
+        svg = verification_card_svg(
+            data, public_id=publication.public_id, locale=_report_locale(lang)
+        )
+        return Response(content=svg, media_type="image/svg+xml")
+
+    @app.get("/v/{public_id}/card.png")
+    def verification_card_png(public_id: str, lang: str | None = None) -> Response:
+        # Social crawlers need a raster image. The existing class card contains
+        # fixed copy only; the SVG above also carries the audit date and public id.
+        _, _, data, _ = _published(public_id)
+        overall = str(data["verdict"]["overall"])
+        if overall not in ("A", "B", "C", "D"):
+            raise _not_found()
+        return static(og_image_name(f"class-{overall}", _report_locale(lang)))
 
     @app.get("/v/{public_id}", response_class=HTMLResponse)
     def verification(request: Request, public_id: str, lang: str | None = None) -> str:
