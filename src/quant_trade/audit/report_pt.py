@@ -148,6 +148,7 @@ REPORT: dict[str, Any] = {
         "pdf_check_link": "Como conferir",
         "switch": "Español",
         "my_account": "Minha conta",
+        "new_audit": "Auditar outro arquivo",
         "yes": "sim",
         "no": "não",
         "redeem": "Tem um código de acesso? Digite-o para ver o relatório completo",

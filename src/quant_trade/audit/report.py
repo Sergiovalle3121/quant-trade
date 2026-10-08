@@ -520,6 +520,7 @@ LABELS: dict[str, dict[str, str]] = {
         "pdf_check_link": "Cómo lo comprueba",
         "switch": "English",
         "my_account": "Mi cuenta",
+        "new_audit": "Auditar otro archivo",
         "yes": "sí",
         "no": "no",
         "redeem": "¿Tienes un código de acceso? Escríbelo para ver el informe completo",
@@ -1889,6 +1890,7 @@ LABELS: dict[str, dict[str, str]] = {
         "pdf_check_link": "How they check",
         "switch": "Español",
         "my_account": "My account",
+        "new_audit": "Audit another file",
         "yes": "yes",
         "no": "no",
         "redeem": "Have an access code? Enter it to see the full report",
@@ -8316,9 +8318,12 @@ def render_html(
             f"onclick='window.print()'><span class='print-long'>{_e(labels['print'])}</span>"
             "<span class='print-short' aria-hidden='true'>PDF</span></button>"
         )
+    from quant_trade.audit.pages import AUDIT_PATHS
+
     account_href = {"es": "/cuenta", "pt": "/pt/conta"}.get(locale, "/account")
     toolbar = (
         "<div class='nav-end no-print'>"
+        + f"<a class='nav-account' href='{AUDIT_PATHS[locale]}'>{_e(labels['new_audit'])}</a> "
         + f"<a class='nav-account' href='{account_href}'>{_e(labels['my_account'])}</a> "
         + print_html
         + _report_language_links(locale, switch_url, labels["report_languages"])

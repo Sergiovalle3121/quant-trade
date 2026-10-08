@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from datetime import UTC, datetime
 
 import pytest
@@ -16,7 +17,15 @@ from audit_fixtures import (
 
 from quant_trade.audit.engine import run_audit
 from quant_trade.audit.guard import AuditReportError, find_claims
-from quant_trade.audit.report import DISCLAIMER, guard_texts, render, render_html, result_sha256
+from quant_trade.audit.pages import AUDIT_PATHS
+from quant_trade.audit.report import (
+    DISCLAIMER,
+    LABELS,
+    guard_texts,
+    render,
+    render_html,
+    result_sha256,
+)
 from quant_trade.audit.schema import DeclaredMetadata, build_inputs
 
 NOW = datetime(2026, 1, 1, tzinfo=UTC)
@@ -48,6 +57,19 @@ def test_html_carries_disclaimer_hashes_and_watermark_toggle() -> None:
     assert result_sha256(result) in preview
     assert "abc123" in preview
     assert "class='lockbox'" not in preview  # free mode locks nothing
+
+
+@pytest.mark.parametrize("locale", ["es", "en", "pt"])
+@pytest.mark.parametrize("watermark", [False, True])
+def test_report_toolbar_links_to_another_upload_outside_print(locale: str, watermark: bool) -> None:
+    page = render_html(_result(locale), locale=locale, watermark=watermark)
+    toolbar = re.search(r"<div class='nav-end no-print'>(.*?)</div>", page)
+    assert toolbar is not None
+    assert (f"href='{AUDIT_PATHS[locale]}'>{LABELS[locale]['new_audit']}</a>") in toolbar.group(1)
+    assert toolbar.group(1).index(LABELS[locale]["new_audit"]) < toolbar.group(1).index(
+        LABELS[locale]["my_account"]
+    )
+    assert find_claims(page) == []
 
 
 def test_legacy_measured_cscv_without_effective_count_still_renders() -> None:
