@@ -95,6 +95,9 @@ def test_the_data_has_the_shape_the_writer_pastes() -> None:
         "cuantos-intentos-reto-prop-firm",
         "copiar-senales-mql5-myfxbook",
         "bot-ia-backtest-suerte",
+        "que-hacer-despues-del-backtest",
+        "cuantas-operaciones-porcentaje-aciertos",
+        "lo-eligio-el-optimizador",
     ]
     for entry in ARTICLES_DATA:
         assert DATA_KEYS <= set(entry) <= DATA_KEYS | {"seo_title"}, entry["key"]
@@ -167,6 +170,21 @@ def test_every_article_exists_in_every_language_and_passes_the_guard() -> None:
             "es": "bot-ia-backtest-suerte",
             "en": "ai-trading-bot-backtest-luck",
             "pt": "bot-ia-backtest-sorte",
+        },
+        "que-hacer-despues-del-backtest": {
+            "es": "que-hacer-despues-del-backtest",
+            "en": "what-to-do-after-a-backtest",
+            "pt": "o-que-fazer-depois-do-backtest",
+        },
+        "cuantas-operaciones-porcentaje-aciertos": {
+            "es": "cuantas-operaciones-porcentaje-aciertos",
+            "en": "how-many-trades-to-trust-a-win-rate",
+            "pt": "quantas-operacoes-taxa-de-acerto",
+        },
+        "lo-eligio-el-optimizador": {
+            "es": "lo-eligio-el-optimizador",
+            "en": "did-the-optimizer-pick-your-result",
+            "pt": "o-otimizador-escolheu-o-resultado",
         },
     }
     for article in ARTICLES:
@@ -254,7 +272,11 @@ def test_article_pages_render_with_metadata_and_a_language_switch(tmp_path: Path
             for question, _answer in article.text[locale].faq:
                 assert f"<h3>{html.escape(question, quote=True)}</h3>" in text
             for _label, href in related_links(article, locale):
-                assert f"href='{href}'" in text, (article.key, locale, href)
+                assert f"href='{html.escape(href, quote=True)}'" in text, (
+                    article.key,
+                    locale,
+                    href,
+                )
             # The closing call: the free calculator and the form, no promise.
             assert f"href='{calculator_url(locale)}'" in text
             assert f"href='{audit_path(locale)}'" in text

@@ -26,11 +26,15 @@ from quant_trade.audit.articles import (
     INDEPENDENT_LUCK_EXAMPLE,
     LUCK_TABLE_COPY,
     LUCK_TABLE_INPUTS,
+    WIN_RATE_RATES,
+    WIN_RATE_TABLE_COPY,
+    WIN_RATE_TRADE_COUNTS,
     Article,
     article_url,
     articles_index_faq,
     articles_index_url,
     related_links,
+    win_rate_interval,
 )
 from quant_trade.audit.audiences import (
     AUDIENCE_COPY,
@@ -4041,6 +4045,24 @@ def article_page(article: Article, *, locale: str = "es", base_url: str = "") ->
             f"<th scope='col'>{_e(luck)}</th></tr></thead><tbody>{rows}</tbody></table>"
         )
         sections.insert(4, (heading, table))
+    if article.key == "cuantas-operaciones-porcentaje-aciertos":
+        heading, trades, note = WIN_RATE_TABLE_COPY[locale]
+        columns = "".join(f"<th scope='col'>DECLARED · {rate:.0%}</th>" for rate in WIN_RATE_RATES)
+        rows = "".join(
+            f"<tr><th scope='row'>DECLARED · {count}</th>"
+            + "".join(
+                f"<td>DECLARED · {_e(win_rate_interval(rate, count, locale))}</td>"
+                for rate in WIN_RATE_RATES
+            )
+            + "</tr>"
+            for count in WIN_RATE_TRADE_COUNTS
+        )
+        table = (
+            f"<table class='article-wilson'><caption>{_e(note)}</caption>"
+            f"<thead><tr><th scope='col'>{_e(trades)}</th>{columns}</tr></thead>"
+            f"<tbody>{rows}</tbody></table>"
+        )
+        sections.insert(2, (heading, table))
     if text.faq:
         faq = "".join(f"<h3>{_e(q)}</h3><p>{_e(a)}</p>" for q, a in text.faq)
         sections.append((words["faq"], faq))
