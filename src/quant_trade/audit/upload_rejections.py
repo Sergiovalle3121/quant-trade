@@ -73,6 +73,15 @@ _CODES: dict[str, tuple[str, ...]] = {
         "encoding",
         "legacy_xls",
         "opendocument_sheet",
+        "bad_csv",
+        "bad_xlsx",
+        "bad_xml",
+        "bad_zip",
+        "zip_contents",
+        "xml_doctype",
+        "universal_not_a_table",
+        "not_optimization",
+        "optimization_file",
     ),
     "pdf_no_trades": ("pdf_statement",),
     "too_large": (
@@ -121,6 +130,10 @@ _CODES: dict[str, tuple[str, ...]] = {
         "ninjatrader_executions_symbol",
         "optimization_header",
         "return_columns",
+        "trades_and_report",
+        "trade_list_as_curve",
+        "optimization_mismatch",
+        "equity_required",
     ),
     "invalid_values": (
         "value_too_large",
@@ -501,9 +514,13 @@ _FORMAT_NAMES: dict[str, str] = {
 
 
 def rejection_guidance(
-    category: str, detected_format: str | None = None, locale: str = "es"
+    category: str,
+    detected_format: str | None = None,
+    locale: str = "es",
+    *,
+    file_inspected: bool = True,
 ) -> str:
-    """Small HTML block with fixed cause, detected container and export links."""
+    """Fixed cause and export links, with a format only when a file was inspected."""
     locale = locale if locale in REJECTION_COPY else "es"
     category = classify(category)
     reason, next_step = REJECTION_COPY[locale][category]
@@ -512,6 +529,7 @@ def rejection_guidance(
     format_name = (
         image_label if source_format == "image" else _FORMAT_NAMES.get(source_format, unknown)
     )
+    format_line = f"<p>{escape(detected)}: {escape(format_name)}.</p>" if file_inspected else ""
     links: list[str] = []
     for slug, label in (
         ("mt5", "MT5 HTML"),
@@ -524,7 +542,7 @@ def rejection_guidance(
         links.append(f'<a href="{escape(path, quote=True)}">{escape(label)}</a>')
     return (
         f'<div class="upload-guidance" data-upload-rejection="{category}">'
-        f"<p>{escape(reason)}</p><p>{escape(detected)}: {escape(format_name)}.</p>"
+        f"<p>{escape(reason)}</p>{format_line}"
         f"<p>{escape(accepted)}: {' · '.join(links)}.</p>"
         f"<p><strong>{escape(step)}:</strong> {escape(next_step)}</p></div>"
     )

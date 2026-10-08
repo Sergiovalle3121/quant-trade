@@ -1481,7 +1481,12 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         request.state.ops_rejection_category = category
         request.state.ops_rejection_format = detected
         request.state.ops_rejection_detector = upload_rejections.safe_detector(detector)
-        guidance = upload_rejections.rejection_guidance(category, detected, locale)
+        guidance = upload_rejections.rejection_guidance(
+            category,
+            detected,
+            locale,
+            file_inspected=getattr(request.state, "upload_file_inspected", False),
+        )
         if _wants_json(request):
             return JSONResponse(
                 {
@@ -4715,13 +4720,17 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 continue
             head = await sent.read(4096)
             await sent.seek(0)
+            if head:
+                request.state.upload_file_inspected = True
             detected = upload_rejections.header_format(head)
             if sent is report or (sent is equity and (report is None or not report.filename)):
                 request.state.ops_rejection_format = detected
             category = upload_rejections.header_rejection(head)
             if category:
-                text = message(
-                    "curve_is_picture" if category == "image" else "invalid_upload", report_loc
+                text = (
+                    message("curve_is_picture", report_loc)
+                    if category == "image" and sent is equity
+                    else upload_rejections.REJECTION_COPY[report_loc][category][0]
                 )
                 return _upload_error(
                     request,
@@ -5111,8 +5120,9 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                         return _mapping_answer(request, table, exc, report_loc, carried, saved)
                 else:
                     return _mapping_answer(request, table, exc, report_loc, carried, report_columns)
-            except Exception:
+            except Exception as exc:
                 # Exception text may contain file data. Only fixed labels reach telemetry.
+                logger.warning("upload could not be parsed: %s", type(exc).__name__)
                 return _upload_error(
                     request,
                     400,

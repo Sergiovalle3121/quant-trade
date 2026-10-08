@@ -2380,13 +2380,15 @@ def _upload_form(
         for name in (
             "cost_bps",
             "oos_start",
-            "benchmark_applicable",
             "initial_balance",
             "net_of_fees",
             "description",
         )
-    )
-    extras_open = extras_open or bool(values.get("challenge"))
+    ) or values.get("benchmark_applicable", "yes") not in {"", "yes"}
+    extras_open = extras_open or values.get("challenge", DEFAULT_PRESET) not in {
+        "",
+        DEFAULT_PRESET,
+    }
     mapping_open = any(
         values.get(f"col_{role}") for _, roles in copy["map_groups"] for role in roles
     )

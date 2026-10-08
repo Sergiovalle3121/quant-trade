@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import re
 import threading
+from html import unescape
 from pathlib import Path
 from typing import Any
 
@@ -15,19 +17,24 @@ from quant_trade.audit.guard import find_claims
 from quant_trade.audit.ops import OpsMiddleware
 from quant_trade.audit.settings import AuditSettings
 from quant_trade.audit.store import make_store
-from quant_trade.audit.upload_rejections import rejection_guidance
-from quant_trade.audit.web import AuditAdmissionMiddleware, create_app
+from quant_trade.audit.upload_rejections import (
+    DETECTED_FORMATS,
+    REJECTION_CATEGORIES,
+    rejection_guidance,
+)
+from quant_trade.audit.web import AuditAdmissionMiddleware, create_app, request_body_limit
 
 KEY = "synthetic-owner-key-" + "k" * 32
 ONE_ROW = b"timestamp,equity\n2024-01-01,100\n"
 
 
-def _app(tmp_path: Path) -> Any:
+def _app(tmp_path: Path, **kwargs: Any) -> Any:
     settings = AuditSettings(
         database_url=f"sqlite:///{tmp_path}/audit.db",
         free_mode=True,
         bootstrap_samples=100,
         admin_key=KEY,
+        **kwargs,
     )
     return create_app(settings, make_store(settings.database_url))
 
@@ -77,7 +84,10 @@ def test_form_validation_preserves_columns_declarations_and_language(
             },
         )
         assert response.status_code == 400
-        assert rejection_guidance("invalid_declaration", "unknown", locale) in response.text
+        assert (
+            rejection_guidance("invalid_declaration", "unknown", locale, file_inspected=False)
+            in response.text
+        )
         for name, value in (
             ("trials", "1234567890123"),
             ("cost_bps", "2.5"),
@@ -100,6 +110,7 @@ def test_rejection_query_failure_keeps_existing_operations_and_retention_visible
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     app = _app(tmp_path)
+    caplog.set_level(logging.DEBUG)
 
     def unavailable(since_day: str) -> Any:
         raise RuntimeError("PRIVATE-query-detail")
@@ -126,7 +137,10 @@ def test_malformed_multipart_uses_localized_upload_guidance(tmp_path: Path, loca
             headers={"content-type": "multipart/form-data"},
         )
         assert response.status_code == 400
-        assert rejection_guidance("invalid_upload", "unknown", locale) in response.text
+        assert (
+            rejection_guidance("invalid_upload", "unknown", locale, file_inspected=False)
+            in response.text
+        )
         assert find_claims(response.text) == []
         app.state.operations.flush()
         (row,) = app.state.store.upload_rejection_rows("2000-01-01")
@@ -178,7 +192,7 @@ def test_stalled_body_uses_localized_guidance_and_counts_one_timeout(
     asyncio.run(scenario())
     assert messages[0]["status"] == 408
     page = b"".join(item.get("body", b"") for item in messages).decode()
-    assert rejection_guidance("upload_timeout", "unknown", locale) in page
+    assert rejection_guidance("upload_timeout", "unknown", locale, file_inspected=False) in page
     assert find_claims(page) == []
     assert slots.acquire(blocking=False)
     slots.release()
@@ -186,3 +200,202 @@ def test_stalled_body_uses_localized_guidance_and_counts_one_timeout(
     (row,) = app.state.store.upload_rejection_rows("2000-01-01")
     assert row["category"] == "upload_timeout" and row["count"] == 1
     assert row["detector"] == "admission"
+
+
+@pytest.mark.parametrize("locale", ("es", "en", "pt"))
+def test_missing_consent_preserves_declarations_and_counts_form_refusal(
+    tmp_path: Path,
+    locale: str,
+) -> None:
+    app = _app(tmp_path)
+    with TestClient(app) as client:
+        response = client.post(
+            "/audits",
+            files={"equity": ("curve.csv", ONE_ROW)},
+            data={
+                "locale": locale,
+                "trials": "7",
+                "cost_bps": "2.5",
+                "oos_start": "2024-01-02",
+                "description": "Synthetic consent notes",
+                "col_profit": "Result & fees",
+                "return_frequency": "monthly",
+                "return_unit": "percent",
+            },
+        )
+        assert response.status_code == 400
+        assert (
+            rejection_guidance("invalid_declaration", "unknown", locale, file_inspected=False)
+            in response.text
+        )
+        for name, value in (
+            ("trials", "7"),
+            ("cost_bps", "2.5"),
+            ("oos_start", "2024-01-02"),
+            ("col_profit", "Result &amp; fees"),
+        ):
+            assert re.search(rf"<input[^>]*name='{name}'[^>]*value='{value}'", response.text)
+        assert ">Synthetic consent notes</textarea>" in response.text
+        for selected in (locale, "monthly", "percent"):
+            assert f"<option value='{selected}' selected>" in response.text
+        assert find_claims(response.text) == []
+        app.state.operations.flush()
+        (row,) = app.state.store.upload_rejection_rows("2000-01-01")
+        assert (row["category"], row["detected_format"], row["detector"], row["count"]) == (
+            "invalid_declaration",
+            "unknown",
+            "form",
+            1,
+        )
+
+
+@pytest.mark.parametrize("locale", ("es", "en", "pt"))
+def test_form_without_any_file_counts_empty_upload(tmp_path: Path, locale: str) -> None:
+    app = _app(tmp_path)
+    with TestClient(app) as client:
+        response = client.post("/audits", data={"consent": "on", "locale": locale})
+        assert response.status_code == 400
+        assert (
+            rejection_guidance("empty_file", "unknown", locale, file_inspected=False)
+            in response.text
+        )
+        assert find_claims(response.text) == []
+        app.state.operations.flush()
+        (row,) = app.state.store.upload_rejection_rows("2000-01-01")
+        assert (row["category"], row["detected_format"], row["detector"], row["count"]) == (
+            "empty_file",
+            "unknown",
+            "form",
+            1,
+        )
+
+
+@pytest.mark.parametrize("locale", ("es", "en", "pt"))
+def test_oversized_request_body_has_guidance_and_counts_body_limit(
+    tmp_path: Path,
+    locale: str,
+) -> None:
+    upload_limit = 100
+    app = _app(tmp_path, max_upload_bytes=upload_limit)
+    with TestClient(app) as client:
+        response = client.post(
+            f"/audits?lang={locale}",
+            content=b"x" * (request_body_limit(upload_limit) + 1),
+            headers={"content-type": "application/octet-stream"},
+        )
+        assert response.status_code == 413
+        assert (
+            rejection_guidance("too_large", "unknown", locale, file_inspected=False)
+            in response.text
+        )
+        assert find_claims(response.text) == []
+        app.state.operations.flush()
+        (row,) = app.state.store.upload_rejection_rows("2000-01-01")
+        assert (row["category"], row["detected_format"], row["detector"], row["count"]) == (
+            "too_large",
+            "unknown",
+            "body_limit",
+            1,
+        )
+
+
+@pytest.mark.parametrize("locale", ("es", "en", "pt"))
+def test_unavailable_admission_slot_has_guidance_and_counts_busy(
+    tmp_path: Path,
+    locale: str,
+) -> None:
+    app = _app(tmp_path)
+    slots = app.state.upload_admission_slots
+    held = 0
+    while slots.acquire(blocking=False):
+        held += 1
+    try:
+        with TestClient(app) as client:
+            response = client.post(
+                f"/audits?lang={locale}",
+                files={"equity": ("curve.csv", ONE_ROW)},
+                data={"consent": "on", "locale": locale},
+            )
+            assert response.status_code == 503
+            assert (
+                rejection_guidance("service_busy", "unknown", locale, file_inspected=False)
+                in response.text
+            )
+            assert find_claims(response.text) == []
+            app.state.operations.flush()
+            (row,) = app.state.store.upload_rejection_rows("2000-01-01")
+            assert (row["category"], row["detected_format"], row["detector"], row["count"]) == (
+                "service_busy",
+                "unknown",
+                "admission",
+                1,
+            )
+    finally:
+        for _ in range(held):
+            slots.release()
+
+
+@pytest.mark.parametrize("locale", ("es", "en", "pt"))
+@pytest.mark.parametrize(
+    ("content", "status", "category", "detected", "detector"),
+    [
+        (b"\x89PNG\r\n\x1a\n", 400, "image", "image", "header"),
+        (
+            b"When,Amount\n2024-01-01,100\n2024-01-02,101\n",
+            422,
+            "columns_missing",
+            "csv",
+            "mapping",
+        ),
+    ],
+)
+def test_json_upload_and_mapping_refusals_use_safe_localized_guidance(
+    tmp_path: Path,
+    locale: str,
+    content: bytes,
+    status: int,
+    category: str,
+    detected: str,
+    detector: str,
+) -> None:
+    app = _app(tmp_path)
+    with TestClient(app) as client:
+        response = client.post(
+            "/audits",
+            files={"report": ("synthetic.csv", content)},
+            data={"consent": "on", "locale": locale},
+            headers={"Accept": "application/json"},
+        )
+        assert response.status_code == status
+        assert response.headers["content-type"].startswith("application/json")
+        payload = response.json()
+        assert payload["category"] == category and category in REJECTION_CATEGORIES
+        assert payload["format"] == detected and detected in DETECTED_FORMATS
+        assert payload["guidance_html"] == rejection_guidance(category, detected, locale)
+        assert "<script" not in payload["guidance_html"].lower()
+        assert find_claims(payload["guidance_html"]) == []
+        app.state.operations.flush()
+        (row,) = app.state.store.upload_rejection_rows("2000-01-01")
+        assert row["detector"] == detector
+
+
+@pytest.mark.parametrize("locale", ("es", "en", "pt"))
+def test_real_rejection_guide_links_load_in_the_selected_language(
+    tmp_path: Path,
+    locale: str,
+) -> None:
+    with TestClient(_app(tmp_path)) as client:
+        response = client.post(
+            "/audits",
+            files={"report": ("synthetic.png", b"\x89PNG\r\n\x1a\n")},
+            data={"consent": "on", "locale": locale},
+        )
+        assert response.status_code == 400
+        block = re.search(r'<div[^>]*data-upload-rejection="image"[^>]*>(.*?)</div>', response.text)
+        assert block is not None
+        hrefs = re.findall(r'href="([^"]+)"', block.group(1))
+        assert len(hrefs) == 4
+        for href in hrefs:
+            guide = client.get(unescape(href))
+            assert guide.status_code == 200, href
+            assert f"<html lang='{locale}'>" in guide.text, href

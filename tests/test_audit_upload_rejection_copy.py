@@ -2,14 +2,17 @@
 
 from __future__ import annotations
 
+import ast
 from html import unescape
 from html.parser import HTMLParser
+from pathlib import Path
+from types import ModuleType
 
 import pytest
 
-from quant_trade.audit.guard import assert_report_clean
+from quant_trade.audit import importers, schema
+from quant_trade.audit.guard import assert_report_clean, find_claims
 from quant_trade.audit.guides import GUIDES, GUIDES_PATH
-from quant_trade.audit.i18n import spanish
 from quant_trade.audit.upload_rejections import (
     DETECTED_FORMATS,
     HEADER_BYTES,
@@ -56,12 +59,62 @@ def test_each_detected_format_is_guard_safe(source_format: str, locale: str) -> 
     assert_report_clean(rejection_guidance("invalid_upload", source_format, locale))
 
 
-def test_refusal_notes_have_central_spanish_rules() -> None:
-    for category in REJECTION_CATEGORIES:
-        for english, expected in zip(
-            REJECTION_COPY["en"][category], REJECTION_COPY["es"][category], strict=True
-        ):
-            assert spanish(english) == expected
+@pytest.mark.parametrize("category", REJECTION_CATEGORIES)
+def test_refusal_notes_are_distinct_in_each_language_and_guard_safe(category: str) -> None:
+    translations = [REJECTION_COPY[locale][category] for locale in ("es", "en", "pt")]
+    for notes in zip(*translations, strict=True):
+        assert len(set(notes)) == 3
+        assert all(find_claims(note) == [] for note in notes)
+
+
+@pytest.mark.parametrize("module", (importers, schema), ids=("importers", "schema"))
+def test_every_parser_error_code_has_specific_guidance(module: ModuleType) -> None:
+    """New parser errors must choose a category instead of silently falling back."""
+    assert module.__file__ is not None
+    tree = ast.parse(Path(module.__file__).read_text(encoding="utf-8"))
+    codes: set[str] = set()
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Name):
+            continue
+        if node.func.id not in {"ParseError", "ReportFormatError"}:
+            continue
+        code = next((keyword.value for keyword in node.keywords if keyword.arg == "code"), None)
+        if code is None and node.func.id == "ReportFormatError":
+            code = node.args[0]
+        branches = (code.body, code.orelse) if isinstance(code, ast.IfExp) else (code,)
+        for branch in branches:
+            if isinstance(branch, ast.Constant) and isinstance(branch.value, str):
+                codes.add(branch.value)
+            else:
+                # The live-statement wrapper preserves an already classified parser error.
+                assert branch is not None and ast.unparse(branch) == "exc.code", node.lineno
+    assert codes
+    assert {code for code in codes if classify(code) == "invalid_upload"} == set()
+
+
+@pytest.mark.parametrize(
+    ("locale", "detected_label"),
+    (("es", "Formato detectado:"), ("en", "Detected format:"), ("pt", "Formato detectado:")),
+)
+@pytest.mark.parametrize(
+    "category",
+    (
+        "rate_limited",
+        "invalid_declaration",
+        "service_busy",
+        "upload_timeout",
+        "too_large",
+        "empty_file",
+    ),
+)
+def test_uninspected_upload_does_not_claim_a_detected_format(
+    category: str, locale: str, detected_label: str
+) -> None:
+    page = rejection_guidance(category, "unknown", locale, file_inspected=False)
+    assert detected_label not in unescape(page)
+    assert REJECTION_COPY[locale][category][1] in unescape(page)
+    assert find_claims(page) == []
+    assert detected_label in unescape(rejection_guidance(category, "unknown", locale))
 
 
 @pytest.mark.parametrize("value", ("alice@example.test", "private.pdf", "203.0.113.1", "<script>"))
@@ -98,7 +151,19 @@ def test_allowlisted_values_survive_normalization() -> None:
         ("return_rows", "too_few_rows"),
         ("return_columns", "columns_missing"),
         ("empty", "empty_file"),
-        ("bad_zip", "invalid_upload"),
+        ("bad_csv", "format_unknown"),
+        ("bad_xlsx", "format_unknown"),
+        ("bad_xml", "format_unknown"),
+        ("bad_zip", "format_unknown"),
+        ("zip_contents", "format_unknown"),
+        ("xml_doctype", "format_unknown"),
+        ("universal_not_a_table", "format_unknown"),
+        ("not_optimization", "format_unknown"),
+        ("optimization_file", "format_unknown"),
+        ("trades_and_report", "columns_missing"),
+        ("trade_list_as_curve", "columns_missing"),
+        ("optimization_mismatch", "columns_missing"),
+        ("equity_required", "columns_missing"),
     ),
 )
 def test_parser_codes_keep_distinct_causes(code: str, expected: str) -> None:

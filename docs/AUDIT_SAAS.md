@@ -4678,6 +4678,10 @@ reader could not read a usable table; it does not assert that a corrupt,
 encrypted, oversized or timed-out PDF contains no trades. Readable PDF tables
 still reach column mapping. Detailed parser codes map to bounded categories;
 unclassified parse failures use `invalid_upload` without logging exception text.
+Unexpected parser exceptions log only their type, without a traceback. Importer
+and schema error codes have an exhaustive mapping test. Numeric cells discarded
+as unreadable use `invalid_values` when fewer than two usable curve rows remain;
+genuinely short or duplicate-only curves retain `too_few_rows`.
 
 Only a 4096-byte prefix is read from each posted file before the full read.
 Strong image and unsupported ELF/RAR/7z/FLAC signatures reject immediately,
@@ -4688,12 +4692,17 @@ table is present, so the existing isolated PDF extraction remains necessary.
 Starlette has already received/spooled multipart before the route runs: this
 avoids processing the whole file, not receiving it. Tests assert bounded reads
 and no parser calls, rather than a machine-dependent timing threshold.
+The detected-format line is omitted if no nonempty file prefix was inspected;
+the counter still uses `unknown`. Image refusals in other upload fields never
+describe the file as an equity curve.
 
 After a parsed-form refusal the page preserves escaped declarations and column
 choices, including return-series units/frequency. Browsers require file
 selection again; the general retry form leaves the access code blank. Refusals
 before multipart parsing (body limit, timeout, admission) cannot preserve fields
 the server has not parsed. Nothing in this retry state is persisted or logged.
+Default benchmark applicability and challenge selections do not open advanced
+options or extras on retry; nondefault declarations still open their sections.
 
 The additive `upload_rejection_counters` table aggregates UTC day, category,
 detected format, detector and count, using strict allow-lists. Format denotes
