@@ -301,7 +301,7 @@ backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);animation:drop .35
 .menu-panel .btn{margin-top:8px;color:#000;background:#f4f4f6}
 @media (max-width:920px){.nav-links{display:none}.menu{display:block}}
 @media (max-width:520px){.nav-end>.lang{display:none}}
-@media (max-width:520px){.nav-end>.btn{display:none}.nav-in{height:56px}}
+@media (max-width:520px){.nav-end>.btn{--h:36px;padding:0 10px;font-size:.8rem}.nav-in{height:56px}}
 """
 
 BUTTONS = """
@@ -836,6 +836,11 @@ color:#a3a3aa;padding:8px 12px;border-radius:999px}
 @media (max-width:520px){.report-languages .lang-switch{padding:8px 6px}.nav-in>.logo{flex:none}
 .report-languages .lang-switch[data-short]{font-size:0}
 .report-languages .lang-switch[data-short]::before{content:attr(data-short);font-size:.8rem}}
+.report-new-audit{white-space:nowrap}.new-audit-short{display:none}
+@media (max-width:720px){.nav-end>.report-new-audit{display:inline-flex;padding:8px 3px}
+.report-new-audit .new-audit-long,.report-toolbar .print-long{display:none}
+.report-new-audit .new-audit-short,.report-toolbar .print-short{display:inline}}
+@media (max-width:520px){.report-toolbar{gap:3px}}
 .report-hero h1{font-weight:640;font-size:clamp(2.8rem,6vw,4.8rem);letter-spacing:-.05em;
 line-height:1;margin:16px 0 18px}
 .meta-line{display:flex;flex-wrap:wrap;gap:8px;margin:0}

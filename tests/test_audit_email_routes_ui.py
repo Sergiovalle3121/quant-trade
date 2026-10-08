@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import html
 import re
 from pathlib import Path
+from urllib.parse import parse_qs, urlsplit
 
 import pytest
 
@@ -12,7 +14,8 @@ pytest.importorskip("sqlalchemy")
 
 from fastapi.testclient import TestClient  # noqa: E402
 
-from quant_trade.audit import account_pages, mail  # noqa: E402
+from quant_trade.audit import account_pages, accounts, mail  # noqa: E402
+from quant_trade.audit.guard import find_claims  # noqa: E402
 from quant_trade.audit.settings import AuditSettings  # noqa: E402
 from quant_trade.audit.store import Store, make_store  # noqa: E402
 from quant_trade.audit.web import create_app  # noqa: E402
@@ -40,10 +43,7 @@ def _outbox_id(store: Store, account_id: str, kind: str) -> str:
     return str(row[0])
 
 
-@pytest.mark.parametrize("locale", account_pages.LANGUAGES)
-def test_confirmation_requires_a_post_and_recovery_keeps_language(
-    tmp_path: Path, locale: str
-) -> None:
+def _client(tmp_path: Path) -> tuple[TestClient, Store]:
     settings = AuditSettings(
         database_url=f"sqlite:///{tmp_path}/email.db",
         base_url="https://rigor.example",
@@ -55,6 +55,14 @@ def test_confirmation_requires_a_post_and_recovery_keeps_language(
     )
     store = make_store(settings.database_url)
     client = TestClient(create_app(settings, store), base_url="https://rigor.example")
+    return client, store
+
+
+@pytest.mark.parametrize("locale", account_pages.LANGUAGES)
+def test_confirmation_requires_a_post_and_recovery_keeps_language(
+    tmp_path: Path, locale: str
+) -> None:
+    client, store = _client(tmp_path)
     paths = account_pages.PATHS[locale]
     email = f"synthetic-{locale}@example.com"
 
@@ -93,6 +101,9 @@ def test_confirmation_requires_a_post_and_recovery_keeps_language(
     )
     assert submitted.status_code == 303
     assert store.email_verified(account.id)
+    confirmed = client.get(submitted.headers["location"])
+    assert account_pages.COPY[locale]["email_verified"] in confirmed.text
+    assert account_pages.COPY[locale]["email_verified_signin"] not in confirmed.text
     assert client.get(confirm_path, params={"token": token}).status_code == 410
 
     new_email = f"changed-{locale}@example.com"
@@ -147,3 +158,83 @@ def test_confirmation_requires_a_post_and_recovery_keeps_language(
     )
     assert unknown.status_code == 303
     assert unknown.headers["location"] == requested.headers["location"]
+
+
+@pytest.mark.parametrize(
+    ("locale", "notice"),
+    [
+        (
+            "es",
+            "Correo confirmado. Inicia sesión para usar tu primer informe completo gratis.",
+        ),
+        ("en", "E-mail confirmed. Sign in to use your first full report, free."),
+        (
+            "pt",
+            "E-mail confirmado. Entre para usar seu primeiro relatório completo grátis.",
+        ),
+    ],
+)
+def test_confirmation_without_a_session_keeps_the_notice_on_signin(
+    tmp_path: Path, locale: str, notice: str
+) -> None:
+    client, store = _client(tmp_path)
+    paths = account_pages.PATHS[locale]
+    signup = client.get(paths["signup"])
+    email = f"separate-browser-{locale}@example.com"
+    created = client.post(
+        paths["signup"],
+        data={"email": email, "password": PASSWORD, "csrf": _csrf(signup.text)},
+        follow_redirects=False,
+    )
+    assert created.status_code == 303
+    account = store.find_account(email)
+    assert account is not None
+    token = mail.token_for(_outbox_id(store, account.id, "verify"), SECRET)
+    confirm_path = mail.PATHS[locale]["verify"]
+
+    browser = TestClient(client.app, base_url="https://rigor.example")
+    assert accounts.SESSION_COOKIE not in browser.cookies
+    confirm = browser.get(confirm_path, params={"token": token})
+    submitted = browser.post(
+        confirm_path,
+        data={"token": token, "csrf": _csrf(confirm.text)},
+        follow_redirects=False,
+    )
+    assert submitted.status_code == 303
+    assert store.email_verified(account.id)
+    account_redirect = browser.get(submitted.headers["location"], follow_redirects=False)
+    assert account_redirect.status_code == 303
+    signin_url = urlsplit(account_redirect.headers["location"])
+    assert signin_url.path == paths["signin"]
+    assert parse_qs(signin_url.query) == {
+        "done": ["email_verified"],
+        "next": [paths["account"]],
+    }
+    signin = browser.get(account_redirect.headers["location"])
+    assert signin.status_code == 200
+    assert f"<div class='flash' role='status'>{notice}</div>" in signin.text
+    assert account_pages.COPY[locale]["email_verified"] not in signin.text
+    assert find_claims(html.unescape(signin.text)) == []
+    assert accounts.SESSION_COOKIE not in browser.cookies
+
+
+@pytest.mark.parametrize("locale", account_pages.LANGUAGES)
+def test_signin_only_shows_allowed_flashes_and_account_only_forwards_confirmation(
+    tmp_path: Path, locale: str
+) -> None:
+    client, _ = _client(tmp_path)
+    paths = account_pages.PATHS[locale]
+    for done in ("email_pending", "email_verified_signin", "unknown", "<script>"):
+        signin = client.get(paths["signin"], params={"done": done})
+        assert signin.status_code == 200
+        assert "<div class='flash'" not in signin.text
+        account_redirect = client.get(
+            paths["account"], params={"done": done}, follow_redirects=False
+        )
+        assert account_redirect.status_code == 303
+        assert parse_qs(urlsplit(account_redirect.headers["location"]).query) == {
+            "next": [paths["account"]]
+        }
+    signed_out = client.get(paths["signin"], params={"done": "signed_out"})
+    assert html.escape(account_pages.COPY[locale]["signed_out"]) in signed_out.text
+    assert "<div class='flash'" in signed_out.text

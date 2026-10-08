@@ -23,7 +23,17 @@ from datetime import UTC, datetime, timedelta
 
 from quant_trade.audit import importers as imp
 from quant_trade.audit import universal
-from quant_trade.audit.pages import _COPY, _e, _error_card, _page, _page_hero, audit_path
+from quant_trade.audit.pages import (
+    _COPY,
+    GUIDES_COPY,
+    _drop,
+    _e,
+    _error_card,
+    _page,
+    _page_hero,
+    audit_path,
+    guides_index_url,
+)
 from quant_trade.audit.seo import BRAND
 
 #: Refusals a column mapping can fix: the table was read, its columns were not.
@@ -902,6 +912,15 @@ def mapping_page(
         f"<p class='help' role='note' style='margin-top:16px'>{_e(words['monthly'])} "
         f"<a href='{back}#subir'>{_e(words['monthly_link'])}</a></p>"
     )
+    report_drop = _drop(
+        "report",
+        words["file"],
+        ".csv,.txt,.tsv,.xlsx,.xls,.ods,.htm,.html,.zip,.pdf,text/csv",
+        _e(words["file_help"]),
+        locale,
+        required=True,
+        help_id="f-report-help",
+    )
     body = (
         _page_hero(words["eyebrow"], words["title"], words["lead"], dot="warn")
         + "<div class='paper page-main'><div class='wrap'>"
@@ -914,17 +933,13 @@ def mapping_page(
         "<form class='map-form' action='/audits' method='post' enctype='multipart/form-data' "
         "style='margin-top:36px'>"
         f"{hidden}<h2>{_e(words['choose'])}</h2><p class='help'>{_e(words['choose_help'])}</p>"
-        f"{groups}"
-        "<div class='field'><label for='m-report'>"
-        f"{_e(words['file'])}</label>"
-        "<input id='m-report' type='file' name='report' required "
-        "accept='.csv,.txt,.tsv,.xlsx,.xls,.ods,.htm,.html,.zip,.pdf,text/csv' "
-        "aria-describedby='m-report-help'>"
-        f"<div class='help' id='m-report-help'>{_e(words['file_help'])}</div></div>"
+        f"{groups}{report_drop}"
         f"<p class='help'>{_e(words['remember'])}</p><p class='help'>{_e(words['extra'])}</p>"
         "<div class='back-row'>"
         f"<button class='btn btn-dark' type='submit'>{_e(words['submit'])}</button>"
         f"<a class='btn btn-ghost' href='{back}'>{_e(words['back'])}</a>"
+        f"<a class='btn btn-ghost' href='{_e(guides_index_url(locale))}'>"
+        f"{_e(GUIDES_COPY[locale]['title'])}</a>"
         "</div></form></div></div>"
     )
     return _page(f"{words['title']} · {BRAND}", locale, body, solid_nav=True)

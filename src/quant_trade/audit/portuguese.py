@@ -549,8 +549,8 @@ UI_PT: dict[str, Any] = {
         "O seu arquivo nunca é publicado.",
         (
             "O seu primeiro relatório completo, grátis ao criar a sua conta; depois, "
-            f"{_FREE} prévias grátis por mês. Sem cobrança: às vezes pedimos para validar um "
-            "cartão, sem custo."
+            f"{_FREE} prévias grátis por mês. Às vezes pedimos validar um "
+            "cartão; nunca é cobrado."
         ),
         "Apagado automaticamente se você não desbloquear o relatório.",
     ],

@@ -520,6 +520,8 @@ LABELS: dict[str, dict[str, str]] = {
         "pdf_check_link": "Cómo lo comprueba",
         "switch": "English",
         "my_account": "Mi cuenta",
+        "new_audit": "Auditar otro archivo",
+        "new_audit_short": "Auditar",
         "yes": "sí",
         "no": "no",
         "redeem": "¿Tienes un código de acceso? Escríbelo para ver el informe completo",
@@ -1889,6 +1891,8 @@ LABELS: dict[str, dict[str, str]] = {
         "pdf_check_link": "How they check",
         "switch": "Español",
         "my_account": "My account",
+        "new_audit": "Audit another file",
+        "new_audit_short": "Audit",
         "yes": "yes",
         "no": "no",
         "redeem": "Have an access code? Enter it to see the full report",
@@ -7773,7 +7777,10 @@ def render_html(
     publish_html = ""
     if public_id and not locked:
         publish_html = share_block(
-            overall=str(data["verdict"]["overall"]), public_id=public_id, locale=locale
+            overall=str(data["verdict"]["overall"]),
+            public_id=public_id,
+            locale=locale,
+            kind="account" if is_account_history(data) else "backtest",
         )
     elif publish_url and not locked:
         publish_html = (
@@ -8301,7 +8308,9 @@ def render_html(
     if locked and (redeem_url or checkout_url or pay_links):
         # A watermarked preview is not worth printing: the header offers the unlock instead.
         print_html = (
-            f"<a class='print-btn' href='#unlock'>{icon('lock')}{_e(labels['unlock_nav'])}</a>"
+            f"<a class='print-btn' href='#unlock' aria-label='{_e(labels['unlock_nav'])}'>"
+            f"<span class='print-long'>{icon('lock')} {_e(labels['unlock_nav'])}</span>"
+            f"<span class='print-short' aria-hidden='true'>{icon('lock')}</span></a>"
         )
     elif pdf_url and not locked:
         print_html = (
@@ -8316,9 +8325,16 @@ def render_html(
             f"onclick='window.print()'><span class='print-long'>{_e(labels['print'])}</span>"
             "<span class='print-short' aria-hidden='true'>PDF</span></button>"
         )
+    from quant_trade.audit.pages import AUDIT_PATHS
+
     account_href = {"es": "/cuenta", "pt": "/pt/conta"}.get(locale, "/account")
     toolbar = (
-        "<div class='nav-end no-print'>"
+        "<div class='nav-end no-print report-toolbar'>"
+        + f"<a class='nav-account report-new-audit' href='{AUDIT_PATHS[locale]}' "
+        f"aria-label='{_e(labels['new_audit'])}' title='{_e(labels['new_audit'])}'>"
+        f"<span class='new-audit-long'>{_e(labels['new_audit'])}</span>"
+        "<span class='new-audit-short' aria-hidden='true'>"
+        f"{_e(labels['new_audit_short'])}</span></a> "
         + f"<a class='nav-account' href='{account_href}'>{_e(labels['my_account'])}</a> "
         + print_html
         + _report_language_links(locale, switch_url, labels["report_languages"])

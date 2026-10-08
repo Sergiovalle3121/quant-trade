@@ -382,6 +382,9 @@ COPY_PT: dict[str, str] = {
     ),
     "email_pending": ("A troca está pendente. Abra o link enviado ao novo e-mail para concluí-la."),
     "email_verified": "E-mail confirmado. Você já pode usar compras e recompensas disponíveis.",
+    "email_verified_signin": (
+        "E-mail confirmado. Entre para usar seu primeiro relatório completo grátis."
+    ),
     "email_checkout_required": (
         "Confirme seu e-mail em Minha conta antes de pagar. A confirmação também "
         "libera seu primeiro relatório completo gratuito."

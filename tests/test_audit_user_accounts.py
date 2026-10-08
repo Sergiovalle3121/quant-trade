@@ -723,14 +723,14 @@ def test_the_landing_says_the_free_preview_comes_with_an_account(tmp_path: Path)
     client, _, _ = _client(tmp_path)
     es = client.get("/").text
     assert "Tu primer informe completo, gratis al crear tu cuenta" in es
-    assert "después, 3 vistas previas gratis al mes. Sin cobro: a veces pedimos validar" in es
+    assert "después, 3 vistas previas gratis al mes. A veces pedimos validar" in es
     assert "Primer informe completo gratis con tu cuenta" in es
     assert "tu primer informe completo; después, 3 vistas previas al mes" in es
     assert "cuenta opcional" not in es and "cuenta es opcional" not in es
     assert "sin crear cuenta" not in es and "Cuenta gratis opcional" not in es
     en = client.get("/en").text
     assert "Your first full report, free when you create your account" in en
-    assert "then 3 free previews a month. No charge: now and then we ask to verify" in en
+    assert "then 3 free previews a month. Sometimes we ask to verify" in en
     assert "account optional" not in en and "account is optional" not in en
     assert "Optional free account" not in en
 

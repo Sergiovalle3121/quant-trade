@@ -19,6 +19,7 @@ from typing import Any
 from urllib.parse import urlencode
 
 from quant_trade.audit import institutional, reading
+from quant_trade.audit.account import is_account_history
 from quant_trade.audit.accounts import FREE_PREVIEWS_PER_MONTH as _FREE
 from quant_trade.audit.articles import (
     ARTICLES,
@@ -1017,8 +1018,8 @@ _UI: dict[str, dict[str, Any]] = {
             "Tu archivo nunca se publica.",
             (
                 "Tu primer informe completo, gratis al crear tu cuenta; después, "
-                f"{_FREE} vistas previas gratis al mes. Sin cobro: a veces pedimos validar "
-                "una tarjeta, sin cargo."
+                f"{_FREE} vistas previas gratis al mes. A veces pedimos validar "
+                "una tarjeta; nunca se cobra."
             ),
             "Borrado automático si no desbloqueas el informe.",
         ],
@@ -1260,8 +1261,8 @@ _UI: dict[str, dict[str, Any]] = {
             "Your file is never published.",
             (
                 "Your first full report, free when you create your account; then "
-                f"{_FREE} free previews a month. No charge: now and then we ask to verify a card, "
-                "and nothing is charged."
+                f"{_FREE} free previews a month. Sometimes we ask to verify a card; "
+                "it is never charged."
             ),
             "Deleted automatically if you do not unlock the report.",
         ],
@@ -2282,8 +2283,15 @@ def _drop(
     locale: str,
     *,
     main: bool = False,
+    required: bool = False,
+    help_id: str = "",
 ) -> str:
     ui = _UI[locale]
+    file_attributes = " required" if required else ""
+    help_attributes = ""
+    if help_id and help_html:
+        file_attributes += f" aria-describedby='{_e(help_id)}'"
+        help_attributes = f" id='{_e(help_id)}'"
     if main:
         formats = "".join(f"<span>{_e(p)}</span>" for p in PLATFORMS)
         return (
@@ -2292,16 +2300,18 @@ def _drop(
             f"<div class='drop-title'>{_e(ui['drop_title'])}</div>"
             f"<div class='drop-sub'>{_e(ui['drop_sub'])}</div>"
             f"<div class='formats'>{formats}</div><div class='drop-file' aria-live='polite'></div>"
-            f"<input id='f-{name}' type='file' name='{name}' accept='{accept}'></div>"
-            f"<div class='help'>{help_html}</div></div>"
+            f"<input id='f-{name}' type='file' name='{name}'{file_attributes} "
+            f"accept='{accept}'></div>"
+            f"<div class='help'{help_attributes}>{help_html}</div></div>"
         )
     return (
         f"<div class='field'><label for='f-{name}'>{_e(label)}</label>"
         f"<div class='drop'><div class='icon'>{icon('file')}</div><div class='drop-txt'>"
         f"<div class='drop-title'>{_e(ui['drop_small'])}</div>"
         f"<div class='drop-file' aria-live='polite'></div>"
-        f"<input id='f-{name}' type='file' name='{name}' accept='{accept}'></div></div>"
-        + (f"<div class='help'>{help_html}</div>" if help_html else "")
+        f"<input id='f-{name}' type='file' name='{name}'{file_attributes} "
+        f"accept='{accept}'></div></div>"
+        + (f"<div class='help'{help_attributes}>{help_html}</div>" if help_html else "")
         + "</div>"
     )
 
@@ -2959,7 +2969,12 @@ def verification_page(
         f"<div class='copy-row'><button class='btn btn-dark btn-sm' type='button' "
         f"data-copy='badge-code' data-done='{_e(ui['v_copied'])}' hidden>{_e(ui['v_copy'])}"
         "</button></div></section>"
-        + share_block(overall=overall, public_id=public_id, locale=locale)
+        + share_block(
+            overall=overall,
+            public_id=public_id,
+            locale=locale,
+            kind="account" if is_account_history(result) else "backtest",
+        )
         + "</div></div>"
     )
     return _page(

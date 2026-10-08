@@ -2413,7 +2413,14 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         return lang if lang in account_pages.LANGUAGES else path_locale
 
     #: Flash keys a redirect may name; anything else in ``done`` is ignored.
-    signin_flashes = ("signed_out", "deleted", "reset_done", "recovered", "two_step_expired")
+    signin_flashes = (
+        "signed_out",
+        "deleted",
+        "reset_done",
+        "recovered",
+        "two_step_expired",
+        "email_verified",
+    )
     account_flashes = (
         "welcome",
         "welcome_confirm",
@@ -3324,7 +3331,10 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             locale = _account_locale(path_locale, lang)
             session = _session(request)
             if session is None:
-                return _signin_redirect(locale, next_path=account_pages.path("account", locale))
+                flash = "email_verified" if done == "email_verified" else ""
+                return _signin_redirect(
+                    locale, done=flash, next_path=account_pages.path("account", locale)
+                )
             account, csrf, session_hash = session
             now = datetime.now(UTC)
             # This browser's own random id (the same cookie as the free
@@ -5250,18 +5260,19 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     ) -> Response:
         """A file whose columns were not recognised: its columns and first
         rows, to name them. Nothing is spent: no preview, no free report."""
+        guessed, _ = mapping.preselected(table)
         if exc.code in ("unknown_format", "universal_columns_missing"):
             # Said on this page, not as "name them on the form".
             if chosen:
                 text = mapping.missing_fields(chosen, locale)
-            elif "profit" in mapping.preselected(table)[0]:
+            elif "profit" in guessed:
                 text = mapping.COPY[locale]["results"]
             else:
                 text = mapping.COPY[locale]["unknown"]
         elif exc.code == "equity_not_positive":
             text = mapping.COPY[locale]["results"]
         elif exc.code in ("missing_value", "missing_timestamp"):
-            results = "profit" in chosen or "profit" in mapping.preselected(table)[0]
+            results = "profit" in chosen or "profit" in guessed
             text = mapping.COPY[locale]["results" if results else "unknown"]
         else:
             text = _sentence(exc.localized(locale))
@@ -5284,6 +5295,16 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         request.state.ops_rejection_format = detected
         request.state.ops_rejection_detector = "mapping"
         guidance = upload_rejections.rejection_guidance(category, detected, locale)
+        logger.info(
+            "mapping page: code=%s pdf=%s columns=%d samples=%d guessed=%d chosen=%d locale=%s",
+            exc.code,
+            table.pdf,
+            len(table.names),
+            len(table.samples),
+            len(guessed),
+            len(chosen),
+            locale,
+        )
         if _wants_json(request):
             return JSONResponse(
                 {

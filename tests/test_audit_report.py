@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from datetime import UTC, datetime
 
 import pytest
@@ -16,7 +17,15 @@ from audit_fixtures import (
 
 from quant_trade.audit.engine import run_audit
 from quant_trade.audit.guard import AuditReportError, find_claims
-from quant_trade.audit.report import DISCLAIMER, guard_texts, render, render_html, result_sha256
+from quant_trade.audit.pages import AUDIT_PATHS
+from quant_trade.audit.report import (
+    DISCLAIMER,
+    LABELS,
+    guard_texts,
+    render,
+    render_html,
+    result_sha256,
+)
 from quant_trade.audit.schema import DeclaredMetadata, build_inputs
 
 NOW = datetime(2026, 1, 1, tzinfo=UTC)
@@ -48,6 +57,38 @@ def test_html_carries_disclaimer_hashes_and_watermark_toggle() -> None:
     assert result_sha256(result) in preview
     assert "abc123" in preview
     assert "class='lockbox'" not in preview  # free mode locks nothing
+
+
+@pytest.mark.parametrize("locale", ["es", "en", "pt"])
+@pytest.mark.parametrize("report_action", ["print", "pdf", "unlock"])
+def test_report_toolbar_links_to_another_upload_outside_print(
+    locale: str, report_action: str
+) -> None:
+    page = render_html(
+        _result(locale),
+        locale=locale,
+        watermark=report_action == "unlock",
+        free_mode=False,
+        checkout_url="/audits/abc123/checkout" if report_action == "unlock" else None,
+        pdf_url="/audits/abc123/report.pdf" if report_action == "pdf" else None,
+    )
+    toolbar = re.search(r"<div class='nav-end no-print report-toolbar'>(.*?)</div>", page)
+    assert toolbar is not None
+    assert f"href='{AUDIT_PATHS[locale]}'" in toolbar.group(1)
+    assert f"aria-label='{LABELS[locale]['new_audit']}'" in toolbar.group(1)
+    assert f"title='{LABELS[locale]['new_audit']}'" in toolbar.group(1)
+    assert f"class='new-audit-long'>{LABELS[locale]['new_audit']}</span>" in toolbar.group(1)
+    assert (
+        f"class='new-audit-short' aria-hidden='true'>{LABELS[locale]['new_audit_short']}</span>"
+        in toolbar.group(1)
+    )
+    assert toolbar.group(1).index(LABELS[locale]["new_audit"]) < toolbar.group(1).index(
+        LABELS[locale]["my_account"]
+    )
+    if report_action == "unlock":
+        assert f"href='#unlock' aria-label='{LABELS[locale]['unlock_nav']}'" in toolbar.group(1)
+        assert "class='print-short' aria-hidden='true'><svg" in toolbar.group(1)
+    assert find_claims(page) == []
 
 
 def test_legacy_measured_cscv_without_effective_count_still_renders() -> None:
