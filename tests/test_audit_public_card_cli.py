@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import builtins
 import json
+import re
 import sys
 from pathlib import Path
 from types import SimpleNamespace
@@ -218,6 +219,8 @@ def test_public_card_safe_output_write_error(tmp_path: Path) -> None:
 def test_public_card_help_passes_guard() -> None:
     result = runner.invoke(app, ["audit", "public-card", "--help"])
     assert result.exit_code == 0, result.output
+    # A colour terminal (the CI runner) wraps the help in ANSI codes; read the plain text.
+    plain = re.sub(r"\x1b\[[0-9;]*[A-Za-z]", "", result.output)
     for option in ("--json", "--out", "--png"):
-        assert option in result.output
-    assert_report_clean(result.output)
+        assert option in plain
+    assert_report_clean(plain)
