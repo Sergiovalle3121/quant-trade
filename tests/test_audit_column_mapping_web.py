@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
 import pytest
@@ -74,6 +75,34 @@ def test_a_journal_nobody_knows_is_audited_with_the_customers_mapping(tmp_path: 
     assert report.status_code == 200
     # The column map shows the customer's own column beside what it was read as.
     assert "<li><code>Gané</code><svg" in report.text and "<span>resultado</span>" in report.text
+
+
+@pytest.mark.parametrize("accept", ["text/html", "application/json"])
+def test_the_mapping_page_logs_the_refusal_code_without_file_data(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture, accept: str
+) -> None:
+    content = b"PRIVATE-column-a,PRIVATE-column-b\nPRIVATE-cell-a,1\nPRIVATE-cell-b,2\n"
+    with _client(tmp_path) as client, caplog.at_level(logging.INFO):
+        answer = client.post(
+            "/audits",
+            files={"report": ("PRIVATE-file.csv", content, "text/csv")},
+            data={"consent": "on", "description": "PRIVATE-description"},
+            headers={"Accept": accept},
+        )
+        assert answer.status_code == 422
+        assert (
+            "mapping page: code=unknown_format pdf=False columns=2 samples=2 "
+            "guessed=1 chosen=0 locale=es"
+        ) in caplog.text
+        assert "PRIVATE" not in caplog.text
+        for name in content.decode().splitlines()[0].split(","):
+            assert name not in caplog.text
+        client.app.state.operations.flush()
+        rows = client.app.state.store.ops_rows("2000-01-01")
+        for operation in ("audit", "upload"):
+            matching = [row for row in rows if row["operation"] == operation]
+            assert sum(row["count"] for row in matching if row["outcome"] == "invalid") == 1
+            assert all(row["outcome"] != "denied" for row in matching)
 
 
 def test_a_mapped_column_missing_from_the_file_is_named(tmp_path: Path) -> None:

@@ -5250,18 +5250,19 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     ) -> Response:
         """A file whose columns were not recognised: its columns and first
         rows, to name them. Nothing is spent: no preview, no free report."""
+        guessed, _ = mapping.preselected(table)
         if exc.code in ("unknown_format", "universal_columns_missing"):
             # Said on this page, not as "name them on the form".
             if chosen:
                 text = mapping.missing_fields(chosen, locale)
-            elif "profit" in mapping.preselected(table)[0]:
+            elif "profit" in guessed:
                 text = mapping.COPY[locale]["results"]
             else:
                 text = mapping.COPY[locale]["unknown"]
         elif exc.code == "equity_not_positive":
             text = mapping.COPY[locale]["results"]
         elif exc.code in ("missing_value", "missing_timestamp"):
-            results = "profit" in chosen or "profit" in mapping.preselected(table)[0]
+            results = "profit" in chosen or "profit" in guessed
             text = mapping.COPY[locale]["results" if results else "unknown"]
         else:
             text = _sentence(exc.localized(locale))
@@ -5284,6 +5285,16 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         request.state.ops_rejection_format = detected
         request.state.ops_rejection_detector = "mapping"
         guidance = upload_rejections.rejection_guidance(category, detected, locale)
+        logger.info(
+            "mapping page: code=%s pdf=%s columns=%d samples=%d guessed=%d chosen=%d locale=%s",
+            exc.code,
+            table.pdf,
+            len(table.names),
+            len(table.samples),
+            len(guessed),
+            len(chosen),
+            locale,
+        )
         if _wants_json(request):
             return JSONResponse(
                 {
