@@ -485,8 +485,10 @@ FROZEN: dict[str, tuple[Any, ...]] = {
     "synthetic/positive_drift;semicolon": (
         "B", "2019-01-02", "2024-10-01", 1500, 4.89628, -0.131589, 2.035296, 0.157907,
         "PS/PS/ND/ND/WK/ND", "ZERO_DECLARED_COSTS"),
+    # A returns frame is audited as periodic returns: the first date and the count
+    # are those of the returns themselves, not of a synthetic starting level.
     "synthetic/returns_frame": (
-        "C", "2019-01-01", "2021-04-20", 601, 0.369762, -0.151795, 0.94576, 0.157846,
+        "C", "2019-01-02", "2021-04-20", 600, 0.369762, -0.151795, 0.929502, 0.155132,
         "WK/WK/ND/ND/WK/ND", "ZERO_DECLARED_COSTS"),
     "synthetic/best_of_n_walks+variants": (
         "C", "2019-01-02", "2020-12-17", 512, 0.83313, -0.148953, 2.038054, 0.158117,

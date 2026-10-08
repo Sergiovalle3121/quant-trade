@@ -1080,7 +1080,8 @@ def _benchmark_step(data: dict[str, Any], status: str, locale: str) -> tuple[str
     excess = _number(_value(bench.get("excess_return")))
     ratio = _number(_value(bench.get("drawdown_ratio")))
     parts = []
-    if bench.get("source") == "file":
+    source = bench.get("source")
+    if source == "file" or (isinstance(source, dict) and source.get("value") == "embedded column"):
         parts.append(
             _say(
                 locale,

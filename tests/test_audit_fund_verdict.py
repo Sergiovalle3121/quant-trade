@@ -47,7 +47,9 @@ def test_a_fund_that_trails_its_own_index_fails_the_benchmark() -> None:
     result = _run(_dated(fund, index))
     assert _status(result)["benchmark"] == "FAIL"
     bench = result.benchmark  # type: ignore[attr-defined]
-    assert bench["source"] == "file" and bench["excess_return"]["value"] < 0
+    # A periodic-return file names where its benchmark came from, as a declared value.
+    assert bench["source"] == {"value": "embedded column", "evidence": "DECLARED", "note": ""}
+    assert bench["excess_return"]["value"] < 0
     assert bench["overlap_share"]["note"] == FILE_BENCHMARK_NOTE
     data = result.model_dump(mode="json")  # type: ignore[attr-defined]
     steps = {step.dimension: step for step in improvement_plan(data, "es")}
@@ -68,7 +70,9 @@ def test_an_uploaded_benchmark_wins_and_a_declared_none_still_counts() -> None:
         _dated(fund, index), DeclaredMetadata(locale="es"), benchmark_bytes=upload
     )
     uploaded = run_audit(inputs, bootstrap_samples=200)
-    assert uploaded.benchmark["status"] == "MEASURED" and "source" not in uploaded.benchmark
+    assert uploaded.benchmark["status"] == "MEASURED"
+    assert uploaded.benchmark["source"]["value"] == "uploaded benchmark file"
+    assert uploaded.benchmark["source"]["evidence"] == "DECLARED"
     none = _run(_dated(fund, index), benchmark_applicable=False)
     assert _status(none)["benchmark"] == "NOT_APPLICABLE"
 
@@ -79,7 +83,8 @@ def test_an_index_with_a_missing_month_is_not_used() -> None:
     data[20] = data[20].rsplit(",", 1)[0] + ","
     result = _run(("\n".join(data) + "\n").encode())
     assert _status(result)["benchmark"] == "NOT_MEASURED"
-    assert "source" not in result.benchmark  # type: ignore[attr-defined]
+    # The source is still named so the reader knows which column could not be used.
+    assert result.benchmark["source"]["value"] == "embedded column"  # type: ignore[attr-defined]
 
 
 @pytest.mark.parametrize("locale", ["es", "en", "pt"])
