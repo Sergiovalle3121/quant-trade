@@ -14,7 +14,7 @@ from fastapi.testclient import TestClient  # noqa: E402
 
 from quant_trade.audit.audiences import AUDIENCE_PAGES, audience_url  # noqa: E402
 from quant_trade.audit.guard import find_claims  # noqa: E402
-from quant_trade.audit.pages import CONTACT_PATHS  # noqa: E402
+from quant_trade.audit.institutional import REVIEW_PATHS  # noqa: E402
 from quant_trade.audit.settings import AuditSettings  # noqa: E402
 from quant_trade.audit.store import make_store  # noqa: E402
 from quant_trade.audit.web import create_app  # noqa: E402
@@ -40,7 +40,7 @@ def client(tmp_path: Path) -> TestClient:
         ("pt", "/pt/para/gestoras-e-sinais", "/pt"),
     ],
 )
-def test_institutional_page_is_indexable_and_routes_to_contact(
+def test_institutional_page_is_indexable_and_routes_to_review_request(
     client: TestClient, locale: str, path: str, home: str
 ) -> None:
     audience = next(page for page in AUDIENCE_PAGES if page.slug == "gestoras-y-senales")
@@ -57,8 +57,8 @@ def test_institutional_page_is_indexable_and_routes_to_contact(
     assert client.get(f"/static/og-{locale}.png").status_code == 200
     for language in ("es", "en", "pt"):
         assert f"https://audit.example{audience_url(audience.slug, language)}" in page
-    assert f"href='{CONTACT_PATHS[locale]}'" in page
-    assert client.get(CONTACT_PATHS[locale]).status_code == 200
+    assert f"href='{REVIEW_PATHS[locale]}'" in page
+    assert client.get(REVIEW_PATHS[locale]).status_code == 200
     assert "class='aud-price'" not in page
     assert f"https://audit.example{path}<" in client.get("/sitemap.xml").text
     assert f"href='{path}'" in client.get(home).text

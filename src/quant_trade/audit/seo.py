@@ -71,6 +71,12 @@ PUBLIC_PAGES: tuple[dict[str, str], ...] = (
     {"es": "/privacidad", "en": "/privacy", "pt": "/pt/privacidade"},
     # The contact page (pages.CONTACT_PATHS, kept in step by a test).
     {"es": "/contacto", "en": "/en/contact", "pt": "/pt/contato"},
+    # The institutional intake (institutional.REVIEW_PATHS, kept in step by a test).
+    {
+        "es": "/revision-institucional",
+        "en": "/en/institutional-review",
+        "pt": "/pt/revisao-institucional",
+    },
 )
 
 #: Paths crawlers are asked to skip: report URLs carry the owner's token.

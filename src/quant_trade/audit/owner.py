@@ -15,6 +15,7 @@ from collections.abc import Sequence
 from typing import TYPE_CHECKING
 
 from quant_trade.audit.funnel import DIRECT, REF_DAYS, REF_TAGS, ref_label
+from quant_trade.audit.guard import find_claims
 from quant_trade.audit.pages import _e, _field, _page, _page_hero
 from quant_trade.audit.settings import DEFAULT_PANEL_PATH
 
@@ -24,6 +25,7 @@ if TYPE_CHECKING:
         AccessCodeRecord,
         CheckoutOrder,
         EmailDeliveryIssue,
+        InstitutionalRequest,
         RefusedPayment,
         StripeRefundRecord,
     )
@@ -94,6 +96,23 @@ TEXT: dict[str, str] = {
     "mail_not_requeued": (
         "No se reencoló: exige aviso fallido, orden live compatible y correo actual confirmado."
     ),
+    "institutional_title": "Solicitudes institucionales",
+    "institutional_lead": (
+        "Solicitudes más recientes. Datos del solicitante: DECLARED. "
+        "Fecha de recepción y seguimiento: MEASURED."
+    ),
+    "institutional_none": "Todavía no hay solicitudes institucionales.",
+    "institutional_cols": (
+        "Fecha (MEASURED)|Organización|Contacto|Tipo (DECLARED)|Frecuencia (DECLARED)|"
+        "Años (DECLARED)|Benchmark (DECLARED)|Variantes (DECLARED)|Seguimiento"
+    ),
+    "institutional_contact": "Marcar contactado",
+    "institutional_done": "Contactado",
+    "institutional_contacted": "Solicitud marcada como contactada.",
+    "institutional_not_found": "No hay una solicitud con ese id.",
+    "institutional_hidden": "Texto omitido",
+    "institutional_yes": "Sí",
+    "institutional_no": "No",
     "reset_title": "Restablecer la contraseña de un cliente",
     "reset_lead": (
         "Crea un enlace de un solo uso (caduca en 24 horas) para un cliente que olvidó su "
@@ -183,6 +202,18 @@ TEXT: dict[str, str] = {
 
 LOCALE_NAMES: dict[str, str] = {"es": "español", "en": "inglés", "pt": "portugués", "-": "-"}
 
+INSTITUTIONAL_TYPES: dict[str, str] = {
+    "signal": "Señal",
+    "model_portfolio": "Cartera modelo",
+    "fund": "Fondo",
+    "ea": "EA",
+}
+INSTITUTIONAL_FREQUENCIES: dict[str, str] = {
+    "daily": "Diaria",
+    "weekly": "Semanal",
+    "monthly": "Mensual",
+}
+
 #: The panel is in Spanish; ``payments.refusal`` reasons are logged in English.
 REFUSAL_REASONS: dict[str, str] = {
     "no Checkout session or no audit id": "sin sesión de Stripe o sin informe",
@@ -256,6 +287,56 @@ def _codes_table(key: str, codes: Sequence[AccessCodeRecord], panel_path: str = 
         tds = "".join(f"<td>{_e(c)}</td>" for c in cells)
         rows.append(f"<tr>{tds}<td>{action}</td></tr>")
     return f"<table><thead><tr>{head}</tr></thead><tbody>{''.join(rows)}</tbody></table>"
+
+
+def _institutional_table(
+    key: str, requests: Sequence[InstitutionalRequest], panel_path: str = PANEL_PATH
+) -> str:
+    """Private contact details and declared inputs; never render the free text or findings."""
+    intro = (
+        f"<h2 style='margin-top:32px'>{_e(TEXT['institutional_title'])}</h2>"
+        f"<p class='muted'>{_e(TEXT['institutional_lead'])}</p>"
+    )
+    if not requests:
+        return intro + f"<p class='muted'>{_e(TEXT['institutional_none'])}</p>"
+
+    def safe_text(value: str) -> str:
+        # Intake validates these fields too; old/imported rows must remain safe to render.
+        return _e(TEXT["institutional_hidden"] if find_claims(value) else value)
+
+    head = "".join(f"<th>{_e(col)}</th>" for col in TEXT["institutional_cols"].split("|"))
+    rows = []
+    for record in requests:
+        contact = f"{safe_text(record.name)}<br>{safe_text(record.email)}"
+        cells = (
+            safe_text(record.created_at[:10]),
+            safe_text(record.organization),
+            contact,
+            _e(INSTITUTIONAL_TYPES.get(record.strategy_type, "—")),
+            _e(INSTITUTIONAL_FREQUENCIES.get(record.frequency, "—")),
+            safe_text(record.history_years),
+            _e(TEXT["institutional_yes"] if record.has_benchmark else TEXT["institutional_no"]),
+            _e(str(record.variants)),
+        )
+        if record.contacted_at:
+            action = (
+                f"{_e(TEXT['institutional_done'])} · {safe_text(record.contacted_at[:10])} "
+                "(MEASURED)"
+            )
+        else:
+            action = (
+                f"<form method='post' action='{_e(panel_path)}'>{_key_field(key)}"
+                "<input type='hidden' name='action' value='institutional_contacted'>"
+                f"<input type='hidden' name='request_id' value='{_e(record.id)}'>"
+                f"<button class='btn btn-ghost' type='submit'>"
+                f"{_e(TEXT['institutional_contact'])}</button></form>"
+            )
+        cells_html = "".join(f"<td>{cell}</td>" for cell in cells)
+        rows.append(f"<tr>{cells_html}<td>{action}</td></tr>")
+    return (
+        intro + "<div style='overflow-x:auto'><table id='institutional-requests'>"
+        f"<thead><tr>{head}</tr></thead><tbody>{''.join(rows)}</tbody></table></div>"
+    )
 
 
 def _refused_table(refused: Sequence[RefusedPayment]) -> str:
@@ -530,6 +611,7 @@ def panel_page(
     refunds: Sequence[StripeRefundRecord] = (),
     mail_issues: Sequence[EmailDeliveryIssue] = (),
     mail_warning_counts: dict[str, int] | None = None,
+    institutional_requests: Sequence[InstitutionalRequest] = (),
     new_code: str = "",
     flash: str = "",
     error: str = "",
@@ -594,6 +676,7 @@ def panel_page(
         + f"<form method='post' action='{_e(panel_path)}'>{_key_field(key)}"
         + "<input type='hidden' name='action' value='public_card'>"
         + f"<button class='btn btn-ghost' type='submit'>{_e(TEXT['public_card'])}</button></form>"
+        + _institutional_table(key, institutional_requests, panel_path)
         + _refused_table(refused)
         + _orders_table(orders)
         + _refunds_table(refunds)

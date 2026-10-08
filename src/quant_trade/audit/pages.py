@@ -17,6 +17,7 @@ from collections.abc import Sequence
 from datetime import datetime
 from typing import Any
 
+from quant_trade.audit import institutional
 from quant_trade.audit.accounts import FREE_PREVIEWS_PER_MONTH as _FREE
 from quant_trade.audit.articles import (
     ARTICLES,
@@ -498,6 +499,7 @@ _COPY: dict[str, dict[str, Any]] = {
     },
     "en": {
         "title": f"{BRAND} · Backtest audit",
+        "meta_title": f"Independent backtest audit · {BRAND}",
         "headline": "Upload your backtest. We tell you whether it is statistically real.",
         "pitch": (
             "Most backtests that look good on paper fail live through overfitting, uncounted "
@@ -618,9 +620,8 @@ _COPY: dict[str, dict[str, Any]] = {
         "disclaimer": "Notice",
         "sample_link": "See a full sample report (synthetic data)",
         "meta_description": (
-            "Upload the file you already have (MetaTrader, TradingView, NinjaTrader, Python or "
-            "your equity curve) and Rigor shows how much of your result holds up under costs, "
-            "how many tests were behind it and whether the data adds up. Class A to D."
+            "Statistical review of a trading strategy: inspect costs, research trials and "
+            "track-record evidence with an independent backtest audit."
         ),
         "sample_description": (
             "A full sample report of the backtest audit, built from synthetic data: verdict, "
@@ -2590,7 +2591,8 @@ def landing(
     address; free mode has no such report, so the note is never shown there."""
     locale = _locale(locale)
     copy = _COPY[locale]
-    meta = _public_meta(copy["title"], copy["meta_description"], locale, _home(locale), base_url)
+    title = copy.get("meta_title", copy["title"])
+    meta = _public_meta(title, copy["meta_description"], locale, _home(locale), base_url)
     sample = _sample_url(locale)
     err = f"<div class='error' role='alert'>{_e(error)}</div>" if error else ""
     count_html = completed_count_html(completed_audits, locale)
@@ -2600,7 +2602,7 @@ def landing(
         + _specs(locale)
         + _audiences(locale)
         + "<div class='section light'><div class='wrap'>"
-        + institutional_block(locale, CONTACT_PATHS[locale])
+        + institutional_block(locale, institutional.REVIEW_PATHS[locale])
         + "</div></div>"
         + _problems(locale)
         + _dimensions(locale, copy)
@@ -2627,7 +2629,7 @@ def landing(
         + _faq_html(copy, locale, retention_days=retention_days)
         + _final_cta(copy, locale, sample, joined=joined, err=err)
     )
-    return _page(copy["title"], locale, body, meta_html=meta, alternates=LANDING_PATHS)
+    return _page(title, locale, body, meta_html=meta, alternates=LANDING_PATHS)
 
 
 def _start_band(locale: str) -> str:
@@ -3199,6 +3201,47 @@ _CONTACT_CHANNELS = {
     "en": "How to write to us",
     "pt": "Como escrever para nós",
 }
+
+
+def institutional_review_page(
+    *,
+    locale: str = "es",
+    base_url: str = "",
+    ref: str = "",
+    received: bool = False,
+    error: str = "",
+) -> str:
+    """Only static confirmation/error copy is returned; client fields are never echoed."""
+    words = institutional.COPY[locale]
+    title = words["received"] if received else words["title"]
+    lead = words["next"] if received else words["lead"]
+    meta = (
+        private_meta(title, locale, lead)
+        if received or error
+        else _public_meta(title, lead, locale, institutional.REVIEW_PATHS[locale], base_url)
+    )
+    content = (
+        f"<p><a href='{_home(locale)}'>{_e(words['back'])}</a></p>"
+        if received
+        else (f"<p class='error' role='alert'>{_e(words[error])}</p>" if error else "")
+        + f"<p>{_e(words['note'])}</p>"
+        + institutional.form_html(locale, ref=ref)
+        + f"<p><a href='{legal_url('privacy', locale)}'>{_e(words['privacy'])}</a></p>"
+    )
+    body = (
+        _page_hero(words["title"], title, lead)
+        + "<div class='paper page-main'><div class='wrap wrap-mid'>"
+        + content
+        + "</div></div>"
+    )
+    return _page(
+        title,
+        locale,
+        body,
+        meta_html=meta,
+        alternates=institutional.REVIEW_PATHS,
+        solid_nav=True,
+    )
 
 
 def contact_page(
@@ -3796,11 +3839,10 @@ def articles_index_page(*, locale: str = "es", base_url: str = "") -> str:
 def article_page(article: Article, *, locale: str = "es", base_url: str = "") -> str:
     """One article: its sections, questions, related pages and a closing call."""
     locale = _locale(locale)
-    copy = _COPY[locale]
     words = ARTICLES_COPY[locale]
     text = article.text[locale]
     alternates = {lang: article_url(article.key, lang) for lang in ("es", "en", "pt")}
-    title = f"{text.title} · {copy['title']}"
+    title = f"{text.title} · {BRAND}"
     meta = _public_meta(title, text.summary, locale, article_url(article.key, locale), base_url)
     meta += article_structured_data(article, locale, base_url)
     sections = [
@@ -3907,8 +3949,8 @@ def audience_page(
     start = audit_path(locale) + ("?extras=1" if audience.open_extras else "")
     start_label = words["start"]
     if audience.contact_cta:
-        start = CONTACT_PATHS[locale]
-        start_label = CONTACT_COPY[locale]["eyebrow"]
+        start = institutional.REVIEW_PATHS[locale]
+        start_label = institutional.COPY[locale]["title"]
     buttons = (
         "<div class='hero-cta'>"
         f"<a class='btn btn-dark' href='{_e(start)}'>{_e(start_label)}"

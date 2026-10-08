@@ -4452,11 +4452,61 @@ date,gross_return,net_return
   Optional CairoSVG converts only the freshly generated SVG into PNG in memory;
   otherwise localized instructions explain external conversion. This operation
   writes neither database records nor files. No new login/session subsystem.
-- The institutional landing block exists in ES/EN/PT and links to the existing
-  localized contact form. No contact delivery or account behavior changes.
+- The institutional landing block exists in ES/EN/PT and now links to the
+  localized institutional review request described below.
 
 Offline regression coverage: `test_audit_return_series.py`,
 `test_audit_period_analysis.py`, `test_audit_frequency.py`,
 `test_audit_series_ui.py`, `test_audit_series_integration.py`,
 `test_audit_owner_card.py` and the related existing importer/engine/report tests.
 Keep the three PDF exclusions above on the Windows laptop.
+
+### Institutional review requests (7 October 2026)
+
+`/revision-institucional`, `/en/institutional-review` and
+`/pt/revisao-institucional` collect contact details and DECLARED strategy type,
+series frequency, years of history, benchmark availability and approximate trial
+count. No audit is run and no files are accepted. The home institutional block
+and the funds/signal audience link here; the normal audit flow handles files later.
+
+The repository's `inbox.py` validates email addresses; the existing contact page
+publishes contact channels and has no POST form or stored inbox. Intake therefore
+uses the existing SQLAlchemy `Store` and durable `mail.py` outbox, adding only an
+`institutional_requests` table. The English audience retains its existing
+canonical `/for/funds-and-signal-providers`, not the brief's `/en/for/...` path.
+
+Limits: five attempts per IP per hour across languages, using the stored attempt
+log (hashed IP key), 16 KiB request body, honeypot, same-origin checks, plain email
+validation and the disposable/reserved-domain rules from `inbox.py`. HTML,
+control characters, unknown/duplicate fields and multipart uploads are refused.
+Names and organizations have 100/160-character limits; history is greater than
+zero and at most 100 years with two decimal places; variants are integers from
+zero to 999,999,999. These bounds protect input/storage, not an audit verdict.
+
+Free text is at most 1,000 characters, scanned with `scan_client_text` and stored
+verbatim with its findings. Claims in that text do not block intake: neither the
+text nor its findings are rendered or emailed. Identity-field claims are refused.
+Confirmation contains only static next steps and is noindex. No client data is
+logged, exported, or written as files by this flow.
+
+When existing mail delivery is ready and `AUDIT_OPERATOR_CONTACT` is a plain
+email address, saving and enqueueing are atomic. The existing worker attempts the
+notice on its next poll (ten seconds), with its existing eight-attempt/seven-day
+limits and stable Message-ID. The notice contains only name, organization, email
+and strategy type. No new credentials or transport are introduced. Without mail
+configuration the request remains in the private panel, without a queued notice;
+immediate notification depends on that configuration and transport availability.
+
+The owner-key POST panel shows the latest 100 requests, their declared context
+and contact details. Marking contacted persists its first timestamp and rejects
+cross-site requests. No free text appears there. Audit retention, payments,
+credits and calculation rules are unchanged; this PR adds no prospect purge
+policy or new privacy promise. The one-business-day response is an operator
+follow-up expectation, not an automated review or a result claim.
+
+Offline coverage: `test_audit_institutional_intake.py`,
+`test_audit_institutional_store_mail.py`, `test_audit_institutional_owner.py` and
+`test_audit_professional_seo.py`, plus the existing mail/panel/public-page tests.
+Windows commands use `D:\quant-trade\.venv\Scripts\python.exe`, a worktree-local
+`--basetemp`, and exclude `tests/test_audit_pdf*.py` and
+`tests/test_personal_paper*.py` as requested.

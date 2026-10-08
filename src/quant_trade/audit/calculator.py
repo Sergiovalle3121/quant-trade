@@ -205,10 +205,10 @@ COPY: dict[str, dict[str, Any]] = {
     "en": {
         "nav": "Luck calculator",
         "eyebrow": "Free calculator",
-        "title": "Edge or luck? Deflated Sharpe calculator",
+        "title": "Deflated Sharpe ratio calculator",
         "summary": (
-            "Enter your backtest's Sharpe, how many years it covers and how many configurations "
-            "you tried: see how much of that Sharpe luck alone could explain. No signup."
+            "Explore the deflated Sharpe ratio using declared Sharpe, years of history and "
+            "research attempts. Assumptions and limits are explicit."
         ),
         "form_title": "Your numbers",
         "sharpe": "Backtest annual Sharpe",

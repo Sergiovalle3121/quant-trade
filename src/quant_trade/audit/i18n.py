@@ -75,6 +75,29 @@ _TRIAL_SOURCES: dict[str, str] = {
 }
 
 _RULES_SOURCE: tuple[tuple[str, str], ...] = (
+    (
+        "The request is too large. Shorten the text and try again.",
+        "La solicitud es demasiado grande. Reduce el texto e inténtalo de nuevo.",
+    ),
+    # Institutional intake: the same notices also have native ES/PT page copy.
+    (
+        "These details are DECLARED: supplied by the person requesting the review. "
+        "This form has no attachments; upload the series later through the usual flow.",
+        "Los datos son DECLARED: los aporta quien solicita la revisión. "
+        "Aquí no se adjuntan archivos; la serie se sube después por el flujo habitual.",
+    ),
+    (
+        "Check the fields. Use text without HTML and a valid email address.",
+        "Revisa los campos. Usa texto sin HTML y un correo válido.",
+    ),
+    (
+        "The request limit has been reached. Try again in one hour.",
+        "Se alcanzó el límite de solicitudes. Inténtalo dentro de una hora.",
+    ),
+    (
+        "We could not save the request. Please try again later.",
+        "No pudimos guardar la solicitud. Inténtalo de nuevo más tarde.",
+    ),
     # Private comparison: fixed steps for reviewing original evidence.
     (
         "What to check now",

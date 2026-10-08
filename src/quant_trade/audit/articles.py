@@ -1843,10 +1843,7 @@ ARTICLES_DATA: tuple[dict[str, Any], ...] = (
         },
         "title": {
             "es": "Auditoría independiente de un backtest: qué revisa que una réplica no",
-            "en": (
-                "Independent backtest audit: what a statistical review checks that a "
-                "replication does not"
-            ),
+            "en": "Independent backtest audit: scope and evidence",
             "pt": (
                 "Auditoria independente de um backtest: o que uma revisão estatística examina "
                 "além da réplica"
@@ -1858,8 +1855,8 @@ ARTICLES_DATA: tuple[dict[str, Any], ...] = (
                 "de variantes y qué distingue los datos medidos de las declaraciones."
             ),
             "en": (
-                "What a statistical backtest review examines, how it handles variant selection, "
-                "and why measured evidence differs from a declaration."
+                "What a statistical review of a trading strategy examines: variant selection, "
+                "costs and the difference between measured and declared evidence."
             ),
             "pt": (
                 "O que uma revisão estatística de um backtest examina, como trata a seleção de "
@@ -2407,7 +2404,7 @@ ARTICLES_DATA: tuple[dict[str, Any], ...] = (
         },
         "title": {
             "es": "Sharpe deflactado, explicado para quienes publican historiales",
-            "en": ("Deflated Sharpe ratio, explained for people who publish track records"),
+            "en": "Deflated Sharpe ratio for track records",
             "pt": "Sharpe deflacionado, explicado para quem publica históricos",
         },
         "summary": {
@@ -2416,8 +2413,8 @@ ARTICLES_DATA: tuple[dict[str, Any], ...] = (
                 "y dónde limita el supuesto de independencia."
             ),
             "en": (
-                "How counting research attempts changes a Sharpe ratio's interpretation, what "
-                "Rigor calculates and where independence assumptions matter."
+                "How the deflated Sharpe ratio accounts for research attempts, which inputs "
+                "Rigor uses and where assumptions about independent trials limit the result."
             ),
             "pt": (
                 "Como contar as tentativas muda a leitura do Sharpe, o que o Rigor calcula e "
@@ -2978,10 +2975,7 @@ ARTICLES_DATA: tuple[dict[str, Any], ...] = (
                 "Cómo auditar una cartera modelo o un historial de señales antes de presentarlo a "
                 "inversores"
             ),
-            "en": (
-                "How to audit a model portfolio or signal track record before showing it to "
-                "investors"
-            ),
+            "en": "Independent backtest audit: portfolios and signals",
             "pt": (
                 "Como auditar uma carteira modelo ou um histórico de sinais antes de apresentá-lo "
                 "a investidores"
@@ -2993,8 +2987,8 @@ ARTICLES_DATA: tuple[dict[str, Any], ...] = (
                 "puede responder una revisión estadística del archivo."
             ),
             "en": (
-                "What return series to supply, how to document costs and the benchmark, and what "
-                "a statistical review of the file can answer."
+                "Prepare a model portfolio or signal history for an independent backtest audit: "
+                "gross and net return series, costs, benchmark and research attempts."
             ),
             "pt": (
                 "Qual série de retornos enviar, como documentar custos e benchmark e o que uma "

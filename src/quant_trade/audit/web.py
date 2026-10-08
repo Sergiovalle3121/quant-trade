@@ -44,6 +44,7 @@ from quant_trade.audit import (
     forensics_web,
     funnel,
     inbox,
+    institutional,
     mapping,
     owner_card,
     payments,
@@ -110,6 +111,7 @@ from quant_trade.audit.pages import (
     examples_page,
     guide_page,
     guides_index_page,
+    institutional_review_page,
     landing,
     legal_page,
     method_page,
@@ -1161,6 +1163,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     upload_attempts = AttemptLog()
     redeem_attempts = AttemptLog()
     waitlist_attempts = AttemptLog()
+    institutional_attempts = StoredAttemptLog(db, "institutional")
     panel_failures = StoredAttemptLog(db, "panel")
     check_attempts = AttemptLog()
     card_lookups = AttemptLog()
@@ -1210,6 +1213,16 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
 
     def _too_large_response(scope: Any) -> Any:
         path = scope.get("path", "")
+        if path in institutional.REVIEW_PATHS.values():
+            locale = next(k for k, v in institutional.REVIEW_PATHS.items() if v == path)
+            review_response = _institutional_response(
+                Request(scope),
+                locale,
+                error="too_large",
+                status=413,
+            )
+            review_response.headers["Connection"] = "close"
+            return _secure(review_response, path=path)
         if path == "/webhooks/stripe":
             webhook_response = PlainTextResponse("Payload too large", status_code=413)
             webhook_response.headers["Connection"] = "close"
@@ -1240,6 +1253,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         limit=body_limit,
         reject=_too_large_response,
         path_limits={
+            **dict.fromkeys(institutional.REVIEW_PATHS.values(), institutional.BODY_LIMIT),
             **dict.fromkeys(CHECK_PATHS, check_body_limit()),
             "/webhooks/stripe": WEBHOOK_BODY_LIMIT,
         },
@@ -1550,6 +1564,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         code_id: Annotated[str, Form()] = "",
         email: Annotated[str, Form(max_length=320)] = "",
         mail_id: Annotated[str, Form(max_length=64)] = "",
+        request_id: Annotated[str, Form(max_length=64)] = "",
         cost_start: Annotated[str, Form(max_length=10)] = "",
         cost_end: Annotated[str, Form(max_length=10)] = "",
         cost_scope: Annotated[str, Form(max_length=8)] = "all",
@@ -1621,6 +1636,12 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         elif action == "mail_requeue":
             flash = "mail_requeued" if db.requeue_purchase_email(mail_id.strip(), at=now) else ""
             error = "" if flash else "mail_not_requeued"
+        elif action == "institutional_contacted":
+            if _cross_site(request):
+                return _html_error(request, 403, message("cross_site", "es"), "es")
+            changed = db.mark_institutional_contacted(request_id.strip(), at=now)
+            flash = "institutional_contacted" if changed else ""
+            error = "" if changed else "institutional_not_found"
         reset_link = ""
         if action == "reset":
             account = db.find_account(acct.normalise_email(email))
@@ -1687,6 +1708,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 refunds=db.list_stripe_refunds(),
                 mail_issues=db.list_purchase_email_issues(at=now),
                 mail_warning_counts=db.purchase_email_warning_counts(at=now),
+                institutional_requests=db.list_institutional_requests(),
                 new_code=new_code,
                 flash=flash,
                 error=error,
@@ -1950,6 +1972,93 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         ("/pt/precos", "/pt"),
     ):
         _forward(price_path, f"{landing_path}#pricing")
+
+    def _institutional_response(
+        request: Request,
+        locale: str,
+        *,
+        received: bool = False,
+        error: str = "",
+        status: int = 200,
+    ) -> HTMLResponse:
+        ref = funnel.clean_ref(request.cookies.get(funnel.REF_COOKIE)) or funnel.clean_ref(
+            request.query_params.get("ref")
+        )
+        page = institutional_review_page(
+            locale=locale,
+            base_url=_site_url(request),
+            ref=ref,
+            received=received,
+            error=error,
+        )
+        response = HTMLResponse(guard_page(page), status_code=status)
+        if received or error:
+            response.headers["X-Robots-Tag"] = NOINDEX
+        return response
+
+    def institutional_form(request: Request) -> HTMLResponse:
+        locale = next(k for k, v in institutional.REVIEW_PATHS.items() if v == request.url.path)
+        return _institutional_response(request, locale)
+
+    async def institutional_submit(request: Request) -> HTMLResponse:
+        locale = next(k for k, v in institutional.REVIEW_PATHS.items() if v == request.url.path)
+        if _cross_site(request):
+            return _institutional_response(request, locale, error="invalid", status=403)
+        now = datetime.now(UTC)
+        ip = _client_ip(request, cfg.trusted_proxy_hops)
+        try:
+            attempts = await run_in_threadpool(institutional_attempts.hit, ip, now)
+        except Exception:
+            logger.warning("institutional request rate limit unavailable")
+            return _institutional_response(request, locale, error="unavailable", status=503)
+        if attempts >= institutional.MAX_REQUESTS_PER_HOUR:
+            return _institutional_response(request, locale, error="limited", status=429)
+        # Reject files before parsing multipart, so this form never spools an upload.
+        content_type = request.headers.get("content-type", "").split(";", 1)[0].strip().lower()
+        if content_type != "application/x-www-form-urlencoded":
+            return _institutional_response(request, locale, error="invalid", status=400)
+        form = await request.form()
+        if any(len(form.getlist(field)) != 1 for field in form):
+            return _institutional_response(request, locale, error="invalid", status=400)
+        values = {field: str(value) for field, value in form.items()}
+        if values.get("website"):
+            return _institutional_response(request, locale, received=True)
+        try:
+            intake = institutional.parse_intake(values)
+        except ValueError:
+            return _institutional_response(request, locale, error="invalid", status=400)
+        ref = (
+            funnel.clean_ref(request.cookies.get(funnel.REF_COOKIE))
+            or funnel.clean_ref(values.get("ref"))
+            or funnel.clean_ref(request.query_params.get("ref"))
+        )
+        recipient = acct.normalise_email(cfg.operator_contact)
+        if not cfg.email_delivery_ready or not acct.simple_email(recipient):
+            recipient = ""
+        try:
+            await run_in_threadpool(
+                db.add_institutional_request,
+                **dataclasses.asdict(intake),
+                locale=locale,
+                ref=ref,
+                at=now,
+                notification_email=recipient,
+            )
+        except Exception:
+            logger.warning("institutional request persistence unavailable")
+            return _institutional_response(request, locale, error="unavailable", status=503)
+        return _institutional_response(request, locale, received=True)
+
+    for review_path in institutional.REVIEW_PATHS.values():
+        app.add_api_route(
+            review_path, institutional_form, methods=["GET"], response_class=HTMLResponse
+        )
+        app.add_api_route(
+            review_path,
+            institutional_submit,
+            methods=["POST"],
+            response_class=HTMLResponse,
+        )
 
     def _contact(request: Request, locale: str) -> HTMLResponse:
         return HTMLResponse(
