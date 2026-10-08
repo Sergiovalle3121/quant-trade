@@ -48,8 +48,8 @@ MAPPING = {
 }
 
 
-def test_the_form_offers_a_field_per_column_role_in_both_languages() -> None:
-    for locale in ("es", "en"):
+def test_the_form_offers_a_field_per_column_role_in_all_three_languages() -> None:
+    for locale in ("es", "en", "pt"):
         page = upload_page(locale=locale)
         assert "id='report-columns'" in page
         for role in ROLES:

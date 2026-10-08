@@ -2282,8 +2282,15 @@ def _drop(
     locale: str,
     *,
     main: bool = False,
+    required: bool = False,
+    help_id: str = "",
 ) -> str:
     ui = _UI[locale]
+    file_attributes = " required" if required else ""
+    help_attributes = ""
+    if help_id and help_html:
+        file_attributes += f" aria-describedby='{_e(help_id)}'"
+        help_attributes = f" id='{_e(help_id)}'"
     if main:
         formats = "".join(f"<span>{_e(p)}</span>" for p in PLATFORMS)
         return (
@@ -2292,16 +2299,18 @@ def _drop(
             f"<div class='drop-title'>{_e(ui['drop_title'])}</div>"
             f"<div class='drop-sub'>{_e(ui['drop_sub'])}</div>"
             f"<div class='formats'>{formats}</div><div class='drop-file' aria-live='polite'></div>"
-            f"<input id='f-{name}' type='file' name='{name}' accept='{accept}'></div>"
-            f"<div class='help'>{help_html}</div></div>"
+            f"<input id='f-{name}' type='file' name='{name}'{file_attributes} "
+            f"accept='{accept}'></div>"
+            f"<div class='help'{help_attributes}>{help_html}</div></div>"
         )
     return (
         f"<div class='field'><label for='f-{name}'>{_e(label)}</label>"
         f"<div class='drop'><div class='icon'>{icon('file')}</div><div class='drop-txt'>"
         f"<div class='drop-title'>{_e(ui['drop_small'])}</div>"
         f"<div class='drop-file' aria-live='polite'></div>"
-        f"<input id='f-{name}' type='file' name='{name}' accept='{accept}'></div></div>"
-        + (f"<div class='help'>{help_html}</div>" if help_html else "")
+        f"<input id='f-{name}' type='file' name='{name}'{file_attributes} "
+        f"accept='{accept}'></div></div>"
+        + (f"<div class='help'{help_attributes}>{help_html}</div>" if help_html else "")
         + "</div>"
     )
 

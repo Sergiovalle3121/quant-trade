@@ -16,6 +16,7 @@ from fastapi.testclient import TestClient  # noqa: E402
 from quant_trade.audit import mapping  # noqa: E402
 from quant_trade.audit.guard import find_claims  # noqa: E402
 from quant_trade.audit.i18n import untranslated  # noqa: E402
+from quant_trade.audit.pages import GUIDES_COPY, guides_index_url  # noqa: E402
 from quant_trade.audit.settings import AuditSettings  # noqa: E402
 from quant_trade.audit.store import make_store  # noqa: E402
 from quant_trade.audit.web import create_app  # noqa: E402
@@ -107,6 +108,24 @@ def test_the_page_is_in_english_too(tmp_path: Path) -> None:
     assert "Tell us what each column is" in answer.text
     assert "Compra · e.g. 2300" in answer.text
     assert find_claims(answer.text) == []
+
+
+@pytest.mark.parametrize("locale", ["es", "en", "pt"])
+def test_the_mapping_page_offers_a_drop_area_and_export_guides(locale: str) -> None:
+    table = mapping.read_table(_journal())
+    assert table is not None
+    page = mapping.mapping_page(table, mapping.COPY[locale]["choose_help"], locale=locale)
+    assert "class='drop'" in page
+    assert "class='drop-file' aria-live='polite'" in page
+    assert "<label for='f-report'>" in page
+    assert "id='f-report' type='file' name='report' required" in page
+    assert "aria-describedby='f-report-help'" in page
+    assert "class='help' id='f-report-help'" in page
+    assert "accept='.csv,.txt,.tsv,.xlsx,.xls,.ods,.htm,.html,.zip,.pdf,text/csv'" in page
+    back_row = page.split("<div class='back-row'>", 1)[1].split("</form>", 1)[0]
+    assert f"href='{guides_index_url(locale)}'" in back_row
+    assert GUIDES_COPY[locale]["title"] in back_row
+    assert find_claims(page) == []
 
 
 def test_a_json_client_gets_the_columns(tmp_path: Path) -> None:
