@@ -2425,6 +2425,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         "recovered",
         "two_step_expired",
         "email_verified",
+        "email_verified_welcome",
     )
     account_flashes = (
         "welcome",
@@ -3336,7 +3337,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             locale = _account_locale(path_locale, lang)
             session = _session(request)
             if session is None:
-                flash = "email_verified" if done == "email_verified" else ""
+                flash = done if done in ("email_verified", "email_verified_welcome") else ""
                 return _signin_redirect(
                     locale, done=flash, next_path=account_pages.path("account", locale)
                 )
@@ -4014,6 +4015,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 _note_event(request, account_id, "email_changed")
             _settle_confirmed_invites(account_id, datetime.now(UTC))
             done = "email_changed" if kind == "change" else "email_verified"
+            if kind != "change" and _session(request) is None and not db.welcome_used(account_id):
+                done = "email_verified_welcome"
             return RedirectResponse(
                 f"{account_pages.path('account', locale)}?done={done}#verificar-correo",
                 status_code=303,

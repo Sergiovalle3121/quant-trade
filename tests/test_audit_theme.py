@@ -3,12 +3,16 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Iterator
 from pathlib import Path
+from xml.etree import ElementTree
 
 import pytest
 
 pytest.importorskip("fastapi")
 
+import cssselect2  # noqa: E402
+import tinycss2  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 
 from quant_trade.audit.guard import find_claims  # noqa: E402
@@ -18,6 +22,7 @@ from quant_trade.audit.settings import AuditSettings  # noqa: E402
 from quant_trade.audit.store import make_store  # noqa: E402
 from quant_trade.audit.theme import (  # noqa: E402
     NAV,
+    REPORT,
     STATIC_CACHE_CONTROL,
     STATIC_DIR,
     STATIC_FILES,
@@ -82,8 +87,91 @@ def test_phone_navigation_keeps_the_upload_button_visible_and_compact() -> None:
     assert ".nav-end>.btn{display:none}" not in NAV
     assert "@media (max-width:520px){.nav-end>.btn{--h:36px;padding:0 10px;font-size:.8rem}" in NAV
     assert ".nav-end>.lang{display:none}" in NAV
-    assert ".nav-end>.nav-account{display:none}" in STYLE
+    assert ".nav-end>.nav-account:not(.report-new-audit){display:none}" in STYLE
     assert ".nav-end>.langs{display:none}" in STYLE
+
+
+def _phone_rules(stylesheet: str, *, phone: bool = False) -> Iterator[tuple[str, str]]:
+    """Visit every rule in a 520px media block, including nested group rules."""
+    for rule in tinycss2.parse_stylesheet(stylesheet, skip_comments=True, skip_whitespace=True):
+        if rule.type == "at-rule" and rule.content is not None:
+            at_phone_width = rule.lower_at_keyword == "media" and bool(
+                re.search(
+                    r"\(\s*max-width\s*:\s*520px\s*\)",
+                    tinycss2.serialize(rule.prelude),
+                    flags=re.IGNORECASE,
+                )
+            )
+            yield from _phone_rules(tinycss2.serialize(rule.content), phone=phone or at_phone_width)
+        elif phone and rule.type == "qualified-rule":
+            yield tinycss2.serialize(rule.prelude), tinycss2.serialize(rule.content)
+
+
+def _hidden_phone_actions(stylesheet: str) -> list[tuple[str, str]]:
+    # The two navigation structures, with the real classes on their upload links.
+    root = cssselect2.ElementWrapper.from_html_root(
+        ElementTree.fromstring(
+            "<html><body><header class='nav'><div class='wrap nav-in'>"
+            "<div class='nav-end'><a class='btn btn-sm' href='/auditar'/></div>"
+            "</div></header><header class='nav nav-solid'><div class='wrap nav-in'>"
+            "<div class='nav-end no-print report-toolbar'>"
+            "<a class='nav-account report-new-audit' href='/auditar'/>"
+            "</div></div></header></body></html>"
+        )
+    )
+    actions = list(root.query_all(".nav-end>.btn, .report-new-audit"))
+    assert len(actions) == 2, "both navigation upload actions must be checked"
+    # Hiding an ancestor also hides its upload action.
+    protected = [element for action in actions for element in (*action.ancestors, action)]
+    hidden = []
+    for selector_text, body in _phone_rules(stylesheet):
+        for declaration in tinycss2.parse_declaration_list(body, skip_comments=True):
+            if declaration.type != "declaration":
+                continue
+            value = [
+                part for part in declaration.value if part.type not in {"whitespace", "comment"}
+            ]
+            serialized = tinycss2.serialize(value).lower()
+            property_name = declaration.lower_name
+            hides = (property_name, serialized) in {
+                ("display", "none"),
+                ("visibility", "hidden"),
+            } or (
+                property_name in {"opacity", "font-size"}
+                and len(value) == 1
+                and value[0].type in {"number", "percentage", "dimension"}
+                and value[0].value == 0
+            )
+            if hides:
+                selectors = cssselect2.compile_selector_list(selector_text)
+                if any(
+                    selector.pseudo_element is None and selector.test(element)
+                    for selector in selectors
+                    for element in protected
+                ):
+                    hidden.append((selector_text, property_name))
+    return hidden
+
+
+@pytest.mark.parametrize("stylesheet", [STYLE, NAV, REPORT], ids=["STYLE", "NAV", "REPORT"])
+def test_no_phone_rule_hides_either_upload_action(stylesheet: str) -> None:
+    assert _hidden_phone_actions(stylesheet) == []
+
+
+@pytest.mark.parametrize(
+    "rule",
+    [
+        ".nav-end > .btn { display: none !important }",
+        ".nav-end>.nav-account { display:none }",
+        ".other, .report-new-audit { visibility: hidden }",
+        ".nav-account { opacity: 0.0 }",
+        "a { font-size: 0px }",
+        ".report-toolbar { display: none }",
+    ],
+)
+def test_phone_visibility_check_rejects_hidden_actions_and_ancestors(rule: str) -> None:
+    stylesheet = f"@media (max-width: 520px) {{ @supports (display: flex) {{ {rule} }} }}"
+    assert _hidden_phone_actions(stylesheet)
 
 
 def test_report_navigation_compacts_only_its_upload_and_document_actions() -> None:

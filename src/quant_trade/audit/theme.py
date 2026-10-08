@@ -832,7 +832,8 @@ animation:spin .9s linear infinite}
 color:#a3a3aa;padding:8px 12px;border-radius:999px}
 .lang-switch:hover,.nav-end>.nav-account:hover{color:#fff}
 .report-languages{display:flex;align-items:center;gap:2px}
-@media (max-width:520px){.nav-end>.nav-account{display:none}}
+/* Keep the report upload action visible regardless of the order of mobile rules. */
+@media (max-width:520px){.nav-end>.nav-account:not(.report-new-audit){display:none}}
 @media (max-width:520px){.report-languages .lang-switch{padding:8px 6px}.nav-in>.logo{flex:none}
 .report-languages .lang-switch[data-short]{font-size:0}
 .report-languages .lang-switch[data-short]::before{content:attr(data-short);font-size:.8rem}}
