@@ -429,6 +429,9 @@ COPY: dict[str, dict[str, str]] = {
         "email_verified": (
             "Correo confirmado. Ya puedes usar las compras y las recompensas disponibles."
         ),
+        "email_verified_signin": (
+            "Correo confirmado. Inicia sesión para usar tu primer informe completo gratis."
+        ),
         "email_checkout_required": (
             "Confirma tu correo desde Mi cuenta antes de pagar. Confirmarlo también "
             "desbloquea tu primer informe completo gratis."
@@ -1143,6 +1146,7 @@ COPY: dict[str, dict[str, str]] = {
             "The change is pending. Open the link sent to the new e-mail to finish it."
         ),
         "email_verified": "E-mail confirmed. You can now use available purchases and rewards.",
+        "email_verified_signin": ("E-mail confirmed. Sign in to use your first full report, free."),
         "email_checkout_required": (
             "Confirm your e-mail from My account before paying. Confirming it also unlocks "
             "your first free full report."
@@ -1920,6 +1924,8 @@ def signin_page(
     locale = _locale(locale)
     copy = COPY[locale]
     signup = path("signup", locale) + (f"?next={_e(_q(next_path))}" if next_path else "")
+    if flash == "email_verified":
+        flash = "email_verified_signin"
     form = (
         _tabs("signin", locale, next_path)
         + _alert(copy, error, flash)
