@@ -13,6 +13,7 @@ src/quant_trade/audit/funnel.py
 src/quant_trade/audit/guides.py
 src/quant_trade/audit/i18n.py
 src/quant_trade/audit/importers.py
+src/quant_trade/audit/indexnow.py
 src/quant_trade/audit/legal.py
 src/quant_trade/audit/mail.py
 src/quant_trade/audit/method.py
@@ -46,6 +47,7 @@ tests/test_audit_email_routes_ui.py
 tests/test_audit_examples.py
 tests/test_audit_funnel.py
 tests/test_audit_importers.py
+tests/test_audit_indexnow.py
 tests/test_audit_landing_trust.py
 tests/test_audit_launch_journey.py
 tests/test_audit_launch_playbook.py

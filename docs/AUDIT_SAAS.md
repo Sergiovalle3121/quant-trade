@@ -2331,6 +2331,7 @@ with an empty value):
 | `AUDIT_TRUSTED_PROXY_HOPS` | `0` | Reverse proxies in front of the service. `0` ignores `X-Forwarded-For` (it is client-controlled) and rate-limits the socket address; `N` takes the N-th entry from the right. Railway needs `1`. |
 | `AUDIT_GOOGLE_VERIFICATION_FILE` | empty | Google Search Console's HTML-file check, e.g. `google1a2b3c4d5e6f7a8b.html`. When set, that path answers with the line Google expects. Anything else is ignored. |
 | `AUDIT_BING_SITE_AUTH` | empty | Bing Webmaster Tools' 32-character code, served as `/BingSiteAuth.xml`. Anything else is ignored. |
+| `AUDIT_INDEXNOW_KEY` | `f5a5a16c542ab2277bfa9656ce368b3d` | The IndexNow key, public by design and served as `/<key>.txt`. Replaces the default (`indexnow.INDEXNOW_KEY`) when it has 8 to 128 characters from `A-Z a-z 0-9 -`; an empty or invalid value keeps the default. Set the same value where `quant-trade audit indexnow` runs. |
 
 Checkout creates a database order before calling Stripe. The order freezes the
 plan, USD amount and report id, and its id is the Stripe idempotency key. A
@@ -3313,6 +3314,38 @@ the page itself is `noindex` so that an unpublished audit does not stay in
 search results. No page sets `og:image`: the badge is SVG, which most chat
 apps do not preview. Every new page must pass the guard in both languages
 (`tests/test_audit_guides_seo.py`).
+
+**IndexNow** (`audit/indexnow.py`, `tests/test_audit_indexnow.py`). The
+[IndexNow protocol](https://www.indexnow.org/documentation) tells Bing (and
+through it DuckDuckGo, Yahoo and ChatGPT's search), Yandex, Seznam and Naver
+that a page exists, without waiting for their crawl. Google does not use it;
+Search Console covers Google. The key is public by design: the site always
+serves it as `text/plain` at `/<key>.txt` (today
+`/f5a5a16c542ab2277bfa9656ce368b3d.txt`, with the site's security headers),
+any other `.txt` stays a 404, the file is not in the sitemap and `robots.txt`
+does not close it. The default is `indexnow.INDEXNOW_KEY`;
+`AUDIT_INDEXNOW_KEY` replaces it (see the variables table). The web service
+never submits anything: the owner runs
+
+```
+quant-trade audit indexnow --dry-run                     # count and first 5 URLs, sends nothing
+quant-trade audit indexnow                               # submit https://rigorscore.com
+quant-trade audit indexnow --site https://rigorscore.com # same, explicit
+```
+
+after a deploy that adds or changes public pages. The URLs are the ones
+`seo.sitemap_xml(site)` lists, built locally (nothing is downloaded), kept
+only when they are `https` on the site's host (anything else, `www.`
+included, is dropped and counted) and sent once each, in POSTs of at most
+10,000 URLs to `https://api.indexnow.org/indexnow` with the JSON body
+`{"host", "key", "keyLocation", "urlList"}`. Each batch prints its HTTP status
+and the documentation's name for it: 200 (OK) and 202 (Accepted, key
+validation pending) are accepted; 400 (Bad request), 403 (Forbidden: key file
+missing or different), 422 (Unprocessable Entity: URL off the host or a key
+outside the protocol), 429 (Too Many Requests) and any network failure (only
+its kind is printed) are errors and the command exits 1. Run it after the new
+key file is live, and with the same `AUDIT_INDEXNOW_KEY` as the server when
+the variable is set there, or the engines answer 403.
 
 Launch basics (2026-09-28, `tests/test_audit_launch_basics.py`):
 

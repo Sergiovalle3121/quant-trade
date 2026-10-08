@@ -81,6 +81,7 @@ from quant_trade.audit.examples import EXAMPLES_PATH
 from quant_trade.audit.faq import FAQ_PATH, faq_page
 from quant_trade.audit.guides import GUIDES_BY_PATH, guide_url
 from quant_trade.audit.importers import detect_format
+from quant_trade.audit.indexnow import clean_key, key_path
 from quant_trade.audit.legal import LEGAL_UPDATED, LegalContext, privacy_text, terms_text
 from quant_trade.audit.market import MarketData
 from quant_trade.audit.ops import OpsCounter, OpsMiddleware
@@ -1999,6 +2000,15 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         @app.get("/BingSiteAuth.xml", include_in_schema=False)
         def bing_verification() -> Response:
             return Response(content=bing_body, media_type="application/xml")
+
+    # The IndexNow key file (audit/indexnow.py). The key is public by design and
+    # always set, so the file always exists; any other ``.txt`` stays a 404. It
+    # is not in the sitemap and robots.txt does not close it: engines fetch it.
+    indexnow_key = clean_key(cfg.indexnow_key)
+
+    @app.get(key_path(indexnow_key), include_in_schema=False)
+    def indexnow_key_file() -> Response:
+        return PlainTextResponse(indexnow_key)
 
     @app.get("/sitemap.xml")
     def sitemap(request: Request) -> Response:
