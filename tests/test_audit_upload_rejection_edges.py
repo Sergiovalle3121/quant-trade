@@ -250,10 +250,24 @@ def test_missing_consent_preserves_declarations_and_counts_form_refusal(
 
 
 @pytest.mark.parametrize("locale", ("es", "en", "pt"))
-def test_form_without_any_file_counts_empty_upload(tmp_path: Path, locale: str) -> None:
-    app = _app(tmp_path)
+@pytest.mark.parametrize("extra_part", (False, True))
+def test_form_without_any_file_counts_empty_upload(
+    tmp_path: Path,
+    locale: str,
+    extra_part: bool,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    app = _app(tmp_path, trusted_proxy_hops=1)
+    caplog.set_level(logging.DEBUG)
+    ip = "192.0.2.233"
     with TestClient(app) as client:
-        response = client.post("/audits", data={"consent": "on", "locale": locale})
+        response = client.post(
+            "/audits",
+            data={"consent": "on", "locale": locale},
+            # No supported upload field is supplied, even with a stray multipart part.
+            files={"unused": ("PRIVATE-unused.csv", b"")} if extra_part else None,
+            headers={"X-Forwarded-For": ip},
+        )
         assert response.status_code == 400
         assert (
             rejection_guidance("empty_file", "unknown", locale, file_inspected=False)
@@ -268,20 +282,27 @@ def test_form_without_any_file_counts_empty_upload(tmp_path: Path, locale: str) 
             "form",
             1,
         )
+        for private in ("PRIVATE", ip, "X-Forwarded-For"):
+            assert private.lower() not in (str(row) + caplog.text).lower()
 
 
 @pytest.mark.parametrize("locale", ("es", "en", "pt"))
 def test_oversized_request_body_has_guidance_and_counts_body_limit(
     tmp_path: Path,
     locale: str,
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
     upload_limit = 100
-    app = _app(tmp_path, max_upload_bytes=upload_limit)
+    app = _app(tmp_path, max_upload_bytes=upload_limit, trusted_proxy_hops=1)
+    caplog.set_level(logging.DEBUG)
+    ip = "192.0.2.234"
     with TestClient(app) as client:
         response = client.post(
             f"/audits?lang={locale}",
-            content=b"x" * (request_body_limit(upload_limit) + 1),
-            headers={"content-type": "application/octet-stream"},
+            files={
+                "equity": ("PRIVATE-oversized.csv", b"x" * (request_body_limit(upload_limit) + 1))
+            },
+            headers={"X-Forwarded-For": ip},
         )
         assert response.status_code == 413
         assert (
@@ -297,14 +318,19 @@ def test_oversized_request_body_has_guidance_and_counts_body_limit(
             "body_limit",
             1,
         )
+        for private in ("PRIVATE", ip, "X-Forwarded-For"):
+            assert private.lower() not in (str(row) + caplog.text).lower()
 
 
 @pytest.mark.parametrize("locale", ("es", "en", "pt"))
 def test_unavailable_admission_slot_has_guidance_and_counts_busy(
     tmp_path: Path,
     locale: str,
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
-    app = _app(tmp_path)
+    app = _app(tmp_path, trusted_proxy_hops=1)
+    caplog.set_level(logging.DEBUG)
+    ip = "192.0.2.235"
     slots = app.state.upload_admission_slots
     held = 0
     while slots.acquire(blocking=False):
@@ -313,8 +339,9 @@ def test_unavailable_admission_slot_has_guidance_and_counts_busy(
         with TestClient(app) as client:
             response = client.post(
                 f"/audits?lang={locale}",
-                files={"equity": ("curve.csv", ONE_ROW)},
+                files={"equity": ("PRIVATE-busy.csv", ONE_ROW)},
                 data={"consent": "on", "locale": locale},
+                headers={"X-Forwarded-For": ip},
             )
             assert response.status_code == 503
             assert (
@@ -330,6 +357,8 @@ def test_unavailable_admission_slot_has_guidance_and_counts_busy(
                 "admission",
                 1,
             )
+            for private in ("PRIVATE", ip, "X-Forwarded-For"):
+                assert private.lower() not in (str(row) + caplog.text).lower()
     finally:
         for _ in range(held):
             slots.release()

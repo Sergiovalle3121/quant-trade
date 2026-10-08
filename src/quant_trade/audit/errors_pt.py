@@ -97,6 +97,8 @@ RULES: tuple[tuple[str, str], ...] = (
      "de retorno (uma de: {returns})"),
     ("the {what} file has fewer than two usable rows",
      "o arquivo {what} tem menos de duas linhas utilizáveis"),
+    ("the {what} file has values the reader cannot use",
+     "o arquivo {what} tem valores que o leitor não consegue usar"),
     ("the {what} file mixes day/month/year and month/day/year dates ({sample} and "
      "{other_sample}): write every date the same way, preferably as year-month-day "
      "(2024-03-15), and upload it again",

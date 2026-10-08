@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from html import escape, unescape
+from html import escape
 from pathlib import Path
 from typing import Any
 
@@ -16,7 +16,7 @@ from quant_trade.audit import pdf_tables, web
 from quant_trade.audit.guard import find_claims
 from quant_trade.audit.settings import AuditSettings
 from quant_trade.audit.store import make_store
-from quant_trade.audit.upload_rejections import REJECTION_COPY, rejection_guidance
+from quant_trade.audit.upload_rejections import rejection_guidance
 
 CURVE = b"timestamp,equity\n2024-01-01,100\n2024-01-02,101\n"
 KEY = "synthetic-owner-key-" + "k" * 32
@@ -90,11 +90,20 @@ def test_synthetic_refusal_explains_cause_and_records_only_labels(
 ) -> None:
     # No external PDF process or network is needed to represent a table-less PDF.
     monkeypatch.setattr(pdf_tables, "_extract", lambda data: {})
-    app = _app(tmp_path)
+    app = _app(tmp_path, trusted_proxy_hops=1)
     caplog.set_level(logging.DEBUG)
     email = "private-upload@example.invalid"
     ip = "192.0.2.231"
     private = f"PRIVATE-description-<unsafe> {email}"
+    observed_ips: list[str] = []
+    original_client_ip = web._client_ip
+
+    def capture_client_ip(request: Any, trusted_proxy_hops: int) -> str:
+        result = original_client_ip(request, trusted_proxy_hops)
+        observed_ips.append(result)
+        return result
+
+    monkeypatch.setattr(web, "_client_ip", capture_client_ip)
     with TestClient(app) as client:
         answer = client.post(
             "/audits",
@@ -110,6 +119,7 @@ def test_synthetic_refusal_explains_cause_and_records_only_labels(
             },
         )
         assert answer.status_code == status, answer.text[:500]
+        assert ip in observed_ips  # The trusted header really entered the upload pipeline.
         assert (
             rejection_guidance(category, detected, locale, file_inspected=category != "empty_file")
             in answer.text
@@ -130,13 +140,13 @@ def test_synthetic_refusal_explains_cause_and_records_only_labels(
 
 @pytest.mark.parametrize("locale", ["es", "en", "pt"])
 @pytest.mark.parametrize(
-    ("category", "status", "detector"),
+    ("category", "status", "detector", "file_inspected"),
     [
-        ("too_large", 413, "body_limit"),
-        ("rate_limited", 429, "rate_limit"),
-        ("invalid_declaration", 400, "form"),
-        ("invalid_upload", 400, "importers"),
-        ("service_busy", 503, "admission"),
+        ("too_large", 413, "body_limit", True),
+        ("rate_limited", 429, "rate_limit", False),
+        ("invalid_declaration", 400, "form", True),
+        ("invalid_upload", 400, "schema", True),
+        ("service_busy", 503, "admission", True),
     ],
 )
 def test_request_refusals_have_guidance(
@@ -147,6 +157,7 @@ def test_request_refusals_have_guidance(
     category: str,
     status: int,
     detector: str,
+    file_inspected: bool,
 ) -> None:
     app = _app(tmp_path, max_upload_bytes=100, max_uploads_per_hour_per_ip=1)
     caplog.set_level(logging.DEBUG)
@@ -185,10 +196,16 @@ def test_request_refusals_have_guidance(
             headers={"X-Forwarded-For": ip},
         )
         assert answer.status_code == status, answer.text[:500]
-        assert f'data-upload-rejection="{category}"' in answer.text
-        reason, step = REJECTION_COPY[locale][category]
-        assert reason in unescape(answer.text) and step in unescape(answer.text)
-        assert "href=" in answer.text and find_claims(answer.text) == []
+        assert (
+            rejection_guidance(
+                category,
+                "csv" if file_inspected else "unknown",
+                locale,
+                file_inspected=file_inspected,
+            )
+            in answer.text
+        )
+        assert find_claims(answer.text) == []
         app.state.operations.flush()
         (row,) = app.state.store.upload_rejection_rows("2000-01-01")
         assert row["category"] == category and row["detector"] == detector

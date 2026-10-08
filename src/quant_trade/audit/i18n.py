@@ -85,6 +85,14 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
             REJECTION_COPY["en"][category], REJECTION_COPY["es"][category], strict=True
         )
     ),
+    (
+        "The {what} file is a picture, not a readable data table.",
+        "El archivo {what} es una imagen, no una tabla de datos legible.",
+    ),
+    (
+        "The {what} file has an incompatible format.",
+        "El archivo {what} tiene un formato incompatible.",
+    ),
     # Public figure reader notes (reading.COPY); keep the Spanish rules explicit.
     (
         "The PNG image is temporarily unavailable.",
