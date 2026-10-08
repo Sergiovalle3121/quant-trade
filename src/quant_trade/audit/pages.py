@@ -2738,12 +2738,18 @@ def upload_page(
     locale = _locale(locale)
     copy = _COPY[locale]
     note = copy["free_note"] if free_mode else copy["paid_note"].format(price=price_usd)
-    meta = _public_meta(
-        f"{copy['form_title']} · {BRAND}",
-        copy["meta_description"],
-        locale,
-        audit_path(locale),
-        base_url,
+    # A refusal answers a POST and is never a page of its own: it stays private
+    # (noindex, nofollow) like error_page, while the empty form is public.
+    meta = (
+        ""
+        if rejection_html
+        else _public_meta(
+            f"{copy['form_title']} · {BRAND}",
+            copy["meta_description"],
+            locale,
+            audit_path(locale),
+            base_url,
+        )
     )
     # No page hero: the form section carries its own heading, right under a solid bar.
     body = _upload_form(
