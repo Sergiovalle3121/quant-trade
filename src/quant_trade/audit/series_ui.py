@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import html
 import math
+from collections.abc import Mapping
 from typing import Any
 
 from quant_trade.audit.period_analysis import REASONS
@@ -211,7 +212,7 @@ def _badge(tag: str) -> str:
     return f"<span class='badge {tag}'>{tag}</span>"
 
 
-def series_fields(locale: str) -> str:
+def series_fields(locale: str, *, carried: Mapping[str, str] | None = None) -> str:
     """Optional declarations for periodic-return uploads; empty values mean inference."""
     copy = _copy(locale)
     fields = []
@@ -221,7 +222,9 @@ def series_fields(locale: str) -> str:
     ):
         options = f"<option value=''>{html.escape(copy[automatic])}</option>"
         options += "".join(
-            f"<option value='{html.escape(value)}'>{html.escape(text)} (DECLARED)</option>"
+            f"<option value='{html.escape(value)}'"
+            + (" selected" if (carried or {}).get(name) == value else "")
+            + f">{html.escape(text)} (DECLARED)</option>"
             for value, text in copy[values].items()
         )
         help_text = (

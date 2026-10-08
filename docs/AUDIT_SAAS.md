@@ -4659,3 +4659,66 @@ visible prices and structured offers are omitted. `test_audit_pricing.py`
 covers the three languages and runtime settings; `test_audit_public_hygiene.py`
 includes the new pages automatically. These are product descriptions, not
 changes to audit criteria, thresholds or readiness decisions.
+
+### Upload refusals and owner visibility (8 October 2026)
+
+`upload_rejections.py` gives each rejected upload fixed Spanish, English and
+Portuguese guidance: the cause, detected container, a short accepted-format
+list linked to the existing export guides, and a concrete retry step. Existing
+parser details remain visible. The column-choice page still returns 422;
+ordinary parser/form refusals still return 400, size limits 413, rate limits
+429, and admission limits 408/503. No import rule, engine calculation, audit
+criterion, threshold or report dimension changed.
+
+The categories are `format_unknown`, `image`, `pdf_no_trades`, `too_large`,
+`too_few_rows`, `dates_unreadable`, `columns_missing`, `rate_limited`,
+`invalid_values`, `invalid_declaration`, `empty_file`, `invalid_upload`,
+`upload_timeout` and `service_busy`. `pdf_no_trades` means the existing PDF
+reader could not read a usable table; it does not assert that a corrupt,
+encrypted, oversized or timed-out PDF contains no trades. Readable PDF tables
+still reach column mapping. Detailed parser codes map to bounded categories;
+unclassified parse failures use `invalid_upload` without logging exception text.
+
+Only a 4096-byte prefix is read from each posted file before the full read.
+Strong image and unsupported ELF/RAR/7z/FLAC signatures reject immediately,
+without format detection, table parsing or engine work. An unknown text prefix
+cannot safely rule out later CSV/HTML tables or workbook contents; those use
+the existing bounded readers. A PDF signature does not reveal whether a trade
+table is present, so the existing isolated PDF extraction remains necessary.
+Starlette has already received/spooled multipart before the route runs: this
+avoids processing the whole file, not receiving it. Tests assert bounded reads
+and no parser calls, rather than a machine-dependent timing threshold.
+
+After a parsed-form refusal the page preserves escaped declarations and column
+choices, including return-series units/frequency. Browsers require file
+selection again; the general retry form leaves the access code blank. Refusals
+before multipart parsing (body limit, timeout, admission) cannot preserve fields
+the server has not parsed. Nothing in this retry state is persisted or logged.
+
+The additive `upload_rejection_counters` table aggregates UTC day, category,
+detected format, detector and count, using strict allow-lists. Format denotes
+the container recognized by the prefix (CSV, HTML, PDF, image, XML, ZIP/XLS or
+unknown), not proof of platform compatibility. ZIP headers alone cannot
+distinguish XLSX from other ZIP containers. No content, full filename, e-mail,
+address or customer identifier enters these counters. The owner-key panel
+shows the last seven UTC dates by category/format, plus attempted/accepted
+upload requests in the existing 30-day funnel. Repeated requests are repeated
+attempts; they are not unique people. An accepted request never increments a
+rejection count. Account/payment denials and unexpected server failures retain
+their existing separate operations outcomes.
+
+The combined parser does not identify the failing auxiliary file on every
+error. With several files supplied, an unattributed parser refusal therefore
+uses `unknown` rather than assigning the primary file's format to that failure;
+header and size checks and explicit column mapping identify their own input.
+
+Rejection counters use the existing optional asynchronous operations worker,
+SQL timeouts and retry behavior, sharing its 4096 pending-key bound. A process
+crash can lose unflushed counts; telemetry failures never change the upload
+answer. New counts start at deployment and cannot explain earlier 422s.
+Offline synthetic tests cover localized guidance and guard, preserved fields,
+header fast paths, category aggregation, owner access and accepted exclusion.
+The Windows verification environment for this change uses
+`D:\wt\.venv-pp\Scripts\python.exe` with worktree `PYTHONPATH` and `--basetemp`,
+without package installation; `test_audit_pdf*.py` and
+`test_personal_paper*.py` are excluded as requested.

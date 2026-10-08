@@ -12,6 +12,11 @@ from typing import Any
 from urllib.parse import parse_qs
 
 from quant_trade.audit.store_ops import BUCKETS_MS, OPERATIONS, OUTCOMES
+from quant_trade.audit.upload_rejections import (
+    REJECTION_CATEGORIES,
+    safe_detector,
+    safe_format,
+)
 
 logger = logging.getLogger(__name__)
 MAX_PENDING_KEYS = 4096
@@ -24,6 +29,7 @@ class OpsCounter:
         self._lock = threading.Lock()
         self._flush_lock = threading.Lock()
         self._pending: Counter[tuple[str, str, str, str, int]] = Counter()
+        self._rejections: Counter[tuple[str, str, str, str]] = Counter()
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
         self.dropped = 0
@@ -60,10 +66,37 @@ class OpsCounter:
         day = (at or datetime.now(UTC)).astimezone(UTC).date().isoformat()
         key = (day, locale if locale in ("es", "en", "pt") else "es", operation, outcome, bucket)
         with self._lock:
-            if key not in self._pending and len(self._pending) >= MAX_PENDING_KEYS:
+            if (
+                key not in self._pending
+                and len(self._pending) + len(self._rejections) >= MAX_PENDING_KEYS
+            ):
                 self.dropped += 1
             else:
                 self._pending[key] += 1
+
+    def observe_rejection(
+        self,
+        category: str,
+        detected_format: str = "unknown",
+        detector: str = "upload",
+        *,
+        at: datetime | None = None,
+    ) -> None:
+        try:
+            if category not in REJECTION_CATEGORIES:
+                return
+            day = (at or datetime.now(UTC)).astimezone(UTC).date().isoformat()
+            key = (day, category, safe_format(detected_format), safe_detector(detector))
+            with self._lock:
+                if (
+                    key not in self._rejections
+                    and len(self._pending) + len(self._rejections) >= MAX_PENDING_KEYS
+                ):
+                    self.dropped += 1
+                else:
+                    self._rejections[key] += 1
+        except Exception:
+            logger.warning("upload rejection counter could not be buffered")
 
     def flush(self) -> None:
         try:
@@ -81,6 +114,7 @@ class OpsCounter:
         try:
             with self._lock:
                 batch, self._pending = self._pending, Counter()
+                rejected, self._rejections = self._rejections, Counter()
             failed: Counter[tuple[str, str, str, str, int]] = Counter()
             for (day, locale, operation, outcome, bucket), count in batch.items():
                 try:
@@ -94,14 +128,37 @@ class OpsCounter:
                     )
                 except Exception:  # telemetry must never change a customer's result
                     failed[(day, locale, operation, outcome, bucket)] += count
-            self.flush_failed = bool(failed)
+            failed_rejections: Counter[tuple[str, str, str, str]] = Counter()
+            for (day, category, detected_format, detector), count in rejected.items():
+                try:
+                    self._store.count_upload_rejection(
+                        day=day,
+                        category=category,
+                        detected_format=detected_format,
+                        detector=detector,
+                        amount=count,
+                    )
+                except Exception:
+                    failed_rejections[(day, category, detected_format, detector)] += count
+            self.flush_failed = bool(failed or failed_rejections)
             with self._lock:
                 for key, count in failed.items():
-                    if key in self._pending or len(self._pending) < MAX_PENDING_KEYS:
+                    if (
+                        key in self._pending
+                        or len(self._pending) + len(self._rejections) < MAX_PENDING_KEYS
+                    ):
                         self._pending[key] += count
                     else:
                         self.dropped += count
-            if failed:
+                for rejection_key, count in failed_rejections.items():
+                    if (
+                        rejection_key in self._rejections
+                        or len(self._pending) + len(self._rejections) < MAX_PENDING_KEYS
+                    ):
+                        self._rejections[rejection_key] += count
+                    else:
+                        self.dropped += count
+            if failed or failed_rejections:
                 logger.warning("operations counters could not be persisted; retry pending")
         finally:
             self._flush_lock.release()
@@ -196,6 +253,25 @@ class OpsMiddleware:
                 self.counter.observe(operation, outcome, time.monotonic() - started, locale=locale)
             except Exception:
                 logger.warning("operations request counter unavailable")
+            if operation == "upload" and status in (400, 408, 413, 422, 429, 503):
+                state = scope.get("state", {})
+                fallback = {
+                    408: "upload_timeout",
+                    413: "too_large",
+                    429: "rate_limited",
+                    503: "service_busy",
+                }.get(status, "invalid_upload")
+                category = state.get("ops_rejection_category", fallback)
+                if category not in REJECTION_CATEGORIES:
+                    category = fallback
+                try:
+                    self.counter.observe_rejection(
+                        category,
+                        state.get("ops_rejection_format", "unknown"),
+                        state.get("ops_rejection_detector", "upload"),
+                    )
+                except Exception:
+                    logger.warning("upload rejection request counter unavailable")
 
 
 def percentile_bucket(rows: list[dict[str, Any]], q: float) -> str:

@@ -2,14 +2,15 @@
 
 from __future__ import annotations
 
-from collections import defaultdict
-from datetime import datetime
+from collections import Counter, defaultdict
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
 from quant_trade.audit.ops import percentile_bucket, retention_status
 from quant_trade.audit.pages import _e
 from quant_trade.audit.store_ops import COST_CATEGORIES, OUTCOMES
+from quant_trade.audit.upload_rejections import DETECTED_FORMATS, REJECTION_CATEGORIES
 
 COST_LABELS = {
     "infrastructure": "Infraestructura (incluye uso variable)",
@@ -42,6 +43,47 @@ def table(headers: list[str], rows: list[list[str]]) -> str:
         + "</tr></thead><tbody>"
         + "".join("<tr>" + "".join(f"<td>{_e(c)}</td>" for c in r) + "</tr>" for r in rows)
         + "</tbody></table></div>"
+    )
+
+
+def upload_rejections_section(rows: list[dict[str, Any]], *, at: datetime) -> str:
+    """A seven-UTC-day view of bounded categories, aggregated across detectors."""
+    today = at.astimezone(UTC).date()
+    first, last = (today - timedelta(days=6)).isoformat(), today.isoformat()
+    counts: Counter[tuple[str, str]] = Counter()
+    for row in rows:
+        category, detected_format = row["category"], row["detected_format"]
+        if (
+            first <= row["day"] <= last
+            and category in REJECTION_CATEGORIES
+            and detected_format in DETECTED_FORMATS
+        ):
+            counts[(category, detected_format)] += int(row["count"])
+    cells = [
+        [category, detected_format, str(count)]
+        for (category, detected_format), count in sorted(counts.items())
+    ]
+    return (
+        "<section id='upload-rejections'><h3>Subidas rechazadas (últimos 7 días)</h3>"
+        "<p>MEASURED · solicitudes rechazadas por categoría y formato detectado, "
+        "agrupadas por día UTC. Sin archivos ni datos de clientes. "
+        "El buffer puede perderse al caer el proceso; unknown indica formato no detectado.</p>"
+        + table(["Categoría", "Formato", "Cuenta · MEASURED"], cells)
+        + ("" if cells else "<p>No se registraron rechazos en este período.</p>")
+        + "</section>"
+    )
+
+
+def upload_attempts_line(rows: list[dict[str, Any]]) -> str:
+    """Uses the funnel's 30-day operations query; each POST counts once."""
+    uploads = [row for row in rows if row["operation"] == "upload"]
+    attempted = sum(int(row["count"]) for row in uploads)
+    accepted = sum(int(row["count"]) for row in uploads if row["outcome"] == "success")
+    return (
+        "<p id='upload-attempts'>Subidas intentadas / aceptadas: "
+        f"MEASURED · {attempted} / {accepted} (30 días). "
+        "Solicitudes, incluidos reintentos; no personas únicas. "
+        "Contadores agregados disponibles desde su activación.</p>"
     )
 
 
