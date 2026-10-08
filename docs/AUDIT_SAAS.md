@@ -13,7 +13,7 @@ parser, PublicClaim and public_card_svg, with the same bounds and daily/normal
 assumptions. The win_rate parameter is a percentage. Attribution is fixed to
 the person using the tool; identity and language query parameters are ignored.
 Missing inputs remain NOT_MEASURED. It creates no audit class or uploaded file.
-SVG attachments (download=svg), inline cards and sharing text stay in memory.
+SVG attachments (download=svg), inline cards, PNG previews and sharing text stay in memory.
 The share link contains the validated numeric strings and ref=lectura. Its
 recipients can read those figures; browser/proxy URL history can retain them.
 No declarations or cards are written to the database or disk. The existing
@@ -21,10 +21,34 @@ funnel cookie recognizes lectura, without new persisted visit counters.
 
 The calculator has no rate limit and the contact page has no POST form. The
 reader uses the existing in-memory AttemptLog: 60 generation attempts per IP
-per sliding hour, across languages and SVG downloads. Invalid attempts count;
+per sliding hour, across languages, SVG downloads and PNG previews (including cache hits).
+Invalid attempts count;
 opening an empty form does not. Trusted-proxy IP rules remain unchanged. The
-limit is per process and resets on restart. No PNG service or new threshold.
-Offline coverage lives in tests/test_audit_public_reading.py.
+limit is per process and resets on restart. No statistical threshold changes.
+Offline coverage lives in tests/test_audit_public_reading.py and tests/test_audit_reading_png*.py.
+
+Each reader exposes a GET `card.png` child path with the same validated numeric
+parameters. A valid card's `PageMeta.image_path` uses that path, without `ref`,
+identity or unknown parameters, for Open Graph and Twitter previews. An empty
+form keeps the site's static image. PNG responses are 1200×630: the entire
+1200×675 card scales uniformly to 1120×630, with 40 px of matching background on
+each side. No text, evidence labels or warnings are cropped or distorted.
+Successful images have `Cache-Control: public, max-age=86400` and no referral
+cookie. Invalid or missing parameters return an empty 404; all-empty numeric
+fields are valid and retain NOT_MEASURED. Rate-limited requests return 429.
+
+`audit/raster.py` imports CairoSVG lazily and returns `None` if loading or
+conversion fails. The private owner-card tool shares this renderer. The reader
+then keeps its static preview and serves a short localized 503 at `card.png`.
+Only successful PNG bytes enter a thread-safe LRU of at most 256 entries per
+app/process, keyed by a SHA-256 digest of the language and validated numeric
+strings. Page rendering warms the same cache; failed conversions are retried.
+The cache resets on restart, never writes files or database rows, and cannot
+prevent downstream social services from retaining a previously fetched image.
+The web extra installs CairoSVG; `Dockerfile.web` explicitly installs
+`libcairo2` alongside the existing WeasyPrint native libraries. Real rendering
+tests use `pytest.importorskip` when CairoSVG is absent and also skip if its
+native Cairo library cannot load; mocked fallback and cache tests stay offline.
 
 The public name is **Rigor** (the same word in Spanish and English: statistical
 rigor is what the audit sells). It replaced "Contraprueba" on 2026-09-24.

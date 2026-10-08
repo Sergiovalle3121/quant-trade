@@ -8,8 +8,9 @@ neither declarations nor generated images need a store or a filesystem path.
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Any, cast
+from typing import Any
 
+from quant_trade.audit import raster
 from quant_trade.audit.guard import AuditReportError
 from quant_trade.audit.pages import _e, _field, _page, _page_hero
 from quant_trade.audit.public_card import COPY as CARD_COPY
@@ -189,22 +190,14 @@ def render_form(values: Mapping[str, str]) -> tuple[PublicClaim, str]:
 
 
 def png_available() -> bool:
-    """An installed package can still lack its native Cairo dependency."""
-    try:
-        import cairosvg  # noqa: F401
-    except (ImportError, OSError, RuntimeError, ValueError):
-        return False
-    return True
+    """Probe conversion too: an import alone cannot establish PNG support."""
+    probe = '<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1"/>'
+    return raster.card_png(probe) is not None
 
 
 def svg_to_png(svg: str) -> bytes | None:
     """Convert our generated SVG in memory; never accept user-provided markup."""
-    try:
-        import cairosvg
-
-        return cast(bytes, cairosvg.svg2png(bytestring=svg.encode("utf-8")))
-    except (ImportError, OSError, RuntimeError, ValueError):
-        return None
+    return raster.card_png(svg)
 
 
 def _values(claim: PublicClaim | None) -> dict[str, str]:

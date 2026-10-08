@@ -10,8 +10,8 @@ locally with the documented HMAC scheme so the payment path needs no SDK to
 be trustworthy.
 
 Growth routes: an owner can publish a verification page (``/v/{public_id}``)
-and its badge; those two routes are the only cacheable ones. ``/ejemplo``
-and ``/sample`` serve a full report of synthetic data.
+and its badge. Verification image assets and public reader PNG previews are
+cacheable. ``/ejemplo`` and ``/sample`` serve a full report of synthetic data.
 """
 
 # No ``from __future__ import annotations`` here: FastAPI resolves the route
@@ -49,6 +49,7 @@ from quant_trade.audit import (
     owner_card,
     payments,
     reading,
+    reading_png,
     track_seal_pages,
     universal,
 )
@@ -1171,6 +1172,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     panel_failures = StoredAttemptLog(db, "panel")
     check_attempts = AttemptLog()
     reading_attempts = AttemptLog()
+    reading_images = reading_png.ReadingPNGCache()
+    reading_png_paths = {path + "/card.png" for path in reading.READING_PATH.values()}
     card_lookups = AttemptLog()
     failed_card_sessions = AttemptLog()
     app.state.attempt_logs = (upload_attempts, redeem_attempts, waitlist_attempts, panel_failures)
@@ -1302,6 +1305,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         if request.method != "GET" or response.status_code != 200:
             return
         path = request.url.path
+        if path in reading_png_paths:
+            return  # Public image responses never carry a visitor's referral cookie.
         kept = funnel.clean_ref(request.cookies.get(funnel.REF_COOKIE))
         arrived = funnel.clean_ref(request.query_params.get("ref"))
         if arrived and not kept:
@@ -1380,6 +1385,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         ok = response.status_code == 200
         if (request.url.path.startswith("/static/") or request.url.path in ICON_PATHS) and ok:
             response.headers["Cache-Control"] = STATIC_CACHE_CONTROL
+        elif request.url.path in reading_png_paths and ok:
+            response.headers["Cache-Control"] = "public, max-age=86400"
         else:
             public = (
                 request.url.path.startswith("/v/")
@@ -5847,17 +5854,21 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         return method_page(locale="pt", base_url=_site_url(request))
 
     def public_reading(request: Request) -> Response:
-        locale = next(k for k, path in reading.READING_PATH.items() if path == request.url.path)
+        png_request = request.url.path in reading_png_paths
+        page_path = request.url.path.removesuffix("/card.png")
+        locale = next(k for k, path in reading.READING_PATH.items() if path == page_path)
         query = request.query_params
         submitted = any(name in query for name in reading.FIELDS) or "download" in query
         values: dict[str, str] = {}
         svg, error, status = "", "", 200
-        if submitted:
+        if submitted or png_request:
             ip = _client_ip(request, cfg.trusted_proxy_hops)
             if reading_attempts.hit(ip, datetime.now(UTC)) >= reading.MAX_REQUESTS_PER_HOUR:
                 error, status = "limited", 429
             else:
                 try:
+                    if not submitted:
+                        raise owner_card.ClaimInputError("invalid")
                     if any(len(query.getlist(name)) > 1 for name in (*reading.FIELDS, "download")):
                         raise owner_card.ClaimInputError("invalid")
                     if query.get("download", "svg") != "svg":
@@ -5868,14 +5879,39 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                     values = candidate
                 except owner_card.ClaimInputError as exc:
                     error, status = str(exc), 400
+        if png_request:
+            if status == 429:
+                return PlainTextResponse(
+                    guard_page(reading.COPY[locale]["limited"]),
+                    status_code=429,
+                    headers={"Retry-After": "3600"},
+                )
+            if not svg:
+                return Response(status_code=404)
+            png = reading_images.get(locale, values, svg)
+            if png is None:
+                return PlainTextResponse(
+                    guard_page(reading.COPY[locale]["png_unavailable"]), status_code=503
+                )
+            return Response(png, media_type="image/png")
         if svg and query.get("download") == "svg":
             return Response(
                 svg,
                 media_type="image/svg+xml",
                 headers={"Content-Disposition": 'attachment; filename="rigor-reading.svg"'},
             )
+        image_path = ""
+        # Test the actual card conversion, not just the import: a failed render
+        # must leave a working static preview. Successful bytes warm the LRU.
+        if svg and reading_images.get(locale, values, svg) is not None:
+            image_path = page_path + "/card.png?" + urlencode(values)
         page = reading_page(
-            locale=locale, base_url=_site_url(request), values=values, svg=svg, error=error
+            locale=locale,
+            base_url=_site_url(request),
+            values=values,
+            svg=svg,
+            error=error,
+            image_path=image_path,
         )
         return HTMLResponse(
             guard_page(page),
@@ -5887,6 +5923,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         app.add_api_route(
             reading_path, public_reading, methods=["GET"], response_class=HTMLResponse
         )
+        app.add_api_route(reading_path + "/card.png", public_reading, methods=["GET"])
 
     def public_faq(request: Request) -> str:
         locale = next(lang for lang, path in FAQ_PATH.items() if path == request.url.path)

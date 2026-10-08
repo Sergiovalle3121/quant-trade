@@ -182,7 +182,7 @@ def test_wrong_key_and_cross_site_requests_are_refused(tmp_path: Path) -> None:
             headers=headers,
         )
         assert answer.status_code in (403, 404)
-        assert "public-card-preview" not in answer.text
+        assert "<div class='public-card-preview'>" not in answer.text
 
 
 def test_card_route_shares_the_owner_failed_key_limit(tmp_path: Path) -> None:
@@ -194,7 +194,7 @@ def test_card_route_shares_the_owner_failed_key_limit(tmp_path: Path) -> None:
         assert answer.status_code in (403, 404)
     blocked = client.post("/panel/public-card", data={"key": KEY, "action": "preview", **FIELDS})
     assert blocked.status_code == 429
-    assert "public-card-preview" not in blocked.text
+    assert "<div class='public-card-preview'>" not in blocked.text
 
 
 def test_hidden_owner_key_is_not_treated_as_a_visible_public_claim(tmp_path: Path) -> None:
@@ -204,7 +204,7 @@ def test_hidden_owner_key_is_not_treated_as_a_visible_public_claim(tmp_path: Pat
     assert form.status_code == 200
     preview = client.post("/panel/public-card", data={"key": key, "action": "preview", **FIELDS})
     assert preview.status_code == 200
-    assert "public-card-preview" in preview.text
+    assert "<div class='public-card-preview'>" in preview.text
     # Only the hidden authentication field contains the key; it is not card copy.
     svg = client.post("/panel/public-card", data={"key": key, "action": "svg", **FIELDS})
     assert svg.status_code == 200
@@ -262,7 +262,10 @@ def test_png_uses_memory_only_and_falls_back_to_svg(
     assert answer.content == png
     assert answer.headers["content-type"].startswith("image/png")
     assert "attachment" in answer.headers["content-disposition"]
-    assert len(received) == 1
+    # The preview probes native rendering; the download converts the actual card.
+    assert len(received) == 2
+    assert b'width="1" height="1"' in received[0]["bytestring"]
+    assert received[1]["bytestring"] == owner_card.render_form(data)[1].encode("utf-8")
     monkeypatch.setitem(sys.modules, "cairosvg", None)
     fallback = client.post("/panel/public-card", data={**data, "action": "png"})
     assert "<svg" in fallback.text
@@ -283,7 +286,7 @@ def test_rejected_source_is_not_reflected_in_an_error_page(tmp_path: Path) -> No
         )
         assert answer.status_code == 400
         assert bad not in answer.text
-        assert "public-card-preview" not in answer.text
+        assert "<div class='public-card-preview'>" not in answer.text
         assert owner_card.COPY[locale]["source"] in answer.text
         assert find_claims(answer.text) == []
 

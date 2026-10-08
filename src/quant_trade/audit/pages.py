@@ -3557,6 +3557,7 @@ def reading_page(
     values: Mapping[str, str] | None = None,
     svg: str = "",
     error: str = "",
+    image_path: str = "",
 ) -> str:
     """A GET form and the existing public SVG, using only validated inputs."""
     from quant_trade.audit.owner_card import COPY as INPUT_COPY
@@ -3616,7 +3617,17 @@ def reading_page(
         lang: reading.reading_url(lang, values if svg else None) for lang in reading.READING_PATH
     }
     title = f"{words['title']} · Rigor"
-    meta = _public_meta(title, words["summary"], locale, reading.reading_url(locale), base_url)
+    meta = head_meta(
+        PageMeta(
+            title=title,
+            description=words["summary"],
+            locale=locale,
+            paths=reading.READING_PATH,
+            image_path=image_path,
+            image_alt=title,
+        ),
+        base_url=base_url,
+    )
     body = (
         _page_hero(words["eyebrow"], words["title"], words["summary"])
         + f"<div class='paper page-main'><div class='wrap'>{body}</div></div>"
