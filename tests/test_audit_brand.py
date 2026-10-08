@@ -23,6 +23,7 @@ def test_landing_and_badge_carry_the_brand() -> None:
     for locale, home in (("es", "href='/'"), ("en", "href='/en'")):
         page = landing(locale=locale)
         assert f"<a class='logo' {home}>" in page and f"<span>{BRAND}</span></a>" in page
-        assert f"<title>{BRAND}" in page
+        # SEO titles can lead with the topic; the brand still belongs in the title.
+        assert BRAND in page.split("<title>", 1)[1].split("</title>", 1)[0]
         badge = badge_svg(overall="C", public_id="abc123", audited_on="2026-09-24", locale=locale)
         assert f"{BRAND} · " in badge

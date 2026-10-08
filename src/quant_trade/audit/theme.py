@@ -620,6 +620,7 @@ box-shadow:0 0 0 4px color-mix(in srgb,var(--accent) 22%,transparent)}
 input::placeholder,textarea::placeholder{color:var(--text-3)}
 input[type=date]::-webkit-calendar-picker-indicator{filter:invert(.7)}
 .paper input[type=date]::-webkit-calendar-picker-indicator{filter:none}
+.public-card-preview svg{display:block;width:100%;height:auto}
 .form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 16px}
 .form-grid>:last-child:nth-child(odd){grid-column:1/-1}
 @media (max-width:620px){.form-grid{grid-template-columns:minmax(0,1fr)}}

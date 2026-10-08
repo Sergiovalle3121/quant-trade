@@ -48,6 +48,7 @@ from quant_trade.audit import (
     mapping,
     owner_card,
     payments,
+    reading,
     track_seal_pages,
     universal,
 )
@@ -115,6 +116,7 @@ from quant_trade.audit.pages import (
     landing,
     legal_page,
     method_page,
+    reading_page,
     sample_meta,
     upload_page,
     verification_card_svg,
@@ -123,6 +125,7 @@ from quant_trade.audit.pages import (
 from quant_trade.audit.payments import stripe_checkout
 from quant_trade.audit.portuguese import MESSAGES_PT, link_locale
 from quant_trade.audit.prop_presets import DEFAULT_PRESET
+from quant_trade.audit.public_card import public_card_svg
 from quant_trade.audit.report import render, result_sha256
 from quant_trade.audit.retention import RetentionWorker
 from quant_trade.audit.return_series import is_return_series
@@ -1166,6 +1169,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     institutional_attempts = StoredAttemptLog(db, "institutional")
     panel_failures = StoredAttemptLog(db, "panel")
     check_attempts = AttemptLog()
+    reading_attempts = AttemptLog()
     card_lookups = AttemptLog()
     failed_card_sessions = AttemptLog()
     app.state.attempt_logs = (upload_attempts, redeem_attempts, waitlist_attempts, panel_failures)
@@ -5840,6 +5844,48 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     @app.get("/pt/metodologia", response_class=HTMLResponse)
     def method_pt(request: Request) -> str:
         return method_page(locale="pt", base_url=_site_url(request))
+
+    def public_reading(request: Request) -> Response:
+        locale = next(k for k, path in reading.READING_PATH.items() if path == request.url.path)
+        query = request.query_params
+        submitted = any(name in query for name in reading.FIELDS) or "download" in query
+        values: dict[str, str] = {}
+        svg, error, status = "", "", 200
+        if submitted:
+            ip = _client_ip(request, cfg.trusted_proxy_hops)
+            if reading_attempts.hit(ip, datetime.now(UTC)) >= reading.MAX_REQUESTS_PER_HOUR:
+                error, status = "limited", 429
+            else:
+                try:
+                    if any(len(query.getlist(name)) > 1 for name in (*reading.FIELDS, "download")):
+                        raise owner_card.ClaimInputError("invalid")
+                    if query.get("download", "svg") != "svg":
+                        raise owner_card.ClaimInputError("invalid")
+                    candidate = {name: query.get(name, "").strip() for name in reading.FIELDS}
+                    claim = reading.claim_from_query(candidate, locale)
+                    svg = public_card_svg(claim)
+                    values = candidate
+                except owner_card.ClaimInputError as exc:
+                    error, status = str(exc), 400
+        if svg and query.get("download") == "svg":
+            return Response(
+                svg,
+                media_type="image/svg+xml",
+                headers={"Content-Disposition": 'attachment; filename="rigor-reading.svg"'},
+            )
+        page = reading_page(
+            locale=locale, base_url=_site_url(request), values=values, svg=svg, error=error
+        )
+        return HTMLResponse(
+            guard_page(page),
+            status_code=status,
+            headers={"Retry-After": "3600"} if status == 429 else None,
+        )
+
+    for reading_path in reading.READING_PATH.values():
+        app.add_api_route(
+            reading_path, public_reading, methods=["GET"], response_class=HTMLResponse
+        )
 
     def _calculator(
         request: Request,

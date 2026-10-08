@@ -31,6 +31,7 @@ from quant_trade.audit.calculator import CALCULATOR_PATH
 from quant_trade.audit.examples import EXAMPLES_PATH
 from quant_trade.audit.guides import GUIDES, guide_url, guides_index_url
 from quant_trade.audit.method import METHOD_PATH
+from quant_trade.audit.reading import READING_PATH
 
 LOCALES: tuple[str, ...] = ("es", "en", "pt")
 
@@ -65,6 +66,7 @@ PUBLIC_PAGES: tuple[dict[str, str], ...] = (
     *({lang: article_url(a.key, lang) for lang in ("es", "en", "pt")} for a in ARTICLES),
     dict(METHOD_PATH),
     dict(CALCULATOR_PATH),
+    dict(READING_PATH),
     *({lang: audience_url(a.slug, lang) for lang in ("es", "en", "pt")} for a in AUDIENCE_PAGES),
     dict(CHECK_PATH),
     {"es": "/terminos", "en": "/terms", "pt": "/pt/termos"},
