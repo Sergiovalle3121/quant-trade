@@ -12,17 +12,20 @@ or the method; it never says that a strategy makes or will make money.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any
 
 from quant_trade.audit.audiences import AUDIENCE_PAGES, audience_url
 from quant_trade.audit.calculator import CALCULATOR_PATH, PERIODS_PER_YEAR, CalculatorInput, compute
 from quant_trade.audit.calculator import COPY as CALCULATOR_COPY
+from quant_trade.audit.costs import break_even_bps
 from quant_trade.audit.examples import EXAMPLES_COPY, EXAMPLES_PATH
 from quant_trade.audit.guides import GUIDES_BY_SLUG, guide_url
 from quant_trade.audit.method import COPY as METHOD_COPY
 from quant_trade.audit.method import METHOD_PATH
+from quant_trade.audit.public_card import _wilson
 from quant_trade.audit.reading import COPY as READING_COPY
-from quant_trade.audit.reading import READING_PATH
+from quant_trade.audit.reading import READING_PATH, reading_url
 from quant_trade.audit.retail_numbers import (
     COIN_NORMAL_TAIL,
     COIN_NULL_WIN_RATE,
@@ -35,6 +38,7 @@ from quant_trade.audit.retail_numbers import (
     PROP_WIN_RATES,
     SIGNAL_DECLARED_WIN_RATE,
 )
+from quant_trade.core.models import Trade
 
 LOCALES: tuple[str, ...] = ("es", "en", "pt")
 
@@ -104,6 +108,62 @@ LUCK_TABLE_COPY = {
     ),
 }
 
+#: Declared teaching examples, computed with the public reader and cost engine.
+#: Rates can be rounded declarations; do not infer an integer count of wins.
+WIN_RATE_TRADE_COUNTS = (20, 45, 100, 300, 1000)
+WIN_RATE_RATES = (0.55, 0.60, 0.71)
+WIN_RATE_EXAMPLE_VALUES = {
+    "trades": "45",
+    "win_rate": "71",
+    "sharpe": "1.8",
+    "years": "3",
+    "trials": "100",
+}
+
+
+def win_rate_interval(rate: float, trades: int, locale: str) -> str:
+    """The reader's Wilson interval, formatted for an editorial table."""
+    low, high = _wilson(rate, trades)
+    value = f"{low * 100:.1f}–{high * 100:.1f} %"
+    return value if locale == "en" else value.replace(".", ",")
+
+
+WIN_RATE_TABLE_COPY = {
+    "es": (
+        "Tabla: cuánto cambia el intervalo con la muestra",
+        "Operaciones",
+        "DECLARED · Intervalos Wilson al 95 % calculados con la función del lector de Rigor. "
+        "Entradas ilustrativas, posiblemente redondeadas; operaciones independientes y una "
+        "regla fijada antes de observar los resultados. No son mediciones de un archivo.",
+    ),
+    "en": (
+        "Table: how the interval changes with sample size",
+        "Trades",
+        "DECLARED · Wilson 95 % intervals calculated with Rigor's reader function. "
+        "Illustrative, possibly rounded inputs; independent trades and a rule fixed before "
+        "observing the results. These are not file measurements.",
+    ),
+    "pt": (
+        "Tabela: como o intervalo muda com a amostra",
+        "Operações",
+        "DECLARED · Intervalos Wilson de 95 % calculados com a função do leitor do Rigor. "
+        "Entradas ilustrativas, possivelmente arredondadas; operações independentes e uma "
+        "regra fixada antes de observar os resultados. Não são medições de um arquivo.",
+    ),
+}
+
+COST_EXAMPLE_TRADE = Trade(
+    entry_time=datetime(2026, 1, 1),
+    exit_time=datetime(2026, 1, 2),
+    entry_price=100.0,
+    exit_price=101.0,
+    quantity=1.0,
+    pnl=1.0,
+    return_pct=0.01,
+)
+_COST_EXAMPLE_BPS = break_even_bps([COST_EXAMPLE_TRADE], ["long"], reported_costs=[0.0])
+
+
 #: Editorial dates, not generated at request time. Existing prose was published
 #: on 2026-10-05; the institutional articles are dated to this brief.
 ARTICLE_PUBLICATION_DATES = {
@@ -116,6 +176,9 @@ ARTICLE_PUBLICATION_DATES = {
     "cuantos-intentos-reto-prop-firm": "2026-10-07",
     "copiar-senales-mql5-myfxbook": "2026-10-07",
     "bot-ia-backtest-suerte": "2026-10-07",
+    "que-hacer-despues-del-backtest": "2026-10-08",
+    "cuantas-operaciones-porcentaje-aciertos": "2026-10-08",
+    "lo-eligio-el-optimizador": "2026-10-08",
 }
 
 
@@ -5194,6 +5257,1560 @@ ARTICLES_DATA: tuple[dict[str, Any], ...] = (
     },
 )
 
+ARTICLES_DATA += (
+    {
+        "key": "que-hacer-despues-del-backtest",
+        "slug": {
+            "es": "que-hacer-despues-del-backtest",
+            "en": "what-to-do-after-a-backtest",
+            "pt": "o-que-fazer-depois-do-backtest",
+        },
+        "title": {
+            "es": "Qué hacer después del backtest: seis comprobaciones",
+            "en": "What to do after a backtest: six checks",
+            "pt": "O que fazer depois do backtest: seis checagens",
+        },
+        "summary": {
+            "es": (
+                "Seis comprobaciones para poner un backtest en contexto, con "
+                "ejemplos calculados y los archivos que necesitas exportar."
+            ),
+            "en": (
+                "Six checks to put a backtest in context, with calculated examples"
+                " and the files you need to export."
+            ),
+            "pt": (
+                "Seis checagens para colocar um backtest em contexto, com exemplos"
+                " calculados e os arquivos que você precisa exportar."
+            ),
+        },
+        "intro": {
+            "es": (
+                "Ya tienes una curva que te convence. El siguiente paso es "
+                "conservar el archivo y preguntar qué explica ese resultado. Estas"
+                " seis comprobaciones ordenan la revisión: no basta con acumular "
+                "operaciones ni con mirar el saldo final. Empieza por la "
+                "incertidumbre, reconstruye la búsqueda y después examina costos, "
+                "separación temporal, datos y referencia."
+            ),
+            "en": (
+                "You have a curve that looks convincing. The next step is to "
+                "preserve the file and ask what explains that result. These six "
+                "checks organise the review: accumulating trades or looking at the"
+                " ending balance is not enough. Start with uncertainty, "
+                "reconstruct the search, then examine costs, time separation, data"
+                " and a benchmark."
+            ),
+            "pt": (
+                "Você já tem uma curva que parece convincente. O próximo passo é "
+                "preservar o arquivo e perguntar o que explica esse resultado. "
+                "Estas seis checagens organizam a revisão: acumular operações ou "
+                "olhar o saldo final não basta. Comece pela incerteza, reconstrua "
+                "a busca e depois examine custos, separação temporal, dados e "
+                "referência."
+            ),
+        },
+        "sections": {
+            "es": [
+                {
+                    "heading": "Significancia: mira la incertidumbre",
+                    "paragraphs": [
+                        (
+                            "Un porcentaje de aciertos es una estimación. Su precisión depende"
+                            " del tamaño de la muestra y de si las operaciones aportan "
+                            "observaciones independientes. Varias entradas sobre el mismo "
+                            "movimiento pueden compartir el mismo riesgo. Un intervalo "
+                            "estrecho tampoco describe cuánto se pierde cuando la operación "
+                            "sale mal."
+                        ),
+                        (
+                            "DECLARED · Ejemplo ilustrativo: 45 operaciones y 71 % de aciertos"
+                            " declarado, quizá redondeado. La función Wilson del lector de "
+                            "Rigor calcula un intervalo al 95 % de "
+                            f"{win_rate_interval(0.71, 45, 'es')}. No procede de un archivo de "
+                            "cliente. No es una prueba de significancia del resultado "
+                            "monetario ni una previsión de la siguiente operación."
+                        ),
+                        (
+                            "Para los rendimientos, el informe examina el Sharpe "
+                            "probabilístico: incorpora tamaño de muestra, asimetría y colas. "
+                            "Cuando dispone de la serie, también evalúa dependencia temporal y"
+                            " remuestrea por bloques. Revisa estas pruebas y sus límites, no "
+                            "solo el porcentaje de aciertos."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Configuraciones probadas: reconstruye la búsqueda",
+                    "paragraphs": [
+                        (
+                            "Anota las combinaciones de parámetros, versiones descartadas y "
+                            "cambios de activo o periodo que influyeron en la elección. Si "
+                            "solo conservas la variante elegida, falta el contexto que permite"
+                            " evaluar la selección. Cuenta también las pruebas manuales; no "
+                            "conviertas un número desconocido en una única prueba."
+                        ),
+                        INDEPENDENT_LUCK_EXAMPLE["es"],
+                        (
+                            "Este ejemplo calcula el Sharpe esperado por suerte, no la "
+                            "probabilidad de que tu estrategia funcione. Declara la búsqueda "
+                            "completa y conserva sus pasadas para contrastar esa declaración."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Costo de equilibrio: mide el margen restante",
+                    "paragraphs": [
+                        (
+                            "El costo de equilibrio indica qué costo adicional por lado "
+                            "llevaría el resultado agregado del archivo a cero. Se calcula "
+                            "sobre precios, cantidades y costos ya cargados. Distingue "
+                            "comisión, spread incorporado en los precios y deslizamiento "
+                            "adicional: sumar otra vez una comisión ya descontada cambia la "
+                            "pregunta."
+                        ),
+                        (
+                            "DECLARED · Ejemplo sintético separado: una compra de 1 unidad a "
+                            "100 y cierre a 101, sin comisiones reportadas. La función "
+                            f"break_even_bps de Rigor calcula {_COST_EXAMPLE_BPS:.2f} puntos "
+                            "básicos por lado de costo adicional hasta el equilibrio. Se "
+                            "aplica al nominal de entrada y salida; no es una tarifa observada"
+                            " ni un supuesto adecuado para todos los mercados."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Dentro y fuera de muestra: conserva la frontera",
+                    "paragraphs": [
+                        (
+                            "Guarda las fechas usadas para elegir los parámetros y las "
+                            "reservadas para evaluarlos. Un tramo fuera de muestra debe "
+                            "permanecer ajeno a esa elección. Si lo consultas y ajustas la "
+                            "estrategia, ya influyó en el desarrollo: cambia su etiqueta y "
+                            "reserva evidencia nueva antes de repetir la evaluación."
+                        ),
+                        (
+                            "Exporta la serie temporal y registra las decisiones junto con la "
+                            "frontera. Una caída fuera de muestra merece explicación, aunque "
+                            "el total agregado resulte atractivo. NOT_MEASURED corresponde a "
+                            "una comparación que no puede hacerse con los archivos; una fecha "
+                            "escrita en un formulario no demuestra que el tramo estuviera "
+                            "intacto."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Calidad de datos: comprueba qué sabía la estrategia",
+                    "paragraphs": [
+                        (
+                            "Revisa huecos, duplicados, zona horaria, ajustes y precios "
+                            "disponibles al decidir. Conserva la fuente, el rango temporal y "
+                            "la versión de datos. Examina si el universo mantiene instrumentos"
+                            " que desaparecieron y si alguna señal utiliza información "
+                            "posterior al momento de entrada."
+                        ),
+                        (
+                            "El historial de operaciones permite detectar algunos problemas, "
+                            "pero no reconstruye por sí solo los datos originales ni la lógica"
+                            " de señales. Documenta lo que falta como NOT_MEASURED. Un campo "
+                            "de calidad del probador no resuelve todas estas preguntas."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Referencia: compara la misma pregunta",
+                    "paragraphs": [
+                        (
+                            "Elige una referencia pertinente antes de mirar cuál favorece al "
+                            "sistema. Compara sobre las mismas fechas, moneda, frecuencia y "
+                            "supuestos de costos. Una exposición simple al mercado puede "
+                            "explicar parte de una curva; sin una referencia alineada no sabes"
+                            " cuánto aporta la regla elegida."
+                        ),
+                        (
+                            "Conserva la serie de la referencia y explica por qué es "
+                            "relevante. Si no está disponible, la comparación queda "
+                            "NOT_MEASURED. No sustituyas una serie ausente por una cifra "
+                            "recordada ni compares ventanas distintas como si fueran "
+                            "equivalentes."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Qué archivo exportar de cada plataforma",
+                    "paragraphs": [
+                        (
+                            "MT4 y MT5: guarda el informe HTML completo del probador, con sus "
+                            "operaciones. Para una búsqueda de MT5, añade el XML de Excel 2003"
+                            " con las pasadas del optimizador. El informe de la variante "
+                            "elegida y la tabla de pasadas responden a preguntas distintas; "
+                            "los enlaces de exportación están al final."
+                        ),
+                        (
+                            "TradingView: exporta el CSV de la lista de operaciones del "
+                            "probador de estrategias. NinjaTrader: exporta la tabla Trades de "
+                            "Strategy Analyzer a CSV. Desde Python, prepara el CSV con el "
+                            "esquema de la guía. Si también revisas un historial, Myfxbook "
+                            "permite CSV y FX Blue CSV; identifica que se trata de una cuenta "
+                            "y no de un backtest."
+                        ),
+                        (
+                            "Conserva además parámetros, costos, fechas de separación, "
+                            "referencia y procedencia de los datos como contexto. No todo lo "
+                            "que falta cabe en el archivo de operaciones. MEASURED identifica "
+                            "cálculos sobre los archivos, DECLARED tus aportaciones y "
+                            "NOT_MEASURED lo que no pudo evaluarse."
+                        ),
+                        (
+                            "QuantConnect: descarga Trades en CSV, no Orders. En "
+                            "backtesting.py exporta stats._trades.to_csv('trades.csv'); en "
+                            "vectorbt, pf.trades.records_readable.to_csv('trades.csv'). Si hay"
+                            " varias columnas de estrategias, identifica la seleccionada y "
+                            "declara las demás variantes. Las guías enlazadas explican cada "
+                            "formato."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Empieza por las cifras que ya tienes",
+                    "paragraphs": [
+                        (
+                            "El lector de cifras y la calculadora de suerte no piden cuenta. "
+                            "Sirven para explorar declaraciones y supuestos; no asignan una "
+                            "clase de auditoría. Para revisar el archivo y sus ausencias, el "
+                            "primer informe completo es gratis con cuenta. La revisión "
+                            "describe evidencia histórica y no decide una operación por ti."
+                        ),
+                    ],
+                },
+            ],
+            "en": [
+                {
+                    "heading": "Significance: look at uncertainty",
+                    "paragraphs": [
+                        (
+                            "A win rate is an estimate. Its precision depends on sample size "
+                            "and whether trades contribute independent observations. Several "
+                            "entries on the same market move may share the same risk. A narrow"
+                            " interval also says nothing about how much is lost when a trade "
+                            "goes wrong."
+                        ),
+                        (
+                            "DECLARED · Illustrative example: 45 trades and a declared, "
+                            "possibly rounded, 71 % win rate. Rigor's reader Wilson function "
+                            f"calculates a 95 % interval of {win_rate_interval(0.71, 45, 'en')}"
+                            ". This does not come from a client file. It is not a significance"
+                            " test of the monetary result or a forecast of the next trade."
+                        ),
+                        (
+                            "For returns, the report examines probabilistic Sharpe, "
+                            "incorporating sample size, skewness and tails. When the series is"
+                            " available, it also assesses time dependence and uses block "
+                            "resampling. Review these tests and their limits alongside the win"
+                            " rate."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Configurations tried: reconstruct the search",
+                    "paragraphs": [
+                        (
+                            "Record parameter combinations, discarded versions and changes of "
+                            "asset or period that influenced the choice. Keeping only the "
+                            "selected variant loses the context needed to assess selection. "
+                            "Include manual experiments too; do not turn an unknown count into"
+                            " a single trial."
+                        ),
+                        INDEPENDENT_LUCK_EXAMPLE["en"],
+                        (
+                            "This example calculates expected Sharpe from luck, not the "
+                            "probability that your strategy will work. Declare the whole "
+                            "search and preserve its passes to compare with that declaration."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Break-even cost: measure the remaining margin",
+                    "paragraphs": [
+                        (
+                            "Break-even cost is the additional cost per side that would bring "
+                            "the file's aggregate result to zero. It uses prices, quantities "
+                            "and costs already charged. Distinguish commission, spread "
+                            "embedded in prices and additional slippage: adding a commission "
+                            "already deducted changes the question."
+                        ),
+                        (
+                            "DECLARED · Separate synthetic example: buy 1 unit at 100 and "
+                            "close at 101, with no reported commissions. Rigor's "
+                            f"break_even_bps function calculates {_COST_EXAMPLE_BPS:.2f} basis "
+                            "points per side of additional cost to break even. This applies to"
+                            " entry and exit notional; it is neither an observed fee nor an "
+                            "appropriate assumption for every market."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "In and out of sample: preserve the boundary",
+                    "paragraphs": [
+                        (
+                            "Save the dates used to select parameters and those reserved for "
+                            "evaluation. An out-of-sample segment must remain separate from "
+                            "that choice. If you inspect it and adjust the strategy, it has "
+                            "influenced development: relabel it and reserve fresh evidence "
+                            "before evaluating again."
+                        ),
+                        (
+                            "Export the time series and record decisions alongside the "
+                            "boundary. A deterioration out of sample deserves explanation even"
+                            " when the aggregate looks attractive. NOT_MEASURED applies when "
+                            "the files cannot support the comparison; a date typed into a form"
+                            " does not demonstrate that the segment remained untouched."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Data quality: check what the strategy knew",
+                    "paragraphs": [
+                        (
+                            "Review gaps, duplicates, time zones, adjustments and prices "
+                            "available at decision time. Preserve the source, date range and "
+                            "data version. Check whether the universe retains instruments that"
+                            " disappeared and whether any signal uses information arriving "
+                            "after entry."
+                        ),
+                        (
+                            "The trade history can reveal some problems, but it cannot by "
+                            "itself reconstruct the original data or signal logic. Document "
+                            "what is missing as NOT_MEASURED. A tester quality field does not "
+                            "resolve all these questions."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Benchmark: compare the same question",
+                    "paragraphs": [
+                        (
+                            "Choose a relevant benchmark before looking at which one favours "
+                            "the system. Compare the same dates, currency, frequency and cost "
+                            "assumptions. Simple market exposure may explain part of a curve; "
+                            "without an aligned benchmark you cannot tell how much the chosen "
+                            "rule contributes."
+                        ),
+                        (
+                            "Keep the benchmark series and explain its relevance. If it is "
+                            "unavailable, the comparison stays NOT_MEASURED. Do not replace a "
+                            "missing series with a remembered figure or compare different "
+                            "windows as though they were equivalent."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Which file to export from each platform",
+                    "paragraphs": [
+                        (
+                            "MT4 and MT5: save the complete tester HTML report, including "
+                            "trades. For an MT5 search, add the Excel 2003 XML optimizer "
+                            "passes. The selected variant's report and the passes table answer"
+                            " different questions; export guides are linked below."
+                        ),
+                        (
+                            "TradingView: export the strategy tester's list of trades as CSV. "
+                            "NinjaTrader: export the Strategy Analyzer Trades table as CSV. "
+                            "From Python, prepare the CSV using the guide's schema. If you are"
+                            " also reviewing an account history, Myfxbook offers CSV and FX "
+                            "Blue CSV; identify it as an account history rather than a "
+                            "backtest."
+                        ),
+                        (
+                            "Also preserve parameters, costs, split dates, the benchmark and "
+                            "data provenance as context. Not everything missing fits in the "
+                            "trade file. MEASURED identifies calculations from files, DECLARED"
+                            " your inputs and NOT_MEASURED what could not be assessed."
+                        ),
+                        (
+                            "QuantConnect: download Trades as CSV, not Orders. In "
+                            "backtesting.py export stats._trades.to_csv('trades.csv'); in "
+                            "vectorbt, pf.trades.records_readable.to_csv('trades.csv'). If "
+                            "there are several strategy columns, identify the selected one and"
+                            " declare the other variants. The linked guides explain each "
+                            "format."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Start with the figures you already have",
+                    "paragraphs": [
+                        (
+                            "The figure reader and luck calculator need no account. They "
+                            "explore declarations and assumptions; they do not assign an audit"
+                            " class. To examine the file and its gaps, your first full report "
+                            "is free with an account. The review describes historical evidence"
+                            " and does not decide a trade for you."
+                        ),
+                    ],
+                },
+            ],
+            "pt": [
+                {
+                    "heading": "Significância: observe a incerteza",
+                    "paragraphs": [
+                        (
+                            "Uma taxa de acerto é uma estimativa. Sua precisão depende do "
+                            "tamanho da amostra e de as operações fornecerem observações "
+                            "independentes. Várias entradas no mesmo movimento podem "
+                            "compartilhar o mesmo risco. Um intervalo estreito também não "
+                            "descreve quanto se perde quando a operação dá errado."
+                        ),
+                        (
+                            "DECLARED · Exemplo ilustrativo: 45 operações e taxa de acerto "
+                            "declarada de 71 %, talvez arredondada. A função Wilson do leitor "
+                            "do Rigor calcula um intervalo de 95 % de "
+                            f"{win_rate_interval(0.71, 45, 'pt')}. Isso não vem de um arquivo "
+                            "de cliente. Não é um teste de significância do resultado "
+                            "monetário nem uma previsão da próxima operação."
+                        ),
+                        (
+                            "Para os retornos, o relatório examina o Sharpe probabilístico, "
+                            "considerando tamanho da amostra, assimetria e caudas. Quando a "
+                            "série está disponível, também avalia dependência temporal e faz "
+                            "reamostragem em blocos. Revise esses testes e seus limites junto "
+                            "da taxa de acerto."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Configurações testadas: reconstrua a busca",
+                    "paragraphs": [
+                        (
+                            "Registre combinações de parâmetros, versões descartadas e "
+                            "mudanças de ativo ou período que influenciaram a escolha. Guardar"
+                            " apenas a variante escolhida perde o contexto necessário para "
+                            "avaliar a seleção. Inclua os testes manuais; não transforme uma "
+                            "contagem desconhecida em uma única tentativa."
+                        ),
+                        INDEPENDENT_LUCK_EXAMPLE["pt"],
+                        (
+                            "Este exemplo calcula o Sharpe esperado por sorte, não a "
+                            "probabilidade de a estratégia funcionar. Declare toda a busca e "
+                            "preserve suas passagens para comparar com essa declaração."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Custo de equilíbrio: meça a margem restante",
+                    "paragraphs": [
+                        (
+                            "O custo de equilíbrio indica o custo adicional por lado que "
+                            "levaria o resultado agregado do arquivo a zero. O cálculo usa "
+                            "preços, quantidades e custos já cobrados. Diferencie comissão, "
+                            "spread incorporado nos preços e deslizamento adicional: somar "
+                            "novamente uma comissão já descontada muda a pergunta."
+                        ),
+                        (
+                            "DECLARED · Exemplo sintético separado: compra de 1 unidade a 100 "
+                            "e fechamento a 101, sem comissões reportadas. A função "
+                            f"break_even_bps do Rigor calcula {_COST_EXAMPLE_BPS:.2f} "
+                            "pontos-base por lado de custo adicional até o equilíbrio. Isso se"
+                            " aplica ao valor nominal de entrada e saída; não é uma tarifa "
+                            "observada nem uma suposição adequada para todos os mercados."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Dentro e fora da amostra: preserve a fronteira",
+                    "paragraphs": [
+                        (
+                            "Guarde as datas usadas para escolher os parâmetros e as "
+                            "reservadas para avaliá-los. Um trecho fora da amostra deve "
+                            "permanecer separado dessa escolha. Se você o consulta e ajusta a "
+                            "estratégia, ele já influenciou o desenvolvimento: mude sua "
+                            "identificação e reserve evidência nova antes de avaliar "
+                            "novamente."
+                        ),
+                        (
+                            "Exporte a série temporal e registre as decisões junto da "
+                            "fronteira. Uma queda fora da amostra merece explicação, mesmo que"
+                            " o total pareça atraente. NOT_MEASURED corresponde a uma "
+                            "comparação que os arquivos não permitem; uma data escrita no "
+                            "formulário não demonstra que o trecho permaneceu intocado."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Qualidade dos dados: confira o que a estratégia sabia",
+                    "paragraphs": [
+                        (
+                            "Revise lacunas, duplicatas, fuso horário, ajustes e preços "
+                            "disponíveis ao decidir. Preserve a fonte, o intervalo temporal e "
+                            "a versão dos dados. Examine se o universo mantém instrumentos que"
+                            " desapareceram e se algum sinal usa informação posterior ao "
+                            "momento de entrada."
+                        ),
+                        (
+                            "O histórico de operações permite detectar alguns problemas, mas "
+                            "não reconstrói sozinho os dados originais nem a lógica dos "
+                            "sinais. Documente o que falta como NOT_MEASURED. Um campo de "
+                            "qualidade do testador não resolve todas essas perguntas."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Referência: compare a mesma pergunta",
+                    "paragraphs": [
+                        (
+                            "Escolha uma referência pertinente antes de observar qual favorece"
+                            " o sistema. Compare as mesmas datas, moeda, frequência e "
+                            "suposições de custos. Uma exposição simples ao mercado pode "
+                            "explicar parte da curva; sem uma referência alinhada não se sabe "
+                            "quanto a regra escolhida acrescenta."
+                        ),
+                        (
+                            "Guarde a série de referência e explique sua relevância. Se ela "
+                            "não estiver disponível, a comparação fica NOT_MEASURED. Não "
+                            "substitua uma série ausente por um número lembrado nem compare "
+                            "janelas diferentes como se fossem equivalentes."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Qual arquivo exportar de cada plataforma",
+                    "paragraphs": [
+                        (
+                            "MT4 e MT5: salve o relatório HTML completo do testador, com as "
+                            "operações. Para uma busca no MT5, acrescente o XML de Excel 2003 "
+                            "com as passagens do otimizador. O relatório da variante escolhida"
+                            " e a tabela de passagens respondem a perguntas diferentes; os "
+                            "guias de exportação estão abaixo."
+                        ),
+                        (
+                            "TradingView: exporte o CSV da lista de operações do testador de "
+                            "estratégias. NinjaTrader: exporte a tabela Trades do Strategy "
+                            "Analyzer para CSV. No Python, prepare o CSV com o esquema do "
+                            "guia. Se também estiver revisando um histórico de conta, Myfxbook"
+                            " oferece CSV e FX Blue CSV; identifique que é uma conta, não um "
+                            "backtest."
+                        ),
+                        (
+                            "Preserve também parâmetros, custos, datas de separação, "
+                            "referência e origem dos dados como contexto. Nem tudo o que falta"
+                            " cabe no arquivo de operações. MEASURED identifica cálculos com "
+                            "os arquivos, DECLARED suas contribuições e NOT_MEASURED o que não"
+                            " pôde ser avaliado."
+                        ),
+                        (
+                            "QuantConnect: baixe Trades em CSV, não Orders. No backtesting.py "
+                            "exporte stats._trades.to_csv('trades.csv'); no vectorbt, "
+                            "pf.trades.records_readable.to_csv('trades.csv'). Se houver várias"
+                            " colunas de estratégias, identifique a selecionada e declare as "
+                            "outras variantes. Os guias vinculados explicam cada formato."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Comece pelos números que você já tem",
+                    "paragraphs": [
+                        (
+                            "O leitor de números e a calculadora de sorte não exigem conta. "
+                            "Eles exploram declarações e suposições; não atribuem uma classe "
+                            "de auditoria. Para examinar o arquivo e suas lacunas, o primeiro "
+                            "relatório completo é grátis com conta. A revisão descreve "
+                            "evidência histórica e não decide uma operação por você."
+                        ),
+                    ],
+                },
+            ],
+        },
+        "faq": {
+            "es": [
+                {
+                    "q": "¿Basta con que la curva siga subiendo?",
+                    "a": (
+                        "No. Conserva operaciones y contexto para revisar las seis "
+                        "comprobaciones. Una captura del saldo no contiene las variantes "
+                        "descartadas ni la separación temporal de la investigación."
+                    ),
+                }
+            ],
+            "en": [
+                {
+                    "q": "Is a rising curve enough?",
+                    "a": (
+                        "No. Preserve trades and context for all six checks. A balance "
+                        "screenshot contains neither the discarded variants nor the "
+                        "research's time separation."
+                    ),
+                }
+            ],
+            "pt": [
+                {
+                    "q": "Uma curva que continua subindo basta?",
+                    "a": (
+                        "Não. Preserve operações e contexto para as seis checagens. Uma "
+                        "captura do saldo não contém as variantes descartadas nem a "
+                        "separação temporal da pesquisa."
+                    ),
+                }
+            ],
+        },
+        "related": [
+            {"kind": "reading"},
+            {"kind": "calculator"},
+            {"kind": "guide", "slug": "mt4"},
+            {"kind": "guide", "slug": "mt5"},
+            {"kind": "guide", "slug": "mt5-optimization"},
+            {"kind": "guide", "slug": "tradingview"},
+            {"kind": "guide", "slug": "ninjatrader"},
+            {"kind": "guide", "slug": "quantconnect"},
+            {"kind": "guide", "slug": "backtesting-py"},
+            {"kind": "guide", "slug": "vectorbt"},
+            {"kind": "guide", "slug": "csv-universal"},
+            {"kind": "guide", "slug": "myfxbook"},
+            {"kind": "guide", "slug": "fxblue"},
+        ],
+    },
+)
+
+ARTICLES_DATA += (
+    {
+        "key": "cuantas-operaciones-porcentaje-aciertos",
+        "slug": {
+            "es": "cuantas-operaciones-porcentaje-aciertos",
+            "en": "how-many-trades-to-trust-a-win-rate",
+            "pt": "quantas-operacoes-taxa-de-acerto",
+        },
+        "title": {
+            "es": "Cuántas operaciones para fiarse de los aciertos",
+            "en": "How many trades to trust a win rate?",
+            "pt": "Quantas operações para confiar na taxa de acerto?",
+        },
+        "summary": {
+            "es": (
+                "Compara intervalos Wilson según operaciones y porcentaje de "
+                "aciertos. Tabla calculada, supuestos y efecto de elegir la mejor "
+                "configuración."
+            ),
+            "en": (
+                "Compare Wilson intervals by trade count and win rate. A "
+                "calculated table, its assumptions and the effect of selecting the"
+                " best configuration."
+            ),
+            "pt": (
+                "Compare intervalos Wilson por operações e taxa de acerto. Tabela "
+                "calculada, suposições e efeito de escolher a melhor configuração."
+            ),
+        },
+        "intro": {
+            "es": (
+                "No existe un número de operaciones que convierta un porcentaje en"
+                " una respuesta definitiva. La pregunta útil es cuánto margen de "
+                "incertidumbre toleras, qué población representan esas operaciones"
+                " y cómo elegiste la regla. Wilson permite expresar esa "
+                "incertidumbre sin tratar el porcentaje observado como si fuera "
+                "exacto."
+            ),
+            "en": (
+                "There is no trade count that turns a percentage into a definitive"
+                " answer. The useful questions are how much uncertainty you can "
+                "tolerate, what population those trades represent and how you "
+                "chose the rule. Wilson expresses that uncertainty without "
+                "treating the observed percentage as exact."
+            ),
+            "pt": (
+                "Não existe um número de operações que transforme uma porcentagem "
+                "em resposta definitiva. As perguntas úteis são quanta incerteza "
+                "você tolera, que população essas operações representam e como "
+                "escolheu a regra. Wilson expressa essa incerteza sem tratar a "
+                "porcentagem observada como exata."
+            ),
+        },
+        "sections": {
+            "es": [
+                {
+                    "heading": "Qué dice el intervalo de Wilson",
+                    "paragraphs": [
+                        (
+                            "El intervalo rodea la tasa estimada con un margen que se reduce "
+                            "al aumentar la muestra. Wilson también desplaza su centro "
+                            "respecto del porcentaje observado, sobre todo en muestras "
+                            "pequeñas o tasas extremas. No es simplemente sumar y restar el "
+                            "mismo margen al porcentaje publicado."
+                        ),
+                        (
+                            "DECLARED · La tabla usa un nivel de confianza del 95 %. Bajo el "
+                            "modelo de operaciones independientes con una probabilidad de "
+                            "acierto estable, el procedimiento cubriría esa probabilidad en "
+                            "aproximadamente el 95 % de muchas muestras repetidas. No atribuye"
+                            " esa probabilidad a un resultado futuro ni sustituye la revisión "
+                            "del proceso de selección."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Cómo se calculó la tabla",
+                    "paragraphs": [
+                        (
+                            "DECLARED · Todas las celdas se calculan al generar el artículo "
+                            "con la misma función Wilson del lector de cifras de Rigor: 20, "
+                            "45, 100, 300 y 1.000 operaciones, con tasas declaradas de 55 %, "
+                            "60 % y 71 %. Son ejemplos matemáticos, no mediciones de un "
+                            "historial."
+                        ),
+                        (
+                            "El lector utiliza la proporción declarada sin reconstruir una "
+                            "cantidad entera de aciertos. Algunas combinaciones de la tabla no"
+                            " corresponden a un conteo entero: representan porcentajes "
+                            "ilustrativos o redondeados. Para analizar un archivo, conserva el"
+                            " conteo original, las operaciones y las reglas con que se "
+                            "clasificaron."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Cómo leer una fila sin convertirla en una meta",
+                    "paragraphs": [
+                        (
+                            "DECLARED · Con 45 operaciones al 71 %, el intervalo calculado es "
+                            f"{win_rate_interval(0.71, 45, 'es')}. Con 1.000 operaciones al "
+                            f"mismo porcentaje es {win_rate_interval(0.71, 1000, 'es')}. El "
+                            "intervalo se estrecha bajo los mismos supuestos; no demuestra que"
+                            " la estrategia conserve esa tasa cuando cambien las condiciones."
+                        ),
+                        (
+                            "Elige la precisión que necesitas antes de seguir acumulando "
+                            "datos. Consultar el intervalo después de cada operación y "
+                            "detenerte cuando parece favorable introduce otra selección que "
+                            "esta tabla no corrige. Decide por adelantado cuándo revisar, qué "
+                            "reglas permanecen fijas y qué harás si el resultado es "
+                            "inconcluso."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "La mejor de muchas configuraciones cambia la lectura",
+                    "paragraphs": [
+                        (
+                            "DECLARED · Supón que publicas la mejor de 100 configuraciones "
+                            "probadas sobre el mismo historial. La elección favorece "
+                            "porcentajes que recibieron una desviación favorable por azar. Es "
+                            "un supuesto de búsqueda, no una medición de cuántas variantes se "
+                            "probaron realmente."
+                        ),
+                        (
+                            "Manteniendo la tasa y el número de operaciones, Wilson devuelve "
+                            "los mismos extremos: no desplaza automáticamente el intervalo por"
+                            " haber seleccionado la mejor variante. Lo que cambia es su "
+                            "interpretación. La cobertura nominal para una regla fijada "
+                            "previamente no se traslada sin más a una regla elegida después de"
+                            " comparar resultados."
+                        ),
+                        (
+                            "Declara la búsqueda, conserva las variantes descartadas y reserva"
+                            " datos que no participen en la elección. La calculadora de suerte"
+                            " explora la selección mediante Sharpe; no es una corrección del "
+                            "intervalo Wilson ni convierte un porcentaje seleccionado en "
+                            "evidencia independiente."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Más operaciones no resuelven toda la incertidumbre",
+                    "paragraphs": [
+                        (
+                            "Operaciones solapadas, señales compartidas y periodos de mercado "
+                            "concentrados pueden reducir la información independiente. La "
+                            "tabla no ajusta por dependencia ni por cambios de régimen. "
+                            "Dividir una misma posición en entradas pequeñas no equivale a "
+                            "reunir nuevas observaciones independientes."
+                        ),
+                        (
+                            "La tasa de aciertos tampoco mide el tamaño de pérdidas y "
+                            "aciertos, costos, caídas o exposición. Examina esos aspectos por "
+                            "separado. Un intervalo estrecho puede describir con precisión una"
+                            " cifra que no responde a la pregunta económica que quieres "
+                            "estudiar."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Reproduce el ejemplo y conserva el archivo",
+                    "paragraphs": [
+                        (
+                            "DECLARED · El enlace de ejemplo abre el lector con 45 "
+                            "operaciones, 71 % de aciertos, Sharpe anual de 1,8, 3 años y 100 "
+                            "configuraciones. Los campos de Sharpe, años e intentos sirven "
+                            "para la lectura de suerte; no cambian Wilson. Son entradas "
+                            "ilustrativas, no datos medidos."
+                        ),
+                        (
+                            "El lector y la calculadora no necesitan cuenta. Puedes cambiar "
+                            "las cifras y observar qué supuesto cambia la lectura. Para "
+                            "revisar operaciones originales, exporta el archivo completo "
+                            "siguiendo la guía de tu plataforma; la guía CSV indica el esquema"
+                            " común. El primer informe completo es gratis con cuenta. MEASURED"
+                            " corresponde a cálculos sobre archivos, DECLARED a declaraciones "
+                            "y NOT_MEASURED a evidencia ausente."
+                        ),
+                    ],
+                },
+            ],
+            "en": [
+                {
+                    "heading": "What the Wilson interval says",
+                    "paragraphs": [
+                        (
+                            "The interval surrounds the estimated rate with a margin that "
+                            "shrinks as the sample grows. Wilson also moves its centre "
+                            "relative to the observed percentage, especially for small samples"
+                            " or extreme rates. It is not simply adding and subtracting the "
+                            "same margin from the published percentage."
+                        ),
+                        (
+                            "DECLARED · The table uses a 95 % confidence level. Under a model "
+                            "of independent trades with a stable win probability, the "
+                            "procedure would cover that probability in approximately 95 % of "
+                            "many repeated samples. It does not assign that probability to a "
+                            "future outcome or replace a review of the selection process."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "How the table was calculated",
+                    "paragraphs": [
+                        (
+                            "DECLARED · Every cell is calculated when generating the article "
+                            "with the same Wilson function used by Rigor's figure reader: 20, "
+                            "45, 100, 300 and 1,000 trades, with declared rates of 55 %, 60 % "
+                            "and 71 %. These are mathematical examples, not measurements of a "
+                            "track record."
+                        ),
+                        (
+                            "The reader uses the declared proportion without reconstructing an"
+                            " integer win count. Some table combinations do not correspond to "
+                            "a whole number of wins: they represent illustrative or rounded "
+                            "percentages. When analysing a file, preserve the original counts,"
+                            " trades and rules used to classify them."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "How to read a row without turning it into a target",
+                    "paragraphs": [
+                        (
+                            "DECLARED · With 45 trades at 71 %, the calculated interval is "
+                            f"{win_rate_interval(0.71, 45, 'en')}. With 1,000 trades at the "
+                            f"same percentage it is {win_rate_interval(0.71, 1000, 'en')}. The "
+                            "interval narrows under the same assumptions; it does not "
+                            "demonstrate that the strategy will retain that rate when "
+                            "conditions change."
+                        ),
+                        (
+                            "Choose the precision you need before accumulating more data. "
+                            "Checking the interval after every trade and stopping when it "
+                            "looks favourable introduces another selection that this table "
+                            "does not correct. Decide in advance when to review, which rules "
+                            "stay fixed and what to do if the result is inconclusive."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "The best of many configurations changes the reading",
+                    "paragraphs": [
+                        (
+                            "DECLARED · Suppose you publish the best of 100 configurations "
+                            "tried on the same history. Selection favours percentages that "
+                            "received a favourable random deviation. This is a search "
+                            "assumption, not a measurement of how many variants were actually "
+                            "tried."
+                        ),
+                        (
+                            "Holding the rate and trade count fixed, Wilson returns the same "
+                            "endpoints: it does not automatically shift the interval because "
+                            "the best variant was selected. What changes is its "
+                            "interpretation. Nominal coverage for a rule fixed beforehand does"
+                            " not simply transfer to a rule chosen after comparing results."
+                        ),
+                        (
+                            "Declare the search, keep discarded variants and reserve data that"
+                            " played no part in selection. The luck calculator explores "
+                            "selection through Sharpe; it does not correct the Wilson interval"
+                            " or turn a selected percentage into independent evidence."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "More trades do not resolve every uncertainty",
+                    "paragraphs": [
+                        (
+                            "Overlapping trades, shared signals and concentrated market "
+                            "periods can reduce independent information. The table does not "
+                            "adjust for dependence or regime changes. Splitting one position "
+                            "into smaller entries is not equivalent to collecting new "
+                            "independent observations."
+                        ),
+                        (
+                            "Win rate also does not measure the size of wins and losses, "
+                            "costs, drawdowns or exposure. Examine these separately. A narrow "
+                            "interval can precisely describe a figure that does not answer the"
+                            " economic question you want to study."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Reproduce the example and preserve the file",
+                    "paragraphs": [
+                        (
+                            "DECLARED · The example link opens the reader with 45 trades, a 71"
+                            " % win rate, annual Sharpe of 1.8, 3 years and 100 "
+                            "configurations. Sharpe, years and trial count feed the luck "
+                            "reading; they do not change Wilson. These are illustrative "
+                            "inputs, not measured data."
+                        ),
+                        (
+                            "The reader and calculator need no account. Change the figures and"
+                            " observe which assumption changes the reading. To examine "
+                            "original trades, export the full file following your platform's "
+                            "guide; the CSV guide gives the common schema. Your first full "
+                            "report is free with an account. MEASURED refers to calculations "
+                            "from files, DECLARED to declarations and NOT_MEASURED to missing "
+                            "evidence."
+                        ),
+                    ],
+                },
+            ],
+            "pt": [
+                {
+                    "heading": "O que diz o intervalo de Wilson",
+                    "paragraphs": [
+                        (
+                            "O intervalo cerca a taxa estimada com uma margem que diminui "
+                            "conforme a amostra cresce. Wilson também desloca seu centro em "
+                            "relação à porcentagem observada, sobretudo em amostras pequenas "
+                            "ou taxas extremas. Não é simplesmente somar e subtrair a mesma "
+                            "margem da porcentagem publicada."
+                        ),
+                        (
+                            "DECLARED · A tabela usa um nível de confiança de 95 %. Sob um "
+                            "modelo de operações independentes com probabilidade de acerto "
+                            "estável, o procedimento cobriria essa probabilidade em "
+                            "aproximadamente 95 % de muitas amostras repetidas. Ele não "
+                            "atribui essa probabilidade a um resultado futuro nem substitui a "
+                            "revisão do processo de seleção."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Como a tabela foi calculada",
+                    "paragraphs": [
+                        (
+                            "DECLARED · Todas as células são calculadas ao gerar o artigo com "
+                            "a mesma função Wilson do leitor de números do Rigor: 20, 45, 100,"
+                            " 300 e 1.000 operações, com taxas declaradas de 55 %, 60 % e 71 "
+                            "%. São exemplos matemáticos, não medições de um histórico."
+                        ),
+                        (
+                            "O leitor usa a proporção declarada sem reconstruir uma quantidade"
+                            " inteira de acertos. Algumas combinações da tabela não "
+                            "correspondem a uma contagem inteira: representam porcentagens "
+                            "ilustrativas ou arredondadas. Ao analisar um arquivo, preserve a "
+                            "contagem original, as operações e as regras usadas para "
+                            "classificá-las."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Como ler uma linha sem transformá-la em meta",
+                    "paragraphs": [
+                        (
+                            "DECLARED · Com 45 operações a 71 %, o intervalo calculado é "
+                            f"{win_rate_interval(0.71, 45, 'pt')}. Com 1.000 operações à mesma "
+                            f"porcentagem, ele é {win_rate_interval(0.71, 1000, 'pt')}. O "
+                            "intervalo fica mais estreito sob as mesmas suposições; isso não "
+                            "demonstra que a estratégia conservará a taxa quando as condições "
+                            "mudarem."
+                        ),
+                        (
+                            "Escolha a precisão necessária antes de acumular mais dados. "
+                            "Consultar o intervalo após cada operação e parar quando parece "
+                            "favorável introduz outra seleção que esta tabela não corrige. "
+                            "Decida antecipadamente quando revisar, quais regras permanecem "
+                            "fixas e o que fazer se o resultado for inconclusivo."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "A melhor de muitas configurações muda a leitura",
+                    "paragraphs": [
+                        (
+                            "DECLARED · Suponha que você publique a melhor de 100 "
+                            "configurações testadas no mesmo histórico. A escolha favorece "
+                            "porcentagens que receberam um desvio favorável por acaso. É uma "
+                            "suposição de busca, não uma medição de quantas variantes foram "
+                            "realmente testadas."
+                        ),
+                        (
+                            "Mantendo a taxa e o número de operações, Wilson retorna os mesmos"
+                            " limites: ele não desloca automaticamente o intervalo porque a "
+                            "melhor variante foi selecionada. O que muda é a interpretação. A "
+                            "cobertura nominal para uma regra fixada previamente não se "
+                            "transfere simplesmente para uma regra escolhida após comparar "
+                            "resultados."
+                        ),
+                        (
+                            "Declare a busca, guarde as variantes descartadas e reserve dados "
+                            "que não participaram da escolha. A calculadora de sorte explora a"
+                            " seleção por meio do Sharpe; ela não corrige o intervalo Wilson "
+                            "nem transforma uma porcentagem selecionada em evidência "
+                            "independente."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Mais operações não resolvem toda a incerteza",
+                    "paragraphs": [
+                        (
+                            "Operações sobrepostas, sinais compartilhados e períodos de "
+                            "mercado concentrados podem reduzir a informação independente. A "
+                            "tabela não ajusta dependência nem mudanças de regime. Dividir a "
+                            "mesma posição em entradas menores não equivale a reunir novas "
+                            "observações independentes."
+                        ),
+                        (
+                            "A taxa de acerto também não mede o tamanho das perdas e acertos, "
+                            "custos, quedas ou exposição. Examine esses aspectos "
+                            "separadamente. Um intervalo estreito pode descrever com precisão "
+                            "um número que não responde à pergunta econômica que você quer "
+                            "estudar."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Reproduza o exemplo e preserve o arquivo",
+                    "paragraphs": [
+                        (
+                            "DECLARED · O link de exemplo abre o leitor com 45 operações, 71 %"
+                            " de acertos, Sharpe anual de 1,8, 3 anos e 100 configurações. Os "
+                            "campos de Sharpe, anos e tentativas alimentam a leitura de sorte;"
+                            " não alteram Wilson. São entradas ilustrativas, não dados "
+                            "medidos."
+                        ),
+                        (
+                            "O leitor e a calculadora não exigem conta. Altere os números e "
+                            "observe qual suposição muda a leitura. Para examinar operações "
+                            "originais, exporte o arquivo completo seguindo o guia da "
+                            "plataforma; o guia CSV indica o esquema comum. O primeiro "
+                            "relatório completo é grátis com conta. MEASURED corresponde a "
+                            "cálculos com arquivos, DECLARED a declarações e NOT_MEASURED à "
+                            "evidência ausente."
+                        ),
+                    ],
+                },
+            ],
+        },
+        "faq": {
+            "es": [
+                {
+                    "q": "¿Una muestra grande elimina el sesgo de selección?",
+                    "a": (
+                        "No. La tabla describe incertidumbre bajo sus supuestos. La "
+                        "dependencia entre operaciones, la selección de variantes y los "
+                        "cambios de mercado necesitan una revisión propia, aunque el "
+                        "intervalo sea estrecho."
+                    ),
+                }
+            ],
+            "en": [
+                {
+                    "q": "Does a large sample eliminate selection bias?",
+                    "a": (
+                        "No. The table describes uncertainty under its assumptions. Trade "
+                        "dependence, variant selection and changing markets need their own"
+                        " review, even when the interval is narrow."
+                    ),
+                }
+            ],
+            "pt": [
+                {
+                    "q": "Uma amostra grande elimina o viés de seleção?",
+                    "a": (
+                        "Não. A tabela descreve incerteza sob suas suposições. Dependência"
+                        " entre operações, seleção de variantes e mudanças de mercado "
+                        "precisam de revisão própria, mesmo com um intervalo estreito."
+                    ),
+                }
+            ],
+        },
+        "related": [
+            {"kind": "reading"},
+            {"kind": "reading", "example": "win-rate"},
+            {"kind": "calculator"},
+            {"kind": "guide", "slug": "csv-universal"},
+            {"kind": "guide", "slug": "mt5"},
+        ],
+    },
+)
+
+ARTICLES_DATA += (
+    {
+        "key": "lo-eligio-el-optimizador",
+        "slug": {
+            "es": "lo-eligio-el-optimizador",
+            "en": "did-the-optimizer-pick-your-result",
+            "pt": "o-otimizador-escolheu-o-resultado",
+        },
+        "title": {
+            "es": "¿El resultado lo eligió el optimizador?",
+            "en": "Did the optimizer pick your result?",
+            "pt": "O otimizador escolheu o seu resultado?",
+        },
+        "summary": {
+            "es": (
+                "Cuenta las configuraciones probadas, exporta las pasadas de MT5 y"
+                " entiende cómo el Sharpe deflactado influye en la clase del "
+                "informe."
+            ),
+            "en": (
+                "Count the configurations tried, export MT5 passes and understand "
+                "how deflated Sharpe affects the report's class."
+            ),
+            "pt": (
+                "Conte as configurações testadas, exporte as passadas do MT5 e "
+                "entenda como o Sharpe deflacionado influencia a classe do "
+                "relatório."
+            ),
+        },
+        "intro": {
+            "es": (
+                "El informe de la configuración elegida cuenta cómo terminó esa "
+                "prueba. Para saber cuánto influyó la selección, necesitas también"
+                " el recorrido que la precedió. Reúne las pasadas, el criterio "
+                "usado para ordenarlas y las variantes que probaste fuera del "
+                "optimizador. Después compara el Sharpe con una referencia que "
+                "tenga en cuenta esa búsqueda."
+            ),
+            "en": (
+                "The chosen configuration's report tells you how that test ended. "
+                "To examine the influence of selection, you also need the search "
+                "that preceded it. Collect the passes, the criterion used to rank "
+                "them and variants tested outside the optimizer. Then compare "
+                "Sharpe with a reference that takes that search into account."
+            ),
+            "pt": (
+                "O relatório da configuração escolhida mostra como aquele teste "
+                "terminou. Para examinar a influência da seleção, você também "
+                "precisa do percurso anterior. Reúna as passadas, o critério usado"
+                " para ordená-las e as variantes testadas fora do otimizador. "
+                "Depois compare o Sharpe com uma referência que considere essa "
+                "busca."
+            ),
+        },
+        "sections": {
+            "es": [
+                {
+                    "heading": "Reconstruye qué se pudo elegir",
+                    "paragraphs": [
+                        (
+                            "Una configuración es una combinación de decisiones que llegó a "
+                            "evaluarse: parámetros, reglas de entrada y salida, mercado, "
+                            "horario o periodo. Si miraste el resultado para elegir entre "
+                            "alternativas, esa comparación forma parte de la búsqueda. Cuenta "
+                            "también los ajustes manuales y las ejecuciones anteriores que "
+                            "influyeron en la selección final; el nombre del archivo no resume"
+                            " el recorrido."
+                        ),
+                        (
+                            "Conserva un registro de las alternativas, sus fechas y el "
+                            "criterio de elección. Las combinaciones que nunca ejecutaste no "
+                            "son pasadas observadas. Si la búsqueda fue genética, el espacio "
+                            "teórico de combinaciones y las pasadas ejecutadas son cantidades "
+                            "distintas. Si faltan registros, identifica el alcance de la "
+                            "cuenta disponible y declara los intentos adicionales conocidos."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Lee el Sharpe junto a la selección",
+                    "paragraphs": [
+                        (
+                            "Elegir el mayor resultado de una búsqueda favorece valores "
+                            "elevados por fluctuación. El Sharpe deflactado compara el Sharpe "
+                            "observado con una referencia que aumenta al considerar más "
+                            "intentos. En el informe utiliza la longitud del historial, la "
+                            "asimetría y las colas de los rendimientos. No responde a la "
+                            "probabilidad de obtener un resultado futuro ni identifica por sí "
+                            "solo la causa de una curva."
+                        ),
+                        (
+                            "La calculadora pública permite explorar la referencia de suerte "
+                            "con cifras declaradas. Sus supuestos de frecuencia, colas "
+                            "normales y ausencia de asimetría simplifican el problema. "
+                            "Configuraciones cercanas pueden estar correlacionadas; esa "
+                            "dependencia limita la interpretación y no justifica borrar "
+                            "variantes del registro. Con los archivos, el informe puede "
+                            "examinar información que una cifra de Sharpe aislada no contiene."
+                        ),
+                        INDEPENDENT_LUCK_EXAMPLE["es"],
+                    ],
+                },
+                {
+                    "heading": "Exporta las pasadas completas de MT5",
+                    "paragraphs": [
+                        (
+                            "Al terminar la optimización, abre Resultados de optimización en "
+                            "el Probador de estrategias. Haz clic derecho en la tabla y elige "
+                            "Exportar a XML (MS Office Excel). Conserva el XML de Excel 2003 "
+                            "con todas las pasadas, incluidas las que descartaste. La guía de "
+                            "exportación enlazada explica el archivo y el campo donde subirlo."
+                        ),
+                        (
+                            "Ejecuta después una prueba simple con los parámetros elegidos y "
+                            "guarda su informe HTML. Sube el XML en «Exportación de "
+                            "optimización de MT5», dentro de «Añadir más archivos», junto con "
+                            "el HTML en «Informe de tu plataforma». El XML contiene resúmenes "
+                            "por pasada, no las operaciones del resultado seleccionado: los "
+                            "archivos aportan piezas diferentes."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Distingue lo declarado de lo contado",
+                    "paragraphs": [
+                        (
+                            "DECLARED identifica el número de intentos que escribes. MEASURED "
+                            "identifica los que cuentan los archivos: pasadas del XML, "
+                            "columnas de una matriz de variantes o variantes presentes en un "
+                            "informe. Rigor usa la mayor cuenta disponible entre la "
+                            "declaración y esos archivos; una declaración menor no reduce el "
+                            "número documentado. El alcance sigue limitado a lo aportado."
+                        ),
+                        (
+                            "NOT_MEASURED identifica la falta de una cuenta cuando no la "
+                            "declaras ni aparece en los archivos. En ese caso el cálculo asume"
+                            " un solo intento, el caso más favorable, y muestra la limitación."
+                            " No confunde ese supuesto con una búsqueda medida. Si probaste "
+                            "variantes fuera del XML, añádelas a la declaración y conserva el "
+                            "registro que explica el total."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Qué puede cambiar en la clase",
+                    "paragraphs": [
+                        (
+                            "Con la cuenta ausente, una multiplicidad que parece suficiente "
+                            "bajo el supuesto más favorable sigue como NOT_MEASURED y la clase"
+                            " no puede superar B. Declarar la cuenta elimina esa ausencia "
+                            "concreta, pero puede reducir el Sharpe deflactado. No existe una "
+                            "subida automática de clase por completar el campo o añadir el "
+                            "XML."
+                        ),
+                        (
+                            "Si la multiplicidad queda débil o falla, la clase resulta C salvo"
+                            " que otras condiciones exijan D. Llegar a A exige además "
+                            "satisfacer las reglas de significancia, costos, fuera de muestra,"
+                            " calidad de datos y referencia. El método enlazado explica el "
+                            "conjunto. La clase resume la evidencia aportada y sus límites; no"
+                            " describe resultados futuros."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Empieza con tus cifras y conserva los archivos",
+                    "paragraphs": [
+                        (
+                            "Lleva al lector de cifras el Sharpe, la duración y los intentos "
+                            "que conoces; deja vacías las cifras desconocidas. Explora la "
+                            "búsqueda en la calculadora y conserva el HTML, el XML completo y "
+                            "las declaraciones para el informe. El lector y la calculadora no "
+                            "piden cuenta. Con una cuenta, el primer informe completo es "
+                            "gratis."
+                        ),
+                    ],
+                },
+            ],
+            "en": [
+                {
+                    "heading": "Reconstruct what could be selected",
+                    "paragraphs": [
+                        (
+                            "A configuration is a combination of decisions that was evaluated:"
+                            " parameters, entry and exit rules, market, trading hours or "
+                            "period. If you inspected the result to choose between "
+                            "alternatives, that comparison belongs to the search. Count manual"
+                            " changes and earlier runs that influenced the final selection "
+                            "too; a filename does not describe that process."
+                        ),
+                        (
+                            "Keep a record of alternatives, dates and the selection criterion."
+                            " Combinations never executed are not observed passes. In a "
+                            "genetic search, the theoretical space of combinations and the "
+                            "passes actually executed are different quantities. If records are"
+                            " missing, identify the scope of the available count and declare "
+                            "additional attempts you know about."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Read Sharpe alongside the selection process",
+                    "paragraphs": [
+                        (
+                            "Selecting the highest result from a search favors values lifted "
+                            "by fluctuation. Deflated Sharpe compares the observed Sharpe with"
+                            " a reference that rises as more attempts are considered. In the "
+                            "report it uses history length, return skewness and tails. It does"
+                            " not describe the probability of a future outcome or identify the"
+                            " cause of a curve on its own."
+                        ),
+                        (
+                            "The public calculator lets you explore the luck reference with "
+                            "declared figures. Its assumptions about frequency, normal tails "
+                            "and no skew simplify the problem. Nearby configurations may be "
+                            "correlated; that dependence limits interpretation and does not "
+                            "justify deleting variants from the record. With the files, the "
+                            "report can examine information that a standalone Sharpe figure "
+                            "lacks."
+                        ),
+                        INDEPENDENT_LUCK_EXAMPLE["en"],
+                    ],
+                },
+                {
+                    "heading": "Export the complete MT5 passes",
+                    "paragraphs": [
+                        (
+                            "When optimization finishes, open Optimization Results in the "
+                            "Strategy Tester. Right-click the table and choose Export to XML "
+                            "(MS Office Excel). Keep the Excel 2003 XML with all passes, "
+                            "including the ones you discarded. The linked export guide "
+                            "explains the file and its upload field."
+                        ),
+                        (
+                            "Then run a single test with the chosen parameters and save its "
+                            "HTML report. Upload the XML under 'MT5 optimisation export', "
+                            "inside 'Add more files', alongside the HTML under 'Your platform "
+                            "report'. The XML contains summaries per pass, not the selected "
+                            "result's trades: the files supply different pieces of evidence."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Separate declared counts from file counts",
+                    "paragraphs": [
+                        (
+                            "DECLARED identifies the attempt count you enter. MEASURED "
+                            "identifies counts from files: XML passes, columns in a variants "
+                            "matrix or variants present in a report. Rigor uses the largest "
+                            "available count across the declaration and those files; a lower "
+                            "declaration cannot reduce the documented count. Its scope still "
+                            "depends on what you provide."
+                        ),
+                        (
+                            "NOT_MEASURED identifies a missing count when neither your "
+                            "declaration nor the files supplies one. The calculation then "
+                            "assumes a single attempt, the most favorable case, and shows the "
+                            "limitation. It does not treat that assumption as a measured "
+                            "search. If you tested variants outside the XML, include them in "
+                            "your declaration and keep the record explaining the total."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "What can change in the class",
+                    "paragraphs": [
+                        (
+                            "With no count, multiplicity that looks sufficient under the most "
+                            "favorable assumption stays NOT_MEASURED and the class cannot "
+                            "exceed B. Declaring the count removes that particular gap, but "
+                            "may reduce deflated Sharpe. Completing the field or adding the "
+                            "XML does not automatically raise the class."
+                        ),
+                        (
+                            "If multiplicity is weak or fails, the class is C unless other "
+                            "conditions require D. Reaching A also requires satisfying the "
+                            "rules for significance, costs, out-of-sample evidence, data "
+                            "quality and the benchmark. The linked method explains the "
+                            "combined rules. The class summarizes the supplied evidence and "
+                            "its limits; it does not describe future results."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Start with your figures and keep the files",
+                    "paragraphs": [
+                        (
+                            "Bring the Sharpe, duration and known attempts to the figure "
+                            "reader; leave unknown figures blank. Explore the search in the "
+                            "calculator and keep the HTML, complete XML and declarations for "
+                            "the report. The reader and calculator need no account. With an "
+                            "account, the first full report is free."
+                        ),
+                    ],
+                },
+            ],
+            "pt": [
+                {
+                    "heading": "Reconstrua o que podia ser escolhido",
+                    "paragraphs": [
+                        (
+                            "Uma configuração é uma combinação de decisões que chegou a ser "
+                            "avaliada: parâmetros, regras de entrada e saída, mercado, horário"
+                            " ou período. Se você examinou o resultado para escolher entre "
+                            "alternativas, essa comparação faz parte da busca. Conte também os"
+                            " ajustes manuais e as execuções anteriores que influenciaram a "
+                            "seleção final; o nome do arquivo não resume o percurso."
+                        ),
+                        (
+                            "Mantenha um registro das alternativas, datas e critério de "
+                            "escolha. Combinações nunca executadas não são passadas "
+                            "observadas. Numa busca genética, o espaço teórico de combinações "
+                            "e as passadas executadas são quantidades diferentes. Se faltam "
+                            "registros, identifique o alcance da contagem disponível e declare"
+                            " as tentativas adicionais conhecidas."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Leia o Sharpe junto com o processo de seleção",
+                    "paragraphs": [
+                        (
+                            "Escolher o maior resultado de uma busca favorece valores elevados"
+                            " por flutuação. O Sharpe deflacionado compara o Sharpe observado "
+                            "com uma referência que sobe ao considerar mais tentativas. No "
+                            "relatório, usa a duração do histórico, a assimetria e as caudas "
+                            "dos retornos. Não descreve a probabilidade de um resultado futuro"
+                            " nem identifica sozinho a causa de uma curva."
+                        ),
+                        (
+                            "A calculadora pública permite explorar a referência de sorte com "
+                            "números declarados. Suas suposições de frequência, caudas normais"
+                            " e ausência de assimetria simplificam o problema. Configurações "
+                            "próximas podem estar correlacionadas; essa dependência limita a "
+                            "interpretação e não justifica apagar variantes do registro. Com "
+                            "os arquivos, o relatório pode examinar informações que um Sharpe "
+                            "isolado não contém."
+                        ),
+                        INDEPENDENT_LUCK_EXAMPLE["pt"],
+                    ],
+                },
+                {
+                    "heading": "Exporte todas as passadas do MT5",
+                    "paragraphs": [
+                        (
+                            "Quando a otimização terminar, abra Optimization Results no "
+                            "Strategy Tester. Clique com o botão direito na tabela e escolha "
+                            "Export to XML (MS Office Excel). Guarde o XML do Excel 2003 com "
+                            "todas as passadas, inclusive as descartadas. O guia de exportação"
+                            " relacionado explica o arquivo e o campo de envio."
+                        ),
+                        (
+                            "Depois execute um teste único com os parâmetros escolhidos e "
+                            "salve seu relatório HTML. Envie o XML em 'Exportação de "
+                            "otimização do MT5', dentro de 'Adicionar mais arquivos', junto "
+                            "com o HTML em 'Relatório da sua plataforma'. O XML contém resumos"
+                            " por passada, não as operações do resultado selecionado: os "
+                            "arquivos fornecem evidências diferentes."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Distinga o declarado do contado nos arquivos",
+                    "paragraphs": [
+                        (
+                            "DECLARED identifica a quantidade de tentativas que você informa. "
+                            "MEASURED identifica o que os arquivos contam: passadas do XML, "
+                            "colunas de uma matriz de variantes ou variantes presentes num "
+                            "relatório. O Rigor usa a maior contagem disponível entre a "
+                            "declaração e esses arquivos; uma declaração menor não reduz a "
+                            "quantidade documentada. O alcance continua limitado ao material "
+                            "fornecido."
+                        ),
+                        (
+                            "NOT_MEASURED identifica a ausência de contagem quando você não a "
+                            "declara e ela não aparece nos arquivos. Nesse caso, o cálculo "
+                            "supõe uma única tentativa, o caso mais favorável, e mostra a "
+                            "limitação. Não trata essa suposição como busca medida. Se testou "
+                            "variantes fora do XML, inclua-as na declaração e guarde o "
+                            "registro que explica o total."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "O que pode mudar na classe",
+                    "paragraphs": [
+                        (
+                            "Sem a contagem, uma multiplicidade que parece suficiente sob a "
+                            "suposição mais favorável continua como NOT_MEASURED e a classe "
+                            "não pode superar B. Declarar a quantidade elimina essa ausência "
+                            "específica, mas pode reduzir o Sharpe deflacionado. Preencher o "
+                            "campo ou adicionar o XML não eleva automaticamente a classe."
+                        ),
+                        (
+                            "Se a multiplicidade fica fraca ou falha, a classe é C, salvo se "
+                            "outras condições exigirem D. Chegar a A também exige satisfazer "
+                            "as regras de significância, custos, fora da amostra, qualidade "
+                            "dos dados e referência. O método relacionado explica o conjunto. "
+                            "A classe resume a evidência fornecida e seus limites; não "
+                            "descreve resultados futuros."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Comece pelos números e preserve os arquivos",
+                    "paragraphs": [
+                        (
+                            "Leve ao leitor de números o Sharpe, a duração e as tentativas "
+                            "conhecidas; deixe os números desconhecidos em branco. Explore a "
+                            "busca na calculadora e preserve o HTML, o XML completo e as "
+                            "declarações para o relatório. O leitor e a calculadora não pedem "
+                            "conta. Com uma conta, o primeiro relatório completo é grátis."
+                        ),
+                    ],
+                },
+            ],
+        },
+        "faq": {
+            "es": [
+                {
+                    "q": "¿El XML permite calcular todo el sobreajuste?",
+                    "a": (
+                        "No. Cuenta las pasadas incluidas, pero sus resúmenes no contienen"
+                        " series alineadas de cada variante. Para calcular PBO hace falta "
+                        "una matriz de rendimientos de variantes; el XML no la sustituye. "
+                        "Tampoco reconstruye búsquedas que no aportaste."
+                    ),
+                },
+            ],
+            "en": [
+                {
+                    "q": "Does the XML measure every aspect of overfitting?",
+                    "a": (
+                        "No. It counts included passes, but its summaries do not contain "
+                        "aligned series for every variant. Computing PBO requires a matrix"
+                        " of variant returns; the XML does not replace it. Nor can it "
+                        "reconstruct searches you did not supply."
+                    ),
+                },
+            ],
+            "pt": [
+                {
+                    "q": "O XML mede todos os aspectos do sobreajuste?",
+                    "a": (
+                        "Não. Conta as passadas incluídas, mas seus resumos não contêm "
+                        "séries alinhadas de cada variante. Calcular PBO exige uma matriz "
+                        "de retornos das variantes; o XML não a substitui. Também não "
+                        "reconstrói buscas que você não forneceu."
+                    ),
+                },
+            ],
+        },
+        "related": [
+            {"kind": "reading"},
+            {"kind": "calculator"},
+            {"kind": "guide", "slug": "mt5-optimization"},
+            {"kind": "guide", "slug": "mt5"},
+            {"kind": "method"},
+        ],
+    },
+)
+
 ARTICLES: tuple[Article, ...] = tuple(Article.from_dict(data) for data in ARTICLES_DATA)
 ARTICLES_BY_KEY: dict[str, Article] = {article.key: article for article in ARTICLES}
 #: Reuse published answers verbatim; the index renders these same pairs visibly.
@@ -5257,7 +6874,15 @@ def related_links(article: Article, locale: str) -> tuple[tuple[str, str], ...]:
         elif kind == "samples":
             links.append((EXAMPLES_COPY[locale]["title"], EXAMPLES_PATH[locale]))
         elif kind == "reading":
-            links.append((READING_COPY[locale]["title"], READING_PATH[locale]))
+            if link.get("example") == "win-rate":
+                label = {
+                    "es": "Abrir el ejemplo en el lector de cifras",
+                    "en": "Open the example in the figure reader",
+                    "pt": "Abrir o exemplo no leitor de números",
+                }[locale]
+                links.append((label, reading_url(locale, WIN_RATE_EXAMPLE_VALUES)))
+            else:
+                links.append((READING_COPY[locale]["title"], READING_PATH[locale]))
         else:
             page = next(p for p in AUDIENCE_PAGES if p.slug == link["slug"])
             links.append((page.text[locale].title, audience_url(page.slug, locale)))
