@@ -21,17 +21,21 @@ from quant_trade.audit.articles import (  # noqa: E402
     ARTICLES_COPY,
     ARTICLES_DATA,
     ARTICLES_PATH,
+    INDEPENDENT_LUCK_EXAMPLE,
+    LUCK_EXAMPLE_INPUT,
+    LUCK_TABLE_INPUTS,
     Article,
     article_url,
     articles_index_url,
     find_article,
     related_links,
 )
-from quant_trade.audit.calculator import calculator_url  # noqa: E402
+from quant_trade.audit.calculator import CalculatorInput, calculator_url, compute  # noqa: E402
 from quant_trade.audit.guard import find_claims  # noqa: E402
 from quant_trade.audit.guides import GUIDES_COPY, guides_index_url  # noqa: E402
-from quant_trade.audit.pages import audit_path  # noqa: E402
+from quant_trade.audit.pages import CONTACT_PATHS, article_page, audit_path  # noqa: E402
 from quant_trade.audit.redflags import FLAG_TITLES  # noqa: E402
+from quant_trade.audit.report import evidence_label, localize_tags  # noqa: E402
 from quant_trade.audit.seo import PUBLIC_PAGES  # noqa: E402
 from quant_trade.audit.settings import AuditSettings  # noqa: E402
 from quant_trade.audit.store import make_store  # noqa: E402
@@ -83,6 +87,9 @@ def test_the_data_has_the_shape_the_writer_pastes() -> None:
         "ea-sobreoptimizado",
         "backtest-costos-reales",
         "leer-informe-probador-mt5",
+        "auditoria-independiente-backtest",
+        "sharpe-deflactado-track-record",
+        "auditar-cartera-modelo-senales",
     ]
     for entry in ARTICLES_DATA:
         assert set(entry) == DATA_KEYS, entry["key"]
@@ -94,7 +101,14 @@ def test_the_data_has_the_shape_the_writer_pastes() -> None:
             for item in entry["faq"][locale]:
                 assert set(item) == {"q", "a"}
         for link in entry["related"]:
-            assert link["kind"] in {"calculator", "guide", "audience", "method"}
+            assert link["kind"] in {
+                "calculator",
+                "guide",
+                "audience",
+                "method",
+                "contact",
+                "samples",
+            }
             assert ("slug" in link) == (link["kind"] in {"guide", "audience"})
 
 
@@ -116,6 +130,21 @@ def test_every_article_exists_in_every_language_and_passes_the_guard() -> None:
             "es": "leer-informe-probador-mt5",
             "en": "read-mt5-strategy-tester-report",
             "pt": "ler-relatorio-testador-mt5",
+        },
+        "auditoria-independiente-backtest": {
+            "es": "auditoria-independiente-backtest",
+            "en": "independent-backtest-audit",
+            "pt": "auditoria-independente-backtest",
+        },
+        "sharpe-deflactado-track-record": {
+            "es": "sharpe-deflactado-track-record",
+            "en": "deflated-sharpe-ratio-track-record",
+            "pt": "sharpe-deflacionado-historico",
+        },
+        "auditar-cartera-modelo-senales": {
+            "es": "auditar-cartera-modelo-senales",
+            "en": "audit-model-portfolio-signal-track-record",
+            "pt": "auditar-carteira-modelo-sinais",
         },
     }
     for article in ARTICLES:
@@ -267,3 +296,59 @@ def test_the_guides_index_links_the_articles(tmp_path: Path) -> None:
         page = client.get(guides_index_url(locale)).text
         assert f"href='{articles_index_url(locale)}'" in page, locale
         assert html.escape(GUIDES_COPY[locale]["articles"], quote=True) in page
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+def test_institutional_articles_length_and_calculator_evidence(locale: str) -> None:
+    from quant_trade.audit.examples import EXAMPLES_PATH
+
+    institutional = ARTICLES[-3:]
+    for article in institutional:
+        text = article.text[locale]
+        body = [text.intro]
+        for section in text.sections:
+            body += [section.heading, *section.paragraphs]
+        body += [words for pair in text.faq for words in pair]
+        assert 700 <= len(" ".join(body).split()) <= 1100, (article.key, locale)
+        assert find_claims(" ".join(body)) == []
+        rendered = article_page(article, locale=locale, base_url=BASE)
+        prose = re.search(r"<article class='prose'>(.*?)</article>", rendered, re.S)
+        assert prose is not None
+        # Include the calculator table and its explanation, not just stored prose.
+        assert 700 <= len(_text(prose.group(1)).split()) <= 1100, (article.key, locale)
+
+    example = INDEPENDENT_LUCK_EXAMPLE[locale]
+    assert example.startswith("DECLARED ·")
+    expected = compute(LUCK_EXAMPLE_INPUT)["luck_sharpe"]["value"]
+    assert f"{expected:.2f}" in example
+    independent = article_page(institutional[0], locale=locale, base_url=BASE)
+    assert html.escape(localize_tags(example, locale), quote=True) in independent
+
+    assert {(v.trials, v.years) for v in LUCK_TABLE_INPUTS} == {
+        (trials, years) for trials in (10, 100, 1000) for years in (1, 3, 5)
+    }
+    sharpe_page = article_page(institutional[1], locale=locale, base_url=BASE)
+    table = re.search(r"<table class='article-luck'>(.*?)</table>", sharpe_page, re.S)
+    assert table is not None
+    rows = re.findall(r"<tr><th scope='row'>(.*?)</tr>", table.group(1))
+    assert len(rows) == 9
+    declared = evidence_label("DECLARED", locale)
+    for row, value in zip(rows, LUCK_TABLE_INPUTS, strict=True):
+        expected = compute(CalculatorInput(1.8, value.years, value.trials))["luck_sharpe"]["value"]
+        assert _text(row).split() == [
+            declared,
+            "·",
+            f"{value.trials:,}",
+            declared,
+            "·",
+            f"{value.years:g}",
+            declared,
+            "·",
+            f"{expected:.2f}",
+        ]
+    assert find_claims(_text(table.group(1))) == []
+    assert evidence_label("MEASURED", locale) not in table.group(1)
+
+    portfolio = article_page(institutional[2], locale=locale, base_url=BASE)
+    assert f"href='{CONTACT_PATHS[locale]}'" in portfolio
+    assert f"href='{EXAMPLES_PATH[locale]}'" in portfolio

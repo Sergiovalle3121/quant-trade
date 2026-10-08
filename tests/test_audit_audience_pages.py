@@ -42,7 +42,10 @@ def test_every_audience_page_exists_in_both_languages(tmp_path: Path) -> None:
             assert "index, follow" in text
             assert f"https://audit.example{audience_url(page.slug, 'es')}" in text
             assert f"https://audit.example{audience_url(page.slug, 'en')}" in text
-            assert "USD 29" in text
+            if page.contact_cta:
+                assert "class='aud-price'" not in text
+            else:
+                assert "USD 29" in text
             assert find_claims(text) == [], path
 
 
