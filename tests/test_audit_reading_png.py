@@ -9,6 +9,7 @@ import socket
 import struct
 from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
+from xml.etree import ElementTree as ET
 
 import pytest
 
@@ -20,6 +21,8 @@ from fastapi.testclient import TestClient  # noqa: E402
 from quant_trade.audit import raster, reading  # noqa: E402
 from quant_trade.audit.guard import find_claims  # noqa: E402
 from quant_trade.audit.i18n import spanish  # noqa: E402
+from quant_trade.audit.public_card import public_card_svg  # noqa: E402
+from quant_trade.audit.reading_png import _social_svg  # noqa: E402
 from quant_trade.audit.settings import AuditSettings  # noqa: E402
 from quant_trade.audit.store import make_store  # noqa: E402
 from quant_trade.audit.web import create_app  # noqa: E402
@@ -187,8 +190,9 @@ def test_renderer_failure_leaves_page_available_with_static_image(
     assert client.get(path + "/card.png", params=FIGURES).content == MOCK_PNG
 
 
+@pytest.mark.parametrize("locale", LOCALES)
 def test_missing_cairosvg_import_returns_503_and_keeps_page_usable(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, locale: str
 ) -> None:
     original_import = builtins.__import__
 
@@ -199,11 +203,16 @@ def test_missing_cairosvg_import_returns_503_and_keeps_page_usable(
 
     monkeypatch.setattr(builtins, "__import__", without_cairo)
     client = _client(tmp_path, monkeypatch)
-    response = client.get("/lectura/card.png", params=FIGURES)
+    path = reading.READING_PATH[locale]
+    response = client.get(path + "/card.png", params=FIGURES)
     assert response.status_code == 503
-    page = client.get("/lectura", params=FIGURES)
+    page = client.get(path, params=FIGURES)
     assert page.status_code == 200
-    assert _meta(page.text, "og:image") == BASE + "/static/og-es.png"
+    assert _meta(page.text, "og:image") == BASE + f"/static/og-{locale}.png"
+    assert reading.COPY[locale]["download"] in page.text
+    assert reading.COPY[locale]["download_png"] not in page.text
+    assert "data-copy='reading-share-link'" in page.text
+    assert reading.COPY[locale]["copy_link"] in page.text
 
 
 def test_new_png_notice_has_a_spanish_translation_and_passes_guard() -> None:
@@ -288,3 +297,18 @@ def test_real_cairo_route_returns_png_with_og_dimensions(
     assert response.content.startswith(b"\x89PNG\r\n\x1a\n")
     assert response.content[12:16] == b"IHDR"
     assert struct.unpack(">II", response.content[16:24]) == (1200, 630)
+    svg = public_card_svg(reading.claim_from_query(FIGURES, locale))
+    ns = {"s": "http://www.w3.org/2000/svg"}
+    root = ET.fromstring(_social_svg(svg))
+    card = root.find("s:svg", ns)
+    assert card is not None
+    footer = next(
+        node
+        for node in card.findall("s:text", ns)
+        if node.text == "rigorscore.com" + reading.READING_PATH[locale]
+    )
+    scale = float(card.attrib["height"]) / float(card.attrib["viewBox"].split()[3])
+    footer_bottom = float(card.attrib["y"]) + scale * (
+        float(footer.attrib["y"]) + float(footer.attrib["font-size"])
+    )
+    assert 0 < footer_bottom < float(root.attrib["height"])

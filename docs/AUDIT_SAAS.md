@@ -16,6 +16,10 @@ Missing inputs remain NOT_MEASURED. It creates no audit class or uploaded file.
 SVG attachments (download=svg), inline cards, PNG previews and sharing text stay in memory.
 The share link contains the validated numeric strings and ref=lectura. Its
 recipients can read those figures; browser/proxy URL history can retain them.
+Results offer a separate copy-link button and SVG download. PNG download uses
+the same numeric strings and referral tag, and appears only when the renderer
+probe and the card conversion succeed. The copy-link field starts hidden and
+is revealed for manual selection if clipboard access is unavailable.
 No declarations or cards are written to the database or disk. The existing
 funnel cookie recognizes lectura, without new persisted visit counters.
 
@@ -67,6 +71,12 @@ figures are `DECLARED`; calculations remain `DECLARED` and explicitly say
 they are computed from declarations. Missing inputs and unsupported
 approximations appear as `NOT_MEASURED` with a reason. Costs, out-of-sample
 evidence and data quality remain unmeasured.
+
+Empty source fields omit their visible attribution lines; with neither source,
+one localized DECLARED line attributes the figures to the person using the tool.
+The accessible source title remains. Each card includes the localized
+rigorscore.com reader address at the lower right, within the 630 px preview area;
+SVG dimensions and the PNG scaling described above remain unchanged.
 
 The JSON fields are `source_handle`, `source_url`, `trades`, `win_rate`,
 `profit_factor`, `sharpe` (annualised), `years`, `trials`, `target_r`,

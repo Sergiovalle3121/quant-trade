@@ -87,6 +87,67 @@ def test_missing_readings_all_explain_the_absent_inputs(locale: str) -> None:
         assert reason in " ".join(node.itertext())
 
 
+@pytest.mark.parametrize(
+    ("locale", "fallback"),
+    [
+        ("es", "Cifras declaradas por quien usó la herramienta"),
+        ("en", "Figures declared by the person who used the tool"),
+        ("pt", "Números declarados por quem usou a ferramenta"),
+    ],
+)
+@pytest.mark.parametrize(
+    ("handle", "url"),
+    [
+        ("@example", "https://example.org/post/123"),
+        ("@example", ""),
+        ("", "https://example.org/post/123"),
+        ("", ""),
+        (" ", " "),
+    ],
+)
+def test_only_present_sources_or_one_fixed_attribution_are_shown(
+    locale: str, fallback: str, handle: str, url: str
+) -> None:
+    svg = public_card_svg(PublicClaim(locale=locale, source_handle=handle, source_url=url))
+    root = ET.fromstring(svg)
+    groups = [node for node in root.findall("s:g", NS) if node.find("s:title", NS) is not None]
+    sources = [source for source in (handle, url) if source.strip()]
+    expected = (
+        [f"DECLARED · {COPY[locale]['source']}: {source}" for source in sources]
+        if sources
+        else [f"DECLARED · {fallback}"]
+    )
+    assert [node.find("s:text", NS).text for node in groups] == expected
+    assert [node.find("s:title", NS).text for node in groups] == (sources or [fallback])
+    assert f"NOT_MEASURED · {COPY[locale]['source']}" not in svg
+    assert find_claims(" ".join(root.itertext())) == []
+    assert root.findall(".//s:script", NS) == []
+    assert not any(key.lower().startswith("on") for node in root.iter() for key in node.attrib)
+
+
+@pytest.mark.parametrize(
+    ("locale", "url"),
+    [
+        ("es", "rigorscore.com/lectura"),
+        ("en", "rigorscore.com/en/reading"),
+        ("pt", "rigorscore.com/pt/leitura"),
+    ],
+)
+@pytest.mark.parametrize("claim", [FULL, PublicClaim()])
+def test_reader_brand_and_link_fit_inside_the_social_image_height(
+    locale: str, url: str, claim: PublicClaim
+) -> None:
+    root = ET.fromstring(public_card_svg(replace(claim, locale=locale)))
+    footers = [node for node in root.findall("s:text", NS) if node.text == url]
+    assert len(footers) == 1
+    footer = footers[0]
+    assert footer.get("text-anchor") == "end"
+    assert int(footer.attrib["x"]) == 1160
+    assert 570 < int(footer.attrib["y"]) < 630
+    assert int(footer.attrib["y"]) + int(footer.attrib["font-size"]) <= 630
+    assert find_claims(footer.text) == []
+
+
 def test_independent_inputs_do_not_hide_other_readings() -> None:
     result = _readings(PublicClaim(trades=45))
     assert result[0][1] is None
