@@ -30,6 +30,7 @@ from quant_trade.audit.articles import (
     WIN_RATE_TABLE_COPY,
     WIN_RATE_TRADE_COUNTS,
     Article,
+    _num,
     article_url,
     articles_index_faq,
     articles_index_url,
@@ -4033,9 +4034,9 @@ def article_page(article: Article, *, locale: str = "es", base_url: str = "") ->
     if article.key in {"sharpe-deflactado-track-record", "bot-ia-backtest-suerte"}:
         heading, trials, years, luck, note = LUCK_TABLE_COPY[locale]
         rows = "".join(
-            f"<tr><th scope='row'>DECLARED · {value.trials:,}</th>"
+            f"<tr><th scope='row'>DECLARED · {_num(value.trials, locale, 0)}</th>"
             f"<td>DECLARED · {value.years:g}</td>"
-            f"<td>DECLARED · {compute(value)['luck_sharpe']['value']:.2f}</td></tr>"
+            f"<td>DECLARED · {_num(compute(value)['luck_sharpe']['value'], locale, 2)}</td></tr>"
             for value in LUCK_TABLE_INPUTS
         )
         table = (
@@ -4047,9 +4048,12 @@ def article_page(article: Article, *, locale: str = "es", base_url: str = "") ->
         sections.insert(4, (heading, table))
     if article.key == "cuantas-operaciones-porcentaje-aciertos":
         heading, trades, note = WIN_RATE_TABLE_COPY[locale]
-        columns = "".join(f"<th scope='col'>DECLARED · {rate:.0%}</th>" for rate in WIN_RATE_RATES)
+        columns = "".join(
+            f"<th scope='col'>DECLARED · {_num(rate * 100, locale, 0)} %</th>"
+            for rate in WIN_RATE_RATES
+        )
         rows = "".join(
-            f"<tr><th scope='row'>DECLARED · {count}</th>"
+            f"<tr><th scope='row'>DECLARED · {_num(count, locale, 0)}</th>"
             + "".join(
                 f"<td>DECLARED · {_e(win_rate_interval(rate, count, locale))}</td>"
                 for rate in WIN_RATE_RATES

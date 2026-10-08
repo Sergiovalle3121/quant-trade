@@ -43,10 +43,21 @@ from quant_trade.core.models import Trade
 LOCALES: tuple[str, ...] = ("es", "en", "pt")
 
 #: The pages an article may point to: the free calculator, an export guide
-#: (by its Spanish slug), an audience page (by its Spanish slug) or the method.
+#: (by its Spanish slug), an audience page (by its Spanish slug), another article
+#: (by its stable key) or the method.
 RELATED_KINDS: frozenset[str] = frozenset(
-    {"calculator", "guide", "audience", "method", "contact", "samples", "reading"}
+    {"calculator", "guide", "audience", "method", "contact", "samples", "reading", "article"}
 )
+
+
+_SWAP_SEPARATORS = str.maketrans({",": ".", ".": ","})
+
+
+def _num(value: float, locale: str, decimals: int) -> str:
+    """An editorial number with the language's separators: 1,000.5 in en, 1.000,5 in es/pt."""
+    formatted = f"{value:,.{decimals}f}"
+    return formatted if locale == "en" else formatted.translate(_SWAP_SEPARATORS)
+
 
 #: Illustrative declarations, never measurements of a client's file. The same
 #: calculator supplies the prose example and every cell of the comparison table.
@@ -62,24 +73,27 @@ INDEPENDENT_LUCK_EXAMPLE = {
         f"DECLARED · Supongamos {LUCK_EXAMPLE_INPUT.trials} variantes independientes y "
         f"{LUCK_EXAMPLE_INPUT.years:g} años de rendimientos diarios, con "
         f"{PERIODS_PER_YEAR:g} periodos al año y un Sharpe anual declarado de "
-        f"{LUCK_EXAMPLE_INPUT.sharpe:g}. La calculadora sitúa el Sharpe esperado de la mejor "
-        f"variante sin habilidad en {_EXAMPLE_LUCK:.2f}. Es una cuenta bajo supuestos de "
+        f"{_num(LUCK_EXAMPLE_INPUT.sharpe, 'es', 1)}. La calculadora sitúa el Sharpe esperado "
+        f"de la mejor variante sin habilidad en {_num(_EXAMPLE_LUCK, 'es', 2)}. "
+        "Es una cuenta bajo supuestos de "
         "asimetría nula y colas normales, no una medición de una cartera."
     ),
     "en": (
         f"DECLARED · Assume {LUCK_EXAMPLE_INPUT.trials} independent variants and "
         f"{LUCK_EXAMPLE_INPUT.years:g} years of daily returns, with "
         f"{PERIODS_PER_YEAR:g} periods per year and a declared annual Sharpe of "
-        f"{LUCK_EXAMPLE_INPUT.sharpe:g}. The calculator puts the expected Sharpe of the best "
-        f"unskilled variant at {_EXAMPLE_LUCK:.2f}. This calculation assumes no skew and "
+        f"{_num(LUCK_EXAMPLE_INPUT.sharpe, 'en', 1)}. The calculator puts the expected Sharpe "
+        f"of the best unskilled variant at {_num(_EXAMPLE_LUCK, 'en', 2)}. "
+        "This calculation assumes no skew and "
         "normal tails; it is not a measurement of a portfolio."
     ),
     "pt": (
         f"DECLARED · Suponha {LUCK_EXAMPLE_INPUT.trials} variantes independentes e "
         f"{LUCK_EXAMPLE_INPUT.years:g} anos de retornos diários, com "
         f"{PERIODS_PER_YEAR:g} períodos por ano e Sharpe anual declarado de "
-        f"{LUCK_EXAMPLE_INPUT.sharpe:g}. A calculadora situa o Sharpe esperado da melhor "
-        f"variante sem habilidade em {_EXAMPLE_LUCK:.2f}. É uma conta sob suposições de "
+        f"{_num(LUCK_EXAMPLE_INPUT.sharpe, 'pt', 1)}. A calculadora situa o Sharpe esperado "
+        f"da melhor variante sem habilidade em {_num(_EXAMPLE_LUCK, 'pt', 2)}. "
+        "É uma conta sob suposições de "
         "assimetria nula e caudas normais, não uma medição de uma carteira."
     ),
 }
@@ -124,8 +138,7 @@ WIN_RATE_EXAMPLE_VALUES = {
 def win_rate_interval(rate: float, trades: int, locale: str) -> str:
     """The reader's Wilson interval, formatted for an editorial table."""
     low, high = _wilson(rate, trades)
-    value = f"{low * 100:.1f}–{high * 100:.1f} %"
-    return value if locale == "en" else value.replace(".", ",")
+    return f"{_num(low * 100, locale, 1)}–{_num(high * 100, locale, 1)} %"
 
 
 WIN_RATE_TABLE_COPY = {
@@ -162,6 +175,7 @@ COST_EXAMPLE_TRADE = Trade(
     return_pct=0.01,
 )
 _COST_EXAMPLE_BPS = break_even_bps([COST_EXAMPLE_TRADE], ["long"], reported_costs=[0.0])
+assert _COST_EXAMPLE_BPS is not None
 
 
 #: Editorial dates, not generated at request time. Existing prose was published
@@ -239,6 +253,7 @@ class Article:
             {str(k): str(v) for k, v in link.items()} for link in data.get("related", ())
         )
         audience_slugs = {page.slug for page in AUDIENCE_PAGES}
+        article_keys = {article["key"] for article in ARTICLES_DATA}
         for link in related:
             if link.get("kind") not in RELATED_KINDS:
                 raise ValueError(f"article {data['key']}: unknown related kind {link!r}")
@@ -246,6 +261,8 @@ class Article:
                 raise ValueError(f"article {data['key']}: unknown guide {link!r}")
             if link["kind"] == "audience" and link.get("slug") not in audience_slugs:
                 raise ValueError(f"article {data['key']}: unknown audience page {link!r}")
+            if link["kind"] == "article" and link.get("key") not in article_keys:
+                raise ValueError(f"article {data['key']}: unknown article {link!r}")
         return cls(
             key=str(data["key"]),
             slug={locale: str(data["slug"][locale]) for locale in LOCALES},
@@ -5350,11 +5367,12 @@ ARTICLES_DATA += (
                             " evaluar la selección. Cuenta también las pruebas manuales; no "
                             "conviertas un número desconocido en una única prueba."
                         ),
-                        INDEPENDENT_LUCK_EXAMPLE["es"],
                         (
-                            "Este ejemplo calcula el Sharpe esperado por suerte, no la "
-                            "probabilidad de que tu estrategia funcione. Declara la búsqueda "
-                            "completa y conserva sus pasadas para contrastar esa declaración."
+                            "El artículo enlazado sobre el Sharpe deflactado desarrolla el "
+                            "ejemplo de suerte y los supuestos de la calculadora. Ese ejemplo "
+                            "calcula el Sharpe esperado por suerte, no la probabilidad de que "
+                            "tu estrategia funcione. Declara la búsqueda completa y conserva "
+                            "sus pasadas para contrastar esa declaración."
                         ),
                     ],
                 },
@@ -5372,8 +5390,9 @@ ARTICLES_DATA += (
                         (
                             "DECLARED · Ejemplo sintético separado: una compra de 1 unidad a "
                             "100 y cierre a 101, sin comisiones reportadas. La función "
-                            f"break_even_bps de Rigor calcula {_COST_EXAMPLE_BPS:.2f} puntos "
-                            "básicos por lado de costo adicional hasta el equilibrio. Se "
+                            "break_even_bps de Rigor calcula "
+                            f"{_num(_COST_EXAMPLE_BPS, 'es', 2)} puntos básicos por lado de "
+                            "costo adicional hasta el equilibrio. Se "
                             "aplica al nominal de entrada y salida; no es una tarifa observada"
                             " ni un supuesto adecuado para todos los mercados."
                         ),
@@ -5521,11 +5540,12 @@ ARTICLES_DATA += (
                             "Include manual experiments too; do not turn an unknown count into"
                             " a single trial."
                         ),
-                        INDEPENDENT_LUCK_EXAMPLE["en"],
                         (
-                            "This example calculates expected Sharpe from luck, not the "
-                            "probability that your strategy will work. Declare the whole "
-                            "search and preserve its passes to compare with that declaration."
+                            "The linked article on deflated Sharpe develops the luck example "
+                            "and the calculator's assumptions. That example calculates "
+                            "expected Sharpe from luck, not the probability that your strategy"
+                            " will work. Declare the whole search and preserve its passes to "
+                            "compare with that declaration."
                         ),
                     ],
                 },
@@ -5542,8 +5562,9 @@ ARTICLES_DATA += (
                         (
                             "DECLARED · Separate synthetic example: buy 1 unit at 100 and "
                             "close at 101, with no reported commissions. Rigor's "
-                            f"break_even_bps function calculates {_COST_EXAMPLE_BPS:.2f} basis "
-                            "points per side of additional cost to break even. This applies to"
+                            "break_even_bps function calculates "
+                            f"{_num(_COST_EXAMPLE_BPS, 'en', 2)} basis points per side of "
+                            "additional cost to break even. This applies to"
                             " entry and exit notional; it is neither an observed fee nor an "
                             "appropriate assumption for every market."
                         ),
@@ -5609,7 +5630,7 @@ ARTICLES_DATA += (
                     "paragraphs": [
                         (
                             "MT4 and MT5: save the complete tester HTML report, including "
-                            "trades. For an MT5 search, add the Excel 2003 XML optimizer "
+                            "trades. For an MT5 search, add the Excel 2003 XML optimiser "
                             "passes. The selected variant's report and the passes table answer"
                             " different questions; export guides are linked below."
                         ),
@@ -5688,11 +5709,12 @@ ARTICLES_DATA += (
                             "avaliar a seleção. Inclua os testes manuais; não transforme uma "
                             "contagem desconhecida em uma única tentativa."
                         ),
-                        INDEPENDENT_LUCK_EXAMPLE["pt"],
                         (
-                            "Este exemplo calcula o Sharpe esperado por sorte, não a "
-                            "probabilidade de a estratégia funcionar. Declare toda a busca e "
-                            "preserve suas passagens para comparar com essa declaração."
+                            "O artigo vinculado sobre o Sharpe deflacionado desenvolve o "
+                            "exemplo de sorte e as suposições da calculadora. Esse exemplo "
+                            "calcula o Sharpe esperado por sorte, não a probabilidade de a "
+                            "estratégia funcionar. Declare toda a busca e preserve suas "
+                            "passagens para comparar com essa declaração."
                         ),
                     ],
                 },
@@ -5709,7 +5731,7 @@ ARTICLES_DATA += (
                         (
                             "DECLARED · Exemplo sintético separado: compra de 1 unidade a 100 "
                             "e fechamento a 101, sem comissões reportadas. A função "
-                            f"break_even_bps do Rigor calcula {_COST_EXAMPLE_BPS:.2f} "
+                            f"break_even_bps do Rigor calcula {_num(_COST_EXAMPLE_BPS, 'pt', 2)} "
                             "pontos-base por lado de custo adicional até o equilíbrio. Isso se"
                             " aplica ao valor nominal de entrada e saída; não é uma tarifa "
                             "observada nem uma suposição adequada para todos os mercados."
@@ -5866,6 +5888,7 @@ ARTICLES_DATA += (
             {"kind": "guide", "slug": "csv-universal"},
             {"kind": "guide", "slug": "myfxbook"},
             {"kind": "guide", "slug": "fxblue"},
+            {"kind": "article", "key": "sharpe-deflactado-track-record"},
         ],
     },
 )
@@ -6032,23 +6055,20 @@ ARTICLES_DATA += (
                     ],
                 },
                 {
-                    "heading": "Reproduce el ejemplo y conserva el archivo",
+                    "heading": "Reproduce el ejemplo en el lector",
                     "paragraphs": [
                         (
                             "DECLARED · El enlace de ejemplo abre el lector con 45 "
-                            "operaciones, 71 % de aciertos, Sharpe anual de 1,8, 3 años y 100 "
+                            "operaciones, 71 % de aciertos, Sharpe anual de "
+                            f"{_num(LUCK_EXAMPLE_INPUT.sharpe, 'es', 1)}, 3 años y 100 "
                             "configuraciones. Los campos de Sharpe, años e intentos sirven "
                             "para la lectura de suerte; no cambian Wilson. Son entradas "
                             "ilustrativas, no datos medidos."
                         ),
                         (
-                            "El lector y la calculadora no necesitan cuenta. Puedes cambiar "
-                            "las cifras y observar qué supuesto cambia la lectura. Para "
-                            "revisar operaciones originales, exporta el archivo completo "
-                            "siguiendo la guía de tu plataforma; la guía CSV indica el esquema"
-                            " común. El primer informe completo es gratis con cuenta. MEASURED"
-                            " corresponde a cálculos sobre archivos, DECLARED a declaraciones "
-                            "y NOT_MEASURED a evidencia ausente."
+                            "Abre el ejemplo en el lector de cifras enlazado y cambia "
+                            "operaciones y porcentaje para ver cómo se mueve el intervalo bajo "
+                            "estos supuestos."
                         ),
                     ],
                 },
@@ -6156,23 +6176,20 @@ ARTICLES_DATA += (
                     ],
                 },
                 {
-                    "heading": "Reproduce the example and preserve the file",
+                    "heading": "Reproduce the example in the reader",
                     "paragraphs": [
                         (
                             "DECLARED · The example link opens the reader with 45 trades, a 71"
-                            " % win rate, annual Sharpe of 1.8, 3 years and 100 "
+                            " % win rate, annual Sharpe of "
+                            f"{_num(LUCK_EXAMPLE_INPUT.sharpe, 'en', 1)}, 3 years and 100 "
                             "configurations. Sharpe, years and trial count feed the luck "
                             "reading; they do not change Wilson. These are illustrative "
                             "inputs, not measured data."
                         ),
                         (
-                            "The reader and calculator need no account. Change the figures and"
-                            " observe which assumption changes the reading. To examine "
-                            "original trades, export the full file following your platform's "
-                            "guide; the CSV guide gives the common schema. Your first full "
-                            "report is free with an account. MEASURED refers to calculations "
-                            "from files, DECLARED to declarations and NOT_MEASURED to missing "
-                            "evidence."
+                            "Open the example in the linked figure reader and change the trade "
+                            "count and win rate to see how the interval moves under these "
+                            "assumptions."
                         ),
                     ],
                 },
@@ -6284,23 +6301,21 @@ ARTICLES_DATA += (
                     ],
                 },
                 {
-                    "heading": "Reproduza o exemplo e preserve o arquivo",
+                    "heading": "Reproduza o exemplo no leitor",
                     "paragraphs": [
                         (
                             "DECLARED · O link de exemplo abre o leitor com 45 operações, 71 %"
-                            " de acertos, Sharpe anual de 1,8, 3 anos e 100 configurações. Os "
+                            " de acertos, Sharpe anual de "
+                            f"{_num(LUCK_EXAMPLE_INPUT.sharpe, 'pt', 1)}, 3 anos e 100 "
+                            "configurações. Os "
                             "campos de Sharpe, anos e tentativas alimentam a leitura de sorte;"
                             " não alteram Wilson. São entradas ilustrativas, não dados "
                             "medidos."
                         ),
                         (
-                            "O leitor e a calculadora não exigem conta. Altere os números e "
-                            "observe qual suposição muda a leitura. Para examinar operações "
-                            "originais, exporte o arquivo completo seguindo o guia da "
-                            "plataforma; o guia CSV indica o esquema comum. O primeiro "
-                            "relatório completo é grátis com conta. MEASURED corresponde a "
-                            "cálculos com arquivos, DECLARED a declarações e NOT_MEASURED à "
-                            "evidência ausente."
+                            "Abra o exemplo no leitor de números vinculado e altere operações "
+                            "e porcentagem para ver como o intervalo se move sob essas "
+                            "suposições."
                         ),
                     ],
                 },
@@ -6359,7 +6374,7 @@ ARTICLES_DATA += (
         },
         "title": {
             "es": "¿El resultado lo eligió el optimizador?",
-            "en": "Did the optimizer pick your result?",
+            "en": "Did the optimiser pick your result?",
             "pt": "O otimizador escolheu o seu resultado?",
         },
         "summary": {
@@ -6391,7 +6406,7 @@ ARTICLES_DATA += (
                 "The chosen configuration's report tells you how that test ended. "
                 "To examine the influence of selection, you also need the search "
                 "that preceded it. Collect the passes, the criterion used to rank "
-                "them and variants tested outside the optimizer. Then compare "
+                "them and variants tested outside the optimiser. Then compare "
                 "Sharpe with a reference that takes that search into account."
             ),
             "pt": (
@@ -6448,7 +6463,10 @@ ARTICLES_DATA += (
                             "variantes del registro. Con los archivos, el informe puede "
                             "examinar información que una cifra de Sharpe aislada no contiene."
                         ),
-                        INDEPENDENT_LUCK_EXAMPLE["es"],
+                        (
+                            "Consulta el ejemplo de suerte y sus límites en el artículo "
+                            "enlazado sobre el Sharpe deflactado."
+                        ),
                     ],
                 },
                 {
@@ -6514,15 +6532,12 @@ ARTICLES_DATA += (
                     ],
                 },
                 {
-                    "heading": "Empieza con tus cifras y conserva los archivos",
+                    "heading": "Conserva las pasadas y el informe",
                     "paragraphs": [
                         (
-                            "Lleva al lector de cifras el Sharpe, la duración y los intentos "
-                            "que conoces; deja vacías las cifras desconocidas. Explora la "
-                            "búsqueda en la calculadora y conserva el HTML, el XML completo y "
-                            "las declaraciones para el informe. El lector y la calculadora no "
-                            "piden cuenta. Con una cuenta, el primer informe completo es "
-                            "gratis."
+                            "Sigue la guía enlazada para exportar el XML de optimización de "
+                            "MetaTrader 5 y conserva todas las pasadas junto al informe de la "
+                            "configuración elegida."
                         ),
                     ],
                 },
@@ -6553,7 +6568,7 @@ ARTICLES_DATA += (
                     "heading": "Read Sharpe alongside the selection process",
                     "paragraphs": [
                         (
-                            "Selecting the highest result from a search favors values lifted "
+                            "Selecting the highest result from a search favours values lifted "
                             "by fluctuation. Deflated Sharpe compares the observed Sharpe with"
                             " a reference that rises as more attempts are considered. In the "
                             "report it uses history length, return skewness and tails. It does"
@@ -6569,14 +6584,17 @@ ARTICLES_DATA += (
                             "report can examine information that a standalone Sharpe figure "
                             "lacks."
                         ),
-                        INDEPENDENT_LUCK_EXAMPLE["en"],
+                        (
+                            "See the luck example and its limits in the linked article on "
+                            "deflated Sharpe."
+                        ),
                     ],
                 },
                 {
                     "heading": "Export the complete MT5 passes",
                     "paragraphs": [
                         (
-                            "When optimization finishes, open Optimization Results in the "
+                            "When optimisation finishes, open Optimization Results in the "
                             "Strategy Tester. Right-click the table and choose Export to XML "
                             "(MS Office Excel). Keep the Excel 2003 XML with all passes, "
                             "including the ones you discarded. The linked export guide "
@@ -6605,7 +6623,7 @@ ARTICLES_DATA += (
                         (
                             "NOT_MEASURED identifies a missing count when neither your "
                             "declaration nor the files supplies one. The calculation then "
-                            "assumes a single attempt, the most favorable case, and shows the "
+                            "assumes a single attempt, the most favourable case, and shows the "
                             "limitation. It does not treat that assumption as a measured "
                             "search. If you tested variants outside the XML, include them in "
                             "your declaration and keep the record explaining the total."
@@ -6617,7 +6635,7 @@ ARTICLES_DATA += (
                     "paragraphs": [
                         (
                             "With no count, multiplicity that looks sufficient under the most "
-                            "favorable assumption stays NOT_MEASURED and the class cannot "
+                            "favourable assumption stays NOT_MEASURED and the class cannot "
                             "exceed B. Declaring the count removes that particular gap, but "
                             "may reduce deflated Sharpe. Completing the field or adding the "
                             "XML does not automatically raise the class."
@@ -6627,20 +6645,18 @@ ARTICLES_DATA += (
                             "conditions require D. Reaching A also requires satisfying the "
                             "rules for significance, costs, out-of-sample evidence, data "
                             "quality and the benchmark. The linked method explains the "
-                            "combined rules. The class summarizes the supplied evidence and "
+                            "combined rules. The class summarises the supplied evidence and "
                             "its limits; it does not describe future results."
                         ),
                     ],
                 },
                 {
-                    "heading": "Start with your figures and keep the files",
+                    "heading": "Keep the passes and the report",
                     "paragraphs": [
                         (
-                            "Bring the Sharpe, duration and known attempts to the figure "
-                            "reader; leave unknown figures blank. Explore the search in the "
-                            "calculator and keep the HTML, complete XML and declarations for "
-                            "the report. The reader and calculator need no account. With an "
-                            "account, the first full report is free."
+                            "Follow the linked guide to exporting the MetaTrader 5 optimisation"
+                            " XML and keep every pass alongside the chosen configuration's "
+                            "report."
                         ),
                     ],
                 },
@@ -6687,7 +6703,10 @@ ARTICLES_DATA += (
                             "os arquivos, o relatório pode examinar informações que um Sharpe "
                             "isolado não contém."
                         ),
-                        INDEPENDENT_LUCK_EXAMPLE["pt"],
+                        (
+                            "Consulte o exemplo de sorte e seus limites no artigo vinculado "
+                            "sobre o Sharpe deflacionado."
+                        ),
                     ],
                 },
                 {
@@ -6753,14 +6772,12 @@ ARTICLES_DATA += (
                     ],
                 },
                 {
-                    "heading": "Comece pelos números e preserve os arquivos",
+                    "heading": "Preserve as passadas e o relatório",
                     "paragraphs": [
                         (
-                            "Leve ao leitor de números o Sharpe, a duração e as tentativas "
-                            "conhecidas; deixe os números desconhecidos em branco. Explore a "
-                            "busca na calculadora e preserve o HTML, o XML completo e as "
-                            "declarações para o relatório. O leitor e a calculadora não pedem "
-                            "conta. Com uma conta, o primeiro relatório completo é grátis."
+                            "Siga o guia vinculado para exportar o XML de otimização do "
+                            "MetaTrader 5 e preserve todas as passadas junto ao relatório da "
+                            "configuração escolhida."
                         ),
                     ],
                 },
@@ -6807,6 +6824,7 @@ ARTICLES_DATA += (
             {"kind": "guide", "slug": "mt5-optimization"},
             {"kind": "guide", "slug": "mt5"},
             {"kind": "method"},
+            {"kind": "article", "key": "sharpe-deflactado-track-record"},
         ],
     },
 )
@@ -6866,6 +6884,9 @@ def related_links(article: Article, locale: str) -> tuple[tuple[str, str], ...]:
         elif kind == "guide":
             guide = GUIDES_BY_SLUG[link["slug"]]
             links.append((guide.text[locale].title, guide_url(guide.slug, locale)))
+        elif kind == "article":
+            related_article = ARTICLES_BY_KEY[link["key"]]
+            links.append((related_article.text[locale].title, article_url(link["key"], locale)))
         elif kind == "contact":
             # Imported here to avoid the pages -> articles import cycle.
             from quant_trade.audit.pages import CONTACT_COPY, CONTACT_PATHS

@@ -118,8 +118,10 @@ def test_the_data_has_the_shape_the_writer_pastes() -> None:
                 "contact",
                 "samples",
                 "reading",
+                "article",
             }
             assert ("slug" in link) == (link["kind"] in {"guide", "audience"})
+            assert ("key" in link) == (link["kind"] == "article")
 
 
 def test_every_article_exists_in_every_language_and_passes_the_guard() -> None:
@@ -213,6 +215,8 @@ def test_an_unknown_related_kind_or_slug_is_refused() -> None:
         ({"kind": "guide", "slug": "nope"}, "unknown guide"),
         ({"kind": "guide"}, "unknown guide"),
         ({"kind": "audience", "slug": "nadie"}, "unknown audience page"),
+        ({"kind": "article", "key": "missing-article"}, "unknown article"),
+        ({"kind": "article"}, "unknown article"),
     ):
         bad = {**ARTICLES_DATA[0], "related": [link]}
         with pytest.raises(ValueError, match=message):
@@ -373,7 +377,8 @@ def test_institutional_articles_length_and_calculator_evidence(locale: str) -> N
     example = INDEPENDENT_LUCK_EXAMPLE[locale]
     assert example.startswith("DECLARED ·")
     expected = compute(LUCK_EXAMPLE_INPUT)["luck_sharpe"]["value"]
-    assert f"{expected:.2f}" in example
+    expected_text = f"{expected:.2f}"
+    assert (expected_text if locale == "en" else expected_text.replace(".", ",")) in example
     independent = article_page(institutional[0], locale=locale, base_url=BASE)
     assert html.escape(localize_tags(example, locale), quote=True) in independent
 
@@ -388,16 +393,20 @@ def test_institutional_articles_length_and_calculator_evidence(locale: str) -> N
     declared = evidence_label("DECLARED", locale)
     for row, value in zip(rows, LUCK_TABLE_INPUTS, strict=True):
         expected = compute(CalculatorInput(1.8, value.years, value.trials))["luck_sharpe"]["value"]
+        trials, luck = f"{value.trials:,}", f"{expected:.2f}"
+        if locale != "en":
+            # The table follows the example above it: 1.000 trials and a decimal comma.
+            trials, luck = trials.replace(",", "."), luck.replace(".", ",")
         assert _text(row).split() == [
             declared,
             "·",
-            f"{value.trials:,}",
+            trials,
             declared,
             "·",
             f"{value.years:g}",
             declared,
             "·",
-            f"{expected:.2f}",
+            luck,
         ]
     assert find_claims(_text(table.group(1))) == []
     assert evidence_label("MEASURED", locale) not in table.group(1)
