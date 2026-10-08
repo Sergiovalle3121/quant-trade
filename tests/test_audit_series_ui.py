@@ -9,7 +9,9 @@ from typing import Any
 import pytest
 
 from quant_trade.audit.guard import find_claims
-from quant_trade.audit.pages import CONTACT_PATHS, calculator_page, landing, upload_page
+from quant_trade.audit.institutional import COPY as INTAKE_COPY
+from quant_trade.audit.institutional import REVIEW_PATHS
+from quant_trade.audit.pages import calculator_page, landing, upload_page
 from quant_trade.audit.schema import declared, measured
 from quant_trade.audit.series_ui import (
     SERIES_COPY,
@@ -127,12 +129,12 @@ def test_report_does_not_echo_untrusted_codes_or_nonfinite_numbers(locale: str) 
 
 
 @pytest.mark.parametrize("locale", ["es", "en", "pt"])
-def test_institutional_block_is_localised_and_escapes_existing_contact_url(locale: str) -> None:
+def test_institutional_block_is_localised_and_escapes_review_url(locale: str) -> None:
     markup = institutional_block(locale, "/contact?source='home'&type=model")
     copy = SERIES_COPY[locale]
     assert copy["institutional_title"] in markup
     assert copy["institutional_text"] in markup
-    assert copy["contact"] in markup
+    assert INTAKE_COPY[locale]["title"] in markup
     assert "href='/contact?source=&#x27;home&#x27;&amp;type=model'" in markup
     assert find_claims(_text(markup)) == []
 
@@ -165,13 +167,13 @@ def test_upload_page_contains_periodic_return_declarations(locale: str) -> None:
 
 
 @pytest.mark.parametrize("locale", ["es", "en", "pt"])
-def test_landing_has_institutional_block_and_existing_contact_path(locale: str) -> None:
+def test_landing_has_institutional_block_and_review_request_path(locale: str) -> None:
     page = landing(locale=locale)
     block = re.search(r"<section class='card institutional'.*?</section>", page)
     assert block is not None
     assert SERIES_COPY[locale]["institutional_title"] in block.group()
     assert SERIES_COPY[locale]["institutional_text"] in block.group()
-    assert f"href='{CONTACT_PATHS[locale]}'" in block.group()
+    assert f"href='{REVIEW_PATHS[locale]}'" in block.group()
     assert find_claims(_text(block.group())) == []
 
 

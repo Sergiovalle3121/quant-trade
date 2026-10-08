@@ -169,6 +169,27 @@ class EmailDeliveryIssue:
 
 
 @dataclass(frozen=True)
+class InstitutionalRequest:
+    """A private prospect declaration, separate from audits and their evidence."""
+
+    id: str
+    created_at: str
+    name: str
+    organization: str
+    email: str
+    strategy_type: str
+    frequency: str
+    history_years: str
+    has_benchmark: bool
+    variants: int
+    description: str
+    claim_findings: list[dict[str, Any]]
+    locale: str
+    ref: str
+    contacted_at: str
+
+
+@dataclass(frozen=True)
 class StripeRefundRecord:
     """A signed Stripe refund snapshot, including partial and failed attempts."""
 
@@ -450,6 +471,26 @@ class Store(OpsStoreMixin):
             sa.Column("email", sa.String(255), nullable=False, unique=True),
             sa.Column("created_at", sa.String(40), nullable=False),
             sa.Column("note", sa.Text, nullable=False, default=""),
+        )
+        # Additive table: prospects submit declarations here, never upload bytes.
+        self.institutional_requests = sa.Table(
+            "institutional_requests",
+            self.metadata,
+            sa.Column("id", sa.String(32), primary_key=True),
+            sa.Column("created_at", sa.String(40), nullable=False, index=True),
+            sa.Column("name", sa.String(120), nullable=False),
+            sa.Column("organization", sa.String(160), nullable=False),
+            sa.Column("email", sa.String(254), nullable=False),
+            sa.Column("strategy_type", sa.String(24), nullable=False),
+            sa.Column("frequency", sa.String(16), nullable=False),
+            sa.Column("history_years", sa.String(32), nullable=False),
+            sa.Column("has_benchmark", sa.Boolean, nullable=False),
+            sa.Column("variants", sa.Integer, nullable=False),
+            sa.Column("description", sa.Text, nullable=False),
+            sa.Column("claim_findings_json", sa.Text, nullable=False),
+            sa.Column("locale", sa.String(8), nullable=False),
+            sa.Column("ref", sa.String(80), nullable=False),
+            sa.Column("contacted_at", sa.String(40), nullable=False, default=""),
         )
         self.access_codes = sa.Table(
             "access_codes",
@@ -3003,6 +3044,113 @@ class Store(OpsStoreMixin):
             return False
         return bool(result.rowcount)
 
+    # -- institutional prospects ------------------------------------------
+    def add_institutional_request(
+        self,
+        *,
+        name: str,
+        organization: str,
+        email: str,
+        strategy_type: str,
+        frequency: str,
+        history_years: str,
+        has_benchmark: bool,
+        variants: int,
+        description: str,
+        claim_findings: list[dict[str, Any]],
+        locale: str,
+        ref: str,
+        at: datetime,
+        notification_email: str = "",
+    ) -> str:
+        """Save a validated request and its operator notice in one transaction.
+
+        The caller supplies the configured operator address only when existing
+        mail delivery is ready. Missing mail configuration never loses a lead.
+        The outbox carries no prospect text: delivery reads four allowed fields.
+        """
+        request_id = secrets.token_hex(16)
+        stamp = _iso(at)
+        with self.engine.begin() as conn:
+            conn.execute(
+                self.institutional_requests.insert().values(
+                    id=request_id,
+                    created_at=stamp,
+                    name=name,
+                    organization=organization,
+                    email=email,
+                    strategy_type=strategy_type,
+                    frequency=frequency,
+                    history_years=history_years,
+                    has_benchmark=has_benchmark,
+                    variants=variants,
+                    description=description,
+                    claim_findings_json=json.dumps(claim_findings, ensure_ascii=False),
+                    locale=locale,
+                    ref=ref,
+                    contacted_at="",
+                )
+            )
+            if notification_email:
+                conn.execute(
+                    self.email_outbox.insert().values(
+                        id=request_id,
+                        account_id="",
+                        kind="institutional",
+                        email=notification_email,
+                        original_email="",
+                        locale="es",
+                        created_at=stamp,
+                        expires_at=_iso(at + timedelta(days=7)),
+                        used_at=None,
+                        status="queued",
+                        attempts=0,
+                        next_attempt_at=stamp,
+                        lease_until="",
+                        sent_at="",
+                    )
+                )
+        return request_id
+
+    def list_institutional_requests(self, limit: int = 100) -> list[InstitutionalRequest]:
+        """Newest private requests first, for the authenticated owner panel."""
+        table = self.institutional_requests
+        with self.engine.connect() as conn:
+            rows = (
+                conn.execute(
+                    self._sa.select(table)
+                    .order_by(table.c.created_at.desc(), table.c.id.desc())
+                    .limit(max(0, min(limit, 1000)))
+                )
+                .mappings()
+                .all()
+            )
+        records = []
+        for row in rows:
+            values = dict(row)
+            values["claim_findings"] = json.loads(values.pop("claim_findings_json"))
+            records.append(InstitutionalRequest(**values))
+        return records
+
+    def mark_institutional_contacted(self, request_id: str, *, at: datetime) -> bool:
+        """Mark an existing request once; repeated clicks keep the first date."""
+        if len(request_id) != 32 or any(ch not in "0123456789abcdef" for ch in request_id):
+            return False
+        table = self.institutional_requests
+        with self.engine.begin() as conn:
+            result = conn.execute(
+                table.update()
+                .where(table.c.id == request_id)
+                .where(table.c.contacted_at == "")
+                .values(contacted_at=_iso(at))
+            )
+            if result.rowcount:
+                return True
+            return (
+                conn.execute(self._sa.select(table.c.id).where(table.c.id == request_id)).first()
+                is not None
+            )
+
     # -- verified email and durable delivery ------------------------------
     def _enqueue_email(
         self,
@@ -3473,6 +3621,29 @@ class Store(OpsStoreMixin):
             )
             if row is None or row["status"] != "sending" or int(row["attempts"]) != attempts:
                 return None
+
+            if row["kind"] == "institutional":
+                prospects = self.institutional_requests
+                contact = (
+                    conn.execute(
+                        sa.select(
+                            prospects.c.name,
+                            prospects.c.organization,
+                            prospects.c.email,
+                            prospects.c.strategy_type,
+                        ).where(prospects.c.id == challenge_id)
+                    )
+                    .mappings()
+                    .first()
+                )
+                if contact is None or row["used_at"] is not None or row["expires_at"] <= stamp:
+                    conn.execute(
+                        table.update()
+                        .where(table.c.id == challenge_id)
+                        .values(status="dead", used_at=stamp, lease_until="")
+                    )
+                    return None
+                return {**dict(row), "institutional_contact": dict(contact)}
 
             account = (
                 conn.execute(
@@ -6006,6 +6177,7 @@ __all__ = [
     "REQUIRE_WEB",
     "AccessCodeRecord",
     "AuditRecord",
+    "InstitutionalRequest",
     "PublicationRecord",
     "Store",
     "account_order_ref",

@@ -92,10 +92,10 @@ EXAMPLES_COPY = {
     "en": {
         "nav": "Public figures",
         "eyebrow": "Reading examples",
-        "title": "What public figures leave out",
+        "title": "Trading strategy review: public examples",
         "summary": (
-            "Win rates, Sharpe and search attempts: anonymous examples with declared figures, "
-            "explicit assumptions and the calculator's own arithmetic."
+            "Examples for a statistical review of a trading strategy: declared Sharpe ratios, "
+            "research attempts and missing evidence, with explicit assumptions."
         ),
         "intro": (
             "These cards put public declarations in context. We do not have the files: "

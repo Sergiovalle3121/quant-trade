@@ -1,4 +1,4 @@
-"""Durable account and purchase email delivery.
+"""Durable account, purchase and institutional notice email delivery.
 
 The outbox stores a random message id, recipient, purpose and delivery state.
 Challenge URL tokens are derived from the id and a deployment HMAC secret
@@ -203,7 +203,17 @@ def compose(
 ) -> EmailMessage:
     locale = str(row["locale"]) if row["locale"] in PATHS else "es"
     kind = str(row["kind"])
-    if kind in ("purchase", "charge_review", "market_review"):
+    if kind == "institutional":
+        contact = row["institutional_contact"]
+        subject = "Nueva solicitud institucional en Rigor"
+        body = (
+            "Solicitud de revisión institucional recibida.\n\n"
+            f"Nombre: {contact['name']}\n"
+            f"Organización: {contact['organization']}\n"
+            f"Correo: {contact['email']}\n"
+            f"Tipo: {contact['strategy_type']}\n"
+        )
+    elif kind in ("purchase", "charge_review", "market_review"):
         if store is None:
             raise ValueError("purchase notice needs its order ledger")
         order = store.get_checkout_order(str(row["id"]))

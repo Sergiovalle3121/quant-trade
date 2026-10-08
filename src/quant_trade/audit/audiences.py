@@ -1828,10 +1828,10 @@ AUDIENCE_PAGES: tuple[Audience, ...] = (
                 ),
             ),
             "en": AudienceText(
-                title="Funds and signal providers: review the record before presenting it",
+                title="Independent backtest audit for funds and signals",
                 summary=(
-                    "A statistical audit of a model portfolio, fund or signal track record: "
-                    "what to supply, what the report measures and what remains unmeasured."
+                    "Statistical review of a trading strategy for funds and signal providers: "
+                    "prepare return series, costs, benchmarks and research-trial counts."
                 ),
                 pains=(
                     "The selected curve does not show how many model versions were discarded.",

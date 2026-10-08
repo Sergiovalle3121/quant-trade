@@ -374,12 +374,14 @@ def series_report(data: dict[str, Any], locale: str) -> str:
 
 
 def institutional_block(locale: str, contact_url: str) -> str:
-    """A concise institutional audience entry point to the existing contact form."""
+    """A concise institutional audience entry point to the review request form."""
+    from quant_trade.audit.institutional import COPY
+
     copy = _copy(locale)
     return (
         "<section class='card institutional' id='institutional'>"
         f"<h2>{html.escape(copy['institutional_title'])}</h2>"
         f"<p>{html.escape(copy['institutional_text'])}</p>"
         f"<a class='button' href='{html.escape(contact_url, quote=True)}'>"
-        f"{html.escape(copy['contact'])}</a></section>"
+        f"{html.escape(COPY[locale]['title'])}</a></section>"
     )
