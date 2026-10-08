@@ -77,6 +77,7 @@ from quant_trade.audit.portuguese import (
     UI_PT,
     link_locale,
 )
+from quant_trade.audit.pricing import PRICING_COPY, PRICING_PATH
 from quant_trade.audit.prop_presets import AS_OF, DEFAULT_PRESET, PRESETS, preset_label
 from quant_trade.audit.redflags import FLAG_TITLES
 from quant_trade.audit.report import (
@@ -1470,7 +1471,7 @@ def _nav(
     links = (
         f"<a href='{home}#how'>{_e(ui['nav_how'])}</a>"
         f"<a href='{_sample_url(locale)}'>{_e(ui['nav_sample'])}</a>"
-        f"<a href='{home}#pricing'>{_e(ui['nav_pricing'])}</a>"
+        f"<a href='{PRICING_PATH[locale]}'>{_e(ui['nav_pricing'])}</a>"
         f"<a href='{_e(guides_index_url(locale))}'>{_e(ui['nav_guides'])}</a>"
         f"<a href='{_compare_url(locale)}'>{_e(ui['nav_compare'])}</a>"
         f"<a href='{home}#faq'>{_e(ui['nav_faq'])}</a>"
@@ -1586,7 +1587,7 @@ def _footer(locale: str) -> str:
         f"<li><a href='{examples_url(locale)}'>{_e(EXAMPLES_COPY[locale]['nav'])}</a></li>"
         f"<li><a href='{reading.reading_url(locale)}'>{_e(reading.COPY[locale]['title'])}</a></li>"
         f"<li><a href='{sample}.pdf' download>{_e(ui['footer_sample_pdf'])}</a></li>"
-        f"<li><a href='{home}#pricing'>{_e(ui['nav_pricing'])}</a></li>"
+        f"<li><a href='{PRICING_PATH[locale]}'>{_e(ui['nav_pricing'])}</a></li>"
         f"<li><a href='{_e(guides_index_url(locale))}'>{_e(ui['nav_guides'])}</a></li>"
         f"<li><a href='{_compare_url(locale)}'>{_e(ui['nav_compare'])}</a></li>"
         f"<li><a href='{_check_url(locale)}'>{_e(ui['footer_check'])}</a></li>"
@@ -2267,7 +2268,9 @@ def _prices_html(
             f"{_e(_method_title(locale))}{icon('arrow')}</a></p>"
         )
     return (
-        f"<section class='section dark' id='pricing'><div class='wrap'>{head}{body}</div></section>"
+        f"<section class='section dark' id='pricing'><div class='wrap'>{head}{body}"
+        f"<p class='method-link'><a href='{PRICING_PATH[locale]}'>"
+        f"{_e(PRICING_COPY[locale]['detail'])}{icon('arrow')}</a></p></div></section>"
     )
 
 

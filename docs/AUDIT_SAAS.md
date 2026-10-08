@@ -3803,6 +3803,35 @@ Pass 56 also gives each shared link its own preview card (`tools/make_og_images.
 
 Pass 56 also turns the prop-firm simulator table (`table.timing.firms`) into one card per challenge on a phone, each figure labelled: its four columns were 436 px wide on a 390 px screen and made the report pan sideways.
 
+Brief 11 (2026-10-08) prepares Portuguese class A–D and sample preview markup in
+`tools/make_og_images.py`, reusing `class_text` (whose Portuguese source is
+`report_pt.py`), `BADGE_NOTICE`, `SAMPLE_BANNER` and the existing Portuguese UI labels.
+The generator uses Playwright's installed Chromium instead of a Linux-specific path,
+and imports it only when rendering. Offline tests validate the complete fixed copy
+with the claim guard. The Windows environment has the bundled Inter/JetBrains Mono
+fonts and Pillow, but no Playwright installation or Chromium cache; no browser or
+download was started and no partial PNGs were added. `OG_PARTIAL_KINDS` therefore
+continues to serve the English class/sample assets. Portuguese publication URLs
+remain `/v/{public_id}?lang=pt`, with the publication-gated PNG URL
+`/v/{public_id}/card.png?lang=pt`; the repository has no `/pt/v/...` route.
+
+To finish rendering on a machine prepared with Pillow, Playwright and its Chromium
+(`python -m pip install pillow playwright`, then `python -m playwright install chromium`),
+set `PYTHONPATH=src` and run from the repository root:
+
+```text
+python tools/make_og_images.py outputs/og-pt --locale pt --kind class-A class-B class-C class-D sample
+```
+
+Review all five 1200×630 images for complete class sentences, fixed notices and
+unclipped text, then copy the five PNGs into `src/quant_trade/audit/static/`.
+Only after this review remove `pt` from `OG_PARTIAL_KINDS`, update the fallback
+expectations in `test_audit_theme.py` and `test_audit_guides_seo.py` (including its
+image count), and run those tests plus `test_audit_og_generator.py` and
+`test_audit_verification_card.py`. They check sample/publication image URLs,
+static HTTP 200 responses, PNG size and publication access rules. The generator
+renders the entire selected batch before writing any image to the destination.
+
 Redesign pass 57 styles the column-mapping page ("Dinos qué es cada columna"): each group of menus is a white card, the menus stack in one column on a phone so column names are not cut short, the file re-pick sits in a dashed box, and every file input's button matches the site's buttons. Cell rendering and escaping are unchanged. It also gives the account's "what we keep and how to delete it" card a shield and a green edge on /registro and /cuenta, makes the landing's secondary link monochrome, lets the price cards use the full width, stacks the sign-up buttons above the upload form on a phone, keeps the landing mock-up's address on one line, and tightens the timing tables below 380 px so they fit the screen. On the landing's "Trabajo real, no humo" section, each card's proof link sits at the card's foot with an arrow, so the six links line up. The one-year p95 drawdown tile now carries the same minus sign as the maximum drawdown beside it, in the report and on the PDF cover; the resampled-risk section still lists the depths as positive sizes of a fall. Portuguese gets its own site card (`og-pt.png`) and six audience cards (`og-for-*-pt.png`, first sales' texts); its verification and sample links keep the English card until there is a Portuguese class sentence and notice (`OG_PARTIAL_KINDS`).
 
 Redesign pass 59 checks "¿Le gana a comprar y mantener el mercado?" on a phone and in the PDF. On a phone its row names ("Sharpe en los mismos 599 días…") now wrap instead of pushing both figure columns off the screen, and both worst falls show in red as in the crises table. The PDF already read well and is unchanged.
@@ -4604,3 +4633,29 @@ Offline coverage: `test_audit_retail_articles.py`, `test_audit_retail_numbers.py
 and `test_audit_faq.py`, plus existing article, structured-data, SEO and public
 reading tests. No customer files, market data, network calls, payment changes or
 broker connectivity are involved.
+
+### Public pricing (8 October 2026)
+
+`pricing.py` serves `/precios`, `/en/pricing` and `/pt/precos`, with reciprocal
+language links, canonical URLs and sitemap entries through `PUBLIC_PAGES`.
+Navigation and footer prices links lead there; the landing retains `#pricing`
+and adds a detail link. Both report columns describe the same six dimensions,
+evidence labels, PDF, optional public page/card, comparison and contact channel.
+Comparison requires two full reports; payment does not create missing evidence.
+The existing landing limitations text is reused without rewriting it.
+
+Prices (including cents), discounted-pack availability and quantity come from
+`AuditSettings.price_usd`, `pack_price_usd` and `settings.PACK_CREDITS`. Card
+countries use `card_markets_line` only when `card_public` is true. The one-off
+payment description follows the existing `mode="payment"` checkout builders;
+no checkout, credit, account or e-mail behavior changes. E-mail confirmation is
+mentioned when configured and support availability follows `operator_contact`.
+The institutional link uses the existing intake form.
+
+Paid pages serialize the visible single/pack offers as Product/Offer JSON-LD
+through `seo._json_ld`, without ratings or reviews. In `free_mode` all full
+reports are described as free, with the existing watermark note, and both
+visible prices and structured offers are omitted. `test_audit_pricing.py`
+covers the three languages and runtime settings; `test_audit_public_hygiene.py`
+includes the new pages automatically. These are product descriptions, not
+changes to audit criteria, thresholds or readiness decisions.

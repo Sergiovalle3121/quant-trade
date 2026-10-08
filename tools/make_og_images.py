@@ -1,33 +1,34 @@
 """Render the 1200x630 share images in ``static/`` with the site fonts.
 
-- ``og-{es,en}.png``: the site card (landing, guides, method, legal pages).
-- ``og-class-{A,B,C,D}-{es,en}.png``: a published verification page (``/v/...``),
+- ``og-{es,en,pt}.png``: the site card (landing, guides, method, legal pages).
+- ``og-class-{A,B,C,D}-{es,en,pt}.png``: a published verification page (``/v/...``),
   showing only the class, its fixed sentence and the fixed notice.
-- ``og-sample-{es,en}.png``: the sample report, marked as synthetic data.
-- ``og-for-{slug}-{es,en}.png``: each audience page, with its own title.
-- ``og-pt.png`` and ``og-for-{slug}-pt.png``: the Portuguese site and audience cards.
+- ``og-sample-{es,en,pt}.png``: the sample report, marked as synthetic data.
+- ``og-for-{slug}-{es,en,pt}.png``: each audience page, with its own title.
 
 Nothing on a card comes from a client file: every text is a fixed string the
-pages already show. Run with Playwright and Chromium available:
-python tools/make_og_images.py [output_dir]
+pages already show. Requires Pillow, Playwright and its installed Chromium;
+the two WOFF2 fonts are bundled in ``static/fonts``. Run from an environment
+where ``quant_trade`` is importable (or set PYTHONPATH=src):
+python tools/make_og_images.py [output_dir] [--locale pt] [--kind sample class-A]
+
+The generator includes cards awaiting PNG generation independently of the deployed
+``OG_PARTIAL_KINDS`` fallback. Remove that fallback only after rendering and
+reviewing all five Portuguese class/sample PNGs. No browser runs on import.
 """
 
+import argparse
 import html
 import io
-import sys
 import tempfile
 from pathlib import Path
 
-from PIL import Image
-from playwright.sync_api import sync_playwright
-
 from quant_trade.audit.audiences import AUDIENCE_PAGES
 from quant_trade.audit.pages import _UI, BADGE_NOTICE, SAMPLE_BANNER, class_text
-from quant_trade.audit.seo import BRAND, OG_IMAGES, TAGLINE
+from quant_trade.audit.seo import BRAND, LOCALES, OG_KINDS, TAGLINE
 from quant_trade.audit.theme import CLASS_COLOURS, STATIC_DIR, logo_mark, ring_svg
 
 FONTS = STATIC_DIR / "fonts"
-OUT = Path(sys.argv[1]) if len(sys.argv) > 1 else STATIC_DIR
 
 STYLE = """
 @font-face{font-family:Inter;src:url('__INTER__') format('woff2');font-weight:100 900}
@@ -130,33 +131,37 @@ def audience_card(title: str, locale: str) -> str:
     )
 
 
-def cards() -> dict[str, str]:
+def cards(locales: tuple[str, ...] = LOCALES, kinds: tuple[str, ...] = OG_KINDS) -> dict[str, str]:
     out: dict[str, str] = {}
-    for locale in ("es", "en"):
+    for locale in locales:
         out[f"og-{locale}.png"] = site_card(locale)
         eyebrow = _UI[locale]["v_eyebrow"]
         for overall in "ABCD":
             out[f"og-class-{overall}-{locale}.png"] = class_card(
                 overall, locale, eyebrow=eyebrow, note=BADGE_NOTICE[locale]
             )
-        sample = "Ejemplo" if locale == "es" else "Sample"
+        sample = _UI[locale]["nav_sample"]
         out[f"og-sample-{locale}.png"] = class_card(
             "C", locale, eyebrow=sample, note=SAMPLE_BANNER[locale].split(":")[0]
         )
         for audience in AUDIENCE_PAGES:
+            if audience.contact_cta:
+                continue
             out[f"og-for-{audience.slug}-{locale}.png"] = audience_card(
                 audience.text[locale].title, locale
             )
-    # Portuguese: the site card and the audience cards (first sales' texts). Its class
-    # and sample cards wait for a Portuguese class sentence and notice.
-    out["og-pt.png"] = site_card("pt")
-    for audience in AUDIENCE_PAGES:
-        out[f"og-for-{audience.slug}-pt.png"] = audience_card(audience.text["pt"].title, "pt")
-    return {name: out[name] for name in OG_IMAGES}
+    names = (
+        f"og-{kind}-{locale}.png" if kind else f"og-{locale}.png"
+        for kind in kinds
+        for locale in locales
+    )
+    return {name: out[name] for name in names}
 
 
 def _small_png(raw: bytes) -> bytes:
     """A 256-colour PNG: a fraction of the size, with no visible change on a dark card."""
+    from PIL import Image
+
     image = (
         Image.open(io.BytesIO(raw)).convert("RGB").quantize(colors=256, dither=Image.Dither.NONE)
     )
@@ -166,20 +171,34 @@ def _small_png(raw: bytes) -> bytes:
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("output_dir", nargs="?", type=Path, default=STATIC_DIR)
+    parser.add_argument("--locale", nargs="+", choices=LOCALES, default=LOCALES)
+    parser.add_argument("--kind", nargs="+", choices=OG_KINDS, default=OG_KINDS)
+    args = parser.parse_args()
+    for name in ("inter-var.woff2", "jetbrains-mono-var.woff2"):
+        if not (FONTS / name).is_file():
+            parser.error(f"Missing bundled font: {FONTS / name}")
+
+    from playwright.sync_api import sync_playwright
+
+    rendered: dict[str, bytes] = {}
     with sync_playwright() as p, tempfile.TemporaryDirectory() as tmp:
-        browser = p.chromium.launch(
-            executable_path="/opt/pw-browsers/chromium-1194/chrome-linux/chrome"
-        )
+        browser = p.chromium.launch()
         page = browser.new_page(viewport={"width": 1200, "height": 630})
-        for name, markup in cards().items():
+        for name, markup in cards(tuple(args.locale), tuple(args.kind)).items():
             # A file page, so the file:// fonts load (about:blank may not read them).
             source = Path(tmp) / "card.html"
             source.write_text(markup, encoding="utf-8")
             page.goto(source.as_uri())
             page.evaluate("document.fonts.ready")
             page.wait_for_timeout(150)
-            (OUT / name).write_bytes(_small_png(page.screenshot()))
+            rendered[name] = _small_png(page.screenshot())
         browser.close()
+    # A missing dependency or a failed render leaves the destination untouched.
+    args.output_dir.mkdir(parents=True, exist_ok=True)
+    for name, data in rendered.items():
+        (args.output_dir / name).write_bytes(data)
 
 
 if __name__ == "__main__":

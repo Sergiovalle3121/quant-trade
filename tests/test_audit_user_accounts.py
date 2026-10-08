@@ -1234,17 +1234,22 @@ def test_the_upload_page_sends_a_visitor_without_an_account_to_sign_up_first(
             assert words not in page
 
 
-def test_the_price_addresses_open_the_landing_prices(tmp_path: Path) -> None:
-    client, _store, _settings_ = _client(tmp_path)
-    for path, target in (
-        ("/precios", "/#pricing"),
-        ("/pricing", "/en#pricing"),
-        ("/en/pricing", "/en#pricing"),
-        ("/pt/precos", "/pt#pricing"),
+def test_price_addresses_open_indexed_pages_and_preserve_the_short_alias(tmp_path: Path) -> None:
+    base_url = "https://audit.example"
+    client, _store, _settings_ = _client(tmp_path, base_url=base_url)
+    for path, locale, home in (
+        ("/precios", "es", "/"),
+        ("/en/pricing", "en", "/en"),
+        ("/pt/precos", "pt", "/pt"),
     ):
         response = client.get(path, follow_redirects=False)
-        assert response.status_code == 301 and response.headers["location"] == target
-    assert "id='pricing'" in client.get("/precios").text
+        assert response.status_code == 200
+        assert f"<html lang='{locale}'>" in response.text
+        assert f"<link rel='canonical' href='{base_url}{path}'>" in response.text
+        assert "<meta name='robots' content='index, follow'>" in response.text
+        assert "id='pricing'" in client.get(home).text
+    alias = client.get("/pricing", follow_redirects=False)
+    assert alias.status_code == 301 and alias.headers["location"] == "/en/pricing"
 
 
 # -- small screens after sign-up ---------------------------------------------------

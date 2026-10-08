@@ -126,6 +126,7 @@ from quant_trade.audit.pages import (
 )
 from quant_trade.audit.payments import stripe_checkout
 from quant_trade.audit.portuguese import MESSAGES_PT, link_locale
+from quant_trade.audit.pricing import PRICING_PATH, pricing_page
 from quant_trade.audit.prop_presets import DEFAULT_PRESET
 from quant_trade.audit.public_card import public_card_svg
 from quant_trade.audit.report import render, result_sha256
@@ -1976,14 +1977,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     ):
         _forward(legal_alias, legal_path)
 
-    # Addresses people type or share for the prices: the landing's price section.
-    for price_path, landing_path in (
-        ("/precios", "/"),
-        ("/pricing", "/en"),
-        ("/en/pricing", "/en"),
-        ("/pt/precos", "/pt"),
-    ):
-        _forward(price_path, f"{landing_path}#pricing")
+    # Preserve the English short alias; translated pricing pages have their own routes.
+    _forward("/pricing", PRICING_PATH["en"])
 
     def _institutional_response(
         request: Request,
@@ -5932,6 +5927,15 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
 
     for faq_path in FAQ_PATH.values():
         app.add_api_route(faq_path, public_faq, methods=["GET"], response_class=HTMLResponse)
+
+    def public_pricing(request: Request) -> str:
+        locale = next(lang for lang, path in PRICING_PATH.items() if path == request.url.path)
+        return pricing_page(cfg, locale=locale, base_url=_site_url(request))
+
+    for pricing_path in PRICING_PATH.values():
+        app.add_api_route(
+            pricing_path, public_pricing, methods=["GET"], response_class=HTMLResponse
+        )
 
     def _calculator(
         request: Request,

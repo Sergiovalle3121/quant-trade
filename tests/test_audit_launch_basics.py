@@ -120,9 +120,7 @@ def test_a_short_address_forwards_to_its_own_page_only(tmp_path: Path) -> None:
         ("/contact", "/en/contact"),
         ("/support", "/en/contact"),
         ("/pt/suporte", "/pt/contato"),
-        ("/precios", "/#pricing"),
-        ("/pricing", "/en#pricing"),
-        ("/pt/precos", "/pt#pricing"),
+        ("/pricing", "/en/pricing"),
         ("/en/terms", "/terms?lang=en"),
         ("/pt/privacy", "/pt/privacidade"),
     ):
