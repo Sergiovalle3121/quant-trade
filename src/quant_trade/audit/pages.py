@@ -1018,8 +1018,8 @@ _UI: dict[str, dict[str, Any]] = {
             "Tu archivo nunca se publica.",
             (
                 "Tu primer informe completo, gratis al crear tu cuenta; después, "
-                f"{_FREE} vistas previas gratis al mes. Sin cobro: a veces pedimos validar "
-                "una tarjeta, sin cargo."
+                f"{_FREE} vistas previas gratis al mes. A veces pedimos validar "
+                "una tarjeta; nunca se cobra."
             ),
             "Borrado automático si no desbloqueas el informe.",
         ],
@@ -1261,8 +1261,8 @@ _UI: dict[str, dict[str, Any]] = {
             "Your file is never published.",
             (
                 "Your first full report, free when you create your account; then "
-                f"{_FREE} free previews a month. No charge: now and then we ask to verify a card, "
-                "and nothing is charged."
+                f"{_FREE} free previews a month. Sometimes we ask to verify a card; "
+                "it is never charged."
             ),
             "Deleted automatically if you do not unlock the report.",
         ],

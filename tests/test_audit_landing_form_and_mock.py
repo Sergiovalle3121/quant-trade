@@ -4,13 +4,38 @@ the upload form asks for it up front, and the landing mock is a class the rules 
 from __future__ import annotations
 
 import html
+from pathlib import Path
 
 import pytest
+from fastapi.testclient import TestClient
 
 from quant_trade.audit.guard import find_claims
 from quant_trade.audit.pages import _COPY, upload_page
+from quant_trade.audit.settings import AuditSettings
+from quant_trade.audit.store import make_store
+from quant_trade.audit.web import create_app
 
 LOCALES = ("es", "en", "pt")
+
+
+@pytest.mark.parametrize(
+    ("paths", "sentence"),
+    [
+        (("/", "/auditar"), "A veces pedimos validar una tarjeta; nunca se cobra."),
+        (("/en", "/en/audit"), "Sometimes we ask to verify a card; it is never charged."),
+        (("/pt", "/pt/auditar"), "Às vezes pedimos validar um cartão; nunca é cobrado."),
+    ],
+)
+def test_landing_and_upload_explain_card_verification_once(
+    tmp_path: Path, paths: tuple[str, str], sentence: str
+) -> None:
+    settings = AuditSettings(database_url=f"sqlite:///{tmp_path}/audit.db")
+    client = TestClient(create_app(settings, make_store(settings.database_url)))
+    for path in paths:
+        response = client.get(path)
+        assert response.status_code == 200
+        assert sentence in html.unescape(response.text)
+        assert find_claims(response.text) == []
 
 
 @pytest.mark.parametrize("locale", LOCALES)
