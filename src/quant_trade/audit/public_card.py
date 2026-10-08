@@ -25,6 +25,8 @@ COPY = {
         "title": "Rigor · lectura de cifras públicas",
         "desc": "Cifras declaradas y contexto estadístico; sin archivo ni clase de auditoría.",
         "source": "Fuente declarada",
+        "attribution": "Cifras declaradas por quien usó la herramienta",
+        "reader_url": "rigorscore.com/lectura",
         "missing": "No declarado",
         "computed": "Calculado a partir de lo declarado",
         "trades": "Operaciones",
@@ -59,6 +61,8 @@ COPY = {
         "title": "Rigor · reading public figures",
         "desc": "Declared figures and statistical context; no file or audit class.",
         "source": "Declared source",
+        "attribution": "Figures declared by the person who used the tool",
+        "reader_url": "rigorscore.com/en/reading",
         "missing": "Not declared",
         "computed": "Computed from declared figures",
         "trades": "Trades",
@@ -93,6 +97,8 @@ COPY = {
         "title": "Rigor · leitura de números públicos",
         "desc": "Números declarados e contexto estatístico; sem arquivo nem classe de auditoria.",
         "source": "Fonte declarada",
+        "attribution": "Números declarados por quem usou a ferramenta",
+        "reader_url": "rigorscore.com/pt/leitura",
         "missing": "Não declarado",
         "computed": "Calculado a partir do declarado",
         "trades": "Operações",
@@ -244,24 +250,33 @@ def public_card_svg(claim: PublicClaim) -> str:
         '<rect width="8" height="675" fill="#245d85"/>',
     ]
 
-    def text(x: int, y: int, value: str, size: int = 16, color: str = "#202c36") -> None:
+    def text(
+        x: int,
+        y: int,
+        value: str,
+        size: int = 16,
+        color: str = "#202c36",
+        anchor: str = "start",
+    ) -> None:
         parts.append(
             f'<text x="{x}" y="{y}" font-family="Arial, sans-serif" font-size="{size}" '
-            f'fill="{color}">{html.escape(value)}</text>'
+            f'fill="{color}" text-anchor="{anchor}">{html.escape(value)}</text>'
         )
 
     text(40, 53, copy["title"], 32)
-    for y, source in ((87, claim.source_handle), (112, claim.source_url)):
-        evidence = "DECLARED" if source else "NOT_MEASURED"
+    sources = [source for source in (claim.source_handle, claim.source_url) if source.strip()]
+    for index, source in enumerate(sources or [copy["attribution"]]):
         # Keep full escaped attribution in a tooltip, with bounded visible lines.
-        parts.append(f"<g><title>{html.escape(source or copy['missing'])}</title>")
+        parts.append(f"<g><title>{html.escape(source)}</title>")
         visible = source[:99] + "…" if len(source) > 100 else source
         if find_claims(visible):
             raise ValueError("shortened source contains unsupported wording")
-        attribution = f"{evidence} · {copy['source']}: {visible or copy['missing']}"
+        attribution = (
+            f"DECLARED · {copy['source']}: {visible}" if sources else f"DECLARED · {visible}"
+        )
         # Reserve a full em per character, including wide glyphs in source text.
         # Long URLs shrink instead of being cropped in a raster export.
-        text(40, y, attribution, min(15, 1120 // len(attribution)))
+        text(40, 87 + index * 25, attribution, min(15, 1120 // len(attribution)))
         parts.append("</g>")
 
     fields = (
@@ -307,6 +322,7 @@ def public_card_svg(claim: PublicClaim) -> str:
             )
         parts.append("</g>")
     text(40, 613, f"NOT_MEASURED · {copy['footer']}", 17)
+    text(1160, 613, copy["reader_url"], 14, "#245d85", anchor="end")
     text(40, 644, copy["cta"], 19)
     parts.append("</svg>")
     return "".join(parts)

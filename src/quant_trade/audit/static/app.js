@@ -174,6 +174,7 @@
         var section = button.closest("[data-public-share]");
         var status = section && section.querySelector("[data-copy-status]");
         function selectText() {
+          target.hidden = false;
           if (target.select) {
             target.focus();
             target.select();

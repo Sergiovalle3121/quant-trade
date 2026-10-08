@@ -5912,6 +5912,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             svg=svg,
             error=error,
             image_path=image_path,
+            png_enabled=bool(image_path) and owner_card.png_available(),
         )
         return HTMLResponse(
             guard_page(page),

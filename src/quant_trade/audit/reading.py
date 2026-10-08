@@ -27,6 +27,8 @@ COPY = {
         "submit": "Crear tarjeta",
         "result": "Lectura de cifras declaradas",
         "download": "Descargar SVG",
+        "download_png": "Descargar PNG",
+        "copy_link": "Copiar enlace",
         "share_text": (
             "Mis cifras declaradas, en contexto con Rigor. Esta tarjeta no es una auditoría. {url}"
         ),
@@ -48,6 +50,8 @@ COPY = {
         "submit": "Create card",
         "result": "Reading declared figures",
         "download": "Download SVG",
+        "download_png": "Download PNG",
+        "copy_link": "Copy link",
         "share_text": (
             "My declared figures, in context with Rigor. This card is not an audit. {url}"
         ),
@@ -71,6 +75,8 @@ COPY = {
         "submit": "Criar cartão",
         "result": "Leitura de números declarados",
         "download": "Baixar SVG",
+        "download_png": "Baixar PNG",
+        "copy_link": "Copiar link",
         "share_text": (
             "Meus números declarados, em contexto com o Rigor. "
             "Este cartão não é uma auditoria. {url}"

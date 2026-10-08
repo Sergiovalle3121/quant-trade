@@ -17,7 +17,7 @@ pytest.importorskip("sqlalchemy")
 
 from fastapi.testclient import TestClient  # noqa: E402
 
-from quant_trade.audit import funnel, owner_card, reading  # noqa: E402
+from quant_trade.audit import funnel, owner_card, raster, reading  # noqa: E402
 from quant_trade.audit.examples import EXAMPLES_PATH  # noqa: E402
 from quant_trade.audit.guard import find_claims  # noqa: E402
 from quant_trade.audit.i18n import spanish  # noqa: E402
@@ -187,6 +187,58 @@ def test_share_text_reproduces_the_same_card_and_x_payload(client: TestClient, l
     assert set(re.findall(numeric, share.replace(urls[0], ""))) <= set(
         re.findall(numeric, _visible(_card(answer.text)))
     )
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+@pytest.mark.parametrize("png_enabled", [True, False])
+def test_copy_link_and_downloads_preserve_exact_public_parameters(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch, locale: str, png_enabled: bool
+) -> None:
+    monkeypatch.setattr(owner_card, "png_available", lambda: png_enabled)
+    monkeypatch.setattr(raster, "card_png", lambda svg: b"mock PNG")
+    figures = {**FIGURES, "win_rate": "71.12345678901234", "profit_factor": "3.2400", "years": ""}
+    path = reading.READING_PATH[locale]
+    form = client.get(path)
+    assert "reading-share-link" not in form.text
+    assert reading.COPY[locale]["download_png"] not in _visible(form.text)
+    page = client.get(path, params={**figures, "ref": "ignored", "source_handle": "ignored"})
+    assert page.status_code == 200
+    field = re.search(
+        r"<textarea\b([^>]*\bid=['\"]reading-share-link['\"][^>]*)>(.*?)</textarea>",
+        page.text,
+        flags=re.S,
+    )
+    assert field is not None
+    assert "readonly" in field.group(1) and "hidden" in field.group(1)
+    copied = html.unescape(field.group(2))
+    parsed = urlsplit(copied)
+    assert parsed.scheme + "://" + parsed.netloc == BASE
+    assert parsed.path == path
+    expected = {name: [value] for name, value in {**figures, "ref": "lectura"}.items()}
+    assert parse_qs(parsed.query, keep_blank_values=True) == expected
+    assert re.search(
+        r"<button\b[^>]*\bdata-copy=['\"]reading-share-link['\"][^>]*>"
+        + re.escape(reading.COPY[locale]["copy_link"])
+        + r"</button>",
+        page.text,
+    )
+    repeated = client.get(copied)
+    assert repeated.status_code == 200
+    assert _card(repeated.text) == _card(page.text)
+    assert reading.COPY[locale]["download"] in _visible(page.text)
+    png_links = [link for link in _links(page.text) if urlsplit(link).path == path + "/card.png"]
+    if png_enabled:
+        assert len(png_links) == 1
+        assert parse_qs(urlsplit(png_links[0]).query, keep_blank_values=True) == expected
+        assert re.search(
+            r"<a\b[^>]*\bdownload[^>]*>" + reading.COPY[locale]["download_png"] + r"</a>",
+            page.text,
+        )
+        assert client.get(png_links[0]).content == b"mock PNG"
+    else:
+        assert png_links == []
+        assert reading.COPY[locale]["download_png"] not in _visible(page.text)
+    assert find_claims(_visible(page.text)) == []
 
 
 @pytest.mark.parametrize("locale", LOCALES)

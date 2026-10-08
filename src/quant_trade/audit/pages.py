@@ -3558,6 +3558,7 @@ def reading_page(
     svg: str = "",
     error: str = "",
     image_path: str = "",
+    png_enabled: bool = False,
 ) -> str:
     """A GET form and the existing public SVG, using only validated inputs."""
     from quant_trade.audit.owner_card import COPY as INPUT_COPY
@@ -3596,17 +3597,30 @@ def reading_page(
     )
     if svg:
         url = reading.reading_url(locale, values)
-        text = words["share_text"].format(url=base_url.rstrip("/") + url)
+        absolute_url = base_url.rstrip("/") + url
+        text = words["share_text"].format(url=absolute_url)
         intent = "https://x.com/intent/post?" + urlencode({"text": text})
+        png_link = ""
+        if png_enabled:
+            png_url = reading.READING_PATH[locale] + "/card.png?" + url.partition("?")[2]
+            png_link = (
+                f" <a class='btn btn-ghost' href='{_e(png_url)}' download>"
+                f"{_e(words['download_png'])}</a>"
+            )
         body += (
             f"<section><h2>{_e(words['result'])}</h2>"
             f"<div class='public-card-preview'>{svg}</div>"
             f"<p><a class='btn btn-ghost' href='{_e(url + '&download=svg')}' download>"
-            f"{_e(words['download'])}</a></p></section>"
+            f"{_e(words['download'])}</a>{png_link}</p></section>"
             f"<section data-public-share><h2>{_e(share['title'])}</h2>"
+            "<textarea id='reading-share-link' readonly hidden rows='3' style='width:100%' "
+            f"aria-label='{_e(words['copy_link'])}'>{_e(absolute_url)}</textarea>"
             f"<label for='reading-share-text'>{_e(share['copy'])}</label>"
             "<textarea id='reading-share-text' readonly rows='5' style='width:100%'>"
             f"{_e(text)}</textarea><div class='copy-row'>"
+            "<button class='btn btn-ghost' type='button' data-copy='reading-share-link' "
+            f"data-done='{_e(share['done'])}' data-fallback='{_e(share['fallback'])}' hidden>"
+            f"{_e(words['copy_link'])}</button>"
             "<button class='btn btn-dark' type='button' data-copy='reading-share-text' "
             f"data-done='{_e(share['done'])}' data-fallback='{_e(share['fallback'])}' hidden>"
             f"{_e(share['copy'])}</button><a class='btn btn-ghost' href='{_e(intent)}' "
