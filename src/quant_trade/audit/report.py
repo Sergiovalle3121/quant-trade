@@ -7775,7 +7775,10 @@ def render_html(
     publish_html = ""
     if public_id and not locked:
         publish_html = share_block(
-            overall=str(data["verdict"]["overall"]), public_id=public_id, locale=locale
+            overall=str(data["verdict"]["overall"]),
+            public_id=public_id,
+            locale=locale,
+            kind="account" if is_account_history(data) else "backtest",
         )
     elif publish_url and not locked:
         publish_html = (

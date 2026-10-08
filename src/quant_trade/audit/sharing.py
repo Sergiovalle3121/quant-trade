@@ -1,4 +1,4 @@
-"""Fixed sharing copy made only from the public class and publication id."""
+"""Fixed sharing copy using only the class, publication id and report kind."""
 
 from __future__ import annotations
 
@@ -12,10 +12,16 @@ COPY = {
             "Audité mi backtest con Rigor: clase {overall}. Consulta costos, fuera de muestra "
             "y configuraciones probadas, con etiquetas de evidencia. {url}"
         ),
+        "text_account": (
+            "Audité el historial de mi cuenta con Rigor: clase {overall}. Consulta costos, "
+            "fuera de muestra y configuraciones probadas, con etiquetas de evidencia. {url}"
+        ),
         "copy": "Copiar texto",
         "done": "Texto copiado",
         "fallback": "Texto seleccionado. Usa la opción Copiar de tu dispositivo.",
         "post": "Publicar en X",
+        "whatsapp": "Enviar por WhatsApp",
+        "telegram": "Compartir en Telegram",
         "preview": "Tarjeta pública del informe",
     },
     "en": {
@@ -24,10 +30,16 @@ COPY = {
             "I audited my backtest with Rigor: class {overall}. See costs, out-of-sample data "
             "and configurations tried, with evidence labels. {url}"
         ),
+        "text_account": (
+            "I audited my account history with Rigor: class {overall}. See costs, "
+            "out-of-sample data and configurations tried, with evidence labels. {url}"
+        ),
         "copy": "Copy text",
         "done": "Text copied",
         "fallback": "Text selected. Use your device's Copy command.",
         "post": "Post on X",
+        "whatsapp": "Send on WhatsApp",
+        "telegram": "Share on Telegram",
         "preview": "Public report card",
     },
     "pt": {
@@ -36,35 +48,55 @@ COPY = {
             "Auditei meu backtest com o Rigor: classe {overall}. Veja custos, dados fora da "
             "amostra e configurações testadas, com etiquetas de evidência. {url}"
         ),
+        "text_account": (
+            "Auditei o histórico da minha conta com o Rigor: classe {overall}. Veja custos, "
+            "dados fora da amostra e configurações testadas, com etiquetas de evidência. {url}"
+        ),
         "copy": "Copiar texto",
         "done": "Texto copiado",
         "fallback": "Texto selecionado. Use a opção Copiar do seu dispositivo.",
         "post": "Publicar no X",
+        "whatsapp": "Enviar pelo WhatsApp",
+        "telegram": "Compartilhar no Telegram",
         "preview": "Cartão público do relatório",
     },
 }
 
 
-def share_text(*, overall: str, public_id: str, locale: str = "es") -> str:
+def _share_url(public_id: str, locale: str) -> str:
+    url = f"https://rigorscore.com/v/{quote(public_id, safe='')}?ref=share"
+    if locale != "es":
+        url += f"&lang={locale}"
+    return url
+
+
+def share_text(*, overall: str, public_id: str, locale: str = "es", kind: str = "backtest") -> str:
     """No result object or private report URL crosses this boundary."""
     locale = locale if locale in COPY else "es"
     if overall not in ("A", "B", "C", "D") or not public_id:
         return ""
-    url = f"https://rigorscore.com/v/{quote(public_id, safe='')}?ref=share"
-    if locale != "es":
-        url += f"&lang={locale}"
-    return COPY[locale]["text"].format(overall=overall, url=url)
+    key = "text_account" if kind == "account" else "text"
+    return COPY[locale][key].format(overall=overall, url=_share_url(public_id, locale))
 
 
-def share_block(*, overall: str, public_id: str, locale: str = "es") -> str:
+def share_block(*, overall: str, public_id: str, locale: str = "es", kind: str = "backtest") -> str:
     """Call only after the store confirms an active publication."""
     locale = locale if locale in COPY else "es"
-    text = share_text(overall=overall, public_id=public_id, locale=locale)
+    text = share_text(overall=overall, public_id=public_id, locale=locale, kind=kind)
     if not text:
         return ""
     words = COPY[locale]
     escape = html.escape
     intent = "https://x.com/intent/post?" + urlencode({"text": text})
+    whatsapp = "https://wa.me/?text=" + quote(text, safe="")
+    url = _share_url(public_id, locale)
+    text_without_url = text.removesuffix(url).rstrip()
+    telegram = (
+        "https://t.me/share/url?url="
+        + quote(url, safe="")
+        + "&text="
+        + quote(text_without_url, safe="")
+    )
     image = f"/v/{quote(public_id, safe='')}/card.svg?lang={locale}"
     return (
         "<section class='rsec no-print' id='share-publication' data-public-share>"
@@ -76,7 +108,11 @@ def share_block(*, overall: str, public_id: str, locale: str = "es") -> str:
         f"data-copy='share-text' data-done='{escape(words['done'])}' "
         f"data-fallback='{escape(words['fallback'])}' hidden>{escape(words['copy'])}</button>"
         f"<a class='btn btn-ghost btn-sm' href='{escape(intent)}' "
-        f"rel='noopener noreferrer'>{escape(words['post'])}</a></div>"
+        f"rel='noopener noreferrer'>{escape(words['post'])}</a>"
+        f"<a class='btn btn-ghost btn-sm' href='{escape(whatsapp)}' "
+        f"rel='noopener noreferrer'>{escape(words['whatsapp'])}</a>"
+        f"<a class='btn btn-ghost btn-sm' href='{escape(telegram)}' "
+        f"rel='noopener noreferrer'>{escape(words['telegram'])}</a></div>"
         "<p class='muted' data-copy-status role='status' aria-live='polite'></p>"
         f"<img src='{escape(image)}' alt='{escape(words['preview'])}' "
         "width='1200' height='630' loading='lazy' style='width:100%;height:auto'>"
