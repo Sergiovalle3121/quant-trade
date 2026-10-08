@@ -9,7 +9,7 @@ import pytest
 from quant_trade.audit.guard import find_claims
 from quant_trade.audit.mapping import Table, mapping_page
 from quant_trade.audit.pages import upload_page
-from quant_trade.audit.prop_presets import PRESETS
+from quant_trade.audit.prop_presets import DEFAULT_PRESET, PRESETS
 
 
 class FormValues(HTMLParser):
@@ -54,7 +54,9 @@ def test_rejection_restores_declarations_and_opens_their_sections(locale: str) -
         "oos_start": "2025-02-01",
         "description": "Synthetic journal & its assumptions",
         "benchmark_applicable": "no",
-        "challenge": next(iter(PRESETS)),
+        # The browser always sends the first preset, so only another choice
+        # counts as touched and opens the extras (#446).
+        "challenge": next(key for key in PRESETS if key != DEFAULT_PRESET),
         "initial_balance": "10000",
         "locale": locale,
         "consent": "on",
