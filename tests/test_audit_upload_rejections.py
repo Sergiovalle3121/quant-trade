@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from html import escape, unescape
 from pathlib import Path
 from typing import Any
@@ -34,29 +35,45 @@ def _app(tmp_path: Path, **kwargs: Any) -> Any:
 
 @pytest.mark.parametrize("locale", ["es", "en", "pt"])
 @pytest.mark.parametrize(
-    ("category", "field", "content", "detected", "status"),
+    ("category", "field", "content", "detected", "status", "detector"),
     [
-        ("format_unknown", "report", b"\x7fELF" + b"x" * 9000, "unknown", 400),
-        ("format_unknown", "report", b"<html><body>unknown</body></html>", "html", 400),
-        ("image", "report", b"\x89PNG\r\n\x1a\n" + b"x" * 9000, "image", 400),
-        ("pdf_no_trades", "report", b"%PDF-1.4\n%%EOF", "pdf", 400),
-        ("too_few_rows", "equity", b"timestamp,equity\n2024-01-01,100\n", "csv", 400),
+        ("format_unknown", "report", b"\x7fELF" + b"x" * 9000, "unknown", 400, "header"),
+        (
+            "format_unknown",
+            "report",
+            b"<html><body>unknown</body></html>",
+            "html",
+            400,
+            "importers",
+        ),
+        ("image", "report", b"\x89PNG\r\n\x1a\n" + b"x" * 9000, "image", 400, "header"),
+        ("pdf_no_trades", "report", b"%PDF-1.4\n%%EOF", "pdf", 400, "importers"),
+        ("too_few_rows", "equity", b"timestamp,equity\n2024-01-01,100\n", "csv", 400, "schema"),
         (
             "dates_unreadable",
             "equity",
             b"timestamp,equity\n15/03/2024,100\n03/16/2024,101\n",
             "csv",
             400,
+            "schema",
         ),
-        ("columns_missing", "report", b"When,Amount\n2024-01-01,100\n2024-01-02,101\n", "csv", 422),
+        (
+            "columns_missing",
+            "report",
+            b"When,Amount\n2024-01-01,100\n2024-01-02,101\n",
+            "csv",
+            422,
+            "mapping",
+        ),
         (
             "invalid_values",
             "equity",
             b"timestamp,equity\n2024-01-01,1e25\n2024-01-02,1e26\n",
             "csv",
             400,
+            "schema",
         ),
-        ("empty_file", "report", b"", "unknown", 400),
+        ("empty_file", "report", b"", "unknown", 400, "form"),
     ],
 )
 def test_synthetic_refusal_explains_cause_and_records_only_labels(
@@ -69,15 +86,20 @@ def test_synthetic_refusal_explains_cause_and_records_only_labels(
     content: bytes,
     detected: str,
     status: int,
+    detector: str,
 ) -> None:
     # No external PDF process or network is needed to represent a table-less PDF.
     monkeypatch.setattr(pdf_tables, "_extract", lambda data: {})
     app = _app(tmp_path)
-    private = "PRIVATE-description-<unsafe>"
+    caplog.set_level(logging.DEBUG)
+    email = "private-upload@example.invalid"
+    ip = "192.0.2.231"
+    private = f"PRIVATE-description-<unsafe> {email}"
     with TestClient(app) as client:
         answer = client.post(
             "/audits",
             files={field: ("PRIVATE-file-name.csv", content)},
+            headers={"X-Forwarded-For": ip},
             data={
                 "consent": "on",
                 "locale": locale,
@@ -88,7 +110,10 @@ def test_synthetic_refusal_explains_cause_and_records_only_labels(
             },
         )
         assert answer.status_code == status, answer.text[:500]
-        assert rejection_guidance(category, detected, locale) in answer.text
+        assert (
+            rejection_guidance(category, detected, locale, file_inspected=category != "empty_file")
+            in answer.text
+        )
         assert find_claims(answer.text) == []
         assert "name='trials'" in answer.text and "value='7'" in answer.text
         assert escape(private, quote=True) in answer.text
@@ -97,24 +122,43 @@ def test_synthetic_refusal_explains_cause_and_records_only_labels(
         assert len(rows) == 1
         assert rows[0]["category"] == category
         assert rows[0]["detected_format"] == detected
+        assert rows[0]["detector"] == detector
         assert rows[0]["count"] == 1
-        assert "PRIVATE" not in str(rows) + caplog.text
+        for secret in ("PRIVATE", email, ip):
+            assert secret not in str(rows) + caplog.text
 
 
 @pytest.mark.parametrize("locale", ["es", "en", "pt"])
 @pytest.mark.parametrize(
-    "category",
-    ["too_large", "rate_limited", "invalid_declaration", "invalid_upload", "service_busy"],
+    ("category", "status", "detector"),
+    [
+        ("too_large", 413, "body_limit"),
+        ("rate_limited", 429, "rate_limit"),
+        ("invalid_declaration", 400, "form"),
+        ("invalid_upload", 400, "importers"),
+        ("service_busy", 503, "admission"),
+    ],
 )
 def test_request_refusals_have_guidance(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
     locale: str,
     category: str,
+    status: int,
+    detector: str,
 ) -> None:
     app = _app(tmp_path, max_upload_bytes=100, max_uploads_per_hour_per_ip=1)
+    caplog.set_level(logging.DEBUG)
+    email = "private-refusal@example.invalid"
+    ip = "192.0.2.232"
     content = CURVE
-    data = {"consent": "on", "locale": locale, "trials": "4"}
+    data = {
+        "consent": "on",
+        "locale": locale,
+        "trials": "4",
+        "description": f"PRIVATE-description {email}",
+    }
     if category == "too_large":
         content += b"x" * 300
     elif category == "rate_limited":
@@ -134,14 +178,31 @@ def test_request_refusals_have_guidance(
 
         monkeypatch.setattr(web, "_take_slot", no_slot)
     with TestClient(app) as client:
-        answer = client.post("/audits", files={"equity": ("file.csv", content)}, data=data)
-        assert answer.status_code in {400, 413, 429, 503}, answer.text[:500]
+        answer = client.post(
+            "/audits",
+            files={"equity": ("PRIVATE-file.csv", content)},
+            data=data,
+            headers={"X-Forwarded-For": ip},
+        )
+        assert answer.status_code == status, answer.text[:500]
         assert f'data-upload-rejection="{category}"' in answer.text
         reason, step = REJECTION_COPY[locale][category]
         assert reason in unescape(answer.text) and step in unescape(answer.text)
         assert "href=" in answer.text and find_claims(answer.text) == []
         app.state.operations.flush()
-        assert app.state.store.upload_rejection_rows("2000-01-01")[0]["category"] == category
+        (row,) = app.state.store.upload_rejection_rows("2000-01-01")
+        assert row["category"] == category and row["detector"] == detector
+        assert row["count"] == 1
+        for secret in ("PRIVATE", email, ip):
+            assert secret not in str(row) + caplog.text
+        if category == "invalid_upload":
+            (warning,) = [
+                record
+                for record in caplog.records
+                if record.getMessage() == "upload could not be parsed: RuntimeError"
+            ]
+            assert warning.levelno == logging.WARNING
+            assert warning.exc_info is None
 
 
 @pytest.mark.parametrize("signature", [b"\x7fELF", b"\x89PNG\r\n\x1a\n"])

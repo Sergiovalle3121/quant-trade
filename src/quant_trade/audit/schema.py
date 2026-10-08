@@ -729,7 +729,9 @@ def parse_equity_csv(data: bytes, *, what: str = "equity") -> IngestedSeries:
         raise ParseError(
             f"the {what} file has fewer than two usable rows",
             message_es=f"El archivo {_file_es(what)} tiene menos de dos filas utilizables.",
-            code="too_few_rows",
+            # Numeric failures in the unreadable-row warning need value guidance;
+            # keep the existing shortage code for dates or duplicate rows alone.
+            code="invalid_values" if unparseable and values.isna().any() else "too_few_rows",
         )
 
     values = frame["value"].astype(float)
