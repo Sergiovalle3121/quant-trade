@@ -1,0 +1,119 @@
+//@version=5
+indicator("Rigor · Luck and Sharpe", overlay = true)
+
+float annualSharpe = input.float(1.8, "Sharpe anual del backtest · DECLARED", minval = 0.05, maxval = 10.0)
+float historyYears = input.float(3.0, "Años de historial · DECLARED", minval = 0.1, maxval = 50.0)
+int trialCount = input.int(100, "Configuraciones probadas · DECLARED", minval = 1, maxval = 10000000)
+
+// Same model as audit/calculator.py: normal returns, independent trials,
+// sampling variance (1 + SR_period^2 / 2) / (observations - 1), and Bonferroni.
+// No prices or trade history are read. Outputs are derived from DECLARED inputs.
+// Manual parity cases: annual Sharpe, years, trials, periods/year, luck, after.
+// PARITY: {"sharpe": 1.8, "years": 3.0, "trials": 100, "periods_per_year": 252, "luck": "1.47", "after": "0.76"}
+// PARITY: {"sharpe": 1.0, "years": 2.0, "trials": 1000, "periods_per_year": 52, "luck": "2.32", "after": "0.00"}
+// PARITY: {"sharpe": 2.5, "years": 5.0, "trials": 10, "periods_per_year": 12, "luck": "0.80", "after": "2.26"}
+
+// BEGIN CALCULATOR MATH
+// Acklam inverse normal, with the same coefficients as metrics/statistics.py.
+f_phi_inv(float p) =>
+    float result = 0.0
+    if p < 0.02425 or p > 1.0 - 0.02425
+        float tail = p
+        if p > 0.5
+            tail := 1.0 - p
+        float q = math.sqrt(-2.0 * math.log(tail))
+        float numerator = (((((-0.007784894002430293 * q - 0.3223964580411365) * q - 2.400758277161838) * q - 2.549732539343734) * q + 4.374664141464968) * q + 2.938163982698783)
+        float denominator = ((((0.007784695709041462 * q + 0.3224671290700398) * q + 2.445134137142996) * q + 3.754408661907416) * q + 1.0)
+        result := numerator / denominator
+        if p > 0.5
+            result := -result
+    else
+        float q = p - 0.5
+        float r = q * q
+        float numerator = (((((-39.69683028665376 * r + 220.9460984245205) * r - 275.9285104469687) * r + 138.3577518672690) * r - 30.66479806614716) * r + 2.506628277459239) * q
+        float denominator = (((((-54.47609879822406 * r + 161.5858368580409) * r - 155.6989798598866) * r + 66.80131188771972) * r - 13.28068155288572) * r + 1.0)
+        result := numerator / denominator
+    result
+
+// erfc approximation evaluated directly in the upper tail, never 1 - CDF.
+// Pine has no math.erfc. Relative tail error is about 1e-7; show two decimals.
+f_normal_tail(float z) =>
+    float x = z / math.sqrt(2.0)
+    float t = 1.0 / (1.0 + 0.5 * x)
+    float polynomial = -1.26551223 + t * (1.00002368 + t * (0.37409196 + t * (0.09678418 + t * (-0.18628806 + t * (0.27886807 + t * (-1.13520398 + t * (1.48851587 + t * (-0.82215223 + t * 0.17087277))))))))
+    0.5 * t * math.exp(-x * x + polynomial)
+
+// Match Python round(): ties go to the even integer, unlike math.round().
+f_round_even(float value) =>
+    int lower = math.floor(value)
+    float fraction = value - lower
+    int rounded = lower
+    if fraction > 0.5 or (fraction == 0.5 and lower % 2 == 1)
+        rounded := lower + 1
+    rounded
+
+// Only single daily, weekly and monthly bars match supported calculator inputs.
+f_periods(bool daily, bool weekly, bool monthly, int multiplier) =>
+    float periods = 0.0
+    if multiplier == 1
+        if daily
+            periods := 252.0
+        else if weekly
+            periods := 52.0
+        else if monthly
+            periods := 12.0
+    periods
+
+f_luck_numbers(float sharpe, float years, int trials, float periods) =>
+    float luck = na
+    float after = na
+    int observations = math.max(2, f_round_even(years * periods))
+    if periods > 0 and observations >= 20 and years * 365.25 >= 28 and trials >= 2
+        float scale = math.sqrt(periods)
+        float perPeriod = sharpe / scale
+        float standardError = math.sqrt((1.0 + perPeriod * perPeriod / 2.0) / (observations - 1))
+        float gamma = 0.5772156649015329
+        float expectedMax = (1.0 - gamma) * f_phi_inv(1.0 - 1.0 / trials) + gamma * f_phi_inv(1.0 - 1.0 / (trials * math.exp(1.0)))
+        luck := standardError * expectedMax * scale
+        float adjustedP = math.min(1.0, f_normal_tail(perPeriod / standardError) * trials)
+        float haircut = 0.0
+        if adjustedP <= 0.0
+            haircut := perPeriod
+        else if adjustedP < 0.5
+            haircut := math.min(perPeriod, math.max(0.0, -f_phi_inv(adjustedP) * standardError))
+        if sharpe <= luck
+            haircut := 0.0
+        after := haircut * scale
+    [luck, after]
+// END CALCULATOR MATH
+
+var table panel = table.new(position.top_right, 2, 9, bgcolor = color.rgb(20, 29, 43), border_width = 1)
+if barstate.isfirst
+    table.merge_cells(panel, 0, 0, 1, 0)
+    table.merge_cells(panel, 0, 7, 1, 7)
+    table.merge_cells(panel, 0, 8, 1, 8)
+if barstate.islast
+    float periods = f_periods(timeframe.isdaily, timeframe.isweekly, timeframe.ismonthly, timeframe.multiplier)
+    [luck, after] = f_luck_numbers(annualSharpe, historyYears, trialCount, periods)
+    string note = "Modelo de rendimientos normales y configuraciones independientes."
+    if periods == 0
+        note := "Usa un gráfico diario, semanal o mensual de una barra · NOT_MEASURED."
+    else if f_round_even(historyYears * periods) < 20 or historyYears * 365.25 < 28
+        note := "Historial insuficiente para el descuento · NOT_MEASURED."
+    else if trialCount == 1
+        note := "Una configuración: no hay búsqueda que descontar · DECLARED."
+    table.cell(panel, 0, 0, "Rigor · Lectura de Sharpe", text_color = color.white)
+    table.cell(panel, 0, 1, "Sharpe anual", text_color = color.white)
+    table.cell(panel, 1, 1, str.tostring(annualSharpe, "0.00") + " · DECLARED", text_color = color.white)
+    table.cell(panel, 0, 2, "Años de historial", text_color = color.white)
+    table.cell(panel, 1, 2, str.tostring(historyYears, "0.00") + " · DECLARED", text_color = color.white)
+    table.cell(panel, 0, 3, "Configuraciones", text_color = color.white)
+    table.cell(panel, 1, 3, str.tostring(trialCount) + " · DECLARED", text_color = color.white)
+    table.cell(panel, 0, 4, "Periodos por año · supuesto del gráfico", text_color = color.white)
+    table.cell(panel, 1, 4, periods > 0 ? str.tostring(periods, "0") + " · DECLARED" : "NOT_MEASURED", text_color = color.white)
+    table.cell(panel, 0, 5, "Sharpe de la pura suerte", text_color = color.white)
+    table.cell(panel, 1, 5, na(luck) ? "NOT_MEASURED" : str.tostring(luck, "0.00") + " · DECLARED", text_color = color.white)
+    table.cell(panel, 0, 6, "Sharpe tras el descuento", text_color = color.white)
+    table.cell(panel, 1, 6, na(after) ? "NOT_MEASURED" : str.tostring(after, "0.00") + " · DECLARED", text_color = color.white)
+    table.cell(panel, 0, 7, note, text_color = color.silver, text_size = size.small)
+    table.cell(panel, 0, 8, "Cifras declaradas · no es una auditoría · rigorscore.com/calculator?ref=tv", text_color = color.silver, text_size = size.small)

@@ -7,6 +7,25 @@ tooling sold as a second opinion. It is not investment advice, it executes
 nothing, it holds no funds and no keys, and it never claims that money was
 or will be made. The profit-claim guard refuses any report that does.
 
+The public figure reader at /lectura, /en/reading and /pt/leitura accepts optional
+declared figures through GET without an account. It reuses the owner's numeric
+parser, PublicClaim and public_card_svg, with the same bounds and daily/normal
+assumptions. The win_rate parameter is a percentage. Attribution is fixed to
+the person using the tool; identity and language query parameters are ignored.
+Missing inputs remain NOT_MEASURED. It creates no audit class or uploaded file.
+SVG attachments (download=svg), inline cards and sharing text stay in memory.
+The share link contains the validated numeric strings and ref=lectura. Its
+recipients can read those figures; browser/proxy URL history can retain them.
+No declarations or cards are written to the database or disk. The existing
+funnel cookie recognizes lectura, without new persisted visit counters.
+
+The calculator has no rate limit and the contact page has no POST form. The
+reader uses the existing in-memory AttemptLog: 60 generation attempts per IP
+per sliding hour, across languages and SVG downloads. Invalid attempts count;
+opening an empty form does not. Trusted-proxy IP rules remain unchanged. The
+limit is per process and resets on restart. No PNG service or new threshold.
+Offline coverage lives in tests/test_audit_public_reading.py.
+
 The public name is **Rigor** (the same word in Spanish and English: statistical
 rigor is what the audit sells). It replaced "Contraprueba" on 2026-09-24.
 `seo.BRAND` and `seo.TAGLINE` hold it; it shows in every page head, report

@@ -13,11 +13,12 @@ from __future__ import annotations
 import html
 import re
 import textwrap
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from datetime import datetime
 from typing import Any
+from urllib.parse import urlencode
 
-from quant_trade.audit import institutional
+from quant_trade.audit import institutional, reading
 from quant_trade.audit.accounts import FREE_PREVIEWS_PER_MONTH as _FREE
 from quant_trade.audit.articles import (
     ARTICLES,
@@ -1582,6 +1583,7 @@ def _footer(locale: str) -> str:
         f"<li><a href='{home}#how'>{_e(ui['nav_how'])}</a></li>"
         f"<li><a href='{_sample_url(locale)}'>{_e(ui['nav_sample'])}</a></li>"
         f"<li><a href='{examples_url(locale)}'>{_e(EXAMPLES_COPY[locale]['nav'])}</a></li>"
+        f"<li><a href='{reading.reading_url(locale)}'>{_e(reading.COPY[locale]['title'])}</a></li>"
         f"<li><a href='{sample}.pdf' download>{_e(ui['footer_sample_pdf'])}</a></li>"
         f"<li><a href='{home}#pricing'>{_e(ui['nav_pricing'])}</a></li>"
         f"<li><a href='{_e(guides_index_url(locale))}'>{_e(ui['nav_guides'])}</a></li>"
@@ -3543,6 +3545,80 @@ def _calculator_result(
         f"<p class='{css}' data-calc-verdict>{_e(verdict)}</p>"
         f"<table class='calc-result'><tbody>{table}</tbody></table>" + note
     )
+
+
+def reading_page(
+    *,
+    locale: str = "es",
+    base_url: str = "",
+    values: Mapping[str, str] | None = None,
+    svg: str = "",
+    error: str = "",
+) -> str:
+    """A GET form and the existing public SVG, using only validated inputs."""
+    from quant_trade.audit.owner_card import COPY as INPUT_COPY
+    from quant_trade.audit.public_card import COPY as CARD_COPY
+    from quant_trade.audit.sharing import COPY as SHARE_COPY
+
+    words, card, share = reading.COPY[locale], CARD_COPY[locale], SHARE_COPY[locale]
+    values = values or {}
+    body = ""
+    if error:
+        message = words["limited"] if error == "limited" else INPUT_COPY[locale][error]
+        body += f"<p class='error' role='alert'>{_e(message)}</p>"
+    body += (
+        f"<p>{_e(words['note'])}</p><p>{_e(words['optional'])}</p>"
+        f"<p>{_e(words['public'])}</p>"
+        f"<form method='get' action='{reading.reading_url(locale)}' class='calc-form'>"
+        "<div class='form-grid'>"
+    )
+    for name in reading.FIELDS:
+        if name in ("trades", "trials"):
+            low, high, step = "1", "10000000", "1"
+        elif name == "win_rate":
+            low, high, step = "0", "100", "any"
+        elif name == "sharpe":
+            low, high, step = "-1000000", "1000000", "any"
+        else:
+            low, high, step = "0", "1000000", "any"
+        label = INPUT_COPY[locale]["rate"] if name == "win_rate" else card[name]
+        body += (
+            f"<div class='field'><label for='reading-{name}'>{_e(label)} · DECLARED</label>"
+            f"<input id='reading-{name}' name='{name}' type='number' min='{low}' max='{high}' "
+            f"step='{step}' value='{_e(values.get(name, ''))}' autocomplete='off'></div>"
+        )
+    body += (
+        f"</div><button class='btn btn-dark' type='submit'>{_e(words['submit'])}</button></form>"
+    )
+    if svg:
+        url = reading.reading_url(locale, values)
+        text = words["share_text"].format(url=base_url.rstrip("/") + url)
+        intent = "https://x.com/intent/post?" + urlencode({"text": text})
+        body += (
+            f"<section><h2>{_e(words['result'])}</h2>"
+            f"<div class='public-card-preview'>{svg}</div>"
+            f"<p><a class='btn btn-ghost' href='{_e(url + '&download=svg')}' download>"
+            f"{_e(words['download'])}</a></p></section>"
+            f"<section data-public-share><h2>{_e(share['title'])}</h2>"
+            f"<label for='reading-share-text'>{_e(share['copy'])}</label>"
+            "<textarea id='reading-share-text' readonly rows='5' style='width:100%'>"
+            f"{_e(text)}</textarea><div class='copy-row'>"
+            "<button class='btn btn-dark' type='button' data-copy='reading-share-text' "
+            f"data-done='{_e(share['done'])}' data-fallback='{_e(share['fallback'])}' hidden>"
+            f"{_e(share['copy'])}</button><a class='btn btn-ghost' href='{_e(intent)}' "
+            f"rel='noopener noreferrer'>{_e(share['post'])}</a></div>"
+            "<p class='muted' data-copy-status role='status' aria-live='polite'></p></section>"
+        )
+    alternates = {
+        lang: reading.reading_url(lang, values if svg else None) for lang in reading.READING_PATH
+    }
+    title = f"{words['title']} · Rigor"
+    meta = _public_meta(title, words["summary"], locale, reading.reading_url(locale), base_url)
+    body = (
+        _page_hero(words["eyebrow"], words["title"], words["summary"])
+        + f"<div class='paper page-main'><div class='wrap'>{body}</div></div>"
+    )
+    return _page(title, locale, body, meta_html=meta, alternates=alternates, solid_nav=True)
 
 
 def calculator_page(

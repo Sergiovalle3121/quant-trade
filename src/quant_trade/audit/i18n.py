@@ -75,6 +75,24 @@ _TRIAL_SOURCES: dict[str, str] = {
 }
 
 _RULES_SOURCE: tuple[tuple[str, str], ...] = (
+    # Public figure reader notes (reading.COPY); keep the Spanish rules explicit.
+    (
+        "This card is not an audit. There is no file or audit class.",
+        "Esta tarjeta no es una auditoría. No hay archivo ni clase de auditoría.",
+    ),
+    (
+        "Leave what you do not know empty: it will appear as NOT_MEASURED.",
+        "Deja vacío lo que no conoces: aparecerá como NOT_MEASURED.",
+    ),
+    (
+        "The shared link contains the figures you enter; anyone with the link can read them.",
+        "El enlace compartido contiene las cifras que escribes; "
+        "cualquiera con el enlace puede leerlas.",
+    ),
+    (
+        "Too many readings from this address. Try again later.",
+        "Demasiadas lecturas desde esta dirección. Inténtalo de nuevo más tarde.",
+    ),
     (
         "The request is too large. Shorten the text and try again.",
         "La solicitud es demasiado grande. Reduce el texto e inténtalo de nuevo.",
