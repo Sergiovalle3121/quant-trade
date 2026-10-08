@@ -12,6 +12,7 @@ depends on it.
 from __future__ import annotations
 
 import json
+import os
 from collections.abc import Callable
 from dataclasses import fields
 from datetime import UTC, datetime
@@ -181,13 +182,13 @@ def indexnow(
     The URLs come from the sitemap built here, nothing is downloaded. The key is
     AUDIT_INDEXNOW_KEY when it is valid, else the default the site serves.
     """
-    from quant_trade.audit.settings import AuditSettings
 
     try:
         host = indexnow_lib.site_host(site)
     except ValueError as exc:
         raise typer.BadParameter(str(exc)) from exc
-    key = AuditSettings.from_env().indexnow_key
+    # Only the key: the same rule as AuditSettings.from_env, without the other variables.
+    key = indexnow_lib.clean_key(os.environ.get("AUDIT_INDEXNOW_KEY", ""))
     location = indexnow_lib.key_location(f"https://{host}", key)
     prepared = indexnow_lib.prepare(indexnow_lib.sitemap_urls(f"https://{host}"), host=host)
     groups = len(indexnow_lib.batches(prepared.urls))

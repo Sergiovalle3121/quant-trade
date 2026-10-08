@@ -216,6 +216,20 @@ def test_nothing_is_sent_when_no_url_is_left() -> None:
     assert result.batches == () and result.dropped == 2 and result.sent == 0
 
 
+@pytest.mark.parametrize("stop", sorted(indexnow.STOP_STATUSES))
+def test_submit_stops_after_a_bad_key_or_a_rate_limit(stop: int) -> None:
+    urls = [f"{SITE}/p{i}" for i in range(indexnow.MAX_URLS_PER_BATCH + 1)]
+    recorder = Recorder(stop, 200)
+    result = _submit(urls, recorder)
+    assert len(recorder.requests) == 1
+    assert [(b.urls, b.status, b.accepted) for b in result.batches] == [
+        (indexnow.MAX_URLS_PER_BATCH, stop, False),
+        (1, None, False),
+    ]
+    assert result.batches[1].meaning == f"not sent after HTTP {stop}"
+    assert result.accepted == 0
+
+
 def test_submit_opens_and_closes_its_own_client(monkeypatch: pytest.MonkeyPatch) -> None:
     recorder = Recorder(202)
     opened: list[httpx.Client] = []
@@ -247,7 +261,14 @@ def test_submit_refuses_a_bad_key_host_or_key_location() -> None:
 
 def test_the_site_must_be_an_https_root() -> None:
     assert indexnow.site_host("https://RigorScore.com/") == HOST
-    for bad in ("http://rigorscore.com", "rigorscore.com", "https://rigorscore.com/en", "https://"):
+    for bad in (
+        "http://rigorscore.com",
+        "rigorscore.com",
+        "https://rigorscore.com/en",
+        "https://",
+        "https://rigorscore.com:443",
+        "https://rigorscore.com:abc",
+    ):
         with pytest.raises(ValueError):
             indexnow.site_host(bad)
 
@@ -264,6 +285,14 @@ def test_the_sitemap_urls_are_the_sitemap_locations() -> None:
 
 def _plain(output: str) -> str:
     return ANSI.sub("", output)
+
+
+def test_the_command_reads_only_its_key(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Another invalid AUDIT_* variable must not break the dry run.
+    monkeypatch.setenv("AUDIT_MAX_UPLOAD_BYTES", "not-a-number")
+    result = runner.invoke(app, ["audit", "indexnow", "--site", SITE, "--dry-run"])
+    assert result.exit_code == 0, result.output
+    assert indexnow.key_path(indexnow.INDEXNOW_KEY) in result.output
 
 
 def test_the_dry_run_lists_the_sitemap_without_the_network(

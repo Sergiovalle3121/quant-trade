@@ -68,6 +68,10 @@ def key_path(key: str) -> str:
     return f"/{key}.txt"
 
 
+#: After these answers the remaining batches are not sent.
+STOP_STATUSES = frozenset({403, 429})
+
+
 def site_host(site: str) -> str:
     """The host of an ``https://`` site root, e.g. ``rigorscore.com``.
 
@@ -81,6 +85,7 @@ def site_host(site: str) -> str:
         parts.scheme != "https"
         or not host
         or "@" in host
+        or ":" in host
         or _UNSAFE.search(host)
         or parts.path not in ("", "/")
         or parts.query
@@ -236,9 +241,23 @@ def submit(
         own = client is None
         http = _new_client() if client is None else client
         try:
-            for group in groups:
+            for index, group in enumerate(groups):
                 body = payload(group, host=host, key=key, key_location=key_location)
-                results.append(_send(http, body, len(group)))
+                result = _send(http, body, len(group))
+                results.append(result)
+                # A bad key (403) fails every batch and a 429 asks to slow down:
+                # the remaining batches are reported as not sent.
+                if result.status in STOP_STATUSES:
+                    results.extend(
+                        BatchResult(
+                            urls=len(rest),
+                            status=None,
+                            accepted=False,
+                            meaning=f"not sent after HTTP {result.status}",
+                        )
+                        for rest in groups[index + 1 :]
+                    )
+                    break
         finally:
             if own:
                 http.close()
@@ -256,6 +275,7 @@ __all__ = [
     "KEY_PATTERN",
     "MAX_URLS_PER_BATCH",
     "STATUS_MEANINGS",
+    "STOP_STATUSES",
     "TIMEOUT_SECONDS",
     "BatchResult",
     "Prepared",

@@ -3322,7 +3322,8 @@ that a page exists, without waiting for their crawl. Google does not use it;
 Search Console covers Google. The key is public by design: the site always
 serves it as `text/plain` at `/<key>.txt` (today
 `/f5a5a16c542ab2277bfa9656ce368b3d.txt`, with the site's security headers),
-any other `.txt` stays a 404, the file is not in the sitemap and `robots.txt`
+no other `.txt` is added (an unknown `/<name>.txt` is a 404 and
+`/robots.txt` is unchanged), the file is not in the sitemap and `robots.txt`
 does not close it. The default is `indexnow.INDEXNOW_KEY`;
 `AUDIT_INDEXNOW_KEY` replaces it (see the variables table). The web service
 never submits anything: the owner runs
