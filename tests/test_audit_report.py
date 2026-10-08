@@ -60,15 +60,34 @@ def test_html_carries_disclaimer_hashes_and_watermark_toggle() -> None:
 
 
 @pytest.mark.parametrize("locale", ["es", "en", "pt"])
-@pytest.mark.parametrize("watermark", [False, True])
-def test_report_toolbar_links_to_another_upload_outside_print(locale: str, watermark: bool) -> None:
-    page = render_html(_result(locale), locale=locale, watermark=watermark)
-    toolbar = re.search(r"<div class='nav-end no-print'>(.*?)</div>", page)
+@pytest.mark.parametrize("report_action", ["print", "pdf", "unlock"])
+def test_report_toolbar_links_to_another_upload_outside_print(
+    locale: str, report_action: str
+) -> None:
+    page = render_html(
+        _result(locale),
+        locale=locale,
+        watermark=report_action == "unlock",
+        free_mode=False,
+        checkout_url="/audits/abc123/checkout" if report_action == "unlock" else None,
+        pdf_url="/audits/abc123/report.pdf" if report_action == "pdf" else None,
+    )
+    toolbar = re.search(r"<div class='nav-end no-print report-toolbar'>(.*?)</div>", page)
     assert toolbar is not None
-    assert (f"href='{AUDIT_PATHS[locale]}'>{LABELS[locale]['new_audit']}</a>") in toolbar.group(1)
+    assert f"href='{AUDIT_PATHS[locale]}'" in toolbar.group(1)
+    assert f"aria-label='{LABELS[locale]['new_audit']}'" in toolbar.group(1)
+    assert f"title='{LABELS[locale]['new_audit']}'" in toolbar.group(1)
+    assert f"class='new-audit-long'>{LABELS[locale]['new_audit']}</span>" in toolbar.group(1)
+    assert (
+        f"class='new-audit-short' aria-hidden='true'>{LABELS[locale]['new_audit_short']}</span>"
+        in toolbar.group(1)
+    )
     assert toolbar.group(1).index(LABELS[locale]["new_audit"]) < toolbar.group(1).index(
         LABELS[locale]["my_account"]
     )
+    if report_action == "unlock":
+        assert f"href='#unlock' aria-label='{LABELS[locale]['unlock_nav']}'" in toolbar.group(1)
+        assert "class='print-short' aria-hidden='true'><svg" in toolbar.group(1)
     assert find_claims(page) == []
 
 

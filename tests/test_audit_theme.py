@@ -17,6 +17,7 @@ from quant_trade.audit.pages import landing, upload_page  # noqa: E402
 from quant_trade.audit.settings import AuditSettings  # noqa: E402
 from quant_trade.audit.store import make_store  # noqa: E402
 from quant_trade.audit.theme import (  # noqa: E402
+    NAV,
     STATIC_CACHE_CONTROL,
     STATIC_DIR,
     STATIC_FILES,
@@ -75,6 +76,27 @@ def test_navigation_has_a_phone_menu_and_links_the_comparison() -> None:
         assert nav.count(f"href='{compare}'") == 2
         footer = page.split("<footer", 1)[1]
         assert f"href='{compare}'" in footer
+
+
+def test_phone_navigation_keeps_the_upload_button_visible_and_compact() -> None:
+    assert ".nav-end>.btn{display:none}" not in NAV
+    assert "@media (max-width:520px){.nav-end>.btn{--h:36px;padding:0 10px;font-size:.8rem}" in NAV
+    assert ".nav-end>.lang{display:none}" in NAV
+    assert ".nav-end>.nav-account{display:none}" in STYLE
+    assert ".nav-end>.langs{display:none}" in STYLE
+
+
+def test_report_navigation_compacts_only_its_upload_and_document_actions() -> None:
+    assert ".report-new-audit{white-space:nowrap}.new-audit-short{display:none}" in STYLE
+    assert (
+        "@media (max-width:720px){.nav-end>.report-new-audit{display:inline-flex;padding:8px 3px}"
+        in STYLE
+    )
+    assert ".report-new-audit .new-audit-long,.report-toolbar .print-long{display:none}" in STYLE
+    assert (
+        ".report-new-audit .new-audit-short,.report-toolbar .print-short{display:inline}" in STYLE
+    )
+    assert "@media (max-width:520px){.report-toolbar{gap:3px}}" in STYLE
 
 
 def test_landing_leads_with_the_product_and_real_key_figures() -> None:
