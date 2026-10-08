@@ -167,7 +167,9 @@ def test_an_upload_from_pt_is_refused_in_portuguese(
     assert "<html lang='pt'>" in response.text
     text = _text(response.text)
     assert expected in text
-    assert "Não foi possível auditar" in text
+    # Since #442 the refusal explains itself: cause, accepted formats and next step,
+    # all in Portuguese, instead of the old generic sentence.
+    assert "Formatos aceitos" in text and "Próximo passo" in text
     assert "the file" not in text.lower() and "el archivo" not in text.lower()
 
 
