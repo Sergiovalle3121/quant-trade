@@ -297,6 +297,8 @@ def test_shared_links_carry_a_preview_image_in_the_page_language(tmp_path: Path)
         ("/en", "og-en.png"),
         ("/ejemplo", "og-sample-es.png"),
         ("/sample", "og-sample-en.png"),
+        # Keep the deployed fallback until all Portuguese class/sample PNGs exist.
+        ("/pt/exemplo", "og-sample-en.png"),
         ("/guias", "og-es.png"),
         ("/para/retos-prop-firm", "og-for-retos-prop-firm-es.png"),
         ("/for/prop-firm-challenges", "og-for-retos-prop-firm-en.png"),

@@ -32,6 +32,7 @@ from quant_trade.audit.examples import EXAMPLES_PATH
 from quant_trade.audit.faq import FAQ_PATH
 from quant_trade.audit.guides import GUIDES, guide_url, guides_index_url
 from quant_trade.audit.method import METHOD_PATH
+from quant_trade.audit.pricing import PRICING_PATH
 from quant_trade.audit.reading import READING_PATH
 
 LOCALES: tuple[str, ...] = ("es", "en", "pt")
@@ -69,6 +70,7 @@ PUBLIC_PAGES: tuple[dict[str, str], ...] = (
     dict(CALCULATOR_PATH),
     dict(READING_PATH),
     dict(FAQ_PATH),
+    dict(PRICING_PATH),
     *({lang: audience_url(a.slug, lang) for lang in ("es", "en", "pt")} for a in AUDIENCE_PAGES),
     dict(CHECK_PATH),
     {"es": "/terminos", "en": "/terms", "pt": "/pt/termos"},
@@ -168,9 +170,9 @@ OG_KINDS: tuple[str, ...] = (
 )
 
 
-#: Card kinds a language has only in part: Portuguese has the site card and the
-#: audience cards; its verification and sample cards wait for a Portuguese class
-#: sentence and notice, and show the English card until then.
+#: Card kinds a language has only in part: Portuguese has the site and audience
+#: cards. Its class/sample source copy is ready in tools/make_og_images.py; keep
+#: the English fallback until the five Portuguese PNGs are rendered and reviewed.
 OG_PARTIAL_KINDS: dict[str, tuple[str, ...]] = {
     "pt": ("", *(f"for-{audience.slug}" for audience in AUDIENCE_PAGES if not audience.contact_cta))
 }
