@@ -148,9 +148,8 @@ COPY_PT: dict[str, Any] = {
     "disclaimer": "Aviso",
     "sample_link": "Ver um relatório de exemplo completo (dados sintéticos)",
     "meta_description": (
-        "Envie o arquivo que você já tem (MetaTrader, TradingView, NinjaTrader, Python ou a sua "
-        "curva de equity) e o Rigor mostra quanto do seu resultado se sustenta com custos, "
-        "quantos testes houve por trás e se os dados fecham. Classe de A a D."
+        "Envie seu arquivo de operações ou curva de equity: o Rigor revisa custos, número "
+        "de testes e coerência dos dados. Classe de A a D."
     ),
     "sample_description": (
         "Relatório completo de exemplo da auditoria de backtests, feito com dados sintéticos: "

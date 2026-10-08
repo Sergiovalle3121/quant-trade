@@ -135,6 +135,8 @@ class ArticleText:
     sections: tuple[ArticleSection, ...]
     #: Question and answer pairs, shown after the sections.
     faq: tuple[tuple[str, str], ...]
+    #: Optional compact metadata title; the full editorial heading stays intact.
+    seo_title: str | None = None
 
 
 @dataclass(frozen=True)
@@ -166,6 +168,7 @@ class Article:
                     for section in data["sections"][locale]
                 ),
                 faq=tuple((str(item["q"]), str(item["a"])) for item in data["faq"][locale]),
+                seo_title=data.get("seo_title", {}).get(locale),
             )
             for locale in LOCALES
         }
@@ -270,6 +273,10 @@ ARTICLES_DATA: tuple[dict[str, Any], ...] = (
             "es": "Cómo saber si un EA está sobreoptimizado antes de comprarlo",
             "en": "How to tell if an expert advisor is overfitted before you buy",
             "pt": "Como saber se um EA está sobreajustado antes de comprar",
+        },
+        "seo_title": {
+            "es": "Cómo saber si un EA está sobreoptimizado antes de comprar",
+            "en": "How to spot an overfitted expert advisor before you buy",
         },
         "summary": {
             "es": (
@@ -806,6 +813,11 @@ ARTICLES_DATA: tuple[dict[str, Any], ...] = (
             "en": "Backtest with real costs: spread, commission, slippage and swap",
             "pt": "Backtest com custos reais: spread, comissão, slippage e swap",
         },
+        "seo_title": {
+            "es": "Backtest, costos reales: spread, comisión, slippage, swap",
+            "en": "Backtest real costs: spread, commission, slippage, swap",
+            "pt": "Backtest, custos reais: spread, comissão, slippage, swap",
+        },
         "summary": {
             "es": (
                 "Qué costos descuenta un backtest serio, por qué el costo cero favorece al corto "
@@ -1314,6 +1326,11 @@ ARTICLES_DATA: tuple[dict[str, Any], ...] = (
             "es": "Cómo leer el informe del probador de MT5 y lo que no te dice",
             "en": "How to read the MT5 Strategy Tester report (and what it omits)",
             "pt": "Como ler o relatório do testador do MT5 e o que ele não diz",
+        },
+        "seo_title": {
+            "es": "Cómo leer el informe del probador MT5 y qué omite",
+            "en": "How to read the MT5 Strategy Tester report and its gaps",
+            "pt": "Como ler o relatório do testador MT5 e suas omissões",
         },
         "summary": {
             "es": (
@@ -1865,6 +1882,10 @@ ARTICLES_DATA: tuple[dict[str, Any], ...] = (
                 "Auditoria independente de um backtest: o que uma revisão estatística examina "
                 "além da réplica"
             ),
+        },
+        "seo_title": {
+            "es": "Auditoría independiente de backtest: más allá de replicar",
+            "pt": "Auditoria independente de backtest: além da réplica",
         },
         "summary": {
             "es": (
@@ -2423,6 +2444,10 @@ ARTICLES_DATA: tuple[dict[str, Any], ...] = (
             "es": "Sharpe deflactado, explicado para quienes publican historiales",
             "en": "Deflated Sharpe ratio for track records",
             "pt": "Sharpe deflacionado, explicado para quem publica históricos",
+        },
+        "seo_title": {
+            "es": "Sharpe deflactado para quienes publican historiales",
+            "pt": "Sharpe deflacionado para quem publica históricos",
         },
         "summary": {
             "es": (
@@ -2998,6 +3023,10 @@ ARTICLES_DATA: tuple[dict[str, Any], ...] = (
                 "a investidores"
             ),
         },
+        "seo_title": {
+            "es": "Cómo auditar carteras modelo o señales para inversores",
+            "pt": "Como auditar carteiras modelo ou sinais para investidores",
+        },
         "summary": {
             "es": (
                 "Qué serie de rendimientos entregar, cómo documentar costos y benchmark, y qué "
@@ -3545,6 +3574,11 @@ ARTICLES_DATA: tuple[dict[str, Any], ...] = (
             "en": "How many prop-firm challenge attempts your own history suggests",
             "pt": "Quantas tentativas de um desafio de prop firm seu histórico sugere",
         },
+        "seo_title": {
+            "es": "Cuántos intentos de prop firm sugiere tu historial",
+            "en": "How many prop-firm attempts your history suggests",
+            "pt": "Quantas tentativas de prop firm seu histórico sugere",
+        },
         "summary": {
             "es": (
                 "Cómo leer un rango de intentos bajo supuestos de acierto y riesgo, y "
@@ -4085,6 +4119,11 @@ ARTICLES_DATA: tuple[dict[str, Any], ...] = (
             "en": "Copying MQL5 or Myfxbook signals: what to check before paying",
             "pt": "Copiar sinais da MQL5 ou do Myfxbook: o que olhar antes de pagar",
         },
+        "seo_title": {
+            "es": "Copiar señales MQL5 o Myfxbook: qué mirar antes de pagar",
+            "en": "Copying MQL5 or Myfxbook signals: checks before paying",
+            "pt": "Copiar sinais MQL5 ou Myfxbook: o que ver antes de pagar",
+        },
         "summary": {
             "es": (
                 "Aciertos, pérdidas abiertas, costos y tamaño de muestra: cómo leer el historial "
@@ -4608,6 +4647,11 @@ ARTICLES_DATA: tuple[dict[str, Any], ...] = (
                 "I built a trading bot with AI in 30 minutes: how to tell if the backtest is luck"
             ),
             "pt": "Fiz um robô com IA em 30 minutos: como saber se o backtest é sorte",
+        },
+        "seo_title": {
+            "es": "Hice un bot con IA en 30 min: ¿es suerte el backtest?",
+            "en": "I built an AI bot in 30 min: is the backtest luck?",
+            "pt": "Fiz um robô com IA em 30 min: o backtest é sorte?",
         },
         "summary": {
             "es": (

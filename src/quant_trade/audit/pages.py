@@ -303,9 +303,8 @@ _COPY: dict[str, dict[str, Any]] = {
         "disclaimer": "Aviso",
         "sample_link": "Ver un informe de ejemplo completo (datos sintéticos)",
         "meta_description": (
-            "Sube el archivo que ya tienes (MetaTrader, TradingView, NinjaTrader, Python o tu "
-            "curva de equity) y Rigor te dice qué tanto de tu resultado aguanta con costos, "
-            "cuántas pruebas hubo detrás y si los datos cuadran. Clase de A a D."
+            "Sube tu archivo de operaciones o curva de equity: Rigor revisa costos, número "
+            "de pruebas y coherencia de datos. Clase de A a D."
         ),
         "sample_description": (
             "Informe completo de ejemplo de la auditoría de backtests, hecho con datos "
@@ -3088,7 +3087,8 @@ def legal_page(
     description = PAGE_DESCRIPTIONS.get(kind, {}).get(locale) or (
         f"{text.title} · {copy['title']}. {_disclaimer(locale)}"
     )
-    meta = _public_meta(text.title, description, locale, path, base_url)
+    title = f"{text.title} · {BRAND}"
+    meta = _public_meta(title, description, locale, path, base_url)
     warning = f"<div class='error'>{_e(text.warning)}</div>" if text.warning else ""
     sections = [
         (heading, "".join(f"<p>{_e(line)}</p>" for line in lines))
@@ -3108,7 +3108,7 @@ def legal_page(
         + f"<p class='muted doc-foot'>{_e(copy['legal_updated'])}: {_e(text.updated)}</p>"
         "</div></div>"
     )
-    return _page(text.title, locale, body, meta_html=meta, alternates=alternates, solid_nav=True)
+    return _page(title, locale, body, meta_html=meta, alternates=alternates, solid_nav=True)
 
 
 #: The contact page in each language; /soporte, /support and /pt/suporte lead here.
@@ -3646,7 +3646,6 @@ def calculator_page(
 ) -> str:
     """The free luck calculator: declared figures and frequency, the luck section's result."""
     locale = _locale(locale)
-    copy = _COPY[locale]
     try:
         frequency = float(periods_per_year) if periods_per_year is not None else 252.0
     except (TypeError, ValueError):
@@ -3654,7 +3653,7 @@ def calculator_page(
     if frequency not in (252, 52, 12):
         frequency = 252.0
     words = calculator_copy(locale, frequency)
-    title = f"{words['title']} · {copy['title']}"
+    title = f"{words['title']} · {BRAND}"
     meta = _public_meta(title, words["summary"], locale, calculator_url(locale), base_url)
 
     def field(name: str, value: str | None, step: str) -> str:
@@ -3768,12 +3767,11 @@ def _language_crumbs(alternates: dict[str, str], locale: str) -> str:
 def guides_index_page(*, locale: str = "es", base_url: str = "") -> str:
     """The list of export guides."""
     locale = _locale(locale)
-    copy = _COPY[locale]
     ui = _UI[locale]
     words = GUIDES_COPY[locale]
     alternates = {lang: guides_index_url(lang) for lang in ("es", "en", "pt")}
     meta = _public_meta(
-        f"{words['title']} · {copy['title']}",
+        f"{words['title']} · {BRAND}",
         words["summary"],
         locale,
         guides_index_url(locale),
@@ -3808,7 +3806,7 @@ def guides_index_page(*, locale: str = "es", base_url: str = "") -> str:
         f"{_e(words['articles'])}{icon('arrow')}</a></div></div></div>"
     )
     return _page(
-        f"{words['title']} · {copy['title']}",
+        f"{words['title']} · {BRAND}",
         locale,
         body,
         meta_html=meta,
@@ -3820,13 +3818,14 @@ def guides_index_page(*, locale: str = "es", base_url: str = "") -> str:
 def guide_page(guide: Guide, *, locale: str = "es", base_url: str = "") -> str:
     """One platform's export guide."""
     locale = _locale(locale)
-    copy = _COPY[locale]
     ui = _UI[locale]
     words = GUIDES_COPY[locale]
     text = guide.text[locale]
     alternates = {lang: guide_url(guide.slug, lang) for lang in ("es", "en", "pt")}
-    title = f"{text.title} · {copy['title']}"
-    meta = _public_meta(title, text.summary, locale, guide_url(guide.slug, locale), base_url)
+    title = f"{text.seo_title or text.title} · {BRAND}"
+    meta = _public_meta(
+        title, text.seo_description or text.summary, locale, guide_url(guide.slug, locale), base_url
+    )
     steps = "".join(f"<li>{_e(step)}</li>" for step in text.steps)
     tips = "".join(f"<li>{icon('check')}<span>{_e(tip)}</span></li>" for tip in text.tips)
     crumbs = f"<a href='{_e(guides_index_url(locale))}'>{_e(words['all'])}</a>" + (
@@ -3932,7 +3931,7 @@ def article_page(article: Article, *, locale: str = "es", base_url: str = "") ->
     words = ARTICLES_COPY[locale]
     text = article.text[locale]
     alternates = {lang: article_url(article.key, lang) for lang in ("es", "en", "pt")}
-    title = f"{text.title} · {BRAND}"
+    title = f"{text.seo_title or text.title} · {BRAND}"
     meta = _public_meta(title, text.summary, locale, article_url(article.key, locale), base_url)
     meta += article_structured_data(article, locale, base_url)
     sections = [
@@ -3997,10 +3996,10 @@ def audience_page(
     copy = _COPY[locale]
     words = AUDIENCE_COPY[locale]
     text = audience.text[locale]
-    title = f"{text.title} · {BRAND}"
+    title = f"{text.seo_title or text.title} · {BRAND}"
     meta = _public_meta(
         title,
-        text.summary,
+        text.seo_description or text.summary,
         locale,
         audience_url(audience.slug, locale),
         base_url,

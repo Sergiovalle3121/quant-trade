@@ -1400,7 +1400,7 @@ REPORT: dict[str, Any] = {
         "title": "Como auditamos",
         "summary": (
             "O que o Rigor testa, com qual limiar e com quais fontes, o que significa cada "
-            "etiqueta e o que ele não faz. Os valores desta página são os mesmos que o motor usa."
+            "etiqueta e o que ele não faz. Os valores desta página são os usados pelo motor."
         ),
         "independence_title": "Independência",
         "independence": [

@@ -24,6 +24,9 @@ class GuideText:
     #: Where the file goes on the upload form.
     upload: str
     tips: tuple[str, ...]
+    #: Concise search metadata; the full heading and summary stay on the page.
+    seo_title: str = ""
+    seo_description: str = ""
 
 
 @dataclass(frozen=True)
@@ -60,8 +63,7 @@ GUIDES_COPY: dict[str, dict[str, str]] = {
         "title": "Guías para exportar tu archivo",
         "summary": (
             "Cómo exportar desde MetaTrader 5 y 4, TradingView, NinjaTrader, QuantConnect, "
-            "backtesting.py y vectorbt el archivo que lee la auditoría de backtests, sin "
-            "convertir nada."
+            "backtesting.py y vectorbt el archivo para auditar backtests, sin convertirlo."
         ),
         "intro": (
             "Sube el archivo tal como lo guarda tu plataforma. Elige la tuya y sigue los pasos."
@@ -79,7 +81,7 @@ GUIDES_COPY: dict[str, dict[str, str]] = {
         "title": "Guides to export your file",
         "summary": (
             "How to export from MetaTrader 5 and 4, TradingView, NinjaTrader, QuantConnect, "
-            "backtesting.py and vectorbt the file the backtest audit reads, with no conversion."
+            "backtesting.py and vectorbt a file for the backtest audit, without conversion."
         ),
         "intro": (
             "Upload the file exactly as your platform saves it. Pick yours and follow the steps."
@@ -97,8 +99,7 @@ GUIDES_COPY: dict[str, dict[str, str]] = {
         "title": "Guias para exportar o seu arquivo",
         "summary": (
             "Como exportar do MetaTrader 5 e 4, TradingView, NinjaTrader, QuantConnect, "
-            "backtesting.py e vectorbt o arquivo que a auditoria de backtests lê, sem converter "
-            "nada."
+            "backtesting.py e vectorbt o arquivo para auditar backtests, sem conversão."
         ),
         "intro": (
             "Envie o arquivo do jeito que a sua plataforma o salva. Escolha a sua e siga os passos."
@@ -259,6 +260,11 @@ GUIDES: tuple[Guide, ...] = (
         text={
             "es": GuideText(
                 title="Cómo revisar la cuenta de alguien antes de copiarlo o invertir",
+                seo_title="Cómo revisar una cuenta antes de copiar o invertir",
+                seo_description=(
+                    "Pide al proveedor de señales, robots o gestión su historial completo de "
+                    "MetaTrader y mira el dinero real detrás de su porcentaje de ganancia."
+                ),
                 summary=(
                     "Pide al proveedor de la señal, del robot o de la gestión el historial "
                     "completo de su cuenta de MetaTrader y mira el dinero real detrás de su "
@@ -293,6 +299,7 @@ GUIDES: tuple[Guide, ...] = (
             ),
             "en": GuideText(
                 title="How to review someone's account before you copy them or invest",
+                seo_title="How to review an account before copying or investing",
                 summary=(
                     "Ask the signal, robot or managed-account provider for the full MetaTrader "
                     "account history and see the real money behind their percentage gain."
@@ -327,6 +334,7 @@ GUIDES: tuple[Guide, ...] = (
             ),
             "pt": GuideText(
                 title="Como revisar a conta de alguém antes de copiar ou investir",
+                seo_title="Como revisar uma conta antes de copiar ou investir",
                 summary=(
                     "Peça ao fornecedor do sinal, do robô ou da conta gerida o histórico "
                     "completo da conta de MetaTrader e veja o dinheiro real por trás da "
@@ -1414,6 +1422,10 @@ GUIDES: tuple[Guide, ...] = (
         text={
             "es": GuideText(
                 title="Cómo subir las operaciones de cualquier plataforma",
+                seo_description=(
+                    "Interactive Brokers, DEGIRO, Trading 212 y otros: sube tu historial de "
+                    "operaciones en CSV o Excel; las columnas se reconocen por su nombre."
+                ),
                 summary=(
                     "Interactive Brokers, DEGIRO, Trading 212, XTB, eToro, Binance, KuCoin o "
                     "cualquier otro bróker, exchange o diario de trading: exporta su historial "
@@ -1467,6 +1479,10 @@ GUIDES: tuple[Guide, ...] = (
             ),
             "en": GuideText(
                 title="How to upload the trades of any platform",
+                seo_description=(
+                    "Interactive Brokers, DEGIRO, Trading 212 and others: upload your trade "
+                    "history as CSV or Excel; columns are recognised by their names."
+                ),
                 summary=(
                     "Interactive Brokers, DEGIRO, Trading 212, XTB, eToro, Binance, KuCoin or "
                     "any other broker, exchange or trading journal: export its trade history "
@@ -1519,6 +1535,10 @@ GUIDES: tuple[Guide, ...] = (
             ),
             "pt": GuideText(
                 title="Como enviar as operações de qualquer plataforma",
+                seo_description=(
+                    "Interactive Brokers, DEGIRO, Trading 212 e outros: envie seu histórico de "
+                    "operações em CSV ou Excel; as colunas são reconhecidas pelo nome."
+                ),
                 summary=(
                     "Interactive Brokers, DEGIRO, Trading 212, XTB, eToro, Binance, KuCoin "
                     "ou qualquer outra corretora, exchange ou diário de trading: exporte o "
