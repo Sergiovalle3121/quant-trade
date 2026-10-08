@@ -147,6 +147,23 @@ REF_TAGS: dict[str, str] = {
     "ph": "Product Hunt",
     "fpa": "Forex Peace Army",
     "betalist": "BetaList",
+    # Outreach of 2026-10-08: one e-mail or form per channel, so /panel shows
+    # which listing, newsletter or show brings visits and accounts.
+    "ftt": "Find Trading Tools · directorio",
+    "forexchasers": "Forex Chasers · colaboración",
+    "fundedtrading": "FundedTrading · directorio B2B",
+    "quantnomad": "Quant Nomad · YouTube",
+    "xtrader": "X-Trader.net · artículo",
+    "algomatic": "Algomatic Trading · newsletter",
+    "strategyquant": "StrategyQuant · blog y Discord",
+    "petko": "Petko Aleksandrov · podcast",
+    "tst": "Trading Strategy Testing · YouTube",
+    "offbeatforex": "Offbeat Forex · lista de backtesting",
+    "completetradersedge": "Complete Trader's Edge · lista de herramientas",
+    "kdavey": "Kevin Davey · podcast",
+    "propfirmmap": "PropFirmMap · Trader Tools",
+    "awesomequant": "awesome-quant · lista en GitHub",
+    "rankia-blog": "Rankia · blog de usuario",
 }
 
 #: Link previews and robots: they fetch a page without a person reading it.
