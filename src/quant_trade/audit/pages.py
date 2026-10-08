@@ -1574,6 +1574,8 @@ def _check_url(locale: str) -> str:
 
 
 def _footer(locale: str) -> str:
+    from quant_trade.audit.faq import FAQ_COPY, FAQ_PATH
+
     copy = _COPY[locale]
     ui = _UI[locale]
     home = _home(locale)
@@ -1591,6 +1593,7 @@ def _footer(locale: str) -> str:
         f"<li><a href='{_check_url(locale)}'>{_e(ui['footer_check'])}</a></li>"
         f"<li><a href='{_e(method_url(locale))}'>{_e(_method_title(locale))}</a></li>"
         f"<li><a href='{_e(calculator_url(locale))}'>{_e(CALCULATOR_COPY[locale]['nav'])}</a></li>"
+        f"<li><a href='{FAQ_PATH[locale]}'>{_e(FAQ_COPY[locale]['title'])}</a></li>"
     )
     legal = (
         f"<li><a href='{_e(legal_url('terms', locale))}'>{_e(copy['terms_link'])}</a></li>"
@@ -3925,7 +3928,7 @@ def article_page(article: Article, *, locale: str = "es", base_url: str = "") ->
         (section.heading, "".join(f"<p>{_e(paragraph)}</p>" for paragraph in section.paragraphs))
         for section in text.sections
     ]
-    if article.key == "sharpe-deflactado-track-record":
+    if article.key in {"sharpe-deflactado-track-record", "bot-ia-backtest-suerte"}:
         heading, trials, years, luck, note = LUCK_TABLE_COPY[locale]
         rows = "".join(
             f"<tr><th scope='row'>DECLARED · {value.trials:,}</th>"

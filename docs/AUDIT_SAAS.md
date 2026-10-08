@@ -4529,3 +4529,44 @@ Offline coverage: `test_audit_institutional_intake.py`,
 Windows commands use `D:\quant-trade\.venv\Scripts\python.exe`, a worktree-local
 `--basetemp`, and exclude `tests/test_audit_pdf*.py` and
 `tests/test_personal_paper*.py` as requested.
+
+### Retail articles and public questions (7 October 2026)
+
+`articles.py` adds articles about prop-firm attempt counts, MQL5/Myfxbook
+signal histories and AI-generated bots in Spanish, English and Portuguese.
+They retain the existing article renderer, free-report CTA, table of contents,
+Article/BreadcrumbList JSON-LD, canonical and language alternates. The AI article
+reuses `calculator.compute` for every cell of the search-size/history-length
+table and links the existing public figure reader in each language.
+
+The brief's proposed challenge title was changed to discuss attempts rather
+than a challenge outcome. Its numerical-source restriction also conflicts with
+the requested binary-win and attempt examples: neither `calculator.compute`
+nor `luck.py` calculates those quantities. `retail_numbers.py` therefore holds
+small deterministic editorial examples, separate from audit calculations, and
+all displayed assumptions and results remain DECLARED. No audit criterion,
+threshold, dimension, simulator or engine was added or changed.
+
+The challenge example imports the generic preset, including its date and source.
+It uses independent daily fixed-stake, equal-size wins/losses, static barriers,
+no costs and no deadline; touching the loss barrier ends the attempt. The inverse
+of the target probability is the mean count of independent identical attempts,
+not a personal forecast, confidence interval, budget or full multi-phase
+evaluation. The losing streak is illustrative, not an empirical typical streak.
+The signal example uses a continuity-corrected normal binomial approximation;
+its tail probability is not a probability of skill or a sample-size requirement.
+Tests compare it with the exact binomial tail and check the barrier calculation
+against a separate symmetric-barrier identity. Correlation, changing payoffs,
+selection and real execution can invalidate these teaching assumptions.
+
+`faq.py` serves ten source-commented questions at `/preguntas`, `/en/faq` and
+`/pt/perguntas`, listed in `PUBLIC_PAGES`, the sitemap and footer. Runtime settings
+supply prices, public card markets, upload size, retention and contact channels.
+It reuses the existing JSON-LD serializer; FAQPage answers match visible localized
+answers. Privacy follows `legal.py`, including retention of the first free full
+report like a paid report. This page adds no privacy promise or retention action.
+
+Offline coverage: `test_audit_retail_articles.py`, `test_audit_retail_numbers.py`
+and `test_audit_faq.py`, plus existing article, structured-data, SEO and public
+reading tests. No customer files, market data, network calls, payment changes or
+broker connectivity are involved.
