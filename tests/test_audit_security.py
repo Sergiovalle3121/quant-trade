@@ -335,8 +335,12 @@ def test_an_importer_crash_is_a_format_message(tmp_path: Path, monkeypatch) -> N
     monkeypatch.setattr(web, "build_inputs", explode)
     response = _post(_client(tmp_path), _equity_upload())
     assert response.status_code == 400
-    assert "No se pudo auditar lo que subiste tal como está." in response.text
-    assert "<b>Qué hacer:</b> Revisa el formato de los archivos." in response.text
+    # The rejection page explains the format without leaking the exception.
+    assert "No se pudo auditar lo que subiste tal como está" in response.text
+    assert "Formatos aceptados" in response.text
+    assert "Siguiente paso" in response.text
+    for leak in ("KeyError", "'column'", "Traceback"):
+        assert leak not in response.text
 
 
 @pytest.mark.parametrize("path", ["/", "/ejemplo", "/nope", "/health"])
