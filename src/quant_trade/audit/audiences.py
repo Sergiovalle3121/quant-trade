@@ -18,9 +18,9 @@ from quant_trade.audit.accounts import FREE_PREVIEWS_PER_MONTH
 
 @dataclass(frozen=True)
 class AudienceText:
-    #: The page's ``<h1>`` and the start of its ``<title>``.
+    #: The page's ``<h1>`` and default start of its ``<title>``.
     title: str
-    #: One sentence for the hero and the meta description.
+    #: One sentence for the hero and default meta description.
     summary: str
     #: What this visitor is worried about, in their own terms.
     pains: tuple[str, ...]
@@ -31,6 +31,9 @@ class AudienceText:
     #: What it does not do, so nobody pays for the wrong thing.
     limits: tuple[str, ...]
     faq: tuple[tuple[str, str], ...]
+    #: Short metadata when the full heading or hero exceeds search limits.
+    seo_title: str = ""
+    seo_description: str = ""
 
 
 @dataclass(frozen=True)
@@ -336,6 +339,7 @@ AUDIENCE_PAGES: tuple[Audience, ...] = (
             ),
             "pt": AudienceText(
                 title="Antes de comprar um robô de trading, revise o backtest dele",
+                seo_title="Antes de comprar um robô de trading, revise o backtest",
                 summary=(
                     "Envie o relatório do testador do MetaTrader que o vendedor mostra e "
                     "descubra se a curva é evidência ou o resultado de testar centenas de "
@@ -425,6 +429,11 @@ AUDIENCE_PAGES: tuple[Audience, ...] = (
         text={
             "es": AudienceText(
                 title="¿Tu estrategia de acciones, futuros o cripto tiene ventaja real?",
+                seo_title="Acciones, futuros o cripto: ¿tu estrategia tiene ventaja?",
+                seo_description=(
+                    "Sube operaciones de TradingView, NinjaTrader, QuantConnect, backtesting.py "
+                    "o vectorbt, o tu curva de equity: mide intentos, costos y el periodo reciente."
+                ),
                 summary=(
                     "Sube la lista de operaciones de TradingView, NinjaTrader, QuantConnect, "
                     "backtesting.py o vectorbt, o tu curva de equity, y mide si tu ventaja "
@@ -505,6 +514,11 @@ AUDIENCE_PAGES: tuple[Audience, ...] = (
             ),
             "en": AudienceText(
                 title="Does your stock, futures or crypto strategy have a real edge?",
+                seo_title="Stocks, futures or crypto: is your strategy's edge real?",
+                seo_description=(
+                    "Upload TradingView, NinjaTrader, QuantConnect, backtesting.py or vectorbt "
+                    "trades, or your equity curve: assess trials, costs and the recent period."
+                ),
                 summary=(
                     "Upload your TradingView, NinjaTrader, QuantConnect, backtesting.py or "
                     "vectorbt list of trades, or your equity curve, and measure whether your "
@@ -584,6 +598,12 @@ AUDIENCE_PAGES: tuple[Audience, ...] = (
             ),
             "pt": AudienceText(
                 title="A sua estratégia de ações, futuros ou cripto tem uma vantagem real?",
+                seo_title="Ações, futuros ou cripto: a sua estratégia tem vantagem?",
+                seo_description=(
+                    "Envie operações do TradingView, NinjaTrader, QuantConnect, backtesting.py "
+                    "ou vectorbt, ou a curva de equity: avalie tentativas, custos e o período "
+                    "recente."
+                ),
                 summary=(
                     "Envie a lista de operações do TradingView, NinjaTrader, QuantConnect, "
                     "backtesting.py ou vectorbt, ou a sua curva de equity, e meça se a sua "
@@ -675,6 +695,12 @@ AUDIENCE_PAGES: tuple[Audience, ...] = (
         text={
             "es": AudienceText(
                 title="Antes de pagar un reto de prop firm, simúlalo con tu historial",
+                seo_title="Antes de pagar un reto de prop firm, simúlalo",
+                seo_description=(
+                    "Sube backtest o historial: remuestrea operaciones y mide la frecuencia de "
+                    "tocar límites de pérdida diaria o total en FTMO, FundedNext, The5ers y "
+                    "Topstep."
+                ),
                 summary=(
                     "Sube tu backtest o tu historial y mira con qué frecuencia tocarías la "
                     "pérdida diaria o la total en retos de FTMO, FundedNext, The5ers y "
@@ -759,6 +785,11 @@ AUDIENCE_PAGES: tuple[Audience, ...] = (
             ),
             "en": AudienceText(
                 title="Before you pay for a prop-firm challenge, simulate it with your history",
+                seo_title="Before you pay for a prop-firm challenge, simulate it",
+                seo_description=(
+                    "Upload your backtest or history: resample trades to measure how often daily "
+                    "or total loss limits are hit in FTMO, FundedNext, The5ers and Topstep."
+                ),
                 summary=(
                     "Upload your backtest or history and see how often you would hit the daily "
                     "or total loss limit in FTMO, FundedNext, The5ers and Topstep challenges, "
@@ -842,6 +873,11 @@ AUDIENCE_PAGES: tuple[Audience, ...] = (
             ),
             "pt": AudienceText(
                 title="Antes de pagar um desafio de prop firm, simule-o com o seu histórico",
+                seo_title="Antes de pagar um desafio de prop firm, simule-o",
+                seo_description=(
+                    "Envie backtest ou histórico: reamostre operações e meça a frequência de tocar "
+                    "limites de perda diária ou total em FTMO, FundedNext, The5ers e Topstep."
+                ),
                 summary=(
                     "Envie o seu backtest ou histórico e veja com que frequência você "
                     "tocaria o limite de perda diária ou total nos desafios da FTMO, "
@@ -935,6 +971,11 @@ AUDIENCE_PAGES: tuple[Audience, ...] = (
         text={
             "es": AudienceText(
                 title="Antes de invertir con un gestor, una señal o un fondo, revisa su historial",
+                seo_title="Gestor, señal o fondo: revisa historial antes de invertir",
+                seo_description=(
+                    "Sube el historial o serie de retornos: separa operaciones de depósitos, "
+                    "compara con el backtest y mide si el historial es evidencia o suerte."
+                ),
                 summary=(
                     "Sube el historial de su cuenta o su serie de retornos y separa el "
                     "resultado de operar de los depósitos, compara la cuenta con su backtest "
@@ -1041,6 +1082,11 @@ AUDIENCE_PAGES: tuple[Audience, ...] = (
             ),
             "en": AudienceText(
                 title="Before you invest with a manager, a signal or a fund, check the history",
+                seo_title="Manager, signal or fund: check history before investing",
+                seo_description=(
+                    "Upload account history or returns: separate trades from deposits, compare "
+                    "with the backtest and measure whether the history is evidence or luck."
+                ),
                 summary=(
                     "Upload their account history or return series to separate trading "
                     "results from deposits, compare the account with its backtest and measure "
@@ -1147,6 +1193,11 @@ AUDIENCE_PAGES: tuple[Audience, ...] = (
             ),
             "pt": AudienceText(
                 title="Antes de investir com um gestor, um sinal ou um fundo, revise o histórico",
+                seo_title="Gestor, sinal ou fundo: veja histórico antes de investir",
+                seo_description=(
+                    "Envie histórico ou retornos: separe operações dos depósitos, compare com "
+                    "o backtest e meça se o histórico é evidência ou sorte."
+                ),
                 summary=(
                     "Envie o histórico da conta ou a série de retornos para separar o "
                     "resultado das operações dos depósitos, comparar a conta com o backtest "
@@ -1501,6 +1552,11 @@ AUDIENCE_PAGES: tuple[Audience, ...] = (
             "es": AudienceText(
                 title="Si inviertes por tu cuenta con DEGIRO, Trading 212, IBKR o XTB, revisa "
                 "tu historial",
+                seo_title="DEGIRO, Trading 212, IBKR o XTB: revisa tu historial",
+                seo_description=(
+                    "Sube el historial de tu bróker o cartera: mide si el resultado se distingue "
+                    "del azar, el peso de las comisiones y las caídas conocidas del mercado."
+                ),
                 summary=(
                     "Sube el historial de tu bróker o la evolución de tu cartera y mira si tu "
                     "resultado se distingue del azar, cuánto pesan las comisiones y cómo le fue "
@@ -1583,6 +1639,11 @@ AUDIENCE_PAGES: tuple[Audience, ...] = (
             "en": AudienceText(
                 title="If you invest on your own with DEGIRO, Trading 212, IBKR or XTB, check "
                 "your history",
+                seo_title="DEGIRO, Trading 212, IBKR or XTB: check your history",
+                seo_description=(
+                    "Upload your broker history or portfolio values: assess whether results "
+                    "stand out from luck, the effect of fees and well-known market falls."
+                ),
                 summary=(
                     "Upload your broker's history or your portfolio's value over time and see "
                     "whether your result stands out from luck, how much the fees weigh and how "
@@ -1666,6 +1727,11 @@ AUDIENCE_PAGES: tuple[Audience, ...] = (
                 title=(
                     "Se você investe por conta própria com DEGIRO, Trading 212, IBKR ou XTB, "
                     "revise o seu histórico"
+                ),
+                seo_title="DEGIRO, Trading 212, IBKR ou XTB: revise o seu histórico",
+                seo_description=(
+                    "Envie o histórico da corretora ou valores da carteira: meça se o resultado "
+                    "se destaca da sorte, o peso das taxas e as quedas conhecidas do mercado."
                 ),
                 summary=(
                     "Envie o histórico da sua corretora ou o valor da sua carteira ao longo "
@@ -1756,6 +1822,7 @@ AUDIENCE_PAGES: tuple[Audience, ...] = (
                 title=(
                     "Gestoras y proveedores de señales: revisar el historial antes de presentarlo"
                 ),
+                seo_title="Gestoras y proveedores de señales: revisar el historial",
                 summary=(
                     "Auditoría estadística del historial de una cartera modelo, fondo o señal: "
                     "qué entregar, qué mide el informe y qué queda sin medir."
@@ -1902,6 +1969,7 @@ AUDIENCE_PAGES: tuple[Audience, ...] = (
                 title=(
                     "Gestoras e fornecedores de sinais: revisar o histórico antes de apresentá-lo"
                 ),
+                seo_title="Gestoras e fornecedores de sinais: revisar o histórico",
                 summary=(
                     "Auditoria estatística do histórico de uma carteira modelo, fundo ou sinal: "
                     "o que enviar, o que o relatório mede e o que fica sem medir."

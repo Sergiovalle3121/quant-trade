@@ -75,6 +75,8 @@ def _text(page: str) -> str:
 def _texts(article: Article, locale: str) -> list[str]:
     text = article.text[locale]
     words = [text.title, text.summary, text.intro]
+    if text.seo_title is not None:
+        words.append(text.seo_title)
     for section in text.sections:
         words += [section.heading, *section.paragraphs]
     for question, answer in text.faq:
@@ -95,7 +97,8 @@ def test_the_data_has_the_shape_the_writer_pastes() -> None:
         "bot-ia-backtest-suerte",
     ]
     for entry in ARTICLES_DATA:
-        assert set(entry) == DATA_KEYS, entry["key"]
+        assert DATA_KEYS <= set(entry) <= DATA_KEYS | {"seo_title"}, entry["key"]
+        assert set(entry.get("seo_title", {})) <= set(LOCALES), entry["key"]
         for field in ("slug", "title", "summary", "intro", "sections", "faq"):
             assert set(entry[field]) == set(LOCALES), (entry["key"], field)
         for locale in LOCALES:
@@ -237,6 +240,8 @@ def test_article_pages_render_with_metadata_and_a_language_switch(tmp_path: Path
             assert "x-robots-tag" not in page.headers
             assert f"<html lang='{locale}'>" in text
             assert html.escape(article.text[locale].title, quote=True) in text
+            seo_title = article.text[locale].seo_title or article.text[locale].title
+            assert f"<title>{html.escape(seo_title, quote=True)} · Rigor</title>" in text
             assert _meta(text, "description") == article.text[locale].summary
             assert _meta(text, "robots") == "index, follow"
             assert _canonical(text) == BASE + article_url(article.key, locale)

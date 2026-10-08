@@ -26,6 +26,14 @@ from quant_trade.audit.web import create_app  # noqa: E402
 HREF = re.compile(r"href='([^']+)'")
 
 
+@pytest.fixture(autouse=True)
+def _stub_pdf_rendering(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Check linked download routes without requiring native PDF layout."""
+    monkeypatch.setattr(
+        "quant_trade.audit.web.pdf_lib.report_pdf", lambda *args, **kwargs: b"%PDF-1.4\n"
+    )
+
+
 def _client(tmp_path: Path) -> TestClient:
     settings = AuditSettings(
         database_url=f"sqlite:///{tmp_path}/audit.db",

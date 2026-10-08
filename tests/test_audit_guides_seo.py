@@ -68,7 +68,16 @@ def _all_guide_texts() -> list[str]:
     texts: list[str] = []
     for guide in GUIDES:
         for text in guide.text.values():
-            texts += [text.title, text.summary, text.file, text.upload, *text.steps, *text.tips]
+            texts += [
+                text.title,
+                text.summary,
+                text.seo_title,
+                text.seo_description,
+                text.file,
+                text.upload,
+                *text.steps,
+                *text.tips,
+            ]
     for copy in GUIDES_COPY.values():
         texts += list(copy.values())
     return texts
@@ -123,7 +132,8 @@ def test_guide_pages_render_with_metadata_and_a_language_switch(tmp_path: Path) 
             text = page.text
             assert f"<html lang='{locale}'>" in text
             assert html.escape(guide.text[locale].title, quote=True) in text
-            assert _meta(text, "description") == guide.text[locale].summary
+            guide_text = guide.text[locale]
+            assert _meta(text, "description") == (guide_text.seo_description or guide_text.summary)
             assert _meta(text, "robots") == "index, follow"
             assert _canonical(text) == BASE + guide_url(guide.slug, locale)
             assert f"hreflang='{other}' href='{BASE}{guide_url(guide.slug, other)}'" in text

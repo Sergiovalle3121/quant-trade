@@ -112,8 +112,8 @@ COPY: dict[str, dict[str, Any]] = {
         "eyebrow": "Calculadora gratis",
         "title": "¿Ventaja o suerte? Calculadora de Sharpe deflactado",
         "summary": (
-            "Escribe el Sharpe de tu backtest, los años que cubre y cuántas configuraciones "
-            "probaste: te decimos cuánto de ese Sharpe podría explicarlo la suerte. Sin registro."
+            "Escribe el Sharpe de tu backtest, sus años y cuántas configuraciones probaste: "
+            "te decimos cuánto de ese Sharpe podría explicar la suerte. Sin registro."
         ),
         "form_title": "Tus números",
         "sharpe": "Sharpe anual del backtest",

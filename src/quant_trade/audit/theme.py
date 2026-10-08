@@ -1301,8 +1301,8 @@ background:none}}
 .pc-hero{display:flex;align-items:center}.pc-ring{flex:none;width:100pt;height:100pt;margin-right:22pt}
 .pc-ring text{font-family:var(--sans)}.pc-hero .verdict-k{margin-bottom:6pt}
 .pc-lead{margin:0;font:600 17pt/1.3 var(--sans);letter-spacing:-.02em;color:#000}
-.pdf-cover h2.pc-h{display:block;margin:18pt 0 9pt;padding-top:9pt;border-top:1px solid #ddd;font:500 8pt var(--mono);letter-spacing:.14em;text-transform:uppercase;color:#555}
-.pdf-cover h2.pc-h::before{content:none;display:none}
+.pdf-cover p.pc-h{display:block;margin:18pt 0 9pt;padding-top:9pt;border-top:1px solid #ddd;font:500 8pt var(--mono);letter-spacing:.14em;text-transform:uppercase;color:#555;break-after:avoid;page-break-after:avoid}
+.pdf-cover p.pc-h::before{content:none;display:none}
 .pc-dims{list-style:none;margin:0;padding:0}.pc-dims li{display:inline-block;width:48.5%;margin:0 3% 6pt 0;padding:7pt 10pt;border:1px solid #ddd;border-radius:8pt;font-size:9.5pt;vertical-align:top}
 .pc-dims li:nth-child(2n){margin-right:0}.pc-dims .badge{float:right;margin-left:8pt}
 .pc-kpis{display:block}.pc-kpi{display:inline-block;vertical-align:top;width:23.5%;margin:0 2% 0 0;padding:9pt 10pt;border:1px solid #ddd;border-radius:8pt}

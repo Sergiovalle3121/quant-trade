@@ -8554,13 +8554,13 @@ def _pdf_cover(
         + f"<div class='pc-eyebrow'>{_e(_title(data, labels))}</div>"
         f"<div class='pc-hero'>{ring}<div><div class='verdict-k'>{_e(labels['verdict'])}</div>"
         f"<p class='pc-lead'>{_e(lead)}</p></div></div>"
-        f"<h2 class='pc-h'>{_e(labels['dimensions'])}</h2><ul class='pc-dims'>{dims}</ul>"
+        f"<p class='pc-h'>{_e(labels['dimensions'])}</p><ul class='pc-dims'>{dims}</ul>"
         + (
-            f"<h2 class='pc-h'>{_e(labels['kpis'])}</h2><div class='pc-kpis'>{kpis}</div>"
+            f"<p class='pc-h'>{_e(labels['kpis'])}</p><div class='pc-kpis'>{kpis}</div>"
             if kpis
             else ""
         )
-        + f"<h2 class='pc-h'>{_e(labels['next'])}</h2><ol class='pc-next'>{next_html}</ol>"
+        + f"<p class='pc-h'>{_e(labels['next'])}</p><ol class='pc-next'>{next_html}</ol>"
         f"<p class='pc-legend'>{_e(labels['evidence_legend'])}</p>"
         "</section>"
     )
