@@ -438,7 +438,9 @@ def test_a_curve_over_the_limit_is_told_the_real_limit(
         files = {"equity": ("curva.csv", data, "text/csv")}
         answer = client.post("/audits", files=files, data={"consent": "on", "locale": locale})
         assert answer.status_code == status
-        text = _text(answer.text)
+        # The retry form now includes the other fields' limits too. The refusal
+        # itself must still name only the limit of the rejected file.
+        text = _text(answer.text.split("<p role='alert'>", 1)[1].split("</p>", 1)[0])
         assert said in text
         assert "10 MB" not in text and "bytes" not in text
 
@@ -463,7 +465,7 @@ def test_an_oversized_platform_report_in_the_curve_box_is_told_the_report_limit(
     files = {"equity": ("ReportTester.html", page, "text/html")}
     answer = client.post("/audits", files=files, data={"consent": "on", "locale": locale})
     assert answer.status_code == 413
-    text = _text(answer.text)
+    text = _text(answer.text.split("<p role='alert'>", 1)[1].split("</p>", 1)[0])
     assert said in text
     assert "5 MB" not in text
 
@@ -507,9 +509,7 @@ def test_the_challenge_list_speaks_the_page_language() -> None:
 )
 def test_one_configuration_is_singular(locale: str, one: str, many: str) -> None:
     def shown(count: int) -> str:
-        data = {
-            "inputs": {"optimization": {"passes": {"value": count, "evidence": "MEASURED"}}}
-        }
+        data = {"inputs": {"optimization": {"passes": {"value": count, "evidence": "MEASURED"}}}}
         return " ".join(_text(_source_html(data, REPORT_LABELS[locale])).split())
 
     assert one in shown(1) and many in shown(12)

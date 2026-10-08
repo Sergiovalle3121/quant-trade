@@ -79,6 +79,8 @@ CARRIED_FIELDS: tuple[str, ...] = (
     "initial_balance",
     "access_code",
     "net_of_fees",
+    "return_frequency",
+    "return_unit",
 )
 
 COPY: dict[str, dict[str, str]] = {
@@ -851,12 +853,14 @@ def mapping_page(
     locale: str = "es",
     carried: Mapping[str, str] | None = None,
     chosen: Mapping[str, str] | None = None,
+    guidance_html: str = "",
 ) -> str:
     """The page that shows the file's columns and asks which is which.
 
     ``problem`` is the refusal in the customer's language, ``carried`` the
     first upload's other form fields (sent again unchanged), ``chosen`` the
     columns to preselect (the customer's own choice, else the reader's guess).
+    ``guidance_html`` is trusted, localized rejection guidance with export links.
     """
     locale = _locale(locale)
     words = COPY[locale]
@@ -902,6 +906,7 @@ def mapping_page(
         _page_hero(words["eyebrow"], words["title"], words["lead"], dot="warn")
         + "<div class='paper page-main'><div class='wrap'>"
         + _error_card(problem, locale)
+        + guidance_html
         + monthly_note
         + f"<section class='map-preview' style='margin-top:32px'><h2>{_e(words['found'])}</h2>"
         f"<p class='help'>{_e(words['found_help'])}</p>{pdf_notice}{_preview(table, words)}"

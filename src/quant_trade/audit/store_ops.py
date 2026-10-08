@@ -6,6 +6,12 @@ from collections import Counter
 from datetime import UTC, date, datetime
 from typing import Any
 
+from quant_trade.audit.upload_rejections import (
+    DETECTED_FORMATS,
+    REJECTION_CATEGORIES,
+    REJECTION_DETECTORS,
+)
+
 OPERATIONS = ("upload", "audit", "pdf", "queue")
 OUTCOMES = ("success", "invalid", "busy", "error", "denied")
 BUCKETS_MS = (100, 250, 500, 1000, 2500, 5000, 10000, 30000, 60000, 120000, 120001)
@@ -38,6 +44,7 @@ class OpsStoreMixin:
     engine: Any
     ops_engine: Any
     ops_counters: Any
+    upload_rejection_counters: Any
     ops_jobs: Any
     commercial_costs: Any
 
@@ -72,6 +79,15 @@ class OpsStoreMixin:
             sa.Column("operation", sa.String(16), primary_key=True),
             sa.Column("outcome", sa.String(16), primary_key=True),
             sa.Column("bucket_ms", sa.Integer, primary_key=True),
+            sa.Column("count", sa.Integer, nullable=False),
+        )
+        self.upload_rejection_counters = sa.Table(
+            "upload_rejection_counters",
+            self.metadata,
+            sa.Column("day", sa.String(10), primary_key=True),
+            sa.Column("category", sa.String(32), primary_key=True),
+            sa.Column("detected_format", sa.String(40), primary_key=True),
+            sa.Column("detector", sa.String(32), primary_key=True),
             sa.Column("count", sa.Integer, nullable=False),
         )
         self.ops_jobs = sa.Table(
@@ -150,6 +166,56 @@ class OpsStoreMixin:
                 dict(row)
                 for row in conn.execute(
                     self._sa.select(self.ops_counters).where(self.ops_counters.c.day >= since_day)
+                ).mappings()
+            ]
+
+    def count_upload_rejection(
+        self,
+        *,
+        day: str,
+        category: str,
+        detected_format: str,
+        detector: str,
+        amount: int = 1,
+    ) -> None:
+        """Only fixed taxonomy values enter this daily aggregate; never upload data."""
+        if (
+            category not in REJECTION_CATEGORIES
+            or detected_format not in DETECTED_FORMATS
+            or detector not in REJECTION_DETECTORS
+            or amount < 1
+        ):
+            raise ValueError("invalid upload rejection counter")
+        if date.fromisoformat(day).isoformat() != day:
+            raise ValueError("invalid upload rejection day")
+        table = self.upload_rejection_counters
+        insert = self._ops_insert(table).values(
+            day=day,
+            category=category,
+            detected_format=detected_format,
+            detector=detector,
+            count=amount,
+        )
+        with self.ops_engine.begin() as conn:
+            conn.execute(
+                insert.on_conflict_do_update(
+                    index_elements=[
+                        table.c.day,
+                        table.c.category,
+                        table.c.detected_format,
+                        table.c.detector,
+                    ],
+                    set_={"count": table.c.count + amount},
+                )
+            )
+
+    def upload_rejection_rows(self, since_day: str) -> list[dict[str, Any]]:
+        table = self.upload_rejection_counters
+        with self.ops_engine.connect() as conn:
+            return [
+                dict(row)
+                for row in conn.execute(
+                    self._sa.select(table).where(table.c.day >= since_day)
                 ).mappings()
             ]
 

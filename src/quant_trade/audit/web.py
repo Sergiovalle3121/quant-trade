@@ -34,6 +34,7 @@ import time
 from collections import OrderedDict
 from collections.abc import AsyncIterator, Callable, Mapping
 from datetime import UTC, datetime, timedelta
+from html import escape
 from typing import Annotated, Any
 from urllib.parse import quote, urlencode, urlsplit
 
@@ -52,6 +53,7 @@ from quant_trade.audit import (
     reading_png,
     track_seal_pages,
     universal,
+    upload_rejections,
 )
 from quant_trade.audit import accounts as acct
 from quant_trade.audit import check as check_lib
@@ -87,6 +89,8 @@ from quant_trade.audit.ops_panel import (
     commercial_section,
     cost_notice,
     operations_section,
+    upload_attempts_line,
+    upload_rejections_section,
 )
 from quant_trade.audit.owner import (
     MAX_CREDITS,
@@ -1248,6 +1252,12 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             return _secure(check_response, path=path)
         locale = _scope_locale(scope)
         text = message("body_too_large", locale, limit=_megabytes(body_limit))
+        if path == "/audits":
+            upload_response = _upload_error(
+                Request(scope), 413, text, locale, category="too_large", detector="body_limit"
+            )
+            upload_response.headers["Connection"] = "close"
+            return _secure(upload_response, path=path)
         accept = dict(scope.get("headers") or []).get(b"accept", b"").decode("latin-1")
         response: Any
         if "application/json" in accept:
@@ -1273,7 +1283,14 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         locale = _scope_locale(scope)
         request = Request(scope)
         status = 408 if reason == "upload_timeout" else 503
-        response = _html_error(request, status, message(reason, locale), locale)
+        response = _upload_error(
+            request,
+            status,
+            message(reason, locale),
+            locale,
+            category="upload_timeout" if status == 408 else "service_busy",
+            detector="admission",
+        )
         response.headers["Connection"] = "close"
         return _secure(response, path=scope.get("path", ""))
 
@@ -1442,12 +1459,73 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             return JSONResponse({"error": message}, status_code=status)
         return HTMLResponse(error_page(message, locale=locale, kind=kind), status_code=status)
 
+    def _upload_error(
+        request: Request,
+        status: int,
+        text: str,
+        locale: str,
+        *,
+        category: str,
+        detector: str,
+        detected_format: str | None = None,
+    ) -> Response:
+        """Explain a refusal and keep declarations only in the returned form.
+
+        Telemetry receives allow-listed labels, never the message, declarations,
+        filename or exception. Files must be selected again by the browser.
+        """
+        detected = upload_rejections.safe_format(
+            detected_format or getattr(request.state, "ops_rejection_format", "unknown")
+        )
+        request.state.ops_locale = locale
+        request.state.ops_rejection_category = category
+        request.state.ops_rejection_format = detected
+        request.state.ops_rejection_detector = upload_rejections.safe_detector(detector)
+        guidance = upload_rejections.rejection_guidance(category, detected, locale)
+        if _wants_json(request):
+            return JSONResponse(
+                {
+                    "error": text,
+                    "category": category,
+                    "format": detected,
+                    "guidance_html": guidance,
+                },
+                status_code=status,
+            )
+        page = upload_page(
+            locale=locale,
+            free_mode=cfg.free_mode,
+            price_usd=cfg.price_usd,
+            access_codes=cfg.access_codes_enabled,
+            retention_days=cfg.retention_days,
+            carried=getattr(request.state, "upload_declarations", {}),
+            rejection_html=f"<p role='alert'>{escape(text)}</p>" + guidance,
+        )
+        return HTMLResponse(page, status_code=status)
+
     def _not_found() -> HTTPException:
         return HTTPException(status_code=404, detail="not_found")
 
     @app.exception_handler(RequestValidationError)
     async def form_error(request: Request, exc: RequestValidationError) -> Response:
         locale = _error_locale(request)
+        if request.method == "POST" and request.url.path == "/audits":
+            with contextlib.suppress(Exception):
+                form = await request.form()
+                request.state.upload_declarations = {
+                    name: str(form[name])[:2000]
+                    for name in (*mapping.CARRIED_FIELDS, *(f"col_{r}" for r in mapping.FORM_ROLES))
+                    if name != "access_code" and isinstance(form.get(name), str)
+                }
+                locale = _report_locale(str(form.get("locale", locale)))
+            return _upload_error(
+                request,
+                400,
+                message("invalid_form", locale),
+                locale,
+                category="invalid_declaration",
+                detector="form",
+            )
         return _html_error(request, 400, message("invalid_form", locale), locale)
 
     @app.exception_handler(Exception)
@@ -1468,6 +1546,19 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         if exc.status_code == 400 and request.url.path.startswith("/webhooks/"):
             return JSONResponse({"error": str(exc.detail)}, status_code=400)
         locale = _error_locale(request)
+        if (
+            request.method == "POST"
+            and request.url.path == "/audits"
+            and exc.status_code in (400, 413, 422)
+        ):
+            return _upload_error(
+                request,
+                exc.status_code,
+                message("invalid_form", locale),
+                locale,
+                category="too_large" if exc.status_code == 413 else "invalid_upload",
+                detector="form",
+            )
         kind = "page" if key == "page_missing" else "audit"
         return _html_error(request, exc.status_code, message(key, locale), locale, kind=kind)
 
@@ -1676,10 +1767,13 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         x_start = funnel.since_day(now, days=14)
         # Two independent blocks: a slow or failed cost query must never hide
         # the retention warning, and the reverse.
+        attempts_html = "<p>Subidas intentadas / aceptadas: NOT_MEASURED.</p>"
         try:
             operations.flush()
+            ops_rows = db.ops_rows(start_day)
+            attempts_html = upload_attempts_line(ops_rows)
             operations_html = operations_section(
-                db.ops_rows(start_day),
+                ops_rows,
                 db.ops_job(),
                 enabled=cfg.auto_purge,
                 at=now,
@@ -1692,6 +1786,13 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             operations_html = (
                 "<p>Operación: NOT_MEASURED; consulta de telemetría no disponible.</p>"
             )
+        try:
+            operations_html += upload_rejections_section(
+                db.upload_rejection_rows(funnel.since_day(now, days=7)), at=now
+            )
+        except Exception:
+            logger.warning("private upload rejection view unavailable")
+            operations_html += "<p>Subidas rechazadas: NOT_MEASURED; consulta no disponible.</p>"
         try:
             totals = funnel.build(db.funnel_events(start_day)).total.counts
             commercial_html = commercial_section(
@@ -1732,7 +1833,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                     days=funnel.FUNNEL_DAYS,
                     example=f"{_site_url(request)}{audience_url('retos-prop-firm', 'es')}?ref=f6",
                     country_rows=db.funnel_country_events(funnel.since_day(now)),
-                ),
+                )
+                + attempts_html,
                 panel_path=app.state.panel_path,
                 observability=private_ops,
             )
@@ -4514,10 +4616,41 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         # The report's language, which the refusals below also speak.
         report_loc = _report_locale(locale)
         request.state.ops_locale = report_loc
+        carried = {
+            "locale": report_loc,
+            "consent": consent,
+            "trials": trials,
+            "cost_bps": cost_bps,
+            "oos_start": oos_start,
+            "description": description,
+            "benchmark_applicable": benchmark_applicable,
+            "challenge": challenge,
+            "initial_balance": initial_balance,
+            "access_code": access_code,
+            "net_of_fees": net_of_fees,
+            "return_frequency": return_frequency,
+            "return_unit": return_unit,
+        }
+        form = await request.form()
+        # Keep explicit column choices for every refusal, including header/size checks.
+        report_columns = {
+            role: _CONTROL.sub("", str(form.get(f"col_{role}") or "")).strip()[:200]
+            for role in mapping.FORM_ROLES
+            if _CONTROL.sub("", str(form.get(f"col_{role}") or "")).strip()
+        }
+        carried.update({f"col_{role}": value for role, value in report_columns.items()})
+        request.state.upload_declarations = carried
         if _cross_site(request):
             return _html_error(request, 403, message("cross_site", report_loc), report_loc)
         if consent.lower() not in ("on", "yes", "true", "1"):
-            return _html_error(request, 400, message("consent_required", report_loc), report_loc)
+            return _upload_error(
+                request,
+                400,
+                message("consent_required", report_loc),
+                report_loc,
+                category="invalid_declaration",
+                detector="form",
+            )
         # The hourly limit counts a network (an IPv6 /64), and the upload
         # stores that network, not the exact address.
         ip = acct.network_address(_client_ip(request, cfg.trusted_proxy_hops))
@@ -4529,7 +4662,14 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             recent >= cfg.max_uploads_per_hour_per_ip
             or attempts >= cfg.max_uploads_per_hour_per_ip * UPLOAD_ATTEMPTS_PER_UPLOAD
         ):
-            return _html_error(request, 429, message("rate_limited", report_loc), report_loc)
+            return _upload_error(
+                request,
+                429,
+                message("rate_limited", report_loc),
+                report_loc,
+                category="rate_limited",
+                detector="rate_limit",
+            )
         # The free tier: without a code that still works, an upload needs an
         # account, and each account gets FREE_PREVIEWS_PER_MONTH previews a
         # calendar month (also capped per network address). Past it, a
@@ -4558,6 +4698,30 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             usable = bool(typed) and await run_in_threadpool(db.code_usable, typed, now)
             if not usable:
                 gate_account = session[0]
+        # Strong signatures can decide a refusal from a bounded prefix. Starlette
+        # has already spooled multipart, but no importer or whole-file read runs.
+        for sent in (report, equity, optimization, live, trades, benchmark, variants):
+            if sent is None or not sent.filename:
+                continue
+            head = await sent.read(4096)
+            await sent.seek(0)
+            detected = upload_rejections.header_format(head)
+            if sent is report or (sent is equity and (report is None or not report.filename)):
+                request.state.ops_rejection_format = detected
+            category = upload_rejections.header_rejection(head)
+            if category:
+                text = message(
+                    "curve_is_picture" if category == "image" else "invalid_upload", report_loc
+                )
+                return _upload_error(
+                    request,
+                    400,
+                    text,
+                    report_loc,
+                    category=category,
+                    detector="header",
+                    detected_format=detected,
+                )
         try:
             uploads = {
                 "equity": await _read_limited(equity, what="equity"),
@@ -4604,14 +4768,31 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                     what=UPLOAD_NAMES[exc.what][report_loc],
                     limit=_megabytes(limit),
                 )
-            return _html_error(request, 413, text, report_loc)
+            return _upload_error(
+                request,
+                413,
+                text,
+                report_loc,
+                category="too_large",
+                detector="body_limit",
+                detected_format=upload_rejections.header_format(exc.head),
+            )
         if not uploads["equity"] and not uploads["report"]:
             # A file that arrived with no bytes is named as empty, not as missing.
             for what, sent in (("report", report), ("equity", equity)):
                 if sent is not None and sent.filename:
                     text = message("empty_upload", report_loc, what=UPLOAD_NAMES[what][report_loc])
-                    return _html_error(request, 400, text, report_loc)
-            return _html_error(request, 400, message("equity_required", report_loc), report_loc)
+                    return _upload_error(
+                        request, 400, text, report_loc, category="empty_file", detector="form"
+                    )
+            return _upload_error(
+                request,
+                400,
+                message("equity_required", report_loc),
+                report_loc,
+                category="empty_file",
+                detector="form",
+            )
         # A new account's first file is a free full report (once per account,
         # browser and file); then the month's free previews; then a credit;
         # else the way to buy. This first look answers at once; the claims
@@ -4744,7 +4925,14 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 return_unit=return_unit.strip() or None,
             )
         except (ValidationError, ValueError):
-            return _html_error(request, 400, message("invalid_declared", report_loc), report_loc)
+            return _upload_error(
+                request,
+                400,
+                message("invalid_declared", report_loc),
+                report_loc,
+                category="invalid_declaration",
+                detector="form",
+            )
         report_filename = report.filename if report is not None and uploads["report"] else None
         # The primary picker accepts period-return CSV/XLSX tables too. Content
         # detection comes before platform sniffing, and uses the curve reader's
@@ -4774,15 +4962,6 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         # A code is only redeemed where something is locked; in free mode it
         # is ignored so no credit is spent on a report that is free anyway.
         code = access_code.strip()[:_CODE_MAX] if cfg.access_codes_enabled else ""
-        # "Name its columns": the customer's mapping for a platform no importer knows.
-        form = await request.form()
-        # Control characters (a NUL) cannot be in a decoded header; dropped
-        # so a pasted name still matches and never reaches a page.
-        report_columns = {
-            role: _CONTROL.sub("", str(form.get(f"col_{role}") or "")).strip()[:200]
-            for role in mapping.FORM_ROLES
-            if _CONTROL.sub("", str(form.get(f"col_{role}") or "")).strip()
-        }
         # Named columns belong to the report: a file sent with them in the
         # curve field is read with them, before any automatic reader.
         if report_columns and uploads["equity"] and not uploads["report"]:
@@ -4793,21 +4972,6 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         # A signed-in customer's column choice is remembered per header.
         signed_in = _session(request)
         mapper = signed_in[0].id if signed_in is not None else ""
-        carried = {
-            "locale": report_loc,
-            "consent": consent,
-            "trials": trials,
-            "cost_bps": cost_bps,
-            "oos_start": oos_start,
-            "description": description,
-            "benchmark_applicable": benchmark_applicable,
-            "challenge": challenge,
-            "initial_balance": initial_balance,
-            "access_code": access_code,
-            "net_of_fees": net_of_fees,
-            "return_frequency": return_frequency,
-            "return_unit": return_unit,
-        }
 
         def build(columns: dict[str, str] | None) -> Any:
             return build_inputs(
@@ -4861,16 +5025,13 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 inputs = attempt(report_columns)
             except ParseError as exc:
                 curve = uploads["equity"]
-                if curve and not uploads["report"] and curve.startswith(PICTURE_SIGNATURES):
-                    # Refused as before; the sentence says what the file is.
-                    return _html_error(
-                        request, 400, message("curve_is_picture", report_loc), report_loc
-                    )
                 if exc.code == "too_large" and curve and len(curve) > MAX_UPLOAD_BYTES:
                     text = message(
                         "curve_too_large", report_loc, limit=_megabytes(MAX_UPLOAD_BYTES)
                     )
-                    return _html_error(request, 400, text, report_loc)
+                    return _upload_error(
+                        request, 400, text, report_loc, category="too_large", detector="schema"
+                    )
                 # A "curve" that starts at 0 or crosses it is a list of
                 # results, and a curve file with no value column may be one:
                 # both are offered to name, a result list preselected as such.
@@ -4898,8 +5059,23 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                     else None
                 )
                 if table is None:
-                    return _html_error(
-                        request, 400, _sentence(exc.localized(report_loc)), report_loc
+                    return _upload_error(
+                        request,
+                        400,
+                        _sentence(exc.localized(report_loc)),
+                        report_loc,
+                        category=upload_rejections.classify(
+                            exc.code,
+                            detected_format=getattr(
+                                request.state, "ops_rejection_format", "unknown"
+                            ),
+                        ),
+                        detector="importers" if uploads["report"] else "schema",
+                        # The combined reader does not identify an auxiliary file on
+                        # every error. Avoid attributing its format to the primary file.
+                        detected_format="unknown"
+                        if sum(bool(v) for v in uploads.values()) > 1
+                        else None,
                     )
                 # The columns this account chose before for the same header;
                 # a PDF's rows are always shown, never read on a saved choice.
@@ -4925,13 +5101,16 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                         return _mapping_answer(request, table, exc, report_loc, carried, saved)
                 else:
                     return _mapping_answer(request, table, exc, report_loc, carried, report_columns)
-            except ValueError:
-                return _html_error(request, 400, message("invalid_upload", report_loc), report_loc)
             except Exception:
-                # A file no importer anticipated: the customer gets the
-                # format message, the operator gets the traceback.
-                logger.exception("upload could not be parsed")
-                return _html_error(request, 400, message("invalid_upload", report_loc), report_loc)
+                # Exception text may contain file data. Only fixed labels reach telemetry.
+                return _upload_error(
+                    request,
+                    400,
+                    message("invalid_upload", report_loc),
+                    report_loc,
+                    category="invalid_upload",
+                    detector="importers",
+                )
             if gate_account is not None:
                 refusal = claim_free_use(gate_account.id, inputs)
                 if refusal is not None:
@@ -4949,7 +5128,14 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         queued_at = time.monotonic()
         if not await _take_slot(audit_slots, cfg.audit_queue_seconds):
             operations.observe("queue", "busy", time.monotonic() - queued_at, locale=report_loc)
-            return _html_error(request, 503, message("busy", report_loc), report_loc)
+            return _upload_error(
+                request,
+                503,
+                message("busy", report_loc),
+                report_loc,
+                category="service_busy",
+                detector="admission",
+            )
         operations.observe("queue", "success", time.monotonic() - queued_at, locale=report_loc)
         audit_started = time.monotonic()
         try:
@@ -4968,7 +5154,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 "error"
                 if outcome.status_code >= 500
                 else "invalid"
-                if outcome.status_code == 400
+                if outcome.status_code in (400, 413, 422)
                 else "denied"
             )
         )
@@ -5082,11 +5268,37 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         if len(table.samples) < 2 and not chosen:
             # One row, or none: naming columns cannot help until the file is whole.
             text = mapping.COPY[locale]["one_row"]
+        category = (
+            "too_few_rows"
+            if len(table.samples) < 2 and not chosen
+            else upload_rejections.classify(exc.code)
+        )
+        if exc.code in ("unknown_format", "equity_not_positive"):
+            category = (
+                "too_few_rows" if len(table.samples) < 2 and not chosen else "columns_missing"
+            )
+        detected = upload_rejections.safe_format(
+            getattr(request.state, "ops_rejection_format", "unknown")
+        )
+        request.state.ops_rejection_category = category
+        request.state.ops_rejection_format = detected
+        request.state.ops_rejection_detector = "mapping"
+        guidance = upload_rejections.rejection_guidance(category, detected, locale)
         if _wants_json(request):
             return JSONResponse(
-                {"error": text, "code": exc.code, "columns": table.names}, status_code=422
+                {
+                    "error": text,
+                    "code": exc.code,
+                    "columns": table.names,
+                    "category": category,
+                    "format": detected,
+                    "guidance_html": guidance,
+                },
+                status_code=422,
             )
-        page = mapping.mapping_page(table, text, locale=locale, carried=carried, chosen=chosen)
+        page = mapping.mapping_page(
+            table, text, locale=locale, carried=carried, chosen=chosen, guidance_html=guidance
+        )
         return HTMLResponse(page, status_code=422)
 
     def _gate(

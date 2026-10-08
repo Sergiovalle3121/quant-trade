@@ -1442,11 +1442,11 @@ def _lang_menu(locale: str, switch_href: str, alternates: dict[str, str] | None)
     )
 
 
-def _preset_options(locale: str) -> str:
+def _preset_options(locale: str, chosen: str = DEFAULT_PRESET) -> str:
     options = []
     for key in sorted(PRESETS):
         rules = PRESETS[key]
-        selected = " selected" if key == DEFAULT_PRESET else ""
+        selected = " selected" if key == chosen else ""
         label = preset_label(rules.firm, rules.program, rules.phase, locale)
         options.append(f"<option value='{_e(key)}'{selected}>{_e(label)}</option>")
     return "".join(options)
@@ -2353,12 +2353,37 @@ def _upload_form(
     retention_days: int,
     extras_open: bool = False,
     signin_first: bool = False,
+    carried: Mapping[str, str] | None = None,
 ) -> str:
     ui = _UI[locale]
     linked = link_locale(locale)
+    values = carried or {}
+
+    def value(name: str) -> str:
+        return _e(values.get(name, ""))
+
+    def checked(name: str) -> str:
+        return " checked" if values.get(name, "").lower() in {"on", "yes", "true", "1"} else ""
+
+    advanced_open = any(
+        values.get(name)
+        for name in (
+            "cost_bps",
+            "oos_start",
+            "benchmark_applicable",
+            "initial_balance",
+            "net_of_fees",
+            "description",
+        )
+    )
+    extras_open = extras_open or bool(values.get("challenge"))
+    mapping_open = any(
+        values.get(f"col_{role}") for _, roles in copy["map_groups"] for role in roles
+    )
     # The report exists in Spanish, English and Portuguese: the page's own language.
     selected = {"es": "", "en": "", "pt": ""}
-    selected[locale if locale in selected else linked] = " selected"
+    selected_locale = values.get("locale", locale)
+    selected[selected_locale if selected_locale in selected else linked] = " selected"
     code_field = ""
     if access_codes:
         code_field = _field(
@@ -2375,7 +2400,7 @@ def _upload_form(
         f"<p>{_e(copy['guide_list'])}: {_guide_links(locale)}</p></details>"
     )
     mapping = (
-        "<details class='adv map-columns'><summary><span>"
+        f"<details class='adv map-columns'{' open' if mapping_open else ''}><summary><span>"
         f"{_e(copy['map_title'])}</span>"
         "<svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' "
         "aria-hidden='true'><path d='M6 9l6 6 6-6'/></svg></summary><div class='adv-body'>"
@@ -2389,7 +2414,7 @@ def _upload_form(
                 _field(
                     copy["map_roles"][role],
                     f"<input type='text' name='col_{role}' maxlength='100' list='report-columns' "
-                    "autocomplete='off' spellcheck='false'>",
+                    f"autocomplete='off' spellcheck='false' value='{value(f'col_{role}')}'>",
                 )
                 for role in roles
             )
@@ -2403,7 +2428,7 @@ def _upload_form(
         f"{_e(copy['optimization_guide'])}</a>"
     )
     advanced = (
-        "<details class='adv'><summary><span>"
+        f"<details class='adv'{' open' if advanced_open else ''}><summary><span>"
         f"{_e(ui['advanced'])} <small>· {_e(ui['advanced_note'])}</small></span>"
         "<svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' "
         "aria-hidden='true'><path d='M6 9l6 6 6-6'/></svg></summary><div class='adv-body'>"
@@ -2425,24 +2450,37 @@ def _upload_form(
         + _drop("variants", copy["variants"], ".csv,text/csv", _e(copy["variants_help"]), locale)
         + _field(
             copy["cost_bps"],
-            "<input type='number' name='cost_bps' min='0' step='0.1' placeholder='0'>",
+            "<input type='number' name='cost_bps' min='0' step='0.1' placeholder='0' "
+            f"value='{value('cost_bps')}'>",
         )
-        + _field(copy["oos_start"], "<input type='date' name='oos_start'>")
+        + _field(
+            copy["oos_start"],
+            f"<input type='date' name='oos_start' value='{value('oos_start')}'>",
+        )
         + _field(
             copy["benchmark_applicable"],
-            f"<select name='benchmark_applicable'><option value='yes'>{_e(copy['yes'])}</option>"
-            f"<option value='no'>{_e(copy['no'])}</option></select>",
+            "<select name='benchmark_applicable'>"
+            + "".join(
+                f"<option value='{option}'"
+                + (" selected" if values.get("benchmark_applicable", "yes") == option else "")
+                + f">{_e(copy[option])}</option>"
+                for option in ("yes", "no")
+            )
+            + "</select>",
         )
         + _field(
             copy["initial_balance"],
-            "<input type='number' name='initial_balance' min='0' step='0.01'>",
+            "<input type='number' name='initial_balance' min='0' step='0.01' "
+            f"value='{value('initial_balance')}'>",
         )
         + "</div>"
-        + "<label class='check'><input type='checkbox' name='net_of_fees' value='on'>"
+        + "<label class='check'><input type='checkbox' name='net_of_fees' value='on'"
+        + f"{checked('net_of_fees')}>"
         + f"<span>{_e(copy['net_of_fees'])}</span></label>"
         + _field(
             copy["description"],
-            "<textarea name='description' rows='3' maxlength='2000'></textarea>",
+            "<textarea name='description' rows='3' maxlength='2000'>"
+            f"{value('description')}</textarea>",
         )
         + "</div></details>"
     )
@@ -2480,12 +2518,13 @@ def _upload_form(
             f"{_e(copy['equity_help'])}<br>{_e(copy['dates_hint'])}",
             locale,
         )
-        + series_fields(locale)
+        + series_fields(locale, carried=values)
         # Declared trials decide whether multiplicity can pass (verdict.assess_multiplicity),
         # so the field sits in the main form, not under the advanced options.
         + _field(
             copy["trials"],
-            "<input type='number' name='trials' min='1' step='1' inputmode='numeric'>",
+            "<input type='number' name='trials' min='1' step='1' inputmode='numeric' "
+            f"value='{value('trials')}'>",
             copy["trials_help"],
         )
         # The one-file case stays short; the second files and the challenge open on demand.
@@ -2499,7 +2538,9 @@ def _upload_form(
         + "</div>"
         + _field(
             copy["challenge"],
-            f"<select name='challenge'>{_preset_options(locale)}</select>",
+            "<select name='challenge'>"
+            + _preset_options(locale, values.get("challenge", DEFAULT_PRESET))
+            + "</select>",
             copy["challenge_help"].format(as_of=_plain_date(AS_OF, locale)),
         )
         + "</div></details>"
@@ -2514,7 +2555,8 @@ def _upload_form(
         + code_field
         + "</div>"
         + advanced
-        + "<label class='check'><input type='checkbox' name='consent' value='on' required>"
+        + "<label class='check'><input type='checkbox' name='consent' value='on' required"
+        + f"{checked('consent')}>"
         f"<span>{_e(copy['consent'].format(retention=retention_days))} "
         f"{_e(copy['consent_read'])} "
         f"<a href='{_e(legal_url('terms', locale))}'>{_e(copy['terms_link'])}</a> · "
@@ -2670,12 +2712,17 @@ def upload_page(
     extras_open: bool = False,
     signed_in: bool | None = None,
     notice: str = "",
+    carried: Mapping[str, str] | None = None,
+    rejection_html: str = "",
 ) -> str:
     """The upload form on its own page, so the landing can stay short.
 
     ``signed_in=False`` in paid mode keeps the "account first" note above the fields
     (the web layer normally sends such a visitor to sign-up before this page).
-    ``notice`` is one line above the fields, such as "confirmation link sent"."""
+    ``notice`` is one line above the fields, such as "confirmation link sent".
+    ``carried`` restores only declaration fields after a refusal; file pickers and
+    access codes remain empty. ``rejection_html`` is trusted, localized guidance.
+    Client declarations are escaped form values, never report claims or logs."""
     locale = _locale(locale)
     copy = _COPY[locale]
     note = copy["free_note"] if free_mode else copy["paid_note"].format(price=price_usd)
@@ -2692,11 +2739,12 @@ def upload_page(
         locale,
         note=note,
         flash=f"<div class='flash'>{_e(notice)}</div>" if notice else "",
-        err="",
+        err=rejection_html,
         access_codes=access_codes,
         retention_days=retention_days,
         extras_open=extras_open,
         signin_first=signed_in is False and not free_mode,
+        carried=carried,
     )
     # The language switch keeps the extra boxes open.
     alternates = {

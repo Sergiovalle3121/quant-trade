@@ -23,6 +23,7 @@ from typing import Any
 
 from quant_trade.audit import report_pt
 from quant_trade.audit.redflags import FLAG_TITLES
+from quant_trade.audit.upload_rejections import REJECTION_CATEGORIES, REJECTION_COPY
 from quant_trade.audit.verdict import NOT_MEASURED_ES
 
 #: Where a parse warning came from, as ``schema.build_inputs`` prefixes it.
@@ -75,6 +76,15 @@ _TRIAL_SOURCES: dict[str, str] = {
 }
 
 _RULES_SOURCE: tuple[tuple[str, str], ...] = (
+    # Upload guidance keeps its native copy together; every new English note
+    # also belongs to the central Spanish translation rules.
+    *(
+        (english, spanish)
+        for category in REJECTION_CATEGORIES
+        for english, spanish in zip(
+            REJECTION_COPY["en"][category], REJECTION_COPY["es"][category], strict=True
+        )
+    ),
     # Public figure reader notes (reading.COPY); keep the Spanish rules explicit.
     (
         "The PNG image is temporarily unavailable.",
