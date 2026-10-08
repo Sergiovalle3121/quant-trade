@@ -29,6 +29,7 @@ from quant_trade.audit.articles import (
 from quant_trade.audit.audiences import AUDIENCE_PAGES, audience_url
 from quant_trade.audit.calculator import CALCULATOR_PATH
 from quant_trade.audit.examples import EXAMPLES_PATH
+from quant_trade.audit.faq import FAQ_PATH
 from quant_trade.audit.guides import GUIDES, guide_url, guides_index_url
 from quant_trade.audit.method import METHOD_PATH
 from quant_trade.audit.reading import READING_PATH
@@ -67,6 +68,7 @@ PUBLIC_PAGES: tuple[dict[str, str], ...] = (
     dict(METHOD_PATH),
     dict(CALCULATOR_PATH),
     dict(READING_PATH),
+    dict(FAQ_PATH),
     *({lang: audience_url(a.slug, lang) for lang in ("es", "en", "pt")} for a in AUDIENCE_PAGES),
     dict(CHECK_PATH),
     {"es": "/terminos", "en": "/terms", "pt": "/pt/termos"},
@@ -242,6 +244,11 @@ def article_structured_data(article: Article, locale: str, base_url: str) -> str
 
 
 def articles_faq_structured_data(locale: str) -> str:
+    return faq_structured_data(articles_index_faq(locale))
+
+
+def faq_structured_data(items: tuple[tuple[str, str], ...]) -> str:
+    """Serialize the same question/answer pairs that the page shows visibly."""
     return _json_ld(
         {
             "@context": "https://schema.org",
@@ -252,7 +259,7 @@ def articles_faq_structured_data(locale: str) -> str:
                     "name": question,
                     "acceptedAnswer": {"@type": "Answer", "text": answer},
                 }
-                for question, answer in articles_index_faq(locale)
+                for question, answer in items
             ],
         }
     )

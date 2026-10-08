@@ -21,13 +21,27 @@ from quant_trade.audit.examples import EXAMPLES_COPY, EXAMPLES_PATH
 from quant_trade.audit.guides import GUIDES_BY_SLUG, guide_url
 from quant_trade.audit.method import COPY as METHOD_COPY
 from quant_trade.audit.method import METHOD_PATH
+from quant_trade.audit.reading import COPY as READING_COPY
+from quant_trade.audit.reading import READING_PATH
+from quant_trade.audit.retail_numbers import (
+    COIN_NORMAL_TAIL,
+    COIN_NULL_WIN_RATE,
+    COIN_THRESHOLD_WIN_RATE,
+    COIN_TRADE_COUNT,
+    PROP_ATTEMPT_EXAMPLES,
+    PROP_RISKS,
+    PROP_RULES,
+    PROP_STREAK_LENGTH,
+    PROP_WIN_RATES,
+    SIGNAL_DECLARED_WIN_RATE,
+)
 
 LOCALES: tuple[str, ...] = ("es", "en", "pt")
 
 #: The pages an article may point to: the free calculator, an export guide
 #: (by its Spanish slug), an audience page (by its Spanish slug) or the method.
 RELATED_KINDS: frozenset[str] = frozenset(
-    {"calculator", "guide", "audience", "method", "contact", "samples"}
+    {"calculator", "guide", "audience", "method", "contact", "samples", "reading"}
 )
 
 #: Illustrative declarations, never measurements of a client's file. The same
@@ -99,6 +113,9 @@ ARTICLE_PUBLICATION_DATES = {
     "auditoria-independiente-backtest": "2026-10-07",
     "sharpe-deflactado-track-record": "2026-10-07",
     "auditar-cartera-modelo-senales": "2026-10-07",
+    "cuantos-intentos-reto-prop-firm": "2026-10-07",
+    "copiar-senales-mql5-myfxbook": "2026-10-07",
+    "bot-ia-backtest-suerte": "2026-10-07",
 }
 
 
@@ -3516,6 +3533,1621 @@ ARTICLES_DATA: tuple[dict[str, Any], ...] = (
             {"kind": "audience", "slug": "gestoras-y-senales"},
         ],
     },
+    {
+        "key": "cuantos-intentos-reto-prop-firm",
+        "slug": {
+            "es": "cuantos-intentos-reto-prop-firm",
+            "en": "how-many-prop-firm-challenge-attempts",
+            "pt": "quantas-tentativas-desafio-prop-firm",
+        },
+        "title": {
+            "es": "Cuántos intentos de un reto de prop firm sugiere tu propio historial",
+            "en": "How many prop-firm challenge attempts your own history suggests",
+            "pt": "Quantas tentativas de um desafio de prop firm seu histórico sugere",
+        },
+        "summary": {
+            "es": (
+                "Cómo leer un rango de intentos bajo supuestos de acierto y riesgo, y "
+                "por qué tu historial importa más que una captura del backtest."
+            ),
+            "en": (
+                "How to read an attempt range under declared win-rate and risk "
+                "assumptions, and why your history matters more than a backtest "
+                "screenshot."
+            ),
+            "pt": (
+                "Como ler uma faixa de tentativas sob hipóteses de acerto e risco, e "
+                "por que seu histórico importa mais que uma captura do backtest."
+            ),
+        },
+        "intro": {
+            "es": (
+                "La tarifa de un reto no describe cuánto podría costar repetirlo. Para "
+                "ordenar esa pregunta necesitas las reglas, la distribución de "
+                "resultados y el tamaño de cada pérdida. Un porcentaje de aciertos "
+                "aislado no contiene esa información. Aquí usamos un ejemplo declarado "
+                "para explicar la cuenta de intentos y sus límites. No es una "
+                "previsión personal ni una simulación de tu cuenta. El paso útil "
+                "consiste en sustituir los supuestos por un historial completo y "
+                "conservar también las partes que contradicen la idea inicial."
+            ),
+            "en": (
+                "A challenge fee does not describe what repeated attempts might cost. "
+                "To organize that question, you need the rules, the distribution of "
+                "outcomes and the size of each loss. A win rate alone does not contain "
+                "that information. This article uses a declared example to explain "
+                "attempt counts and their limits. It is not a personal forecast or a "
+                "simulation of your account. The useful next step is to replace "
+                "assumptions with a complete history, including the parts that "
+                "contradict the original idea."
+            ),
+            "pt": (
+                "A taxa de um desafio não descreve quanto sua repetição poderia "
+                "custar. Para organizar essa pergunta, você precisa das regras, da "
+                "distribuição dos resultados e do tamanho de cada perda. Uma taxa de "
+                "acerto isolada não contém essas informações. Aqui usamos um exemplo "
+                "declarado para explicar a conta de tentativas e seus limites. Não é "
+                "uma previsão pessoal nem uma simulação da sua conta. O passo útil é "
+                "substituir as hipóteses por um histórico completo, preservando também "
+                "os trechos que contradizem a ideia inicial."
+            ),
+        },
+        "sections": {
+            "es": [
+                {
+                    "heading": "Empieza por las reglas y su fecha",
+                    "paragraphs": [
+                        (
+                            "DECLARED · El preset genérico del repositorio fija un objetivo de "
+                            f"{PROP_RULES.profit_target:.0%}, una pérdida total máxima de "
+                            f"{PROP_RULES.max_total_loss:.0%}, un límite diario de "
+                            f"{PROP_RULES.max_daily_loss:.0%} y un mínimo de "
+                            f"{PROP_RULES.min_trading_days} días con actividad. No tiene plazo "
+                            f"máximo. Su fecha es {PROP_RULES.as_of} y su fuente es "
+                            f"{PROP_RULES.source_url}. Es una referencia didáctica, no las "
+                            "condiciones actuales de una firma. El suelo de pérdida total es "
+                            "estático y se refiere al saldo inicial."
+                        ),
+                        (
+                            "Las reglas de un contrato pueden definir el día de otra manera, "
+                            "incluir posiciones abiertas o mover el suelo cuando sube el saldo. "
+                            "Antes de interpretar cualquier cifra, identifica exactamente qué "
+                            "saldo, horario y fase describe. Cambiar una de esas definiciones "
+                            "cambia la pregunta. Un preset fechado ayuda a reconocer el supuesto "
+                            "utilizado; no sustituye la lectura de las condiciones vigentes."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Una cuenta sencilla, separada del simulador",
+                    "paragraphs": [
+                        (
+                            "DECLARED · El ejemplo supone una operación independiente por día, con "
+                            "pérdidas y ganancias del mismo tamaño respecto al saldo inicial, sin "
+                            "costos y sin límite temporal. Cada intento comienza de nuevo con "
+                            "idénticas condiciones. Se detiene al tocar el objetivo o el suelo de "
+                            "pérdida; tratar el contacto con el suelo como final es conservador "
+                            "respecto al simulador, que distingue tocar de rebasar el límite. La "
+                            "trayectoria más corta del ejemplo ya cumple los días mínimos."
+                        ),
+                        (
+                            "Esta cuenta de barreras es una explicación editorial, no una salida "
+                            "de la calculadora de Sharpe ni del informe. No incorpora las fases "
+                            "posteriores, las restricciones de noticias, el comportamiento dentro "
+                            "del día ni cambios de tamaño. Si llamamos p a la probabilidad del "
+                            "objetivo bajo estos supuestos, la media de intentos independientes es "
+                            "el inverso de p. Una media no señala cuándo terminaría una persona "
+                            "concreta."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Dos tasas de acierto y dos tamaños de riesgo",
+                    "paragraphs": [
+                        (
+                            f"DECLARED · Con acierto de {PROP_WIN_RATES[0]:.0%}, el riesgo de "
+                            f"{PROP_RISKS[0]:.1%} por operación produce una media de "
+                            f"{PROP_ATTEMPT_EXAMPLES[0].expected_attempts:.2f} intentos; con "
+                            f"riesgo de {PROP_RISKS[1]:.1%}, la media es "
+                            f"{PROP_ATTEMPT_EXAMPLES[1].expected_attempts:.2f}. El rango entre "
+                            f"esos escenarios es {PROP_ATTEMPT_EXAMPLES[1].expected_attempts:.2f}–"
+                            f"{PROP_ATTEMPT_EXAMPLES[0].expected_attempts:.2f} intentos. Con "
+                            f"acierto de {PROP_WIN_RATES[1]:.0%}, los mismos riesgos producen "
+                            f"{PROP_ATTEMPT_EXAMPLES[2].expected_attempts:.2f} y "
+                            f"{PROP_ATTEMPT_EXAMPLES[3].expected_attempts:.2f}, respectivamente: "
+                            f"rango {PROP_ATTEMPT_EXAMPLES[2].expected_attempts:.2f}–"
+                            f"{PROP_ATTEMPT_EXAMPLES[3].expected_attempts:.2f}."
+                        ),
+                        (
+                            "Estos rangos comparan supuestos; no son intervalos de confianza ni "
+                            "límites del número de intentos. El escenario con deriva desfavorable "
+                            "puede acercarse al objetivo con mayor frecuencia al aumentar el "
+                            "tamaño, pero también consume antes el margen de pérdida. Esa "
+                            "peculiaridad del modelo no constituye una recomendación de riesgo. Si "
+                            "cambias la relación entre el tamaño de ganancias y pérdidas, estas "
+                            "cifras dejan de describir el problema."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "La racha que suele quedar fuera de la captura",
+                    "paragraphs": [
+                        (
+                            f"DECLARED · Una racha ilustrativa de {PROP_STREAK_LENGTH} pérdidas "
+                            f"consume {PROP_STREAK_LENGTH * PROP_RISKS[0]:.1%} o "
+                            f"{PROP_STREAK_LENGTH * PROP_RISKS[1]:.1%} del saldo inicial con los "
+                            "riesgos anteriores. Son operaciones en días distintos. Para una "
+                            "ventana fijada de antemano, su probabilidad es "
+                            f"{((1 - PROP_WIN_RATES[0]) ** PROP_STREAK_LENGTH):.1%} o "
+                            f"{((1 - PROP_WIN_RATES[1]) ** PROP_STREAK_LENGTH):.1%}, según la "
+                            "tasa de acierto. No es la probabilidad de encontrar esa racha en "
+                            "cualquier lugar del historial."
+                        ),
+                        (
+                            "Llamarla típica requiere observar tus secuencias reales. El "
+                            "agrupamiento de pérdidas puede volver frágil la hipótesis de "
+                            "independencia. Revisa la peor racha, el tiempo de recuperación y las "
+                            "operaciones que quedaron abiertas entre sesiones. Un límite diario no "
+                            "es intercambiable con un límite total: varias pérdidas concentradas "
+                            "en la misma sesión plantean un problema que este ejemplo diario no "
+                            "modela."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Por qué pesa más el historial real",
+                    "paragraphs": [
+                        (
+                            "Un registro de operaciones realmente realizadas conserva costos, "
+                            "horarios, interrupciones y decisiones que un backtest idealizado "
+                            "puede omitir. Para esta pregunta interesan especialmente la secuencia "
+                            "de pérdidas y la diferencia entre riesgo planeado y observado. "
+                            "Solicita fechas, importes, depósitos, retiros y posiciones abiertas; "
+                            "separa movimientos de caja del resultado de operar. La evidencia "
+                            "mejora cuando permite reconstruir el recorrido, no solo su punto "
+                            "final."
+                        ),
+                        (
+                            "Tampoco un historial real elimina la incertidumbre. Puede abarcar un "
+                            "solo régimen, omitir cuentas cerradas o haber sido seleccionado "
+                            "después de comparar muchas cuentas. Un archivo describe lo que "
+                            "contiene y necesita contexto. Si el tamaño cambió durante una racha "
+                            "adversa, una frecuencia global de aciertos esconderá precisamente el "
+                            "comportamiento que intentas estudiar."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Qué llevar al informe gratis",
+                    "paragraphs": [
+                        (
+                            "Conserva el archivo completo, las reglas fechadas y la lista de "
+                            "variantes descartadas. Distingue lo medido en el archivo de lo "
+                            "declarado por su autor y de aquello que falta. Rigor analiza la "
+                            "evidencia aportada y puede mostrar límites del historial; no "
+                            "sustituye el contrato ni observa la ejecución futura. La calculadora "
+                            "de suerte permite explorar otra pregunta: cuánto podría explicar la "
+                            "búsqueda de configuraciones en el Sharpe publicado."
+                        ),
+                        (
+                            "Antes de multiplicar una media de intentos por una tarifa, identifica "
+                            "descuentos, reinicios y condiciones que no están representados. El "
+                            "costo esperado depende de esos supuestos y no es un presupuesto "
+                            "máximo. Empieza por el primer informe completo gratis con tu cuenta "
+                            "para revisar el archivo y sus faltantes, conservando cualquier "
+                            "resultado desfavorable en la comparación."
+                        ),
+                    ],
+                },
+            ],
+            "en": [
+                {
+                    "heading": "Start with the rules and their date",
+                    "paragraphs": [
+                        (
+                            "DECLARED · The repository's generic preset sets a target of "
+                            f"{PROP_RULES.profit_target:.0%}, maximum total loss of "
+                            f"{PROP_RULES.max_total_loss:.0%}, daily loss limit of "
+                            f"{PROP_RULES.max_daily_loss:.0%}, and at least "
+                            f"{PROP_RULES.min_trading_days} active days. It has no deadline. Its "
+                            f"date is {PROP_RULES.as_of} and its source is {PROP_RULES.source_url}"
+                            ". This is a teaching reference, not any firm's current terms. The "
+                            "total loss floor is static and relates to the initial balance."
+                        ),
+                        (
+                            "A contract might define the trading day differently, include open "
+                            "positions or move the floor as the balance rises. Before interpreting "
+                            "a number, identify exactly which balance, time zone and phase it "
+                            "describes. Changing any of those definitions changes the question. A "
+                            "dated preset makes the assumption traceable; it does not replace "
+                            "reading the current contract or checking how its limits are applied."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "A simple calculation, separate from the simulator",
+                    "paragraphs": [
+                        (
+                            "DECLARED · This example assumes an independent trade each day, equal "
+                            "win and loss amounts relative to the initial balance, no costs and "
+                            "unlimited time. Each attempt restarts under identical conditions. It "
+                            "stops upon touching either the target or loss floor; ending a path at "
+                            "contact with the floor is conservative relative to the simulator, "
+                            "which distinguishes touching from breaching that limit. Even the "
+                            "shortest target path in the example satisfies the minimum trading "
+                            "days."
+                        ),
+                        (
+                            "This barrier calculation is an editorial explanation, not output from "
+                            "the Sharpe calculator or a report. It leaves out later phases, news "
+                            "restrictions, events within the day and changes in position size. If "
+                            "p denotes the probability of reaching the target under these "
+                            "assumptions, the mean count of independent attempts is its "
+                            "reciprocal. A mean does not identify when a particular person's "
+                            "attempts would end."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Two win rates and two risk sizes",
+                    "paragraphs": [
+                        (
+                            f"DECLARED · At a {PROP_WIN_RATES[0]:.0%} win rate, risk of "
+                            f"{PROP_RISKS[0]:.1%} per trade gives a mean of "
+                            f"{PROP_ATTEMPT_EXAMPLES[0].expected_attempts:.2f} attempts; at "
+                            f"{PROP_RISKS[1]:.1%} risk, the mean is "
+                            f"{PROP_ATTEMPT_EXAMPLES[1].expected_attempts:.2f}. The range across "
+                            f"these scenarios is {PROP_ATTEMPT_EXAMPLES[1].expected_attempts:.2f}–"
+                            f"{PROP_ATTEMPT_EXAMPLES[0].expected_attempts:.2f} attempts. At a "
+                            f"{PROP_WIN_RATES[1]:.0%} win rate, those same risk sizes give "
+                            f"{PROP_ATTEMPT_EXAMPLES[2].expected_attempts:.2f} and "
+                            f"{PROP_ATTEMPT_EXAMPLES[3].expected_attempts:.2f}, respectively: a "
+                            f"range of {PROP_ATTEMPT_EXAMPLES[2].expected_attempts:.2f}–"
+                            f"{PROP_ATTEMPT_EXAMPLES[3].expected_attempts:.2f}."
+                        ),
+                        (
+                            "These ranges compare assumptions; they are neither confidence "
+                            "intervals nor limits on the number of attempts. A path with "
+                            "unfavorable drift can reach the upper barrier more frequently with "
+                            "larger steps, while also using up its loss allowance faster. That "
+                            "feature of this model is not a recommendation about position size. "
+                            "Change the relationship between win and loss amounts and these "
+                            "figures no longer describe the problem you are studying."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "The losing streak a screenshot leaves out",
+                    "paragraphs": [
+                        (
+                            f"DECLARED · An illustrative streak of {PROP_STREAK_LENGTH} losses "
+                            f"consumes {PROP_STREAK_LENGTH * PROP_RISKS[0]:.1%} or "
+                            f"{PROP_STREAK_LENGTH * PROP_RISKS[1]:.1%} of initial balance at the "
+                            "risk sizes above. Those trades occur on separate days. In a window "
+                            "fixed beforehand, its probability is "
+                            f"{((1 - PROP_WIN_RATES[0]) ** PROP_STREAK_LENGTH):.1%} or "
+                            f"{((1 - PROP_WIN_RATES[1]) ** PROP_STREAK_LENGTH):.1%}, depending on "
+                            "the win rate. This is not the probability of finding the streak "
+                            "somewhere in an entire history."
+                        ),
+                        (
+                            "Calling a streak typical requires looking at actual sequences. "
+                            "Clustering losses can undermine the independence assumption. Examine "
+                            "the worst streak, the recovery period and positions held across "
+                            "sessions. A daily limit is not interchangeable with a total limit: "
+                            "losses concentrated within the same session raise a question that "
+                            "this daily example does not model. The ordering matters even when the "
+                            "overall win count stays unchanged."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Why actual trading history carries more information",
+                    "paragraphs": [
+                        (
+                            "A record of trades that actually occurred retains costs, timestamps, "
+                            "interruptions and decisions that an idealized backtest might omit. "
+                            "The loss sequence and the gap between planned and observed risk are "
+                            "especially relevant here. Ask for dates, amounts, deposits, "
+                            "withdrawals and open positions; separate cash movements from trading "
+                            "outcomes. Evidence becomes more useful when it lets you reconstruct "
+                            "the path instead of looking only at its endpoint."
+                        ),
+                        (
+                            "An actual history still leaves uncertainty. It may cover only one "
+                            "market regime, leave out closed accounts or have been selected after "
+                            "comparing many accounts. A file describes its contents and needs "
+                            "context. If position sizes changed during an adverse streak, an "
+                            "overall win rate can conceal the very behavior you need to examine. "
+                            "Preserve the inconvenient periods when preparing the export."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "What to bring to the free report",
+                    "paragraphs": [
+                        (
+                            "Keep the complete file, dated rules and a list of discarded variants. "
+                            "Distinguish what is measured in the file from what its author "
+                            "declares and what remains missing. Rigor analyzes supplied evidence "
+                            "and can expose limitations of the history; it does not replace the "
+                            "contract or observe future execution. The luck calculator addresses a "
+                            "different question: how much searching across configurations might "
+                            "explain the published Sharpe."
+                        ),
+                        (
+                            "Before multiplying an attempt average by a fee, identify discounts, "
+                            "resets and conditions that are absent from the model. An expected "
+                            "cost depends on those assumptions and is not a maximum budget. Start "
+                            "with the free first full report available with your account to review "
+                            "the file and its missing evidence, keeping unfavorable findings "
+                            "visible alongside the rest of the comparison."
+                        ),
+                    ],
+                },
+            ],
+            "pt": [
+                {
+                    "heading": "Comece pelas regras e sua data",
+                    "paragraphs": [
+                        (
+                            "DECLARED · O preset genérico do repositório fixa um objetivo de "
+                            f"{PROP_RULES.profit_target:.0%}, perda total máxima de "
+                            f"{PROP_RULES.max_total_loss:.0%}, limite diário de "
+                            f"{PROP_RULES.max_daily_loss:.0%} e mínimo de "
+                            f"{PROP_RULES.min_trading_days} dias com atividade. Não há prazo "
+                            f"máximo. Sua data é {PROP_RULES.as_of} e sua fonte é "
+                            f"{PROP_RULES.source_url}. É uma referência didática, não as "
+                            "condições atuais de uma empresa. O piso de perda total é estático e "
+                            "se refere ao saldo inicial."
+                        ),
+                        (
+                            "As regras de um contrato podem definir o dia de outra forma, incluir "
+                            "posições abertas ou mover o piso quando o saldo sobe. Antes de "
+                            "interpretar qualquer número, identifique exatamente qual saldo, "
+                            "horário e fase ele descreve. Mudar uma dessas definições muda a "
+                            "pergunta. Um preset datado ajuda a reconhecer a hipótese utilizada; "
+                            "não substitui a leitura das condições vigentes nem o exame de sua "
+                            "aplicação."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Uma conta simples, separada do simulador",
+                    "paragraphs": [
+                        (
+                            "DECLARED · O exemplo supõe uma operação independente por dia, perdas "
+                            "e ganhos do mesmo tamanho em relação ao saldo inicial, sem custos e "
+                            "sem limite de tempo. Cada tentativa recomeça em condições idênticas. "
+                            "Ela termina ao tocar o objetivo ou o piso de perda; encerrar no "
+                            "contato com o piso é conservador em relação ao simulador, que "
+                            "distingue tocar de ultrapassar o limite. A trajetória mais curta do "
+                            "exemplo já cumpre o mínimo de dias."
+                        ),
+                        (
+                            "Esta conta de barreiras é uma explicação editorial, não um resultado "
+                            "da calculadora de Sharpe nem do relatório. Ela não incorpora fases "
+                            "posteriores, restrições de notícias, acontecimentos dentro do dia ou "
+                            "mudanças de tamanho. Se p representa a probabilidade do objetivo sob "
+                            "essas hipóteses, a média de tentativas independentes é o inverso de "
+                            "p. Uma média não indica quando terminariam as tentativas de uma "
+                            "pessoa específica."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Duas taxas de acerto e dois tamanhos de risco",
+                    "paragraphs": [
+                        (
+                            f"DECLARED · Com acerto de {PROP_WIN_RATES[0]:.0%}, o risco de "
+                            f"{PROP_RISKS[0]:.1%} por operação produz uma média de "
+                            f"{PROP_ATTEMPT_EXAMPLES[0].expected_attempts:.2f} tentativas; com "
+                            f"risco de {PROP_RISKS[1]:.1%}, a média é "
+                            f"{PROP_ATTEMPT_EXAMPLES[1].expected_attempts:.2f}. A faixa entre "
+                            f"esses cenários é {PROP_ATTEMPT_EXAMPLES[1].expected_attempts:.2f}–"
+                            f"{PROP_ATTEMPT_EXAMPLES[0].expected_attempts:.2f} tentativas. Com "
+                            f"acerto de {PROP_WIN_RATES[1]:.0%}, os mesmos riscos produzem "
+                            f"{PROP_ATTEMPT_EXAMPLES[2].expected_attempts:.2f} e "
+                            f"{PROP_ATTEMPT_EXAMPLES[3].expected_attempts:.2f}, respectivamente: "
+                            f"faixa {PROP_ATTEMPT_EXAMPLES[2].expected_attempts:.2f}–"
+                            f"{PROP_ATTEMPT_EXAMPLES[3].expected_attempts:.2f}."
+                        ),
+                        (
+                            "Essas faixas comparam hipóteses; não são intervalos de confiança nem "
+                            "limites para o número de tentativas. Um cenário de tendência "
+                            "desfavorável pode atingir o objetivo com maior frequência ao aumentar "
+                            "o tamanho, mas também consome antes a margem de perda. Essa "
+                            "particularidade do modelo não constitui recomendação de risco. Se "
+                            "mudar a relação entre os valores dos ganhos e das perdas, esses "
+                            "números deixam de descrever o problema."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "A sequência de perdas ausente na captura",
+                    "paragraphs": [
+                        (
+                            f"DECLARED · Uma sequência ilustrativa de {PROP_STREAK_LENGTH} perdas "
+                            f"consome {PROP_STREAK_LENGTH * PROP_RISKS[0]:.1%} ou "
+                            f"{PROP_STREAK_LENGTH * PROP_RISKS[1]:.1%} do saldo inicial com os "
+                            "riscos anteriores. São operações em dias diferentes. Para uma "
+                            "janela fixada de antemão, sua probabilidade é "
+                            f"{((1 - PROP_WIN_RATES[0]) ** PROP_STREAK_LENGTH):.1%} ou "
+                            f"{((1 - PROP_WIN_RATES[1]) ** PROP_STREAK_LENGTH):.1%}, conforme a "
+                            "taxa de acerto. Não é a probabilidade de encontrar a sequência em "
+                            "qualquer parte do histórico."
+                        ),
+                        (
+                            "Chamá-la de típica exige observar suas sequências reais. O "
+                            "agrupamento de perdas pode enfraquecer a hipótese de independência. "
+                            "Examine a pior sequência, o tempo de recuperação e as posições "
+                            "abertas entre sessões. Um limite diário não equivale a um limite "
+                            "total: várias perdas concentradas na mesma sessão representam um "
+                            "problema que este exemplo diário não modela. A ordem importa mesmo "
+                            "sem mudar o total de acertos."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Por que o histórico real traz mais informação",
+                    "paragraphs": [
+                        (
+                            "Um registro de operações realmente realizadas preserva custos, "
+                            "horários, interrupções e decisões que um backtest idealizado pode "
+                            "omitir. Para esta pergunta, interessam especialmente a sequência das "
+                            "perdas e a diferença entre risco planejado e observado. Peça datas, "
+                            "valores, depósitos, retiradas e posições abertas; separe movimentos "
+                            "de caixa dos resultados das operações. A evidência melhora quando "
+                            "permite reconstruir o percurso, não apenas seu ponto final."
+                        ),
+                        (
+                            "Um histórico real também deixa incertezas. Pode abranger apenas um "
+                            "regime de mercado, omitir contas encerradas ou ter sido selecionado "
+                            "depois de comparar várias contas. Um arquivo descreve seu conteúdo e "
+                            "precisa de contexto. Se o tamanho mudou durante uma sequência "
+                            "adversa, uma taxa global de acerto esconderá justamente o "
+                            "comportamento que você procura estudar. Preserve os períodos "
+                            "inconvenientes ao preparar a exportação."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "O que levar ao relatório grátis",
+                    "paragraphs": [
+                        (
+                            "Guarde o arquivo completo, as regras datadas e a lista de variantes "
+                            "descartadas. Diferencie o que foi medido no arquivo, o que foi "
+                            "declarado pelo autor e aquilo que falta. O Rigor analisa a evidência "
+                            "fornecida e pode mostrar limites do histórico; não substitui o "
+                            "contrato nem observa a execução futura. A calculadora de sorte "
+                            "explora outra pergunta: quanto a busca entre configurações poderia "
+                            "explicar do Sharpe publicado."
+                        ),
+                        (
+                            "Antes de multiplicar uma média de tentativas por uma taxa, "
+                            "identifique descontos, reinícios e condições ausentes no modelo. O "
+                            "custo esperado depende dessas hipóteses e não representa um orçamento "
+                            "máximo. Comece pelo primeiro relatório completo grátis com sua conta "
+                            "para examinar o arquivo e suas lacunas, mantendo qualquer resultado "
+                            "desfavorável visível junto com o restante da comparação."
+                        ),
+                    ],
+                },
+            ],
+        },
+        "faq": {
+            "es": [
+                {
+                    "q": "¿Puedo convertir este rango en un presupuesto personal?",
+                    "a": (
+                        "No. Es una comparación de supuestos declarados con intentos "
+                        "independientes. Faltan tus datos, costos y condiciones completas; una "
+                        "media no limita cuántas repeticiones podrían ocurrir."
+                    ),
+                }
+            ],
+            "en": [
+                {
+                    "q": "Can I turn this range into a personal budget?",
+                    "a": (
+                        "No. It compares declared assumptions with independent attempts. Your "
+                        "data, costs and full conditions are missing; an average does not cap "
+                        "how many repetitions could occur."
+                    ),
+                }
+            ],
+            "pt": [
+                {
+                    "q": "Posso transformar essa faixa em um orçamento pessoal?",
+                    "a": (
+                        "Não. Ela compara hipóteses declaradas com tentativas independentes. "
+                        "Faltam seus dados, custos e condições completas; uma média não limita "
+                        "quantas repetições poderiam ocorrer."
+                    ),
+                }
+            ],
+        },
+        "related": [
+            {"kind": "calculator"},
+            {"kind": "method"},
+            {"kind": "samples"},
+        ],
+    },
+    {
+        "key": "copiar-senales-mql5-myfxbook",
+        "slug": {
+            "es": "copiar-senales-mql5-myfxbook",
+            "en": "copying-mql5-myfxbook-signals",
+            "pt": "copiar-sinais-mql5-myfxbook",
+        },
+        "title": {
+            "es": "Copiar señales de MQL5 o Myfxbook: qué mirar antes de pagar",
+            "en": "Copying MQL5 or Myfxbook signals: what to check before paying",
+            "pt": "Copiar sinais da MQL5 ou do Myfxbook: o que olhar antes de pagar",
+        },
+        "summary": {
+            "es": (
+                "Aciertos, pérdidas abiertas, costos y tamaño de muestra: cómo leer el historial "
+                "de una señal y qué puede revisar Rigor en el archivo."
+            ),
+            "en": (
+                "Win rates, open losses, costs and sample size: how to read a signal's history and "
+                "what Rigor can review in the file."
+            ),
+            "pt": (
+                "Acertos, perdas abertas, custos e tamanho da amostra: como ler o histórico de um "
+                "sinal e o que o Rigor pode revisar no arquivo."
+            ),
+        },
+        "intro": {
+            "es": (
+                "Antes de pagar por copiar una señal de MQL5 o Myfxbook, conviene convertir su "
+                "presentación en preguntas que un archivo pueda responder. Una curva suave, una "
+                "racha reciente y un porcentaje de aciertos resumen cosas distintas. Ninguno "
+                "muestra por sí solo cuánto se arriesgó para obtener ese historial. El punto de "
+                "partida es pedir las operaciones exportadas, las fechas que cubren y una curva "
+                "que incluya posiciones abiertas. Así puedes separar lo que se observa de lo "
+                "que cuenta el proveedor y de lo que todavía falta por medir."
+            ),
+            "en": (
+                "Before paying to copy an MQL5 or Myfxbook signal, turn its presentation into "
+                "questions that a file can answer. A smooth curve, a recent streak and a win "
+                "percentage summarise different things. None shows, by itself, how much risk "
+                "produced that history. Start by requesting exported trades, the dates they cover "
+                "and a curve that includes open positions. That lets you separate observations "
+                "from the provider's account of events and from questions that still lack data. "
+                "The purpose is to understand the evidence behind the signal, including its gaps."
+            ),
+            "pt": (
+                "Antes de pagar para copiar um sinal da MQL5 ou do Myfxbook, transforme a "
+                "apresentação em perguntas que um arquivo possa responder. Uma curva suave, uma "
+                "sequência recente e uma porcentagem de acertos resumem coisas diferentes. "
+                "Nenhum deles mostra sozinho quanto risco produziu aquele histórico. Comece "
+                "pedindo as operações exportadas, as datas cobertas e uma curva que inclua "
+                "posições abertas. Assim você separa observações, informações do fornecedor e "
+                "perguntas para as quais ainda faltam dados. O objetivo é entender a evidência "
+                "por trás do sinal, inclusive suas lacunas."
+            ),
+        },
+        "sections": {
+            "es": [
+                {
+                    "heading": "Una tasa de acierto no describe el tamaño de las pérdidas",
+                    "paragraphs": [
+                        (
+                            "DECLARED · Imagina una señal que anuncia "
+                            f"{SIGNAL_DECLARED_WIN_RATE:.0%} "
+                            "de aciertos y poco drawdown. Es un ejemplo declarado, no una medición "
+                            "de MQL5, Myfxbook ni una cuenta concreta. El porcentaje cuenta "
+                            "cuántas "
+                            "operaciones terminaron positivas; no compara el tamaño de sus "
+                            "resultados. Muchas salidas pequeñas pueden convivir con pérdidas "
+                            "grandes. Hace falta ver la distribución completa, los costos y cuánto "
+                            "tiempo permanecieron abiertas las posiciones que terminaron perdiendo."
+                        ),
+                        (
+                            "También importa cómo se define una operación. Un conjunto de entradas "
+                            "sobre el mismo movimiento puede inflar el recuento sin añadir "
+                            "observaciones independientes. Agrupa mentalmente esas entradas por "
+                            "episodio y pregunta si comparten salida, exposición y dirección. Una "
+                            "captura con el porcentaje agregado no responde eso. Conserva el "
+                            "archivo original para que los cambios de tamaño y las secuencias "
+                            "sigan visibles al revisar el historial."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "La moneda: una referencia pequeña y explícita",
+                    "paragraphs": [
+                        (
+                            f"DECLARED · Supón {COIN_TRADE_COUNT} operaciones independientes, cada "
+                            f"una con probabilidad de acierto {COIN_NULL_WIN_RATE:.0%}, como una "
+                            f"moneda equilibrada. Alcanzar al menos {COIN_THRESHOLD_WIN_RATE:.0%} "
+                            "de aciertos tiene una probabilidad aproximada de "
+                            f"{COIN_NORMAL_TAIL:.2%}, redondeada a {COIN_NORMAL_TAIL:.0%}, bajo "
+                            "una "
+                            "aproximación normal con corrección de continuidad. La corrección "
+                            "desplaza la frontera medio acierto porque el recuento es discreto. "
+                            "Es la probabilidad de observar ese umbral o más dentro del modelo; "
+                            "no es la probabilidad de que una señal concreta sea azar."
+                        ),
+                        (
+                            "La cuenta mantiene fijos el tamaño de muestra y el umbral antes de "
+                            "mirar los resultados. Si eliges la señal después de recorrer un "
+                            "catálogo, escoges también entre muchos historiales. Los destacados "
+                            "pueden incluir extremos que aparecen por selección. Y una moneda "
+                            "ignora cuánto se pierde al fallar: este ejemplo trata del número de "
+                            "aciertos, no del resultado económico de copiar."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Cuántas operaciones hacen falta depende de la pregunta",
+                    "paragraphs": [
+                        (
+                            "No hay un mínimo universal de operaciones que convierta una señal "
+                            "en evidencia suficiente. Primero define qué diferencia frente a "
+                            "la moneda quieres detectar, qué incertidumbre toleras y cómo vas "
+                            "a tratar los intentos anteriores. Después considera dependencia, "
+                            "cambios de tamaño y duración del historial. Muchas operaciones "
+                            "concentradas en el mismo movimiento contienen menos información "
+                            "que el recuento bruto sugiere."
+                        ),
+                        (
+                            "Un historial que abarca distintos periodos ayuda a observar "
+                            "comportamientos que una ventana favorable oculta. Separa el tramo "
+                            "usado para escoger la señal de un tramo posterior que no decidiera "
+                            "esa elección. Conserva también las fechas en que cambió el sistema. "
+                            "Si el proveedor modifica las reglas tras cada retroceso, el conjunto "
+                            "mezcla decisiones distintas y no representa un experimento estable."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Poco drawdown: pide la curva que cuenta posiciones abiertas",
+                    "paragraphs": [
+                        (
+                            "La curva de saldo registra cierres; la curva de equity incorpora "
+                            "el valor de posiciones abiertas cuando está disponible. Un sistema "
+                            "puede cerrar pequeñas operaciones positivas y mantener una pérdida "
+                            "abierta durante mucho tiempo. Por eso un drawdown reducido en saldo "
+                            "no describe toda la exposición. Comprueba qué curva recibió Rigor "
+                            "y si sus fechas cubren las operaciones."
+                        ),
+                        (
+                            "Con solo operaciones cerradas, el drawdown flotante dentro de ellas "
+                            "queda NOT_MEASURED. Un dato que aparece en el resumen de la "
+                            "plataforma puede seguir DECLARED si el archivo no permite "
+                            "reconstruirlo. Los depósitos y retiros necesitan su propia lectura: "
+                            "una entrada de capital cambia el saldo, pero no es una operación. "
+                            "Pregunta además qué posiciones seguían abiertas al terminar el "
+                            "archivo."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Qué revisa Rigor en el archivo de una señal",
+                    "paragraphs": [
+                        (
+                            "Con el historial adecuado, Rigor busca patrones como aumentar el "
+                            "tamaño después de perder, acumular entradas para promediar una "
+                            "pérdida y concentrar el resultado en pocas operaciones. Revisa "
+                            "pérdidas grandes frente a la pérdida típica, exposición simultánea, "
+                            "movimientos de dinero y posiciones pendientes al final. Son "
+                            "hallazgos sobre los datos aportados; su ausencia no prueba que el "
+                            "riesgo esté ausente fuera de ese archivo."
+                        ),
+                        (
+                            "Cuando hay operaciones y costos utilizables, el informe muestra "
+                            "la sensibilidad a mayores costos. También distingue métricas "
+                            "calculadas del archivo, MEASURED, información aportada, DECLARED, "
+                            "y lo que no se pudo medir, NOT_MEASURED. Esta separación ayuda a "
+                            "formular la siguiente pregunta al proveedor. Rigor no entra en su "
+                            "cuenta, no copia órdenes y no decide si debes contratar la señal."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Prepara una revisión que otra persona pueda repetir",
+                    "paragraphs": [
+                        (
+                            "Pide la exportación completa, identifica si procede de una cuenta "
+                            "real o demo según su documentación y anota el intervalo solicitado. "
+                            "Guarda por separado las explicaciones del proveedor, las comisiones "
+                            "desglosadas y las limitaciones de la curva. El historial de origen "
+                            "tampoco representa tus propias ejecuciones: latencia, tamaños y "
+                            "costos pueden diferir. El informe gratis permite empezar por las "
+                            "preguntas que el archivo puede contestar y dejar las demás visibles."
+                        ),
+                    ],
+                },
+            ],
+            "en": [
+                {
+                    "heading": "A win rate does not describe the size of losses",
+                    "paragraphs": [
+                        (
+                            "DECLARED · Imagine a signal advertising a "
+                            f"{SIGNAL_DECLARED_WIN_RATE:.0%} "
+                            "win rate and little drawdown. This is a declared example, not a "
+                            "measurement of MQL5, Myfxbook or any particular account. The "
+                            "percentage counts trades that ended positive; it does not compare "
+                            "the size of their outcomes. Many small exits can coexist with large "
+                            "losses. You need the full distribution, trading costs and the time "
+                            "that positions which eventually lost remained open."
+                        ),
+                        (
+                            "The definition of a trade also matters. A group of entries into the "
+                            "same market move can increase the count without adding independent "
+                            "observations. Consider those entries as episodes and ask whether "
+                            "they share exits, exposure and direction. A screenshot of the "
+                            "aggregate percentage cannot answer that. Keep the original export "
+                            "so position changes and sequences remain visible when reviewing "
+                            "the history with someone else."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "The coin: a small, explicit reference model",
+                    "paragraphs": [
+                        (
+                            f"DECLARED · Assume {COIN_TRADE_COUNT} independent trades, each with "
+                            f"a {COIN_NULL_WIN_RATE:.0%} chance of a win, like a fair coin. "
+                            f"Reaching a win rate of at least {COIN_THRESHOLD_WIN_RATE:.0%} has an "
+                            f"approximate probability of {COIN_NORMAL_TAIL:.2%}, rounded to "
+                            f"{COIN_NORMAL_TAIL:.0%}, using a normal approximation with continuity "
+                            "correction. The correction moves the boundary by half a win because "
+                            "the count is discrete. This is the probability of observing that "
+                            "threshold or more within the model; it is not the probability that "
+                            "a particular signal is explained by chance."
+                        ),
+                        (
+                            "The calculation fixes the sample size and threshold before looking "
+                            "at outcomes. If you pick a signal after browsing a catalogue, you "
+                            "also select among many histories. The highlights may include "
+                            "extremes that appear through selection. A coin also ignores the "
+                            "amount lost when a trade fails: this example concerns the count "
+                            "of wins, not the financial result of copying a strategy."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "The number of trades depends on the question",
+                    "paragraphs": [
+                        (
+                            "There is no universal minimum trade count that makes a signal's "
+                            "evidence sufficient. Define the difference from the coin you want "
+                            "to detect, the uncertainty you can tolerate and how previous "
+                            "attempts enter the analysis. Then consider dependence, changes in "
+                            "position size and the history's duration. Many trades concentrated "
+                            "in the same market move contain less information than their raw "
+                            "count suggests. The model's assumptions matter as much as its sample."
+                        ),
+                        (
+                            "A history covering different periods helps reveal behaviour that "
+                            "a favourable window hides. Separate the period used to choose the "
+                            "signal from a later period that did not influence that choice. "
+                            "Keep dates of system changes too. If the provider changes the "
+                            "rules after each setback, the combined record mixes different "
+                            "decisions instead of describing a stable experiment. Extra rows "
+                            "alone do not resolve that problem."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Little drawdown: request a curve that includes open positions",
+                    "paragraphs": [
+                        (
+                            "A balance curve records closed outcomes; an equity curve includes "
+                            "the value of open positions when available. A system can close "
+                            "small positive trades while keeping a losing position open for "
+                            "a long time. A shallow balance drawdown therefore does not describe "
+                            "all exposure. Check which curve Rigor received and whether its "
+                            "dates cover the trades. The labels attached to those curves are "
+                            "part of understanding the result."
+                        ),
+                        (
+                            "With closed trades alone, floating drawdown within them remains "
+                            "NOT_MEASURED. A figure printed in the platform summary can remain "
+                            "DECLARED if the file cannot reconstruct it. Deposits and withdrawals "
+                            "need their own treatment: incoming capital changes the balance "
+                            "but is not a trade. Also ask which positions were still open at "
+                            "the end of the export and whether the report describes that gap."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "What Rigor reviews in a signal's file",
+                    "paragraphs": [
+                        (
+                            "With suitable history, Rigor looks for patterns such as increasing "
+                            "size after losses, adding entries to average down a losing position "
+                            "and concentrating results in a few trades. It reviews large losses "
+                            "relative to the typical loss, simultaneous exposure, cash movements "
+                            "and positions left open at the end. These are findings about "
+                            "supplied data; their absence does not establish that risk is absent "
+                            "outside the file or outside the period it covers."
+                        ),
+                        (
+                            "When usable trades and costs are available, the report shows "
+                            "sensitivity to higher trading costs. It also separates file-derived "
+                            "metrics, MEASURED, supplied information, DECLARED, and questions "
+                            "that could not be measured, NOT_MEASURED. That separation helps "
+                            "formulate the next question for the provider. Rigor does not enter "
+                            "the provider's account, copy orders or decide whether you should "
+                            "subscribe to the signal. Its scope is the uploaded evidence."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Prepare a review someone else can repeat",
+                    "paragraphs": [
+                        (
+                            "Request the complete export, identify whether its documentation "
+                            "describes a live or demo account and record the requested interval. "
+                            "Keep provider explanations, itemised fees and curve limitations "
+                            "separately. The source account's history does not describe your "
+                            "own executions: latency, sizes and costs can differ. The free "
+                            "report lets you start with questions the file can answer and "
+                            "keep unanswered questions visible, with a clear distinction "
+                            "between an observation and an assumption."
+                        ),
+                    ],
+                },
+            ],
+            "pt": [
+                {
+                    "heading": "A taxa de acerto não descreve o tamanho das perdas",
+                    "paragraphs": [
+                        (
+                            "DECLARED · Imagine um sinal anunciando "
+                            f"{SIGNAL_DECLARED_WIN_RATE:.0%} "
+                            "de acertos e pouco drawdown. É um exemplo declarado, não uma "
+                            "medição da MQL5, do Myfxbook ou de alguma conta específica. A "
+                            "porcentagem conta operações que terminaram positivas; não compara "
+                            "o tamanho dos resultados. Muitas saídas pequenas podem coexistir "
+                            "com perdas grandes. É preciso ver a distribuição completa, os "
+                            "custos e quanto tempo ficaram abertas as posições que terminaram "
+                            "com perda."
+                        ),
+                        (
+                            "Também importa como cada operação é definida. Um grupo de entradas "
+                            "sobre o mesmo movimento pode aumentar a contagem sem acrescentar "
+                            "observações independentes. Considere essas entradas como episódios "
+                            "e pergunte se compartilham saída, exposição e direção. Uma captura "
+                            "com a porcentagem agregada não responde isso. Preserve o arquivo "
+                            "original para que mudanças de tamanho e sequências continuem "
+                            "visíveis quando outra pessoa revisar o histórico."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "A moeda: uma referência pequena e explícita",
+                    "paragraphs": [
+                        (
+                            f"DECLARED · Suponha {COIN_TRADE_COUNT} operações independentes, cada "
+                            f"uma com probabilidade de acerto de {COIN_NULL_WIN_RATE:.0%}, como "
+                            "uma "
+                            f"moeda equilibrada. Alcançar pelo menos {COIN_THRESHOLD_WIN_RATE:.0%} "
+                            "de acertos tem probabilidade aproximada de "
+                            f"{COIN_NORMAL_TAIL:.2%}, arredondada para {COIN_NORMAL_TAIL:.0%}, "
+                            "pela "
+                            "aproximação normal com correção de continuidade. A correção move "
+                            "a fronteira em meio acerto porque a contagem é discreta. É a "
+                            "probabilidade de observar aquele limite ou mais dentro do modelo; "
+                            "não é a probabilidade de um sinal específico ser explicado pelo acaso."
+                        ),
+                        (
+                            "A conta fixa o tamanho da amostra e o limite antes de olhar "
+                            "os resultados. Se você escolhe o sinal depois de percorrer um "
+                            "catálogo, também seleciona entre muitos históricos. Os destaques "
+                            "podem incluir extremos que aparecem pela seleção. Uma moeda "
+                            "também ignora quanto se perde ao errar: o exemplo trata do "
+                            "número de acertos, não do resultado financeiro de copiar uma "
+                            "estratégia."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Quantas operações são necessárias depende da pergunta",
+                    "paragraphs": [
+                        (
+                            "Não existe uma quantidade mínima universal de operações que torne "
+                            "a evidência de um sinal suficiente. Defina qual diferença em "
+                            "relação à moeda você quer detectar, quanta incerteza tolera e "
+                            "como tratar as tentativas anteriores. Depois considere dependência, "
+                            "mudanças no tamanho das posições e duração do histórico. Muitas "
+                            "operações concentradas no mesmo movimento contêm menos informação "
+                            "do que a contagem bruta sugere. As suposições também precisam de "
+                            "atenção."
+                        ),
+                        (
+                            "Um histórico que abrange períodos diferentes ajuda a observar "
+                            "comportamentos que uma janela favorável esconde. Separe o trecho "
+                            "usado para escolher o sinal de um período posterior que não "
+                            "influenciou essa escolha. Guarde também as datas de mudanças no "
+                            "sistema. Se o fornecedor altera as regras depois de cada recuo, "
+                            "o conjunto mistura decisões diferentes e não representa um "
+                            "experimento estável. Mais linhas, sozinhas, não resolvem esse "
+                            "problema."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Pouco drawdown: peça uma curva que inclua posições abertas",
+                    "paragraphs": [
+                        (
+                            "A curva de saldo registra encerramentos; a curva de equity inclui "
+                            "o valor das posições abertas quando disponível. Um sistema pode "
+                            "fechar operações pequenas positivas e manter uma perda aberta "
+                            "durante muito tempo. Um drawdown reduzido no saldo, portanto, "
+                            "não descreve toda a exposição. Confira qual curva o Rigor "
+                            "recebeu e se as datas cobrem as operações. Entender o significado "
+                            "da curva faz parte da leitura do resultado."
+                        ),
+                        (
+                            "Com apenas operações fechadas, o drawdown flutuante dentro delas "
+                            "fica NOT_MEASURED. Um dado do resumo da plataforma pode continuar "
+                            "DECLARED se o arquivo não permite reconstruí-lo. Depósitos e "
+                            "saques precisam de tratamento próprio: uma entrada de capital "
+                            "altera o saldo, mas não é uma operação. Pergunte também quais "
+                            "posições ainda estavam abertas no fim da exportação e se o "
+                            "relatório descreve essa lacuna."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "O que o Rigor revisa no arquivo de um sinal",
+                    "paragraphs": [
+                        (
+                            "Com o histórico adequado, o Rigor procura padrões como aumentar "
+                            "o tamanho após perdas, acumular entradas para reduzir o preço "
+                            "médio de uma posição em perda e concentrar resultados em poucas "
+                            "operações. Revisa perdas grandes diante da perda típica, exposição "
+                            "simultânea, movimentações de dinheiro e posições abertas no final. "
+                            "São observações sobre os dados enviados; a ausência de um alerta "
+                            "não demonstra ausência de risco fora daquele arquivo."
+                        ),
+                        (
+                            "Quando existem operações e custos utilizáveis, o relatório mostra "
+                            "a sensibilidade a custos maiores. Também separa métricas calculadas "
+                            "do arquivo, MEASURED, informações fornecidas, DECLARED, e perguntas "
+                            "que não puderam ser medidas, NOT_MEASURED. Essa separação ajuda "
+                            "a formular a próxima pergunta ao fornecedor. O Rigor não entra "
+                            "na conta dele, não copia ordens e não decide se você deve "
+                            "contratar o sinal. Seu escopo é a evidência enviada."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Prepare uma revisão que outra pessoa consiga repetir",
+                    "paragraphs": [
+                        (
+                            "Peça a exportação completa, identifique se a documentação descreve "
+                            "uma conta real ou demo e anote o intervalo solicitado. Guarde "
+                            "separadamente as explicações do fornecedor, as taxas discriminadas "
+                            "e as limitações da curva. O histórico de origem também não "
+                            "representa suas próprias execuções: latência, tamanhos e custos "
+                            "podem ser diferentes. O relatório grátis permite começar pelas "
+                            "perguntas que o arquivo consegue responder e manter as demais "
+                            "visíveis, separando uma observação de uma suposição."
+                        ),
+                    ],
+                },
+            ],
+        },
+        "faq": {
+            "es": [
+                {
+                    "q": "¿Basta una captura del ranking?",
+                    "a": (
+                        "No permite reconstruir las operaciones ni las pérdidas abiertas. Pide la "
+                        "exportación y conserva las fechas y limitaciones del archivo."
+                    ),
+                },
+                {
+                    "q": "¿El informe decide si debo copiar?",
+                    "a": (
+                        "No. Describe la evidencia del historial que subes y las preguntas que "
+                        "siguen abiertas. La decisión no forma parte de la auditoría."
+                    ),
+                },
+            ],
+            "en": [
+                {
+                    "q": "Is a ranking screenshot enough?",
+                    "a": (
+                        "It cannot reconstruct trades or open losses. Request the export and keep "
+                        "the file's dates and limitations alongside it."
+                    ),
+                },
+                {
+                    "q": "Does the report decide whether I should copy?",
+                    "a": (
+                        "No. It describes evidence in the uploaded history and questions that "
+                        "remain open. That decision is outside the audit's scope."
+                    ),
+                },
+            ],
+            "pt": [
+                {
+                    "q": "Uma captura do ranking é suficiente?",
+                    "a": (
+                        "Ela não permite reconstruir operações nem perdas abertas. Peça a "
+                        "exportação e preserve as datas e limitações do arquivo."
+                    ),
+                },
+                {
+                    "q": "O relatório decide se devo copiar?",
+                    "a": (
+                        "Não. Ele descreve a evidência do histórico enviado e as perguntas que "
+                        "continuam abertas. Essa decisão fica fora do escopo da auditoria."
+                    ),
+                },
+            ],
+        },
+        "related": [
+            {"kind": "guide", "slug": "cuenta-proveedor"},
+            {"kind": "guide", "slug": "mql5-signal"},
+            {"kind": "guide", "slug": "myfxbook"},
+            {"kind": "audience", "slug": "copiar-senales"},
+            {"kind": "method"},
+            {"kind": "calculator"},
+        ],
+    },
+    {
+        "key": "bot-ia-backtest-suerte",
+        "slug": {
+            "es": "bot-ia-backtest-suerte",
+            "en": "ai-trading-bot-backtest-luck",
+            "pt": "bot-ia-backtest-sorte",
+        },
+        "title": {
+            "es": "Hice un bot con IA en 30 minutos: cómo saber si el backtest es suerte",
+            "en": (
+                "I built a trading bot with AI in 30 minutes: how to tell if the backtest is luck"
+            ),
+            "pt": "Fiz um robô com IA em 30 minutos: como saber se o backtest é sorte",
+        },
+        "summary": {
+            "es": (
+                "Un bot generado rápido también acumula intentos. Cuenta las variantes, compara el "
+                "Sharpe con la calculadora y revisa el efecto de los costos."
+            ),
+            "en": (
+                "A quickly generated bot still accumulates trials. Count its variants, compare "
+                "Sharpe"
+                " with the calculator and inspect the effect of trading costs."
+            ),
+            "pt": (
+                "Um robô gerado depressa também acumula tentativas. Conte as variantes, compare o "
+                "Sharpe na calculadora e examine o efeito dos custos."
+            ),
+        },
+        "intro": {
+            "es": (
+                "DECLARED · Los treinta minutos del título describen una situación ilustrativa, no "
+                "un"
+                " desarrollo cronometrado por Rigor. Un hilo viral muestra el mensaje enviado a un "
+                "agente, el código y una curva ascendente. Lo que suele faltar es el recorrido "
+                "entre "
+                "esas imágenes: instrucciones descartadas, filtros añadidos y cambios de mercado "
+                "después de mirar el resultado. Crear código rápido no crea evidencia nueva. Antes "
+                "de"
+                " interpretar la curva, hace falta reconstruir cuántas oportunidades tuvo el "
+                "proceso "
+                "de encontrar una coincidencia favorable en el mismo pasado."
+            ),
+            "en": (
+                "DECLARED · The thirty minutes in the title describe an illustrative situation, "
+                "not "
+                "development timed by Rigor. A viral thread shows a prompt, generated code and an "
+                "upward curve. What often disappears is the path between those images: discarded "
+                "instructions, added filters and changes of market after inspecting a result. "
+                "Producing code quickly does not produce fresh evidence. Before interpreting the "
+                "curve, reconstruct how many opportunities the process had to discover a favorable "
+                "coincidence in the same history. The coding tool cannot recover that missing "
+                "record "
+                "for you."
+            ),
+            "pt": (
+                "DECLARED · Os trinta minutos do título descrevem uma situação ilustrativa, não um "
+                "desenvolvimento cronometrado pelo Rigor. Um tópico viral mostra a instrução "
+                "enviada "
+                "ao agente, o código e uma curva ascendente. O que costuma desaparecer é o caminho "
+                "entre essas imagens: instruções descartadas, filtros acrescentados e mudanças de "
+                "mercado depois de olhar o resultado. Produzir código depressa não produz "
+                "evidência "
+                "nova. Antes de interpretar a curva, reconstrua quantas oportunidades o processo "
+                "teve"
+                " de encontrar uma coincidência favorável no mesmo passado. A ferramenta não "
+                "recupera"
+                " sozinha esse registro."
+            ),
+        },
+        "sections": {
+            "es": [
+                {
+                    "heading": "Cuenta la búsqueda completa",
+                    "paragraphs": [
+                        (
+                            "Cada vez que el agente prueba una regla y recibe el resultado, esa "
+                            "información puede orientar el siguiente cambio. Cambiar el indicador, "
+                            "la"
+                            " salida, el horario o el activo pertenece a la búsqueda aunque el "
+                            "archivo final conserve el mismo nombre. También cuentan las versiones "
+                            "que no llegaron al hilo. El número de mensajes del chat no equivale "
+                            "al "
+                            "número de configuraciones: una instrucción puede lanzar muchas "
+                            "combinaciones, y una corrección de sintaxis puede no cambiar ninguna "
+                            "regla."
+                        ),
+                        (
+                            "Conserva el registro del optimizador, las versiones y el criterio "
+                            "usado "
+                            "para elegir. Si falta parte del recorrido, declara esa ausencia. Un "
+                            "recuento parcial no debe presentarse como el total medido."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Compara contra una búsqueda sin habilidad",
+                    "paragraphs": [
+                        (
+                            "La calculadora pública recibe el Sharpe anual, la duración y el "
+                            "número "
+                            "de configuraciones. Compara el resultado declarado con el Sharpe "
+                            "esperado de la mejor variante de una búsqueda sin habilidad bajo sus "
+                            "supuestos. Esa referencia no describe una cuenta concreta. Tampoco es "
+                            "la"
+                            " probabilidad de que el bot funcione después. Resume cuánto puede "
+                            "elevar"
+                            " el máximo observado el simple hecho de seleccionar entre "
+                            "alternativas."
+                        ),
+                        (
+                            "La tabla usa entradas declaradas y rendimientos diarios con colas "
+                            "normales. Mantiene el mismo Sharpe de entrada al cambiar duración e "
+                            "intentos. Las variantes parecidas no son independientes: conserva esa "
+                            "limitación al interpretar el cálculo, sin convertirla en permiso para "
+                            "borrar intentos."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Lee la tabla antes de celebrar la curva",
+                    "paragraphs": [
+                        (
+                            "La tabla cruza tamaños de búsqueda con duraciones del historial. Cada "
+                            "fila vuelve a llamar a la calculadora; ninguna celda procede de una "
+                            "captura viral. Al aumentar la búsqueda aumenta la referencia de "
+                            "suerte, "
+                            "mientras que ampliar el historial suele reducir su dispersión. Eso "
+                            "explica por qué una curva seleccionada después de muchas pruebas "
+                            "exige "
+                            "más contexto que una regla definida de antemano."
+                        ),
+                        (
+                            "Los años no son intercambiables con las operaciones. Muchas entradas "
+                            "concentradas en el mismo episodio pueden aportar poca diversidad. "
+                            "Revisa"
+                            " la cobertura temporal, las pausas y los cambios de régimen, además "
+                            "del "
+                            "total de filas."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Somete los costos al doble",
+                    "paragraphs": [
+                        (
+                            "DECLARED · La prueba a 2x es un escenario: duplica los supuestos de "
+                            "costos y compara el resultado con la ejecución base. Documenta "
+                            "comisión,"
+                            " spread, deslizamiento y financiación cuando correspondan. Evita "
+                            "descontar otra vez un costo que ya figure dentro de la serie neta. Si "
+                            "solo tienes rendimientos agregados y desconoces las operaciones o sus "
+                            "gastos, ese efecto queda NOT_MEASURED; no rellenes el vacío con una "
+                            "cifra cómoda."
+                        ),
+                        (
+                            "Rigor revisa la sensibilidad a costos cuando el archivo aporta la "
+                            "información necesaria. Observa cuánto cambia la lectura y qué parte "
+                            "sigue sin medirse. Un escenario de costos no reproduce todas las "
+                            "condiciones de ejecución de una plataforma."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Separa desarrollo y evaluación",
+                    "paragraphs": [
+                        (
+                            "Reserva un tramo que el agente no haya visto y define antes qué "
+                            "compararás. Si modificas la estrategia tras conocer ese resultado, el "
+                            "tramo ya influyó en el desarrollo. Guárdalo en el registro de "
+                            "búsqueda y"
+                            " explica el cambio. Repetir el ciclo hasta obtener una curva "
+                            "atractiva "
+                            "no recupera la independencia perdida."
+                        ),
+                        (
+                            "Inspecciona además si los precios usados estaban disponibles al "
+                            "decidir,"
+                            " cómo se ajustaron los datos y si el universo conserva instrumentos "
+                            "desaparecidos. Un error de fechas puede dominar cualquier corrección "
+                            "estadística. Pide al agente que explique decisiones y supuestos; el "
+                            "tono"
+                            " seguro de su respuesta no sustituye una prueba reproducible."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Lleva el archivo a la lectura pública",
+                    "paragraphs": [
+                        (
+                            "El lector público enlazado permite empezar por cifras declaradas. La "
+                            "calculadora ayuda a explorar otros tamaños de búsqueda. Para revisar "
+                            "la "
+                            "evidencia del historial, conserva el archivo original y acompáñalo de "
+                            "los intentos conocidos, la frecuencia y los costos. Una imagen del "
+                            "saldo"
+                            " no contiene esa trazabilidad."
+                        ),
+                        (
+                            "En el informe, MEASURED identifica lo calculado con los archivos, "
+                            "DECLARED lo aportado por ti y NOT_MEASURED lo que no pudo evaluarse. "
+                            "El "
+                            "primer informe completo gratis usa el mismo acceso que los demás "
+                            "artículos. Su lectura puede señalar ausencias o debilidades del "
+                            "backtest; no decide por ti ni conecta el bot a una cuenta."
+                        ),
+                    ],
+                },
+            ],
+            "en": [
+                {
+                    "heading": "Count the complete search",
+                    "paragraphs": [
+                        (
+                            "Whenever the agent tests a rule and receives a result, that "
+                            "information "
+                            "can guide its next change. Switching the indicator, exit, session or "
+                            "market belongs to the search even if the final file keeps its "
+                            "original "
+                            "name. Versions omitted from the thread count too. Chat messages are "
+                            "not "
+                            "a configuration count: an instruction can launch many combinations, "
+                            "while a syntax correction may leave every trading rule unchanged."
+                        ),
+                        (
+                            "Keep optimizer logs, saved versions and the selection criterion. If "
+                            "part"
+                            " of the search is missing, declare that gap. A partial count should "
+                            "not "
+                            "appear as a measured total simply because it is the only count "
+                            "available."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Compare against a search without skill",
+                    "paragraphs": [
+                        (
+                            "The public calculator takes annual Sharpe, history length and "
+                            "configuration count. It compares the declared result with the "
+                            "expected "
+                            "Sharpe of the best unskilled variant under its assumptions. This "
+                            "reference does not describe a particular account. It is not the "
+                            "probability that the bot will work later. It summarizes how selecting "
+                            "among alternatives can lift the largest observed result even without "
+                            "skill."
+                        ),
+                        (
+                            "The table uses declared inputs and daily returns with normal tails. "
+                            "It "
+                            "holds the input Sharpe constant while varying duration and trials. "
+                            "Similar variants are not independent: keep that limitation visible "
+                            "without using it as permission to erase attempted configurations from "
+                            "the record."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Read the table before celebrating the curve",
+                    "paragraphs": [
+                        (
+                            "The table crosses search sizes with history lengths. Every row calls "
+                            "the"
+                            " calculator again; no cell comes from a viral screenshot. A larger "
+                            "search raises the luck reference, while a longer history generally "
+                            "narrows its dispersion. This helps explain why a curve selected after "
+                            "extensive testing needs more context than a rule specified "
+                            "beforehand. "
+                            "It does not establish a universal threshold for accepting a strategy."
+                        ),
+                        (
+                            "Years and trades are different quantities. Many entries clustered in "
+                            "the"
+                            " same market episode may offer little variety. Inspect calendar "
+                            "coverage, inactive stretches and changing conditions as well as the "
+                            "number of rows in the exported file."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Stress costs at twice the baseline",
+                    "paragraphs": [
+                        (
+                            "DECLARED · The 2x cost test is a scenario: double the cost "
+                            "assumptions "
+                            "and compare with the baseline calculation. Record commission, spread, "
+                            "slippage and financing where relevant. Avoid subtracting a cost again "
+                            "if"
+                            " it is already included in net returns. If only aggregate returns are "
+                            "available and trades or expenses are unknown, that effect remains "
+                            "NOT_MEASURED. A convenient guess does not fill the evidence gap."
+                        ),
+                        (
+                            "Rigor examines cost sensitivity when the uploaded file contains the "
+                            "necessary information. Inspect the change and identify what remains "
+                            "unmeasured. A cost scenario cannot reproduce every execution "
+                            "condition "
+                            "on a platform, including the timing of fills during a disruption."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Separate development from evaluation",
+                    "paragraphs": [
+                        (
+                            "Reserve a period the agent has not seen and specify the comparison "
+                            "beforehand. If you change the strategy after observing that result, "
+                            "the "
+                            "period has influenced development. Keep it in the search record and "
+                            "explain the change. Repeating this cycle until an attractive curve "
+                            "appears does not restore the lost independence. An untouched period "
+                            "matters because it limits feedback into selection."
+                        ),
+                        (
+                            "Also inspect whether the prices were available at decision time, how "
+                            "adjustments were applied and whether the universe retains "
+                            "discontinued "
+                            "instruments. A timestamp error can dominate any statistical "
+                            "correction. "
+                            "Ask the agent to explain choices and assumptions; a confident "
+                            "explanation cannot replace a reproducible check of the underlying "
+                            "data."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Take the evidence to the public reader",
+                    "paragraphs": [
+                        (
+                            "The linked public reader provides a starting point with declared "
+                            "figures. The calculator helps explore other search sizes. To examine "
+                            "the"
+                            " history itself, preserve the original file alongside the known "
+                            "attempts, frequency and costs. A balance screenshot does not contain "
+                            "this record, and a narrative cannot reconstruct missing observations."
+                        ),
+                        (
+                            "In a report, MEASURED marks calculations from files, DECLARED marks "
+                            "information you supplied, and NOT_MEASURED marks what could not be "
+                            "evaluated. The free first full report uses the same access as the "
+                            "other "
+                            "articles. Its findings can identify missing evidence or weaknesses in "
+                            "a "
+                            "backtest; they do not make a decision for you or connect the bot to "
+                            "an "
+                            "account."
+                        ),
+                    ],
+                },
+            ],
+            "pt": [
+                {
+                    "heading": "Conte a busca completa",
+                    "paragraphs": [
+                        (
+                            "Sempre que o agente testa uma regra e recebe o resultado, essa "
+                            "informação pode orientar a mudança seguinte. Trocar indicador, saída, "
+                            "horário ou mercado faz parte da busca mesmo quando o arquivo final "
+                            "mantém o nome original. As versões omitidas do tópico também contam. "
+                            "Mensagens do chat não equivalem a configurações: uma instrução pode "
+                            "lançar muitas combinações, enquanto uma correção de sintaxe pode não "
+                            "alterar regra alguma."
+                        ),
+                        (
+                            "Guarde os registros do otimizador, as versões e o critério de "
+                            "escolha. "
+                            "Se parte do percurso estiver ausente, declare essa falta. Uma "
+                            "contagem "
+                            "parcial não deve aparecer como total medido apenas porque é a única "
+                            "disponível."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Compare com uma busca sem habilidade",
+                    "paragraphs": [
+                        (
+                            "A calculadora pública recebe Sharpe anual, duração do histórico e "
+                            "quantidade de configurações. Ela compara o resultado declarado com o "
+                            "Sharpe esperado da melhor variante sem habilidade sob suas "
+                            "suposições. "
+                            "Essa referência não descreve uma conta concreta. Também não é a "
+                            "probabilidade de o robô funcionar depois. Ela resume quanto a seleção "
+                            "entre alternativas pode elevar o maior resultado observado."
+                        ),
+                        (
+                            "A tabela usa entradas declaradas e retornos diários com caudas "
+                            "normais. "
+                            "Mantém o Sharpe de entrada ao variar duração e tentativas. Variantes "
+                            "semelhantes não são independentes: mantenha essa limitação visível, "
+                            "sem "
+                            "transformá-la em permissão para apagar configurações que foram "
+                            "testadas."
+                            " O registro deve explicar o processo de seleção."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Leia a tabela antes de celebrar a curva",
+                    "paragraphs": [
+                        (
+                            "A tabela cruza tamanhos de busca com durações do histórico. Cada "
+                            "linha "
+                            "chama novamente a calculadora; nenhuma célula vem de uma captura "
+                            "viral. "
+                            "Aumentar a busca eleva a referência de sorte, enquanto ampliar o "
+                            "histórico costuma reduzir sua dispersão. Isso ajuda a explicar por "
+                            "que "
+                            "uma curva escolhida depois de muitos testes exige mais contexto que "
+                            "uma "
+                            "regra definida antes da análise."
+                        ),
+                        (
+                            "Anos e operações são quantidades diferentes. Muitas entradas "
+                            "concentradas no mesmo episódio podem oferecer pouca diversidade. "
+                            "Examine"
+                            " a cobertura temporal, os intervalos sem atividade e as mudanças de "
+                            "condições, além do total de linhas. O calendário faz parte da "
+                            "interpretação, não apenas da apresentação."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Examine os custos em dobro",
+                    "paragraphs": [
+                        (
+                            "DECLARED · O teste a 2x é um cenário: dobre as suposições de custos e "
+                            "compare com o cálculo base. Documente comissão, spread, deslizamento "
+                            "e "
+                            "financiamento quando aplicáveis. Evite descontar novamente um custo "
+                            "já "
+                            "incluído nos retornos líquidos. Se houver apenas retornos agregados e "
+                            "as"
+                            " operações ou despesas forem desconhecidas, esse efeito fica "
+                            "NOT_MEASURED. Uma estimativa conveniente não preenche a falta de "
+                            "evidência."
+                        ),
+                        (
+                            "O Rigor examina a sensibilidade a custos quando o arquivo enviado "
+                            "contém"
+                            " as informações necessárias. Observe a mudança e identifique o que "
+                            "continua sem medição. Um cenário de custos não reproduz todas as "
+                            "condições de execução de uma plataforma, inclusive atrasos em "
+                            "momentos "
+                            "de interrupção."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Separe desenvolvimento e avaliação",
+                    "paragraphs": [
+                        (
+                            "Reserve um período que o agente ainda não tenha visto e defina antes "
+                            "a "
+                            "comparação. Se alterar a estratégia depois de observar esse "
+                            "resultado, o"
+                            " período já influenciou o desenvolvimento. Mantenha isso no registro "
+                            "da "
+                            "busca e explique a mudança. Repetir o ciclo até obter uma curva "
+                            "atraente"
+                            " não recupera a independência perdida. Um trecho intocado limita a "
+                            "informação que volta para a escolha."
+                        ),
+                        (
+                            "Examine também se os preços estavam disponíveis no momento da "
+                            "decisão, "
+                            "como os dados foram ajustados e se o universo conserva instrumentos "
+                            "que "
+                            "desapareceram. Um erro de datas pode dominar qualquer correção "
+                            "estatística. Peça ao agente explicações sobre escolhas e suposições; "
+                            "uma"
+                            " resposta confiante não substitui uma checagem reproduzível dos dados."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Leve a evidência ao leitor público",
+                    "paragraphs": [
+                        (
+                            "O leitor público relacionado permite começar por números declarados. "
+                            "A "
+                            "calculadora ajuda a explorar outros tamanhos de busca. Para examinar "
+                            "o "
+                            "histórico, preserve o arquivo original junto com as tentativas "
+                            "conhecidas, a frequência e os custos. Uma imagem do saldo não contém "
+                            "esse registro, e uma narrativa não recupera observações ausentes."
+                        ),
+                        (
+                            "No relatório, MEASURED identifica cálculos com os arquivos, DECLARED "
+                            "identifica o que você informou e NOT_MEASURED identifica o que não "
+                            "pôde "
+                            "ser avaliado. O primeiro relatório completo gratuito usa o mesmo "
+                            "acesso "
+                            "dos demais artigos. A leitura pode apontar ausências ou fragilidades "
+                            "do "
+                            "backtest; não decide por você nem conecta o robô a uma conta."
+                        ),
+                    ],
+                },
+            ],
+        },
+        "faq": {
+            "es": [
+                {
+                    "q": "¿La IA cambia cómo se interpreta el backtest?",
+                    "a": (
+                        "Cambia la velocidad de exploración, pero siguen importando los datos "
+                        "disponibles al decidir, los costos y las variantes descartadas. Si el "
+                        "agente"
+                        " recibió resultados anteriores, registra ese recorrido. El archivo "
+                        "elegido "
+                        "por sí solo no revela toda la búsqueda."
+                    ),
+                },
+            ],
+            "en": [
+                {
+                    "q": "Does AI change how a backtest should be read?",
+                    "a": (
+                        "It changes the speed of exploration, but data available at decision time, "
+                        "costs and discarded variants still matter. If the agent received earlier "
+                        "results, record that process. The selected file alone cannot reveal the "
+                        "entire search or show which alternatives influenced its selection."
+                    ),
+                },
+            ],
+            "pt": [
+                {
+                    "q": "A IA muda como interpretar um backtest?",
+                    "a": (
+                        "Ela muda a velocidade de exploração, mas continuam relevantes os dados "
+                        "disponíveis ao decidir, os custos e as variantes descartadas. Se o agente "
+                        "recebeu resultados anteriores, registre esse percurso. O arquivo "
+                        "escolhido "
+                        "sozinho não revela toda a busca nem mostra quais alternativas "
+                        "influenciaram "
+                        "a escolha."
+                    ),
+                },
+            ],
+        },
+        "related": [
+            {
+                "kind": "reading",
+            },
+            {
+                "kind": "calculator",
+            },
+            {
+                "kind": "method",
+            },
+        ],
+    },
 )
 
 ARTICLES: tuple[Article, ...] = tuple(Article.from_dict(data) for data in ARTICLES_DATA)
@@ -3580,6 +5212,8 @@ def related_links(article: Article, locale: str) -> tuple[tuple[str, str], ...]:
             links.append((CONTACT_COPY[locale]["eyebrow"], CONTACT_PATHS[locale]))
         elif kind == "samples":
             links.append((EXAMPLES_COPY[locale]["title"], EXAMPLES_PATH[locale]))
+        elif kind == "reading":
+            links.append((READING_COPY[locale]["title"], READING_PATH[locale]))
         else:
             page = next(p for p in AUDIENCE_PAGES if p.slug == link["slug"])
             links.append((page.text[locale].title, audience_url(page.slug, locale)))

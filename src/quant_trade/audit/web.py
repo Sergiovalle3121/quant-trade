@@ -75,6 +75,7 @@ from quant_trade.audit.completed_count import CompletedAuditCounter
 from quant_trade.audit.engine import run_audit
 from quant_trade.audit.errors_pt import FILES_PT
 from quant_trade.audit.examples import EXAMPLES_PATH
+from quant_trade.audit.faq import FAQ_PATH, faq_page
 from quant_trade.audit.guides import GUIDES_BY_PATH, guide_url
 from quant_trade.audit.importers import detect_format
 from quant_trade.audit.legal import LEGAL_UPDATED, LegalContext, privacy_text, terms_text
@@ -5886,6 +5887,13 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         app.add_api_route(
             reading_path, public_reading, methods=["GET"], response_class=HTMLResponse
         )
+
+    def public_faq(request: Request) -> str:
+        locale = next(lang for lang, path in FAQ_PATH.items() if path == request.url.path)
+        return faq_page(cfg, locale=locale, base_url=_site_url(request))
+
+    for faq_path in FAQ_PATH.values():
+        app.add_api_route(faq_path, public_faq, methods=["GET"], response_class=HTMLResponse)
 
     def _calculator(
         request: Request,

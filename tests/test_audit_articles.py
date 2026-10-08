@@ -90,6 +90,9 @@ def test_the_data_has_the_shape_the_writer_pastes() -> None:
         "auditoria-independiente-backtest",
         "sharpe-deflactado-track-record",
         "auditar-cartera-modelo-senales",
+        "cuantos-intentos-reto-prop-firm",
+        "copiar-senales-mql5-myfxbook",
+        "bot-ia-backtest-suerte",
     ]
     for entry in ARTICLES_DATA:
         assert set(entry) == DATA_KEYS, entry["key"]
@@ -108,6 +111,7 @@ def test_the_data_has_the_shape_the_writer_pastes() -> None:
                 "method",
                 "contact",
                 "samples",
+                "reading",
             }
             assert ("slug" in link) == (link["kind"] in {"guide", "audience"})
 
@@ -145,6 +149,21 @@ def test_every_article_exists_in_every_language_and_passes_the_guard() -> None:
             "es": "auditar-cartera-modelo-senales",
             "en": "audit-model-portfolio-signal-track-record",
             "pt": "auditar-carteira-modelo-sinais",
+        },
+        "cuantos-intentos-reto-prop-firm": {
+            "es": "cuantos-intentos-reto-prop-firm",
+            "en": "how-many-prop-firm-challenge-attempts",
+            "pt": "quantas-tentativas-desafio-prop-firm",
+        },
+        "copiar-senales-mql5-myfxbook": {
+            "es": "copiar-senales-mql5-myfxbook",
+            "en": "copying-mql5-myfxbook-signals",
+            "pt": "copiar-sinais-mql5-myfxbook",
+        },
+        "bot-ia-backtest-suerte": {
+            "es": "bot-ia-backtest-suerte",
+            "en": "ai-trading-bot-backtest-luck",
+            "pt": "bot-ia-backtest-sorte",
         },
     }
     for article in ARTICLES:
@@ -302,7 +321,14 @@ def test_the_guides_index_links_the_articles(tmp_path: Path) -> None:
 def test_institutional_articles_length_and_calculator_evidence(locale: str) -> None:
     from quant_trade.audit.examples import EXAMPLES_PATH
 
-    institutional = ARTICLES[-3:]
+    institutional = [
+        next(article for article in ARTICLES if article.key == key)
+        for key in (
+            "auditoria-independiente-backtest",
+            "sharpe-deflactado-track-record",
+            "auditar-cartera-modelo-senales",
+        )
+    ]
     for article in institutional:
         text = article.text[locale]
         body = [text.intro]
