@@ -1,6 +1,7 @@
 """``quant-trade audit``: run an audit from files, serve the web app, purge old
-uploads, and answer a client's privacy request (``export``, ``delete``,
-``unpublish``, ``waitlist-remove``).
+uploads, answer a client's privacy request (``export``, ``delete``,
+``unpublish``, ``waitlist-remove``), and announce the public pages to the
+IndexNow engines (``indexnow``).
 
 ``run`` is the whole product without a browser: the operator receives a CSV
 by e-mail, runs one command, and sends back ``report.html``. ``serve`` and
@@ -11,6 +12,7 @@ depends on it.
 from __future__ import annotations
 
 import json
+import os
 from collections.abc import Callable
 from dataclasses import fields
 from datetime import UTC, datetime
@@ -22,6 +24,7 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
+from quant_trade.audit import indexnow as indexnow_lib
 from quant_trade.audit.engine import run_audit
 from quant_trade.audit.market import MarketData
 from quant_trade.audit.prop_presets import DEFAULT_PRESET, PRESETS
@@ -163,6 +166,63 @@ def public_card(
     except (OSError, ValueError) as exc:
         raise typer.BadParameter("cannot write the PNG; SVG kept") from exc
     typer.echo("PNG written.")
+
+
+@audit_app.command("indexnow")
+def indexnow(
+    site: Annotated[
+        str, typer.Option("--site", help="The https site whose sitemap is announced")
+    ] = indexnow_lib.DEFAULT_SITE,
+    dry_run: Annotated[
+        bool, typer.Option("--dry-run", help="Only count and list the URLs; send nothing")
+    ] = False,
+) -> None:
+    """Announce the sitemap's public pages to Bing, Yandex, Seznam and Naver (IndexNow).
+
+    The URLs come from the sitemap built here, nothing is downloaded. The key is
+    AUDIT_INDEXNOW_KEY when it is valid, else the default the site serves.
+    """
+
+    try:
+        host = indexnow_lib.site_host(site)
+    except ValueError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    # Only the key: the same rule as AuditSettings.from_env, without the other variables.
+    key = indexnow_lib.clean_key(os.environ.get("AUDIT_INDEXNOW_KEY", ""))
+    location = indexnow_lib.key_location(f"https://{host}", key)
+    prepared = indexnow_lib.prepare(indexnow_lib.sitemap_urls(f"https://{host}"), host=host)
+    groups = len(indexnow_lib.batches(prepared.urls))
+    left_out = (
+        f"Left out: {prepared.dropped} not https or on another host, "
+        f"{prepared.duplicates} repeated."
+    )
+    if dry_run:
+        typer.echo(
+            f"IndexNow dry run for {host}: {len(prepared.urls)} URL(s) in {groups} batch(es) "
+            "would be sent; nothing was sent."
+        )
+        typer.echo(f"Key file: {location}")
+        typer.echo(left_out)
+        typer.echo("First URLs:")
+        for url in prepared.urls[:5]:
+            typer.echo(f"  {url}")
+        return
+    if not prepared.urls:
+        typer.echo(f"IndexNow: no URL to send for {host}.")
+        return
+    typer.echo(
+        f"IndexNow for {host}: {len(prepared.urls)} URL(s) in {groups} batch(es) "
+        f"to {indexnow_lib.ENDPOINT}"
+    )
+    typer.echo(f"Key file: {location}")
+    typer.echo(left_out)
+    result = indexnow_lib.submit(prepared.urls, host=host, key=key, key_location=location)
+    for number, batch in enumerate(result.batches, start=1):
+        answer = "no HTTP answer" if batch.status is None else f"HTTP {batch.status}"
+        typer.echo(f"Batch {number}: {batch.urls} URL(s), {answer}, {batch.meaning}")
+    if not result.accepted:
+        typer.echo("At least one batch was refused or got no answer.", err=True)
+        raise typer.Exit(code=1)
 
 
 @audit_app.command("run")

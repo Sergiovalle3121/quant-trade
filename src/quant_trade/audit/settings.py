@@ -17,6 +17,7 @@ import re
 from collections.abc import Collection, Mapping
 from dataclasses import dataclass, field
 
+from quant_trade.audit.indexnow import INDEXNOW_KEY, clean_key
 from quant_trade.audit.schema import MAX_UPLOAD_BYTES
 
 DEFAULT_DATABASE_URL = "sqlite:///state/audit/audit.db"
@@ -219,6 +220,10 @@ class AuditSettings:
     #: Bing Webmaster Tools (the ``BingSiteAuth.xml`` code). Empty serves nothing.
     google_verification_file: str = ""
     bing_site_auth: str = ""
+    #: The IndexNow key, served at ``/<key>.txt`` (``audit/indexnow.py``). It is
+    #: public by design, so it has a default; ``AUDIT_INDEXNOW_KEY`` replaces it
+    #: when it has 8 to 128 characters from ``A-Z a-z 0-9 -``.
+    indexnow_key: str = INDEXNOW_KEY
     #: Optional wording of the address and the jurisdiction for the English and
     #: Portuguese pages. Empty means the base value above is shown as written.
     operator_address_en: str = ""
@@ -475,6 +480,7 @@ class AuditSettings:
             jurisdiction=_text(env.get("AUDIT_JURISDICTION", "")),
             google_verification_file=_google_file(env.get("AUDIT_GOOGLE_VERIFICATION_FILE", "")),
             bing_site_auth=_bing_code(env.get("AUDIT_BING_SITE_AUTH", "")),
+            indexnow_key=clean_key(env.get("AUDIT_INDEXNOW_KEY", "")),
             operator_address_en=_text(env.get("AUDIT_OPERATOR_ADDRESS_EN", "")),
             operator_address_pt=_text(env.get("AUDIT_OPERATOR_ADDRESS_PT", "")),
             jurisdiction_en=_text(env.get("AUDIT_JURISDICTION_EN", "")),
