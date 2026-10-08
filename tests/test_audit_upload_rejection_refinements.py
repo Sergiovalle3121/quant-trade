@@ -9,6 +9,7 @@ from typing import Any
 import pytest
 from fastapi.testclient import TestClient
 
+from quant_trade.audit import web
 from quant_trade.audit.guard import find_claims
 from quant_trade.audit.prop_presets import DEFAULT_PRESET, PRESETS
 from quant_trade.audit.schema import ParseError, parse_equity_csv
@@ -110,4 +111,40 @@ def test_rejected_form_opens_only_sections_with_nondefault_declarations(
     assert response.status_code == 400
     assert ("<details class='adv' open>" in response.text) == advanced_open
     assert ("<details class='adv extras' open>" in response.text) == extras_open
+    assert ("<details class='adv'>" in response.text) == (not advanced_open)
+    assert ("<details class='adv extras'>" in response.text) == (not extras_open)
     assert find_claims(response.text) == []
+
+
+@pytest.mark.parametrize(("field", "detector"), (("equity", "schema"), ("report", "importers")))
+@pytest.mark.parametrize("error_type", (ParseError, RuntimeError))
+def test_unexpected_parse_failure_uses_the_same_detector_as_a_known_error(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    field: str,
+    detector: str,
+    error_type: type[Exception],
+) -> None:
+    def broken(*args: Any, **kwargs: Any) -> Any:
+        if error_type is ParseError:
+            raise ParseError("Too few rows.", message_es="Hay pocas filas.", code="too_few_rows")
+        raise error_type("PRIVATE-parser-detail")
+
+    monkeypatch.setattr(web, "build_inputs", broken)
+    app = _app(tmp_path)
+    with TestClient(app) as client:
+        response = client.post(
+            "/audits",
+            files={field: ("PRIVATE-file.csv", b"timestamp,equity\n2024-01-01,100\n")},
+            data={"consent": "on"},
+            headers={"Accept": "application/json"},
+        )
+        assert response.status_code == 400
+        category = "too_few_rows" if error_type is ParseError else "invalid_upload"
+        assert response.json()["category"] == category
+        assert response.json()["guidance_html"] == rejection_guidance(category, "csv", "es")
+        assert "PRIVATE" not in response.text
+        assert find_claims(response.text) == []
+        app.state.operations.flush()
+        (row,) = app.state.store.upload_rejection_rows("2000-01-01")
+        assert row["detector"] == detector

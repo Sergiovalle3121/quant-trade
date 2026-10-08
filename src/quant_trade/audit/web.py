@@ -262,6 +262,16 @@ MESSAGES: dict[str, dict[str, str]] = {
             "Excel, with a date column and an equity or return column."
         ),
     },
+    "file_is_picture": {
+        "es": "El archivo {what} es una imagen, no una tabla de datos legible.",
+        "en": "The {what} file is a picture, not a readable data table.",
+        "pt": "O arquivo {what} é uma imagem, não uma tabela de dados legível.",
+    },
+    "file_not_a_report": {
+        "es": "El archivo {what} tiene un formato incompatible.",
+        "en": "The {what} file has an incompatible format.",
+        "pt": "O arquivo {what} tem um formato incompatível.",
+    },
     "equity_required": {
         "es": (
             "Falta el archivo: sube el informe de tu plataforma (MetaTrader, TradingView...) "
@@ -4718,22 +4728,37 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 gate_account = session[0]
         # Strong signatures can decide a refusal from a bounded prefix. Starlette
         # has already spooled multipart, but no importer or whole-file read runs.
-        for sent in (report, equity, optimization, live, trades, benchmark, variants):
+        for field, sent in (
+            ("report", report),
+            ("equity", equity),
+            ("optimization", optimization),
+            ("live", live),
+            ("trades", trades),
+            ("benchmark", benchmark),
+            ("variants", variants),
+        ):
             if sent is None or not sent.filename:
                 continue
             head = await sent.read(4096)
             await sent.seek(0)
-            if head:
-                request.state.upload_file_inspected = True
             detected = upload_rejections.header_format(head)
-            if sent is report or (sent is equity and (report is None or not report.filename)):
-                request.state.ops_rejection_format = detected
             category = upload_rejections.header_rejection(head)
+            if (
+                category
+                or sent is report
+                or (sent is equity and (report is None or not report.filename))
+            ):
+                request.state.ops_rejection_format = detected
+                request.state.upload_file_inspected = bool(head)
             if category:
                 text = (
                     message("curve_is_picture", report_loc)
                     if category == "image" and sent is equity
-                    else upload_rejections.REJECTION_COPY[report_loc][category][0]
+                    else message(
+                        "file_is_picture" if category == "image" else "file_not_a_report",
+                        report_loc,
+                        what=UPLOAD_NAMES[field][report_loc],
+                    )
                 )
                 return _upload_error(
                     request,
@@ -5132,7 +5157,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                     message("invalid_upload", report_loc),
                     report_loc,
                     category="invalid_upload",
-                    detector="importers",
+                    detector="importers" if uploads["report"] else "schema",
                 )
             if gate_account is not None:
                 refusal = claim_free_use(gate_account.id, inputs)

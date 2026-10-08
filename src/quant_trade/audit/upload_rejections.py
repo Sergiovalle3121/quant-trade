@@ -23,6 +23,7 @@ REJECTION_CATEGORIES: tuple[str, ...] = (
     "too_few_rows",
     "dates_unreadable",
     "columns_missing",
+    "files_mismatch",
     "rate_limited",
     "invalid_values",
     "invalid_declaration",
@@ -130,10 +131,12 @@ _CODES: dict[str, tuple[str, ...]] = {
         "ninjatrader_executions_symbol",
         "optimization_header",
         "return_columns",
+        "equity_required",
+    ),
+    "files_mismatch": (
         "trades_and_report",
         "trade_list_as_curve",
         "optimization_mismatch",
-        "equity_required",
     ),
     "invalid_values": (
         "value_too_large",
@@ -282,6 +285,14 @@ REJECTION_COPY: dict[str, dict[str, tuple[str, str]]] = {
             "Indica qué representa cada columna o exporta de nuevo siguiendo la guía de CSV "
             "universal, con las fechas, cantidades y precios de las operaciones.",
         ),
+        "files_mismatch": (
+            "Los archivos están mezclados, puestos en un campo equivocado o no corresponden "
+            "entre sí.",
+            "Sube un informe de plataforma o una lista de operaciones, no ambos. Una lista "
+            "exportada por la plataforma va en «Informe de tu plataforma», no en el campo "
+            "de la curva. Si la "
+            "optimización no corresponde al informe, elige la del mismo informe.",
+        ),
         "rate_limited": (
             "Se alcanzó el límite de intentos de subida de esta hora.",
             "Espera una hora antes de volver a subir el archivo y revisa la guía de exportación.",
@@ -351,6 +362,13 @@ REJECTION_COPY: dict[str, dict[str, tuple[str, str]]] = {
             "Name what each column represents or export again following the universal CSV "
             "guide, with the trade dates, quantities and prices.",
         ),
+        "files_mismatch": (
+            "The files are mixed, placed in the wrong field or do not belong together.",
+            "Upload a platform report or a trade list, not both. A list exported by the "
+            'platform belongs in "Your platform report", not the curve field. '
+            "If the optimisation does not match the "
+            "report, choose the optimisation for that report.",
+        ),
         "rate_limited": (
             "The upload attempt limit for this hour has been reached.",
             "Wait one hour before uploading again and check the export guide.",
@@ -419,6 +437,13 @@ REJECTION_COPY: dict[str, dict[str, tuple[str, str]]] = {
             "Faltam colunas necessárias ou não reconhecemos as colunas que você escolheu.",
             "Indique o que cada coluna representa ou exporte novamente seguindo o guia de "
             "CSV universal, com as datas, quantidades e preços das operações.",
+        ),
+        "files_mismatch": (
+            "Os arquivos estão misturados, colocados no campo errado ou não correspondem entre si.",
+            "Envie um relatório da plataforma ou uma lista de operações, não ambos. Uma "
+            'lista exportada pela plataforma deve ir em "Relatório da sua plataforma", '
+            "não no campo da curva. Se "
+            "a otimização não corresponde ao relatório, escolha a do mesmo relatório.",
         ),
         "rate_limited": (
             "O limite de tentativas de envio desta hora foi atingido.",

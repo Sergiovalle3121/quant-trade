@@ -4671,17 +4671,32 @@ ordinary parser/form refusals still return 400, size limits 413, rate limits
 criterion, threshold or report dimension changed.
 
 The categories are `format_unknown`, `image`, `pdf_no_trades`, `too_large`,
-`too_few_rows`, `dates_unreadable`, `columns_missing`, `rate_limited`,
+`too_few_rows`, `dates_unreadable`, `columns_missing`, `files_mismatch`, `rate_limited`,
 `invalid_values`, `invalid_declaration`, `empty_file`, `invalid_upload`,
 `upload_timeout` and `service_busy`. `pdf_no_trades` means the existing PDF
 reader could not read a usable table; it does not assert that a corrupt,
 encrypted, oversized or timed-out PDF contains no trades. Readable PDF tables
 still reach column mapping. Detailed parser codes map to bounded categories;
 unclassified parse failures use `invalid_upload` without logging exception text.
-Unexpected parser exceptions log only their type, without a traceback. Importer
-and schema error codes have an exhaustive mapping test. Numeric cells discarded
-as unreadable use `invalid_values` when fewer than two usable curve rows remain;
+Unexpected parser exceptions log only their type, without a traceback. Error
+codes across the audit package have an exhaustive mapping test, including
+attribute calls, the factsheet helper and the return-series error dictionary.
+Nonempty numeric cells discarded as unreadable use `invalid_values` with their
+own message when fewer than two usable curve rows remain; empty cells,
 genuinely short or duplicate-only curves retain `too_few_rows`.
+
+`files_mismatch` groups `trades_and_report`, `trade_list_as_curve` and
+`optimization_mismatch`: these are incompatible or misplaced files, not missing
+columns. Guidance in all three languages explains that a platform report and a
+trade list cannot be supplied together, a platform-exported list belongs in
+the platform report field rather than the curve field, and an optimization
+must match its report. This preserves the existing `trade_list_as_curve`
+direction: platform lists/fills use the report importer; the optional closed
+trades field accepts the canonical CSV schema. Directing all platform lists
+to the closed trades field would contradict the existing reader and form.
+The owner panel includes this category through the shared category allow-list.
+`equity_required` stays in `columns_missing`: the required curve input is absent;
+the error does not establish that a supplied file arrived empty.
 
 Only a 4096-byte prefix is read from each posted file before the full read.
 Strong image and unsupported ELF/RAR/7z/FLAC signatures reject immediately,

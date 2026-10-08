@@ -7,6 +7,7 @@ import pandas as pd
 import pytest
 from audit_fixtures import business_days, csv_bytes, positive_drift, returns_frame, trades_frame
 
+from quant_trade.audit.guard import find_claims
 from quant_trade.audit.schema import (
     MAX_ROWS,
     MAX_UPLOAD_BYTES,
@@ -99,6 +100,68 @@ def test_parse_errors_speak_plainly(payload: bytes, message: str, spanish: str, 
     assert caught.value.code == code
     assert spanish in caught.value.localized("es")
     assert caught.value.localized("en") == str(caught.value)
+
+
+@pytest.mark.parametrize("value", ["not-a-number", "inf", "1e400", "NaN", "n/a", "NULL"])
+@pytest.mark.parametrize("what", ["equity", "benchmark"])
+def test_nonempty_unusable_values_have_their_own_message(value: str, what: str) -> None:
+    payload = f"timestamp,equity\n2020-01-01,100\n2020-01-02,{value}\n".encode()
+    with pytest.raises(ParseError) as caught:
+        parse_equity_csv(payload, what=what)
+    error = caught.value
+    assert error.code == "invalid_values"
+    expected = {
+        "en": f"the {what} file has values the reader cannot use",
+        "es": (
+            f"El archivo {'de la curva de equity' if what == 'equity' else 'del benchmark'} "
+            "trae valores que el lector no puede usar."
+        ),
+        "pt": (
+            f"o arquivo {'da curva de equity' if what == 'equity' else 'do benchmark'} "
+            "tem valores que o leitor não consegue usar"
+        ),
+    }
+    for locale, message in expected.items():
+        assert error.localized(locale) == message
+        assert find_claims(message) == []
+
+
+@pytest.mark.parametrize(
+    "rows",
+    [
+        "2020-01-01,100\n2020-01-02,\n",
+        "2020-01-01,100\n2020-01-02,   \n",
+        "2020-01-01,100\n",
+        "2020-01-01,100\n2020-01-01,101\n",
+        "2020-01-01,100\nnot-a-date,101\n",
+    ],
+)
+def test_empty_values_or_short_series_keep_row_guidance(rows: str) -> None:
+    with pytest.raises(ParseError) as caught:
+        parse_equity_csv(f"timestamp,equity\n{rows}".encode())
+    assert caught.value.code == "too_few_rows"
+    assert str(caught.value) == "the equity file has fewer than two usable rows"
+
+
+@pytest.mark.parametrize("value", ["", "   ", "NaN", "not-a-number"])
+def test_unusable_values_still_drop_when_two_rows_remain(value: str) -> None:
+    payload = (f"timestamp,equity\n2020-01-01,100\n2020-01-02,{value}\n2020-01-03,101\n").encode()
+    series = parse_equity_csv(payload)
+    assert series.observations == 2
+    assert series.unparseable_rows == 1
+    assert series.frame["equity"].tolist() == [100.0, 101.0]
+
+
+@pytest.mark.parametrize("missing", ["", "NaN"])
+def test_missing_epoch_timestamp_keeps_numeric_date_inference(missing: str) -> None:
+    series = parse_equity_csv(
+        f"timestamp,equity\n1577836800,100\n{missing},102\n1577923200,101\n".encode()
+    )
+    assert series.frame["timestamp"].dt.strftime("%Y-%m-%d").tolist() == [
+        "2020-01-01",
+        "2020-01-02",
+    ]
+    assert series.unparseable_rows == 1
 
 
 def test_parse_error_without_spanish_falls_back_to_english() -> None:

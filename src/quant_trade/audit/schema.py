@@ -359,7 +359,7 @@ def _as_utf8_csv(data: bytes) -> bytes:
     return data
 
 
-def _read_csv(data: bytes, *, what: str) -> pd.DataFrame:
+def _read_csv(data: bytes, *, what: str, preserve_na_text: bool = False) -> pd.DataFrame:
     if data and len(data) <= MAX_UPLOAD_BYTES:
         data = _as_utf8_csv(data)
     if not data or not data.strip():
@@ -388,7 +388,14 @@ def _read_csv(data: bytes, *, what: str) -> pd.DataFrame:
             code="line_too_long",
         )
     try:
-        frame = pd.read_csv(io.BytesIO(data), sep=None, engine="python", encoding="utf-8-sig")
+        frame = pd.read_csv(
+            io.BytesIO(data),
+            sep=None,
+            engine="python",
+            encoding="utf-8-sig",
+            keep_default_na=not preserve_na_text,
+            na_values=[""] if preserve_na_text else None,
+        )
     except UnicodeDecodeError as exc:
         raise ParseError(
             f"the {what} file is not UTF-8 text",
@@ -726,12 +733,24 @@ def parse_equity_csv(data: bytes, *, what: str = "equity") -> IngestedSeries:
     duplicates = int(frame["timestamp"].duplicated().sum())
     frame = frame.drop_duplicates("timestamp", keep="last").reset_index(drop=True)
     if len(frame) < 2:
+        source_values = raw[value_col]
+        if grid is None and bool(source_values.isna().any()):
+            # On refusal only, distinguish literal NA markers from empty cells
+            # without changing the original numeric/date inference.
+            source_values = _read_csv(data, what=what, preserve_na_text=True)[value_col]
+        nonempty_values = source_values.fillna("").astype(str).str.strip().ne("")
+        if bool((nonempty_values & values.isna()).any()):
+            raise ParseError(
+                f"the {what} file has values the reader cannot use",
+                message_es=(
+                    f"El archivo {_file_es(what)} trae valores que el lector no puede usar."
+                ),
+                code="invalid_values",
+            )
         raise ParseError(
             f"the {what} file has fewer than two usable rows",
             message_es=f"El archivo {_file_es(what)} tiene menos de dos filas utilizables.",
-            # Numeric failures in the unreadable-row warning need value guidance;
-            # keep the existing shortage code for dates or duplicate rows alone.
-            code="invalid_values" if unparseable and values.isna().any() else "too_few_rows",
+            code="too_few_rows",
         )
 
     values = frame["value"].astype(float)

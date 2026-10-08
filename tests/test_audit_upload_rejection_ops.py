@@ -32,6 +32,7 @@ def test_rejections_aggregate_by_utc_day_category_format_and_detector(tmp_path: 
     for _ in range(2):
         counter.observe_rejection("columns_missing", "csv", "mapping", at=NOW)
     counter.observe_rejection("dates_unreadable", "csv", "schema", at=NOW)
+    counter.observe_rejection("files_mismatch", "csv", "schema", at=NOW)
     counter.observe_rejection("columns_missing", "html", "mapping", at=NOW)
     local_midnight = datetime(2026, 10, 8, 23, tzinfo=timezone(timedelta(hours=-6)))
     counter.observe_rejection("columns_missing", "csv", "mapping", at=local_midnight)
@@ -39,13 +40,14 @@ def test_rejections_aggregate_by_utc_day_category_format_and_detector(tmp_path: 
     counter.flush()
     counter.flush()
     rows = store.upload_rejection_rows("2000-01-01")
-    assert len(rows) == 4 and sum(row["count"] for row in rows) == 5
+    assert len(rows) == 5 and sum(row["count"] for row in rows) == 6
     assert {
         (row["day"], row["category"], row["detected_format"], row["detector"]): row["count"]
         for row in rows
     } == {
         ("2026-10-08", "columns_missing", "csv", "mapping"): 2,
         ("2026-10-08", "dates_unreadable", "csv", "schema"): 1,
+        ("2026-10-08", "files_mismatch", "csv", "schema"): 1,
         ("2026-10-08", "columns_missing", "html", "mapping"): 1,
         ("2026-10-09", "columns_missing", "csv", "mapping"): 1,
     }
@@ -168,9 +170,11 @@ def test_seven_day_owner_table_excludes_older_and_future_rows_and_passes_guard()
             ("2026-10-09", 100),
         ]
     ]
+    rows.append(dict(day="2026-10-08", category="files_mismatch", detected_format="csv", count=4))
     html = upload_rejections_section(rows, at=NOW)
     assert "Subidas rechazadas (últimos 7 días)" in html
     assert "<td>columns_missing</td><td>csv</td><td>5</td>" in html
+    assert "<td>files_mismatch</td><td>csv</td><td>4</td>" in html
     assert "100" not in html and find_claims(html) == []
     attempts = upload_attempts_line(
         [

@@ -6,13 +6,14 @@ import ast
 from html import unescape
 from html.parser import HTMLParser
 from pathlib import Path
-from types import ModuleType
 
 import pytest
 
-from quant_trade.audit import importers, schema
+from quant_trade import audit
 from quant_trade.audit.guard import assert_report_clean, find_claims
 from quant_trade.audit.guides import GUIDES, GUIDES_PATH
+from quant_trade.audit.i18n import spanish
+from quant_trade.audit.schema import ParseError, parse_equity_csv
 from quant_trade.audit.upload_rejections import (
     DETECTED_FORMATS,
     HEADER_BYTES,
@@ -67,29 +68,101 @@ def test_refusal_notes_are_distinct_in_each_language_and_guard_safe(category: st
         assert all(find_claims(note) == [] for note in notes)
 
 
-@pytest.mark.parametrize("module", (importers, schema), ids=("importers", "schema"))
-def test_every_parser_error_code_has_specific_guidance(module: ModuleType) -> None:
-    """New parser errors must choose a category instead of silently falling back."""
-    assert module.__file__ is not None
-    tree = ast.parse(Path(module.__file__).read_text(encoding="utf-8"))
+@pytest.mark.parametrize("category", REJECTION_CATEGORIES)
+def test_spanish_rules_stay_in_sync_with_refusal_notes(category: str) -> None:
+    for english, expected in zip(
+        REJECTION_COPY["en"][category], REJECTION_COPY["es"][category], strict=True
+    ):
+        assert spanish(english) == expected
+
+
+def _parser_codes(tree: ast.Module, module_name: str) -> set[str]:
+    """Read constructors, the factsheet wrapper and return-series copy keys."""
     codes: set[str] = set()
+    forwarded_calls = {
+        child
+        for node in tree.body
+        if module_name == "factsheet.py"
+        and isinstance(node, ast.FunctionDef)
+        and node.name == "_no_grid"
+        for child in ast.walk(node)
+        if isinstance(child, ast.Call)
+    }
+
+    def add_code(node: ast.AST) -> None:
+        if isinstance(node, ast.IfExp):
+            add_code(node.body)
+            add_code(node.orelse)
+        else:
+            assert isinstance(node, ast.Constant) and isinstance(node.value, str), (
+                module_name,
+                ast.unparse(node),
+            )
+            codes.add(node.value)
+
     for node in ast.walk(tree):
-        if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Name):
+        if module_name == "return_series.py" and isinstance(node, (ast.Assign, ast.AnnAssign)):
+            targets = node.targets if isinstance(node, ast.Assign) else [node.target]
+            if any(isinstance(target, ast.Name) and target.id == "ERRORS" for target in targets):
+                assert isinstance(node.value, ast.Dict)
+                for key in node.value.keys:
+                    assert key is not None
+                    add_code(key)
+        if not isinstance(node, ast.Call):
             continue
-        if node.func.id not in {"ParseError", "ReportFormatError"}:
+        name = (
+            node.func.id
+            if isinstance(node.func, ast.Name)
+            else node.func.attr
+            if isinstance(node.func, ast.Attribute)
+            else ""
+        )
+        if name not in {"ParseError", "ReportFormatError", "ReturnSeriesError", "_no_grid"}:
             continue
         code = next((keyword.value for keyword in node.keywords if keyword.arg == "code"), None)
-        if code is None and node.func.id == "ReportFormatError":
+        if code is None and name in {"ReportFormatError", "ReturnSeriesError"}:
             code = node.args[0]
-        branches = (code.body, code.orelse) if isinstance(code, ast.IfExp) else (code,)
-        for branch in branches:
-            if isinstance(branch, ast.Constant) and isinstance(branch.value, str):
-                codes.add(branch.value)
-            else:
-                # The live-statement wrapper preserves an already classified parser error.
-                assert branch is not None and ast.unparse(branch) == "exc.code", node.lineno
+        elif code is None and name == "_no_grid":
+            code = node.args[2]
+        if code is None:
+            code = ast.Constant(value="parse")  # ParseError's implicit default is a code too.
+        if node in forwarded_calls and ast.unparse(code) == "code":
+            continue  # _no_grid forwards its third argument; its callers are scanned above.
+        if module_name == "schema.py" and ast.unparse(code) == "exc.code":
+            continue  # The live-statement wrapper preserves an already classified error.
+        add_code(code)
+    return codes
+
+
+def test_every_parser_error_code_has_specific_guidance() -> None:
+    """New codes anywhere in the package must not silently use generic guidance."""
+    assert audit.__file__ is not None
+    # No current parser code needs the generic fallback. Exceptions must be listed here.
+    accepted_generic_codes: frozenset[str] = frozenset()
+    codes: set[str] = set()
+    for path in sorted(Path(audit.__file__).parent.rglob("*.py")):
+        module_codes = _parser_codes(ast.parse(path.read_text(encoding="utf-8")), path.name)
+        unmapped = {code for code in module_codes if classify(code) == "invalid_upload"}
+        assert unmapped <= accepted_generic_codes, (path.name, sorted(unmapped))
+        codes.update(module_codes)
     assert codes
-    assert {code for code in codes if classify(code) == "invalid_upload"} == set()
+
+
+@pytest.mark.parametrize(
+    ("module_name", "source"),
+    (
+        ("new_reader.py", 'imp.ReportFormatError("new_code", "message", "mensaje")'),
+        ("factsheet.py", '_no_grid("message", "mensaje", "new_code")'),
+        ("return_series.py", 'ERRORS: dict = {"new_code": {"en": "message"}}'),
+        ("new_reader.py", 'ParseError("message", code="new_code" if flag else "empty")'),
+    ),
+)
+def test_parser_inventory_detects_unmapped_codes_in_all_supported_forms(
+    module_name: str, source: str
+) -> None:
+    codes = _parser_codes(ast.parse(source), module_name)
+    assert "new_code" in codes
+    assert {code for code in codes if classify(code) == "invalid_upload"} == {"new_code"}
 
 
 @pytest.mark.parametrize(
@@ -160,14 +233,35 @@ def test_allowlisted_values_survive_normalization() -> None:
         ("universal_not_a_table", "format_unknown"),
         ("not_optimization", "format_unknown"),
         ("optimization_file", "format_unknown"),
-        ("trades_and_report", "columns_missing"),
-        ("trade_list_as_curve", "columns_missing"),
-        ("optimization_mismatch", "columns_missing"),
+        ("trades_and_report", "files_mismatch"),
+        ("trade_list_as_curve", "files_mismatch"),
+        ("optimization_mismatch", "files_mismatch"),
         ("equity_required", "columns_missing"),
     ),
 )
 def test_parser_codes_keep_distinct_causes(code: str, expected: str) -> None:
     assert classify(code) == expected
+
+
+@pytest.mark.parametrize(
+    ("locale", "report_field"),
+    (
+        ("es", "Informe de tu plataforma"),
+        ("en", "Your platform report"),
+        ("pt", "Relatório da sua plataforma"),
+    ),
+)
+def test_trade_list_detail_and_guidance_point_to_the_same_supported_field(
+    locale: str, report_field: str
+) -> None:
+    payload = b"entry_time,exit_time,quantity,entry_price,exit_price,side\n"
+    payload += b"2024-01-01,2024-01-02,1,100,101,long\n"
+    with pytest.raises(ParseError) as caught:
+        parse_equity_csv(payload)
+    assert caught.value.code == "trade_list_as_curve"
+    assert report_field in caught.value.localized(locale)
+    assert report_field in REJECTION_COPY[locale]["files_mismatch"][1]
+    assert find_claims(caught.value.localized(locale)) == []
 
 
 @pytest.mark.parametrize(
