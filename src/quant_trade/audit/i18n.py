@@ -77,6 +77,10 @@ _TRIAL_SOURCES: dict[str, str] = {
 _RULES_SOURCE: tuple[tuple[str, str], ...] = (
     # Public figure reader notes (reading.COPY); keep the Spanish rules explicit.
     (
+        "The PNG image is temporarily unavailable.",
+        "La imagen PNG no está disponible temporalmente.",
+    ),
+    (
         "This card is not an audit. There is no file or audit class.",
         "Esta tarjeta no es una auditoría. No hay archivo ni clase de auditoría.",
     ),

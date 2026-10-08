@@ -31,6 +31,7 @@ COPY = {
             "Mis cifras declaradas, en contexto con Rigor. Esta tarjeta no es una auditoría. {url}"
         ),
         "limited": "Demasiadas lecturas desde esta dirección. Inténtalo de nuevo más tarde.",
+        "png_unavailable": "La imagen PNG no está disponible temporalmente.",
     },
     "en": {
         "title": "Figure reader",
@@ -51,6 +52,7 @@ COPY = {
             "My declared figures, in context with Rigor. This card is not an audit. {url}"
         ),
         "limited": "Too many readings from this address. Try again later.",
+        "png_unavailable": "The PNG image is temporarily unavailable.",
     },
     "pt": {
         "title": "Leitor de números",
@@ -74,6 +76,7 @@ COPY = {
             "Este cartão não é uma auditoria. {url}"
         ),
         "limited": "Leituras demais a partir deste endereço. Tente novamente mais tarde.",
+        "png_unavailable": "A imagem PNG está temporariamente indisponível.",
     },
 }
 
