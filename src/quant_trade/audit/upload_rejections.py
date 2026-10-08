@@ -288,10 +288,11 @@ REJECTION_COPY: dict[str, dict[str, tuple[str, str]]] = {
         "files_mismatch": (
             "Los archivos están mezclados, puestos en un campo equivocado o no corresponden "
             "entre sí.",
-            "Sube un informe de plataforma o una lista de operaciones, no ambos. Una lista "
-            "exportada por la plataforma va en «Informe de tu plataforma», no en el campo "
-            "de la curva. Si la "
-            "optimización no corresponde al informe, elige la del mismo informe.",
+            "Pon el informe o la lista de operaciones exportada por tu plataforma en "
+            "«Informe de tu plataforma» y deja vacío «Operaciones cerradas»: ese campo solo "
+            "acompaña a una curva, nunca a un informe. «Curva de equity o serie de retornos» "
+            "lleva fechas con saldos o retornos, no una lista de operaciones. En «Exportación "
+            "de optimización de MT5» va el XML de ese mismo informe.",
         ),
         "rate_limited": (
             "Se alcanzó el límite de intentos de subida de esta hora.",
@@ -364,10 +365,11 @@ REJECTION_COPY: dict[str, dict[str, tuple[str, str]]] = {
         ),
         "files_mismatch": (
             "The files are mixed, placed in the wrong field or do not belong together.",
-            "Upload a platform report or a trade list, not both. A list exported by the "
-            'platform belongs in "Your platform report", not the curve field. '
-            "If the optimisation does not match the "
-            "report, choose the optimisation for that report.",
+            'Put the report or the trade list exported by your platform in "Your platform '
+            'report" and leave "Closed trades" empty: that field only goes with a curve, '
+            'never with a report. "Equity curve or return series" takes dates with balances '
+            'or returns, not a trade list. "MT5 optimisation export" takes the XML of that '
+            "same report.",
         ),
         "rate_limited": (
             "The upload attempt limit for this hour has been reached.",
@@ -440,10 +442,11 @@ REJECTION_COPY: dict[str, dict[str, tuple[str, str]]] = {
         ),
         "files_mismatch": (
             "Os arquivos estão misturados, colocados no campo errado ou não correspondem entre si.",
-            "Envie um relatório da plataforma ou uma lista de operações, não ambos. Uma "
-            'lista exportada pela plataforma deve ir em "Relatório da sua plataforma", '
-            "não no campo da curva. Se "
-            "a otimização não corresponde ao relatório, escolha a do mesmo relatório.",
+            "Coloque o relatório ou a lista de operações exportada pela plataforma em "
+            '"Relatório da sua plataforma" e deixe vazio "Operações fechadas": esse campo só '
+            'acompanha uma curva, nunca um relatório. "Curva de equity ou série de retornos" '
+            "recebe datas com saldos ou retornos, não uma lista de operações. "
+            '"Exportação de otimização do MT5" recebe o XML desse mesmo relatório.',
         ),
         "rate_limited": (
             "O limite de tentativas de envio desta hora foi atingido.",

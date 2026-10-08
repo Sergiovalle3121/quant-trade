@@ -2423,6 +2423,14 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         found = db.get_account(account_id)
         return found.email if found is not None else ""
 
+    def _welcome_status(account_id: str, email: str) -> str:
+        """Read the same welcome availability for account and confirmation notices."""
+        if cfg.free_mode or not acct.WELCOME_FULL_REPORT:
+            return ""
+        if db.welcome_used(account_id) or db.free_claim_taken(inbox.welcome_key(email)):
+            return "used"
+        return "available"
+
     def _account_locale(path_locale: str, lang: str | None) -> str:
         # The account screens exist in Portuguese too (``/pt/conta``).
         return lang if lang in account_pages.LANGUAGES else path_locale
@@ -3352,6 +3360,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                     locale, done=flash, next_path=account_pages.path("account", locale)
                 )
             account, csrf, session_hash = session
+            if done == "email_verified_welcome":
+                done = "email_verified"
             now = datetime.now(UTC)
             # This browser's own random id (the same cookie as the free
             # report's), minted here when missing; only its hash is stored.
@@ -3403,16 +3413,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                     ),
                     free_limit=0 if cfg.free_mode else acct.FREE_PREVIEWS_PER_MONTH,
                     retention_days=cfg.retention_days,
-                    welcome=(
-                        ""
-                        if cfg.free_mode or not acct.WELCOME_FULL_REPORT
-                        else (
-                            "used"
-                            if db.welcome_used(account.id)
-                            or db.free_claim_taken(inbox.welcome_key(account.email))
-                            else "available"
-                        )
-                    ),
+                    welcome=_welcome_status(account.id, account.email),
                     strategies=db.list_strategies(account.id),
                     recovery_created=db.recovery_key_created(account.id) or "",
                     two_step_since=db.two_step_on(account.id),
@@ -4025,7 +4026,11 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 _note_event(request, account_id, "email_changed")
             _settle_confirmed_invites(account_id, datetime.now(UTC))
             done = "email_changed" if kind == "change" else "email_verified"
-            if kind != "change" and _session(request) is None and not db.welcome_used(account_id):
+            if (
+                kind != "change"
+                and _session(request) is None
+                and _welcome_status(account_id, _account_email(account_id)) == "available"
+            ):
                 done = "email_verified_welcome"
             return RedirectResponse(
                 f"{account_pages.path('account', locale)}?done={done}#verificar-correo",
@@ -5106,6 +5111,10 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                     else None
                 )
                 if table is None:
+                    multiple_files = sum(bool(v) for v in uploads.values()) > 1
+                    if multiple_files:
+                        # The failed file is unknown, even if the primary header was read.
+                        request.state.upload_file_inspected = False
                     return _upload_error(
                         request,
                         400,
@@ -5120,9 +5129,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                         detector="importers" if uploads["report"] else "schema",
                         # The combined reader does not identify an auxiliary file on
                         # every error. Avoid attributing its format to the primary file.
-                        detected_format="unknown"
-                        if sum(bool(v) for v in uploads.values()) > 1
-                        else None,
+                        detected_format="unknown" if multiple_files else None,
                     )
                 # The columns this account chose before for the same header;
                 # a PDF's rows are always shown, never read on a saved choice.
@@ -5151,6 +5158,9 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             except Exception as exc:
                 # Exception text may contain file data. Only fixed labels reach telemetry.
                 logger.warning("upload could not be parsed: %s", type(exc).__name__)
+                multiple_files = sum(bool(v) for v in uploads.values()) > 1
+                if multiple_files:
+                    request.state.upload_file_inspected = False
                 return _upload_error(
                     request,
                     400,
@@ -5158,6 +5168,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                     report_loc,
                     category="invalid_upload",
                     detector="importers" if uploads["report"] else "schema",
+                    detected_format="unknown" if multiple_files else None,
                 )
             if gate_account is not None:
                 refusal = claim_free_use(gate_account.id, inputs)

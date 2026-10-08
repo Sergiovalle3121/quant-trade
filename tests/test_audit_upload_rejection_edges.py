@@ -260,10 +260,11 @@ def test_form_without_any_file_counts_empty_upload(
     app = _app(tmp_path, trusted_proxy_hops=1)
     caplog.set_level(logging.DEBUG)
     ip = "192.0.2.233"
+    email = "private-empty-upload@example.invalid"
     with TestClient(app) as client:
         response = client.post(
             "/audits",
-            data={"consent": "on", "locale": locale},
+            data={"consent": "on", "locale": locale, "description": f"PRIVATE notes {email}"},
             # No supported upload field is supplied, even with a stray multipart part.
             files={"unused": ("PRIVATE-unused.csv", b"")} if extra_part else None,
             headers={"X-Forwarded-For": ip},
@@ -282,27 +283,42 @@ def test_form_without_any_file_counts_empty_upload(
             "form",
             1,
         )
-        for private in ("PRIVATE", ip, "X-Forwarded-For"):
+        for private in ("PRIVATE", email, ip, "X-Forwarded-For"):
             assert private.lower() not in (str(row) + caplog.text).lower()
 
 
 @pytest.mark.parametrize("locale", ("es", "en", "pt"))
+@pytest.mark.parametrize("body_kind", ("multipart", "raw"))
 def test_oversized_request_body_has_guidance_and_counts_body_limit(
     tmp_path: Path,
     locale: str,
+    body_kind: str,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     upload_limit = 100
     app = _app(tmp_path, max_upload_bytes=upload_limit, trusted_proxy_hops=1)
     caplog.set_level(logging.DEBUG)
     ip = "192.0.2.234"
+    email = "private-oversized-upload@example.invalid"
+    headers = {"X-Forwarded-For": ip}
+    payload = email.encode() + b"x" * (request_body_limit(upload_limit) + 1)
+    if body_kind == "multipart":
+        request_body: dict[str, Any] = {
+            "files": {"equity": ("PRIVATE-oversized.csv", payload)},
+            "data": {
+                "consent": "on",
+                "locale": locale,
+                "description": f"PRIVATE notes {email}",
+            },
+        }
+    else:
+        headers["Content-Type"] = "application/octet-stream"
+        request_body = {"content": payload}
     with TestClient(app) as client:
         response = client.post(
             f"/audits?lang={locale}",
-            files={
-                "equity": ("PRIVATE-oversized.csv", b"x" * (request_body_limit(upload_limit) + 1))
-            },
-            headers={"X-Forwarded-For": ip},
+            **request_body,
+            headers=headers,
         )
         assert response.status_code == 413
         assert (
@@ -318,7 +334,7 @@ def test_oversized_request_body_has_guidance_and_counts_body_limit(
             "body_limit",
             1,
         )
-        for private in ("PRIVATE", ip, "X-Forwarded-For"):
+        for private in ("PRIVATE", email, ip, "X-Forwarded-For"):
             assert private.lower() not in (str(row) + caplog.text).lower()
 
 
@@ -331,6 +347,7 @@ def test_unavailable_admission_slot_has_guidance_and_counts_busy(
     app = _app(tmp_path, trusted_proxy_hops=1)
     caplog.set_level(logging.DEBUG)
     ip = "192.0.2.235"
+    email = "private-busy-upload@example.invalid"
     slots = app.state.upload_admission_slots
     held = 0
     while slots.acquire(blocking=False):
@@ -340,7 +357,11 @@ def test_unavailable_admission_slot_has_guidance_and_counts_busy(
             response = client.post(
                 f"/audits?lang={locale}",
                 files={"equity": ("PRIVATE-busy.csv", ONE_ROW)},
-                data={"consent": "on", "locale": locale},
+                data={
+                    "consent": "on",
+                    "locale": locale,
+                    "description": f"PRIVATE notes {email}",
+                },
                 headers={"X-Forwarded-For": ip},
             )
             assert response.status_code == 503
@@ -357,7 +378,7 @@ def test_unavailable_admission_slot_has_guidance_and_counts_busy(
                 "admission",
                 1,
             )
-            for private in ("PRIVATE", ip, "X-Forwarded-For"):
+            for private in ("PRIVATE", email, ip, "X-Forwarded-For"):
                 assert private.lower() not in (str(row) + caplog.text).lower()
     finally:
         for _ in range(held):

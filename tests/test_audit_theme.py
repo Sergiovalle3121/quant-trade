@@ -11,8 +11,6 @@ import pytest
 
 pytest.importorskip("fastapi")
 
-import cssselect2  # noqa: E402
-import tinycss2  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 
 from quant_trade.audit.guard import find_claims  # noqa: E402
@@ -22,7 +20,6 @@ from quant_trade.audit.settings import AuditSettings  # noqa: E402
 from quant_trade.audit.store import make_store  # noqa: E402
 from quant_trade.audit.theme import (  # noqa: E402
     NAV,
-    REPORT,
     STATIC_CACHE_CONTROL,
     STATIC_DIR,
     STATIC_FILES,
@@ -91,23 +88,46 @@ def test_phone_navigation_keeps_the_upload_button_visible_and_compact() -> None:
     assert ".nav-end>.langs{display:none}" in STYLE
 
 
-def _phone_rules(stylesheet: str, *, phone: bool = False) -> Iterator[tuple[str, str]]:
-    """Visit every rule in a 520px media block, including nested group rules."""
+def _phone_media(query: str) -> bool:
+    """Match the theme's inclusive pixel width ranges against a 520px screen.
+
+    Other device features are treated as potentially active, so their rules
+    also receive the visibility check. Comma-separated queries are alternatives.
+    """
+    for alternative in query.lower().split(","):
+        if re.match(r"\s*(?:only\s+)?print\b", alternative):
+            continue
+        bounds = re.findall(r"\(\s*(min|max)-width\s*:\s*(\d+(?:\.\d+)?)px\s*\)", alternative)
+        if all(
+            float(width) <= 520 if bound == "min" else float(width) >= 520
+            for bound, width in bounds
+        ):
+            return True
+    return False
+
+
+def _phone_rules(stylesheet: str) -> Iterator[tuple[str, str]]:
+    """Visit base rules and matching media ranges, preserving source order."""
+    # tinycss2 and cssselect2 arrive with weasyprint (the ``web`` extra, like
+    # fastapi above); requirements.lock.txt pins only the cloud, data, dev and
+    # crypto extras, so pinning them in ``dev`` would duplicate weasyprint's
+    # choice. Only these static visibility checks skip without them.
+    tinycss2 = pytest.importorskip("tinycss2")
     for rule in tinycss2.parse_stylesheet(stylesheet, skip_comments=True, skip_whitespace=True):
         if rule.type == "at-rule" and rule.content is not None:
-            at_phone_width = rule.lower_at_keyword == "media" and bool(
-                re.search(
-                    r"\(\s*max-width\s*:\s*520px\s*\)",
-                    tinycss2.serialize(rule.prelude),
-                    flags=re.IGNORECASE,
-                )
-            )
-            yield from _phone_rules(tinycss2.serialize(rule.content), phone=phone or at_phone_width)
-        elif phone and rule.type == "qualified-rule":
+            if rule.lower_at_keyword == "media":
+                if not _phone_media(tinycss2.serialize(rule.prelude)):
+                    continue
+            elif rule.lower_at_keyword != "supports":
+                continue
+            yield from _phone_rules(tinycss2.serialize(rule.content))
+        elif rule.type == "qualified-rule":
             yield tinycss2.serialize(rule.prelude), tinycss2.serialize(rule.content)
 
 
-def _hidden_phone_actions(stylesheet: str) -> list[tuple[str, str]]:
+def _hidden_phone_actions(stylesheet: str) -> list[str]:
+    cssselect2 = pytest.importorskip("cssselect2")
+    tinycss2 = pytest.importorskip("tinycss2")
     # The two navigation structures, with the real classes on their upload links.
     root = cssselect2.ElementWrapper.from_html_root(
         ElementTree.fromstring(
@@ -115,18 +135,26 @@ def _hidden_phone_actions(stylesheet: str) -> list[tuple[str, str]]:
             "<div class='nav-end'><a class='btn btn-sm' href='/auditar'/></div>"
             "</div></header><header class='nav nav-solid'><div class='wrap nav-in'>"
             "<div class='nav-end no-print report-toolbar'>"
-            "<a class='nav-account report-new-audit' href='/auditar'/>"
+            "<a class='nav-account report-new-audit' href='/auditar'>"
+            "<span class='new-audit-long'>Nuevo informe</span>"
+            "<span class='new-audit-short'>Nuevo</span></a>"
             "</div></div></header></body></html>"
         )
     )
     actions = list(root.query_all(".nav-end>.btn, .report-new-audit"))
     assert len(actions) == 2, "both navigation upload actions must be checked"
-    # Hiding an ancestor also hides its upload action.
-    protected = [element for action in actions for element in (*action.ancestors, action)]
-    hidden = []
+    labels = list(root.query_all(".new-audit-long, .new-audit-short"))
+    assert len(labels) == 2, "both report upload labels must be checked"
+    matcher = cssselect2.Matcher()
     for selector_text, body in _phone_rules(stylesheet):
+        declarations = []
         for declaration in tinycss2.parse_declaration_list(body, skip_comments=True):
-            if declaration.type != "declaration":
+            if declaration.type != "declaration" or declaration.lower_name not in {
+                "display",
+                "visibility",
+                "opacity",
+                "font-size",
+            }:
                 continue
             value = [
                 part for part in declaration.value if part.type not in {"whitespace", "comment"}
@@ -142,20 +170,52 @@ def _hidden_phone_actions(stylesheet: str) -> list[tuple[str, str]]:
                 and value[0].type in {"number", "percentage", "dimension"}
                 and value[0].value == 0
             )
-            if hides:
-                selectors = cssselect2.compile_selector_list(selector_text)
+            declarations.append((property_name, declaration.important, hides))
+        if declarations:
+            # Pseudo-elements cannot hide these DOM nodes; vendor names also
+            # fall outside cssselect2's supported set. Split only top-level
+            # commas so an ordinary selector in the same list is still checked.
+            groups = [[]]
+            for token in tinycss2.parse_component_value_list(selector_text, skip_comments=True):
+                if token.type == "literal" and token.value == ",":
+                    groups.append([])
+                else:
+                    groups[-1].append(token)
+            for group in groups:
                 if any(
-                    selector.pseudo_element is None and selector.test(element)
-                    for selector in selectors
-                    for element in protected
+                    left.type == right.type == "literal" and left.value == right.value == ":"
+                    for left, right in zip(group, group[1:], strict=False)
                 ):
-                    hidden.append((selector_text, property_name))
-    return hidden
+                    continue
+                for selector in cssselect2.compile_selector_list(group):
+                    if selector.pseudo_element is None:
+                        matcher.add_selector(selector, declarations)
+    # Resolve importance, specificity and source order: the short label starts
+    # hidden in base CSS and is displayed by the wider 720px phone rule.
+    hidden_elements = set()
+    for element in root.iter_subtree():
+        winners = {}
+        for specificity, order, _pseudo, declarations in matcher.match(element):
+            for index, (property_name, important, hides) in enumerate(declarations):
+                candidate = (important, specificity, order, index, hides)
+                winners[property_name] = max(candidate, winners.get(property_name, candidate))
+        if any(winner[-1] for winner in winners.values()):
+            hidden_elements.add(element)
+
+    def is_hidden(element: cssselect2.ElementWrapper) -> bool:
+        return any(parent in hidden_elements for parent in (*element.ancestors, element))
+
+    hidden_actions = [
+        action.etree_element.attrib["class"] for action in actions if is_hidden(action)
+    ]
+    if all(is_hidden(label) for label in labels):
+        hidden_actions.append("both report upload labels")
+    return hidden_actions
 
 
-@pytest.mark.parametrize("stylesheet", [STYLE, NAV, REPORT], ids=["STYLE", "NAV", "REPORT"])
-def test_no_phone_rule_hides_either_upload_action(stylesheet: str) -> None:
-    assert _hidden_phone_actions(stylesheet) == []
+def test_no_phone_rule_hides_either_upload_action() -> None:
+    # STYLE already contains NAV and REPORT; their combined cascade is the page.
+    assert _hidden_phone_actions(STYLE) == []
 
 
 @pytest.mark.parametrize(
@@ -167,11 +227,58 @@ def test_no_phone_rule_hides_either_upload_action(stylesheet: str) -> None:
         ".nav-account { opacity: 0.0 }",
         "a { font-size: 0px }",
         ".report-toolbar { display: none }",
+        ".new-audit-long, .new-audit-short { display: none }",
     ],
 )
 def test_phone_visibility_check_rejects_hidden_actions_and_ancestors(rule: str) -> None:
     stylesheet = f"@media (max-width: 520px) {{ @supports (display: flex) {{ {rule} }} }}"
     assert _hidden_phone_actions(stylesheet)
+
+
+@pytest.mark.parametrize(
+    ("media", "applies"),
+    [
+        ("(max-width:720px)", True),
+        ("(min-width:520px)", True),
+        ("screen and (min-width:400px) and (max-width:620px)", True),
+        ("(max-width:519px)", False),
+        ("(min-width:521px)", False),
+        ("(max-width:400px), (min-width:500px)", True),
+        ("print and (max-width:720px)", False),
+    ],
+)
+def test_phone_visibility_check_respects_media_ranges(media: str, applies: bool) -> None:
+    stylesheet = f"@media {media} {{ .nav-end > .btn {{ display: none }} }}"
+    assert bool(_hidden_phone_actions(stylesheet)) is applies
+
+
+def test_phone_visibility_check_includes_base_rules_and_intersects_nested_media() -> None:
+    assert _hidden_phone_actions(".report-toolbar { display: none }")
+    assert (
+        _hidden_phone_actions(
+            "@media (max-width:720px) { @media (min-width:521px) {"
+            ".report-toolbar { display:none } } }"
+        )
+        == []
+    )
+
+
+def test_phone_visibility_check_resolves_label_cascade() -> None:
+    base = ".new-audit-short { display: none }"
+    phone = "@media (max-width:720px) { .new-audit-long { display:none }"
+    assert _hidden_phone_actions(base + phone + " }") == ["both report upload labels"]
+    assert _hidden_phone_actions(base + phone + ".new-audit-short { display:inline } }") == []
+    assert _hidden_phone_actions(
+        ".new-audit-short { display:none !important }"
+        + phone
+        + ".new-audit-short { display:inline } }"
+    ) == ["both report upload labels"]
+
+
+def test_phone_visibility_check_ignores_only_pseudo_elements_in_mixed_lists() -> None:
+    vendor = ".report-new-audit::-webkit-details-marker"
+    assert _hidden_phone_actions(vendor + " { display:none }") == []
+    assert _hidden_phone_actions(vendor + ", :is(.other, .report-new-audit) { display:none }")
 
 
 def test_report_navigation_compacts_only_its_upload_and_document_actions() -> None:

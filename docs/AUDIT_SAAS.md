@@ -4440,6 +4440,10 @@ URL's `options`. See
   token or client text. Shared links use `https://rigorscore.com/v/<id>?ref=share`
   (and `lang=en`/`lang=pt` as appropriate). A private or withdrawn report has no
   share block. Published views kept by the existing purge remain shareable.
+  The retained view also keeps only `fund.track_record` as a boolean, so a
+  fund's sharing text keeps its report kind after purge, without retaining
+  fund figures. Previously purged views without that flag cannot recover it
+  from deleted data and retain the existing fallback classification.
 - **Attribution.** `share` and `ejemplos` are named tags in `funnel.REF_TAGS`.
   Adding these bare names requires this deploy: there is no runtime setting
   for arbitrary tags. Existing campaign-shaped names, such as `x-es-103`,
@@ -4735,6 +4739,12 @@ The combined parser does not identify the failing auxiliary file on every
 error. With several files supplied, an unattributed parser refusal therefore
 uses `unknown` rather than assigning the primary file's format to that failure;
 header and size checks and explicit column mapping identify their own input.
+The page then omits the detected-format line instead of printing "not
+recognised" for a report that was identified (for example an MT5 HTML report
+posted with a separate trades CSV); the generic parser failure follows the
+same rule. The `files_mismatch` next step names the form field for each file
+(platform report, closed trades, equity curve or return series, MT5
+optimisation export) instead of repeating the parser's "not both" alert.
 
 Rejection counters use the existing optional asynchronous operations worker,
 SQL timeouts and retry behavior, sharing its 4096 pending-key bound. A process

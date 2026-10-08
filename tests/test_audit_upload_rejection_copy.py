@@ -149,20 +149,26 @@ def test_every_parser_error_code_has_specific_guidance() -> None:
 
 
 @pytest.mark.parametrize(
-    ("module_name", "source"),
+    ("module_name", "source", "expected_code"),
     (
-        ("new_reader.py", 'imp.ReportFormatError("new_code", "message", "mensaje")'),
-        ("factsheet.py", '_no_grid("message", "mensaje", "new_code")'),
-        ("return_series.py", 'ERRORS: dict = {"new_code": {"en": "message"}}'),
-        ("new_reader.py", 'ParseError("message", code="new_code" if flag else "empty")'),
+        ("new_reader.py", 'imp.ReportFormatError("new_code", "message", "mensaje")', "new_code"),
+        ("factsheet.py", '_no_grid("message", "mensaje", "new_code")', "new_code"),
+        ("return_series.py", 'ERRORS: dict = {"new_code": {"en": "message"}}', "new_code"),
+        (
+            "new_reader.py",
+            'ParseError("message", code="new_code" if flag else "empty")',
+            "new_code",
+        ),
+        ("new_reader.py", 'ReturnSeriesError("x")', "x"),
+        ("new_reader.py", 'ParseError("message")', "parse"),
     ),
 )
 def test_parser_inventory_detects_unmapped_codes_in_all_supported_forms(
-    module_name: str, source: str
+    module_name: str, source: str, expected_code: str
 ) -> None:
     codes = _parser_codes(ast.parse(source), module_name)
-    assert "new_code" in codes
-    assert {code for code in codes if classify(code) == "invalid_upload"} == {"new_code"}
+    assert expected_code in codes
+    assert {code for code in codes if classify(code) == "invalid_upload"} == {expected_code}
 
 
 @pytest.mark.parametrize(
@@ -262,6 +268,71 @@ def test_trade_list_detail_and_guidance_point_to_the_same_supported_field(
     assert report_field in caught.value.localized(locale)
     assert report_field in REJECTION_COPY[locale]["files_mismatch"][1]
     assert find_claims(caught.value.localized(locale)) == []
+
+
+@pytest.mark.parametrize(
+    ("locale", "fields", "not_both"),
+    (
+        (
+            "es",
+            (
+                "Informe de tu plataforma",
+                "Operaciones cerradas",
+                "Curva de equity o serie de retornos",
+                "Exportación de optimización de MT5",
+            ),
+            "no ambos",
+        ),
+        (
+            "en",
+            (
+                "Your platform report",
+                "Closed trades",
+                "Equity curve or return series",
+                "MT5 optimisation export",
+            ),
+            "not both",
+        ),
+        (
+            "pt",
+            (
+                "Relatório da sua plataforma",
+                "Operações fechadas",
+                "Curva de equity ou série de retornos",
+                "Exportação de otimização do MT5",
+            ),
+            "não os dois",
+        ),
+    ),
+)
+def test_mismatch_next_step_names_a_field_for_each_file_without_repeating_the_alert(
+    locale: str, fields: tuple[str, ...], not_both: str
+) -> None:
+    from audit_fixtures import csv_bytes, synthetic_mt5_report, trades_frame
+
+    from quant_trade.audit.pages import upload_page
+    from quant_trade.audit.schema import DeclaredMetadata, build_inputs
+
+    next_step = REJECTION_COPY[locale]["files_mismatch"][1]
+    form = unescape(upload_page(locale=locale))
+    for field in fields:
+        # The same label the customer reads on the upload form.
+        assert field in next_step
+        assert field in form
+    with pytest.raises(ParseError) as caught:
+        build_inputs(
+            None,
+            DeclaredMetadata(),
+            report_bytes=synthetic_mt5_report(days=3),
+            trades_bytes=csv_bytes(trades_frame(3)),
+        )
+    assert caught.value.code == "trades_and_report"
+    alert = caught.value.localized(locale)
+    # The alert already says "not both"; the next step says where each file goes.
+    assert not_both in alert
+    assert not_both not in next_step
+    assert alert not in next_step
+    assert find_claims(next_step) == []
 
 
 @pytest.mark.parametrize(

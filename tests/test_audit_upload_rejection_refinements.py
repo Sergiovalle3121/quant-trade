@@ -118,12 +118,14 @@ def test_rejected_form_opens_only_sections_with_nondefault_declarations(
 
 @pytest.mark.parametrize(("field", "detector"), (("equity", "schema"), ("report", "importers")))
 @pytest.mark.parametrize("error_type", (ParseError, RuntimeError))
+@pytest.mark.parametrize("multiple_files", (False, True))
 def test_unexpected_parse_failure_uses_the_same_detector_as_a_known_error(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     field: str,
     detector: str,
     error_type: type[Exception],
+    multiple_files: bool,
 ) -> None:
     def broken(*args: Any, **kwargs: Any) -> Any:
         if error_type is ParseError:
@@ -132,19 +134,27 @@ def test_unexpected_parse_failure_uses_the_same_detector_as_a_known_error(
 
     monkeypatch.setattr(web, "build_inputs", broken)
     app = _app(tmp_path)
+    files = {field: ("PRIVATE-file.csv", b"timestamp,equity\n2024-01-01,100\n")}
+    if multiple_files:
+        files["benchmark"] = ("PRIVATE-benchmark.csv", b"timestamp,equity\n2024-01-01,100\n")
     with TestClient(app) as client:
         response = client.post(
             "/audits",
-            files={field: ("PRIVATE-file.csv", b"timestamp,equity\n2024-01-01,100\n")},
+            files=files,
             data={"consent": "on"},
             headers={"Accept": "application/json"},
         )
         assert response.status_code == 400
         category = "too_few_rows" if error_type is ParseError else "invalid_upload"
+        detected = "unknown" if multiple_files else "csv"
         assert response.json()["category"] == category
-        assert response.json()["guidance_html"] == rejection_guidance(category, "csv", "es")
+        assert response.json()["format"] == detected
+        assert response.json()["guidance_html"] == rejection_guidance(
+            category, detected, "es", file_inspected=not multiple_files
+        )
         assert "PRIVATE" not in response.text
         assert find_claims(response.text) == []
         app.state.operations.flush()
         (row,) = app.state.store.upload_rejection_rows("2000-01-01")
         assert row["detector"] == detector
+        assert row["detected_format"] == detected
