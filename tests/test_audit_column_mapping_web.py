@@ -13,7 +13,8 @@ pytest.importorskip("sqlalchemy")
 from fastapi.testclient import TestClient  # noqa: E402
 
 from quant_trade.audit.guard import find_claims  # noqa: E402
-from quant_trade.audit.pages import upload_page  # noqa: E402
+from quant_trade.audit.mapping import missing_fields  # noqa: E402
+from quant_trade.audit.pages import guides_index_url, upload_page  # noqa: E402
 from quant_trade.audit.settings import AuditSettings  # noqa: E402
 from quant_trade.audit.store import make_store  # noqa: E402
 from quant_trade.audit.universal import ROLES  # noqa: E402
@@ -78,22 +79,28 @@ def test_a_journal_nobody_knows_is_audited_with_the_customers_mapping(tmp_path: 
 
 
 @pytest.mark.parametrize("accept", ["text/html", "application/json"])
+@pytest.mark.parametrize("locale", ["es", "en", "pt"])
 def test_the_mapping_page_logs_the_refusal_code_without_file_data(
-    tmp_path: Path, caplog: pytest.LogCaptureFixture, accept: str
+    tmp_path: Path, caplog: pytest.LogCaptureFixture, accept: str, locale: str
 ) -> None:
     content = b"PRIVATE-column-a,PRIVATE-column-b\nPRIVATE-cell-a,1\nPRIVATE-cell-b,2\n"
     with _client(tmp_path) as client, caplog.at_level(logging.INFO):
         answer = client.post(
             "/audits",
             files={"report": ("PRIVATE-file.csv", content, "text/csv")},
-            data={"consent": "on", "description": "PRIVATE-description"},
+            data={"consent": "on", "description": "PRIVATE-description", "locale": locale},
             headers={"Accept": accept},
         )
         assert answer.status_code == 422
         assert (
             "mapping page: code=unknown_format pdf=False columns=2 samples=2 "
-            "guessed=1 chosen=0 locale=es"
+            f"guessed=1 chosen=0 locale={locale}"
         ) in caplog.text
+        if accept == "text/html":
+            assert "class='drop'" in answer.text
+            assert "id='f-report' type='file' name='report' required" in answer.text
+            assert f"href='{guides_index_url(locale)}'" in answer.text
+            assert find_claims(answer.text) == []
         assert "PRIVATE" not in caplog.text
         for name in content.decode().splitlines()[0].split(","):
             assert name not in caplog.text
@@ -103,6 +110,34 @@ def test_the_mapping_page_logs_the_refusal_code_without_file_data(
             matching = [row for row in rows if row["operation"] == operation]
             assert sum(row["count"] for row in matching if row["outcome"] == "invalid") == 1
             assert all(row["outcome"] != "denied" for row in matching)
+
+
+@pytest.mark.parametrize("locale", ["es", "en", "pt"])
+@pytest.mark.parametrize("role", ["date", "profit"])
+def test_an_absent_mapping_choice_is_counted_without_logging_its_name(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture, locale: str, role: str
+) -> None:
+    content = b"PRIVATE-column-a,PRIVATE-column-b\nPRIVATE-cell-a,1\nPRIVATE-cell-b,2\n"
+    chosen = {role: "PRIVATE-absent-client-column"}
+    with _client(tmp_path) as client, caplog.at_level(logging.DEBUG):
+        answer = client.post(
+            "/audits",
+            files={"report": ("PRIVATE-file.csv", content, "text/csv")},
+            data={"consent": "on", "locale": locale, f"col_{role}": chosen[role]},
+            headers={"Accept": "text/html"},
+        )
+    assert answer.status_code == 422
+    # A lone date choice cannot select a reader yet: exercise missing_fields.
+    # A profit choice reaches the reader's explicit unknown-column refusal.
+    code = "unknown_format" if role == "date" else "universal_unknown_column"
+    assert (
+        f"mapping page: code={code} pdf=False columns=2 samples=2 "
+        f"guessed=1 chosen=1 locale={locale}"
+    ) in caplog.text
+    if role == "date":
+        assert missing_fields(chosen, locale) in answer.text
+    assert "PRIVATE" not in caplog.text
+    assert find_claims(answer.text) == []
 
 
 def test_a_mapped_column_missing_from_the_file_is_named(tmp_path: Path) -> None:

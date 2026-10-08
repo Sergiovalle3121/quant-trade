@@ -20,7 +20,7 @@ from quant_trade.audit.engine import run_audit  # noqa: E402
 from quant_trade.audit.forensics.copy import CHECK_NAMES  # noqa: E402
 from quant_trade.audit.guard import find_claims  # noqa: E402
 from quant_trade.audit.guides import GUIDES  # noqa: E402
-from quant_trade.audit.pages import upload_page, verification_page  # noqa: E402
+from quant_trade.audit.pages import AUDIT_PATHS, upload_page, verification_page  # noqa: E402
 from quant_trade.audit.prop_presets import PRESETS, preset_label  # noqa: E402
 from quant_trade.audit.report import LABELS as REPORT_LABELS  # noqa: E402
 from quant_trade.audit.report import (  # noqa: E402
@@ -299,6 +299,22 @@ def _client(tmp_path: Path, **extra: object) -> TestClient:
     values.update(extra)
     settings = AuditSettings(**values)  # type: ignore[arg-type]
     return TestClient(create_app(settings, make_store(settings.database_url)))
+
+
+def test_report_http_toolbar_links_another_upload_in_each_language(tmp_path: Path) -> None:
+    client = _client(tmp_path)
+    uploaded = _upload(client)
+    assert uploaded.status_code == 303
+    location = uploaded.headers["location"]
+    assert "?token=" in location
+    for locale in LOCALES:
+        response = client.get(location + f"&lang={locale}")
+        assert response.status_code == 200
+        toolbar = response.text.split("<div class='nav-end no-print report-toolbar'>", 1)[1]
+        toolbar = toolbar.split("</div>", 1)[0]
+        assert f"<a class='nav-account report-new-audit' href='{AUDIT_PATHS[locale]}'" in toolbar
+        assert html.escape(REPORT_LABELS[locale]["new_audit"]) in toolbar
+        assert find_claims(response.text) == []
 
 
 @pytest.mark.parametrize(

@@ -34,7 +34,14 @@ def test_landing_and_upload_explain_card_verification_once(
     for path in paths:
         response = client.get(path)
         assert response.status_code == 200
-        assert sentence in html.unescape(response.text)
+        page = html.unescape(response.text)
+        assert page.count(sentence) == 1
+        if path == paths[1]:
+            beside_drop = page.split("<div class='sticky'>", 1)[1].split(
+                "<div class='panel' data-reveal>", 1
+            )[0]
+            assert sentence in beside_drop
+            assert "<div class='drop drop-main'>" in page
         assert find_claims(response.text) == []
 
 

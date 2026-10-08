@@ -7445,11 +7445,17 @@ def _skill_html(bench: dict[str, Any], locale: str, labels: dict[str, str]) -> s
     return out
 
 
+def report_kind(data: dict[str, Any]) -> str:
+    """One classification for the report title and its public sharing text."""
+    if _fund_record(data):
+        return "fund"
+    return "account" if is_account_history(data) else "backtest"
+
+
 def _title(data: dict[str, Any], labels: dict[str, str]) -> str:
     """The report's name: a fund's track record, an account history or a backtest."""
-    if _fund_record(data):
-        return labels["title_fund"]
-    return labels["title_account" if is_account_history(data) else "title"]
+    key = {"fund": "title_fund", "account": "title_account"}.get(report_kind(data), "title")
+    return labels[key]
 
 
 def _fund_record(data: dict[str, Any]) -> bool:
@@ -7780,7 +7786,7 @@ def render_html(
             overall=str(data["verdict"]["overall"]),
             public_id=public_id,
             locale=locale,
-            kind="account" if is_account_history(data) else "backtest",
+            kind=report_kind(data),
         )
     elif publish_url and not locked:
         publish_html = (

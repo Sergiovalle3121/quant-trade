@@ -16,6 +16,10 @@ COPY = {
             "Audité el historial de mi cuenta con Rigor: clase {overall}. Consulta costos, "
             "fuera de muestra y configuraciones probadas, con etiquetas de evidencia. {url}"
         ),
+        "text_fund": (
+            "Audité el historial de mi fondo con Rigor: clase {overall}. Consulta las "
+            "comprobaciones del historial, con etiquetas de evidencia. {url}"
+        ),
         "copy": "Copiar texto",
         "done": "Texto copiado",
         "fallback": "Texto seleccionado. Usa la opción Copiar de tu dispositivo.",
@@ -34,6 +38,10 @@ COPY = {
             "I audited my account history with Rigor: class {overall}. See costs, "
             "out-of-sample data and configurations tried, with evidence labels. {url}"
         ),
+        "text_fund": (
+            "I audited my fund's track record with Rigor: class {overall}. See the "
+            "history checks, with evidence labels. {url}"
+        ),
         "copy": "Copy text",
         "done": "Text copied",
         "fallback": "Text selected. Use your device's Copy command.",
@@ -51,6 +59,10 @@ COPY = {
         "text_account": (
             "Auditei o histórico da minha conta com o Rigor: classe {overall}. Veja custos, "
             "dados fora da amostra e configurações testadas, com etiquetas de evidência. {url}"
+        ),
+        "text_fund": (
+            "Auditei o histórico do meu fundo com o Rigor: classe {overall}. Veja as "
+            "verificações do histórico, com etiquetas de evidência. {url}"
         ),
         "copy": "Copiar texto",
         "done": "Texto copiado",
@@ -75,7 +87,7 @@ def share_text(*, overall: str, public_id: str, locale: str = "es", kind: str = 
     locale = locale if locale in COPY else "es"
     if overall not in ("A", "B", "C", "D") or not public_id:
         return ""
-    key = "text_account" if kind == "account" else "text"
+    key = {"account": "text_account", "fund": "text_fund"}.get(kind, "text")
     return COPY[locale][key].format(overall=overall, url=_share_url(public_id, locale))
 
 
@@ -108,11 +120,11 @@ def share_block(*, overall: str, public_id: str, locale: str = "es", kind: str =
         f"data-copy='share-text' data-done='{escape(words['done'])}' "
         f"data-fallback='{escape(words['fallback'])}' hidden>{escape(words['copy'])}</button>"
         f"<a class='btn btn-ghost btn-sm' href='{escape(intent)}' "
-        f"rel='noopener noreferrer'>{escape(words['post'])}</a>"
+        f"target='_blank' rel='noopener noreferrer'>{escape(words['post'])}</a>"
         f"<a class='btn btn-ghost btn-sm' href='{escape(whatsapp)}' "
-        f"rel='noopener noreferrer'>{escape(words['whatsapp'])}</a>"
+        f"target='_blank' rel='noopener noreferrer'>{escape(words['whatsapp'])}</a>"
         f"<a class='btn btn-ghost btn-sm' href='{escape(telegram)}' "
-        f"rel='noopener noreferrer'>{escape(words['telegram'])}</a></div>"
+        f"target='_blank' rel='noopener noreferrer'>{escape(words['telegram'])}</a></div>"
         "<p class='muted' data-copy-status role='status' aria-live='polite'></p>"
         f"<img src='{escape(image)}' alt='{escape(words['preview'])}' "
         "width='1200' height='630' loading='lazy' style='width:100%;height:auto'>"

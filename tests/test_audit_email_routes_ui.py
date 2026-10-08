@@ -161,21 +161,32 @@ def test_confirmation_requires_a_post_and_recovery_keeps_language(
 
 
 @pytest.mark.parametrize(
-    ("locale", "notice"),
+    ("locale", "welcome_notice", "used_notice"),
     [
         (
             "es",
             "Correo confirmado. Inicia sesión para usar tu primer informe completo gratis.",
+            "Correo confirmado. Inicia sesión.",
         ),
-        ("en", "E-mail confirmed. Sign in to use your first full report, free."),
+        (
+            "en",
+            "E-mail confirmed. Sign in to use your first full report, free.",
+            "E-mail confirmed. Sign in.",
+        ),
         (
             "pt",
             "E-mail confirmado. Entre para usar seu primeiro relatório completo grátis.",
+            "E-mail confirmado. Entre.",
         ),
     ],
 )
+@pytest.mark.parametrize("welcome_used", [False, True])
 def test_confirmation_without_a_session_keeps_the_notice_on_signin(
-    tmp_path: Path, locale: str, notice: str
+    tmp_path: Path,
+    locale: str,
+    welcome_notice: str,
+    used_notice: str,
+    welcome_used: bool,
 ) -> None:
     client, store = _client(tmp_path)
     paths = account_pages.PATHS[locale]
@@ -189,6 +200,14 @@ def test_confirmation_without_a_session_keeps_the_notice_on_signin(
     assert created.status_code == 303
     account = store.find_account(email)
     assert account is not None
+    if welcome_used:
+        with store.engine.begin() as conn:
+            conn.execute(
+                store.welcome_reports.insert().values(
+                    account_id=account.id, created_at="2026-10-01T12:00:00Z"
+                )
+            )
+    assert store.welcome_used(account.id) is welcome_used
     token = mail.token_for(_outbox_id(store, account.id, "verify"), SECRET)
     confirm_path = mail.PATHS[locale]["verify"]
 
@@ -207,15 +226,35 @@ def test_confirmation_without_a_session_keeps_the_notice_on_signin(
     signin_url = urlsplit(account_redirect.headers["location"])
     assert signin_url.path == paths["signin"]
     assert parse_qs(signin_url.query) == {
-        "done": ["email_verified"],
+        "done": ["email_verified" if welcome_used else "email_verified_welcome"],
         "next": [paths["account"]],
     }
     signin = browser.get(account_redirect.headers["location"])
     assert signin.status_code == 200
+    notice = used_notice if welcome_used else welcome_notice
     assert f"<div class='flash' role='status'>{notice}</div>" in signin.text
+    assert (welcome_notice in signin.text) is not welcome_used
     assert account_pages.COPY[locale]["email_verified"] not in signin.text
     assert find_claims(html.unescape(signin.text)) == []
     assert accounts.SESSION_COOKIE not in browser.cookies
+    next_match = re.search(r"name='next' value='([^']+)'", signin.text)
+    assert next_match is not None
+    signed_in = browser.post(
+        paths["signin"],
+        data={
+            "email": email,
+            "password": PASSWORD,
+            "csrf": _csrf(signin.text),
+            "next": html.unescape(next_match.group(1)),
+        },
+        follow_redirects=False,
+    )
+    assert signed_in.status_code == 303
+    assert signed_in.headers["location"] == paths["account"]
+    account_page = browser.get(signed_in.headers["location"])
+    assert account_page.status_code == 200
+    assert notice not in account_page.text
+    assert "<div class='flash'" not in account_page.text
 
 
 @pytest.mark.parametrize("locale", account_pages.LANGUAGES)
@@ -224,7 +263,13 @@ def test_signin_only_shows_allowed_flashes_and_account_only_forwards_confirmatio
 ) -> None:
     client, _ = _client(tmp_path)
     paths = account_pages.PATHS[locale]
-    for done in ("email_pending", "email_verified_signin", "unknown", "<script>"):
+    for done in (
+        "email_pending",
+        "email_verified_signin",
+        "email_verified_welcome_signin",
+        "unknown",
+        "<script>",
+    ):
         signin = client.get(paths["signin"], params={"done": done})
         assert signin.status_code == 200
         assert "<div class='flash'" not in signin.text
@@ -238,3 +283,7 @@ def test_signin_only_shows_allowed_flashes_and_account_only_forwards_confirmatio
     signed_out = client.get(paths["signin"], params={"done": "signed_out"})
     assert html.escape(account_pages.COPY[locale]["signed_out"]) in signed_out.text
     assert "<div class='flash'" in signed_out.text
+    confirmed = client.get(paths["signin"], params={"done": "email_verified"})
+    assert account_pages.COPY[locale]["email_verified_signin"] in confirmed.text
+    assert account_pages.COPY[locale]["email_verified_welcome_signin"] not in confirmed.text
+    assert find_claims(html.unescape(confirmed.text)) == []

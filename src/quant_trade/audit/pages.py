@@ -19,7 +19,6 @@ from typing import Any
 from urllib.parse import urlencode
 
 from quant_trade.audit import institutional, reading
-from quant_trade.audit.account import is_account_history
 from quant_trade.audit.accounts import FREE_PREVIEWS_PER_MONTH as _FREE
 from quant_trade.audit.articles import (
     ARTICLES,
@@ -89,6 +88,7 @@ from quant_trade.audit.report import (
     evidence_label,
     localize_tags,
     localize_text_nodes,
+    report_kind,
     source_name,
 )
 from quant_trade.audit.seo import (
@@ -2981,7 +2981,7 @@ def verification_page(
             overall=overall,
             public_id=public_id,
             locale=locale,
-            kind="account" if is_account_history(result) else "backtest",
+            kind=report_kind(result),
         )
         + "</div></div>"
     )
