@@ -17,12 +17,14 @@ pytest.importorskip("sqlalchemy")
 from fastapi.testclient import TestClient  # noqa: E402
 
 from quant_trade.audit import funnel, public_card, raster, reading, reading_png  # noqa: E402
-from quant_trade.audit.calculator import (  # noqa: E402
+from quant_trade.audit.calculator import (
+    # noqa: E402
     CALCULATOR_PATH,
     CARD_FIELDS,
     CARD_REQUESTS_PER_HOUR,
     COPY,
     CalculatorInput,
+    calculator_copy,
     compute,
     parse_input,
     read_input,
@@ -161,6 +163,8 @@ def test_one_configuration_card_shows_the_what_if_rows(locale: str) -> None:
         assert f"{row['luck_sharpe']['value']:.2f}" in shown
         assert f"{row['trials']:,}" in shown
         assert f"{row['years_needed']['value']:.1f}" in shown
+        # A hypothetical count is neither measured nor declared: no evidence tag.
+        assert node.get("data-evidence") is None and "DECLARED" not in shown
     assert root.find(".//s:g[@data-reading='sharpe_after']", NS) is None
     text = " ".join(root.itertext())
     assert find_claims(text) == []
@@ -310,12 +314,12 @@ def test_png_limit_is_sixty_per_hour_and_page_never_429(
     blocked = client.get("/calculadora/card.png", params=CARD)
     assert blocked.status_code == 429
     assert blocked.headers["retry-after"] == "3600"
-    assert blocked.text == reading.COPY["es"]["limited"]
+    assert blocked.text == calculator_copy("es")["card_limited"]
     assert "public" not in blocked.headers.get("cache-control", "")
     for locale in ("en", "pt"):
         other = client.get(CALCULATOR_PATH[locale] + "/card.png", params=CARD)
         assert other.status_code == 429
-        assert other.text == reading.COPY[locale]["limited"]
+        assert other.text == calculator_copy(locale)["card_limited"]
     page = client.get("/calculadora", params=FORM)
     assert page.status_code == 200
     assert _meta(page.text, "og:image") == f"{BASE}/static/og-es.png"
@@ -472,3 +476,13 @@ def test_png_generation_uses_no_network_database_or_files(
         if path.is_file()
     }
     assert after == before
+
+
+@pytest.mark.parametrize("locale", ["es", "en", "pt"])
+def test_card_limit_message_speaks_of_calculator_cards(locale: str) -> None:
+    from quant_trade.audit.calculator import calculator_copy
+
+    words = calculator_copy(locale)["card_limited"]
+    assert find_claims(words) == []
+    assert {"es": "calculadora", "en": "calculator", "pt": "calculadora"}[locale] in words
+    assert "lectura" not in words.lower() and "reading" not in words.lower()

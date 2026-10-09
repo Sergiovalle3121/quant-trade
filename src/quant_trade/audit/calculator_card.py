@@ -144,13 +144,12 @@ def calculator_card_svg(value: CalculatorInput, locale: str) -> str:
                 f"{words['col_years']} {row['years_needed']['value']:.1f}"
             )
             parts += [
-                f'<g data-reading="what_if" data-trials="{row["trials"]}" '
-                'data-evidence="DECLARED">',
+                # A row is a hypothetical count of configurations, not something declared.
+                f'<g data-reading="what_if" data-trials="{row["trials"]}">',
                 f'<rect x="40" y="{y}" width="1120" height="78" rx="9" '
                 'fill="#ffffff" stroke="#d6dde0"/>',
             ]
-            text(56, y + 24, computed, NOTE_SIZE, _MUTED)
-            text(56, y + 58, line, 22, _ACCENT)
+            text(56, y + 47, line, 22, _ACCENT)
             parts.append("</g>")
         next_y = 474
     # The arithmetic's own assumptions: frequency, no skew, normal tails.

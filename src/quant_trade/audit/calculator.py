@@ -232,6 +232,10 @@ COPY: dict[str, dict[str, Any]] = {
             "con Rigor. Esta tarjeta no es una auditoría. {url}"
         ),
         "card_title": "Rigor · calculadora de suerte",
+        "card_limited": (
+            "Demasiadas tarjetas de la calculadora desde esta dirección. "
+            "Inténtalo de nuevo más tarde."
+        ),
         # The reader's own notice, word for word: the link carries the figures.
         "card_public": (
             "El enlace compartido contiene las cifras que escribes; "
@@ -339,6 +343,7 @@ COPY: dict[str, dict[str, Any]] = {
             "Rigor. This card is not an audit. {url}"
         ),
         "card_title": "Rigor · luck calculator",
+        "card_limited": "Too many calculator cards from this address. Try again later.",
         "card_public": (
             "The shared link contains the figures you enter; anyone with the link can read them."
         ),
@@ -444,6 +449,9 @@ COPY: dict[str, dict[str, Any]] = {
             "Rigor. Este cartão não é uma auditoria. {url}"
         ),
         "card_title": "Rigor · calculadora de sorte",
+        "card_limited": (
+            "Cartões da calculadora demais a partir deste endereço. Tente novamente mais tarde."
+        ),
         "card_public": (
             "O link compartilhado contém os números que você informa; "
             "qualquer pessoa com o link pode lê-los."

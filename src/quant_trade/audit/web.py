@@ -70,6 +70,7 @@ from quant_trade.audit.calculator import (
     CARD_FIELDS,
     CARD_REQUESTS_PER_HOUR,
     CalculatorInput,
+    calculator_copy,
     calculator_url,
     compute,
     read_input,
@@ -6333,7 +6334,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         ip = _client_ip(request, cfg.trusted_proxy_hops)
         if calculator_attempts.hit(ip, datetime.now(UTC)) >= CARD_REQUESTS_PER_HOUR:
             return PlainTextResponse(
-                guard_page(reading.COPY[locale]["limited"]),
+                guard_page(calculator_copy(locale)["card_limited"]),
                 status_code=429,
                 headers={"Retry-After": "3600"},
             )
