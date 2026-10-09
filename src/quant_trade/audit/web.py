@@ -2090,9 +2090,11 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     def _audit_form(request: Request, locale: str, extras: int, done: str = "") -> Response:
         signed_in = _session(request) is not None
         # Only the known value is shown, so the query cannot inject text.
-        notice = ""
+        notice = notice_link = ""
         if done == "welcome_confirm" and _confirm_pending(request):
             notice = account_pages.COPY[locale]["welcome_confirm"]
+            # While the e-mail arrives, the export guides.
+            notice_link = account_pages.welcome_confirm_guides(locale)
         if not signed_in and not cfg.free_mode:
             # Uploads need an account: sign up (or sign in) first, then come back here,
             # so nobody fills the form and loses it.
@@ -2110,6 +2112,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 extras_open=bool(extras),
                 signed_in=signed_in,
                 notice=notice,
+                notice_link_html=notice_link,
             )
         )
 
@@ -2560,6 +2563,13 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         "passkey_full",
     )
 
+    def _offer() -> str:
+        """What a new visitor gets for a first file: every full report free (free
+        mode), the free first full report with an account, or neither."""
+        if cfg.free_mode:
+            return "free"
+        return "welcome" if acct.WELCOME_FULL_REPORT else "paid"
+
     def _referrals_on() -> bool:
         # The reward is paid when the invitee's free first report exists and
         # both addresses are confirmed, so without mail nothing is offered.
@@ -2728,6 +2738,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 csrf=csrf,
                 next_path=acct.safe_next(next),
                 invite=_invite(invita) if _referrals_on() else "",
+                email_verification=cfg.email_verification_required,
+                offer=_offer(),
             )
             return _anon_page(page, csrf)
 
@@ -2767,6 +2779,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                     # A ticked "keep what I typed" box survives the next error.
                     typo_of=typo_of or (clean if email_as_typed else ""),
                     typo_kept=bool(email_as_typed) and not typo_of,
+                    email_verification=cfg.email_verification_required,
+                    offer=_offer(),
                 )
                 answer = _anon_page(page, new_csrf, status)
                 if status == 429:
@@ -6095,6 +6109,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                     head_meta=sample_meta(locale, base_url),
                     pdf_url=(SAMPLE_PDF_PATHS[locale] if pdf_ok else None),
                     tools_link=True,
+                    sample_cta=True,
+                    sample_offer=_offer(),
                 )
                 # The tab title ends with the report's id, "sample": show the
                 # page's own word. Nothing inside the report changes.

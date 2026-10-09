@@ -55,6 +55,20 @@ PRICING_COPY: dict[str, dict[str, str]] = {
         "one_off": "Los pagos son únicos: no hay suscripción ni cargos recurrentes.",
         "institutional": "Para gestoras: solicitar una revisión institucional",
         "limits": "Lo que Rigor no hace",
+        "start_title": "Empieza por el informe gratis",
+        "start_text": (
+            "El primer informe completo es el mismo informe que los de pago, con PDF. "
+            "Necesitas una cuenta y el archivo que exporta tu plataforma."
+        ),
+        "start_button": "Crear cuenta y pedir mi primer informe",
+        "start_text_free": (
+            "Ahora todos los informes completos son gratis, con PDF. Solo necesitas el archivo "
+            "que exporta tu plataforma."
+        ),
+        "start_button_free": "Pedir mi informe gratis",
+        "start_sample": "Ver el informe de ejemplo",
+        "start_guides": "Guías de exportación",
+        "start_calculator": "¿Aún sin archivo? La calculadora de suerte es gratis y sin registro.",
     },
     "en": {
         "title": "Full report pricing",
@@ -99,6 +113,20 @@ PRICING_COPY: dict[str, dict[str, str]] = {
         "one_off": "Payments are one-off: there is no subscription or recurring charge.",
         "institutional": "For asset managers: request an institutional review",
         "limits": "What Rigor does not do",
+        "start_title": "Start with the free report",
+        "start_text": (
+            "The first full report is the same report as the paid ones, with the PDF. "
+            "You need an account and the file your platform exports."
+        ),
+        "start_button": "Create an account and get my first report",
+        "start_text_free": (
+            "All full reports are currently free, with the PDF. You only need the file your "
+            "platform exports."
+        ),
+        "start_button_free": "Get my free report",
+        "start_sample": "See the sample report",
+        "start_guides": "Export guides",
+        "start_calculator": "No file yet? The luck calculator is free and needs no sign-up.",
     },
     "pt": {
         "title": "Preços dos relatórios",
@@ -143,8 +171,61 @@ PRICING_COPY: dict[str, dict[str, str]] = {
         "one_off": "Os pagamentos são únicos: não há assinatura nem cobranças recorrentes.",
         "institutional": "Para gestoras: solicitar uma revisão institucional",
         "limits": "O que a Rigor não faz",
+        "start_title": "Comece pelo relatório grátis",
+        "start_text": (
+            "O primeiro relatório completo é o mesmo relatório dos pagos, com o PDF. "
+            "Você precisa de uma conta e do arquivo que a sua plataforma exporta."
+        ),
+        "start_button": "Criar conta e pedir o meu primeiro relatório",
+        "start_text_free": (
+            "Agora todos os relatórios completos são grátis, com o PDF. Você só precisa do "
+            "arquivo que a sua plataforma exporta."
+        ),
+        "start_button_free": "Pedir o meu relatório grátis",
+        "start_sample": "Ver o relatório de exemplo",
+        "start_guides": "Guias de exportação",
+        "start_calculator": "Ainda sem arquivo? A calculadora de sorte é grátis e sem cadastro.",
     },
 }
+
+
+def start_cta(settings: AuditSettings, locale: str) -> str:
+    """The page's closing call: the free report first, as the configuration offers it.
+
+    Free mode: every full report is free and the form needs no account. Otherwise,
+    with the welcome report on, the first full report is free with an account (and
+    a confirmed e-mail when that is required). Without either, the articles' call.
+    """
+    # Lazy imports, as in ``pricing_page``: pages imports this module.
+    from quant_trade.audit.accounts import WELCOME_FULL_REPORT
+    from quant_trade.audit.calculator import calculator_url
+    from quant_trade.audit.guides import guides_index_url
+    from quant_trade.audit.pages import SAMPLE_PAGE_PATHS, _articles_cta, _e, audit_path
+    from quant_trade.audit.theme import icon
+
+    locale = locale if locale in PRICING_COPY else "es"
+    words = PRICING_COPY[locale]
+    if settings.free_mode:
+        text, button = words["start_text_free"], words["start_button_free"]
+    elif WELCOME_FULL_REPORT:
+        text, button = words["start_text"], words["start_button"]
+        if settings.email_verification_required:
+            text += " " + words["email_note"]
+    else:
+        return _articles_cta(locale)
+    return (
+        f"<section class='article-cta'><h2>{_e(words['start_title'])}</h2><p>{_e(text)}</p>"
+        "<div class='back-row'>"
+        f"<a class='btn btn-dark' href='{_e(audit_path(locale))}'>{_e(button)}"
+        f"<span class='go'>{icon('arrow')}</span></a>"
+        f"<a class='link-more' href='{_e(SAMPLE_PAGE_PATHS[locale])}'>"
+        f"{_e(words['start_sample'])}{icon('arrow')}</a>"
+        f"<a class='link-more' href='{_e(guides_index_url(locale))}'>"
+        f"{_e(words['start_guides'])}{icon('arrow')}</a></div>"
+        f"<p class='start-calculator' style='margin-top:12px'>"
+        f"<a href='{_e(calculator_url(locale))}'>{_e(words['start_calculator'])}</a></p>"
+        "</section>"
+    )
 
 
 def pricing_page(
@@ -156,7 +237,6 @@ def pricing_page(
     from quant_trade.audit.pages import (
         _COPY,
         CONTACT_PATHS,
-        _articles_cta,
         _e,
         _home,
         _language_crumbs,
@@ -262,6 +342,6 @@ def pricing_page(
         f"<section class='rsec'><h2>{_e(words['payment'])}</h2>{payment}"
         f"<p><a href='{REVIEW_PATHS[locale]}'>{_e(words['institutional'])}</a></p></section>"
         f"<section class='rsec'><h2>{_e(words['limits'])}</h2>"
-        f"<p>{_e(landing['not'])}</p></section>" + _articles_cta(locale) + "</div></div>"
+        f"<p>{_e(landing['not'])}</p></section>" + start_cta(settings, locale) + "</div></div>"
     )
     return _page(title, locale, body, meta_html=meta, alternates=PRICING_PATH, solid_nav=True)
