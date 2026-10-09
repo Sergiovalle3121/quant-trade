@@ -1076,6 +1076,30 @@ REPORT: dict[str, Any] = {
         "ch_ladder_low_out_of_sample": "só fora da amostra",
         "ch_ladder_low_reference_cost": "com o custo de referência",
         "ch_ladder_low_luck_haircut": "com a sorte descontada",
+        "ch_size_title": "Em que tamanho? O desafio a 0.5x, 1x, 1.5x e 2x",
+        "ch_size_intro": (
+            "O mesmo programa da escada ({program}), com outro tamanho. Em cada linha, atingir "
+            "a meta, romper uma perda e não atingir a meta dentro do limite repartem todas as "
+            "simulações, contando todas as fases. A tabela mostra o que muda com o tamanho; não "
+            "aconselha nenhum."
+        ),
+        "ch_size_one": (
+            "1x é o tamanho do histórico que você enviou: cada dia simulado ganha ou perde a "
+            "mesma porcentagem do saldo que um dia do arquivo. 0.5x é a metade desse tamanho e "
+            "2x, o dobro."
+        ),
+        "ch_size_lot": "Lote ou risco por operação a 1x",
+        "ch_size_account": (
+            "Conta que o programa nomeia: {size} USD. Os seus limites em dólares são simulados "
+            "como porcentagens dessa conta."
+        ),
+        "ch_size_no_account": (
+            "As regras deste programa são porcentagens do saldo inicial: a tabela é a mesma "
+            "para qualquer tamanho de conta."
+        ),
+        "ch_size_size": "Tamanho",
+        "ch_size_unfinished": "Não atinge a meta dentro do limite ({days} dias úteis)",
+        "ch_size_assumption": "Método e premissa: {note}.",
         "assumptions": "Premissas",
         "source": "Fonte",
         "as_of": "lida em",
@@ -1654,6 +1678,10 @@ REPORT: dict[str, Any] = {
         "capital": "Quanto capital exige e com qual tamanho de posição",
         "challenge": (
             "Com que frequência tocaria os limites de um desafio de mesa proprietária (prop firm)"
+        ),
+        "ch_size_title": (
+            "Em que tamanho? O desafio a 0.5x, 1x, 1.5x e 2x o tamanho do histórico, com a "
+            "probabilidade de atingir a meta e de romper cada perda"
         ),
         "questions": "O que perguntar ao vendedor ou ao gestor",
         "performance": "Rentabilidade anual, volatilidade e drawdown máximo medidos",
@@ -3994,6 +4022,44 @@ RULES: tuple[tuple[str, str], ...] = (
             "proporção de todos os percursos reamostrados que chegam ao objetivo com o melhor "
             "dia dentro da regra do melhor dia da firma; a regra é conferida ao atingir o "
             "objetivo, com fechamentos diários"
+        ),
+    ),
+    (
+        (
+            "the ladder's full-history row with every daily return multiplied by the size; it "
+            "assumes that changing the size scales every daily return in the same proportion, "
+            "as linear leverage does when the costs per trade and the execution do not change"
+        ),
+        (
+            "a linha do histórico completo da escada com cada retorno diário multiplicado pelo "
+            "tamanho; supõe que mudar o tamanho escala cada retorno diário na mesma proporção, "
+            "como faz a alavancagem linear quando os custos por operação e a execução não mudam"
+        ),
+    ),
+    (
+        "the audit keeps neither the lot nor the stop loss of each trade, so the lot or risk "
+        "per trade at 1x is not known",
+        "a auditoria não guarda o lote nem o stop loss de cada operação, então o lote ou o "
+        "risco por operação a 1x não é conhecido",
+    ),
+    (
+        "account size in US dollars that the program names; its limits are shares of it",
+        "tamanho de conta em dólares americanos que o programa nomeia; seus limites são "
+        "porcentagens dela",
+    ),
+    (
+        "the program's rules are shares of the starting balance; it names no account size",
+        "as regras do programa são porcentagens do saldo inicial; ele não nomeia um tamanho de "
+        "conta",
+    ),
+    (
+        (
+            "share of the resampled paths that end the program this way: each phase is a fresh "
+            "start reached only by passing the phases before it"
+        ),
+        (
+            "proporção dos percursos reamostrados que terminam o programa assim: cada fase é um "
+            "recomeço ao qual só se chega passando pelas anteriores"
         ),
     ),
     (

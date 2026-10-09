@@ -1255,6 +1255,37 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
         "cierres diarios",
     ),
     (
+        "the ladder's full-history row with every daily return multiplied by the size; it "
+        "assumes that changing the size scales every daily return in the same proportion, as "
+        "linear leverage does when the costs per trade and the execution do not change",
+        "la fila de historia completa de la escalera con cada retorno diario multiplicado por "
+        "el tamaño; supone que cambiar el tamaño escala cada retorno diario en la misma "
+        "proporción, como hace el apalancamiento lineal cuando no cambian los costos por "
+        "operación ni la ejecución",
+    ),
+    (
+        "the audit keeps neither the lot nor the stop loss of each trade, so the lot or risk "
+        "per trade at 1x is not known",
+        "la auditoría no guarda el lote ni el stop loss de cada operación, así que no se "
+        "conoce el lote ni el riesgo por operación a 1x",
+    ),
+    (
+        "account size in US dollars that the program names; its limits are shares of it",
+        "tamaño de cuenta en dólares estadounidenses que nombra el programa; sus límites son "
+        "porcentajes de ella",
+    ),
+    (
+        "the program's rules are shares of the starting balance; it names no account size",
+        "las reglas del programa son porcentajes del balance inicial; no nombra un tamaño de "
+        "cuenta",
+    ),
+    (
+        "share of the resampled paths that end the program this way: each phase is a fresh "
+        "start reached only by passing the phases before it",
+        "proporción de los recorridos remuestreados que terminan el programa así: cada fase es "
+        "un comienzo nuevo al que solo se llega pasando las anteriores",
+    ),
+    (
         "the curve covers none of the dated market falls in full",
         "la curva no cubre completa ninguna de las caídas de mercado con fecha",
     ),

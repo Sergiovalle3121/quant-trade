@@ -378,6 +378,10 @@ LOCKED_GAINS: dict[str, dict[str, str]] = {
         "forward": "Si aguanta en el tramo forward que no se usó para ajustarla",
         "capital": "Qué capital pide y a qué tamaño de posición",
         "challenge": "Con qué frecuencia tocaría los límites de un reto de prop firm",
+        "ch_size_title": (
+            "¿A qué tamaño? El reto a 0.5x, 1x, 1.5x y 2x el tamaño del historial, con la "
+            "probabilidad de llegar al objetivo y de romper cada pérdida"
+        ),
         "questions": "Qué preguntarle al vendedor o al gestor",
         "performance": "Rentabilidad anual, volatilidad y caída máxima medidas",
         "significance": "Si el resultado se distingue de la suerte",
@@ -419,6 +423,10 @@ LOCKED_GAINS: dict[str, dict[str, str]] = {
         "forward": "Whether it holds in the forward period not used for tuning",
         "capital": "How much capital it needs and at what position size",
         "challenge": "How often it would hit a prop-firm challenge's limits",
+        "ch_size_title": (
+            "At what size? The challenge at 0.5x, 1x, 1.5x and 2x the history's size, with the "
+            "chance of reaching the target and of breaking each loss limit"
+        ),
         "questions": "What to ask the vendor or manager",
         "performance": "Annual return, volatility and maximum drawdown as measured",
         "significance": "Whether the result stands out from luck",
@@ -1776,6 +1784,30 @@ LABELS: dict[str, dict[str, str]] = {
         "ch_ladder_low_out_of_sample": "solo fuera de muestra",
         "ch_ladder_low_reference_cost": "con el costo de referencia",
         "ch_ladder_low_luck_haircut": "con la suerte descontada",
+        "ch_size_title": "¿A qué tamaño? El reto a 0.5x, 1x, 1.5x y 2x",
+        "ch_size_intro": (
+            "El mismo programa que la escalera ({program}), con otro tamaño. En cada fila, "
+            "llegar al objetivo, romper una pérdida y no llegar dentro del tope se reparten "
+            "todas las simulaciones, contando todas las fases. La tabla muestra qué cambia con "
+            "el tamaño; no aconseja ninguno."
+        ),
+        "ch_size_one": (
+            "1x es el tamaño del historial que subiste: cada día simulado gana o pierde el "
+            "mismo porcentaje del balance que un día del archivo. 0.5x es la mitad de ese "
+            "tamaño y 2x, el doble."
+        ),
+        "ch_size_lot": "Lote o riesgo por operación a 1x",
+        "ch_size_account": (
+            "Cuenta que nombra el programa: {size} USD. Sus límites en dólares se simulan como "
+            "porcentajes de esa cuenta."
+        ),
+        "ch_size_no_account": (
+            "Las reglas de este programa son porcentajes del balance inicial: la tabla es la "
+            "misma para cualquier tamaño de cuenta."
+        ),
+        "ch_size_size": "Tamaño",
+        "ch_size_unfinished": "No llega al objetivo dentro del tope ({days} días hábiles)",
+        "ch_size_assumption": "Método y supuesto: {note}.",
         "assumptions": "Supuestos",
         "source": "Fuente",
         "as_of": "leída el",
@@ -3206,6 +3238,30 @@ LABELS: dict[str, dict[str, str]] = {
         "ch_ladder_low_out_of_sample": "out-of-sample only",
         "ch_ladder_low_reference_cost": "with the reference cost",
         "ch_ladder_low_luck_haircut": "with the luck discounted",
+        "ch_size_title": "At what size? The challenge at 0.5x, 1x, 1.5x and 2x",
+        "ch_size_intro": (
+            "The same program as the ladder ({program}), at another size. In each row, "
+            "reaching the target, breaking a loss limit and not reaching the target within "
+            "the cap share out all the simulations, counting every phase. The table shows "
+            "what changes with the size; it advises none."
+        ),
+        "ch_size_one": (
+            "1x is the size of the history you uploaded: each simulated day gains or loses "
+            "the same share of the balance as a day of the file. 0.5x is half that size and "
+            "2x is double."
+        ),
+        "ch_size_lot": "Lot or risk per trade at 1x",
+        "ch_size_account": (
+            "Account the program names: {size} USD. Its dollar limits are simulated as shares "
+            "of that account."
+        ),
+        "ch_size_no_account": (
+            "This program's rules are shares of the starting balance: the table is the same "
+            "for any account size."
+        ),
+        "ch_size_size": "Size",
+        "ch_size_unfinished": "Does not reach the target within the cap ({days} business days)",
+        "ch_size_assumption": "Method and assumption: {note}.",
         "assumptions": "Assumptions",
         "source": "Source",
         "as_of": "read on",
@@ -5243,6 +5299,14 @@ def _challenge_html(
             challenge.get("scenarios"), locale, labels, optimistic=optimistic
         )
         html_text += ladder
+        html_text += _challenge_sizing_html(
+            challenge.get("sizing"),
+            locale,
+            labels,
+            rules=rules,
+            horizon=horizon,
+            optimistic=optimistic,
+        )
     notes = rules.get("notes") or []
     if notes:
         html_text += (
@@ -5391,6 +5455,104 @@ def _challenge_ladder_html(
         f"<table class='timing firms'><thead><tr>{head}</tr></thead>"
         f"<tbody>{''.join(line(row) for row in rows)}</tbody></table>"
     )
+    if optimistic:
+        out += f"<p><strong>{_e(labels['ff_optimistic'])}</strong></p>"
+    return out
+
+
+def _sizing_shown(challenge: dict[str, Any] | None) -> bool:
+    """Whether the challenge section carries the size table with figures."""
+    challenge = challenge or {}
+    sizing = challenge.get("sizing") or {}
+    return (
+        challenge.get("status") == "MEASURED"
+        and sizing.get("status") == "MEASURED"
+        and bool(sizing.get("rows"))
+    )
+
+
+def _challenge_sizing_html(
+    sizing: dict[str, Any] | None,
+    locale: str,
+    labels: dict[str, str],
+    *,
+    rules: dict[str, Any],
+    horizon: int | None,
+    optimistic: bool = False,
+) -> str:
+    """The chosen program at 0.5x, 1x, 1.5x and 2x the history's size, under
+    the ladder: what changes with the size, never which size to use."""
+    if not sizing:
+        return ""
+    title = f"<h3>{_e(labels['ch_size_title'])}</h3>"
+    if sizing.get("status") != "MEASURED" or not sizing.get("rows"):
+        reason = localize(str(sizing.get("reason") or ""), locale)
+        return f"{title}<p>{_badge('NOT_MEASURED')} <span class='muted'>{_e(reason)}</span></p>"
+    program = sizing.get("program") or {}
+    phases = int(program.get("phases") or 1)
+    scope = _program_name(program, locale)
+    if phases > 1:
+        scope += ", " + _phases(phases, labels)
+    rows = sizing["rows"]
+    clean = any(row.get("pass_within_best_day") for row in rows)
+    daily_rule = rules.get("max_daily_loss") is not None
+    unfinished = (
+        labels["ch_size_unfinished"].format(days=horizon)
+        if rules.get("time_limit_days") is None and horizon
+        else labels["unfinished"]
+    )
+    columns = [("pass", labels["ch_ladder_pass"])]
+    if clean:
+        columns.append(("pass_within_best_day", labels["ff_clean"]))
+    columns += [
+        ("fail_daily_loss", labels["fail_daily_loss"]),
+        ("fail_total_loss", labels["fail_total_loss"]),
+        ("unfinished", unfinished),
+    ]
+
+    def cell(row: dict[str, Any], key: str, label: str) -> str:
+        item = row.get(key)
+        if (key == "fail_daily_loss" and not daily_rule) or not item:
+            return f"<td class='val muted' data-l='{_e(label)}'>{_e(labels['ff_no_rule'])}</td>"
+        shown = _firm_pct(float(item["value"]))
+        return f"<td class='val' data-l='{_e(label)}'>{_e(shown)}</td>"
+
+    def line(row: dict[str, Any]) -> str:
+        cells = "".join(cell(row, key, label) for key, label in columns)
+        return f"<tr><td>{_e(str(row.get('key', '')))}</td>{cells}</tr>"
+
+    head = f"<th>{_e(labels['ch_size_size'])}</th>" + "".join(
+        f"<th class='val'>{_e(label)}</th>" for _, label in columns
+    )
+    per_trade = sizing.get("size_per_trade") or {}
+    account = sizing.get("account_size") or {}
+    out = (
+        title
+        + f"<p class='muted'>{_e(labels['ch_size_intro'].format(program=scope))} "
+        + f"{_badge('MEASURED')}</p>"
+        + f"<p>{_e(labels['ch_size_one'])}</p>"
+    )
+    if per_trade.get("evidence") == "NOT_MEASURED":
+        reason = localize(str(per_trade.get("note") or ""), locale)
+        out += (
+            f"<p>{_e(labels['ch_size_lot'])}: {_badge('NOT_MEASURED')} "
+            f"<span class='muted'>{_e(reason)}</span></p>"
+        )
+    if account.get("evidence") == "DECLARED" and account.get("value"):
+        size = f"{float(account['value']):,.0f}"
+        out += (
+            f"<p class='muted'>{_e(labels['ch_size_account'].format(size=size))} "
+            f"{_badge('DECLARED')}</p>"
+        )
+    else:
+        out += f"<p class='muted'>{_e(labels['ch_size_no_account'])}</p>"
+    out += (
+        f"<table class='timing firms'><thead><tr>{head}</tr></thead>"
+        f"<tbody>{''.join(line(row) for row in rows)}</tbody></table>"
+    )
+    if sizing.get("note"):
+        note = localize(str(sizing["note"]), locale)
+        out += f"<p class='muted'>{_e(labels['ch_size_assumption'].format(note=note))}</p>"
     if optimistic:
         out += f"<p><strong>{_e(labels['ff_optimistic'])}</strong></p>"
     return out
@@ -8255,6 +8417,24 @@ def _locked_gains(titles: list[str], labels: dict[str, str], locale: str) -> lis
     return out
 
 
+def _locked_titles(
+    detail: list[tuple[str, str]], data: dict[str, Any], labels: dict[str, str]
+) -> list[str]:
+    """The titles the lockbox offers, in the report's order: each section with
+    something to show, and the size table right after the challenge section."""
+    titles: list[str] = []
+    for title, body in detail:
+        if _only_unmeasured(body):
+            continue
+        # Falls of markets the history does not trade are not on offer.
+        if title == labels["crises"] and not _crises_apply(data):
+            continue
+        titles.append(title)
+        if title == labels["challenge"] and _sizing_shown(data.get("challenge")):
+            titles.append(labels["ch_size_title"])
+    return titles
+
+
 def _only_unmeasured(body: str) -> bool:
     """True when a section has nothing but NOT_MEASURED marks to show."""
     return "badge NOT_MEASURED" in body and not any(
@@ -9147,17 +9327,7 @@ def render_html(
             f"<div class='lockbox' id='unlock'><p>{_e(labels['locked_intro'])}:</p><ul>"
             + "".join(
                 f"<li>{_e(gain)}</li>"
-                for gain in _locked_gains(
-                    [
-                        title
-                        for title, body in detail
-                        if not _only_unmeasured(body)
-                        # Falls of markets the history does not trade are not on offer.
-                        and (title != labels["crises"] or _crises_apply(data))
-                    ],
-                    labels,
-                    locale,
-                )
+                for gain in _locked_gains(_locked_titles(detail, data, labels), labels, locale)
             )
             + "</ul>"
             f"<p class='lock-sample'><a href='{sample_href}' target='_blank' rel='noopener'>"

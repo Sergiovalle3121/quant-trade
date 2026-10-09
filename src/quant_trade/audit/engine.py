@@ -57,7 +57,7 @@ from quant_trade.audit import testdata as testdata_lib
 from quant_trade.audit import timing as timing_lib
 from quant_trade.audit.guard import find_claims, scan_client_text
 from quant_trade.audit.importers import MT4_STATEMENT_HTML, lead_number
-from quant_trade.audit.prop_presets import DEFAULT_PRESET, get_preset
+from quant_trade.audit.prop_presets import ACCOUNT_SIZES, DEFAULT_PRESET, get_preset
 from quant_trade.audit.return_series import frame_returns, return_performance
 from quant_trade.audit.schema import (
     DECLARED,
@@ -136,6 +136,27 @@ LADDER_NOT_MONEY = "the curve and the trades do not reconcile in money"
 LADDER_NOT_SHOWN = "the curve was not shown to be money"
 LADDER_NOT_SHOWN_WHY = "the curve was not shown to be money: {why}"
 LADDER_RUIN = "with the reference cost the balance reaches zero inside the history"
+#: A returns upload says nothing in money: the reconciliation and the size table
+#: give this same reason.
+RETURNS_NOT_MONEY = "uploaded returns are not money"
+#: The size table: the ladder's full-history row again with every daily return
+#: multiplied by each size. 1x is the history as uploaded.
+SIZING_MULTIPLIERS: tuple[float, ...] = (0.5, 1.0, 1.5, 2.0)
+SIZING_NOTE = (
+    "the ladder's full-history row with every daily return multiplied by the size; it assumes "
+    "that changing the size scales every daily return in the same proportion, as linear "
+    "leverage does when the costs per trade and the execution do not change"
+)
+SIZING_NO_SIZE = (
+    "the audit keeps neither the lot nor the stop loss of each trade, so the lot or risk per "
+    "trade at 1x is not known"
+)
+SIZING_ACCOUNT_NOTE = (
+    "account size in US dollars that the program names; its limits are shares of it"
+)
+SIZING_NO_ACCOUNT = (
+    "the program's rules are shares of the starting balance; it names no account size"
+)
 SERIES_MAX_POINTS = 400
 WITHHELD_TEXT = "[withheld: promotional wording]"
 NO_LOCAL_CASH = (
@@ -1154,7 +1175,7 @@ def _reconciliation(inputs: AuditInputs) -> tuple[dict[str, Any], list[redflags.
     if inputs.trades is None or not inputs.trades.trades:
         return {"status": "NOT_MEASURED", "reason": "no closed-trade ledger supplied"}, []
     if inputs.equity.source != "equity":
-        return {"status": "NOT_MEASURED", "reason": "uploaded returns are not money"}, []
+        return {"status": "NOT_MEASURED", "reason": RETURNS_NOT_MONEY}, []
 
     trades = inputs.trades.trades
     frame = inputs.equity.frame
@@ -1592,6 +1613,7 @@ def _challenge(
             "selected_by": selected_by,
             "rules": rules.to_dict(),
             "assumptions": analytics.CHALLENGE_ASSUMPTIONS,
+            "sizing": {"status": "NOT_MEASURED", "reason": reason},
         }
     daily = analytics.daily_returns_from_equity(inputs.equity.frame)
     result = analytics.simulate_challenge(daily, rules, samples=samples, seed=seed)
@@ -1599,6 +1621,7 @@ def _challenge(
     out: dict[str, Any] = {"status": status, "preset": key, "selected_by": selected_by, **result}
     if status == "NOT_MEASURED":
         out["reason"] = result["probability"]["pass"]["note"]
+        out["sizing"] = {"status": "NOT_MEASURED", "reason": out["reason"]}
     else:
         out["firm_fit"] = firmfit_lib.firm_fit(
             daily, samples=min(samples, firmfit_lib.SAMPLES), seed=seed, known={key: result}
@@ -1615,6 +1638,9 @@ def _challenge(
             money_curve=money_curve,
             luck=luck,
             reconciliation=reconciliation,
+        )
+        out["sizing"] = _challenge_sizing(
+            inputs, daily, key, result, out["scenarios"], samples=samples, seed=seed
         )
     return out
 
@@ -1790,6 +1816,66 @@ def _challenge_scenarios(
         },
         "note": LADDER_NOTE,
         "rows": rows,
+    }
+
+
+def _challenge_sizing(
+    inputs: AuditInputs,
+    daily: pd.Series,
+    key: str,
+    result: dict[str, Any],
+    scenarios: dict[str, Any],
+    *,
+    samples: int,
+    seed: int,
+) -> dict[str, Any]:
+    """The chosen program at 0.5x, 1x, 1.5x and 2x the history's size.
+
+    Each row is the ladder's full-history row (``firmfit.program_pass``: same
+    simulator, seed, paths per phase and rules) on the daily returns
+    multiplied by the size, plus how the program ends when it is not passed.
+    The 1x row is the full-history row itself. Not measured, with the same
+    reason, when the ladder's full row is not, or when the upload is returns
+    rather than money. Informational; nothing here feeds the verdict."""
+    rows: list[dict[str, Any]] = scenarios.get("rows") or []
+    full = next((row for row in rows if row.get("key") == "full"), {})
+    figure = full.get("pass") or {}
+    if figure.get("evidence") != MEASURED:
+        return {"status": "NOT_MEASURED", "reason": str(figure.get("note") or "not measured")}
+    if inputs.equity.source != "equity":
+        return {"status": "NOT_MEASURED", "reason": RETURNS_NOT_MONEY}
+    sized: list[dict[str, Any]] = []
+    for size in SIZING_MULTIPLIERS:
+        # 1x is the history untouched and the chosen phase already simulated.
+        series = daily if size == 1.0 else daily * size
+        known = {key: result} if size == 1.0 else None
+        program = firmfit_lib.program_outcomes(series, key, samples=samples, seed=seed, known=known)
+        if program["status"] != "MEASURED":
+            return {"status": "NOT_MEASURED", "reason": program["reason"]}
+        row: dict[str, Any] = {
+            "key": f"{size:g}x",
+            "multiplier": size,
+            "days": int(len(daily)),
+            "pass": program["pass"],
+            "main_risk": program["main_risk"],
+        }
+        if "pass_within_best_day" in program:
+            row["pass_within_best_day"] = program["pass_within_best_day"]
+        for fail in ("fail_daily_loss", "fail_total_loss", "unfinished"):
+            row[fail] = program[fail]
+        sized.append(row)
+    account = ACCOUNT_SIZES.get(key)
+    return {
+        "status": "MEASURED",
+        "program": scenarios.get("program"),
+        "note": SIZING_NOTE,
+        "size_per_trade": not_measured(SIZING_NO_SIZE),
+        "account_size": (
+            declared(account, SIZING_ACCOUNT_NOTE)
+            if account is not None
+            else not_measured(SIZING_NO_ACCOUNT)
+        ),
+        "rows": sized,
     }
 
 

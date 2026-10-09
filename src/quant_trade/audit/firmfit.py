@@ -41,6 +41,11 @@ NOTE = (
 )
 
 _FAILS = ("fail_daily_loss", "fail_total_loss", "unfinished")
+#: How a program ends, phase by phase, for :func:`program_outcomes`.
+OUTCOME_NOTE = (
+    "share of the resampled paths that end the program this way: each phase is a fresh "
+    "start reached only by passing the phases before it"
+)
 
 
 def _main_risk(probability: dict[str, Any]) -> str:
@@ -102,6 +107,46 @@ def program_keys(key: str) -> list[str]:
     ]
 
 
+def _phase_results(
+    daily_returns: pd.Series | np.ndarray | Sequence[float],
+    key: str,
+    *,
+    samples: int,
+    seed: int,
+    known: dict[str, dict[str, Any]] | None,
+) -> tuple[list[tuple[str, dict[str, Any]]], str | None]:
+    """Each phase of ``key``'s program simulated, or why one could not be."""
+    results: list[tuple[str, dict[str, Any]]] = []
+    for phase in program_keys(key):
+        result = (known or {}).get(phase) or simulate_challenge(
+            daily_returns,
+            PRESETS[phase],
+            samples=samples if phase == key else min(samples, SAMPLES),
+            seed=seed,
+        )
+        if not result.get("method"):
+            return [], str(result["probability"]["pass"].get("note", "not measured"))
+        results.append((phase, result))
+    return results, None
+
+
+def _outcomes(results: list[tuple[str, dict[str, Any]]]) -> dict[str, Any]:
+    """The share of paths each failure ends the whole program with.
+
+    A phase is reached only by passing the ones before it (fresh starts, as
+    the pass chance takes them), so its failures count in proportion to the
+    chance of getting there; with the program's pass chance they sum to one."""
+    reach = 1.0
+    shares = dict.fromkeys(_FAILS, 0.0)
+    for key, result in results:
+        probability = result["probability"]
+        for _ in range(REPEATS.get(key, 1)):
+            for fail in _FAILS:
+                shares[fail] += reach * float(probability[fail]["value"])
+            reach *= float(probability["pass"]["value"])
+    return {fail: measured(share, OUTCOME_NOTE) for fail, share in shares.items()}
+
+
 def program_pass(
     daily_returns: pd.Series | np.ndarray | Sequence[float],
     key: str,
@@ -116,19 +161,29 @@ def program_pass(
     ``min(samples, SAMPLES)``, as :func:`firm_fit` does next to a chosen firm,
     so with ``known={key: result}`` the row is the same as that program's row
     in the firm table."""
-    results: list[tuple[str, dict[str, Any]]] = []
-    for phase in program_keys(key):
-        result = (known or {}).get(phase) or simulate_challenge(
-            daily_returns,
-            PRESETS[phase],
-            samples=samples if phase == key else min(samples, SAMPLES),
-            seed=seed,
-        )
-        if not result.get("method"):
-            reason = result["probability"]["pass"].get("note", "not measured")
-            return {"status": "NOT_MEASURED", "reason": reason}
-        results.append((phase, result))
+    results, reason = _phase_results(daily_returns, key, samples=samples, seed=seed, known=known)
+    if reason is not None:
+        return {"status": "NOT_MEASURED", "reason": reason}
     return {"status": "MEASURED", **_program(results)}
+
+
+def program_outcomes(
+    daily_returns: pd.Series | np.ndarray | Sequence[float],
+    key: str,
+    *,
+    samples: int,
+    seed: int,
+    known: dict[str, dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    """:func:`program_pass` plus how the program ends when it is not passed.
+
+    The row is :func:`program_pass`'s, unchanged, with ``fail_daily_loss``,
+    ``fail_total_loss`` and ``unfinished`` over every phase (see
+    :func:`_outcomes`); with ``pass`` they sum to one."""
+    results, reason = _phase_results(daily_returns, key, samples=samples, seed=seed, known=known)
+    if reason is not None:
+        return {"status": "NOT_MEASURED", "reason": reason}
+    return {"status": "MEASURED", **_program(results), **_outcomes(results)}
 
 
 def firm_fit(
@@ -173,4 +228,12 @@ def firm_fit(
     return out
 
 
-__all__ = ["REPEATS", "SAMPLES", "firm_fit", "program_keys", "program_pass"]
+__all__ = [
+    "OUTCOME_NOTE",
+    "REPEATS",
+    "SAMPLES",
+    "firm_fit",
+    "program_keys",
+    "program_outcomes",
+    "program_pass",
+]

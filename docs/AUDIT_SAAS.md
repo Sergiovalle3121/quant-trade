@@ -1264,6 +1264,50 @@ and report wire them in during the integration step):
   `/v`, the badge or the card. Every preset has `time_limit_days=None`, so
   "unfinished" reads as not reaching the target within the simulator's
   250 business days, the cap, never as a deadline the rules set.
+- `challenge.sizing`, the size table ("¿A qué tamaño? El reto a 0.5x, 1x,
+  1.5x y 2x", under the ladder): the ladder's `full` row again with every
+  daily return of the history multiplied by 0.5, 1, 1.5 and 2
+  (`SIZING_MULTIPLIERS`), through `firmfit.program_outcomes`, which is
+  `program_pass` (same simulator, seed, paths per phase and rules, all the
+  program's phases) plus how the program ends when it is not passed. JSON:
+  `{"status", "program", "note", "size_per_trade", "account_size", "rows"}`;
+  each row is `{"key": "0.5x" | "1x" | "1.5x" | "2x", "multiplier", "days",
+  "pass", "main_risk", "pass_within_best_day" (when the program has a
+  best-day rule), "fail_daily_loss", "fail_total_loss", "unfinished"}`, all
+  MEASURED. `pass` is the chance of passing every phase (the product, as in
+  the firm table); the three failures count a phase's outcome weighted by
+  the chance of reaching that phase (fresh starts, The5ers Bootcamp three
+  times), so the four figures of a row sum to one. The 1x row is the ladder's
+  `full` row itself (same `days`, `pass`, `main_risk` and
+  `pass_within_best_day`). The `note` says the assumption: changing the size
+  scales every daily return in the same proportion, as linear leverage does
+  when the costs per trade and the execution do not change. `size_per_trade`
+  is NOT_MEASURED: the importers fold each trade's lots into units of the
+  instrument and read no stop loss, so the report does not know the lot or
+  the risk per trade behind 1x and never gives one; 1x is "the size of the
+  history you uploaded" (each simulated day gains or loses the same share of
+  the balance as a day of the file). `account_size` is DECLARED only when
+  the preset's program names one (`prop_presets.ACCOUNT_SIZES`: Topstep
+  50K/100K/150K, whose dollar limits are shares of that account); otherwise
+  NOT_MEASURED, and the report says the rules are shares of the starting
+  balance, so the table is the same for any account size. The whole block is
+  NOT_MEASURED, with the same reason, when the challenge or the ladder's
+  `full` row is not measured, and with "uploaded returns are not money"
+  (`RETURNS_NOT_MONEY`, the reconciliation's own reason) for a returns
+  upload. The report shows one row per size with the chance of reaching the
+  target in every phase, within the best-day rule when the program has one,
+  of breaking the daily limit ("no rule" for programs without one), of
+  breaking the total limit and of not reaching the target within the
+  simulator's cap, in the ladder's formats (`_firm_pct`), and repeats the
+  open-loss warning ("cifras optimistas") under the same condition as the
+  ladder (`_challenge_optimistic`). It shows what changes with the size and
+  advises none. In the locked preview its title is listed after the
+  challenge simulator. Time measured with `time.perf_counter` at the
+  production 5,000 paths: about 0.17 s extra on the sample report (generic
+  preset) and 0.30 s with FTMO 2-Step (two phases), under 1 s, so every
+  size keeps the ladder's paths. Informational: no class, dimension,
+  challenge figure, ladder row or firm-table change, and nothing reaches
+  `/v`, the badge or the card.
 - `vendor_questions`: neutral questions for the seller of a robot, driven by
   the red flags and the missing inputs, in Spanish and English. It never
   says whether to buy.
