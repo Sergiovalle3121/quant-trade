@@ -73,6 +73,7 @@ from quant_trade.audit.examples import (
     examples_content,
     examples_url,
 )
+from quant_trade.audit.guide_capabilities import GUIDE_TOOL, guide_points, guide_purpose
 from quant_trade.audit.guides import (
     GUIDES,
     GUIDES_COPY,
@@ -97,7 +98,7 @@ from quant_trade.audit.portuguese import (
     UI_PT,
     link_locale,
 )
-from quant_trade.audit.pricing import PRICING_COPY, PRICING_PATH, usd
+from quant_trade.audit.pricing import PRICING_COPY, PRICING_PATH, offer_text, usd
 from quant_trade.audit.prop_presets import AS_OF, DEFAULT_PRESET, PRESETS, preset_label
 from quant_trade.audit.public_card import PublicClaim
 from quant_trade.audit.redflags import FLAG_TITLES
@@ -2820,7 +2821,10 @@ def _evidence_value(item: Any, locale: str = "es") -> str:
     return "—" if item is None else _e(str(item))
 
 
-def _page_hero(eyebrow: str, title: str, lead: str = "", crumbs: str = "", *, dot: str = "") -> str:
+def _page_hero(
+    eyebrow: str, title: str, lead: str = "", crumbs: str = "", *, dot: str = "", note: str = ""
+) -> str:
+    """A page's first screen; ``note`` is one more line of plain text under the lead."""
     return (
         "<section class='page-hero'>"
         + aurora()
@@ -2831,6 +2835,12 @@ def _page_hero(eyebrow: str, title: str, lead: str = "", crumbs: str = "", *, do
         f"<span class='dot{' ' + dot if dot else ''}'></span>"
         f"{_e(eyebrow)}</div><h1 class='rise' style='--i:2'>{_e(title)}</h1>"
         + (f"<p class='lead rise' style='--i:3'>{_e(lead)}</p>" if lead else "")
+        # The landing's anchor style, aligned with the lead instead of centred.
+        + (
+            f"<p class='hero-anchor rise' style='--i:4;margin-left:0'>{_e(note)}</p>"
+            if note
+            else ""
+        )
         + "</div></section>"
     )
 
@@ -4327,8 +4337,54 @@ def guides_index_page(*, locale: str = "es", base_url: str = "") -> str:
     )
 
 
-def guide_page(guide: Guide, *, locale: str = "es", base_url: str = "") -> str:
-    """One platform's export guide."""
+def _guide_offer(slug: str, locale: str, *, offer: str, email_verification: bool) -> str:
+    """ "What you get" on a guide: the report's contents and the free report as the
+    sign-up panel and /precios word them, the upload button, the sample report
+    and the free tool that fits the guide (``guide_capabilities.GUIDE_TOOL``).
+
+    ``offer`` is the service's (``free``, ``welcome`` or ``paid``); without a free
+    report the line under the button links the prices instead.
+    """
+    # Lazy: account_pages imports this module.
+    from quant_trade.audit.account_pages import report_contents
+
+    words = GUIDES_COPY[locale]
+    # In free mode the line under the button already says every report is free.
+    contents = report_contents(locale, "welcome" if offer == "welcome" else "")
+    note = offer_text(offer, locale, email_verification=email_verification)
+    after = (
+        f"<p>{_e(note)}</p>"
+        if note
+        else f"<p><a href='{_e(PRICING_PATH[locale])}'>{_e(_UI[locale]['nav_pricing'])}</a></p>"
+    )
+    tool = GUIDE_TOOL.get(slug, "calculator")
+    return (
+        f"<p>{_e(contents)}</p>"
+        f"<p><a class='btn btn-dark' href='{_e(_form_url(locale))}'>{_e(words['upload_this'])}"
+        f"<span class='go'>{icon('arrow')}</span></a> "
+        f"<a href='{_e(SAMPLE_PAGE_PATHS[locale])}'>{_e(PRICING_COPY[locale]['start_sample'])}</a>"
+        f"</p>{after}"
+        f"<p>{_e(words['tool'])} <a href='{_e(_tool_url(tool, locale))}'>"
+        f"{_e(_tool_name(tool, locale))}</a>. {_e(TOOLS_COPY[locale][tool]['question'])}</p>"
+    )
+
+
+def guide_page(
+    guide: Guide,
+    *,
+    locale: str = "es",
+    base_url: str = "",
+    offer: str = "free",
+    email_verification: bool = False,
+) -> str:
+    """One platform's export guide.
+
+    After the steps, what the report does with this file (each point from the
+    code that does it, ``guide_capabilities``) and what the visitor gets, with
+    the free report as ``offer`` and ``email_verification`` say: the same values
+    the sign-up page receives. The title, description, heading, address and
+    language links do not depend on them.
+    """
     locale = _locale(locale)
     ui = _UI[locale]
     words = GUIDES_COPY[locale]
@@ -4340,25 +4396,43 @@ def guide_page(guide: Guide, *, locale: str = "es", base_url: str = "") -> str:
     )
     steps = "".join(f"<li>{_e(step)}</li>" for step in text.steps)
     tips = "".join(f"<li>{icon('check')}<span>{_e(tip)}</span></li>" for tip in text.tips)
+    does = "".join(
+        f"<li>{icon('check')}<span>{_e(point)}</span></li>"
+        for point in guide_points(guide.slug, locale)
+    )
     crumbs = f"<a href='{_e(guides_index_url(locale))}'>{_e(words['all'])}</a>" + (
         _language_crumbs(alternates, locale)
     )
+    sections = [
+        (words["file"], f"<p>{_e(text.file)}</p>"),
+        (words["steps"], f"<ol class='list-steps steps-guide'>{steps}</ol>"),
+        (words["upload"], f"<p>{_e(text.upload)}</p>"),
+        (words["tips"], f"<ul class='checks'>{tips}</ul>"),
+    ]
+    if does:
+        sections.append((words["does"], f"<ul class='checks guide-does'>{does}</ul>"))
+    sections.append(
+        (
+            words["get"],
+            _guide_offer(guide.slug, locale, offer=offer, email_verification=email_verification),
+        )
+    )
     body = (
-        _page_hero(ui["guides_eyebrow"], text.title, text.summary, crumbs)
+        _page_hero(
+            ui["guides_eyebrow"],
+            text.title,
+            text.summary,
+            crumbs,
+            note=guide_purpose(guide.slug, locale),
+        )
         + "<div class='paper page-main'><div class='wrap'>"
         + _doc(
-            [
-                (words["file"], f"<p>{_e(text.file)}</p>"),
-                (words["steps"], f"<ol class='list-steps steps-guide'>{steps}</ol>"),
-                (words["upload"], f"<p>{_e(text.upload)}</p>"),
-                (words["tips"], f"<ul class='checks'>{tips}</ul>"),
-            ],
+            sections,
             locale,
             aside=f"<a class='btn btn-dark btn-sm toc-cta' href='{_e(_form_url(locale))}'>"
-            f"{_e(words['form'])}<span class='go'>{icon('arrow')}</span></a>",
+            f"{_e(words['upload_this'])}<span class='go'>{icon('arrow')}</span></a>",
         )
-        + f"<div class='back-row'><a class='btn btn-dark' href='{_e(_form_url(locale))}'>"
-        f"{_e(words['form'])}<span class='go'>{icon('arrow')}</span></a></div></div></div>"
+        + "</div></div>"
     )
     return _page(
         title,

@@ -76,6 +76,10 @@ GUIDES_COPY: dict[str, dict[str, str]] = {
         "form": "Ir al formulario",
         "back": "Volver al inicio",
         "articles": "Artículos sobre backtests",
+        "does": "Qué hace el informe con este archivo",
+        "get": "Lo que recibes",
+        "upload_this": "Subir este archivo",
+        "tool": "Herramienta gratis, sin registro:",
     },
     "en": {
         "title": "Guides to export your file",
@@ -94,6 +98,10 @@ GUIDES_COPY: dict[str, dict[str, str]] = {
         "form": "Go to the form",
         "back": "Back to the home page",
         "articles": "Articles about backtests",
+        "does": "What the report does with this file",
+        "get": "What you get",
+        "upload_this": "Upload this file",
+        "tool": "Free tool, no sign-up:",
     },
     "pt": {
         "title": "Guias para exportar o seu arquivo",
@@ -112,6 +120,10 @@ GUIDES_COPY: dict[str, dict[str, str]] = {
         "form": "Ir ao formulário",
         "back": "Voltar ao início",
         "articles": "Artigos sobre backtests",
+        "does": "O que o relatório faz com este arquivo",
+        "get": "O que você recebe",
+        "upload_this": "Enviar este arquivo",
+        "tool": "Ferramenta grátis, sem cadastro:",
     },
 }
 
