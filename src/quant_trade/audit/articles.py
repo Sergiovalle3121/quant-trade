@@ -4185,6 +4185,7 @@ ARTICLES_DATA: tuple[dict[str, Any], ...] = (
             {"kind": "calculator"},
             {"kind": "method"},
             {"kind": "samples"},
+            {"kind": "audience", "slug": "retos-prop-firm"},
         ],
     },
     {

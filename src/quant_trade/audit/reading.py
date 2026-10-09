@@ -34,6 +34,17 @@ COPY = {
         ),
         "limited": "Demasiadas lecturas desde esta dirección. Inténtalo de nuevo más tarde.",
         "png_unavailable": "La imagen PNG no está disponible temporalmente.",
+        "see_also": "Si solo quieres una cifra:",
+        "beyond_title": "Lo que esta tarjeta no puede medir",
+        "beyond": (
+            "Las cifras de la tarjeta son declaradas: no vemos tu archivo. Con el archivo que "
+            "exporta tu plataforma, el informe mide el coste de equilibrio, dentro y fuera de "
+            "muestra, la calidad de datos y la referencia, y da una clase de A a D. El primer "
+            "informe completo es gratis con cuenta."
+        ),
+        "beyond_button": "Auditar mi archivo",
+        "sample_link": "Ver un informe de ejemplo",
+        "guides_link": "Qué archivo exportar: guías",
     },
     "en": {
         "title": "Figure reader",
@@ -57,6 +68,17 @@ COPY = {
         ),
         "limited": "Too many readings from this address. Try again later.",
         "png_unavailable": "The PNG image is temporarily unavailable.",
+        "see_also": "If you only need one figure:",
+        "beyond_title": "What this card cannot measure",
+        "beyond": (
+            "The card's figures are declared: we do not see your file. With the file your "
+            "platform exports, the report measures break-even cost, in-sample versus "
+            "out-of-sample, data quality and a benchmark, and gives an A to D class. Your first "
+            "full report is free with an account."
+        ),
+        "beyond_button": "Audit my file",
+        "sample_link": "See a sample report",
+        "guides_link": "Which file to export: guides",
     },
     "pt": {
         "title": "Leitor de números",
@@ -83,6 +105,17 @@ COPY = {
         ),
         "limited": "Leituras demais a partir deste endereço. Tente novamente mais tarde.",
         "png_unavailable": "A imagem PNG está temporariamente indisponível.",
+        "see_also": "Se você só precisa de um número:",
+        "beyond_title": "O que este cartão não consegue medir",
+        "beyond": (
+            "Os números do cartão são declarados: não vemos o seu arquivo. Com o arquivo que a "
+            "sua plataforma exporta, o relatório mede o custo de equilíbrio, dentro e fora da "
+            "amostra, a qualidade dos dados e uma referência, e dá uma classe de A a D. O seu "
+            "primeiro relatório completo é grátis com conta."
+        ),
+        "beyond_button": "Auditar meu arquivo",
+        "sample_link": "Ver um relatório de exemplo",
+        "guides_link": "Qual arquivo exportar: guias",
     },
 }
 

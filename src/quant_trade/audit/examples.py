@@ -61,6 +61,7 @@ EXAMPLES_COPY = {
         "source": "Post público, octubre de 2026",
         "back": "Inicio",
         "calculator": "Explorar en la calculadora",
+        "reader_link": "Crea la tarjeta con tus propias cifras",
         "ai-search_title": "Una estrategia atribuida a IA",
         "ai-search_line1": (
             "DECLARED · La publicación atribuye la búsqueda a IA en tres semanas. "
@@ -104,6 +105,7 @@ EXAMPLES_COPY = {
         "source": "Public post, October 2026",
         "back": "Home",
         "calculator": "Explore in the calculator",
+        "reader_link": "Create the card with your own figures",
         "ai-search_title": "A strategy attributed to AI",
         "ai-search_line1": (
             "DECLARED · The post attributes the search to AI over three weeks. "
@@ -147,6 +149,7 @@ EXAMPLES_COPY = {
         "source": "Post público, outubro de 2026",
         "back": "Início",
         "calculator": "Explorar na calculadora",
+        "reader_link": "Crie o cartão com os seus próprios números",
         "ai-search_title": "Uma estratégia atribuída à IA",
         "ai-search_line1": (
             "DECLARED · O post atribui a busca à IA em três semanas. "

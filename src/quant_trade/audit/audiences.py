@@ -121,6 +121,7 @@ AUDIENCE_COPY: dict[str, dict[str, str]] = {
         "sample": "Ver un informe de ejemplo",
         "guide": "Cómo exportarlo",
         "others": "Otros casos",
+        "read": "Para leer",
         "home": "Inicio",
     },
     "en": {
@@ -142,6 +143,7 @@ AUDIENCE_COPY: dict[str, dict[str, str]] = {
         "sample": "See a sample report",
         "guide": "How to export it",
         "others": "Other cases",
+        "read": "Further reading",
         "home": "Home",
     },
     "pt": {
@@ -162,6 +164,7 @@ AUDIENCE_COPY: dict[str, dict[str, str]] = {
         "sample": "Ver um relatório de exemplo",
         "guide": "Como exportar",
         "others": "Outros casos",
+        "read": "Para ler",
         "home": "Início",
     },
 }

@@ -13,6 +13,7 @@ pytest.importorskip("fastapi")
 
 from fastapi.testclient import TestClient  # noqa: E402
 
+from quant_trade.audit.articles import articles_index_url  # noqa: E402
 from quant_trade.audit.guard import find_claims  # noqa: E402
 from quant_trade.audit.legal import legal_url  # noqa: E402
 from quant_trade.audit.pages import landing, upload_page  # noqa: E402
@@ -69,15 +70,23 @@ def test_pages_use_self_hosted_fonts_and_no_third_party() -> None:
         assert find_claims(page) == []
 
 
-def test_navigation_has_a_phone_menu_and_links_the_comparison() -> None:
-    for locale, compare in (("es", "/comparar"), ("en", "/compare")):
+def test_navigation_has_a_phone_menu_and_links_the_free_tools() -> None:
+    for locale, compare, tools in (
+        ("es", "/comparar", "/herramientas"),
+        ("en", "/compare", "/en/tools"),
+        ("pt", "/pt/comparar", "/pt/ferramentas"),
+    ):
         page = landing(locale=locale)
         nav = page.split("<header", 1)[1].split("</header>", 1)[0]
         # The menu opens without script, and holds the same links.
         assert "<details class='menu'>" in nav and "class='menu-panel'" in nav
-        assert nav.count(f"href='{compare}'") == 2
+        assert nav.count(f"href='{tools}'") == 2
+        # The comparison needs two reports of one's own: it lives in the footer only.
+        assert f"href='{compare}'" not in nav
         footer = page.split("<footer", 1)[1]
         assert f"href='{compare}'" in footer
+        assert f"href='{tools}'" in footer
+        assert f"href='{articles_index_url(locale)}'" in footer
 
 
 def test_phone_navigation_keeps_the_upload_button_visible_and_compact() -> None:
