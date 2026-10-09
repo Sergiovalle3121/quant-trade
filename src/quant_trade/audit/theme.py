@@ -591,6 +591,8 @@ text-transform:uppercase;padding:5px 10px;border-radius:999px;color:var(--btn-fg
 .price-more a{display:inline-flex;align-items:center;gap:6px;color:var(--text)}
 .price-more svg{width:14px;height:14px}
 .plan-cards{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}
+/* Long button labels (pt) wrap inside the price card on phones. */
+@media (max-width:620px){.price .btn{white-space:normal;height:auto;min-height:48px;padding:12px 18px;text-align:center;line-height:1.3}}
 .plan-card{display:flex;flex-direction:column;gap:10px;min-width:0;padding:22px;border:1px solid var(--border);
 border-radius:16px;background:#fff;overflow-wrap:anywhere}
 .plan-card h2{margin:0;font-size:1.02rem;font-weight:600;letter-spacing:0}
