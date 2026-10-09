@@ -14,12 +14,16 @@ really do with that file type. Each point (:class:`Capability`) names:
 
 A point is only listed for a file type the code handles that way: Myfxbook,
 MQL5 and FX Blue print no running balance, so their guides say the money
-reconciliation stays NOT_MEASURED instead of promising one.
+reconciliation stays NOT_MEASURED instead of promising one. A point the code
+only does under a condition (the Myfxbook floating result needs the "Open
+Trades" block and a deposit; the plateau needs the main optimisation export,
+not the forward one) states that condition.
 """
 
 from __future__ import annotations
 
 import importlib
+import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any
@@ -254,7 +258,12 @@ CAPABILITIES: dict[str, Capability] = {
         },
     ),
     "plateau": Capability(
-        sources=("plateau:parameter_stability", "importers:_mt5_input_values"),
+        sources=(
+            "plateau:parameter_stability",
+            "plateau:METRICS",
+            "plateau:FORWARD_EXPORT",
+            "importers:_mt5_input_values",
+        ),
         formats=frozenset({MT5_OPTIMIZATION_XML}),
         fields={
             "section": "label:plateau",
@@ -265,54 +274,69 @@ CAPABILITIES: dict[str, Capability] = {
         },
         text={
             "es": (
-                "En «{section}» compara la configuración elegida (la del informe del probador o, "
-                "si no aparece, la de mayor resultado) con las que están a un paso en cada "
-                "parámetro; hacen falta al menos {passes} pasadas. Si menos del {share} de esas "
-                "vecinas termina con ganancia, o su mediana conserva menos del {keep} del "
-                "resultado elegido, sale la bandera «{flag}»."
+                "Con la exportación principal (sin periodo forward), «{section}» compara la "
+                "configuración elegida (la del informe del probador o, si no aparece, la de mayor "
+                "beneficio en la columna Profit) con las que están a un paso en cada parámetro; "
+                "hacen falta al menos {passes} pasadas. Si menos del {share} de esas vecinas "
+                "termina con ganancia, o su mediana conserva menos del {keep} del beneficio "
+                "elegido, sale la bandera «{flag}»."
             ),
             "en": (
-                "In '{section}' it compares the chosen settings (those of the tester report or, "
-                "if they are not there, the best result) with those one step away on each "
-                "parameter; it needs at least {passes} passes. If fewer than {share} of those "
-                "neighbours end in profit, or their median keeps less than {keep} of the chosen "
-                "result, the red flag '{flag}' is raised."
+                "With the main export (no forward period), '{section}' compares the chosen "
+                "settings (those of the tester report or, if they are not there, the highest "
+                "profit in the Profit column) with those one step away on each parameter; it "
+                "needs at least {passes} passes. If fewer than {share} of those neighbours end in "
+                "profit, or their median keeps less than {keep} of the chosen profit, the red "
+                "flag '{flag}' is raised."
             ),
             "pt": (
-                "Em '{section}' compara a configuração escolhida (a do relatório do testador ou, "
-                "se ela não aparecer, a de maior resultado) com as que estão a um passo em cada "
-                "parâmetro; são necessárias pelo menos {passes} passadas. Se menos de {share} "
-                "dessas vizinhas termina com lucro, ou a mediana delas conserva menos de {keep} "
-                "do resultado escolhido, aparece a bandeira '{flag}'."
+                "Com a exportação principal (sem período forward), '{section}' compara a "
+                "configuração escolhida (a do relatório do testador ou, se ela não aparecer, a de "
+                "maior lucro na coluna Profit) com as que estão a um passo em cada parâmetro; são "
+                "necessárias pelo menos {passes} passadas. Se menos de {share} dessas vizinhas "
+                "termina com lucro, ou a mediana delas conserva menos de {keep} do lucro "
+                "escolhido, aparece a bandeira '{flag}'."
             ),
         },
     ),
     "forward": Capability(
-        sources=("forward:forward_review", "forward:is_forward"),
+        sources=(
+            "forward:forward_review",
+            "forward:is_forward",
+            "plateau:FORWARD_EXPORT",
+            "schema:build_inputs",
+        ),
         formats=frozenset({MT5_OPTIMIZATION_XML}),
         fields={
             "section": "label:forward",
             "flag": "flag:FORWARD_NOT_HELD",
             "passes": "int:forward:MIN_PASSES",
+            "plateau": "label:plateau",
         },
         text={
             "es": (
-                "Si exportas los resultados de una optimización con periodo forward (columnas "
-                "Back Result y Forward Result), «{section}» mide si el orden del backtest se "
-                "mantiene en ese tramo y si sus mejores pasadas siguen con ganancia; hacen falta "
-                "al menos {passes} pasadas. Si no aguanta, sale la bandera «{flag}»."
+                "El formulario admite un solo XML: si subes el de una optimización con periodo "
+                "forward (columnas Back Result y Forward Result), «{section}» mide si el orden del "
+                "backtest se mantiene en ese tramo y si sus mejores pasadas siguen con ganancia; "
+                "hacen falta al menos {passes} pasadas. Si no aguanta, sale la bandera «{flag}». "
+                "Ese XML sustituye a la exportación principal, así que «{plateau}» queda como "
+                "NOT_MEASURED."
             ),
             "en": (
-                "If you export the results of an optimisation with a forward period (Back Result "
-                "and Forward Result columns), '{section}' measures whether the backtest's ranking "
-                "holds in that period and whether its best passes stay in profit; it needs at "
-                "least {passes} passes. If it does not hold, the red flag '{flag}' is raised."
+                "The form takes a single XML: if you upload the one of an optimisation with a "
+                "forward period (Back Result and Forward Result columns), '{section}' measures "
+                "whether the backtest's ranking holds in that period and whether its best passes "
+                "stay in profit; it needs at least {passes} passes. If it does not hold, the red "
+                "flag '{flag}' is raised. That XML takes the place of the main export, so "
+                "'{plateau}' stays NOT_MEASURED."
             ),
             "pt": (
-                "Se você exportar os resultados de uma otimização com período forward (colunas "
-                "Back Result e Forward Result), '{section}' mede se a ordem do backtest se mantém "
-                "nesse trecho e se as melhores passadas continuam com lucro; são necessárias pelo "
-                "menos {passes} passadas. Se não se sustenta, aparece a bandeira '{flag}'."
+                "O formulário aceita um só XML: se você enviar o de uma otimização com período "
+                "forward (colunas Back Result e Forward Result), '{section}' mede se a ordem do "
+                "backtest se mantém nesse trecho e se as melhores passadas continuam com lucro; "
+                "são necessárias pelo menos {passes} passadas. Se não se sustenta, aparece a "
+                "bandeira '{flag}'. Esse XML substitui a exportação principal, então '{plateau}' "
+                "fica como NOT_MEASURED."
             ),
         },
     ),
@@ -321,19 +345,20 @@ CAPABILITIES: dict[str, Capability] = {
         formats=frozenset({MT5_OPTIMIZATION_XML}),
         text={
             "es": (
-                "Comprueba que el XML sea de la misma prueba que el informe HTML del probador: si "
-                "el robot, el símbolo, el marco temporal o los parámetros no coinciden, rechaza la "
-                "subida y te dice qué difiere."
+                "Comprueba que el XML sea de la misma prueba que el informe del probador: si el "
+                "robot, el símbolo o el marco temporal que declaran ambos archivos no coinciden, o "
+                "si no comparten ningún nombre de parámetro, rechaza la subida y te dice qué "
+                "difiere."
             ),
             "en": (
-                "It checks that the XML comes from the same test as the tester's HTML report: if "
-                "the robot, the symbol, the timeframe or the inputs differ, the upload is refused "
-                "and you are told what differs."
+                "It checks that the XML comes from the same test as the tester report: if the "
+                "robot, the symbol or the timeframe both files state differ, or if they share no "
+                "input name, the upload is refused and you are told what differs."
             ),
             "pt": (
-                "Confere se o XML é do mesmo teste que o relatório HTML do testador: se o robô, o "
-                "símbolo, o timeframe ou os parâmetros não coincidem, recusa o envio e diz o que "
-                "difere."
+                "Confere se o XML é do mesmo teste que o relatório do testador: se o robô, o "
+                "símbolo ou o timeframe que os dois arquivos declaram não coincidem, ou se eles "
+                "não têm nenhum nome de parâmetro em comum, recusa o envio e diz o que difere."
             ),
         },
     ),
@@ -384,10 +409,10 @@ CAPABILITIES: dict[str, Capability] = {
         sources=(
             "importers:_parse_mt5_history",
             "importers:_parse_mt4_statement",
-            "importers:_floating_from_open",
             "account:account_review",
+            "account:FLOATING_WARN",
         ),
-        formats=_MT5_HISTORY | {MT4_STATEMENT_HTML, MYFXBOOK_CSV},
+        formats=_MT5_HISTORY | {MT4_STATEMENT_HTML},
         fields={"flag": "flag:FLOATING_LOSS_AT_END", "share": "pct:account:FLOATING_WARN"},
         text={
             "es": (
@@ -407,23 +432,62 @@ CAPABILITIES: dict[str, Capability] = {
             ),
         },
     ),
+    "myfxbook_floating": Capability(
+        sources=(
+            "importers:_parse_myfxbook",
+            "importers:_floating_from_open",
+            "account:account_review",
+            "account:FLOATING_WARN",
+        ),
+        formats=frozenset({MYFXBOOK_CSV}),
+        fields={"flag": "flag:FLOATING_LOSS_AT_END", "share": "pct:account:FLOATING_WARN"},
+        text={
+            "es": (
+                "Si la exportación trae el bloque «Open Trades» y algún depósito, lee el "
+                "resultado flotante de esas posiciones abiertas y lo compara con el saldo que "
+                "dejan los depósitos, los retiros y las operaciones cerradas: una pérdida abierta "
+                "de al menos el {share} de ese saldo sale como «{flag}». Sin ese bloque no hay "
+                "flotante que leer."
+            ),
+            "en": (
+                "If the export holds the 'Open Trades' block and a deposit, it reads the floating "
+                "result of those open positions and compares it with the balance the deposits, "
+                "withdrawals and closed trades leave: an open loss of at least {share} of that "
+                "balance is raised as '{flag}'. Without that block there is no floating result "
+                "to read."
+            ),
+            "pt": (
+                "Se a exportação trouxer o bloco 'Open Trades' e algum depósito, lê o resultado "
+                "flutuante dessas posições abertas e o compara com o saldo que os depósitos, os "
+                "saques e as operações fechadas deixam: uma perda aberta de pelo menos {share} "
+                "desse saldo aparece como '{flag}'. Sem esse bloco não há resultado flutuante "
+                "para ler."
+            ),
+        },
+    ),
     "no_printed_balance": Capability(
         sources=("engine:_reconciliation", "engine:_NO_PRINTED_BALANCE_REASON"),
         formats=NO_BALANCE_FORMATS,
-        fields={"recon": "integrity:recon_title", "reason": "integrity:recon_no_balance"},
+        fields={
+            "recon": "integrity:recon_title",
+            "reason": "integrity:recon_no_balance",
+            "field": "form:report",
+        },
         text={
             "es": (
-                "El CSV no imprime un saldo propio, así que «{recon}» queda como NOT_MEASURED "
-                "(«{reason}»): no compara el saldo con cifras sacadas de las mismas filas."
+                "Subido solo, en «{field}», el CSV no imprime un saldo propio, así que «{recon}» "
+                "queda como NOT_MEASURED («{reason}»): no compara el saldo con cifras sacadas de "
+                "las mismas filas."
             ),
             "en": (
-                "The CSV prints no balance of its own, so '{recon}' stays NOT_MEASURED "
-                "('{reason}'): it does not compare the balance with figures taken from the same "
-                "rows."
+                "Uploaded on its own, in '{field}', the CSV prints no balance of its own, so "
+                "'{recon}' stays NOT_MEASURED ('{reason}'): it does not compare the balance with "
+                "figures taken from the same rows."
             ),
             "pt": (
-                "O CSV não imprime um saldo próprio, então '{recon}' fica como NOT_MEASURED "
-                "('{reason}'): não compara o saldo com números tirados das mesmas linhas."
+                "Enviado sozinho, em '{field}', o CSV não imprime um saldo próprio, então "
+                "'{recon}' fica como NOT_MEASURED ('{reason}'): não compara o saldo com números "
+                "tirados das mesmas linhas."
             ),
         },
     ),
@@ -434,22 +498,23 @@ CAPABILITIES: dict[str, Capability] = {
             "section": "label:live",
             "live": "int:live:MIN_LIVE_TRADES",
             "backtest": "int:live:MIN_BACKTEST_TRADES",
+            "field": "form:live",
         },
         text={
             "es": (
-                "Subido en «Estado de cuenta real o demo» junto al backtest del robot, "
+                "Subido en «{field}» junto al backtest del robot, "
                 "«{section}» sitúa el resultado, el % de aciertos y la peor caída de la cuenta "
                 "entre historias sacadas al azar de las operaciones del backtest; hacen falta al "
                 "menos {live} operaciones en la cuenta y {backtest} en el backtest."
             ),
             "en": (
-                "Uploaded in 'Live or demo account statement' next to the robot's backtest, "
+                "Uploaded in '{field}' next to the robot's backtest, "
                 "'{section}' places the account's result, win rate and deepest fall among "
                 "histories drawn at random from the backtest's trades; it needs at least {live} "
                 "trades in the account and {backtest} in the backtest."
             ),
             "pt": (
-                "Enviado em 'Extrato da conta real ou demo' ao lado do backtest do robô, "
+                "Enviado em '{field}' ao lado do backtest do robô, "
                 "'{section}' situa o resultado, a taxa de acerto e a pior queda da conta entre "
                 "históricos sorteados das operações do backtest; são necessárias pelo menos "
                 "{live} operações na conta e {backtest} no backtest."
@@ -586,25 +651,27 @@ CAPABILITIES: dict[str, Capability] = {
     "tv_capital": Capability(
         sources=(
             "importers:_capital_from_percent",
+            "importers:CAPITAL_FROM_PERCENT_MIN",
             "importers:_parse_tradingview_xlsx",
             "importers:_balance_curve",
         ),
         formats=_TRADINGVIEW,
+        fields={"min": "number:importers:CAPITAL_FROM_PERCENT_MIN"},
         text={
             "es": (
                 "Deduce el capital inicial de las columnas de P&L acumulado y su % en el CSV (si "
-                "ese % llega al 1 % o más) o lo lee de las propiedades del XLSX, y el informe "
+                "ese % llega al {min} % o más) o lo lee de las propiedades del XLSX, y el informe "
                 "dice de dónde salió."
             ),
             "en": (
                 "It works out the starting capital from the cumulative P&L and cumulative P&L % "
-                "columns of the CSV (when that % reaches 1 % or more) or reads it from the XLSX "
-                "properties, and the report says where it came from."
+                "columns of the CSV (when that % reaches {min} % or more) or reads it from the "
+                "XLSX properties, and the report says where it came from."
             ),
             "pt": (
                 "Deduz o capital inicial das colunas de P&L acumulado e do seu % no CSV (se esse "
-                "% chegar a 1 % ou mais) ou o lê das propriedades do XLSX, e o relatório diz de "
-                "onde saiu."
+                "% chegar a {min} % ou mais) ou o lê das propriedades do XLSX, e o relatório diz "
+                "de onde saiu."
             ),
         },
     ),
@@ -747,30 +814,31 @@ CAPABILITIES: dict[str, Capability] = {
         },
     ),
     "recent_fade": Capability(
-        sources=("decay:recent_review", "decay:DROP_Z"),
+        sources=("decay:recent_review", "decay:RECENT_SHARE", "decay:DROP_Z"),
         formats=_TRADE_LISTS,
         fields={
             "section": "label:recent",
             "flag": "flag:EDGE_FADING",
             "trades": "int:decay:MIN_TRADES",
             "days": "int:decay:MIN_SPAN_DAYS",
+            "parts": "parts:decay:RECENT_SHARE",
         },
         text={
             "es": (
-                "«{section}» parte el historial en tres tramos de tiempo y compara el último con "
-                "los dos anteriores (hacen falta al menos {trades} operaciones y {days} días). Si "
-                "las anteriores tenían una media positiva, las recientes no, y la caída es mayor "
-                "de lo que explica el azar, sale la bandera «{flag}»."
+                "«{section}» parte el historial en {parts} tramos de tiempo iguales y compara el "
+                "último con los anteriores (hacen falta al menos {trades} operaciones y {days} "
+                "días). Si las anteriores tenían una media positiva, las recientes no, y la caída "
+                "es mayor de lo que explica el azar, sale la bandera «{flag}»."
             ),
             "en": (
-                "'{section}' cuts the history into three stretches of time and compares the last "
-                "with the two before (it needs at least {trades} trades and {days} days). If the "
-                "earlier trades averaged a gain, the recent ones do not, and the drop is larger "
-                "than chance explains, the red flag '{flag}' is raised."
+                "'{section}' cuts the history into {parts} equal stretches of time and compares "
+                "the last with the ones before (it needs at least {trades} trades and {days} "
+                "days). If the earlier trades averaged a gain, the recent ones do not, and the "
+                "drop is larger than chance explains, the red flag '{flag}' is raised."
             ),
             "pt": (
-                "'{section}' divide o histórico em três trechos de tempo e compara o último com "
-                "os dois anteriores (são necessárias pelo menos {trades} operações e {days} "
+                "'{section}' divide o histórico em {parts} trechos de tempo iguais e compara o "
+                "último com os anteriores (são necessárias pelo menos {trades} operações e {days} "
                 "dias). Se as anteriores tinham média positiva, as recentes não, e a queda é "
                 "maior do que o acaso explica, aparece a bandeira '{flag}'."
             ),
@@ -915,20 +983,28 @@ CAPABILITIES: dict[str, Capability] = {
         },
     ),
     "futures_point": Capability(
-        sources=("universal:_price_futures", "universal:FUTURES_WARNING"),
+        sources=(
+            "universal:_price_futures",
+            "universal:FUTURES_WARNING",
+            "importers:FUTURES_POINT_VALUE_USD",
+            "importers:FUTURES_POINT_VALUE_OTHER",
+        ),
         formats=_UNIVERSAL,
         text={
             "es": (
-                "Los futuros de CME con código de contrato (por ejemplo ESZ6) se valoran con su "
-                "valor por punto oficial y el informe lista cuál usó."
+                "Si el archivo no trae columna de resultado ni de multiplicador, los futuros con "
+                "código de contrato (por ejemplo ESZ6) se valoran con el valor por punto que "
+                "publica su bolsa y el informe lista cuál usó."
             ),
             "en": (
-                "CME futures with a contract code (ESZ6, for example) are priced with their "
-                "official point value and the report lists the one it used."
+                "If the file has no result column and no multiplier column, futures with a "
+                "contract code (ESZ6, for example) are priced with the point value their "
+                "exchange publishes and the report lists the one it used."
             ),
             "pt": (
-                "Os futuros da CME com código de contrato (por exemplo ESZ6) são valorizados com "
-                "o valor oficial do ponto e o relatório lista qual usou."
+                "Se o arquivo não tiver coluna de resultado nem de multiplicador, os futuros com "
+                "código de contrato (por exemplo ESZ6) são valorizados com o valor do ponto que a "
+                "sua bolsa publica e o relatório lista qual usou."
             ),
         },
     ),
@@ -945,7 +1021,7 @@ GUIDE_CAPABILITIES: dict[str, tuple[str, ...]] = {
     "quantconnect": ("qc_fees", "cost_stress", "trials_declared", "recent_fade"),
     "backtesting-py": ("btpy_commission", "cost_stress", "trials_declared", "loss_streak"),
     "vectorbt": ("vbt_variants", "variants_matrix", "vbt_fees", "cost_stress"),
-    "myfxbook": ("account_money", "top_up", "floating_end", "no_printed_balance"),
+    "myfxbook": ("account_money", "top_up", "myfxbook_floating", "no_printed_balance"),
     "mql5-signal": ("account_money", "top_up", "live_compare", "no_printed_balance"),
     "fxblue": ("account_money", "busiest_account", "live_compare", "no_printed_balance"),
     "robinhood": ("rh_pairing", "rh_unopened", "win_stats", "loss_streak"),
@@ -1106,16 +1182,19 @@ GUIDE_PURPOSE: dict[str, dict[str, str]] = {
     },
     "myfxbook": {
         "es": (
-            "Con este CSV, Rigor separa el resultado de operar de los depósitos y retiros y "
-            "avisa si las posiciones abiertas cargan una pérdida que el saldo no muestra."
+            "Con este CSV, Rigor separa el resultado de operar de los depósitos y retiros y, si "
+            "la exportación trae las posiciones abiertas y los depósitos, avisa si esas "
+            "posiciones cargan una pérdida que el saldo no muestra."
         ),
         "en": (
             "With this CSV, Rigor separates the trading result from deposits and withdrawals "
-            "and warns when open positions carry a loss the balance does not show."
+            "and, when the export lists the open positions and the deposits, warns if those "
+            "positions carry a loss the balance does not show."
         ),
         "pt": (
-            "Com este CSV, o Rigor separa o resultado das operações dos depósitos e saques e "
-            "avisa quando as posições abertas carregam uma perda que o saldo não mostra."
+            "Com este CSV, o Rigor separa o resultado das operações dos depósitos e saques e, se "
+            "a exportação trouxer as posições abertas e os depósitos, avisa se essas posições "
+            "carregam uma perda que o saldo não mostra."
         ),
     },
     "mql5-signal": {
@@ -1193,6 +1272,12 @@ GUIDE_PURPOSE: dict[str, dict[str, str]] = {
 }
 
 _AND = {"es": "y", "en": "and", "pt": "e"}
+#: How many equal parts a share such as ``1/3`` cuts a span into, in words.
+_PARTS = {
+    "es": {2: "dos", 3: "tres", 4: "cuatro", 5: "cinco"},
+    "en": {2: "two", 3: "three", 4: "four", 5: "five"},
+    "pt": {2: "dois", 3: "três", 4: "quatro", 5: "cinco"},
+}
 
 
 def resolve(reference: str) -> Any:
@@ -1221,9 +1306,13 @@ def field_value(spec: str, locale: str) -> str:
 
     ``label``, ``integrity``, ``kpi`` and ``platform`` are the report's own titles
     (``report.LABELS``, ``INTEGRITY_TEXT``, ``KEY_LABELS``, ``PLATFORM_LABELS``);
-    ``flag`` a red flag's title; ``pct``, ``int``, ``number`` and ``times`` a
-    constant (``module:NAME``) as a percentage, a whole number, a number or a
-    list of multiples, with the language's decimal mark.
+    ``form`` an upload field's label on the form (``pages._COPY``) without its
+    "(optional)"; ``flag`` a red flag's title; ``pct``, ``int``, ``number`` and
+    ``times`` a constant (``module:NAME``) as a percentage, a whole number, a
+    number or a list of multiples, with the language's decimal mark; ``parts``
+    a share (``1/3``) as the number of equal parts it makes, in words. A share
+    that makes no whole number of parts raises, so the text is rewritten
+    rather than wrong.
     """
     from quant_trade.audit import report
     from quant_trade.audit.redflags import FLAG_TITLES
@@ -1239,6 +1328,11 @@ def field_value(spec: str, locale: str) -> str:
         return str(tables[kind][locale][reference])
     if kind == "flag":
         return FLAG_TITLES[reference][locale]
+    if kind == "form":
+        # Lazy: pages imports this module.
+        from quant_trade.audit.pages import _COPY
+
+        return re.sub(r"\s*\([^()]*\)$", "", str(_COPY[locale][reference]))
     value = resolve(reference)
     if kind == "pct":
         return f"{_figure(round(float(value) * 100, 6), locale)} %"
@@ -1246,6 +1340,11 @@ def field_value(spec: str, locale: str) -> str:
         return _figure(float(value), locale)
     if kind == "times":
         return _listed([_figure(float(item), locale) for item in value], locale)
+    if kind == "parts":
+        parts = 1 / float(value)
+        if round(parts) < 2 or abs(parts - round(parts)) > 1e-9:
+            raise ValueError(f"{spec} does not cut a span into equal parts")
+        return _PARTS[locale].get(round(parts), str(round(parts)))
     raise ValueError(f"unknown field kind: {spec}")
 
 

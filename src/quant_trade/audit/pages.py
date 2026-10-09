@@ -4337,30 +4337,45 @@ def guides_index_page(*, locale: str = "es", base_url: str = "") -> str:
     )
 
 
-def _guide_offer(slug: str, locale: str, *, offer: str, email_verification: bool) -> str:
+def _guide_offer(guide: Guide, locale: str, *, offer: str, email_verification: bool) -> str:
     """ "What you get" on a guide: the report's contents and the free report as the
     sign-up panel and /precios word them, the upload button, the sample report
     and the free tool that fits the guide (``guide_capabilities.GUIDE_TOOL``).
 
-    ``offer`` is the service's (``free``, ``welcome`` or ``paid``); without a free
-    report the line under the button links the prices instead.
+    ``offer`` is the service's (``free``, ``welcome`` or ``paid``). The free first
+    report comes with the limits the upload applies to it (``web._first_look``:
+    one per e-mail, browser and file, and a monthly share per network). Without
+    a free report the block says the full report is paid, next to the free
+    previews, and links the prices. A file that only goes next to a report (the
+    optimisation XML, ``field == "optimization"``) says so, and in free mode
+    drops "you only need the file".
     """
     # Lazy: account_pages imports this module.
     from quant_trade.audit.account_pages import report_contents
 
     words = GUIDES_COPY[locale]
-    # In free mode the line under the button already says every report is free.
-    contents = report_contents(locale, "welcome" if offer == "welcome" else "")
+    if offer == "welcome":
+        contents = f"{report_contents(locale, 'welcome')} {words['free_terms']}"
+    elif offer == "free":
+        # The line under the button already says every report is free.
+        contents = report_contents(locale, "")
+    else:
+        contents = words["paid_terms"].format(n=accounts.FREE_PREVIEWS_PER_MONTH)
+    lines = [contents]
     note = offer_text(offer, locale, email_verification=email_verification)
+    if guide.field == "optimization":
+        lines.append(words["optimization_with_report"].format(upload=words["upload"]))
+        if offer == "free":
+            note = PRICING_COPY[locale]["free"]
     after = (
         f"<p>{_e(note)}</p>"
         if note
         else f"<p><a href='{_e(PRICING_PATH[locale])}'>{_e(_UI[locale]['nav_pricing'])}</a></p>"
     )
-    tool = GUIDE_TOOL.get(slug, "calculator")
+    tool = GUIDE_TOOL.get(guide.slug, "calculator")
     return (
-        f"<p>{_e(contents)}</p>"
-        f"<p><a class='btn btn-dark' href='{_e(_form_url(locale))}'>{_e(words['upload_this'])}"
+        "".join(f"<p>{_e(line)}</p>" for line in lines)
+        + f"<p><a class='btn btn-dark' href='{_e(_form_url(locale))}'>{_e(words['upload_this'])}"
         f"<span class='go'>{icon('arrow')}</span></a> "
         f"<a href='{_e(SAMPLE_PAGE_PATHS[locale])}'>{_e(PRICING_COPY[locale]['start_sample'])}</a>"
         f"</p>{after}"
@@ -4414,7 +4429,7 @@ def guide_page(
     sections.append(
         (
             words["get"],
-            _guide_offer(guide.slug, locale, offer=offer, email_verification=email_verification),
+            _guide_offer(guide, locale, offer=offer, email_verification=email_verification),
         )
     )
     body = (
