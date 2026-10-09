@@ -92,7 +92,8 @@ def test_every_localized_question_and_all_copy_pass_the_guard(locale: str) -> No
 def test_prices_follow_settings_and_free_mode(locale: str) -> None:
     first = _settings(AUDIT_PRICE_USD_CENTS="1735")
     second = _settings(AUDIT_PRICE_USD_CENTS="4860")
-    assert evidence_label("DECLARED", locale) + " · " in faq_items(first, locale)[0][1]
+    # The price is the operator's own setting, said plainly: no evidence label.
+    assert evidence_label("DECLARED", locale) not in faq_items(first, locale)[0][1]
     assert f"USD {first.price_usd:.2f}" in faq_items(first, locale)[0][1]
     assert f"USD {second.price_usd:.2f}" in faq_items(second, locale)[0][1]
     assert f"USD {first.price_usd:.2f}" not in faq_items(second, locale)[0][1]
@@ -108,7 +109,8 @@ def test_card_countries_come_only_from_active_runtime_markets(locale: str) -> No
         assert settings.card_public
         answer = faq_items(settings, locale)[1][1]
         expected = card_markets_line(tuple(settings.approved_markets), locale)
-        assert answer.startswith(evidence_label("DECLARED", locale) + " · " + expected)
+        assert answer.startswith(expected)
+        assert evidence_label("DECLARED", locale) not in answer
         assert find_claims(answer) == []
     active = _card_settings(AUDIT_APPROVED_MARKETS="MX")
     empty = _card_settings(AUDIT_APPROVED_MARKETS="")
@@ -133,8 +135,11 @@ def test_retention_upload_limit_and_contact_follow_configuration(locale: str) ->
     )
     pairs = faq_items(settings, locale)
     declared = evidence_label("DECLARED", locale)
-    assert declared in pairs[2][1] and "7 MB" in pairs[2][1]
-    assert declared in pairs[8][1] and str(settings.retention_days) in pairs[8][1]
+    # 7 MiB is 7.3 MB, and a platform report may be twice that up to the importers'
+    # own ceiling (upload_limits); the operator's limits carry no evidence label.
+    seven = "7.3 MB" if locale == "en" else "7,3 MB"
+    assert declared not in pairs[2][1] and seven in pairs[2][1] and "10 MB" in pairs[2][1]
+    assert declared not in pairs[8][1] and str(settings.retention_days) in pairs[8][1]
     assert "30" not in pairs[8][1]
     # The FAQ must preserve legal.py's exception for the first free full report.
     first_free = {

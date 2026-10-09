@@ -161,8 +161,11 @@ def test_cards_and_reading_lines_use_the_pages_decimal_mark(
     assert f"56{mark}5 % – 82{mark}2 %" in first
     assert f"56{other}5 %" not in first and f"3{other}24" not in first
     lines = _visible(" ".join(re.findall(r"<p class='example-reading'>.*?</p>", page, re.S)))
-    years = f"{SHORT_HISTORY_WEEKS / WEEKS_PER_YEAR:.6f}"
+    # Nine weeks are 0.17 years in the site's format, never the raw 0.173077.
+    years = f"{SHORT_HISTORY_WEEKS / WEEKS_PER_YEAR:.2f}"
     assert years.replace(".", mark) in lines
+    raw = f"{SHORT_HISTORY_WEEKS / WEEKS_PER_YEAR:.6f}"
+    assert raw not in page and raw.replace(".", mark) not in page
     many = compute(CalculatorInput(1.8, 3, 1000))
     luck = f"{many['luck_sharpe']['value']:.2f}"
     assert luck.replace(".", mark) in lines

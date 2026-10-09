@@ -1,8 +1,9 @@
 """Anonymous public declarations, using the card and calculator's own arithmetic.
 
 These are illustrative readings of public figures, not uploaded files or audits.
-Nine weeks is converted using an explicit 52-week year; a development period is
-never substituted for a backtest's missing history.
+Nine weeks is converted using an explicit 52-week year, and shown rounded to two
+decimals as the site writes figures; a development period is never substituted for
+a backtest's missing history.
 """
 
 from __future__ import annotations
@@ -213,7 +214,7 @@ def examples_content(locale: str = "es") -> str:
         if example.key == "short-history":
             values = {
                 "weeks": SHORT_HISTORY_WEEKS,
-                "years": _num(SHORT_HISTORY_WEEKS / WEEKS_PER_YEAR, lang, 6),
+                "years": _num(SHORT_HISTORY_WEEKS / WEEKS_PER_YEAR, lang, 2),
                 "weeks_per_year": WEEKS_PER_YEAR,
             }
         elif example.key == "many-trials":

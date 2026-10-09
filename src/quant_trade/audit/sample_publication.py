@@ -53,6 +53,14 @@ SAMPLE_PAGES_PUBLISHED = "2026-10-09"
 #: The funnel tag of a shared sample page (``funnel.REF_TAGS``), so its visits never
 #: count as a shared publication's ("share").
 SAMPLE_SHARE_REF = "v-ejemplo"
+#: The identifier a reader sees for each sample, in each language: on its report
+#: and PDF (``report.LABELS[locale]['audit_id']``, in place of the stored id
+#: ``check.SAMPLE_AUDIT_ID``, which ``/comprobar`` keeps reading) and on its public
+#: page. The PDFs' file names use the same words.
+SAMPLE_SHOWN_IDS: dict[str, dict[str, str]] = {
+    "backtest": {"es": "ejemplo", "en": "sample", "pt": "exemplo"},
+    "signal": {"es": "ejemplo-senal", "en": "sample-signal", "pt": "exemplo-sinal"},
+}
 
 #: The notice on top of a sample's public page: what the page is, then the
 #: synthetic-data notice of the sample reports.
@@ -264,6 +272,8 @@ class SamplePage:
     share_template: str
     share_ref: str
     badge_help: str
+    #: The identifier its report shows (``SAMPLE_SHOWN_IDS``), in place of the page's id.
+    shown_id: str = ""
 
 
 def sample_page(public_id: str, locale: str) -> SamplePage | None:
@@ -279,7 +289,22 @@ def sample_page(public_id: str, locale: str) -> SamplePage | None:
         share_template=SAMPLE_SHARE_TEXT[lang],
         share_ref=SAMPLE_SHARE_REF,
         badge_help=SAMPLE_BADGE_HELP[lang],
+        shown_id=SAMPLE_SHOWN_IDS[SAMPLE_KIND_BY_PUBLIC_ID[public_id]][lang],
     )
+
+
+def show_sample_id(page: str, kind: str, locale: str) -> str:
+    """A sample report's HTML with its identifier as the reader sees it everywhere
+    (``SAMPLE_SHOWN_IDS``): the report prints the stored id, ``check.SAMPLE_AUDIT_ID``,
+    after ``report.LABELS[locale]['audit_id']``. Only those words change; nothing the
+    report measured does, and the stored id stays what ``/comprobar`` reads."""
+    from quant_trade.audit.check import SAMPLE_AUDIT_ID
+    from quant_trade.audit.report import LABELS
+
+    lang = _lang(locale)
+    label = html.escape(LABELS[lang]["audit_id"], quote=True)
+    shown = html.escape(SAMPLE_SHOWN_IDS[kind][lang], quote=True)
+    return page.replace(f"<span>{label} {SAMPLE_AUDIT_ID}", f"<span>{label} {shown}")
 
 
 @dataclass(frozen=True)
@@ -334,6 +359,7 @@ __all__ = [
     "SAMPLE_REPORT_LINK",
     "SAMPLE_SHARE_REF",
     "SAMPLE_SHARE_TEXT",
+    "SAMPLE_SHOWN_IDS",
     "SAMPLE_SPANISH_SOURCE",
     "SAMPLE_TITLE_WORD",
     "SampleAudit",
@@ -346,4 +372,5 @@ __all__ = [
     "sample_public_path",
     "sample_publication",
     "sample_report_path",
+    "show_sample_id",
 ]

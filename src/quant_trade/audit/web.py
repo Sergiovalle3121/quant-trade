@@ -66,6 +66,7 @@ from quant_trade.audit import (
 from quant_trade.audit import passkeys as pk
 from quant_trade.audit import pdf as pdf_lib
 from quant_trade.audit import strategies as strategies_lib
+from quant_trade.audit.about import ABOUT_ALIASES, ABOUT_PATH, about_page
 from quant_trade.audit.articles import article_url, find_article
 from quant_trade.audit.audiences import AUDIENCES_BY_PATH, audience_url
 from quant_trade.audit.calculator import (
@@ -166,11 +167,14 @@ from quant_trade.audit.sample import sample_result, signal_sample_result
 from quant_trade.audit.sample_publication import (
     SAMPLE_KIND_BY_PUBLIC_ID,
     SAMPLE_PUBLICATION_LOCALE,
+    SAMPLE_SHOWN_IDS,
     sample_page,
     sample_publication,
+    show_sample_id,
 )
 from quant_trade.audit.schema import (
     MAX_UPLOAD_BYTES,
+    REPORT_SIZE_FACTOR,
     AuditResult,
     DeclaredMetadata,
     ParseError,
@@ -540,14 +544,13 @@ STRATEGY_PDFS_PER_WINDOW = 10
 STRATEGY_PDF_WINDOW = timedelta(minutes=10)
 #: How many upload fields ``POST /audits`` takes.
 UPLOAD_FIELDS = 7
-#: The fields that may carry a platform report, and how much larger than
-#: ``max_upload_bytes`` they may be. The MT5 optimisation XML is one: about
-#: 900 bytes a pass, so 5 MB stopped at some 5,500 passes, fewer than a
-#: common genetic run.
+#: The fields that may carry a platform report; each may be
+#: ``schema.REPORT_SIZE_FACTOR`` times ``max_upload_bytes``. The MT5
+#: optimisation XML is one: about 900 bytes a pass, so 5 MB stopped at some
+#: 5,500 passes, fewer than a common genetic run.
 REPORT_FIELDS = frozenset({"equity", "report", "live", "optimization"})
 #: Bytes a pass takes in an MT5 optimisation export, for the size refusal.
 OPTIMIZATION_PASS_BYTES = 900
-REPORT_SIZE_FACTOR = 2
 #: How a picture begins (PNG, JPEG, GIF, TIFF): named as such when it
 #: arrives in the curve box, which takes tables only. A PDF is not listed:
 #: a PDF statement's table is read through the column screen.
@@ -597,6 +600,28 @@ def _megabytes(size: int) -> str:
     if size >= 1_000_000:
         return f"{size / 1_000_000:.1f}".rstrip("0").rstrip(".") + " MB"
     return f"{max(size // 1000, 1)} KB"
+
+
+def accept_language_locale(header: str | None) -> str | None:
+    """The report language a browser asks for in ``Accept-Language`` (``pt-BR``
+    gives "pt", ``en-US`` "en"), by its own preference order; ``None`` when it
+    names none of ``REPORT_LOCALES``. Only a page without its language in the
+    address or in ``?lang=`` reads it: the public page ``/v/{id}``."""
+    choices: list[tuple[float, int, str]] = []
+    for index, part in enumerate((header or "").split(",")):
+        tag, _, params = part.strip().partition(";")
+        weight = 1.0
+        for param in params.split(";"):
+            name, _, value = param.strip().partition("=")
+            if name.strip().lower() == "q":
+                try:
+                    weight = float(value)
+                except ValueError:
+                    weight = 0.0
+        primary = tag.strip().lower().split("-", 1)[0]
+        if primary in REPORT_LOCALES and weight > 0:
+            choices.append((-weight, index, primary))
+    return min(choices)[2] if choices else None
 
 
 def message(key: str, locale: str, **values: Any) -> str:
@@ -1123,11 +1148,12 @@ def _sentence(text: str) -> str:
 
 #: Where the sample report's PDF is served, per language.
 SAMPLE_PDF_PATHS = {"es": "/ejemplo.pdf", "en": "/sample.pdf", "pt": "/pt/exemplo.pdf"}
-#: The sample PDF's name inside the file and on download.
-SAMPLE_PDF_NAMES = {"es": "ejemplo", "en": "sample", "pt": "exemplo"}
+#: The sample PDF's name inside the file and on download: the identifier its report
+#: and its public page show (``sample_publication.SAMPLE_SHOWN_IDS``).
+SAMPLE_PDF_NAMES = SAMPLE_SHOWN_IDS["backtest"]
 #: The same for the signal sample: its PDF sits next to its page, as the first one's.
 SIGNAL_SAMPLE_PDF_PATHS = {lang: f"{path}.pdf" for lang, path in SIGNAL_SAMPLE_PATHS.items()}
-SIGNAL_SAMPLE_PDF_NAMES = {"es": "ejemplo-senal", "en": "sample-signal", "pt": "exemplo-sinal"}
+SIGNAL_SAMPLE_PDF_NAMES = SAMPLE_SHOWN_IDS["signal"]
 
 
 @dataclasses.dataclass(frozen=True)
@@ -1594,6 +1620,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             retention_days=cfg.retention_days,
             carried=getattr(request.state, "upload_declarations", {}),
             rejection_html=f"<p role='alert'>{escape(text)}</p>" + guidance,
+            max_upload_bytes=cfg.max_upload_bytes,
         )
         return HTMLResponse(page, status_code=status)
 
@@ -2168,6 +2195,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 signed_in=signed_in,
                 notice=notice,
                 notice_link_html=notice_link,
+                max_upload_bytes=cfg.max_upload_bytes,
             )
         )
 
@@ -2334,6 +2362,30 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         ("/pt/suporte", "/pt/contato"),
     ):
         _forward(alias, contact_path)
+
+    def _about(request: Request) -> HTMLResponse:
+        """Who is behind Rigor (``about.py``): only the details the terms and the
+        landing already publish, from the settings."""
+        locale = next(k for k, v in ABOUT_PATH.items() if v == request.url.path)
+        return HTMLResponse(about_page(cfg, locale=locale, base_url=_site_url(request)))
+
+    for about_path in ABOUT_PATH.values():
+        app.add_api_route(about_path, _about, methods=["GET"], response_class=HTMLResponse)
+    for alias, about_path in ABOUT_ALIASES.items():
+        _forward(alias, about_path)
+
+    # Addresses people guess for pages that live elsewhere: the English signal
+    # sample, the comparison and the sign-up (English pages without "/en"), and the
+    # Portuguese landing under its regional tag. Each gave a 404 before.
+    for guessed, kept_query, page_path in (
+        ("/sample-signal", False, SIGNAL_SAMPLE_PATHS["en"]),
+        ("/en/compare", True, COMPARE_PATH["en"]),
+        ("/en/signup", True, account_pages.PATHS["en"]["signup"]),
+        ("/register", True, account_pages.PATHS["en"]["signup"]),
+        ("/pt-br", False, "/pt"),
+        ("/pt-BR", False, "/pt"),
+    ):
+        _forward(guessed, page_path, keep_query=kept_query)
 
     @app.get("/en", response_class=HTMLResponse)
     def index_en(request: Request, extras: int = 0) -> Response:
@@ -6377,9 +6429,18 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         return static(og_image_name(f"class-{overall}", locale))
 
     @app.get("/v/{public_id}", response_class=HTMLResponse)
-    def verification(request: Request, public_id: str, lang: str | None = None) -> str:
+    def verification(
+        request: Request, response: Response, public_id: str, lang: str | None = None
+    ) -> str:
         publication, _, data, digest = _published(public_id)
-        locale = _report_locale(lang)
+        if lang is None:
+            # No language in the address: the browser's, as a badge's link opens it
+            # (Spanish has no suffix). The canonical and the language links stay the
+            # page's own for the language it shows.
+            locale = accept_language_locale(request.headers.get("accept-language")) or "es"
+            response.headers["Vary"] = "Accept-Language"
+        else:
+            locale = _report_locale(lang)
         return verification_page(
             data,
             public_id=publication.public_id,
@@ -6491,12 +6552,13 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                     sample_offer=_offer(),
                     sample_kind=kind,
                 )
-                # The tab title ends with the report's id, "sample": show the
-                # page's own word. Nothing inside the report changes.
+                # The tab title and the identifier line end with the report's id,
+                # "sample": show the page's own word, the one its public page shows
+                # too. Nothing the report measured changes.
                 html_text = html_text.replace(
                     " · sample</title>", f" · {sample.names[locale]}</title>", 1
                 )
-                sample_cache[key] = html_text
+                sample_cache[key] = show_sample_id(html_text, kind, locale)
             return sample_cache[key]
 
     sample_pdfs: dict[tuple[str, str, tuple[str, ...]], bytes] = {}
@@ -6521,8 +6583,9 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                     legal_links=True,
                     locale=locale,
                 )
-                # The PDF's own title carries the page's word too, not "sample".
+                # The PDF's own title and identifier carry the page's word too, not "sample".
                 page = page.replace(" · sample</title>", f" · {sample.names[locale]}</title>", 1)
+                page = show_sample_id(page, kind, locale)
                 try:
                     sample_pdfs[key] = pdf_lib.report_pdf(
                         page,
@@ -6878,6 +6941,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 # The free report as the sign-up page states it.
                 offer=_offer(),
                 email_verification=cfg.email_verification_required,
+                max_upload_bytes=cfg.max_upload_bytes,
             )
         )
 

@@ -38,7 +38,7 @@ COPY = {
         "beyond_title": "Lo que esta tarjeta no puede medir",
         "beyond": (
             "Las cifras de la tarjeta son declaradas: no vemos tu archivo. Con el archivo que "
-            "exporta tu plataforma, el informe mide el coste de equilibrio, dentro y fuera de "
+            "exporta tu plataforma, el informe mide el costo de equilibrio, dentro y fuera de "
             "muestra, la calidad de datos y la referencia, y da una clase de A a D. El primer "
             "informe completo es gratis con cuenta."
         ),

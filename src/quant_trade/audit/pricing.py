@@ -53,7 +53,7 @@ PRICING_COPY: dict[str, dict[str, str]] = {
         "compare": "Comparación de hasta tres informes",
         "compare_note": "Desde tu cuenta, lado a lado con otros informes completos tuyos.",
         "support": "Soporte por correo",
-        "support_note": "El mismo canal de contacto para ambos informes.",
+        "support_note": "El mismo canal de contacto para todos los informes.",
         "no_email": "El operador aún no ha publicado un correo de soporte.",
         "contact": "Ver los medios de contacto",
         "data_note": (
@@ -125,7 +125,7 @@ PRICING_COPY: dict[str, dict[str, str]] = {
         "compare": "Compare up to three reports",
         "compare_note": "From your account, side by side with other full reports of yours.",
         "support": "E-mail support",
-        "support_note": "The same contact channel for both reports.",
+        "support_note": "The same contact channel for every report.",
         "no_email": "The operator has not published a support e-mail yet.",
         "contact": "See contact channels",
         "data_note": (
@@ -197,7 +197,7 @@ PRICING_COPY: dict[str, dict[str, str]] = {
         "compare": "Comparação de até três relatórios",
         "compare_note": "Pela sua conta, lado a lado com outros relatórios completos seus.",
         "support": "Suporte por e-mail",
-        "support_note": "O mesmo canal de contato para ambos os relatórios.",
+        "support_note": "O mesmo canal de contato para todos os relatórios.",
         "no_email": "O operador ainda não publicou um e-mail de suporte.",
         "contact": "Ver os meios de contato",
         "data_note": (

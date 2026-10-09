@@ -65,6 +65,7 @@ from quant_trade.audit.sample_publication import (  # noqa: E402
     SAMPLE_REPORT_LINK,
     SAMPLE_SHARE_REF,
     SAMPLE_SHARE_TEXT,
+    SAMPLE_SHOWN_IDS,
     SAMPLE_SPANISH_SOURCE,
     SAMPLE_TITLE_WORD,
     public_pages_line,
@@ -193,8 +194,9 @@ def _swap(page: str, old: str, new: str, count: int | None = None) -> str:
 def _as_sample(page: str, *, public_id: str, kind: str, locale: str, published: str) -> str:
     """A real publication's page (its id already the sample's) with exactly the words a
     sample's page says its own way, and nothing else: the notice on top, "Sample" in
-    front of the title and the link preview, the sample's publication day, the words
-    over the badge code without its copy button, and the share text and tag."""
+    front of the title and the link preview, the sample's publication day, the
+    identifier its report shows, the words over the badge code without its copy button,
+    and the share text and tag."""
     from quant_trade.audit.pages import BADGE_NOTICE, CLASS_WORD
 
     copy, ui, e = _COPY[locale], _UI[locale], html.escape
@@ -217,6 +219,12 @@ def _as_sample(page: str, *, public_id: str, kind: str, locale: str, published: 
     )
     eyebrow = "<div class='eyebrow rise'>"
     page = _swap(page, eyebrow, sample_notice_html(public_id, locale) + eyebrow, 1)
+    page = _swap(
+        page,
+        f"<b>{e(ui['v_id'])}</b><span>{e(public_id)}</span>",
+        f"<b>{e(ui['v_id'])}</b><span>{e(SAMPLE_SHOWN_IDS[kind][locale])}</span>",
+        1,
+    )
     page = _swap(page, e(copy["v_badge_help"]), e(SAMPLE_BADGE_HELP[locale]), 1)
     page = _swap(
         page,
