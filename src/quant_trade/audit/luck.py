@@ -42,6 +42,8 @@ MIN_SPAN_DAYS = 28
 #: Search sizes shown when the files do not say how many were tried.
 WHAT_IF_TRIALS = (10, 100, 1000)
 
+#: Why there is nothing to discount when the history did not gain.
+NO_GAIN = "the Sharpe ratio is zero or negative; there is no gain to discount"
 NOTE = (
     "E[max Sharpe] of unskilled trials (Bailey & Lopez de Prado); minimum backtest "
     "length (Bailey, Borwein, Lopez de Prado & Zhu); Bonferroni haircut (Harvey & Liu)"
@@ -67,7 +69,7 @@ def luck_review(
     sr = float(moments["sharpe_per_period"])
     n = int(moments["observations"])
     if not math.isfinite(sr) or sr <= 0:
-        return _not_measured("the Sharpe ratio is zero or negative; there is no gain to discount")
+        return _not_measured(NO_GAIN)
     if (
         span_years * 365.25 < MIN_SPAN_DAYS
         or n < MIN_OBSERVATIONS

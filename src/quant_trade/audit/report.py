@@ -1411,6 +1411,18 @@ LABELS: dict[str, dict[str, str]] = {
         "hero_live": "Cuenta real: {badge}.",
         "hero_live_money": "Resultado de operar: {result} sobre {deposits} depositados.",
         "hero_live_link": "Ver la comparación con el backtest",
+        "hero_challenge": (
+            "Reto elegido, {program}: llega al objetivo en el {full} de las simulaciones con "
+            "la historia completa y en el {low} {low_label}."
+        ),
+        "hero_challenge_full": (
+            "Reto elegido, {program}: llega al objetivo en el {full} de las simulaciones con "
+            "la historia completa."
+        ),
+        "hero_challenge_link": "Ver la escalera",
+        "hero_challenge_optimistic": (
+            "Son cifras optimistas: el balance de operaciones cerradas no ve las pérdidas abiertas."
+        ),
         "live_badge_CONSISTENT": "Coherente",
         "live_badge_EDGE": "En el borde",
         "live_badge_INCONSISTENT": "No coherente",
@@ -1623,6 +1635,10 @@ LABELS: dict[str, dict[str, str]] = {
         "fail_daily_loss": "Rompe la pérdida diaria",
         "fail_total_loss": "Rompe la pérdida total",
         "unfinished": "No termina a tiempo",
+        "unfinished_cap": (
+            "No llega al objetivo en {days} días hábiles (tope de la simulación; las reglas no "
+            "ponen plazo)"
+        ),
         "ci95": "Intervalo del 95 % de llegar al objetivo",
         "days_to_target": "Días hábiles hasta el objetivo (p25 / p50 / p75)",
         "best_day_line": (
@@ -1637,6 +1653,10 @@ LABELS: dict[str, dict[str, str]] = {
             "regla del mejor día, si la firma la tiene; a igual cifra, por nombre. Compara "
             "reglas; no recomienda comprar ningún reto."
         ),
+        "ff_basis": (
+            "Cifras con la historia completa y sin el costo de referencia; la escalera de "
+            "arriba muestra cuánto cambian."
+        ),
         "ff_program": "Reto",
         "ff_pass": "Pasa",
         "ff_clean": "Pasa dentro de la regla del mejor día",
@@ -1645,7 +1665,7 @@ LABELS: dict[str, dict[str, str]] = {
         "ff_risk_none": "Nada en las simulaciones",
         "ff_risk_fail_daily_loss": "romper la pérdida diaria",
         "ff_risk_fail_total_loss": "romper la pérdida total",
-        "ff_risk_unfinished": "no llegar al objetivo a tiempo",
+        "ff_risk_unfinished": "no llegar al objetivo dentro del tope de la simulación",
         "ff_optimistic": (
             "Las mismas cifras optimistas de arriba aplican a esta tabla: el balance esconde "
             "pérdidas abiertas."
@@ -1660,6 +1680,29 @@ LABELS: dict[str, dict[str, str]] = {
         ),
         "ff_phases": "{n} fases",
         "ff_phase": "1 fase",
+        "ch_ladder_title": "¿Cuánto cambia con lo que encontró este informe?",
+        "ch_ladder_intro": (
+            "El mismo programa ({program}, {phases}), remuestreado igual, con distintos tramos "
+            "del historial o con lo que el informe descuenta. Son escenarios del mismo "
+            "historial, no predicciones: si la cifra cae mucho fuera de muestra o con costos, "
+            "la de la historia completa es optimista."
+        ),
+        "ch_ladder_scenario": "Escenario",
+        "ch_ladder_days": "Días de datos",
+        "ch_ladder_pass": "Llega al objetivo en todas las fases",
+        "ch_ladder_full": "Historia completa (la cifra de arriba)",
+        "ch_ladder_full_program": "Historia completa (la cifra de la tabla de firmas)",
+        "ch_ladder_in_sample": "Solo dentro de muestra (hasta el {date})",
+        "ch_ladder_out_of_sample": "Solo fuera de muestra (desde el {date})",
+        "ch_ladder_cost": "Con el costo de referencia ({bps} pb por lado)",
+        "ch_ladder_haircut": (
+            "Con la suerte de {trials} intentos descontada (Sharpe {before} → {after}, Harvey "
+            "y Liu)"
+        ),
+        "ch_ladder_low_in_sample": "solo dentro de muestra",
+        "ch_ladder_low_out_of_sample": "solo fuera de muestra",
+        "ch_ladder_low_reference_cost": "con el costo de referencia",
+        "ch_ladder_low_luck_haircut": "con la suerte descontada",
         "assumptions": "Supuestos",
         "source": "Fuente",
         "as_of": "leída el",
@@ -2753,6 +2796,18 @@ LABELS: dict[str, dict[str, str]] = {
         "hero_live": "Live account: {badge}.",
         "hero_live_money": "Trading result: {result} on {deposits} deposited.",
         "hero_live_link": "See the comparison with the backtest",
+        "hero_challenge": (
+            "Chosen challenge, {program}: reaches the target in {full} of the simulations with "
+            "the full history and in {low} {low_label}."
+        ),
+        "hero_challenge_full": (
+            "Chosen challenge, {program}: reaches the target in {full} of the simulations with "
+            "the full history."
+        ),
+        "hero_challenge_link": "See the ladder",
+        "hero_challenge_optimistic": (
+            "These figures are optimistic: the closed-trade balance does not see the open losses."
+        ),
         "live_badge_CONSISTENT": "Consistent",
         "live_badge_EDGE": "At the edge",
         "live_badge_INCONSISTENT": "Not consistent",
@@ -2962,6 +3017,10 @@ LABELS: dict[str, dict[str, str]] = {
         "fail_daily_loss": "Breaks the daily loss limit",
         "fail_total_loss": "Breaks the total loss limit",
         "unfinished": "Does not finish in time",
+        "unfinished_cap": (
+            "Does not reach the target within {days} business days (the simulation's cap; the "
+            "rules set no deadline)"
+        ),
         "ci95": "95 % interval of reaching the target",
         "days_to_target": "Business days to the target (p25 / p50 / p75)",
         "best_day_line": (
@@ -2975,6 +3034,10 @@ LABELS: dict[str, dict[str, str]] = {
             "rule, where the firm has one; ties go by name. It compares rules; it does not "
             "recommend buying any challenge."
         ),
+        "ff_basis": (
+            "Figures from the full history without the reference cost; the ladder above shows "
+            "how much they change."
+        ),
         "ff_program": "Challenge",
         "ff_pass": "Passes",
         "ff_clean": "Passes within the best-day rule",
@@ -2983,7 +3046,7 @@ LABELS: dict[str, dict[str, str]] = {
         "ff_risk_none": "Nothing in the simulations",
         "ff_risk_fail_daily_loss": "breaking the daily loss limit",
         "ff_risk_fail_total_loss": "breaking the total loss limit",
-        "ff_risk_unfinished": "not reaching the target in time",
+        "ff_risk_unfinished": "not reaching the target within the simulation's cap",
         "ff_optimistic": (
             "The same optimistic figures as above apply to this table: the balance hides open "
             "losses."
@@ -2998,6 +3061,28 @@ LABELS: dict[str, dict[str, str]] = {
         ),
         "ff_phases": "{n} phases",
         "ff_phase": "1 phase",
+        "ch_ladder_title": "How much does it change with what this report found?",
+        "ch_ladder_intro": (
+            "The same program ({program}, {phases}), resampled the same way, on different "
+            "stretches of the history or with what the report discounts. These are scenarios "
+            "of the same history, not predictions: if the figure drops sharply out of sample "
+            "or with costs, the full-history figure is optimistic."
+        ),
+        "ch_ladder_scenario": "Scenario",
+        "ch_ladder_days": "Days of data",
+        "ch_ladder_pass": "Reaches the target in every phase",
+        "ch_ladder_full": "Full history (the figure above)",
+        "ch_ladder_full_program": "Full history (the firm table's figure)",
+        "ch_ladder_in_sample": "In-sample only (up to {date})",
+        "ch_ladder_out_of_sample": "Out-of-sample only (from {date})",
+        "ch_ladder_cost": "With the reference cost ({bps} bps per side)",
+        "ch_ladder_haircut": (
+            "With the luck of {trials} trials discounted (Sharpe {before} → {after}, Harvey & Liu)"
+        ),
+        "ch_ladder_low_in_sample": "in-sample only",
+        "ch_ladder_low_out_of_sample": "out-of-sample only",
+        "ch_ladder_low_reference_cost": "with the reference cost",
+        "ch_ladder_low_luck_haircut": "with the luck discounted",
         "assumptions": "Assumptions",
         "source": "Source",
         "as_of": "read on",
@@ -4826,6 +4911,18 @@ def _open_loss_note(
     )
 
 
+def _challenge_optimistic(
+    challenge: dict[str, Any], platform_dd: float | None, labels: dict[str, str], hidden_note: str
+) -> bool:
+    """Whether open losses the closed-trade balance cannot see make the
+    challenge's figures optimistic: the platform's open-trade drawdown breaks
+    the total loss limit, or the red flags found hidden open losses."""
+    return bool(
+        _open_loss_note(challenge, platform_dd, labels)
+        or (hidden_note and challenge.get("status") == "MEASURED")
+    )
+
+
 def _challenge_html(
     challenge: dict[str, Any] | None,
     locale: str,
@@ -4861,12 +4958,22 @@ def _challenge_html(
     html_text += _status_line(challenge, labels)
     open_loss = _open_loss_note(challenge, platform_dd, labels)
     html_text += open_loss or (hidden_note if challenge.get("status") == "MEASURED" else "")
+    optimistic = _challenge_optimistic(challenge, platform_dd, labels, hidden_note)
+    ladder = ""
     if challenge.get("status") == "MEASURED":
         probability = challenge["probability"]
+        horizon = (challenge.get("method") or {}).get("horizon_business_days")
+
+        def outcome(key: str) -> str:
+            # Without a deadline in the rules, "unfinished" is the simulator's cap.
+            if key == "unfinished" and rules.get("time_limit_days") is None and horizon:
+                return labels["unfinished_cap"].format(days=horizon)
+            return labels[key]
+
         html_text += (
             f"<table><tr><th>{_e(labels['outcome'])}</th><th>{_e(labels['probability'])}</th></tr>"
             + "".join(
-                f"<tr><td>{_e(labels[key])}</td>"
+                f"<tr><td>{_e(outcome(key))}</td>"
                 f"<td>{_value_cell(probability[key], percent=True)}</td></tr>"
                 for key in ("pass", "fail_daily_loss", "fail_total_loss", "unfinished")
             )
@@ -4892,6 +4999,10 @@ def _challenge_html(
                 f"<p>{_e(labels['best_day_line'].format(share=_share_pct(share)))} "
                 f"{_badge('MEASURED')}</p>"
             )
+        ladder = _challenge_ladder_html(
+            challenge.get("scenarios"), locale, labels, optimistic=optimistic
+        )
+        html_text += ladder
     notes = rules.get("notes") or []
     if notes:
         html_text += (
@@ -4901,9 +5012,7 @@ def _challenge_html(
         )
     html_text += _assumptions(challenge.get("assumptions"), locale, labels)
     return html_text + _firm_fit_html(
-        challenge.get("firm_fit"),
-        labels,
-        optimistic=bool(open_loss or (hidden_note and challenge.get("status") == "MEASURED")),
+        challenge.get("firm_fit"), labels, optimistic=optimistic, ladder=bool(ladder)
     )
 
 
@@ -4930,8 +5039,127 @@ def _firm_pct(value: float) -> str:
     return f"{value:.0%}"
 
 
+def _risk_text(key: str, labels: dict[str, str]) -> str:
+    """The failure that ends most simulations, as a table cell says it.
+
+    Not reaching the target is said against the simulation's cap: no
+    published rule sets a deadline."""
+    if key == "none":
+        return labels["ff_risk_none"]
+    if key == "unfinished":
+        text = labels["ff_risk_unfinished"]
+        return text[:1].upper() + text[1:]
+    return labels[key]
+
+
+def _program_name(program: dict[str, Any], locale: str) -> str:
+    """``firm · program`` as the reader's language names it."""
+    parts = (str(program.get("firm", "")), str(program.get("program", "")))
+    return " · ".join(localize(part, locale) for part in parts if part)
+
+
+#: Where each rung of the ladder comes from, in the engine's order.
+CHALLENGE_LADDER_ROWS = ("full", "in_sample", "out_of_sample", "reference_cost", "luck_haircut")
+
+
+def _challenge_ladder_label(row: dict[str, Any], labels: dict[str, str], phases: int = 1) -> str:
+    """A rung's name, with its date, cost or haircut when the engine kept them.
+
+    The section above simulates one phase; with more than one, the full
+    history's figure is the firm table's (every phase), not the one above."""
+    key = str(row.get("key", ""))
+    cost = row.get("cost_bps_per_side") or {}
+    if key == "full":
+        return labels["ch_ladder_full" if phases == 1 else "ch_ladder_full_program"]
+    if key == "in_sample" and row.get("until"):
+        return labels["ch_ladder_in_sample"].format(date=row["until"])
+    if key == "out_of_sample" and row.get("from"):
+        return labels["ch_ladder_out_of_sample"].format(date=row["from"])
+    if key == "reference_cost" and cost.get("value") is not None:
+        return labels["ch_ladder_cost"].format(bps=f"{float(cost['value']):g}")
+    if key == "luck_haircut" and row.get("sharpe_after") and row.get("trials"):
+        return labels["ch_ladder_haircut"].format(
+            trials=f"{int(row['trials']['value']):,}",
+            before=f"{float(row['sharpe']['value']):.2f}",
+            after=f"{float(row['sharpe_after']['value']):.2f}",
+        )
+    text = labels.get(f"ch_ladder_low_{key}", key)
+    return text[:1].upper() + text[1:]
+
+
+def _challenge_ladder_html(
+    scenarios: dict[str, Any] | None,
+    locale: str,
+    labels: dict[str, str],
+    *,
+    optimistic: bool = False,
+) -> str:
+    """The chosen program again on parts of the history and with what the
+    report discounts, so the full-history figure is never read alone."""
+    if not scenarios or scenarios.get("status") != "MEASURED" or not scenarios.get("rows"):
+        return ""
+    program = scenarios.get("program") or {}
+    phases = int(program.get("phases") or 1)
+    intro = labels["ch_ladder_intro"].format(
+        program=_program_name(program, locale), phases=_phases(phases, labels)
+    )
+    rows = [row for row in scenarios["rows"] if row.get("key") in CHALLENGE_LADDER_ROWS]
+    clean = any(row.get("pass_within_best_day") for row in rows)
+    span = 3 if clean else 2
+
+    def pct(item: dict[str, Any] | None, label: str) -> str:
+        if not item:
+            return f"<td class='val muted' data-l='{_e(label)}'>{_e(labels['ff_no_rule'])}</td>"
+        return f"<td class='val' data-l='{_e(label)}'>{_e(_firm_pct(float(item['value'])))}</td>"
+
+    def line(row: dict[str, Any]) -> str:
+        name = _e(_challenge_ladder_label(row, labels, phases))
+        cost = row.get("cost_bps_per_side") or {}
+        if row.get("key") == "reference_cost" and cost.get("evidence"):
+            name += " " + _badge(str(cost["evidence"]))
+        days = row.get("days")
+        shown = f"{int(days):,}" if isinstance(days, int) else "—"
+        cells = (
+            f"<td>{name}</td><td class='val' data-l='{_e(labels['ch_ladder_days'])}'>{shown}</td>"
+        )
+        item = row.get("pass") or {}
+        if item.get("evidence") != "MEASURED":
+            reason = localize(str(item.get("note", "")), locale)
+            return (
+                f"<tr>{cells}<td colspan='{span}' data-l='{_e(labels['ch_ladder_pass'])}'>"
+                f"<span>{_badge('NOT_MEASURED')} <span class='muted'>{_e(reason)}</span>"
+                "</span></td></tr>"
+            )
+        cells += pct(item, labels["ch_ladder_pass"])
+        if clean:
+            cells += pct(row.get("pass_within_best_day"), labels["ff_clean"])
+        risk = _risk_text(str(row.get("main_risk", "none")), labels)
+        return f"<tr>{cells}<td data-l='{_e(labels['ff_risk'])}'>{_e(risk)}</td></tr>"
+
+    head = (
+        f"<th>{_e(labels['ch_ladder_scenario'])}</th>"
+        f"<th class='val'>{_e(labels['ch_ladder_days'])}</th>"
+        f"<th class='val'>{_e(labels['ch_ladder_pass'])}</th>"
+        + (f"<th class='val'>{_e(labels['ff_clean'])}</th>" if clean else "")
+        + f"<th>{_e(labels['ff_risk'])}</th>"
+    )
+    out = (
+        f"<h3>{_e(labels['ch_ladder_title'])}</h3>"
+        f"<p class='muted'>{_e(intro)} {_badge('MEASURED')}</p>"
+        f"<table class='timing firms'><thead><tr>{head}</tr></thead>"
+        f"<tbody>{''.join(line(row) for row in rows)}</tbody></table>"
+    )
+    if optimistic:
+        out += f"<p><strong>{_e(labels['ff_optimistic'])}</strong></p>"
+    return out
+
+
 def _firm_fit_html(
-    fit: dict[str, Any] | None, labels: dict[str, str], *, optimistic: bool = False
+    fit: dict[str, Any] | None,
+    labels: dict[str, str],
+    *,
+    optimistic: bool = False,
+    ladder: bool = False,
 ) -> str:
     """Every published challenge on the same resampled history, best odds first."""
     if not fit or fit.get("status") != "MEASURED" or not fit.get("firms"):
@@ -4940,6 +5168,8 @@ def _firm_fit_html(
         f"<h3>{_e(labels['ff_title'])}</h3>"
         f"<p class='muted'>{_e(labels['ff_intro'])} {_badge('MEASURED')}</p>"
     )
+    if ladder:
+        out += f"<p class='muted'>{_e(labels['ff_basis'])}</p>"
     if optimistic:
         out += f"<p><strong>{_e(labels['ff_optimistic'])}</strong></p>"
     uniform = fit.get("uniform")
@@ -4955,9 +5185,6 @@ def _firm_fit_html(
             return f"<td class='val muted' data-l='{_e(label)}'>{_e(labels['ff_no_rule'])}</td>"
         return f"<td class='val' data-l='{_e(label)}'>{_e(_firm_pct(float(item['value'])))}</td>"
 
-    def risk(key: str) -> str:
-        return labels["ff_risk_none"] if key == "none" else labels[key]
-
     body = "".join(
         "<tr><td>"
         + _e(f"{row['firm']} · {row['program']}")
@@ -4965,7 +5192,8 @@ def _firm_fit_html(
         + "</td>"
         + pct(row["pass"], labels["ff_pass"])
         + pct(row.get("pass_within_best_day"), labels["ff_clean"])
-        + f"<td data-l='{_e(labels['ff_risk'])}'>{_e(risk(row['main_risk']))}</td></tr>"
+        + f"<td data-l='{_e(labels['ff_risk'])}'>{_e(_risk_text(row['main_risk'], labels))}</td>"
+        + "</tr>"
         for row in fit["firms"]
     )
     return out + (
@@ -8563,6 +8791,10 @@ def render_html(
     live_anchor = next(
         (f"r-d{i}" for i, (title, _) in enumerate(detail, 1) if title == labels["live"]), ""
     )
+    challenge_anchor = next(
+        (f"r-d{i}" for i, (title, _) in enumerate(detail, 1) if title == labels["challenge"]),
+        "",
+    )
     hero = (
         ("" if locked else _pdf_cover(data, verdict, labels, "" if notice_ok else notice or ""))
         + "<section class='report-hero'>"
@@ -8583,6 +8815,7 @@ def render_html(
         + _verdict_html(str(verdict["summary"]))
         + stale_account
         + ("" if locked else _hero_live(data, labels, live_anchor))
+        + ("" if locked else _hero_challenge(data, labels, challenge_anchor, hidden))
         + f"<p class='muted evidence-legend'>{_e(labels['evidence_legend'])}</p>"
         + "</div></div>"
         + (
@@ -8745,6 +8978,49 @@ def _hero_live(data: dict[str, Any], labels: dict[str, str], anchor: str) -> str
     link = f" <a href='#{_e(anchor)}'>{_e(labels['hero_live_link'])}</a>" if anchor else ""
     tone = {"PASS": "pass", "WEAK": "weak", "FAIL": "fail"}.get(LIVE_TONE.get(outcome, ""), "")
     return f"<p class='verdict-live {tone}'>{_e(text)}{_e(money)} {_badge('MEASURED')}{link}</p>"
+
+
+def _hero_challenge(
+    data: dict[str, Any], labels: dict[str, str], anchor: str, hidden_note: str = ""
+) -> str:
+    """One line under the verdict when the client chose a challenge: the
+    full-history figure next to the lowest rung of the ladder, so the most
+    optimistic figure is never the only one at the top of the report. When
+    the section warns that the balance hides open losses, so does the line."""
+    challenge = data.get("challenge") or {}
+    if challenge.get("status") != "MEASURED" or challenge.get("selected_by") != "client":
+        return ""
+    scenarios = challenge.get("scenarios") or {}
+    rows = [
+        row
+        for row in scenarios.get("rows") or []
+        if (row.get("pass") or {}).get("evidence") == "MEASURED"
+    ]
+    full = next((row for row in rows if row.get("key") == "full"), None)
+    if full is None:
+        return ""
+    locale = _locale_of(labels)
+    program = _program_name(scenarios.get("program") or {}, locale)
+    full_value = float(full["pass"]["value"])
+    others = [row for row in rows if row.get("key") in CHALLENGE_LADDER_ROWS[1:]]
+    low = min(others, key=lambda row: float(row["pass"]["value"]), default=None)
+    if low is not None and float(low["pass"]["value"]) < full_value:
+        text = labels["hero_challenge"].format(
+            program=program,
+            full=_firm_pct(full_value),
+            low=_firm_pct(float(low["pass"]["value"])),
+            low_label=labels[f"ch_ladder_low_{low['key']}"],
+        )
+    else:
+        text = labels["hero_challenge_full"].format(program=program, full=_firm_pct(full_value))
+    platform_dd = _ev_value((data.get("performance") or {}).get("platform_equity_drawdown"))
+    warning = (
+        f" <strong>{_e(labels['hero_challenge_optimistic'])}</strong>"
+        if _challenge_optimistic(challenge, platform_dd, labels, hidden_note)
+        else ""
+    )
+    link = f" <a href='#{_e(anchor)}'>{_e(labels['hero_challenge_link'])}</a>" if anchor else ""
+    return f"<p class='verdict-live'>{_e(text)} {_badge('MEASURED')}{warning}{link}</p>"
 
 
 def _pdf_cover(

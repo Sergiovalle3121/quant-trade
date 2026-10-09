@@ -1147,6 +1147,50 @@ and report wire them in during the integration step):
   the balance hides open losses, the table repeats that its figures are
   optimistic. MEASURED under the simulator's assumptions; it compares rules
   and never recommends buying a challenge. No class change.
+- `challenge.scenarios`, the challenge ladder ("¿Cuánto cambia con lo que
+  encontró este informe?"): the chosen program (all its phases, through
+  `firmfit.program_pass`; the generic preset is one phase) run again with
+  the same simulator, seed, paths per phase and rules on other versions of
+  the same history, so the full-history figure is never read alone. Each
+  row keeps how many daily returns it used. The rows, in order:
+  `full`, the whole history, identical to the program's row in the firm
+  table (for a one-phase program, also the section's own figure; with more
+  phases the row says it is the firm table's); `in_sample` and
+  `out_of_sample`, the daily returns before and from the declared
+  out-of-sample start, NOT_MEASURED with the holdout's own
+  reason when it was not measured (no date declared, a date outside the
+  series, a side too short); `reference_cost`, the curve with the cost
+  section's reference cost per side (`costs.round_trip_cost`) taken off the
+  balance from each trade's exit on, NOT_MEASURED without trades, when the
+  curve is not money (deposits or withdrawals inside the history make it an
+  index; otherwise the curve and the trades must reconcile, or the balance
+  be rebuilt from the platform's deals) or when the charge takes the balance
+  to zero. Only a reconciliation CONTRADICTION reads "the curve and the
+  trades do not reconcile in money"; a reconciliation that was not measured
+  reads "the curve was not shown to be money" followed by its own reason
+  (trades outside the curve dates, an uncovered tail, a gap that flows,
+  conversion or open positions could explain), and uploaded returns say
+  they are not money; `luck_haircut`, the daily returns with their mean cut
+  to the share of the Sharpe that the Harvey and Liu haircut of the luck
+  section leaves (same spread, so the same volatility), NOT_MEASURED with
+  the luck section's reason, with "fewer than 2 trials" when 1 trial was
+  declared or counted in the files, and with "trial count not declared"
+  when the client left it empty and no file counts it (the engine then
+  computes with 1, the most favourable case, which says nothing about the
+  search). A row the simulator cannot
+  measure (too few daily returns) says why. The rows are scenarios of the
+  same history, not predictions; the ladder is MEASURED, informational and
+  changes neither the class, the dimensions, the challenge's own figures
+  nor the firm table, which now says that its figures come from the full
+  history without the reference cost. When the client chose the challenge,
+  one line under the verdict gives the full-history figure next to the
+  lowest measured row and links to the section; when the section warns that
+  the balance hides open losses (the platform's drawdown with open trades
+  at or past the total loss limit, or the hidden floating drawdown flag),
+  the line says its figures are optimistic too. No ladder figure reaches
+  `/v`, the badge or the card. Every preset has `time_limit_days=None`, so
+  "unfinished" reads as not reaching the target within the simulator's
+  250 business days, the cap, never as a deadline the rules set.
 - `vendor_questions`: neutral questions for the seller of a robot, driven by
   the red flags and the missing inputs, in Spanish and English. It never
   says whether to buy.

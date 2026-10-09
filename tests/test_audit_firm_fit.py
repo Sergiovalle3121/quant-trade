@@ -146,7 +146,7 @@ def test_no_program_passing_names_what_stops_it() -> None:
     fit = firm_fit(daily, samples=200)
     assert fit["uniform"] == "all_fail" and fit["common_risk"] == "unfinished"
     html = _firm_fit_html(fit, LABELS["en"])
-    assert "not reaching the target in time" in html and "<table" not in html
+    assert "not reaching the target within the simulation" in html and "<table" not in html
 
 
 def test_programs_rank_by_the_figure_within_the_best_day_rule() -> None:
