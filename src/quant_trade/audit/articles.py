@@ -467,7 +467,8 @@ STREAK_READING: dict[str, str] = {
     "es": (
         f"DECLARED · Con {_rate(_STREAK.win_rate, 'es')} de aciertos y {_STREAK.trades} "
         f"operaciones, la racha más larga llega a {_STREAK.median_run} pérdidas en al menos la "
-        f"mitad de los historiales y a {_STREAK.rare_run} en 1 de cada {_ONE_IN}. Con "
+        f"mitad de los historiales y a {_STREAK.rare_run} en al menos 1 de cada {_ONE_IN}: en "
+        f"el {_pct(_STREAK.rare_chance, 'es')} de ellos. Con "
         f"{_rate(_STREAK_HIGH.win_rate, 'es')} de aciertos y las mismas operaciones, las cifras "
         f"son {_STREAK_HIGH.median_run} y {_STREAK_HIGH.rare_run}; con "
         f"{_rate(_STREAK_LOW.win_rate, 'es')}, {_STREAK_LOW.median_run} y "
@@ -478,7 +479,8 @@ STREAK_READING: dict[str, str] = {
     "en": (
         f"DECLARED · At a {_rate(_STREAK.win_rate, 'en')} win rate and {_STREAK.trades} "
         f"trades, the longest streak reaches {_STREAK.median_run} losses in at least half of "
-        f"the histories and {_STREAK.rare_run} in 1 history in {_ONE_IN}. At "
+        f"the histories and {_STREAK.rare_run} in at least 1 history in {_ONE_IN}: in "
+        f"{_pct(_STREAK.rare_chance, 'en')} of them. At "
         f"{_rate(_STREAK_HIGH.win_rate, 'en')} and the same trades, the figures are "
         f"{_STREAK_HIGH.median_run} and {_STREAK_HIGH.rare_run}; at "
         f"{_rate(_STREAK_LOW.win_rate, 'en')}, {_STREAK_LOW.median_run} and "
@@ -489,7 +491,8 @@ STREAK_READING: dict[str, str] = {
     "pt": (
         f"DECLARED · Com {_rate(_STREAK.win_rate, 'pt')} de acerto e {_STREAK.trades} "
         f"operações, a maior sequência chega a {_STREAK.median_run} perdas em pelo menos "
-        f"metade dos históricos e a {_STREAK.rare_run} em 1 em cada {_ONE_IN}. Com "
+        f"metade dos históricos e a {_STREAK.rare_run} em pelo menos 1 em cada {_ONE_IN}: em "
+        f"{_pct(_STREAK.rare_chance, 'pt')} deles. Com "
         f"{_rate(_STREAK_HIGH.win_rate, 'pt')} de acerto e as mesmas operações, os números são "
         f"{_STREAK_HIGH.median_run} e {_STREAK_HIGH.rare_run}; com "
         f"{_rate(_STREAK_LOW.win_rate, 'pt')}, {_STREAK_LOW.median_run} e "
@@ -508,7 +511,7 @@ STREAK_STAKES: dict[str, str] = {
         f"operaciones resta {_stake_pct(_STREAK.rare_run * _LARGE, 'es')} del saldo inicial; "
         f"con {_stake_pct(_SMALL, 'es')}, resta {_stake_pct(_STREAK.rare_run * _SMALL, 'es')}. "
         "Si el límite total de tu reto queda por debajo de esa cifra, una racha que el azar da "
-        f"en 1 de cada {_ONE_IN} historiales termina el intento."
+        f"en el {_pct(_STREAK.rare_chance, 'es')} de los historiales termina el intento."
     ),
     "en": (
         f"DECLARED · At a risk of {_stake_pct(_LARGE, 'en')} per trade, the 1-in-{_ONE_IN} "
@@ -516,7 +519,7 @@ STREAK_STAKES: dict[str, str] = {
         f"{_stake_pct(_STREAK.rare_run * _LARGE, 'en')} of the initial balance; at "
         f"{_stake_pct(_SMALL, 'en')}, it takes {_stake_pct(_STREAK.rare_run * _SMALL, 'en')}. "
         "If your challenge's total limit is below that figure, a streak that chance gives in "
-        f"1 history in {_ONE_IN} ends the attempt."
+        f"{_pct(_STREAK.rare_chance, 'en')} of histories ends the attempt."
     ),
     "pt": (
         f"DECLARED · Com risco de {_stake_pct(_LARGE, 'pt')} por operação, a sequência de 1 em "
@@ -524,7 +527,7 @@ STREAK_STAKES: dict[str, str] = {
         f"operações tira {_stake_pct(_STREAK.rare_run * _LARGE, 'pt')} do saldo inicial; com "
         f"{_stake_pct(_SMALL, 'pt')}, tira {_stake_pct(_STREAK.rare_run * _SMALL, 'pt')}. Se o "
         "limite total do seu desafio fica abaixo desse número, uma sequência que o acaso dá em "
-        f"1 em cada {_ONE_IN} históricos encerra a tentativa."
+        f"{_pct(_STREAK.rare_chance, 'pt')} dos históricos encerra a tentativa."
     ),
 }
 

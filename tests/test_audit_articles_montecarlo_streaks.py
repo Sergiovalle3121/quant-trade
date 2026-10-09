@@ -220,6 +220,7 @@ def test_streak_table_cells_equal_longest_run_tail(locale: str) -> None:
         assert PINNED_STREAKS[(win_rate, trades)] == (median, rare)
         assert numbers.streak_for(win_rate, trades).median_run == median
         assert numbers.streak_for(win_rate, trades).rare_run == rare
+        assert numbers.streak_for(win_rate, trades).rare_chance == tail[rare] >= RARE
         seen.append((win_rate, trades))
     assert seen == list(PINNED_STREAKS)
     assert evidence_label("MEASURED", locale) not in _visible(table.group(1))
@@ -257,9 +258,21 @@ def test_streak_prose_reads_the_computed_rows(locale: str) -> None:
     assert reading.startswith("DECLARED ·") and stakes.startswith("DECLARED ·")
     example = numbers.streak_for(*numbers.STREAK_EXAMPLE)
     assert (example.median_run, example.rare_run) == (7, 10)
+    # The 1-in-20 streak is the longest one chance gives at least that often; for
+    # this row it comes in about 9 histories in 100, and the prose prints that figure.
+    chance = longest_run_tail(200, 0.5, 60)[10]
+    assert round(chance, 4) == 0.0899 and example.rare_chance == chance
+    printed = _pct(chance, locale)
+    assert printed == {"es": "9,0 %", "en": "9.0 %", "pt": "9,0 %"}[locale]
+    assert reading.count(printed) == 1 and stakes.count(printed) == 1
+    at_least = {"es": "al menos 1 de cada 20", "en": "at least 1 history in 20"}
+    assert at_least.get(locale, "pelo menos 1 em cada 20") in reading
+    for exact in ("en 1 de cada 20 historiales", "in 1 history in 20 ", "em 1 em cada 20 hist"):
+        assert exact not in reading and exact not in stakes
     high, low = numbers.streak_for(0.60, 200), numbers.streak_for(0.45, 200)
     short, long = numbers.streak_for(0.50, 100), numbers.streak_for(0.50, 500)
-    figures = [int(value) for value in re.findall(r"\b\d+\b", reading.split("·", 1)[1])]
+    prose = reading.split("·", 1)[1].replace(printed, "")
+    figures = [int(value) for value in re.findall(r"\b\d+\b", prose)]
     # Each row's figures in the order the paragraph reads them.
     assert figures == [
         50,
@@ -482,18 +495,39 @@ def test_index_sitemap_and_case_page_list_the_new_articles(client: TestClient) -
     assert STREAKS in AUDIENCE_ARTICLES["retos-prop-firm"]
 
 
+#: The section as each page must show it, written out: ``METHOD_COPY`` itself
+#: is rewritten for "pt" by ``report_pt.install`` once ``report`` is imported.
+RESAMPLING_TEXTS = {
+    "es": ("Remuestreo y Monte Carlo", "Varias cifras del informe salen de simulaciones"),
+    "en": ("Resampling and Monte Carlo", "Several figures in the report come from Monte Carlo"),
+    "pt": ("Reamostragem e Monte Carlo", "Vários números do relatório saem de simulações"),
+}
+
+
 @pytest.mark.parametrize("locale", LOCALES)
 def test_method_page_names_monte_carlo_where_it_explains_resampling(locale: str) -> None:
-    words = METHOD_COPY[locale]
-    assert "Monte Carlo" in str(words["resampling_title"])
-    assert any("Monte Carlo" in item for item in words["resampling"])
     page = method_page(locale=locale, base_url=BASE)
     text = _visible(_main(page))
     assert "Monte Carlo" in text
-    assert html.escape(str(words["resampling_title"]), quote=True) in page
+    title, opening = RESAMPLING_TEXTS[locale]
+    assert f">{html.escape(title, quote=True)}<" in page
+    assert opening in text
+    for other, (other_title, other_opening) in RESAMPLING_TEXTS.items():
+        if other != locale:
+            assert other_title not in text and other_opening not in text, other
     assert find_claims(text) == []
     if locale == "pt":
         assert not any(word in text for word in ("archivo", "informe", "Sube "))
+
+
+def test_portuguese_method_copy_installed_by_the_report_covers_every_key() -> None:
+    # ``report_pt.install`` replaces the method page's "pt" texts with its own,
+    # over the English: a key it lacks would read in English on /pt/metodologia.
+    from quant_trade.audit import report_pt
+
+    assert set(report_pt.REPORT["METHOD_COPY"]) == set(METHOD_COPY["en"])
+    english = METHOD_COPY["en"]
+    assert [key for key in english if METHOD_COPY["pt"][key] == english[key]] == []
 
 
 @pytest.mark.parametrize("locale", LOCALES)

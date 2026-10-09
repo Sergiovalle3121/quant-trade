@@ -56,6 +56,8 @@ class StreakRow:
     median_run: int
     #: Longest k with P(longest losing run >= k) >= ``STREAK_RARE``.
     rare_run: int
+    #: P(longest losing run >= ``rare_run``): at least ``STREAK_RARE``, often more.
+    rare_chance: float
 
 
 def streak_row(win_rate: float, trades: int, max_run: int = STREAK_MAX_RUN) -> StreakRow:
@@ -67,7 +69,13 @@ def streak_row(win_rate: float, trades: int, max_run: int = STREAK_MAX_RUN) -> S
         raise ValueError("max_run is too short to reach the one-in-twenty run")
     median = int(np.max(np.nonzero(tail >= STREAK_MEDIAN)[0]))
     rare = int(np.max(np.nonzero(tail >= STREAK_RARE)[0]))
-    return StreakRow(win_rate=win_rate, trades=trades, median_run=median, rare_run=rare)
+    return StreakRow(
+        win_rate=win_rate,
+        trades=trades,
+        median_run=median,
+        rare_run=rare,
+        rare_chance=float(tail[rare]),
+    )
 
 
 STREAK_ROWS: tuple[StreakRow, ...] = tuple(
