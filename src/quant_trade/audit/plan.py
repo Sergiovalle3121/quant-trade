@@ -832,6 +832,25 @@ def _multiplicity_step(data: dict[str, Any], status: str, locale: str) -> tuple[
     return " ".join(parts), actions
 
 
+#: Currency pairs the costs step names when the history trades several.
+PLAN_PAIRS_SHOWN = 3
+
+
+def _pair_pips(item: tuple[str, float, float | None], needs: str) -> str:
+    """``EURUSD 4.31 (passing needs 1.65)``: a pair's break-even pips per side
+    and three times its reference, the bar the costs dimension sets."""
+    name, value, reference = item
+    bar = f" ({needs} {_fmt(reference * 3.0)})" if reference is not None else ""
+    return f"{name} {_fmt(value)}{bar}"
+
+
+def _listed(names: list[str], conjunction: str) -> str:
+    """``EURUSD, GBPUSD y AUDUSD``."""
+    if len(names) < 2:
+        return "".join(names)
+    return f"{', '.join(names[:-1])} {conjunction} {names[-1]}"
+
+
 def _costs_step(data: dict[str, Any], status: str, locale: str) -> tuple[str, list[str]]:
     costs = data.get("costs") or {}
     if (status == "NOT_MEASURED" or costs.get("status") != "MEASURED") and _fund_record(data):
@@ -861,6 +880,14 @@ def _costs_step(data: dict[str, Any], status: str, locale: str) -> tuple[str, li
     pips = _number(_value(costs.get("break_even_pips")))
     reference_pips = _number(_value(costs.get("reference_pips")))
     pair = str(costs.get("pip_symbol") or "")
+    # Several pairs: each one's pips at its own median price (the most traded first).
+    by_symbol = [
+        (str(row.get("symbol") or ""), value, _number(_value(row.get("reference_pips"))))
+        for row in (costs.get("pips_by_symbol") or {}).get("rows") or []
+        if (value := _number(_value(row.get("break_even_pips")))) is not None and row.get("symbol")
+    ][:PLAN_PAIRS_SHOWN]
+    per_lot = _number(_value(costs.get("break_even_per_lot")))
+    lot_currency = str(costs.get("per_lot_currency") or "")
     if breakeven is None or breakeven <= 0:
         finding = _say(
             locale,
@@ -894,6 +921,33 @@ def _costs_step(data: dict[str, Any], status: str, locale: str) -> tuple[str, li
                 f" Em {pair}: {_fmt(pips)} pips por lado; o mínimo para passar são "
                 f"{_fmt(reference_pips * 3.0)} pips.",
             )
+        elif by_symbol:
+            finding += _say(
+                locale,
+                " En pips por lado: "
+                + ", ".join(_pair_pips(item, "mínimo para pasar") for item in by_symbol)
+                + ".",
+                " In pips per side: "
+                + ", ".join(_pair_pips(item, "passing needs") for item in by_symbol)
+                + ".",
+                " Em pips por lado: "
+                + ", ".join(_pair_pips(item, "mínimo para passar") for item in by_symbol)
+                + ".",
+            )
+        if per_lot is not None:
+            money = f"{_fmt(per_lot)} {lot_currency}" if lot_currency else _fmt(per_lot)
+            finding += _say(
+                locale,
+                f" En dinero: {money} por lote y lado"
+                + ("" if lot_currency else ", en unidades del archivo")
+                + ".",
+                f" In money: {money} per lot and side"
+                + ("" if lot_currency else ", in file units")
+                + ".",
+                f" Em dinheiro: {money} por lote e lado"
+                + ("" if lot_currency else ", em unidades do arquivo")
+                + ".",
+            )
     broker = (
         _say(
             locale,
@@ -902,6 +956,23 @@ def _costs_step(data: dict[str, Any], status: str, locale: str) -> tuple[str, li
             f"Compare essa margem com o spread e o slippage reais da sua corretora em {pair}.",
         )
         if pips is not None and pair
+        else _say(
+            locale,
+            "Compara ese margen con el spread y el deslizamiento reales de tu bróker en "
+            f"{_listed([name for name, _, _ in by_symbol], 'y')}.",
+            "Compare that margin with your broker's real spread and slippage on "
+            f"{_listed([name for name, _, _ in by_symbol], 'and')}.",
+            "Compare essa margem com o spread e o slippage reais da sua corretora em "
+            f"{_listed([name for name, _, _ in by_symbol], 'e')}.",
+        )
+        if by_symbol
+        else _say(
+            locale,
+            "Compara ese margen con la comisión por lote y el spread reales de tu bróker.",
+            "Compare that margin with your broker's real commission per lot and spread.",
+            "Compare essa margem com a comissão por lote e o spread reais da sua corretora.",
+        )
+        if per_lot is not None
         else _say(
             locale,
             "Compara ese margen con el spread y el deslizamiento reales de tu bróker: en "

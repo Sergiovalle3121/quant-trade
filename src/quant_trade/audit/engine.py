@@ -1031,6 +1031,106 @@ def _real_fills(inputs: AuditInputs) -> bool:
     return inputs.source_format in account_lib.ACCOUNT_FORMATS
 
 
+def _pip_size(pair: str) -> float:
+    """A pip of a currency pair ``fx_pair`` recognises: 0.01 on yen pairs, else 0.0001."""
+    return 0.01 if pair.endswith("JPY") else 0.0001
+
+
+#: What the per-symbol pips are: the whole ledger's break-even, converted.
+PIPS_BY_SYMBOL_NOTE = (
+    "the whole history's break-even and reference costs per side, converted to pips at "
+    "each symbol's median entry price; not a break-even computed from that symbol's "
+    "trades alone"
+)
+#: A metal is recognised (``crises.symbol_market``) but the audit has no pip size for it.
+PIPS_NO_METAL_SIZE = "no pip size is defined for metals; this symbol's cost stays in bps"
+#: The extra cost per lot and side at which the ledger nets to zero, by hand:
+#: the net money of the closed trades over every lot bought or sold.
+PER_LOT_NOTE = (
+    "cost per lot and side at which the ledger nets to zero: the net at 0x, "
+    "{net} {currency}, over {lots} lots traded counting entries and exits"
+)
+PER_LOT_NOTE_FEES = (
+    "extra cost per lot and side, on top of the report's fees, at which the ledger nets "
+    "to zero: the net at 0x, {net} {currency}, over {lots} lots traded counting entries "
+    "and exits"
+)
+PER_LOT_NO_LOTS = "the file does not give each trade's volume in lots"
+
+
+def _symbol_code(name: str) -> str:
+    """The six letters ``fx_pair`` reads in a symbol name (``XAUUSD`` for ``XAUUSD.r``)."""
+    return "".join(ch for ch in name.upper() if ch.isalnum())[:6]
+
+
+def _pips_by_symbol(
+    inputs: AuditInputs, be: float | None, ref: float, assumed: bool
+) -> dict[str, Any] | None:
+    """The break-even and reference costs per side in pips of each currency pair
+    the ledger trades, at that pair's median entry price; metals are listed in
+    basis points with the reason. ``None`` when the trades are on one pair (the
+    section's ``break_even_pips`` say it) or name no pair or metal."""
+    assert inputs.trades is not None
+    trades = inputs.trades.trades
+    symbols = inputs.trade_symbols
+    if be is None or not symbols or len(symbols) != len(trades):
+        return None
+    if fx_pair(symbols, inputs.report_metadata or {}) is not None:
+        return None
+    prices: dict[str, list[float]] = {}
+    metals: set[str] = set()
+    for name, trade in zip(symbols, trades, strict=True):
+        code = fx_pair([name], {}) if name else None
+        if code is None and name and crises_lib.symbol_market(name) == "metal":
+            code = _symbol_code(name)
+            metals.add(code)
+        if code is not None and trade.entry_price > 0:
+            prices.setdefault(code, []).append(float(trade.entry_price))
+    if not prices:
+        return None
+    rows: list[dict[str, Any]] = []
+    for code, entries in sorted(prices.items(), key=lambda item: (-len(item[1]), item[0])):
+        price = float(np.median(entries))
+        row: dict[str, Any] = {
+            "symbol": code,
+            "trades": len(entries),
+            "median_entry_price": measured(price),
+        }
+        if code in metals:
+            row["break_even_pips"] = not_measured(PIPS_NO_METAL_SIZE)
+            row["reference_pips"] = not_measured(PIPS_NO_METAL_SIZE)
+        else:
+            pip = _pip_size(code)
+            where = f"per side on {code} at {price:.5g}, the median entry price"
+            row["pip_size"] = pip
+            row["break_even_pips"] = measured(be / 10_000 * price / pip, where)
+            row["reference_pips"] = _reference(ref / 10_000 * price / pip, where, assumed=assumed)
+        rows.append(row)
+    return {"note": PIPS_BY_SYMBOL_NOTE, "rows": rows}
+
+
+def _break_even_per_lot(inputs: AuditInputs, net: float, fees_reported: bool) -> dict[str, Any]:
+    """The extra cost per lot and side at which the closed trades net to zero:
+    the ledger's net with no extra cost (the 0x row of the costs table, in the
+    account's money) over every lot bought and sold.
+
+    Only a format that prints the volume in lots and each trade's result in
+    money (``importers.LOT_FORMATS``) gives it; no contract size is assumed."""
+    assert inputs.trades is not None
+    lots = inputs.trade_lots
+    if not lots or len(lots) != len(inputs.trades.trades):
+        return not_measured(PER_LOT_NO_LOTS)
+    traded = 2.0 * float(sum(lots))
+    if not math.isfinite(traded) or traded <= 0 or not math.isfinite(net):
+        return not_measured(PER_LOT_NO_LOTS)
+    note = (PER_LOT_NOTE_FEES if fees_reported else PER_LOT_NOTE).format(
+        net=f"{net:,.2f}",
+        currency=inputs.account_currency or "in file units",
+        lots=f"{traded:,.2f}",
+    )
+    return measured(net / traded, note)
+
+
 def _costs(
     inputs: AuditInputs,
 ) -> tuple[dict[str, Any], list[cost_lib.RecostRow] | None, float | None, bool, list[float] | None]:
@@ -1095,11 +1195,19 @@ def _costs(
     prices = [t.entry_price for t in inputs.trades.trades if t.entry_price > 0]
     if pair is not None and be is not None and prices:
         price = float(np.median(prices))
-        pip = 0.01 if pair.endswith("JPY") else 0.0001
+        pip = _pip_size(pair)
         where = f"per side on {pair} at {price:.5g}, the median entry price"
         section["break_even_pips"] = measured(be / 10_000 * price / pip, where)
         section["reference_pips"] = _reference(ref / 10_000 * price / pip, where, assumed=assumed)
         section["pip_symbol"] = pair
+    by_symbol = _pips_by_symbol(inputs, be, ref, assumed)
+    if by_symbol is not None:
+        section["pips_by_symbol"] = by_symbol
+    # The 0x row: the ledger's net after the report's fees, before any extra cost.
+    net = float(sum(gross)) - float(sum(charged or []))
+    section["break_even_per_lot"] = _break_even_per_lot(inputs, net, fees_reported)
+    if section["break_even_per_lot"]["evidence"] == MEASURED:
+        section["per_lot_currency"] = inputs.account_currency
     if inputs.reported_fees:
         section["reported_fees"] = {
             name: measured(value, "signed total the report itemises; negative is a cost")

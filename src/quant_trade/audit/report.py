@@ -1768,6 +1768,7 @@ LABELS: dict[str, dict[str, str]] = {
         "ch_ladder_in_sample": "Solo dentro de muestra (hasta el {date})",
         "ch_ladder_out_of_sample": "Solo fuera de muestra (desde el {date})",
         "ch_ladder_cost": "Con el costo de referencia ({bps} pb por lado)",
+        "ch_ladder_cost_declared": "Con el costo declarado ({bps} pb por lado)",
         "ch_ladder_haircut": (
             "Con la suerte de {trials} intentos descontada (Sharpe {before} → {after}, Harvey "
             "y Liu)"
@@ -1816,6 +1817,12 @@ LABELS: dict[str, dict[str, str]] = {
         "kpi_trades": "Operaciones · % de aciertos",
         "kpi_breakeven": "Costo extra que lo lleva a cero",
         "kpi_breakeven_negative": "ya pierde sin costo extra",
+        "kpi_pips_on": "{pips} pips en {symbol}",
+        "kpi_per_lot": "{value} {currency} por lote y lado",
+        "kpi_per_lot_units": "{value} por lote y lado, en unidades del archivo",
+        "cost_pips_title": "En pips, por símbolo",
+        "cost_symbol": "Símbolo",
+        "cost_median_entry": "Precio de entrada mediano",
         "kpi_stress": "Sin las 5 mejores operaciones",
         "kpi_stress_curve": "Sin los 5 mejores periodos",
         "kpi_hint_return": "cuánto cambió la cuenta en todo el historial",
@@ -3199,6 +3206,7 @@ LABELS: dict[str, dict[str, str]] = {
         "ch_ladder_in_sample": "In-sample only (up to {date})",
         "ch_ladder_out_of_sample": "Out-of-sample only (from {date})",
         "ch_ladder_cost": "With the reference cost ({bps} bps per side)",
+        "ch_ladder_cost_declared": "With the declared cost ({bps} bps per side)",
         "ch_ladder_haircut": (
             "With the luck of {trials} trials discounted (Sharpe {before} → {after}, Harvey & Liu)"
         ),
@@ -3246,6 +3254,12 @@ LABELS: dict[str, dict[str, str]] = {
         "kpi_trades": "Trades · win rate",
         "kpi_breakeven": "Extra cost that takes it to zero",
         "kpi_breakeven_negative": "already negative before any extra cost",
+        "kpi_pips_on": "{pips} pips on {symbol}",
+        "kpi_per_lot": "{value} {currency} per lot and side",
+        "kpi_per_lot_units": "{value} per lot and side, in file units",
+        "cost_pips_title": "In pips, by symbol",
+        "cost_symbol": "Symbol",
+        "cost_median_entry": "Median entry price",
         "kpi_stress": "Without the best 5 trades",
         "kpi_stress_curve": "Without the best 5 periods",
         "kpi_hint_return": "how much the account changed over the whole history",
@@ -3476,6 +3490,7 @@ KEY_LABELS: dict[str, dict[str, str]] = {
         "break_even_bps": "Costo de equilibrio (pb por lado)",
         "break_even_pips": "Costo de equilibrio (pips por lado)",
         "reference_pips": "Costo de referencia (pips por lado)",
+        "break_even_per_lot": "Costo de equilibrio (por lote y lado)",
         "platform_equity_drawdown": "Drawdown con operaciones abiertas (tu plataforma)",
         "commission": "Comisión",
         "swap": "Swap",
@@ -3585,6 +3600,7 @@ KEY_LABELS: dict[str, dict[str, str]] = {
         "break_even_bps": "Break-even cost (bps per side)",
         "break_even_pips": "Break-even cost (pips per side)",
         "reference_pips": "Reference cost (pips per side)",
+        "break_even_per_lot": "Break-even cost (per lot and side)",
         "platform_equity_drawdown": "Drawdown with open trades (your platform)",
         "commission": "Commission",
         "swap": "Swap",
@@ -3618,6 +3634,7 @@ MONEY_KEYS = {
     "deposits_total",
     "withdrawals_total",
     "trading_result",
+    "break_even_per_lot",
     "floating_pnl",
     "amount",
     "balance_before",
@@ -4065,6 +4082,8 @@ def _evidence_rows(section: dict[str, Any], labels: dict[str, str], *, skip: set
         raw = value["value"]
         if key == "ownership":
             shown = _e(ownership.choice_label(raw, _locale_of(labels)))
+        elif key == "break_even_per_lot" and raw is not None and section.get("per_lot_currency"):
+            shown = f"{_fmt(raw, key=key)} {_e(section['per_lot_currency'])}"
         elif isinstance(raw, bool):
             shown = _e(labels["yes" if raw else "no"])
         else:
@@ -4450,11 +4469,10 @@ def _kpi_list(data: dict[str, Any], labels: dict[str, str]) -> list[tuple[str, s
         out.append((label, "0", "bad"))
     elif breakeven is not None:
         tone = "bad" if breakeven < 3 * reference else "good"
-        label = f"{labels['kpi_breakeven']} ({labels['bps_side']})"
-        pips = _ev_value(costs.get("break_even_pips"))
-        if pips is not None:
-            # The pips go under the figure, so the tile keeps one short number.
-            label = f"{labels['kpi_breakeven']} ({labels['bps_side']}; {pips:,.1f} pips)"
+        # The pips and the money per lot go under the figure, so the tile keeps
+        # one short number: the basis points the costs section measures.
+        parts = [labels["bps_side"], *_trader_units(costs, labels)]
+        label = f"{labels['kpi_breakeven']} ({'; '.join(parts)})"
         out.append((label, f"{breakeven:,.2f}", tone))
     for block, scenario, label, percent in (
         (stress.get("trades") or {}, "best_5_trades", "kpi_stress", False),
@@ -4466,6 +4484,55 @@ def _kpi_list(data: dict[str, Any], labels: dict[str, str]) -> list[tuple[str, s
             shown = _stress_value(value, percent=percent, signed=True)
             out.append((labels[label], shown, "good" if value > 0 else "bad"))
     return out
+
+
+#: Currency pairs named in the break-even tile; the costs section lists them all.
+KPI_PIPS_SHOWN = 3
+
+
+def _symbol_pips(costs: dict[str, Any]) -> list[tuple[str, float, dict[str, Any]]]:
+    """``(symbol, break-even pips, evidence)`` of each pair the costs measured
+    in pips, most traded first (the engine's order)."""
+    rows = (costs.get("pips_by_symbol") or {}).get("rows") or []
+    out = []
+    for row in rows:
+        block = row.get("break_even_pips") or {}
+        value = _ev_value(block)
+        if value is not None and row.get("symbol"):
+            out.append((str(row["symbol"]), value, block))
+    return out
+
+
+def _per_lot_text(costs: dict[str, Any], labels: dict[str, str]) -> str:
+    """The break-even per lot and side in the account's money, or ``""``."""
+    value = _ev_value(costs.get("break_even_per_lot"))
+    if value is None:
+        return ""
+    currency = str(costs.get("per_lot_currency") or "")
+    if currency:
+        return labels["kpi_per_lot"].format(value=f"{value:,.2f}", currency=currency)
+    return labels["kpi_per_lot_units"].format(value=f"{value:,.2f}")
+
+
+def _trader_units(costs: dict[str, Any], labels: dict[str, str]) -> list[str]:
+    """The break-even in pips (of the one pair, or of each pair traded) and
+    per lot and side, as the tile says them after the basis points."""
+    parts: list[str] = []
+    pips = _ev_value(costs.get("break_even_pips"))
+    if pips is not None:
+        parts.append(f"{pips:,.1f} pips")
+    else:
+        pairs = _symbol_pips(costs)
+        if pairs:
+            shown = " / ".join(
+                labels["kpi_pips_on"].format(pips=f"{value:,.1f}", symbol=symbol)
+                for symbol, value, _ in pairs[:KPI_PIPS_SHOWN]
+            )
+            parts.append("≈ " + shown + (" / …" if len(pairs) > KPI_PIPS_SHOWN else ""))
+    per_lot = _per_lot_text(costs, labels)
+    if per_lot:
+        parts.append(per_lot)
+    return parts
 
 
 def _kpi_size(shown: str) -> str:
@@ -4529,6 +4596,10 @@ def _kpi_evidence(label: str, labels: dict[str, str], data: dict[str, Any]) -> s
         sources[label] = [bps]
         if (_ev_value(bps) or 0) > 0 and _ev_value(pips) is not None:
             sources[label].append(pips)
+        elif (_ev_value(bps) or 0) > 0:
+            sources[label] += [block for _, _, block in _symbol_pips(costs)[:KPI_PIPS_SHOWN]]
+        if (_ev_value(bps) or 0) > 0 and _ev_value(costs.get("break_even_per_lot")) is not None:
+            sources[label].append(costs["break_even_per_lot"])
     for section, scenario, key in (
         ("trades", "best_5_trades", "kpi_stress"),
         ("returns", "best_5_periods", "kpi_stress_curve"),
@@ -5113,6 +5184,54 @@ def _shuffle_html(shuffle: dict[str, Any] | None, labels: dict[str, str]) -> str
     )
 
 
+def _pips_by_symbol_html(block: dict[str, Any] | None, locale: str, labels: dict[str, str]) -> str:
+    """The break-even and reference costs in pips of each pair traded (a metal
+    stays in basis points, with the reason), under the costs table."""
+    rows = (block or {}).get("rows") or []
+    if not block or not rows:
+        return ""
+
+    def cell(item: dict[str, Any] | None, key: str) -> str:
+        item = item or {}
+        value = item.get("value")
+        if not isinstance(value, int | float) or isinstance(value, bool):
+            return "<td class='val'>—</td>"
+        return (
+            f"<td class='val'>{_fmt(float(value), key=key)} "
+            f"{_badge(str(item.get('evidence', 'NOT_MEASURED')))}</td>"
+        )
+
+    body = ""
+    for row in rows:
+        price = _ev_value(row.get("median_entry_price"))
+        shown = f"{price:,.6g}" if price is not None else "—"
+        lead = f"<tr><td>{_e(str(row.get('symbol', '')))}</td><td class='val'>{_e(shown)}</td>"
+        be = row.get("break_even_pips") or {}
+        if be.get("evidence") == "NOT_MEASURED":
+            reason = localize(str(be.get("note", "")), locale)
+            body += (
+                f"{lead}<td colspan='2'>{_badge('NOT_MEASURED')} "
+                f"<span class='muted'>{_e(reason)}</span></td></tr>"
+            )
+            continue
+        body += (
+            lead
+            + cell(be, "break_even_pips")
+            + cell(row.get("reference_pips"), "reference_pips")
+            + "</tr>"
+        )
+    return (
+        f"<h3>{_e(labels['cost_pips_title'])}</h3>"
+        f"<p class='muted'>{_e(localize(str(block.get('note', '')), locale))}</p>"
+        f"<div class='tscroll'><table><tr><th>{_e(labels['cost_symbol'])}</th>"
+        f"<th class='val'>{_e(labels['cost_median_entry'])}</th>"
+        f"<th class='val'>{_e(_key_label('break_even_pips', labels))}</th>"
+        f"<th class='val'>{_e(_key_label('reference_pips', labels))}</th></tr>"
+        + body
+        + "</table></div>"
+    )
+
+
 def _cost_gap_note(
     rows: list[dict[str, Any]], stats: dict[str, Any], labels: dict[str, str]
 ) -> str:
@@ -5316,7 +5435,9 @@ def _challenge_ladder_label(row: dict[str, Any], labels: dict[str, str], phases:
     if key == "out_of_sample" and row.get("from"):
         return labels["ch_ladder_out_of_sample"].format(date=row["from"])
     if key == "reference_cost" and cost.get("value") is not None:
-        return labels["ch_ladder_cost"].format(bps=f"{float(cost['value']):g}")
+        # The client's own cost is the reference when declared: the row says so.
+        name = "ch_ladder_cost_declared" if cost.get("evidence") == "DECLARED" else "ch_ladder_cost"
+        return labels[name].format(bps=f"{float(cost['value']):g}")
     if key == "luck_haircut" and row.get("sharpe_after") and row.get("trials"):
         return labels["ch_ladder_haircut"].format(
             trials=f"{int(row['trials']['value']):,}",
@@ -8777,6 +8898,8 @@ def render_html(
             + "</table></div>"
         )
         cost_html += _cost_gap_note(cost["rows"], data.get("trade_stats") or {}, labels)
+    if cost.get("kind") != "period_returns":
+        cost_html += _pips_by_symbol_html(cost.get("pips_by_symbol"), locale, labels)
 
     bench_html = (
         _status_line(data["benchmark"], labels)

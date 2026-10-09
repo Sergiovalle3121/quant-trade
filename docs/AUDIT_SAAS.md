@@ -1123,8 +1123,41 @@ Three details a buyer reading a real MetaTrader report asked about:
   GBP, JPY, CHF, AUD, NZD or CAD (a broker suffix is ignored), the break-even
   and reference costs are also given in pips per side at the median entry
   price (`costs.break_even_pips`, `costs.reference_pips`, `costs.pip_symbol`;
-  a pip is 0.01 on yen pairs, else 0.0001). Metals, indices and mixed
-  symbols stay in basis points only.
+  a pip is 0.01 on yen pairs, else 0.0001). Indices and other symbols stay in
+  basis points only.
+- Costs in pips by symbol: when the trades are on more than one symbol and
+  at least one is such a pair or a metal (`crises.symbol_market`: XAU, XAG,
+  XPT or XPD against one of those currencies), `costs.pips_by_symbol` lists
+  each one, most traded first: `{"note", "rows": [{"symbol", "trades",
+  "median_entry_price", "pip_size", "break_even_pips", "reference_pips"}]}`.
+  Each pair's figures are the same formula as for one pair
+  (`bps / 10,000 × median entry price / pip`) with that pair's own median
+  entry price: the break-even is the whole history's (`break_even_bps`),
+  converted, not a break-even of that pair's trades alone, and the note says
+  so. The repository defines no pip size for metals, so a metal's row has no
+  `pip_size` and its two figures are NOT_MEASURED ("no pip size is defined for
+  metals; this symbol's cost stays in bps"). The key is absent with one pair
+  (the three keys above say it) and when no pair or metal is traded.
+- Costs per lot: `costs.break_even_per_lot` is the extra cost per lot and
+  side at which the ledger nets to zero, MEASURED only for the formats whose
+  volume is the platform's lots and whose rows print each trade's result in
+  money (`importers.LOT_FORMATS`: MT5 tester and history, HTML or XLSX; MT4
+  tester and statement). It is the net of the 0x row of the costs table (after
+  the fees the report itemises) divided by twice the lots traded (each trade
+  buys and sells its volume); the note gives both figures so it can be checked
+  by hand, and `costs.per_lot_currency` is the account currency (null when the
+  file does not state it: the note then says "in file units"). Any other format
+  is NOT_MEASURED ("the file does not give each trade's volume in lots"): no
+  contract size is assumed. The lots of different symbols are added as the
+  platform prints them.
+- In the report, the executive summary's break-even tile reads "(bps per side;
+  1.7 pips)" with one pair, "(bps per side; ≈ 4.3 pips on EURUSD / 5.0 pips on
+  GBPUSD)" with several (the three most traded), and adds "52.54 USD per lot
+  and side" when the per-lot figure is measured; the basis points stay the
+  figure. The costs section adds a table "In pips, by symbol" under the
+  re-costed ledger. The improvement plan's costs step quotes those figures and
+  drops the generic "on EURUSD at 1.10, 1 bp per side is about 1.1 pips" when
+  the history has its own pips or per-lot figure.
 
 ### The variance policy behind the deflated Sharpe
 
@@ -1233,7 +1266,11 @@ and report wire them in during the integration step):
   out-of-sample start, NOT_MEASURED with the holdout's own
   reason when it was not measured (no date declared, a date outside the
   series, a side too short); `reference_cost`, the curve with the cost
-  section's reference cost per side (`costs.round_trip_cost`) taken off the
+  section's reference cost per side (`costs.reference_bps`: the client's
+  declared cost when one above zero was declared, and the row's name then
+  reads "With the declared cost (N bps per side)" with a DECLARED badge;
+  otherwise the assumed reference, named "With the reference cost"),
+  charged with `costs.round_trip_cost` and taken off the
   balance from each trade's exit on, NOT_MEASURED without trades, when the
   curve is not money (deposits or withdrawals inside the history make it an
   index; otherwise the curve and the trades must reconcile, or the balance

@@ -2084,6 +2084,36 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
         "cost per side at which the ledger nets to zero",
         "costo por lado con el que el resultado queda en cero",
     ),
+    (
+        "the whole history's break-even and reference costs per side, converted to pips at "
+        "each symbol's median entry price; not a break-even computed from that symbol's "
+        "trades alone",
+        "los costos de equilibrio y de referencia por lado de todo el historial, pasados a "
+        "pips con el precio de entrada mediano de cada símbolo; no es un equilibrio calculado "
+        "solo con las operaciones de ese símbolo",
+    ),
+    (
+        "no pip size is defined for metals; this symbol's cost stays in bps",
+        "no hay un tamaño de pip definido para los metales; el costo de este símbolo queda en pb",
+    ),
+    (
+        "cost per lot and side at which the ledger nets to zero: the net at 0x, "
+        "{net} {currency}, over {lots} lots traded counting entries and exits",
+        "costo por lote y lado con el que el resultado queda en cero: el neto a 0x, "
+        "{net} {currency}, dividido entre {lots} lotes negociados contando entradas y salidas",
+    ),
+    (
+        "extra cost per lot and side, on top of the report's fees, at which the ledger nets "
+        "to zero: the net at 0x, {net} {currency}, over {lots} lots traded counting entries "
+        "and exits",
+        "costo extra por lote y lado, además de los costos del informe, con el que el "
+        "resultado queda en cero: el neto a 0x, {net} {currency}, dividido entre {lots} "
+        "lotes negociados contando entradas y salidas",
+    ),
+    (
+        "the file does not give each trade's volume in lots",
+        "el archivo no da el volumen de cada operación en lotes",
+    ),
     ("no traded notional", "no hay volumen operado"),
     ("undefined", "no definido"),
     (

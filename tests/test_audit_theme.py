@@ -443,8 +443,11 @@ def test_prop_simulator_ranges_are_cards_and_open_losses_a_callout() -> None:
         facts = challenge.split("<div class='facts'>", 1)[1].split("</div></div>", 1)[0]
         assert facts.count("<div class='fact'>") == 2 and " – " in facts and " / " in facts
         assert facts.count('class="badge MEASURED"') == 2
-        # The break-even tile keeps one short number; the pips go in its label.
-        assert re.search(r"<b>[\d.,]+</b><span>[^<]*pips\)</span>", page)
+        # The break-even tile keeps one short number; the pips (and, from an MT5
+        # file, the money per lot and side) go in its label.
+        assert re.search(
+            r"<b>[\d.,]+</b><span>[^<]*pips; [^<]*(?:per lot|por lote)[^<]*\)</span>", page
+        )
         assert find_claims(page) == []
 
 

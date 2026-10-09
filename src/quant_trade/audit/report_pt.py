@@ -1068,6 +1068,7 @@ REPORT: dict[str, Any] = {
         "ch_ladder_in_sample": "Só dentro da amostra (até {date})",
         "ch_ladder_out_of_sample": "Só fora da amostra (a partir de {date})",
         "ch_ladder_cost": "Com o custo de referência ({bps} pb por lado)",
+        "ch_ladder_cost_declared": "Com o custo declarado ({bps} pb por lado)",
         "ch_ladder_haircut": (
             "Com a sorte de {trials} tentativas descontada (Sharpe {before} → {after}, Harvey "
             "e Liu)"
@@ -1116,6 +1117,12 @@ REPORT: dict[str, Any] = {
         "kpi_trades": "Operações · % de acerto",
         "kpi_breakeven": "Custo extra que o leva a zero",
         "kpi_breakeven_negative": "já perde sem custo extra",
+        "kpi_pips_on": "{pips} pips em {symbol}",
+        "kpi_per_lot": "{value} {currency} por lote e lado",
+        "kpi_per_lot_units": "{value} por lote e lado, em unidades do arquivo",
+        "cost_pips_title": "Em pips, por símbolo",
+        "cost_symbol": "Símbolo",
+        "cost_median_entry": "Preço de entrada mediano",
         "kpi_stress": "Sem as 5 melhores operações",
         "kpi_stress_curve": "Sem os 5 melhores períodos",
         "kpi_hint_return": "quanto a conta mudou em todo o histórico",
@@ -1790,6 +1797,7 @@ REPORT: dict[str, Any] = {
         "break_even_bps": "Custo de equilíbrio (pb por lado)",
         "break_even_pips": "Custo de equilíbrio (pips por lado)",
         "reference_pips": "Custo de referência (pips por lado)",
+        "break_even_per_lot": "Custo de equilíbrio (por lote e lado)",
         "platform_equity_drawdown": "Drawdown com operações abertas (sua plataforma)",
         "commission": "Comissão",
         "swap": "Swap",
@@ -4596,6 +4604,36 @@ RULES: tuple[tuple[str, str], ...] = (
     (
         "cost per side at which the ledger nets to zero",
         "custo por lado com o qual o resultado fica em zero",
+    ),
+    (
+        "the whole history's break-even and reference costs per side, converted to pips at "
+        "each symbol's median entry price; not a break-even computed from that symbol's "
+        "trades alone",
+        "os custos de equilíbrio e de referência por lado de todo o histórico, convertidos "
+        "em pips com o preço de entrada mediano de cada símbolo; não é um equilíbrio "
+        "calculado só com as operações desse símbolo",
+    ),
+    (
+        "no pip size is defined for metals; this symbol's cost stays in bps",
+        "não há um tamanho de pip definido para os metais; o custo deste símbolo fica em pb",
+    ),
+    (
+        "cost per lot and side at which the ledger nets to zero: the net at 0x, "
+        "{net} {currency}, over {lots} lots traded counting entries and exits",
+        "custo por lote e lado com o qual o resultado fica em zero: o líquido a 0x, "
+        "{net} {currency}, dividido por {lots} lotes negociados contando entradas e saídas",
+    ),
+    (
+        "extra cost per lot and side, on top of the report's fees, at which the ledger nets "
+        "to zero: the net at 0x, {net} {currency}, over {lots} lots traded counting entries "
+        "and exits",
+        "custo extra por lote e lado, além dos custos do relatório, com o qual o resultado "
+        "fica em zero: o líquido a 0x, {net} {currency}, dividido por {lots} lotes "
+        "negociados contando entradas e saídas",
+    ),
+    (
+        "the file does not give each trade's volume in lots",
+        "o arquivo não dá o volume de cada operação em lotes",
     ),
     (
         "no traded notional",
