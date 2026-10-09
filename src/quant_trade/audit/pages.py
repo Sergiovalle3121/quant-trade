@@ -120,6 +120,7 @@ from quant_trade.audit.report import (
 from quant_trade.audit.seo import (
     BRAND,
     OG_IMAGE_SIZE,
+    SIGNAL_SAMPLE_PATHS,
     TAGLINE,
     PageMeta,
     article_structured_data,
@@ -211,6 +212,57 @@ SAMPLE_BANNER: dict[str, str] = {
         "Relatório de exemplo feito com dados sintéticos gerados por computador: não é a conta "
         "nem a estratégia de ninguém. Assim fica um relatório completo."
     ),
+}
+
+#: The second sample (``SIGNAL_SAMPLE_PATHS``, ``sample.signal_sample_result``): its
+#: notice opens by saying what the signal is, then repeats the synthetic-data notice.
+SIGNAL_SAMPLE_BANNER: dict[str, str] = {
+    "es": (
+        "Es una señal inventada para mostrar qué ve quien va a copiar una señal, y no es de "
+        "nadie. Informe de ejemplo con datos sintéticos generados por computadora, en el "
+        "formato del CSV que exporta Myfxbook: no es la cuenta ni la estrategia de nadie. Así "
+        "se ve un informe completo."
+    ),
+    "en": (
+        "This is a made-up signal, built to show what someone about to copy a signal sees, and "
+        "it belongs to nobody. Sample report built from computer-generated synthetic data, in "
+        "the format of the CSV Myfxbook exports: it is nobody's account or strategy. This is "
+        "what a full report looks like."
+    ),
+    "pt": (
+        "É um sinal inventado para mostrar o que vê quem vai copiar um sinal, e não é de "
+        "ninguém. Relatório de exemplo feito com dados sintéticos gerados por computador, no "
+        "formato do CSV que o Myfxbook exporta: não é a conta nem a estratégia de ninguém. "
+        "Assim fica um relatório completo."
+    ),
+}
+
+#: The signal sample's search title and description, and the words of the links to it.
+SIGNAL_SAMPLE_COPY: dict[str, dict[str, str]] = {
+    "es": {
+        "title": "Informe de ejemplo de una señal para copiar (datos sintéticos)",
+        "description": (
+            "Informe de ejemplo de una señal inventada, exportada de Myfxbook: martingala, "
+            "rejilla, depósito en plena pérdida y pérdida abierta, como los ve quien copia."
+        ),
+        "link": "Ver el informe de ejemplo de una señal",
+    },
+    "en": {
+        "title": "Sample report of a signal to copy (synthetic data)",
+        "description": (
+            "Sample report of a made-up signal exported from Myfxbook: martingale, a grid, a "
+            "deposit deep in a loss and an open loss, as someone about to copy it sees them."
+        ),
+        "link": "See the sample report of a signal",
+    },
+    "pt": {
+        "title": "Relatório de exemplo de um sinal para copiar (dados sintéticos)",
+        "description": (
+            "Relatório de exemplo de um sinal inventado exportado do Myfxbook: martingale, "
+            "grade, depósito em plena perda e perda aberta, como os vê quem vai copiá-lo."
+        ),
+        "link": "Ver o relatório de exemplo de um sinal",
+    },
 }
 
 _COPY: dict[str, dict[str, Any]] = {
@@ -1602,6 +1654,20 @@ def sample_meta(locale: str, base_url: str) -> str:
     title = f"{copy['sample_link']} · {copy['title']}"
     path = SAMPLE_PAGE_PATHS.get(locale, "/sample")
     return _public_meta(title, copy["sample_description"], locale, path, base_url, "sample")
+
+
+def signal_sample_meta(locale: str, base_url: str) -> str:
+    """Head tags for the signal sample: indexable like the first sample, same card."""
+    locale = _locale(locale)
+    words = SIGNAL_SAMPLE_COPY[locale]
+    return _public_meta(
+        f"{words['title']} · {BRAND}",
+        words["description"],
+        locale,
+        SIGNAL_SAMPLE_PATHS[locale],
+        base_url,
+        "sample",
+    )
 
 
 def _guide_links(locale: str) -> str:
@@ -4277,6 +4343,9 @@ def winrate_page(
 
 #: Guides for an account's history rather than a backtest, listed apart on /guias.
 ACCOUNT_GUIDES = frozenset({"cuenta-proveedor", "myfxbook", "mql5-signal", "fxblue"})
+#: The tracking-site exports: their "What you get" also links the signal sample,
+#: a report of the same kind of file.
+SIGNAL_SAMPLE_GUIDES = frozenset({"myfxbook", "mql5-signal", "fxblue"})
 _GUIDE_GROUPS: dict[str, tuple[tuple[str, str], tuple[str, str]]] = {
     "es": (
         ("Backtests", "Informes del probador de estrategias y listas de operaciones."),
@@ -4401,12 +4470,18 @@ def _guide_offer(guide: Guide, locale: str, *, offer: str, email_verification: b
         else f"<p><a href='{_e(PRICING_PATH[locale])}'>{_e(_UI[locale]['nav_pricing'])}</a></p>"
     )
     tool = GUIDE_TOOL.get(guide.slug, "calculator")
+    signal = (
+        f" · <a href='{_e(SIGNAL_SAMPLE_PATHS[locale])}'>"
+        f"{_e(SIGNAL_SAMPLE_COPY[locale]['link'])}</a>"
+        if guide.slug in SIGNAL_SAMPLE_GUIDES
+        else ""
+    )
     return (
         "".join(f"<p>{_e(line)}</p>" for line in lines)
         + f"<p><a class='btn btn-dark' href='{_e(_form_url(locale))}'>{_e(words['upload_this'])}"
         f"<span class='go'>{icon('arrow')}</span></a> "
         f"<a href='{_e(SAMPLE_PAGE_PATHS[locale])}'>{_e(PRICING_COPY[locale]['start_sample'])}</a>"
-        f"</p>{after}"
+        f"{signal}</p>{after}"
         f"<p>{_e(words['tool'])} <a href='{_e(_tool_url(tool, locale))}'>"
         f"{_e(_tool_name(tool, locale))}</a>. {_e(TOOLS_COPY[locale][tool]['question'])}</p>"
     )
@@ -4797,13 +4872,27 @@ def audience_page(
     if audience.contact_cta:
         start = institutional.REVIEW_PATHS[locale]
         start_label = institutional.COPY[locale]["title"]
+    sample_label = words["sample"]
+    if audience.sample == "signal":
+        sample = SIGNAL_SAMPLE_PATHS[locale]
+        sample_label = SIGNAL_SAMPLE_COPY[locale]["link"]
     buttons = (
         "<div class='hero-cta'>"
         f"<a class='btn btn-dark' href='{_e(start)}'>{_e(start_label)}"
         f"<span class='go'>{icon('arrow')}</span></a>"
-        f"<a class='link-more' href='{_e(sample)}'>{_e(words['sample'])}{icon('arrow')}</a>"
+        f"<a class='link-more' href='{_e(sample)}'>{_e(sample_label)}{icon('arrow')}</a>"
         "</div>"
     )
+    lead = buttons
+    if audience.sample == "signal":
+        # Whoever is about to copy a signal sees what they would get first.
+        lead = (
+            "<div class='hero-cta'>"
+            f"<a class='btn btn-dark' href='{_e(sample)}'>{_e(sample_label)}"
+            f"<span class='go'>{icon('arrow')}</span></a>"
+            f"<a class='link-more' href='{_e(start)}'>{_e(start_label)}{icon('arrow')}</a>"
+            "</div>"
+        )
     alternates = {lang: audience_url(audience.slug, lang) for lang in ("es", "en", "pt")}
     crumbs = f"<a href='{_e(_home(locale))}'>{_e(words['home'])}</a>" + _language_crumbs(
         alternates, locale
@@ -4828,7 +4917,7 @@ def audience_page(
                 (words["others"], f"<ul class='aud-others'>{others}</ul>"),
             ],
             locale,
-            lead=buttons,
+            lead=lead,
             aside=f"<a class='btn btn-dark btn-sm toc-cta' href='{_e(start)}'>"
             f"{_e(start_label)}<span class='go'>{icon('arrow')}</span></a>",
         )
@@ -4847,6 +4936,9 @@ def audience_page(
 __all__ = [
     "BADGE_NOTICE",
     "SAMPLE_BANNER",
+    "SIGNAL_SAMPLE_BANNER",
+    "SIGNAL_SAMPLE_COPY",
+    "SIGNAL_SAMPLE_PATHS",
     "VERIFICATION_NOTICE",
     "audience_page",
     "badge_svg",
@@ -4857,6 +4949,7 @@ __all__ = [
     "legal_page",
     "method_page",
     "sample_meta",
+    "signal_sample_meta",
     "tools_page",
     "verification_card_svg",
     "verification_page",

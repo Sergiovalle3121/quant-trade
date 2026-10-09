@@ -64,7 +64,7 @@ from quant_trade.audit.report import (  # noqa: E402
     sample_signup_href,
 )
 from quant_trade.audit.schema import DeclaredMetadata, build_inputs  # noqa: E402
-from quant_trade.audit.seo import CHECK_PATH  # noqa: E402
+from quant_trade.audit.seo import CHECK_PATH, SIGNAL_SAMPLE_PATHS  # noqa: E402
 from quant_trade.audit.settings import AuditSettings  # noqa: E402
 from quant_trade.audit.store import make_store  # noqa: E402
 from quant_trade.audit.strategies import CLASS_ORDER  # noqa: E402
@@ -372,6 +372,8 @@ def test_the_sample_offers_the_free_report_and_a_check_of_its_pdf(
         AUDIT_PATHS[locale],
         guide_url("mt5", locale),
         guide_url("mt5-optimization", locale),
+        # Whoever is about to copy a signal goes on to the other sample.
+        SIGNAL_SAMPLE_PATHS[locale],
     ]
     # (b) "Create account" where a client's report says "My account".
     toolbar = _between(page, "<div class='nav-end no-print report-toolbar'>", "</div>")

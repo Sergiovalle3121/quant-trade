@@ -50,6 +50,10 @@ class Audience:
     slug_pt: str = ""
     #: Institutional visitors start by discussing the supplied record.
     contact_cta: bool = False
+    #: Which public sample report fits the case: "backtest" (``/ejemplo``) or
+    #: "signal" (``/ejemplo-senal``). A signal copier's main button opens the
+    #: signal sample, and starting comes after it.
+    sample: str = "backtest"
 
     def slug_for(self, locale: str) -> str:
         if locale == "pt":
@@ -1309,6 +1313,7 @@ AUDIENCE_PAGES: tuple[Audience, ...] = (
         slug_en="signal-copiers",
         slug_pt="copiar-sinais",
         icon="copy",
+        sample="signal",
         text={
             "es": AudienceText(
                 title="Antes de copiar una señal, mira el riesgo que no enseña",

@@ -115,6 +115,24 @@ def test_the_sample_report_downloads_as_pdf(tmp_path: Path) -> None:
         assert response.headers["content-disposition"].startswith("attachment")
 
 
+@needs_pdf
+def test_the_signal_sample_downloads_as_pdf(tmp_path: Path) -> None:
+    client = _client(tmp_path, free_mode=False, access_codes=True, contact_url="https://wa.me/0")
+    for page_path, name in (
+        ("/ejemplo-senal", "ejemplo-senal"),
+        ("/en/sample-signal", "sample-signal"),
+        ("/pt/exemplo-sinal", "exemplo-sinal"),
+    ):
+        pdf_path = f"{page_path}.pdf"
+        assert f"href='{pdf_path}'" in client.get(page_path).text
+        response = client.get(pdf_path)
+        assert response.status_code == 200
+        assert response.content.startswith(b"%PDF")
+        assert response.headers["content-disposition"] == (
+            f'attachment; filename="rigor-{name}.pdf"'
+        )
+
+
 def test_the_footer_links_the_sample_pdf(tmp_path: Path) -> None:
     client = _client(tmp_path)
     assert "href='/ejemplo.pdf'" in client.get("/").text
@@ -186,6 +204,8 @@ def test_pdf_buttons_say_the_pdf_is_being_prepared(tmp_path: Path) -> None:
         # its "check it yourself" block (report.sample_check_block).
         pages = ((client.get(f"{location}&lang={lang}").text, 2),)
         pages += ((client.get("/ejemplo" if lang == "es" else "/sample").text, 3),)
+        signal = "/ejemplo-senal" if lang == "es" else "/en/sample-signal"
+        pages += ((client.get(signal).text, 3),)
         for page, buttons in pages:
             assert page.count(f"download data-busy='{busy}'") == buttons
             assert f"<noscript> <span class='muted'>{wait}</span></noscript>" in page

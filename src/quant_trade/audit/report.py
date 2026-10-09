@@ -56,7 +56,13 @@ from quant_trade.audit.plan import improvement_plan
 from quant_trade.audit.prop_presets import preset_label
 from quant_trade.audit.redflags import flag_title
 from quant_trade.audit.schema import AuditResult, Dimension
-from quant_trade.audit.seo import BRAND, CHECK_PATH, TAGLINE, private_meta
+from quant_trade.audit.seo import (
+    BRAND,
+    CHECK_PATH,
+    SIGNAL_SAMPLE_PATHS,
+    TAGLINE,
+    private_meta,
+)
 from quant_trade.audit.series_ui import series_report
 from quant_trade.audit.sharing import share_block
 from quant_trade.audit.sizing import scale_text as sizing_scale_text
@@ -5876,8 +5882,9 @@ def _report_language_url(switch_url: str, target: str) -> str:
     The public synthetic sample has a canonical path for each language.
     """
     parts = urlsplit(switch_url)
-    if parts.path in SAMPLE_PATHS.values():
-        return SAMPLE_PATHS[target]
+    for paths in (SAMPLE_PATHS, SIGNAL_SAMPLE_PATHS):
+        if parts.path in paths.values():
+            return paths[target]
     query = [
         (name, value)
         for name, value in parse_qsl(parts.query, keep_blank_values=True)
@@ -8674,6 +8681,12 @@ SAMPLE_CTA_COPY: dict[str, dict[str, str]] = {
         ),
         "check_pdf": "Descargar el PDF del ejemplo",
         "check_link": "Ir a Comprobar un informe",
+        "other_signal": "¿Vas a copiar una señal?",
+        "other_signal_link": "Mira este otro ejemplo",
+        "signal_files": "El historial que exportan {myfxbook}, {mql5} o {fxblue}.",
+        "myfxbook": "Myfxbook",
+        "mql5": "una señal de MQL5",
+        "fxblue": "FX Blue",
     },
     "en": {
         "lead_welcome": "Your first one, with your own file, is free when you create an account.",
@@ -8697,6 +8710,12 @@ SAMPLE_CTA_COPY: dict[str, dict[str, str]] = {
         ),
         "check_pdf": "Download the sample PDF",
         "check_link": "Go to Check a report",
+        "other_signal": "About to copy a signal?",
+        "other_signal_link": "See this other sample",
+        "signal_files": "The history exported by {myfxbook}, {mql5} or {fxblue}.",
+        "myfxbook": "Myfxbook",
+        "mql5": "an MQL5 signal",
+        "fxblue": "FX Blue",
     },
     "pt": {
         "lead_welcome": "O primeiro com o seu arquivo é grátis ao criar uma conta.",
@@ -8720,6 +8739,12 @@ SAMPLE_CTA_COPY: dict[str, dict[str, str]] = {
         ),
         "check_pdf": "Baixar o PDF do exemplo",
         "check_link": "Ir para Comprovar um relatório",
+        "other_signal": "Vai copiar um sinal?",
+        "other_signal_link": "Veja este outro exemplo",
+        "signal_files": "O histórico exportado pelo {myfxbook}, por {mql5} ou pelo {fxblue}.",
+        "myfxbook": "Myfxbook",
+        "mql5": "um sinal da MQL5",
+        "fxblue": "FX Blue",
     },
 }
 #: Sign-up per language, with ``next`` back to the upload form.
@@ -8742,23 +8767,50 @@ def sample_signup_href(locale: str) -> str:
     return f"{SAMPLE_SIGNUP_PATHS[lang]}?next={quote(AUDIT_PATHS[lang], safe='/')}"
 
 
-def sample_cta_band(locale: str, offer: str = "welcome") -> str:
+#: The two public samples: the robot's backtest (``/ejemplo``) and a signal's
+#: account (``/ejemplo-senal``).
+SAMPLE_KINDS: tuple[str, ...] = ("backtest", "signal")
+
+
+def sample_cta_band(locale: str, offer: str = "welcome", kind: str = "backtest") -> str:
     """Under the sample's synthetic-data notice: the free first report and which file
-    gives a report like this. Hidden when printed; only the public sample shows it."""
+    gives a report like this. Hidden when printed; only the public samples show it.
+
+    The backtest sample (``kind="backtest"``) names the MT5 files and sends whoever
+    is about to copy a signal to the other sample; the signal sample names the
+    account exports it reads."""
     from quant_trade.audit.pages import AUDIT_PATHS
 
     lang = locale if locale in SAMPLE_CTA_COPY else "es"
     words = SAMPLE_CTA_COPY[lang]
     offer = offer if offer in ("welcome", "free", "paid") else "paid"
+    if kind == "signal":
+        links = {
+            key: f"<a href='{_e(guide_url(slug, lang))}'>{_e(words[key])}</a>"
+            for key, slug in (
+                ("myfxbook", "myfxbook"),
+                ("mql5", "mql5-signal"),
+                ("fxblue", "fxblue"),
+            )
+        }
+        files = f"{_e(words['files'])} {_e(words['signal_files']).format(**links)}"
+        other = ""
+    else:
+        files = (
+            f"{_e(words['files'])} "
+            f"<a href='{_e(guide_url('mt5', lang))}'>{_e(words['mt5'])}</a> {_e(words['joint'])} "
+            f"<a href='{_e(guide_url('mt5-optimization', lang))}'>{_e(words['optimization'])}</a>."
+        )
+        other = (
+            f"<p class='sample-cta-files'>{_e(words['other_signal'])} "
+            f"<a href='{_e(SIGNAL_SAMPLE_PATHS[lang])}'>{_e(words['other_signal_link'])}</a>.</p>"
+        )
     return (
         f"<div class='sample-cta no-print'><style>{SAMPLE_CTA_CSS}</style>"
         f"<p><b>{_e(words['lead_' + offer])}</b></p>"
         f"<a class='btn btn-primary btn-sm' href='{_e(AUDIT_PATHS[lang])}'>"
         f"{_e(words['button_' + offer])}</a>"
-        f"<p class='sample-cta-files'>{_e(words['files'])} "
-        f"<a href='{_e(guide_url('mt5', lang))}'>{_e(words['mt5'])}</a> {_e(words['joint'])} "
-        f"<a href='{_e(guide_url('mt5-optimization', lang))}'>{_e(words['optimization'])}</a>."
-        "</p></div>"
+        f"<p class='sample-cta-files'>{files}</p>{other}</div>"
     )
 
 
@@ -8808,6 +8860,7 @@ def render_html(
     tools_link: bool = False,
     sample_cta: bool = False,
     sample_offer: str = "welcome",
+    sample_kind: str = "backtest",
 ) -> str:
     """The audit as one HTML document.
 
@@ -8824,6 +8877,8 @@ def render_html(
     the configuration) and the export guides, "Create account" in place of
     "My account", and a closing block to download its PDF and check it on
     /comprobar. All of it is hidden when printed; off, the page is unchanged.
+    ``sample_kind`` says which public sample it is (``SAMPLE_KINDS``): the band
+    names the files that give that report.
 
     The verdict, the plain-language explanations, the charts, the input
     hashes and the list of red flags are always shown. In paid mode an
@@ -9638,7 +9693,7 @@ def render_html(
         + "<div class='wrap wrap-mid'>"
         + watermark_html
         + _notice_html(notice, ok=notice_ok)
-        + (sample_cta_band(locale, sample_offer) if sample_cta else "")
+        + (sample_cta_band(locale, sample_offer, sample_kind) if sample_cta else "")
         + _pack_notice(labels, pack_code, pack_credits_left)
         + account_box
         + f"<div class='eyebrow rise'><span class='dot'></span>{_e(_title(data, labels))}</div>"
@@ -10041,6 +10096,7 @@ def render(
     tools_link: bool = False,
     sample_cta: bool = False,
     sample_offer: str = "welcome",
+    sample_kind: str = "backtest",
 ) -> tuple[str, str]:
     """``(html, json)`` for a result, both guarded. Raises ``AuditReportError``."""
     html_text = render_html(
@@ -10071,6 +10127,7 @@ def render(
         tools_link=tools_link,
         sample_cta=sample_cta,
         sample_offer=sample_offer,
+        sample_kind=sample_kind,
     )
     guard_texts(result, html_text)
     return html_text, to_json(result)

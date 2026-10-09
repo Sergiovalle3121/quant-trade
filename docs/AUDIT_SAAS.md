@@ -358,7 +358,8 @@ developer and neutral reports say neither "vendedor", "proveedor" nor "si
 compraste" (nor their English and Portuguese), that figures, class and tags
 are identical across voices, and that every new text passes the guard. The
 public verification page and its cards never read the answer. The public
-sample (`/ejemplo`) declares `own`, so it shows the developer's actions.
+sample (`/ejemplo`) declares `own`, so it shows the developer's actions; the
+signal sample (`/ejemplo-senal`) declares `buyer`, so it speaks to a copier.
 
 ### Dates and numbers in a hand-made file
 
@@ -2010,6 +2011,28 @@ download lands, or with `AUDIT_PUBLIC_DATA=false`, it is the offline sample.
 Each version is built once per language and set of series in memory and
 kept. The public series move no figure of the sample, only add their lines.
 
+The second sample, for whoever is about to copy a signal (`/ejemplo-senal`,
+`/en/sample-signal`, `/pt/exemplo-sinal` and the same addresses with `.pdf`),
+goes through the same route code, cache, notice, sign-up band and PDF record
+(`/comprobar` answers it is the sample). Its input is the Myfxbook export of a
+made-up account (`sample.synthetic_signal_statement`, seed `SIGNAL_SEED`):
+twelve months of a grid robot on EURUSD and GBPUSD that adds 1.5 times the
+lots every 20 pips against the basket (six entries at most), closes the
+basket 10 pips past its average or 30 pips past its sixth entry, and doubles
+the next basket after a loss. The market ranges most of the year and trends
+against the open basket on the dates in `SIGNAL_TRENDS`; the last trend
+leaves a full basket open in "Open Trades". A 1 000 deposit, a 4 000 top-up
+the business day after the first losing basket and a 600 withdrawal complete
+it. It is uploaded as a copier would (trials, cost and out-of-sample blank,
+ownership `buyer`), and the current engine raises MARTINGALE_SIZING,
+GRID_AVERAGING, DEPOSIT_DURING_DRAWDOWN, FLOATING_LOSS_AT_END and
+GAIN_INFLATED_BY_FLOWS on it, all at WARN; `tests/test_audit_signal_sample.py`
+checks each one and notes why none reaches FAIL and why the win-rate and
+no-stop flags do not come out. The signal-copiers page opens it with its main
+button, the Myfxbook, MQL5 and FX Blue guides link it under "What you get",
+the first sample links it from its band, and the sitemap lists it with its
+own date (`seo.SIGNAL_SAMPLE_PUBLISHED`).
+
 Sharpe after the cash rate (`audit/cashrate.py`). With public data on, the
 report adds one line under the key figures: the Sharpe ratio of the returns
 after subtracting what the 3-month US Treasury bill paid over the same days
@@ -2571,6 +2594,7 @@ Routes:
 | `POST /audits/{id}/unpublish?token=…` | Remove the public page. |
 | `GET /v/{public_id}` | Public verification page. `GET /v/{public_id}/badge.svg` its badge. Survives the retention purge (only the shown fields are kept); 404 once unpublished. |
 | `GET /ejemplo`, `GET /sample` | A full report of synthetic data, Spanish and English. |
+| `GET /ejemplo-senal`, `/en/sample-signal`, `/pt/exemplo-sinal` | The signal sample: a full report of a made-up Myfxbook account, for a copier; each with its `.pdf`. |
 | `GET /terminos`, `GET /terms` | Terms of service (`audit/legal.py`), Spanish and English; either answers `?lang=`. |
 | `GET /privacidad`, `GET /privacy` | Privacy policy, Spanish and English. |
 | `GET /en/terms`, `/en/privacy`, `/pt/terms`, `/pt/privacy` | 301 to the legal page in that language (guessed addresses). |

@@ -126,6 +126,8 @@ from quant_trade.audit.pages import (
     AUDIT_PATHS,
     LANDING_PATHS,
     SAMPLE_BANNER,
+    SIGNAL_SAMPLE_BANNER,
+    SIGNAL_SAMPLE_PATHS,
     article_page,
     articles_index_page,
     audience_page,
@@ -144,6 +146,7 @@ from quant_trade.audit.pages import (
     method_page,
     reading_page,
     sample_meta,
+    signal_sample_meta,
     tools_page,
     upload_page,
     verification_card_svg,
@@ -158,7 +161,7 @@ from quant_trade.audit.public_card import public_card_svg
 from quant_trade.audit.report import render, report_kind, result_sha256
 from quant_trade.audit.retention import RetentionWorker
 from quant_trade.audit.return_series import is_return_series
-from quant_trade.audit.sample import sample_result
+from quant_trade.audit.sample import sample_result, signal_sample_result
 from quant_trade.audit.schema import (
     MAX_UPLOAD_BYTES,
     AuditResult,
@@ -1115,6 +1118,25 @@ def _sentence(text: str) -> str:
 SAMPLE_PDF_PATHS = {"es": "/ejemplo.pdf", "en": "/sample.pdf", "pt": "/pt/exemplo.pdf"}
 #: The sample PDF's name inside the file and on download.
 SAMPLE_PDF_NAMES = {"es": "ejemplo", "en": "sample", "pt": "exemplo"}
+#: The same for the signal sample: its PDF sits next to its page, as the first one's.
+SIGNAL_SAMPLE_PDF_PATHS = {lang: f"{path}.pdf" for lang, path in SIGNAL_SAMPLE_PATHS.items()}
+SIGNAL_SAMPLE_PDF_NAMES = {"es": "ejemplo-senal", "en": "sample-signal", "pt": "exemplo-sinal"}
+
+
+@dataclasses.dataclass(frozen=True)
+class _PublicSample:
+    """One public sample report (``report.SAMPLE_KINDS``) as its pages serve it."""
+
+    #: Builds the result in a language, with the public series in memory.
+    result: Callable[..., AuditResult]
+    banner: dict[str, str]
+    #: Head tags: (locale, base URL) -> HTML.
+    meta: Callable[[str, str], str]
+    #: The address the report's language links start from, per language.
+    switch: dict[str, str]
+    pdf_paths: dict[str, str]
+    #: The page's word in its tab title and PDF name.
+    names: dict[str, str]
 
 
 def _route_roots(locale: str) -> frozenset[str]:
@@ -1123,7 +1145,7 @@ def _route_roots(locale: str) -> frozenset[str]:
     paths = [pair[locale] for pair in PUBLIC_PAGES if locale in pair]
     paths += account_pages.PATHS[locale].values()
     paths += mail_lib.PATHS[locale].values()
-    paths += [COMPARE_PATH[locale], SAMPLE_PDF_PATHS[locale]]
+    paths += [COMPARE_PATH[locale], SAMPLE_PDF_PATHS[locale], SIGNAL_SAMPLE_PDF_PATHS[locale]]
     return frozenset(path.split("/")[1] for path in paths)
 
 
@@ -6337,8 +6359,26 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             locale=_report_locale(lang),
         )
 
-    sample_cache: dict[tuple[str, str, tuple[str, ...]], str] = {}
+    sample_cache: dict[tuple[str, str, str, tuple[str, ...]], str] = {}
     sample_lock = threading.Lock()
+    samples = {
+        "backtest": _PublicSample(
+            result=sample_result,
+            banner=SAMPLE_BANNER,
+            meta=sample_meta,
+            switch={"es": "/sample?lang=en", "en": "/ejemplo?lang=es", "pt": "/ejemplo?lang=es"},
+            pdf_paths=SAMPLE_PDF_PATHS,
+            names=SAMPLE_PDF_NAMES,
+        ),
+        "signal": _PublicSample(
+            result=signal_sample_result,
+            banner=SIGNAL_SAMPLE_BANNER,
+            meta=signal_sample_meta,
+            switch=SIGNAL_SAMPLE_PATHS,
+            pdf_paths=SIGNAL_SAMPLE_PDF_PATHS,
+            names=SIGNAL_SAMPLE_PDF_NAMES,
+        ),
+    }
 
     def _sample_market() -> tuple[Callable[[str], Any] | None, tuple[str, ...]]:
         """The public series already in memory for the sample, never waiting on
@@ -6346,78 +6386,80 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         ready = market_data.ready() if market_data is not None else ()
         return (market_data.closes if market_data is not None and ready else None), ready
 
-    def _sample_html(locale: str, base_url: str) -> str:
-        """Built once per locale, address and set of public series in memory, and
-        kept: the input and the clock are fixed."""
+    def _sample_html(locale: str, base_url: str, kind: str = "backtest") -> str:
+        """Built once per sample, locale, address and set of public series in
+        memory, and kept: the input and the clock are fixed."""
+        sample = samples[kind]
         with sample_lock:
             # Read the series in memory under the lock, so a request that saw an
             # older set never evicts a page built for a newer one.
             market, ready = _sample_market()
-            key = (locale, base_url, ready)
+            key = (kind, locale, base_url, ready)
             # Only the current set of series is worth keeping.
-            for stale in [k for k in sample_cache if k[2] != ready]:
+            for stale in [k for k in sample_cache if k[3] != ready]:
                 del sample_cache[stale]
             if key not in sample_cache:
                 html_text, _ = render(
-                    sample_result(locale, market=market),
+                    sample.result(locale, market=market),
                     watermark=False,
                     free_mode=True,
-                    notice=SAMPLE_BANNER[locale],
+                    notice=sample.banner[locale],
                     legal_links=True,
-                    switch_url="/sample?lang=en" if locale == "es" else "/ejemplo?lang=es",
+                    switch_url=sample.switch[locale],
                     locale=locale,
-                    head_meta=sample_meta(locale, base_url),
-                    pdf_url=(SAMPLE_PDF_PATHS[locale] if pdf_ok else None),
+                    head_meta=sample.meta(locale, base_url),
+                    pdf_url=(sample.pdf_paths[locale] if pdf_ok else None),
                     tools_link=True,
                     sample_cta=True,
                     sample_offer=_offer(),
+                    sample_kind=kind,
                 )
                 # The tab title ends with the report's id, "sample": show the
                 # page's own word. Nothing inside the report changes.
                 html_text = html_text.replace(
-                    " · sample</title>", f" · {SAMPLE_PDF_NAMES[locale]}</title>", 1
+                    " · sample</title>", f" · {sample.names[locale]}</title>", 1
                 )
                 sample_cache[key] = html_text
             return sample_cache[key]
 
-    sample_pdfs: dict[tuple[str, tuple[str, ...]], bytes] = {}
+    sample_pdfs: dict[tuple[str, str, tuple[str, ...]], bytes] = {}
     # Its own lock: a PDF build (seconds) never holds up the sample page.
     sample_pdf_lock = threading.Lock()
 
-    def _sample_pdf(locale: str) -> Response:
-        """The sample report as the PDF a buyer gets, built once per language and
-        set of public series in memory."""
+    def _sample_pdf(locale: str, kind: str = "backtest") -> Response:
+        """The sample report as the PDF a buyer gets, built once per sample,
+        language and set of public series in memory."""
+        sample = samples[kind]
         with sample_pdf_lock:
             market, ready = _sample_market()
-            key = (locale, ready)
-            for stale in [k for k in sample_pdfs if k[1] != ready]:
+            key = (kind, locale, ready)
+            for stale in [k for k in sample_pdfs if k[2] != ready]:
                 del sample_pdfs[stale]
             if key not in sample_pdfs:
                 page, _ = render(
-                    sample_result(locale, market=market),
+                    sample.result(locale, market=market),
                     watermark=False,
                     free_mode=True,
-                    notice=SAMPLE_BANNER[locale],
+                    notice=sample.banner[locale],
                     legal_links=True,
                     locale=locale,
                 )
                 # The PDF's own title carries the page's word too, not "sample".
-                page = page.replace(
-                    " · sample</title>", f" · {SAMPLE_PDF_NAMES[locale]}</title>", 1
-                )
+                page = page.replace(" · sample</title>", f" · {sample.names[locale]}</title>", 1)
                 try:
                     sample_pdfs[key] = pdf_lib.report_pdf(
                         page,
-                        audit_id=SAMPLE_PDF_NAMES[locale],
+                        audit_id=sample.names[locale],
                         locale=locale,
                         wait_seconds=PDF_WAIT_SECONDS,
                     )
+                    # Both samples are recorded as the sample: /comprobar says so.
                     _record_issued(sample_pdfs[key], audit_id=check_lib.SAMPLE_AUDIT_ID, kind="pdf")
                 except (pdf_lib.PdfBusy, pdf_lib.PdfUnavailable):
                     return HTMLResponse(
                         error_page(message("pdf_busy", locale), locale=locale), status_code=503
                     )
-        name = f"rigor-{SAMPLE_PDF_NAMES[locale]}.pdf"
+        name = f"rigor-{sample.names[locale]}.pdf"
         return Response(
             content=sample_pdfs[key],
             media_type="application/pdf",
@@ -6450,6 +6492,31 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     @app.get("/sample", response_class=HTMLResponse)
     async def sample_en(request: Request, lang: str | None = None) -> str:
         return await run_in_threadpool(_sample_html, _locale(lang or "en"), _site_url(request))
+
+    # The signal sample: the same pages, cache and PDF, one address per language.
+    @app.get(SIGNAL_SAMPLE_PDF_PATHS["es"])
+    async def signal_sample_pdf_es() -> Response:
+        return await run_in_threadpool(_sample_pdf, "es", "signal")
+
+    @app.get(SIGNAL_SAMPLE_PDF_PATHS["en"])
+    async def signal_sample_pdf_en() -> Response:
+        return await run_in_threadpool(_sample_pdf, "en", "signal")
+
+    @app.get(SIGNAL_SAMPLE_PDF_PATHS["pt"])
+    async def signal_sample_pdf_pt() -> Response:
+        return await run_in_threadpool(_sample_pdf, "pt", "signal")
+
+    @app.get(SIGNAL_SAMPLE_PATHS["es"], response_class=HTMLResponse)
+    async def signal_sample_es(request: Request) -> str:
+        return await run_in_threadpool(_sample_html, "es", _site_url(request), "signal")
+
+    @app.get(SIGNAL_SAMPLE_PATHS["en"], response_class=HTMLResponse)
+    async def signal_sample_en(request: Request) -> str:
+        return await run_in_threadpool(_sample_html, "en", _site_url(request), "signal")
+
+    @app.get(SIGNAL_SAMPLE_PATHS["pt"], response_class=HTMLResponse)
+    async def signal_sample_pt(request: Request) -> str:
+        return await run_in_threadpool(_sample_html, "pt", _site_url(request), "signal")
 
     @app.get("/guias", response_class=HTMLResponse)
     def guides_es(request: Request, lang: str | None = None) -> str:
