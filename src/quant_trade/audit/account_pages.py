@@ -798,7 +798,7 @@ COPY: dict[str, dict[str, str]] = {
             "PDF, sin pagar. Después tienes {limit} vistas previas gratis cada mes: la clase de "
             "A a D, las gráficas y las señales de alerta. Tu archivo no se guardó: al crear tu "
             "cuenta vuelves al formulario para subirlo otra vez. Si ya tienes un código de "
-            "acceso, escríbelo en el formulario y no necesitas cuenta."
+            "acceso, entra en tu cuenta y escríbelo en el formulario."
         ),
         "gate_code_title": "Ese código no sirve",
         "gate_code_lead": (
@@ -1542,7 +1542,7 @@ COPY: dict[str, dict[str, str]] = {
             "report, with the PDF, at no cost. Then you get {limit} free previews every month: "
             "the A to D class, the charts and the red flags. Your file was not kept: once your "
             "account exists you are back at the form to upload it again. If you already have "
-            "an access code, type it in the form and you need no account."
+            "an access code, sign in to your account and type it in the form."
         ),
         "gate_code_title": "That code does not work",
         "gate_code_lead": (
