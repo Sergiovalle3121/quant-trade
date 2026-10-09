@@ -91,6 +91,7 @@ CARRIED_FIELDS: tuple[str, ...] = (
     "net_of_fees",
     "return_frequency",
     "return_unit",
+    "ownership",
 )
 
 COPY: dict[str, dict[str, str]] = {

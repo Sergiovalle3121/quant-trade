@@ -21,7 +21,7 @@ from datetime import date
 from typing import Any
 from urllib.parse import parse_qsl, quote, urlencode, urlsplit, urlunsplit
 
-from quant_trade.audit import charts, report_pt
+from quant_trade.audit import charts, ownership, report_pt
 from quant_trade.audit.account import is_account_history
 from quant_trade.audit.crises import MARKET, MARKET_AS_OF
 from quant_trade.audit.decay import is_weaker
@@ -3341,6 +3341,7 @@ KEY_LABELS: dict[str, dict[str, str]] = {
         "cost_bps_per_side": "Costo por lado (pb)",
         "oos_start": "Inicio fuera de muestra",
         "benchmark_applicable": "Aplica benchmark",
+        "ownership": "De quién es la estrategia",
         "overlap_share": "Fechas en común con el benchmark",
         "strategy_total_return": "Retorno total de la estrategia",
         "benchmark_total_return": "Retorno total del benchmark",
@@ -3443,6 +3444,7 @@ KEY_LABELS: dict[str, dict[str, str]] = {
         "cost_bps_per_side": "Cost per side (bps)",
         "oos_start": "Out-of-sample start",
         "benchmark_applicable": "Benchmark applies",
+        "ownership": "Whose strategy it is",
         "overlap_share": "Dates shared with the benchmark",
         "strategy_total_return": "Strategy total return",
         "benchmark_total_return": "Benchmark total return",
@@ -3846,6 +3848,10 @@ def _is_evidence(value: Any) -> bool:
 
 
 def _locale_of(labels: dict[str, str]) -> str:
+    # Labels in a declared voice (``ownership.Voiced``) carry their language.
+    voiced = getattr(labels, "locale", None)
+    if voiced:
+        return str(voiced)
     return next((locale for locale, table in LABELS.items() if table is labels), "en")
 
 
@@ -3941,7 +3947,12 @@ def _evidence_rows(section: dict[str, Any], labels: dict[str, str], *, skip: set
         if key in skip or not _is_evidence(value):
             continue
         raw = value["value"]
-        shown = _e(labels["yes" if raw else "no"]) if isinstance(raw, bool) else _fmt(raw, key=key)
+        if key == "ownership":
+            shown = _e(ownership.choice_label(raw, _locale_of(labels)))
+        elif isinstance(raw, bool):
+            shown = _e(labels["yes" if raw else "no"])
+        else:
+            shown = _fmt(raw, key=key)
         note = localize(value.get("note", ""), _locale_of(labels))
         rows.append(
             f"<tr><td>{_e(_key_label(key, labels))}</td><td class='val'>{shown}</td>"
@@ -4005,7 +4016,12 @@ def _dimension_title(name: str, locale: str) -> str:
 
 
 def _meaning_html(
-    verdict: dict[str, Any], locale: str, *, account: bool = False, fund: bool = False
+    verdict: dict[str, Any],
+    locale: str,
+    *,
+    account: bool = False,
+    fund: bool = False,
+    role: str = ownership.BUYER,
 ) -> str:
     by_name = {d["name"]: d for d in verdict["dimensions"]}
     items = []
@@ -4013,7 +4029,9 @@ def _meaning_html(
         dimension = by_name.get(name)
         if dimension is None:
             continue
-        text = meaning(
+        text = ownership.meaning(
+            name, dimension["status"], locale, role, account=account, fund=fund
+        ) or meaning(
             name,
             dimension["status"],
             locale,
@@ -5233,11 +5251,21 @@ def _question_text(question: dict[str, str], locale: str) -> str:
 
 
 def _questions_html(questions: list[dict[str, str]], locale: str, labels: dict[str, str]) -> str:
+    """The open questions, in the voice the labels carry: to put to the seller,
+    to answer with one's own files, or that clients will ask."""
     if not questions:
         return f"<p class='muted'>{_e(labels['none'])}</p>"
-    return (
-        "<ol>" + "".join(f"<li>{_e(_question_text(q, locale))}</li>" for q in questions) + "</ol>"
+    role = getattr(labels, "role", ownership.BUYER)
+    intro = labels.get("questions_intro", "")
+    items = "".join(
+        "<li>"
+        + _e(
+            ownership.question_item(str(q.get("code", "")), _question_text(q, locale), locale, role)
+        )
+        + "</li>"
+        for q in questions
     )
+    return (f"<p class='muted'>{_e(intro)}</p>" if intro else "") + f"<ol>{items}</ol>"
 
 
 def _source_html(data: dict[str, Any], labels: dict[str, str]) -> str:
@@ -7834,7 +7862,7 @@ def _ladder_html(current: str, labels: dict[str, str]) -> str:
 
 def _locked_gains(titles: list[str], labels: dict[str, str], locale: str) -> list[str]:
     """Each locked section as what it tells the buyer, in the report's order."""
-    gains = LOCKED_GAINS.get(locale, LOCKED_GAINS["es"])
+    gains = ownership.gains_for(LOCKED_GAINS.get(locale, LOCKED_GAINS["es"]), labels)
     by_title = {labels[key]: text for key, text in gains.items() if key in labels}
     out: list[str] = []
     for title in titles:
@@ -8064,7 +8092,10 @@ def render_html(
     data = result.model_dump(mode="json")
     declared_locale = data["declared"].get("locale", "es")
     locale = locale if locale in LABELS else declared_locale
-    labels = LABELS.get(locale, LABELS["es"])
+    # Whose strategy it is decides to whom the sentences speak; the figures stay.
+    role = ownership.role_of(data)
+    base = LABELS.get(locale, LABELS["es"])
+    labels = ownership.labels_for(base, _locale_of(base), role)
     locked = watermark and not free_mode
     verdict = data["verdict"]
     if locale != declared_locale or locale == "pt":
@@ -8930,7 +8961,11 @@ def render_html(
         section(
             labels["meaning"],
             _meaning_html(
-                verdict, locale, account=is_account_history(data), fund=_fund_record(data)
+                verdict,
+                locale,
+                account=is_account_history(data),
+                fund=_fund_record(data),
+                role=role,
             ),
             "r-meaning",
         ),
@@ -9149,6 +9184,15 @@ def _next_steps(
     if not account and (status.get("out_of_sample") in open_ | {"NOT_MEASURED"}):
         steps.append(("next_oos", labels["plan"]))
     steps = steps[:3]
+    if (
+        ownership.role_of(data) == ownership.OWN
+        and not account
+        and live.get("status") != "MEASURED"
+        and (data.get("trade_stats") or {}).get("status") == "MEASURED"
+    ):
+        # The developer's own robot with a trade list and no live comparison yet:
+        # enough demo trades for ``live.compare_live`` to measure one.
+        steps.append(("next_demo", labels["live"] if live else ""))
     if data.get("vendor_questions"):
         steps.append(("next_questions", labels["questions"]))
     steps.append(("next_keep", ""))
@@ -9161,10 +9205,11 @@ def _next_steps_html(
     labels: dict[str, str],
     anchors: dict[str, str],
 ) -> str:
-    """ "What to do now": the few things a buyer should clear up first, in
-    order, from the dimensions that did not pass and the live comparison.
-    The class plan speaks to whoever builds the robot; this speaks to whoever
-    runs it. Questions to ask and checks to make, never a trading instruction."""
+    """ "What to do now": the few things to clear up first, in order, from the
+    dimensions that did not pass and the live comparison, in the voice the
+    labels carry (``ownership``): the buyer's questions to the seller, the
+    developer's tests, what a provider's clients will ask, or a neutral
+    wording. Questions to ask and checks to make, never a trading instruction."""
     steps = _next_steps(data, verdict, labels)
     intro = labels["next_intro_fund" if _fund_record(data) else "next_intro"]
 

@@ -85,6 +85,8 @@ from quant_trade.audit.guides import (
 from quant_trade.audit.legal import LegalText, legal_url
 from quant_trade.audit.method import COPY as METHOD_COPY
 from quant_trade.audit.method import dimension_rows, method_url, references
+from quant_trade.audit.ownership import FORM as OWNERSHIP_FORM
+from quant_trade.audit.ownership import ROLES as OWNERSHIP_ROLES
 from quant_trade.audit.portuguese import (
     AUDIENCES_PT,
     CLASS_B_PT,
@@ -2262,6 +2264,21 @@ def _signin_first(copy: dict[str, Any], locale: str) -> str:
 REPORT_ACCEPT = ".htm,.html,.csv,.txt,.tsv,.xlsx,.xls,.ods,.xml,.zip,.pdf"
 
 
+def _ownership_field(locale: str, chosen: str) -> str:
+    """The optional "Whose strategy is this?" field, on "I'd rather not say"
+    unless the client chose another answer (kept after a refusal). It only sets
+    to whom the report speaks (``audit/ownership.py``)."""
+    words = OWNERSHIP_FORM[locale]
+    chosen = chosen if chosen in OWNERSHIP_ROLES else ""
+    options = "".join(
+        f"<option value='{_e(value)}'"
+        + (" selected" if value == chosen else "")
+        + f">{_e(text)}</option>"
+        for value, text in words["choices"].items()
+    )
+    return _field(words["label"], f"<select name='ownership'>{options}</select>", words["help"])
+
+
 def _upload_form(
     copy: dict[str, Any],
     locale: str,
@@ -2455,6 +2472,7 @@ def _upload_form(
             f"value='{value('trials')}'>",
             copy["trials_help"],
         )
+        + _ownership_field(locale, values.get("ownership", ""))
         # The one-file case stays short; the second files and the challenge open on demand.
         + f"<details class='adv extras'{' open' if extras_open else ''}><summary><span>"
         f"{_e(ui['extras'])} <small>· {_e(ui['extras_note'])}</small></span>"

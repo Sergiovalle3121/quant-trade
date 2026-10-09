@@ -9,7 +9,7 @@ from functools import lru_cache
 from quant_trade.audit import sample as sample_module
 from quant_trade.audit.report import render_html
 from quant_trade.audit.sample import sample_result
-from quant_trade.audit.schema import AuditResult
+from quant_trade.audit.schema import AuditResult, declared
 
 
 @lru_cache(maxsize=2)
@@ -61,14 +61,40 @@ def test_no_sentence_reads_as_an_accusation() -> None:
             assert phrase not in page
 
 
-def test_what_to_do_now_speaks_to_the_buyer_and_links_each_step() -> None:
-    page = _page("es")
+def _next_box(page: str) -> str:
     start = page.index("id='r-next'")
-    box = page[start : page.index("</section>", start)]
+    return page[start : page.index("</section>", start)]
+
+
+def test_what_to_do_now_speaks_to_the_developer_and_links_each_step() -> None:
+    # The sample is an optimised EA declared as the client's own (sample.py).
+    box = _next_box(_page("es"))
     assert "<h2>Qué hacer ahora</h2>" in box
     # The sample's open points, in order: live account, costs, trials; then the
     # questions and a closing step.
     order = [
+        "Si la estrategia es tuya",
+        "la cuenta real queda fuera",
+        "Compara el spread",
+        "Reduce los intentos",
+        "Responde con tus archivos las preguntas",
+        "Guarda este informe",
+    ]
+    positions = [box.index(text) for text in order]
+    assert positions == sorted(positions)
+    assert box.count("Ir al apartado") == 4
+    assert "vendedor" not in box and "Si compraste" not in box
+    assert "What to do now" in _page("en")
+
+
+def test_what_to_do_now_still_speaks_to_a_declared_buyer() -> None:
+    sample = sample_result("es", bootstrap_samples=60)
+    buyer = sample.model_copy(
+        update={"declared": {**sample.declared, "ownership": declared("buyer")}}
+    )
+    box = _next_box(render_html(buyer, watermark=False))
+    order = [
+        "Si compraste o vas a comprar",
         "tu cuenta real queda fuera",
         "Compara el spread",
         "cuántas configuraciones",
@@ -78,7 +104,6 @@ def test_what_to_do_now_speaks_to_the_buyer_and_links_each_step() -> None:
     positions = [box.index(text) for text in order]
     assert positions == sorted(positions)
     assert box.count("Ir al apartado") == 4
-    assert "What to do now" in _page("en")
 
 
 def test_the_evidence_tags_are_explained_under_the_verdict() -> None:
@@ -260,8 +285,8 @@ def test_the_verdict_sentence_speaks_plainly() -> None:
 def test_dimension_reasons_open_the_technical_tables() -> None:
     page = _page("es")
     reasons = page.index("Detalle técnico de cada dimensión</h2>")
-    # After the findings a buyer reads, right before the technical tables.
-    assert page.index("Preguntas para hacerle al vendedor</h2>") < reasons
+    # After the findings a reader goes through, right before the technical tables.
+    assert page.index("Preguntas que deja abiertas este informe</h2>") < reasons
     assert reasons < page.index("Rendimiento anualizado</h2>")
     assert "Número de configuraciones probadas" in page
     assert "Número de intentos (Sharpe deflactado)" not in page

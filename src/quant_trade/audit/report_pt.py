@@ -1708,6 +1708,7 @@ REPORT: dict[str, Any] = {
         "cost_bps_per_side": "Custo por lado (pb)",
         "oos_start": "Início fora da amostra",
         "benchmark_applicable": "Benchmark se aplica",
+        "ownership": "De quem é a estratégia",
         "overlap_share": "Datas em comum com o benchmark",
         "strategy_total_return": "Retorno total da estratégia",
         "benchmark_total_return": "Retorno total do benchmark",

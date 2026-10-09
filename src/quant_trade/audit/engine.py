@@ -2374,6 +2374,12 @@ def run_audit(
                 if inputs.declared.initial_balance is not None
                 else not_measured("not declared")
             ),
+            # Whose strategy it is sets only the report's voice; no answer, no key.
+            **(
+                {"ownership": declared(inputs.declared.ownership)}
+                if inputs.declared.ownership
+                else {}
+            ),
             "challenge": inputs.declared.challenge,
             "locale": inputs.declared.locale,
             "description": inputs.declared.description,
