@@ -470,9 +470,10 @@ _COPY: dict[str, dict[str, Any]] = {
             (
                 "¿Qué pasa con mi archivo?",
                 "Se guarda para poder regenerar tu informe. Si no pagas, se borra a los "
-                "{retention} días y solo quedan la clase y los hashes. Nunca se publica: la "
-                "página de verificación muestra la clase, las dimensiones y los hashes, y solo "
-                "si tú la publicas.",
+                "{retention} días y solo quedan la clase y los hashes (y lo que muestra tu "
+                "página de verificación, si la publicaste). Nunca se publica: la página de "
+                "verificación muestra la clase, las dimensiones, los hashes, qué se auditó y el "
+                "periodo de los datos, y solo si tú la publicas.",
             ),
             (
                 "¿Y si olvido mi contraseña?",
@@ -515,10 +516,6 @@ _COPY: dict[str, dict[str, Any]] = {
         "v_kind_account": "Historial de cuenta real o demo",
         "v_kind_fund": "Historial de un fondo",
         "v_period": "Periodo de los datos",
-        "v_observations": "observaciones",
-        "v_observation_one": "observación",
-        "v_trades": "operaciones",
-        "v_trade_one": "operación",
         "v_age": "Días entre el último dato y la auditoría",
         "v_format": "Formato del archivo",
         "v_engine": "Motor",
@@ -790,9 +787,10 @@ _COPY: dict[str, dict[str, Any]] = {
             (
                 "What happens to my file?",
                 "It is kept so your report can be regenerated. If unpaid it is deleted after "
-                "{retention} days and only the class and the hashes remain. It is never "
-                "published: the verification page shows the class, the dimensions and the "
-                "hashes, and only if you publish it.",
+                "{retention} days and only the class and the hashes remain (plus what your "
+                "verification page shows, if you published it). It is never published: the "
+                "verification page shows the class, the dimensions, the hashes, what was "
+                "audited and the data period, and only if you publish it.",
             ),
             (
                 "What if I forget my password?",
@@ -835,10 +833,6 @@ _COPY: dict[str, dict[str, Any]] = {
         "v_kind_account": "Live or demo account history",
         "v_kind_fund": "A fund's track record",
         "v_period": "Data period",
-        "v_observations": "observations",
-        "v_observation_one": "observation",
-        "v_trades": "trades",
-        "v_trade_one": "trade",
         "v_age": "Days between the last data point and the audit",
         "v_format": "File format",
         "v_engine": "Engine",
@@ -2969,23 +2963,14 @@ def _meaning_of(dimension: dict[str, Any], locale: str, kind: str = "backtest") 
     )
 
 
-def _whole_figure(item: Any) -> tuple[int, str] | None:
-    """A count and its evidence tag, from ``{"value": 285, "evidence": "MEASURED"}``
-    or a bare integer (no tag); ``None`` when there is no count to show."""
-    value = item.get("value") if isinstance(item, dict) else item
-    if isinstance(value, bool) or not isinstance(value, int):
-        return None
-    tag = str(item.get("evidence", "")) if isinstance(item, dict) else ""
-    return value, tag if tag in ("MEASURED", "DECLARED", "NOT_MEASURED") else ""
-
-
 def _data_period(result: dict[str, Any], locale: str) -> str:
-    """HTML of the data period: first and last dates, sampling frequency, number
-    of observations and of trades, the figures with their evidence badge.
+    """HTML of the data period: first and last dates and the sampling frequency.
 
     Empty when the dates are missing (a public view kept before the page showed
-    them); the frequency and each count are left out when they are missing."""
-    copy = _COPY[locale]
+    them); the frequency is left out when it is missing. No count is shown:
+    the privacy policy and the terms list what this page shows and keeps
+    (class, dimensions, hashes, dates, trials, engine), and the number of
+    observations or of trades is not on that list."""
     inputs = result.get("inputs") or {}
     first, last = inputs.get("first_timestamp"), inputs.get("last_timestamp")
     if not first or not last:
@@ -2994,29 +2979,7 @@ def _data_period(result: dict[str, Any], locale: str) -> str:
         f"{_plain_date(str(first)[:10], locale)} → {_plain_date(str(last)[:10], locale)}",
         FREQUENCY_TEXT[locale].get(str(inputs.get("frequency_label")), ""),
     ]
-    figures: list[tuple[str, str]] = []
-    for item, many, one in (
-        (inputs.get("observations"), "v_observations", "v_observation_one"),
-        ((result.get("trade_stats") or {}).get("trade_count"), "v_trades", "v_trade_one"),
-    ):
-        figure = _whole_figure(item)
-        if figure is not None:
-            value, tag = figure
-            figures.append((f"{_num(value, locale, 0)} {copy[one if value == 1 else many]}", tag))
-    lead = " · ".join(_e(word) for word in words if word)
-    tags = {tag for _, tag in figures}
-    if len(tags) == 1:
-        # One badge covers every figure when they share their evidence.
-        tag = tags.pop()
-        *rest, (final, _) = figures
-        badge = f" {_badge(tag, locale)}" if tag else ""
-        shown = [_e(text) for text, _ in rest] + [f"<span class='vc'>{_e(final)}{badge}</span>"]
-    else:
-        shown = [
-            f"<span class='vc'>{_e(text)}{f' {_badge(tag, locale)}' if tag else ''}</span>"
-            for text, tag in figures
-        ]
-    return " · ".join([lead, *shown])
+    return " · ".join(_e(word) for word in words if word)
 
 
 def _trials_used_value(item: Any, locale: str) -> str:
@@ -3043,12 +3006,13 @@ def verification_page(
 
     Built from an allow-list of fields: class, what was audited (a backtest,
     an account history or a fund's track record), the data period (first and
-    last dates, frequency, number of observations and of trades), the days
-    between the last data point and the audit, dates, dimension statuses with
-    their fixed plain-language text, input hashes, source format, engine,
-    trial counts and a fixed notice. The description, trades, files and
-    token are never read here, so they cannot leak. A view kept before the
-    period was shown has no dates or counts, and those rows are left out.
+    last dates and frequency), the days between the last data point and the
+    audit, dates, dimension statuses with their fixed plain-language text,
+    input hashes, source format, engine, trial counts and a fixed notice. The
+    description, trades (their list or their count), the number of
+    observations, files and token are never read here, so they cannot leak. A
+    view kept before the period was shown has no dates, and those rows are
+    left out.
     """
     locale = _locale(locale)
     copy = _COPY[locale]

@@ -1509,8 +1509,9 @@ LABELS: dict[str, dict[str, str]] = {
         ),
         "publish": "Publicar verificación pública",
         "publish_help": (
-            "Crea una página pública con la clase, las dimensiones y los hashes, y un sello "
-            "para tu web. Nunca muestra tus archivos, operaciones ni descripción."
+            "Crea una página pública con la clase, las dimensiones, los hashes, qué se auditó y "
+            "el periodo de tus datos (fechas y frecuencia), y un sello para tu web. Nunca "
+            "muestra tus archivos, operaciones ni descripción."
         ),
         "evidence_legend": (
             "Cada cifra lleva su etiqueta: «Medido» si se calculó de tus archivos; "
@@ -2850,8 +2851,9 @@ LABELS: dict[str, dict[str, str]] = {
         ),
         "publish": "Publish a public verification",
         "publish_help": (
-            "Creates a public page with the class, the dimensions and the hashes, and a badge "
-            "for your site. It never shows your files, trades or description."
+            "Creates a public page with the class, the dimensions, the hashes, what was audited "
+            "and your data period (dates and frequency), and a badge for your site. It never "
+            "shows your files, trades or description."
         ),
         "evidence_legend": (
             "Every figure carries its tag: “Measured” when computed from your files; "

@@ -3308,10 +3308,12 @@ the page's second and last `<table class='kv'>`) gains three rows:
   "Histórico de conta real ou demo", or "Historial de un fondo" / "A fund's
   track record" / "Histórico de um fundo".
 - "Periodo de los datos" / "Data period" / "Período dos dados": first and last
-  dates (`inputs.first_timestamp`, `inputs.last_timestamp`), the sampling
-  frequency (`inputs.frequency_label`, in the report's `FREQUENCY_TEXT`), the
-  number of observations and, when the upload has trades, the trade count
-  (`trade_stats.trade_count`), the counts with their evidence badge.
+  dates (`inputs.first_timestamp`, `inputs.last_timestamp`) and the sampling
+  frequency (`inputs.frequency_label`, in the report's `FREQUENCY_TEXT`). No
+  count of observations or trades: the privacy policy and the terms
+  (`legal.py`) list what the page shows and what the purge keeps (class,
+  dimension statuses, hashes, dates, trials, engine version) and say it never
+  shows the trades, so a count would need that text changed first.
 - "Días entre el último dato y la auditoría" / "Days between the last data
   point and the audit" / "Dias entre o último dado e a auditoria": calendar
   days from the last data point to the audit date (`report.data_age_days`),
@@ -3320,16 +3322,21 @@ the page's second and last `<table class='kv'>`) gains three rows:
 When the trials used carry `NOT_MEASURED` (never declared, computed at 1),
 that row shows "—", its badge and "sin declarar; se calcula con 1, el caso
 más favorable" instead of "1". A view kept before these rows existed has no
-dates or counts, and the page leaves those rows out.
+dates, and the page leaves those rows out.
+
+The consent text next to the publish button (`publish_help`, es/en/pt) and
+the FAQs (`faq.py` publishing answer, the home FAQ's "what happens to my
+file") name what was audited and the data period alongside the class,
+dimensions and hashes, so the owner knows the dates go public before
+publishing.
 
 The retention purge does not take a published page down: for a published
 unpaid audit it keeps, in the `publication_views` table, only the fields the
 page reads (class, dimension statuses, input hashes, source format, engine
 name and version, declared and used trials, the audit date, whether it is a
-fund track record, a single boolean, the first and last timestamps, the
-number of observations with its evidence tag, the frequency label and
-`trade_stats.trade_count` with its evidence tag, a count and never the
-trades) and the SHA-256 of the full result, so the page, its result hash and
+fund track record, a single boolean, the first and last timestamps and the
+frequency label; no number of observations and no trade count) and the
+SHA-256 of the full result, so the page, its result hash and
 an embedded badge stay exactly as they were. The description, client text findings, series,
 trades, statistics and files are deleted as for any other audit. The page
 goes away (404) when the owner unpublishes it (the private link still works

@@ -838,8 +838,9 @@ REPORT: dict[str, Any] = {
         ),
         "publish": "Publicar verificação pública",
         "publish_help": (
-            "Cria uma página pública com a classe, as dimensões e os hashes, e um selo para o "
-            "seu site. Nunca mostra seus arquivos, operações nem descrição."
+            "Cria uma página pública com a classe, as dimensões, os hashes, o que foi auditado e "
+            "o período dos seus dados (datas e frequência), e um selo para o seu site. Nunca "
+            "mostra seus arquivos, operações nem descrição."
         ),
         "evidence_legend": (
             "Cada número leva sua etiqueta: «Medido» quando calculado a partir dos seus "

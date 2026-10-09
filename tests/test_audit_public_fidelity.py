@@ -1,9 +1,11 @@
 """The public page, its card and the private report say what was audited and when.
 
 An account history reads as an account on ``/v`` and its card (never "the
-backtest"), the page and the view kept by the purge show the data period and
-the days between the last data point and the audit, and a backtest keeps its
-wording and its static class card. Nothing here reaches the network.
+backtest"), the page and the view kept by the purge show the data period (dates
+and frequency, no count of observations or trades, which the privacy policy and
+the terms do not list) and the days between the last data point and the audit,
+and a backtest keeps its wording and its static class card. The publish help
+and the FAQs name the data period. Nothing here reaches the network.
 """
 
 from __future__ import annotations
@@ -29,6 +31,7 @@ from test_audit_sharing import _published_history  # noqa: E402
 
 from quant_trade.audit import raster  # noqa: E402
 from quant_trade.audit.articles import _num  # noqa: E402
+from quant_trade.audit.faq import faq_items  # noqa: E402
 from quant_trade.audit.guard import find_claims  # noqa: E402
 from quant_trade.audit.pages import _COPY, _plain_date, verification_page  # noqa: E402
 from quant_trade.audit.report import (  # noqa: E402
@@ -40,13 +43,14 @@ from quant_trade.audit.report import (  # noqa: E402
 from quant_trade.audit.sample import synthetic_live_statement  # noqa: E402
 from quant_trade.audit.schema import AuditResult  # noqa: E402
 from quant_trade.audit.seo import og_image_name  # noqa: E402
+from quant_trade.audit.settings import AuditSettings  # noqa: E402
 from quant_trade.audit.store import public_view  # noqa: E402
 from quant_trade.audit.theme import STATIC_DIR  # noqa: E402
 from quant_trade.audit.verdict import MEANING, class_text, meaning  # noqa: E402
 
 LOCALES = ("es", "en", "pt")
 SVG = "{http://www.w3.org/2000/svg}"
-NEW_FIELDS = ("first_timestamp", "last_timestamp", "observations", "frequency_label")
+NEW_FIELDS = ("first_timestamp", "last_timestamp", "frequency_label")
 #: Backtest wording an account's public page must never carry.
 BACKTEST_PHRASES = (
     "el backtest no supera",
@@ -124,7 +128,10 @@ def test_account_history_reads_as_an_account_on_the_public_page(tmp_path: Path) 
         assert copy_["v_period"] in text
         assert _plain_date(first, locale) in text and _plain_date(last, locale) in text
         trades = data["trade_stats"]["trade_count"]["value"]
-        assert f"{_num(trades, locale, 0)} {copy_['v_trades']}" in text
+        observations = data["inputs"]["observations"]["value"]
+        # Counts are not on the legal pages' list of what /v shows.
+        for count in (trades, observations):
+            assert f"· {_num(count, locale, 0)} " not in text, (locale, count)
         assert f"{copy_['v_age']} {_num(days, locale, 0)}" in text
         assert f"{copy_['v_kind']} {copy_['v_kind_account']}" in text
         assert copy_["v_trials_undeclared"] in text
@@ -217,9 +224,10 @@ def test_backtest_public_page_keeps_its_wording_and_static_card(tmp_path: Path) 
     text = _text(page)
     assert class_text(overall, "es") in text
     details = _text(re.findall(r"<table class='kv'>(.*?)</table>", page, flags=re.S)[1])
-    # An equity curve has a period and observations but no trade count.
-    assert copy_["v_period"] in details and copy_["v_observations"] in details
-    assert copy_["v_trades"] not in details
+    # The period has dates and frequency, never the number of observations.
+    assert copy_["v_period"] in details
+    observations = data["inputs"]["observations"]["value"]
+    assert f"· {_num(observations, 'es', 0)} " not in details
     assert copy_["v_trials_undeclared"] not in text  # three trials were declared
     assert page.count("<table class='kv'>") == 2
     assert find_claims(text) == []
@@ -237,9 +245,10 @@ def test_purged_view_keeps_period_and_kind(tmp_path: Path) -> None:
     view, digest = public_view(store.get_audit(audit_id).result_json)
     for key in NEW_FIELDS:
         assert view["inputs"][key] == data["inputs"][key]
-    assert view["trade_stats"] == {"trade_count": data["trade_stats"]["trade_count"]}
+    # No count of observations or trades: the privacy policy lists what is kept.
+    assert "observations" not in view["inputs"] and "trade_stats" not in view
     kept = json.dumps(view)
-    for private in ("entry_time", "description", "series", "parse_warnings"):
+    for private in ("entry_time", "description", "series", "parse_warnings", "trade_count"):
         assert private not in kept, private
 
     page = verification_page(
@@ -261,7 +270,6 @@ def test_purged_view_keeps_period_and_kind(tmp_path: Path) -> None:
     old = copy.deepcopy(view)
     for key in NEW_FIELDS:
         old["inputs"].pop(key)
-    old.pop("trade_stats")
     legacy = verification_page(
         old,
         public_id="x",
@@ -324,10 +332,6 @@ def test_new_public_and_report_texts_exist_in_every_language_and_pass_the_guard(
         "v_kind_account",
         "v_kind_fund",
         "v_period",
-        "v_observations",
-        "v_observation_one",
-        "v_trades",
-        "v_trade_one",
         "v_age",
         "v_trials_undeclared",
     )
@@ -342,3 +346,24 @@ def test_new_public_and_report_texts_exist_in_every_language_and_pass_the_guard(
     assert len({_COPY[locale]["v_kind_account"] for locale in LOCALES}) == 3
     assert len({LABELS[locale]["data_age_account"] for locale in LOCALES}) == 3
     assert len({MEANING[locale]["costs.FAIL.account"] for locale in LOCALES}) == 3
+
+
+def test_publish_help_and_faqs_name_what_was_audited_and_the_data_period() -> None:
+    # The consent text next to the publish button and the FAQs say what /v
+    # shows besides the class, dimensions and hashes: the owner reads it before
+    # the dates of the data go public.
+    words = {
+        "es": ("qué se auditó", "periodo"),
+        "en": ("what was audited", "period"),
+        "pt": ("o que foi auditado", "período"),
+    }
+    for locale in LOCALES:
+        audited, period = words[locale]
+        faq = dict(faq_items(AuditSettings(), locale))
+        home = dict(_COPY[locale]["faq"])
+        texts = [LABELS[locale]["publish_help"], *faq.values(), *home.values()]
+        publish = [text for text in texts if audited in text and period in text]
+        # publish_help, the FAQ page's publishing answer and the home FAQ's file answer.
+        assert len(publish) == 3, (locale, publish)
+        for text in publish:
+            assert find_claims(text) == [], (locale, text)

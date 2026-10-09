@@ -292,9 +292,10 @@ COPY_PT: dict[str, Any] = {
         (
             "O que acontece com o meu arquivo?",
             "Fica guardado para poder gerar o seu relatório de novo. Se você não pagar, é "
-            "apagado após {retention} dias e só ficam a classe e os hashes. Nunca é publicado: a "
-            "página de verificação mostra a classe, as dimensões e os hashes, e só se você a "
-            "publicar.",
+            "apagado após {retention} dias e só ficam a classe e os hashes (e o que a sua "
+            "página de verificação mostra, se você a publicou). Nunca é publicado: a página "
+            "de verificação mostra a classe, as dimensões, os hashes, o que foi auditado e o "
+            "período dos dados, e só se você a publicar.",
         ),
         (
             "E se eu esquecer minha senha?",
@@ -337,10 +338,6 @@ COPY_PT: dict[str, Any] = {
     "v_kind_account": "Histórico de conta real ou demo",
     "v_kind_fund": "Histórico de um fundo",
     "v_period": "Período dos dados",
-    "v_observations": "observações",
-    "v_observation_one": "observação",
-    "v_trades": "operações",
-    "v_trade_one": "operação",
     "v_age": "Dias entre o último dado e a auditoria",
     "v_format": "Formato do arquivo",
     "v_engine": "Motor",
