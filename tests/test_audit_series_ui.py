@@ -192,7 +192,9 @@ def test_calculator_page_preserves_declared_frequency(locale: str, periods: int)
     assumption = copy["assumptions"][0].split(" (DECLARED)")[0]
     assert assumption in _text(page)
     result = compute(CalculatorInput(1.8, 3, 100, periods))
-    assert f"{result['luck_sharpe']['value']:.2f}" in page
+    # The figure in the page's typography: a decimal comma in es and pt, a point in en.
+    luck = f"{result['luck_sharpe']['value']:.2f}"
+    assert (luck if locale == "en" else luck.replace(".", ",")) in page
     assert find_claims(_text(page.split("<main", 1)[1].split("</main>", 1)[0])) == []
 
 

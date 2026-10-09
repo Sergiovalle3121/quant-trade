@@ -61,6 +61,7 @@ from quant_trade.audit.calculator import (
 )
 from quant_trade.audit.calculator import COPY as CALCULATOR_COPY
 from quant_trade.audit.calculator import REASONS as CALCULATOR_REASONS
+from quant_trade.audit.calculator_card import count_text, result_figures, what_if_figures
 from quant_trade.audit.completed_count import completed_count_html
 from quant_trade.audit.examples import (
     EXAMPLES_COPY,
@@ -3682,12 +3683,14 @@ def _calculator_result(
         return (
             f"<p class='error' role='alert'>{_e(words['not_measured'].format(reason=reason))}</p>"
         )
-    count = f"{parsed.trials:,}"
+    # The card's own figures and typography: a decimal comma in es and pt, a point in en.
+    count = count_text(parsed.trials, locale)
     note = f"<p class='help'>{_badge('DECLARED', locale)} {_e(words['declared_note'])}</p>"
     if not result["counted"]:
         rows = "".join(
-            f"<tr><td>{row['trials']:,}</td><td>{row['luck_sharpe']['value']:.2f}</td>"
-            f"<td>{row['years_needed']['value']:.1f}</td></tr>"
+            "<tr>"
+            + "".join(f"<td>{_e(cell)}</td>" for cell in what_if_figures(row, locale))
+            + "</tr>"
             for row in result["what_if"]
         )
         return (
@@ -3696,11 +3699,12 @@ def _calculator_result(
             f"<th>{_e(words['col_years'])}</th></tr></thead><tbody>{rows}</tbody></table>" + note
         )
     verdict = words["beats" if result["beats_luck"] else "loses"].format(n=count)
+    shown = result_figures(result, locale)
     figures = (
-        (words["luck"].format(n=count), f"{result['luck_sharpe']['value']:.2f}"),
-        (words["after"], f"{result['sharpe_after']['value']:.2f}"),
-        (words["haircut"], f"{result['haircut']['value']:.0%}"),
-        (words["years_needed"], f"{result['years_needed']['value']:.1f}"),
+        (words["luck"].format(n=count), shown["luck_sharpe"]),
+        (words["after"], shown["sharpe_after"]),
+        (words["haircut"], shown["haircut"]),
+        (words["years_needed"], shown["years_needed"]),
     )
     table = "".join(
         f"<tr><th scope='row'>{_e(label)}</th><td><b>{_e(value)}</b></td></tr>"

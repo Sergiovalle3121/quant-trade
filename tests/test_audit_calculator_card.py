@@ -93,12 +93,18 @@ def _links(page: str) -> list[str]:
     return [html.unescape(link) for link in re.findall(r"href=['\"]([^'\"]+)['\"]", page)]
 
 
-def _figures(result: dict) -> tuple[str, str, str, str]:
+def _mark(text: str, locale: str) -> str:
+    """``text`` written with a point, in the page's typography: a decimal comma (and a
+    point between thousands) in es and pt, unchanged in en."""
+    return text if locale == "en" else text.translate(str.maketrans({",": ".", ".": ","}))
+
+
+def _figures(result: dict, locale: str) -> tuple[str, str, str, str]:
     return (
-        f"{result['luck_sharpe']['value']:.2f}",
-        f"{result['sharpe_after']['value']:.2f}",
-        f"{result['haircut']['value']:.0%}",
-        f"{result['years_needed']['value']:.1f}",
+        _mark(f"{result['luck_sharpe']['value']:.2f}", locale),
+        _mark(f"{result['sharpe_after']['value']:.2f}", locale),
+        _mark(f"{result['haircut']['value']:.0%}", locale),
+        _mark(f"{result['years_needed']['value']:.1f}", locale),
     )
 
 
@@ -115,7 +121,9 @@ def test_card_figures_come_from_compute(locale: str) -> None:
     svg = calculator_card_svg(value, locale)
     root = ET.fromstring(svg)
     for key, figure in zip(
-        ("luck_sharpe", "sharpe_after", "haircut", "years_needed"), _figures(r), strict=True
+        ("luck_sharpe", "sharpe_after", "haircut", "years_needed"),
+        _figures(r, locale),
+        strict=True,
     ):
         assert figure in svg
         group = root.find(f".//s:g[@data-reading='{key}']", NS)
@@ -136,7 +144,8 @@ def test_card_figures_come_from_compute(locale: str) -> None:
     }
     assert set(inputs) == set(CARD_FIELDS)
     assert all("DECLARED" in shown for shown in inputs.values())
-    assert inputs["sharpe"].endswith("1.8") and inputs["trials"].endswith("100")
+    assert inputs["sharpe"].endswith(_mark("1.8", locale))
+    assert inputs["trials"].endswith("100")
     assert COPY[locale]["frequency_options"][252] in inputs["periods_per_year"]
     text = " ".join(root.itertext())
     assert find_claims(text) == []
@@ -159,10 +168,11 @@ def test_one_configuration_card_shows_the_what_if_rows(locale: str) -> None:
     assert len(rows) == len(result["what_if"]) == 3
     for row, node in zip(result["what_if"], rows, strict=True):
         shown = "".join(node.itertext())
-        assert f"{row['luck_sharpe']['value']:.2f}" in svg
-        assert f"{row['luck_sharpe']['value']:.2f}" in shown
-        assert f"{row['trials']:,}" in shown
-        assert f"{row['years_needed']['value']:.1f}" in shown
+        luck = _mark(f"{row['luck_sharpe']['value']:.2f}", locale)
+        assert luck in svg
+        assert luck in shown
+        assert _mark(f"{row['trials']:,}", locale) in shown
+        assert _mark(f"{row['years_needed']['value']:.1f}", locale) in shown
         # A hypothetical count is neither measured nor declared: no evidence tag.
         assert node.get("data-evidence") is None and "DECLARED" not in shown
     assert root.find(".//s:g[@data-reading='sharpe_after']", NS) is None
@@ -324,7 +334,7 @@ def test_png_limit_is_sixty_per_hour_and_page_never_429(
     assert page.status_code == 200
     assert _meta(page.text, "og:image") == f"{BASE}/static/og-es.png"
     assert "data-calc-verdict" in page.text
-    for figure in _figures(compute(_parsed(*FORM.values()))):
+    for figure in _figures(compute(_parsed(*FORM.values())), "es"):
         assert figure in _visible(page.text)
     # The limit is per address, and the reader keeps its own.
     second_ip = TestClient(client.app, client=("192.0.2.2", 50000))
@@ -390,7 +400,7 @@ def test_share_block_reproduces_the_result(client: TestClient, path: str, locale
     # The shared link opens the same result, with the same four figures.
     repeated = client.get(shared.removeprefix(BASE))
     assert repeated.status_code == 200
-    for figure in _figures(compute(_parsed(*FORM.values()))):
+    for figure in _figures(compute(_parsed(*FORM.values())), locale):
         assert figure in _visible(repeated.text)
     assert "calculadora" in funnel.REF_TAGS
     browser = TestClient(client.app)
