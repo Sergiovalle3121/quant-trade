@@ -152,7 +152,13 @@ def test_the_way_to_a_person_shows_only_with_a_contact(locale: str) -> None:
 
 def test_every_new_sentence_passes_the_guard() -> None:
     texts = [mapping.COPY[locale]["human"] for locale in LOCALES]
-    for key in ("email_verified_report", "welcome_refused_unverified", "welcome_confirm"):
+    for key in (
+        "email_verified_report",
+        "welcome_refused_unverified",
+        "welcome_confirm",
+        "welcome_pending_other",
+        "welcome_pending_confirmed",
+    ):
         texts += [account_pages.COPY[locale][key] for locale in ("es", "en")]
         texts.append(account_pt.COPY_PT[key])
     assert len(set(texts)) == len(texts)

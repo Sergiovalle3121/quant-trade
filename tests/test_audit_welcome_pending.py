@@ -114,6 +114,23 @@ def _pending(store: Store, account_id: str) -> list[Any]:
     return store.welcome_pending_for(account_id, since=datetime.now(UTC) - timedelta(days=60))
 
 
+PROMISE = account_pages._e(account_pages.COPY["es"]["welcome_refused_unverified"])
+OTHER = account_pages._e(account_pages.COPY["es"]["welcome_pending_other"])
+CONFIRMED = account_pages._e(account_pages.COPY["es"]["welcome_pending_confirmed"])
+
+
+def _notice(client: TestClient, location: str) -> str:
+    """Which of the three notices the preview's page shows."""
+    page = client.get(location).text
+    shown = [
+        name
+        for name, text in (("promise", PROMISE), ("other", OTHER), ("confirmed", CONFIRMED))
+        if text in page
+    ]
+    assert len(shown) <= 1, shown
+    return shown[0] if shown else ""
+
+
 def test_the_report_uploaded_before_confirming_opens_in_full(tmp_path: Path) -> None:
     app, store = _app(tmp_path)
     laptop = _browser(app)
@@ -149,14 +166,21 @@ def test_only_the_most_recent_pending_upload_opens(tmp_path: Path) -> None:
     app, store = _app(tmp_path)
     laptop = _browser(app)
     account_id = _signup(laptop, store, "dos@example.com")
-    first = _audit_id(_upload(laptop, 21))
-    second = _audit_id(_upload(laptop, 22))
+    first_location = _upload(laptop, 21)
+    second_location = _upload(laptop, 22)
+    first, second = _audit_id(first_location), _audit_id(second_location)
     assert [row.audit_id for row in _pending(store, account_id)] == [second, first]
+    # Only the upload that confirming would open says so; the other one says
+    # which one opens.
+    assert _notice(laptop, second_location) == "promise"
+    assert _notice(laptop, first_location) == "other"
     _, confirmed = _confirm(app, store, account_id)
     assert "done=email_verified_report" in confirmed.headers["location"]
     opened, kept = store.get_audit(second), store.get_audit(first)
     assert opened is not None and opened.paid
     assert kept is not None and not kept.paid
+    # Confirmed, the preview that stayed one no longer asks to confirm.
+    assert _notice(laptop, first_location) == "confirmed"
     month = month_start(datetime.now(UTC))
     assert store.free_previews_since(month, account_id=account_id) == 1
     assert _pending(store, account_id) == []
@@ -166,13 +190,17 @@ def test_a_file_that_already_had_its_free_report_is_not_opened(tmp_path: Path) -
     app, store = _app(tmp_path)
     ana = _browser(app)
     ana_id = _signup(ana, store, "ana@example.com")
-    waiting = _audit_id(_upload(ana, 31))
+    location = _upload(ana, 31)
+    waiting = _audit_id(location)
     (row,) = _pending(store, ana_id)
+    assert _notice(ana, location) == "promise"
     # Someone else, confirmed first, gets the free report with the same file.
     beto = _browser(app)
     beto_id = _signup(beto, store, "beto@example.com")
     _confirm(app, store, beto_id)
     assert "acct=welcome" in _upload(beto, 31)
+    # The same page no longer promises what confirming cannot give.
+    assert _notice(ana, location) == "other"
 
     _, confirmed = _confirm(app, store, ana_id)
     assert "done=email_verified_report" not in confirmed.headers["location"]
@@ -190,18 +218,65 @@ def test_a_file_that_already_had_its_free_report_is_not_opened(tmp_path: Path) -
         per_ip=WELCOME_REPORTS_PER_IP_PER_MONTH,
     )
     assert refusal == "file"
+    assert _notice(ana, location) == "confirmed"
+
+
+def test_a_file_that_had_its_free_report_before_the_upload_is_not_noted(tmp_path: Path) -> None:
+    app, store = _app(tmp_path)
+    beto = _browser(app)
+    beto_id = _signup(beto, store, "beto@example.com")
+    _confirm(app, store, beto_id)
+    assert "acct=welcome" in _upload(beto, 33)
+    ana = _browser(app)
+    ana_id = _signup(ana, store, "ana@example.com")
+    location = _upload(ana, 33)
+    assert "acct=preview_unverified" in location
+    # The file is checked at upload: nothing waits, and nothing is promised.
+    assert _pending(store, ana_id) == []
+    assert _notice(ana, location) == "other"
+    _, confirmed = _confirm(app, store, ana_id)
+    assert "done=email_verified_report" not in confirmed.headers["location"]
+    record = store.get_audit(_audit_id(location))
+    assert record is not None and not record.paid
+    assert _notice(ana, location) == "confirmed"
+
+
+def test_the_most_recent_upload_that_can_still_open_is_the_one(tmp_path: Path) -> None:
+    app, store = _app(tmp_path)
+    laptop = _browser(app)
+    account_id = _signup(laptop, store, "tres@example.com")
+    first_location = _upload(laptop, 71)
+    second_location = _upload(laptop, 72)
+    assert _notice(laptop, second_location) == "promise"
+    # Another account has its free report with the second file meanwhile.
+    beto = _browser(app)
+    beto_id = _signup(beto, store, "beto3@example.com")
+    _confirm(app, store, beto_id)
+    assert "acct=welcome" in _upload(beto, 72)
+    # The first upload is now the one confirming would open, and says so.
+    assert _notice(laptop, second_location) == "other"
+    assert _notice(laptop, first_location) == "promise"
+    _, confirmed = _confirm(app, store, account_id)
+    assert "done=email_verified_report" in confirmed.headers["location"]
+    opened = store.get_audit(_audit_id(first_location))
+    kept = store.get_audit(_audit_id(second_location))
+    assert opened is not None and opened.paid
+    assert kept is not None and not kept.paid
 
 
 def test_a_pending_upload_older_than_a_week_is_ignored(tmp_path: Path) -> None:
     app, store = _app(tmp_path)
     laptop = _browser(app)
     account_id = _signup(laptop, store, "tarde@example.com")
-    audit_id = _audit_id(_upload(laptop, 41))
+    location = _upload(laptop, 41)
+    audit_id = _audit_id(location)
     old = datetime.now(UTC) - timedelta(days=WELCOME_PENDING_DAYS + 1)
     with store.engine.begin() as conn:
         conn.execute(
             store.welcome_pending.update().values(created_at=old.isoformat().replace("+00:00", "Z"))
         )
+    # Past the window the page no longer promises it.
+    assert _notice(laptop, location) == "other"
     _, confirmed = _confirm(app, store, account_id)
     assert "done=email_verified_report" not in confirmed.headers["location"]
     record = store.get_audit(audit_id)
@@ -214,7 +289,8 @@ def test_confirming_a_new_address_grants_nothing(tmp_path: Path) -> None:
     app, store = _app(tmp_path)
     laptop = _browser(app)
     account_id = _signup(laptop, store, "cambio@example.com")
-    audit_id = _audit_id(_upload(laptop, 51))
+    location = _upload(laptop, 51)
+    audit_id = _audit_id(location)
     account_page = laptop.get("/cuenta").text
     asked = laptop.post(
         "/cuenta/correo",
@@ -233,6 +309,9 @@ def test_confirming_a_new_address_grants_nothing(tmp_path: Path) -> None:
     assert record is not None and not record.paid
     assert not store.welcome_used(account_id)
     assert [row.audit_id for row in _pending(store, account_id)] == [audit_id]
+    # The address is confirmed by the change: the page stops asking for it.
+    assert store.email_verified(account_id)
+    assert _notice(laptop, location) == "confirmed"
 
 
 def test_pending_rows_go_with_the_report_and_the_retention_purge(tmp_path: Path) -> None:

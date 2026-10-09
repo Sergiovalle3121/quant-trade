@@ -14,7 +14,11 @@ from typing import Any
 from urllib.parse import quote
 
 from quant_trade.audit.account_pt import COPY_PT, PATHS_PT
-from quant_trade.audit.accounts import FREE_PREVIEWS_PER_MONTH, MIN_PASSWORD_CHARS
+from quant_trade.audit.accounts import (
+    FREE_PREVIEWS_PER_MONTH,
+    MIN_PASSWORD_CHARS,
+    WELCOME_PENDING_DAYS,
+)
 from quant_trade.audit.compare import guard_page
 from quant_trade.audit.engine import _safe_text
 from quant_trade.audit.pages import _disclaimer, _e, _field, _home, _page, _page_hero
@@ -146,9 +150,12 @@ COPY: dict[str, dict[str, str]] = {
         "signed_out": "Saliste de tu cuenta.",
         "welcome": "Cuenta creada. Ya puedes subir un archivo: el informe se guarda aquí.",
         "welcome_confirm": (
-            "Cuenta creada. Ya puedes subir tu archivo: al abrir el enlace que te enviamos por "
-            "correo, tu primer informe se abre completo y gratis. Si no lo ves, revisa la "
-            "carpeta de spam."
+            "Cuenta creada. Ya puedes subir tu archivo. Al abrir el enlace que te enviamos por "
+            "correo (si no lo ves, revisa la carpeta de spam), se abre completa y gratis la más "
+            f"reciente de tus subidas de los {WELCOME_PENDING_DAYS} días anteriores que aún pueda "
+            "recibir el informe gratis: cuyo archivo y navegador no lo hayan tenido en otra "
+            "cuenta y cuya red no haya agotado los del mes. Si ninguna puede, lo recibe la "
+            "primera que hagas después que cumpla lo mismo."
         ),
         "account_title": "Mis informes",
         "account_lead": "Todo lo que auditaste con esta cuenta, en un solo lugar.",
@@ -217,8 +224,22 @@ COPY: dict[str, dict[str, str]] = {
             "es una vista previa. El primer informe gratis es uno por persona."
         ),
         "welcome_refused_unverified": (
-            "Confirma tu correo con el enlace que te enviamos y este mismo informe se abre "
-            "completo, gratis, sin volver a subirlo. Mientras tanto, esto es una vista previa."
+            "Confirma tu correo con el enlace que te enviamos dentro de los "
+            f"{WELCOME_PENDING_DAYS} días siguientes a esta subida y este mismo informe se abre "
+            "completo y gratis, sin volver a subirlo, si para entonces sigue siendo la más "
+            "reciente de tus subidas que puede recibir el informe gratis. Hoy lo es: su archivo y "
+            "su navegador no lo tuvieron en otra cuenta y su red no agotó los del mes. Mientras "
+            "tanto, esto es una vista previa."
+        ),
+        "welcome_pending_other": (
+            "Esto es una vista previa. Al confirmar tu correo con el enlace que te enviamos, se "
+            f"abre completa y gratis la más reciente de tus subidas de los {WELCOME_PENDING_DAYS} "
+            "días anteriores que aún pueda recibir el informe gratis: cuyo archivo y navegador no "
+            "lo hayan tenido en otra cuenta y cuya red no haya agotado los del mes. Hoy no es "
+            "esta."
+        ),
+        "welcome_pending_confirmed": (
+            "Tu correo ya está confirmado; esta subida sigue siendo una vista previa."
         ),
         "welcome_refused_unverified_nomail": (
             "La confirmación de correo no está disponible en este momento, así que esto es "
@@ -872,9 +893,12 @@ COPY: dict[str, dict[str, str]] = {
         "signed_out": "You signed out.",
         "welcome": "Account created. Upload a file now: the report is saved here.",
         "welcome_confirm": (
-            "Account created. You can upload your file now: when you open the link we e-mailed "
-            "you, your first report opens in full, free. If you do not see it, check your spam "
-            "folder."
+            "Account created. You can upload your file now. When you open the link we e-mailed "
+            "you (if you do not see it, check your spam folder), the most recent of your uploads "
+            f"of the previous {WELCOME_PENDING_DAYS} days that can still get the free report opens "
+            "in full, free: one whose file and browser have not had it on another account and "
+            "whose network has not used up this month's. If none can, the first one you make "
+            "afterwards that meets the same gets it."
         ),
         "account_title": "My reports",
         "account_lead": "Everything you audited with this account, in one place.",
@@ -943,9 +967,20 @@ COPY: dict[str, dict[str, str]] = {
             "it is a preview. The free first report is one per person."
         ),
         "welcome_refused_unverified": (
-            "Confirm your e-mail with the link we sent you and this same report opens in full, "
-            "free, without uploading it again. Until then, this is a preview."
+            f"Confirm your e-mail with the link we sent you within {WELCOME_PENDING_DAYS} days of "
+            "this upload and this same report opens in full, free, without uploading it again, if "
+            "by then it is still the most recent of your uploads that can get the free report. "
+            "Today it is: its file and browser have not had it on another account and its network "
+            "has not used up this month's. Until then, this is a preview."
         ),
+        "welcome_pending_other": (
+            "This is a preview. When you confirm your e-mail with the link we sent you, the most "
+            f"recent of your uploads of the previous {WELCOME_PENDING_DAYS} days that can still "
+            "get the free report opens in full, free: one whose file and browser have not had it "
+            "on another account and whose network has not used up this month's. Today that is not "
+            "this one."
+        ),
+        "welcome_pending_confirmed": "Your e-mail is confirmed; this upload is still a preview.",
         "welcome_refused_unverified_nomail": (
             "E-mail confirmation is not available right now, so this is a preview. To sort "
             "it out, write to us: {contact}"

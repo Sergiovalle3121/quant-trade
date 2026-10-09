@@ -155,6 +155,52 @@ def test_empty_live_file_alone_is_named_as_empty(tmp_path: Path) -> None:
         assert name in page
 
 
+@pytest.mark.parametrize(
+    ("box", "name", "what"),
+    [
+        ("report", "backtest.html", "del informe"),
+        ("equity", "curva.csv", "de la curva de equity"),
+    ],
+)
+def test_an_empty_main_file_is_not_replaced_by_the_live_statement(
+    tmp_path: Path, box: str, name: str, what: str
+) -> None:
+    # The three boxes as a browser sends them: the unused one with no name.
+    files = {
+        "report": ("", b"", "application/octet-stream"),
+        "equity": ("", b"", "application/octet-stream"),
+        "live": ("statement.csv", synthetic_live_statement(), "text/csv"),
+    }
+    files[box] = (name, b"", "text/csv")
+    with _client(tmp_path) as client:
+        response = client.post(
+            "/audits",
+            files=files,
+            data={"consent": "on", "locale": "es"},
+            follow_redirects=False,
+        )
+    assert response.status_code == 400
+    page = html.unescape(response.text)
+    assert f"El archivo {what} llegó vacío" in page
+    assert 'data-upload-rejection="empty_file"' in page
+
+
+def test_the_live_statement_with_two_unused_boxes_is_the_main_file(tmp_path: Path) -> None:
+    files = {
+        "report": ("", b"", "application/octet-stream"),
+        "equity": ("", b"", "application/octet-stream"),
+        "live": ("statement.csv", synthetic_live_statement(), "text/csv"),
+    }
+    with _client(tmp_path) as client:
+        response = client.post(
+            "/audits", files=files, data={"consent": "on", "locale": "es"}, follow_redirects=False
+        )
+        assert response.status_code == 303, response.text[:500]
+        data = _result(client, response.headers["location"])
+    assert data["inputs"]["source_format"] == "myfxbook_csv"
+    assert data["live"] is None
+
+
 def test_unreadable_live_file_alone_is_not_called_empty(tmp_path: Path) -> None:
     with _client(tmp_path) as client:
         response = _post(client, "live", "statement.csv", b"hola\nesto no es un informe\n")

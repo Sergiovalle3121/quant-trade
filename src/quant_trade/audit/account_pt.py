@@ -10,7 +10,11 @@ profit-claim guard.
 
 from __future__ import annotations
 
-from quant_trade.audit.accounts import FREE_PREVIEWS_PER_MONTH, MIN_PASSWORD_CHARS
+from quant_trade.audit.accounts import (
+    FREE_PREVIEWS_PER_MONTH,
+    MIN_PASSWORD_CHARS,
+    WELCOME_PENDING_DAYS,
+)
 from quant_trade.audit.seo import BRAND
 
 PATHS_PT: dict[str, str] = {
@@ -104,9 +108,12 @@ COPY_PT: dict[str, str] = {
     "signed_out": "Você saiu da conta.",
     "welcome": "Conta criada. Envie um arquivo agora: o relatório fica salvo aqui.",
     "welcome_confirm": (
-        "Conta criada. Você já pode enviar seu arquivo: ao abrir o link que enviamos por "
-        "e-mail, seu primeiro relatório abre completo e grátis. Se não encontrar, confira a "
-        "pasta de spam."
+        "Conta criada. Você já pode enviar seu arquivo. Ao abrir o link que enviamos por e-mail "
+        "(se não encontrar, confira a pasta de spam), abre completo e grátis o mais recente dos "
+        f"seus envios dos {WELCOME_PENDING_DAYS} dias anteriores que ainda possa receber o "
+        "relatório grátis: aquele cujo arquivo e navegador não o tiveram em outra conta e cuja "
+        "rede não esgotou os do mês. Se nenhum puder, recebe-o o primeiro que você fizer depois e "
+        "que cumpra o mesmo."
     ),
     "account_title": "Meus relatórios",
     "account_lead": "Tudo o que você auditou com esta conta, num só lugar.",
@@ -175,8 +182,20 @@ COPY_PT: dict[str, str] = {
         "é uma prévia. O primeiro relatório gratuito é um por pessoa."
     ),
     "welcome_refused_unverified": (
-        "Confirme seu e-mail com o link que enviamos e este mesmo relatório abre completo, "
-        "grátis, sem enviá-lo de novo. Enquanto isso, esta é uma prévia."
+        f"Confirme seu e-mail com o link que enviamos em até {WELCOME_PENDING_DAYS} dias depois "
+        "deste envio e este mesmo relatório abre completo e grátis, sem enviá-lo de novo, se até "
+        "lá ele continuar sendo o mais recente dos seus envios que pode receber o relatório "
+        "grátis. Hoje é o caso: o arquivo e o navegador dele não o tiveram em outra conta e a "
+        "rede dele não esgotou os do mês. Enquanto isso, esta é uma prévia."
+    ),
+    "welcome_pending_other": (
+        "Esta é uma prévia. Ao confirmar seu e-mail com o link que enviamos, abre completo e "
+        f"grátis o mais recente dos seus envios dos {WELCOME_PENDING_DAYS} dias anteriores que "
+        "ainda possa receber o relatório grátis: aquele cujo arquivo e navegador não o tiveram em "
+        "outra conta e cuja rede não esgotou os do mês. Hoje não é este."
+    ),
+    "welcome_pending_confirmed": (
+        "Seu e-mail já está confirmado; este envio continua sendo uma prévia."
     ),
     "welcome_refused_unverified_nomail": (
         "A confirmação de e-mail não está disponível no momento, então isto é uma "

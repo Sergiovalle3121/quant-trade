@@ -258,7 +258,10 @@ A platform report dropped in the equity field by mistake (an `.htm`,
 `.html` or `.xlsx` name, or HTML content, UTF-16 included) is read as the
 report instead of failing as a malformed CSV; so is a Myfxbook, MQL5 or FX
 Blue account CSV, and an account statement sent alone in the optional live
-box is the main file (an empty one is named as the live statement). A CSV the parser cannot read
+box is the main file (an empty one is named as the live statement). It is
+promoted only when no file was chosen in the report or curve box: a report or
+curve that arrived with a name and 0 bytes keeps its own "arrived empty"
+refusal instead of being replaced by the statement. A CSV the parser cannot read
 is explained in the form's language (header row, same number of columns),
 without the parser's English message.
 
@@ -2795,13 +2798,22 @@ an account never changes what a report says.
   `AUDIT_EMAIL_VERIFICATION_REQUIRED=true`, an account with an unconfirmed
   address gets a preview with reason `unverified` and keeps its free
   report for after confirming. That preview is noted in `welcome_pending`
-  (the upload's browser mark, file fingerprint and network); confirming the
-  address (`kind != "change"`) opens the most recent one of the last
-  `WELCOME_PENDING_DAYS` (7) days in full, from any device, if the same
-  account, inbox, browser, file, network and card rules still allow it, gives
-  the month's preview back and lands on `done=email_verified_report`; every
-  pending row of the account goes either way, and with the report, the account
-  or the retention purge. The account notice and the checkout refusal
+  (the upload's browser mark, file fingerprint and network) only if its file
+  has not had a free report already (checked at upload with the fingerprint);
+  confirming the address (`kind != "change"`) opens in full, from any device,
+  the most recent one of the last `accounts.WELCOME_PENDING_DAYS` (7) days
+  that the same account, inbox, browser, file, network and card rules still
+  allow, gives the month's preview back and lands on
+  `done=email_verified_report`; every pending row of the account goes either
+  way, and with the report, the account or the retention purge. The preview's
+  `acct=preview_unverified` notice is worked out when the page is shown:
+  `welcome_refused_unverified` (this same report opens on confirming within
+  the 7 days, if it is still the most recent upload that can get it) only
+  while the owner is unconfirmed and this upload is the one confirming would
+  open now; `welcome_pending_other` (which upload opens, with its conditions)
+  for any other upload of an unconfirmed owner; `welcome_pending_confirmed`
+  once the address is confirmed. `welcome_confirm` states the same rule. The
+  account notice and the checkout refusal
   say so plainly (confirming unlocks the first free full report and
   purchases), and the notice after sign-up says a confirmation link was sent
   and to check spam (`welcome_confirm`, only while delivery is configured).
@@ -3816,7 +3828,8 @@ Redesign pass 36, the pay step. A wrong, used or expired access code is answered
 under the code field itself, in amber, with what to do next (copy the code as it
 arrived and redeem it again, or message us with the button above); the field is
 marked invalid for screen readers. The redeem form and the upload redirect carry
-`#canjear`, so the page comes back at the field instead of at a banner at the top.
+`#canjear` (the JSON `location` too, which the in-place upload form follows), so
+the page comes back at the field instead of at a banner at the top.
 A payment or code that worked shows a green "done" notice instead of the blue
 informational one. The optimisation XML refusal also states its limit in MB and
 splits into the problem and "What to do".
