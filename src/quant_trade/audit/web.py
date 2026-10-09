@@ -125,6 +125,7 @@ from quant_trade.audit.pages import (
     method_page,
     reading_page,
     sample_meta,
+    tools_page,
     upload_page,
     verification_card_svg,
     verification_page,
@@ -169,6 +170,7 @@ from quant_trade.audit.store import (
     strategy_name,
 )
 from quant_trade.audit.theme import ICON_PATHS, STATIC_CACHE_CONTROL, static_file
+from quant_trade.audit.tools_hub import TOOLS_PATH
 from quant_trade.evidence.canonical_json import canonical_dumps, sha256_of_bytes
 
 #: ``(settings, audit_id, token, *, plan, locale, order_id, amount_cents)``.
@@ -1962,18 +1964,30 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     for icon_path, icon_name in ICON_PATHS.items():
         app.add_api_route(icon_path, _icon(icon_name), methods=["GET"], include_in_schema=False)
 
-    def _forward(alias: str, target: str) -> None:
+    def _forward(alias: str, target: str, *, keep_query: bool = False) -> None:
         """A short address that forwards to a fixed page of the site.
 
-        The handler takes no parameter: the target never comes from the request.
+        The target path never comes from the request. With ``keep_query`` the
+        query string travels along (a calculator link keeps its figures); the
+        path stays the fixed ``target``.
         """
+        if keep_query:
 
-        def handler() -> Response:
-            return RedirectResponse(target, status_code=301)
+            def handler_with_query(request: Request) -> Response:
+                query = request.url.query
+                return RedirectResponse(target + ("?" + query if query else ""), status_code=301)
+
+            endpoint: Callable[..., Response] = handler_with_query
+        else:
+
+            def handler() -> Response:
+                return RedirectResponse(target, status_code=301)
+
+            endpoint = handler
 
         if _path_locale(urlsplit(target).path) == "en":
             english_roots.add(alias.split("/")[1])
-        app.add_api_route(alias, handler, methods=["GET"], include_in_schema=False)
+        app.add_api_route(alias, endpoint, methods=["GET"], include_in_schema=False)
 
     @app.get("/robots.txt", response_class=PlainTextResponse)
     def robots(request: Request) -> str:
@@ -2106,6 +2120,23 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
 
     # Preserve the English short alias; translated pricing pages have their own routes.
     _forward("/pricing", PRICING_PATH["en"])
+
+    # Addresses people guess for the free tools and the English pages. Each one
+    # gave a 404 before; none of them shadows a page that answers 200.
+    for guessed, kept_query, page_path in (
+        ("/en/calculator", True, "/calculator"),
+        ("/reading", True, "/en/reading"),
+        ("/en/methodology", False, "/methodology"),
+        ("/en/articles", False, "/articles"),
+        ("/en/guides", False, "/guides"),
+        ("/en/sample", False, "/sample"),
+        ("/en/check", False, "/check"),
+        ("/faq", False, "/en/faq"),
+        ("/examples", False, "/en/examples"),
+        ("/tools", False, TOOLS_PATH["en"]),
+        ("/pt/tools", False, TOOLS_PATH["pt"]),
+    ):
+        _forward(guessed, page_path, keep_query=kept_query)
 
     def _institutional_response(
         request: Request,
@@ -6219,6 +6250,13 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
 
     for faq_path in FAQ_PATH.values():
         app.add_api_route(faq_path, public_faq, methods=["GET"], response_class=HTMLResponse)
+
+    def public_tools(request: Request) -> str:
+        locale = next(lang for lang, path in TOOLS_PATH.items() if path == request.url.path)
+        return tools_page(locale=locale, base_url=_site_url(request))
+
+    for tools_path in TOOLS_PATH.values():
+        app.add_api_route(tools_path, public_tools, methods=["GET"], response_class=HTMLResponse)
 
     def public_pricing(request: Request) -> str:
         locale = next(lang for lang, path in PRICING_PATH.items() if path == request.url.path)

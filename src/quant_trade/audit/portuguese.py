@@ -357,6 +357,7 @@ UI_PT: dict[str, Any] = {
     "nav_faq": "Perguntas",
     "nav_account": "Minha conta",
     "nav_compare": "Comparar",
+    "nav_tools": "Ferramentas",
     "nav_menu": "Menu",
     "cta": "Começar grátis",
     "cta_full": "Comece com a prévia grátis",

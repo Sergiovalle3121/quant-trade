@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import html
 import json
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -34,6 +35,7 @@ from quant_trade.audit.guides import GUIDES, guide_url, guides_index_url
 from quant_trade.audit.method import METHOD_PATH
 from quant_trade.audit.pricing import PRICING_PATH
 from quant_trade.audit.reading import READING_PATH
+from quant_trade.audit.tools_hub import TOOLS_PATH
 
 LOCALES: tuple[str, ...] = ("es", "en", "pt")
 
@@ -69,6 +71,7 @@ PUBLIC_PAGES: tuple[dict[str, str], ...] = (
     dict(METHOD_PATH),
     dict(CALCULATOR_PATH),
     dict(READING_PATH),
+    dict(TOOLS_PATH),
     dict(FAQ_PATH),
     dict(PRICING_PATH),
     *({lang: audience_url(a.slug, lang) for lang in ("es", "en", "pt")} for a in AUDIENCE_PAGES),
@@ -245,6 +248,49 @@ def article_structured_data(article: Article, locale: str, base_url: str) -> str
     )
 
 
+def _web_application(name: str, description: str, url: str, locale: str) -> dict[str, Any]:
+    """A free tool that runs in the browser; ``url`` is absolute."""
+    return {
+        "@type": "WebApplication",
+        "name": name,
+        "description": description,
+        "url": url,
+        "applicationCategory": "FinanceApplication",
+        "operatingSystem": "Web",
+        "isAccessibleForFree": True,
+        "inLanguage": locale,
+        "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"},
+    }
+
+
+def web_application_structured_data(name: str, description: str, url: str, locale: str) -> str:
+    """One free tool as a ``WebApplication``: only the texts its page shows."""
+    return _json_ld(
+        {"@context": "https://schema.org", **_web_application(name, description, url, locale)}
+    )
+
+
+def tools_structured_data(items: Sequence[tuple[str, str, str]], locale: str) -> str:
+    """The free tools page as an ``ItemList`` of ``WebApplication``.
+
+    ``items`` are (name, description, absolute URL), in the order the page shows them.
+    """
+    return _json_ld(
+        {
+            "@context": "https://schema.org",
+            "@type": "ItemList",
+            "itemListElement": [
+                {
+                    "@type": "ListItem",
+                    "position": position,
+                    "item": _web_application(name, description, url, locale),
+                }
+                for position, (name, description, url) in enumerate(items, start=1)
+            ],
+        }
+    )
+
+
 def articles_faq_structured_data(locale: str) -> str:
     return faq_structured_data(articles_index_faq(locale))
 
@@ -391,4 +437,6 @@ __all__ = [
     "private_meta",
     "robots_txt",
     "sitemap_xml",
+    "tools_structured_data",
+    "web_application_structured_data",
 ]
