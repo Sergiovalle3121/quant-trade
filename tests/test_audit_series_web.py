@@ -144,5 +144,8 @@ def test_calculator_route_uses_the_frequency_query(tmp_path: Path, path: str) ->
     assert answer.status_code == 200
     assert "<option value='52' selected>" in answer.text
     result = compute(CalculatorInput(1.8, 3, 1000, 52))
-    assert f"<td><b>{result['luck_sharpe']['value']:.2f}</b></td>" in answer.text
+    # The figure in the page's typography: a decimal comma in es and pt, a point in en.
+    luck = f"{result['luck_sharpe']['value']:.2f}"
+    shown = luck if path == "/calculator" else luck.replace(".", ",")
+    assert f"<td><b>{shown}</b></td>" in answer.text
     assert find_claims(answer.text) == []

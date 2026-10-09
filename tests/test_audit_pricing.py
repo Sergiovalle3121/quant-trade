@@ -25,8 +25,8 @@ from quant_trade.audit.pages import (  # noqa: E402
     _dimension_titles,
     card_markets_line,
 )
-from quant_trade.audit.pricing import PRICING_COPY, PRICING_PATH, pricing_page  # noqa: E402
-from quant_trade.audit.report import evidence_label, localize_tags  # noqa: E402
+from quant_trade.audit.pricing import PRICING_COPY, PRICING_PATH, pricing_page, usd  # noqa: E402
+from quant_trade.audit.report import localize_tags  # noqa: E402
 from quant_trade.audit.seo import PUBLIC_PAGES  # noqa: E402
 from quant_trade.audit.settings import PACK_CREDITS, AuditSettings  # noqa: E402
 from quant_trade.audit.store import make_store  # noqa: E402
@@ -74,35 +74,29 @@ def _offers(product: dict) -> list[dict]:
     return [offers] if isinstance(offers, dict) else offers
 
 
-class _Table(HTMLParser):
-    """Inspect accessible row text independently of the page's CSS markup."""
+class _Includes(HTMLParser):
+    """The items of the one-column "every full report includes" list, as text."""
 
     def __init__(self, page: str) -> None:
         super().__init__(convert_charrefs=True)
-        self.rows: list[list[str]] = []
-        self._in_table = False
-        self._in_cell = False
+        self.items: list[str] = []
+        self._in_list = False
         self.feed(page)
         self.close()
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
-        if tag == "table":
-            self._in_table = True
-        elif self._in_table and tag == "tr":
-            self.rows.append([])
-        elif self._in_table and tag in {"th", "td"}:
-            self._in_cell = True
-            self.rows[-1].append("")
+        if tag == "ul" and "plan-includes" in (dict(attrs).get("class") or ""):
+            self._in_list = True
+        elif self._in_list and tag == "li":
+            self.items.append("")
 
     def handle_endtag(self, tag: str) -> None:
-        if tag == "table":
-            self._in_table = False
-        elif tag in {"th", "td"}:
-            self._in_cell = False
+        if tag == "ul":
+            self._in_list = False
 
     def handle_data(self, data: str) -> None:
-        if self._in_table and self._in_cell:
-            self.rows[-1][-1] += data
+        if self._in_list and self.items:
+            self.items[-1] += data
 
 
 @pytest.mark.parametrize("locale", LOCALES)
@@ -123,34 +117,29 @@ def test_localized_copy_and_paid_and_free_pages_pass_guard(locale: str) -> None:
 
 
 @pytest.mark.parametrize("locale", LOCALES)
-def test_both_full_reports_include_the_same_dimensions_and_evidence(locale: str) -> None:
+def test_one_list_says_what_every_full_report_includes(locale: str) -> None:
+    # Paying buys more reports, never a different analysis: one list serves every card.
     page = pricing_page(_settings(), locale=locale)
-    rows = _Table(page).rows
-    assert rows and len(rows[0]) == 3  # Row label and the two report plans.
-    for title in _dimension_titles(locale).values():
-        matching = [row for row in rows if title in row[0]]
-        assert len(matching) == 1
-        assert len(matching[0]) == 3
-        assert matching[0][1] == matching[0][2]
-        assert matching[0][1].strip()
-    for tag in ("MEASURED", "DECLARED", "NOT_MEASURED"):
-        assert evidence_label(tag, locale) in html.unescape(page)
-    pdf_rows = [row for row in rows if "PDF" in row[0]]
-    assert len(pdf_rows) == 1
-    assert pdf_rows[0][1] == pdf_rows[0][2]
+    items = _Includes(page).items
+    titles = list(_dimension_titles(locale).values())
+    assert items[: len(titles)] == titles
     words = PRICING_COPY[locale]
-    for feature in ("evidence", "public", "compare", "support"):
-        matching = [row for row in rows if row[0] == words[feature]]
-        assert len(matching) == 1
-        assert matching[0][1] == matching[0][2]
-    for key in ("intro", "optional", "compare_note"):
-        assert words[key] in html.unescape(page)
+    rest = items[len(titles) :]
+    assert rest[0] == f"{words['evidence']} {words['evidence_text']}"
+    assert rest[1] == "PDF"
+    assert rest[2] == f"{words['public']} {words['optional']}"
+    assert rest[3] == f"{words['compare']} {words['compare_note']}"
+    assert rest[4].startswith(words["support"])
+    assert len(items) == len(titles) + 5
+    assert words["intro"] in html.unescape(page)
+    assert "<table" not in page.split("<main", 1)[1]
 
 
 @pytest.mark.parametrize("locale", LOCALES)
 def test_single_and_pack_prices_preserve_cents_from_settings(locale: str) -> None:
     first = _settings(AUDIT_PRICE_USD_CENTS="1735", AUDIT_PACK_PRICE_USD_CENTS="4155")
     second = _settings(AUDIT_PRICE_USD_CENTS="4860", AUDIT_PACK_PRICE_USD_CENTS="10725")
+    whole = _settings(AUDIT_PRICE_USD_CENTS="2900", AUDIT_PACK_PRICE_USD_CENTS="7500")
     first_page = pricing_page(first, locale=locale)
     second_page = pricing_page(second, locale=locale)
     for settings, page in ((first, first_page), (second, second_page)):
@@ -159,6 +148,11 @@ def test_single_and_pack_prices_preserve_cents_from_settings(locale: str) -> Non
         assert str(PACK_CREDITS) in html.unescape(page)
     assert f"USD {first.price_usd:.2f}" not in second_page
     assert f"USD {first.pack_price_usd:.2f}" not in second_page
+    # Whole dollars drop the ".00" on the page; the JSON-LD offer keeps two decimals.
+    whole_page = pricing_page(whole, locale=locale)
+    visible = whole_page.split("<main", 1)[1]
+    assert "USD 29<" in visible and "USD 75<" in visible and "USD 29.00" not in visible
+    assert {offer["price"] for offer in _offers(_product(whole_page))} == {"29.00", "75.00"}
 
 
 @pytest.mark.parametrize("locale", LOCALES)
@@ -181,10 +175,9 @@ def test_pack_quantity_uses_the_settings_constant(
     monkeypatch.setattr("quant_trade.audit.pricing.PACK_CREDITS", 5)
     settings = _settings(AUDIT_PRICE_USD_CENTS="1735", AUDIT_PACK_PRICE_USD_CENTS="4155")
     page = pricing_page(settings, locale=locale)
-    expected = PRICING_COPY[locale]["pack"].format(n=5, price=settings.pack_price_usd)
-    # The evidence tag is localized during rendering, so check the quantity via
-    # the localized pack name too, independently of that label's translation.
-    assert expected.split(" · ", 1)[1] in html.unescape(page)
+    expected = PRICING_COPY[locale]["pack"].format(n=5, price=usd(settings.pack_price_usd))
+    assert expected in html.unescape(page)
+    assert PRICING_COPY[locale]["pack_title"].format(n=5) in html.unescape(page)
     assert PRICING_COPY[locale]["pack_name"].format(n=5) in {
         offer["name"] for offer in _offers(_product(page))
     }

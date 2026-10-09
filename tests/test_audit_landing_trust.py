@@ -1,15 +1,18 @@
-"""The landing tells a stranger why to trust Rigor, and each point links to
-the page where they can check it; nothing in it promises a result."""
+"""Why a stranger can trust Rigor, on the short landing: who is behind it (once the
+founder's photo is in), what Rigor does not do, and links to the pages that prove it;
+nothing in it promises a result."""
 
 from __future__ import annotations
 
 import html
 import re
+from pathlib import Path
 
 import pytest
 
+from quant_trade.audit import theme
 from quant_trade.audit.guard import find_claims
-from quant_trade.audit.pages import TRUST_COPY, landing
+from quant_trade.audit.pages import _COPY, FOUNDER_PHOTO, landing
 
 
 def _paid(locale: str, **extra: object) -> str:
@@ -27,45 +30,46 @@ def _paid(locale: str, **extra: object) -> str:
 
 
 def _section(page: str) -> str:
-    return page.split("id='confianza'", 1)[1].split("</section>", 1)[0]
+    return page.split("id='quien'", 1)[1].split("</section>", 1)[0]
+
+
+@pytest.fixture
+def photo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    (tmp_path / FOUNDER_PHOTO).write_bytes(b"photo")
+    monkeypatch.setattr(theme, "STATIC_DIR", tmp_path)
 
 
 @pytest.mark.parametrize("locale", ["es", "en", "pt"])
-def test_every_landing_has_the_trust_section_with_its_proofs(locale: str) -> None:
-    section = _section(_paid(locale))
-    words = TRUST_COPY[locale]
-    for _icon, title, _text, label, target in words["items"]:
-        assert html.escape(title, quote=True) in section
-        if target:
-            assert html.escape(label, quote=True) in section
-    text = html.unescape(re.sub(r"<[^>]+>", " ", section))
-    assert find_claims(text) == []
-    assert "30" in text  # the retention days are the real setting
+def test_the_founder_block_signs_with_the_operator_and_links_whatsapp(
+    locale: str, photo: None
+) -> None:
+    section = _section(_paid(locale, operator=("Ana Pérez", "México")))
     assert "https://wa.me/000" in section
+    text = html.unescape(re.sub(r"<[^>]+>", " ", section))
+    assert "Ana Pérez" in text
+    assert find_claims(text) == []
 
 
-def test_trust_links_point_to_pages_that_exist_in_the_page_language() -> None:
-    es = _section(_paid("es"))
-    # Three cards: the sample, no bots or signals, your file (methodology and the
-    # check page stay linked from pricing, the footer and the report).
-    for href in ("/ejemplo?lang=es", "/privacidad"):
-        assert f"href='{href}" in es, href
-    # Portuguese legal pages are translated and linked in the same language.
-    pt = _section(_paid("pt"))
-    for href in ("/pt/exemplo", "/pt/privacidade"):
-        assert f"href='{href}" in pt, href
+@pytest.mark.parametrize("locale", ["es", "en", "pt"])
+def test_what_rigor_does_not_do_shows_without_the_founder_block(locale: str) -> None:
+    page = _paid(locale, operator=("Ana Pérez", "México"))
+    assert "id='quien'" not in page  # the repository ships no founder photo
+    faq = page.split("id='faq'", 1)[1].split("</section>", 1)[0]
+    assert html.escape(_COPY[locale]["not"], quote=True) in faq
 
 
-def test_who_is_behind_shows_only_when_the_operator_is_configured() -> None:
-    assert "trust-who" not in _paid("es")
-    assert "trust-who" not in _paid("es", operator=("Ana", ""))
+def test_the_whatsapp_link_needs_a_contact(photo: None) -> None:
+    section = _section(_paid("es", operator=("Ana Pérez", "México"), contact_url=""))
+    assert "wa.me" not in section
+
+
+def test_the_trust_cards_left_the_landing() -> None:
+    # The sample, the privacy policy and the method stay linked from the hero, the
+    # prices, the questions and the footer.
     page = _paid("es", operator=("Ana Pérez", "México"))
-    assert "Quién está detrás: Ana Pérez, México." in page
-    assert "Who is behind it: Ana Pérez, México." in _paid("en", operator=("Ana Pérez", "México"))
-
-
-def test_the_whatsapp_line_needs_a_contact() -> None:
-    assert "trust-ask" not in _paid("es", contact_url="")
+    assert "id='confianza'" not in page and "trust-who" not in page
+    for href in ("/ejemplo?lang=es", "/privacidad"):
+        assert f"href='{href}" in page, href
 
 
 def test_platform_figure_counts_readers_and_recognised_exports() -> None:
