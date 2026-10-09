@@ -35,7 +35,12 @@ PRICING_COPY: dict[str, dict[str, str]] = {
         "pack_name": "Paquete de {n} informes completos",
         "pack_title": "{n} informes",
         "pack_each": "{each} por informe",
-        "pack_text": "Audita {n} robots antes de comprar uno o sigue tu cuenta {n} meses.",
+        "pack_text": (
+            "Audita {n} robots y compáralos lado a lado antes de comprar uno, o sigue tu "
+            "cuenta {n} meses."
+        ),
+        # A pack larger than one comparison (compare.MAX_COMPARED) says less.
+        "pack_text_plain": "Audita {n} robots antes de comprar uno o sigue tu cuenta {n} meses.",
         "card_button": "Subir mi archivo",
         "includes_title": "Cada informe completo incluye",
         "evidence": "Etiquetas de evidencia",
@@ -45,8 +50,8 @@ PRICING_COPY: dict[str, dict[str, str]] = {
         ),
         "public": "Verificación pública y tarjeta",
         "optional": "Opcional: tú decides si publicas la página y compartes la tarjeta.",
-        "compare": "Comparación de dos informes",
-        "compare_note": "Desde tu cuenta, lado a lado con otro informe completo tuyo.",
+        "compare": "Comparación de hasta tres informes",
+        "compare_note": "Desde tu cuenta, lado a lado con otros informes completos tuyos.",
         "support": "Soporte por correo",
         "support_note": "El mismo canal de contacto para ambos informes.",
         "no_email": "El operador aún no ha publicado un correo de soporte.",
@@ -101,7 +106,13 @@ PRICING_COPY: dict[str, dict[str, str]] = {
         "pack_name": "Pack of {n} full reports",
         "pack_title": "{n} reports",
         "pack_each": "{each} per report",
-        "pack_text": "Audit {n} robots before buying one, or follow your account for {n} months.",
+        "pack_text": (
+            "Audit {n} robots and compare them side by side before buying one, or follow "
+            "your account for {n} months."
+        ),
+        "pack_text_plain": (
+            "Audit {n} robots before buying one, or follow your account for {n} months."
+        ),
         "card_button": "Upload my file",
         "includes_title": "Every full report includes",
         "evidence": "Evidence labels",
@@ -111,8 +122,8 @@ PRICING_COPY: dict[str, dict[str, str]] = {
         ),
         "public": "Public verification and card",
         "optional": "Optional: you decide whether to publish the page and share the card.",
-        "compare": "Compare two reports",
-        "compare_note": "From your account, side by side with another full report of yours.",
+        "compare": "Compare up to three reports",
+        "compare_note": "From your account, side by side with other full reports of yours.",
         "support": "E-mail support",
         "support_note": "The same contact channel for both reports.",
         "no_email": "The operator has not published a support e-mail yet.",
@@ -167,7 +178,13 @@ PRICING_COPY: dict[str, dict[str, str]] = {
         "pack_name": "Pacote de {n} relatórios completos",
         "pack_title": "{n} relatórios",
         "pack_each": "{each} por relatório",
-        "pack_text": "Audite {n} robôs antes de comprar um ou acompanhe sua conta por {n} meses.",
+        "pack_text": (
+            "Audite {n} robôs e compare-os lado a lado antes de comprar um, ou acompanhe "
+            "sua conta por {n} meses."
+        ),
+        "pack_text_plain": (
+            "Audite {n} robôs antes de comprar um ou acompanhe sua conta por {n} meses."
+        ),
         "card_button": "Enviar meu arquivo",
         "includes_title": "Cada relatório completo inclui",
         "evidence": "Rótulos de evidência",
@@ -177,8 +194,8 @@ PRICING_COPY: dict[str, dict[str, str]] = {
         ),
         "public": "Verificação pública e cartão",
         "optional": "Opcional: você decide se publica a página e compartilha o cartão.",
-        "compare": "Comparação de dois relatórios",
-        "compare_note": "Pela sua conta, lado a lado com outro relatório completo seu.",
+        "compare": "Comparação de até três relatórios",
+        "compare_note": "Pela sua conta, lado a lado com outros relatórios completos seus.",
         "support": "Suporte por e-mail",
         "support_note": "O mesmo canal de contato para ambos os relatórios.",
         "no_email": "O operador ainda não publicou um e-mail de suporte.",
@@ -280,6 +297,7 @@ def pricing_page(
 ) -> str:
     """An indexable description of existing reports, without a checkout action."""
     # Lazy imports let seo/pages use PRICING_PATH without an import cycle.
+    from quant_trade.audit.compare import MAX_COMPARED
     from quant_trade.audit.institutional import REVIEW_PATHS
     from quant_trade.audit.pages import (
         _COPY,
@@ -371,7 +389,10 @@ def pricing_page(
                     words["pack_title"].format(n=PACK_CREDITS),
                     usd(settings.pack_price_usd),
                     words["pack_each"].format(each=each),
-                    words["pack_text"].format(n=PACK_CREDITS),
+                    # "Compare them side by side" only while one comparison holds the pack.
+                    words[
+                        "pack_text" if PACK_CREDITS <= MAX_COMPARED else "pack_text_plain"
+                    ].format(n=PACK_CREDITS),
                     "",
                 )
             )

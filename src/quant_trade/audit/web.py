@@ -82,6 +82,7 @@ from quant_trade.audit.calculator import (
 from quant_trade.audit.calculator_card import calculator_card_svg
 from quant_trade.audit.compare import (
     COMPARE_PATH,
+    MAX_COMPARED,
     compare_form,
     comparison_body,
     guard_page,
@@ -162,6 +163,12 @@ from quant_trade.audit.report import render, report_kind, result_sha256
 from quant_trade.audit.retention import RetentionWorker
 from quant_trade.audit.return_series import is_return_series
 from quant_trade.audit.sample import sample_result, signal_sample_result
+from quant_trade.audit.sample_publication import (
+    SAMPLE_KIND_BY_PUBLIC_ID,
+    SAMPLE_PUBLICATION_LOCALE,
+    sample_page,
+    sample_publication,
+)
 from quant_trade.audit.schema import (
     MAX_UPLOAD_BYTES,
     AuditResult,
@@ -3938,14 +3945,19 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 # Back to this comparison after signing in, not to the list.
                 here = request.url.path + (f"?{request.url.query}" if request.url.query else "")
                 return _signin_redirect(locale, next_path=here)
-            picked = list(dict.fromkeys(id or []))
+            picked = list(id or [])
             mine = {item.audit_id: item for item in db.account_audits_list(session[0].id)}
             ready = {
                 audit_id
                 for audit_id, item in mine.items()
                 if account_pages.comparable(item, free_mode=cfg.free_mode)
             }
-            if len(picked) != 2 or not ready.issuperset(picked):
+            # Two or three different full reports of the list; one twice is refused.
+            if (
+                not 2 <= len(picked) <= MAX_COMPARED
+                or len(set(picked)) != len(picked)
+                or not ready.issuperset(picked)
+            ):
                 return RedirectResponse(f"{base}?error=compare_pick", status_code=303)
             results = []
             for audit_id in picked:
@@ -3955,20 +3967,22 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 result = AuditResult.model_validate_json(record.result_json)
                 results.append(result.model_dump(mode="json"))
             view = locale
+            three = len(picked) == 3
             body = comparison_body(
-                results[0],
-                results[1],
-                href_a=account_pages.report_href(picked[0], locale),
-                href_b=account_pages.report_href(picked[1], locale),
+                results,
+                hrefs=[account_pages.report_href(audit_id, locale) for audit_id in picked],
                 locale=view,
+                same_system=three and _same_strategy(session[0].id, picked),
             )
             copy = account_pages.COPY[view]
             body += f"<p><a class='btn btn-ghost' href='{base}'>{copy['compare_back']}</a></p>"
+            # The shareable address carries every report, in the order shown.
             query = "&".join(f"id={audit_id}" for audit_id in picked)
             page = compare_page(
                 body,
                 locale=view,
-                lead=copy["compare_lead"],
+                lead=copy["compare_lead_three" if three else "compare_lead"],
+                title=COMPARE_COPY[view]["title_three"] if three else "",
                 alternates={
                     lang: f"{account_pages.path('account', lang)}/comparar?{query}"
                     for lang in ("es", "en", "pt")
@@ -3977,6 +3991,17 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             return HTMLResponse(guard_page(page))
 
         return handler
+
+    def _same_strategy(account_id: str, audit_ids: list[str]) -> bool:
+        """Whether the account filed every report in one of its strategies.
+
+        "Mis estrategias" is where a customer says that reports are versions
+        of one system; a report is filed in one strategy at most.
+        """
+        wanted = set(audit_ids)
+        return any(
+            wanted.issubset(strategy.audit_ids) for strategy in db.list_strategies(account_id)
+        )
 
     def _signed_in_action(
         request: Request, path_locale: str, lang: str | None, csrf: str
@@ -6284,8 +6309,12 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         """Publication, record, the page's data and the result's SHA-256.
 
         A purged audit is served from the view the purge kept; without one
-        the page is gone (410).
+        the page is gone (410). A public sample's reserved id
+        (``sample_publication``) is answered from the sample itself, before any
+        lookup: no real id can be one (``Store.publish`` draws 12 characters).
         """
+        if public_id in SAMPLE_KIND_BY_PUBLIC_ID:
+            return _sample_publication(public_id)
         publication = db.get_publication(public_id)
         if publication is None:
             raise _not_found()
@@ -6350,13 +6379,16 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     @app.get("/v/{public_id}", response_class=HTMLResponse)
     def verification(request: Request, public_id: str, lang: str | None = None) -> str:
         publication, _, data, digest = _published(public_id)
+        locale = _report_locale(lang)
         return verification_page(
             data,
             public_id=publication.public_id,
             published_at=publication.created_at,
             result_sha256=digest,
             base_url=_site_url(request),
-            locale=_report_locale(lang),
+            locale=locale,
+            # None for a publication: only a public sample's page has its own words.
+            sample=sample_page(public_id, locale),
         )
 
     sample_cache: dict[tuple[str, str, str, tuple[str, ...]], str] = {}
@@ -6386,6 +6418,51 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         ready = market_data.ready() if market_data is not None else ()
         return (market_data.closes if market_data is not None and ready else None), ready
 
+    # Each sample's audit per language, for the set of public series it was built
+    # with: its page, its PDF and its public page share one run, so /v/ejemplo reads
+    # the Spanish result /ejemplo already built (and the other way round).
+    sample_audits: dict[tuple[str, str], tuple[tuple[str, ...], AuditResult]] = {}
+    sample_audit_locks: dict[tuple[str, str], threading.Lock] = {}
+    sample_audit_guard = threading.Lock()
+
+    def _sample_audit(
+        kind: str, locale: str, market: Callable[[str], Any] | None, ready: tuple[str, ...]
+    ) -> AuditResult:
+        """The sample's result in ``locale`` for the series ``ready``: run once and
+        kept until the series change. One lock per sample and language, so a run
+        never holds up another language, and two requests never run the same one."""
+        key = (kind, locale)
+        with sample_audit_guard:
+            lock = sample_audit_locks.setdefault(key, threading.Lock())
+        with lock:
+            kept = sample_audits.get(key)
+            if kept is None or kept[0] != ready:
+                kept = (ready, samples[kind].result(locale, market=market))
+                sample_audits[key] = kept
+            return kept[1]
+
+    sample_views: dict[tuple[str, tuple[str, ...]], tuple[Any, Any, dict[str, Any], str]] = {}
+    # Its own lock: building a sample's view never holds up the sample pages.
+    sample_view_lock = threading.Lock()
+
+    def _sample_publication(public_id: str) -> tuple[Any, Any, dict[str, Any], str]:
+        """``_published`` for a public sample's reserved id: its publication (the day
+        it was published), its record (the audit's date and class), the view a purge
+        keeps of the sample's Spanish report and its hash, with the public series in
+        memory as its page has them. Built once per sample and set of series, from
+        the run its report page shares, and kept; nothing is read from or written to
+        the database."""
+        kind = SAMPLE_KIND_BY_PUBLIC_ID[public_id]
+        with sample_view_lock:
+            market, ready = _sample_market()
+            for stale in [k for k in sample_views if k[1] != ready]:
+                del sample_views[stale]
+            key = (kind, ready)
+            if key not in sample_views:
+                result = _sample_audit(kind, SAMPLE_PUBLICATION_LOCALE, market, ready)
+                sample_views[key] = sample_publication(public_id, result)
+            return sample_views[key]
+
     def _sample_html(locale: str, base_url: str, kind: str = "backtest") -> str:
         """Built once per sample, locale, address and set of public series in
         memory, and kept: the input and the clock are fixed."""
@@ -6400,7 +6477,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 del sample_cache[stale]
             if key not in sample_cache:
                 html_text, _ = render(
-                    sample.result(locale, market=market),
+                    _sample_audit(kind, locale, market, ready),
                     watermark=False,
                     free_mode=True,
                     notice=sample.banner[locale],
@@ -6437,7 +6514,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 del sample_pdfs[stale]
             if key not in sample_pdfs:
                 page, _ = render(
-                    sample.result(locale, market=market),
+                    _sample_audit(kind, locale, market, ready),
                     watermark=False,
                     free_mode=True,
                     notice=sample.banner[locale],
@@ -6948,7 +7025,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         if request is not None and _session(request) is not None:
             # Signed in: their own reports compare without pasting links.
             form = account_pages.compare_mine_note(locale) + form
-        page = compare_page(form, locale=locale)
+        page = compare_page(form, locale=locale, title=COMPARE_COPY[locale]["title_form"])
         return HTMLResponse(page, status_code=status)
 
     @app.get("/comparar", response_class=HTMLResponse)
@@ -6963,15 +7040,20 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     def compare_pt(request: Request) -> Response:
         return _compare_form_page("pt", request=request)
 
-    def _compare(link_a: str, link_b: str, lang: str | None, default: str) -> Response:
+    def _compare(request: Request, links: list[str], lang: str | None, default: str) -> Response:
         # A Portuguese report posted to another language's address stays Portuguese.
         locale = "pt" if "pt" in (default, lang) else _locale(lang or default)
         copy = COMPARE_COPY[locale]
-        first, second = parse_report_link(link_a), parse_report_link(link_b)
-        if first is None or second is None:
-            return _compare_form_page(locale, error=copy["bad_link"], status=400)
-        parsed = [first, second]
-        if first[0] == second[0]:
+        # The third field is optional: left empty, two reports are compared.
+        texts = links[:2] + [text for text in links[2:MAX_COMPARED] if text.strip()]
+        parsed: list[tuple[str, str]] = []
+        for text in texts:
+            link = parse_report_link(text)
+            if link is None:
+                return _compare_form_page(locale, error=copy["bad_link"], status=400)
+            parsed.append(link)
+        ids = [audit_id for audit_id, _ in parsed]
+        if len(set(ids)) != len(ids):
             return _compare_form_page(locale, error=copy["same"], status=400)
         results = []
         for audit_id, token in parsed:
@@ -6987,41 +7069,49 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 return _compare_form_page(locale, error=copy["locked"], status=402)
             result = AuditResult.model_validate_json(record.result_json)
             results.append((result.model_dump(mode="json"), f"/audits/{audit_id}?token={token}"))
-        (data_a, href_a), (data_b, href_b) = results
+        three = len(results) == 3
+        # Versions of one strategy only for whoever filed all three in it.
+        session = _session(request) if three else None
         body = comparison_body(
-            data_a,
-            data_b,
-            href_a=f"{href_a}&lang={locale}",
-            href_b=f"{href_b}&lang={locale}",
+            [data for data, _ in results],
+            hrefs=[f"{href}&lang={locale}" for _, href in results],
             locale=locale,
+            same_system=session is not None and _same_strategy(session[0].id, ids),
         )
         again = COMPARE_PATH[locale] + ("" if locale == "pt" else f"?lang={locale}")
         body += f"<p><a class='btn btn-ghost' href='{again}'>{copy['again']}</a></p>"
-        return HTMLResponse(guard_page(compare_page(body, locale=locale)))
+        title = copy["title_three"] if three else ""
+        return HTMLResponse(guard_page(compare_page(body, locale=locale, title=title)))
 
     @app.post("/comparar", response_class=HTMLResponse)
     def compare_post_es(
+        request: Request,
         link_a: Annotated[str, Form(max_length=1000)],
         link_b: Annotated[str, Form(max_length=1000)],
+        link_c: Annotated[str, Form(max_length=1000)] = "",
         lang: Annotated[str | None, Form()] = None,
     ) -> Response:
-        return _compare(link_a, link_b, lang, "es")
+        return _compare(request, [link_a, link_b, link_c], lang, "es")
 
     @app.post("/compare", response_class=HTMLResponse)
     def compare_post_en(
+        request: Request,
         link_a: Annotated[str, Form(max_length=1000)],
         link_b: Annotated[str, Form(max_length=1000)],
+        link_c: Annotated[str, Form(max_length=1000)] = "",
         lang: Annotated[str | None, Form()] = None,
     ) -> Response:
-        return _compare(link_a, link_b, lang, "en")
+        return _compare(request, [link_a, link_b, link_c], lang, "en")
 
     @app.post("/pt/comparar", response_class=HTMLResponse)
     def compare_post_pt(
+        request: Request,
         link_a: Annotated[str, Form(max_length=1000)],
         link_b: Annotated[str, Form(max_length=1000)],
+        link_c: Annotated[str, Form(max_length=1000)] = "",
         lang: Annotated[str | None, Form()] = None,
     ) -> Response:
-        return _compare(link_a, link_b, lang, "pt")
+        return _compare(request, [link_a, link_b, link_c], lang, "pt")
 
     def _check_page(request: Request, locale: str, content: str, status: int = 200) -> Response:
         page = check_page(content, locale=locale, base_url=_site_url(request))

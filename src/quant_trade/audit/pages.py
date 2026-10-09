@@ -117,6 +117,7 @@ from quant_trade.audit.report import (
     report_kind,
     source_name,
 )
+from quant_trade.audit.sample_publication import SamplePage, public_pages_line
 from quant_trade.audit.seo import (
     BRAND,
     OG_IMAGE_SIZE,
@@ -2962,7 +2963,8 @@ def _utc_time(stamp: str, locale: str) -> str:
     """An ISO UTC stamp as a readable ``<time>`` (24 sep 2026 · 17:30 UTC).
 
     The exact stamp stays in the ``datetime`` attribute; anything that does
-    not parse is shown as it came.
+    not parse is shown as it came. A bare date (a public sample's day of
+    publication) is shown without a time of day.
     """
     try:
         when = datetime.fromisoformat(stamp.replace("Z", "+00:00"))
@@ -2973,6 +2975,8 @@ def _utc_time(stamp: str, locale: str) -> str:
         day = f"{when.day} {month} {when.year}"
     else:
         day = f"{month} {when.day}, {when.year}"
+    if len(stamp) == len("2026-10-09"):
+        return f"<time datetime='{_e(stamp)}'>{day}</time>"
     return f"<time datetime='{_e(stamp)}'>{day} · {when:%H:%M} UTC</time>"
 
 
@@ -3035,6 +3039,7 @@ def verification_page(
     result_sha256: str,
     base_url: str,
     locale: str = "es",
+    sample: SamplePage | None = None,
 ) -> str:
     """The public page of a published audit.
 
@@ -3047,6 +3052,12 @@ def verification_page(
     observations, files and token are never read here, so they cannot leak. A
     view kept before the period was shown has no dates, and those rows are
     left out.
+
+    ``sample`` is only a public sample's page (``sample_publication.sample_page``),
+    which is nobody's audit: its notice goes on top, above the title; its title
+    and link preview start with "Sample"; its share text is its own; and its
+    badge code is shown as the sample's, without a copy button. A publication's
+    page never has one, and without it nothing on the page changes.
     """
     locale = _locale(locale)
     copy = _COPY[locale]
@@ -3123,6 +3134,9 @@ def verification_page(
     description = copy["v_description"].format(
         cls_label=cls_label, overall=overall, date=audited[:10], notice=BADGE_NOTICE[locale]
     )
+    if sample is not None:
+        title = f"{sample.title_word} · {title}"
+        description = f"{sample.meta_lead} · {description}"
     alternates = {lang: f"/v/{public_id}?lang={lang}" for lang in CLASS_WORD}
     alternates["es"] = f"/v/{public_id}"
     # Never indexed (an unpublished page should not linger in search), but it
@@ -3140,8 +3154,12 @@ def verification_page(
         base_url=base_url,
     )
     hero = (
-        "<section class='page-hero'>" + aurora() + grid_bg() + "<div class='wrap'>"
-        f"<div class='eyebrow rise'><span class='dot'></span>{_e(ui['v_eyebrow'])}</div>"
+        "<section class='page-hero'>"
+        + aurora()
+        + grid_bg()
+        + "<div class='wrap'>"
+        + (sample.notice_html if sample is not None else "")
+        + f"<div class='eyebrow rise'><span class='dot'></span>{_e(ui['v_eyebrow'])}</div>"
         f"<h1 class='rise' style='--i:1'>{_e(copy['v_title'])}</h1>"
         "<div class='v-hero rise' style='--i:2'>"
         + class_ring(overall, size="xl")
@@ -3169,16 +3187,24 @@ def verification_page(
         f"<section class='rsec'><h2>{_e(copy['v_badge'])}</h2><div class='badge-preview'>"
         f"<img src='/v/{_e(public_id)}/badge.svg?lang={_e(locale)}' "
         f"alt='{_e(BADGE_NOTICE[locale])}' width='480' height='72'></div>"
-        f"<p class='muted' style='margin-top:18px'>{_e(copy['v_badge_help'])}</p>"
+        f"<p class='muted' style='margin-top:18px'>"
+        f"{_e(sample.badge_help if sample is not None else copy['v_badge_help'])}</p>"
         f"<pre><code id='badge-code'>{_e(snippet)}</code></pre>"
-        f"<div class='copy-row'><button class='btn btn-dark btn-sm' type='button' "
-        f"data-copy='badge-code' data-done='{_e(ui['v_copied'])}' hidden>{_e(ui['v_copy'])}"
-        "</button></div></section>"
+        + (
+            ""
+            if sample is not None
+            else "<div class='copy-row'><button class='btn btn-dark btn-sm' type='button' "
+            f"data-copy='badge-code' data-done='{_e(ui['v_copied'])}' hidden>{_e(ui['v_copy'])}"
+            "</button></div>"
+        )
+        + "</section>"
         + share_block(
             overall=overall,
             public_id=public_id,
             locale=locale,
             kind=kind,
+            template=sample.share_template if sample is not None else None,
+            ref=sample.share_ref if sample is not None else "share",
         )
         + "</div></div>"
     )
@@ -3339,9 +3365,11 @@ PAGE_DESCRIPTIONS: dict[str, dict[str, str]] = {
         ),
     },
     "compare": {
-        "es": "Compara dos de tus informes de Rigor, lado a lado, para ver qué cambió.",
-        "en": "Compare two of your Rigor reports, side by side, to see what changed.",
-        "pt": "Compare dois dos seus relatórios do Rigor, lado a lado, para ver o que mudou.",
+        "es": "Compara dos o tres de tus informes de Rigor, lado a lado, para ver qué cambió.",
+        "en": "Compare two or three of your Rigor reports, side by side, to see what changed.",
+        "pt": (
+            "Compare dois ou três dos seus relatórios do Rigor, lado a lado, para ver o que mudou."
+        ),
     },
     "signup": {
         "es": "Crea tu cuenta de Rigor para subir tus archivos y guardar tus informes.",
@@ -3596,24 +3624,27 @@ def compare_page(
     locale: str = "es",
     lead: str = "",
     alternates: dict[str, str] | None = None,
+    title: str = "",
 ) -> str:
-    """The private page that compares two reports (``audit/compare.py`` builds ``content``)."""
+    """The private page that compares two or three reports (``audit/compare.py``
+    builds ``content``); ``title`` names three reports or the form."""
     from quant_trade.audit.compare import COMPARE_CSS, COMPARE_PATH, COPY
 
     locale = _locale(locale)
     copy = COPY[locale]
+    title = title or copy["title"]
     body = (
-        _page_hero(copy["eyebrow"], copy["title"], lead or copy["lead"])
+        _page_hero(copy["eyebrow"], title, lead or copy["lead"])
         + f"<div class='paper page-main'><div class='wrap'><style>{COMPARE_CSS}</style>"
         + content
         + "</div></div>"
     )
     # A comparison reached from Mi cuenta passes its own addresses.
     return _page(
-        copy["title"],
+        title,
         locale,
         body,
-        meta_html=private_meta(copy["title"], locale, PAGE_DESCRIPTIONS["compare"][locale]),
+        meta_html=private_meta(title, locale, PAGE_DESCRIPTIONS["compare"][locale]),
         alternates=alternates or dict(COMPARE_PATH),
         solid_nav=True,
     )
@@ -4893,6 +4924,9 @@ def audience_page(
             f"<a class='link-more' href='{_e(start)}'>{_e(start_label)}{icon('arrow')}</a>"
             "</div>"
         )
+    if audience.public_example:
+        # What the provider's clients would see, before uploading anything.
+        lead += public_pages_line(locale, css="aud-example")
     alternates = {lang: audience_url(audience.slug, lang) for lang in ("es", "en", "pt")}
     crumbs = f"<a href='{_e(_home(locale))}'>{_e(words['home'])}</a>" + _language_crumbs(
         alternates, locale

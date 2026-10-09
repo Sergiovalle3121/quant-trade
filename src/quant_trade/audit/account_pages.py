@@ -202,15 +202,21 @@ COPY: dict[str, dict[str, str]] = {
         "pdf": "PDF",
         "public_page": "Página pública",
         "compare_pick_label": "Elegir para comparar",
-        "compare_button": "Comparar los dos elegidos",
-        "compare_help": "Marca dos informes completos y compáralos lado a lado, sin pegar enlaces.",
-        "compare_pick": "Elige exactamente dos informes completos de tu lista para compararlos.",
+        "compare_button": "Comparar los elegidos",
+        "compare_help": (
+            "Marca dos o tres informes completos y compáralos lado a lado, sin pegar enlaces."
+        ),
+        "compare_pick": "Elige dos o tres informes completos de tu lista para compararlos.",
         "compare_back": "Volver a mis informes",
         "compare_mine": "¿Son informes de tu cuenta? Compáralos desde tu lista, sin pegar enlaces.",
         "compare_mine_button": "Elegir en mis informes",
         "compare_lead": (
             "Dos informes de tu cuenta. Sirve para ver qué cambió entre dos versiones de una "
             "estrategia o entre dos robots."
+        ),
+        "compare_lead_three": (
+            "Tres informes de tu cuenta. Sirve para ver en qué difieren tres versiones de una "
+            "estrategia o tres robots."
         ),
         "status_full": "Completo",
         "status_preview": "Vista previa",
@@ -964,15 +970,21 @@ COPY: dict[str, dict[str, str]] = {
         "pdf": "PDF",
         "public_page": "Public page",
         "compare_pick_label": "Pick to compare",
-        "compare_button": "Compare the two picked",
-        "compare_help": "Tick two full reports and compare them side by side, no links to paste.",
-        "compare_pick": "Pick exactly two full reports from your list to compare them.",
+        "compare_button": "Compare the picked reports",
+        "compare_help": (
+            "Tick two or three full reports and compare them side by side, no links to paste."
+        ),
+        "compare_pick": "Pick two or three full reports from your list to compare them.",
         "compare_back": "Back to my reports",
         "compare_mine": "Are they reports on your account? Compare them from your list, no links.",
         "compare_mine_button": "Pick from my reports",
         "compare_lead": (
             "Two reports from your account. Use it to see what changed between two versions "
             "of a strategy or between two robots."
+        ),
+        "compare_lead_three": (
+            "Three reports from your account. Use it to see how three versions of a strategy "
+            "or three robots differ."
         ),
         "status_full": "Full",
         "status_preview": "Preview",
