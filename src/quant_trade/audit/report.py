@@ -4029,15 +4029,22 @@ def _meaning_html(
         dimension = by_name.get(name)
         if dimension is None:
             continue
+        undeclared = trials_undeclared(dimension.get("inputs"))
         text = ownership.meaning(
-            name, dimension["status"], locale, role, account=account, fund=fund
+            name,
+            dimension["status"],
+            locale,
+            role,
+            account=account,
+            fund=fund,
+            undeclared=undeclared,
         ) or meaning(
             name,
             dimension["status"],
             locale,
             account=account,
             fund=fund,
-            undeclared=trials_undeclared(dimension.get("inputs")),
+            undeclared=undeclared,
         )
         items.append(
             f"<div class='item s-{_e(dimension['status'])}'>"
@@ -8699,7 +8706,10 @@ def render_html(
             if _trade_section_shown(data, "challenge")
             else []
         ),
-        (labels["questions"], _questions_html(data.get("vendor_questions", []), locale, labels)),
+        (
+            labels["questions"],
+            _questions_html(ownership.open_questions(data, role), locale, labels),
+        ),
         # The dimension reasons repeat the verdict in thresholds, so they open the
         # technical tables instead of sitting between the plan and the findings.
         (labels["reasons_detail"], _reasons_html(verdict, locale, labels)),
@@ -9153,10 +9163,14 @@ def _pdf_cover(
 def _next_steps(
     data: dict[str, Any], verdict: dict[str, Any], labels: dict[str, str]
 ) -> list[tuple[str, str]]:
-    """The "what to do now" items as (label key, section title), in order."""
-    status = {str(item["name"]): str(item["status"]) for item in verdict.get("dimensions", [])}
+    """The "what to do now" items as (label key, section title), in order, in
+    the voice the labels carry (``ownership``'s step helpers pick the key)."""
+    dimensions = {str(item["name"]): item for item in verdict.get("dimensions", [])}
+    status = {name: str(item["status"]) for name, item in dimensions.items()}
     open_ = {"WEAK", "FAIL"}
     account = is_account_history(data)
+    role = getattr(labels, "role", ownership.BUYER)
+    asked = ownership.open_questions(data, role)
     steps: list[tuple[str, str]] = []
     if _fund_record(data):
         # A fund's record is its real history: no robot, no optimisation, no
@@ -9166,7 +9180,7 @@ def _next_steps(
             steps.append(("next_flags", labels["red_flags"]))
         if (fund.get("fees") or {}).get("status") == "MEASURED":
             steps.append(("next_fund_fees", labels["fund"]))
-        if data.get("vendor_questions"):
+        if asked:
             steps.append(("next_questions_fund", labels["questions"]))
         steps.append(("next_keep_fund", ""))
         return steps
@@ -9180,20 +9194,16 @@ def _next_steps(
     elif status.get("costs") == "WEAK":
         steps.append(("next_costs", labels["costs"]))
     if not account and status.get("multiplicity") in open_:
-        steps.append(("next_trials", labels["plan"]))
+        steps.append((ownership.trials_step(dimensions.get("multiplicity"), role), labels["plan"]))
     if not account and (status.get("out_of_sample") in open_ | {"NOT_MEASURED"}):
-        steps.append(("next_oos", labels["plan"]))
+        steps.append((ownership.oos_step(status["out_of_sample"], data, role), labels["plan"]))
     steps = steps[:3]
-    if (
-        ownership.role_of(data) == ownership.OWN
-        and not account
-        and live.get("status") != "MEASURED"
-        and (data.get("trade_stats") or {}).get("status") == "MEASURED"
-    ):
+    demo = None if account else ownership.demo_step(data, role)
+    if demo:
         # The developer's own robot with a trade list and no live comparison yet:
-        # enough demo trades for ``live.compare_live`` to measure one.
-        steps.append(("next_demo", labels["live"] if live else ""))
-    if data.get("vendor_questions"):
+        # what ``live.compare_live`` needs to measure one.
+        steps.append((demo, labels["live"] if live else ""))
+    if asked:
         steps.append(("next_questions", labels["questions"]))
     steps.append(("next_keep", ""))
     return steps

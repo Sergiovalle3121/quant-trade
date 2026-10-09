@@ -26,13 +26,14 @@ from quant_trade.audit import ownership, plan, report
 from quant_trade.audit.analytics import _QUESTIONS
 from quant_trade.audit.engine import run_audit
 from quant_trade.audit.guard import find_claims
-from quant_trade.audit.live import MIN_LIVE_TRADES
+from quant_trade.audit.live import MIN_BACKTEST_TRADES, MIN_LIVE_TRADES
 from quant_trade.audit.mapping import CARRIED_FIELDS, Table, mapping_page
 from quant_trade.audit.pages import upload_page, verification_card_svg, verification_page
 from quant_trade.audit.plan import improvement_plan
 from quant_trade.audit.report import render_html, to_json
 from quant_trade.audit.sample import sample_result
 from quant_trade.audit.schema import AuditResult, DeclaredMetadata, build_inputs, declared
+from quant_trade.audit.verdict import MEANING as VERDICT_MEANING
 
 LOCALES = ("es", "en", "pt")
 FIXTURES = Path(__file__).parent / "fixtures" / "audit_imports"
@@ -106,6 +107,8 @@ def test_the_form_offers_four_answers_and_says_nothing_by_default(locale: str) -
     assert [value for value, selected, _ in options if selected] == [""]
     shown = html.unescape(page)
     assert words["label"] in shown and words["help"] in shown
+    # The help says all it changes: the report's sentences, and the developer's demo step.
+    assert "demo" in words["help"] and "«Qué hacer ahora»" not in words["help"]
     # Next to the other optional fields: a labelled control with its help line.
     assert "<label for='f-ownership'>" in page and "id='f-ownership-help'" in page
     assert find_claims(_text(page)) == []
@@ -268,8 +271,9 @@ def test_the_provider_reads_what_clients_will_ask_and_what_to_provide(locale: st
     for key in ("next_intro", "next_live", "next_trials", "next_questions", "questions"):
         assert labels[key] in shown, key
     lead = ownership.QUESTION_ITEM[ownership.PROVIDER][locale].split("{ask}")[0]
-    asked = [q for q in _sample(locale).vendor_questions]
-    assert shown.count(lead.strip()) >= len(asked)
+    data = _with_role(_sample(locale), ownership.PROVIDER).model_dump(mode="json")
+    asked = ownership.open_questions(data, ownership.PROVIDER)
+    assert asked and shown.count(lead.strip()) >= len(asked)
     for question in asked:
         assert ownership.QUESTIONS[question["code"]][locale][1] in shown
     assert report.LABELS[locale]["next_intro"] not in shown
@@ -305,6 +309,319 @@ def test_a_developer_without_a_live_account_gets_the_developer_steps(locale: str
     for role in (ownership.BUYER, ownership.PROVIDER, None):
         other = _text(render_html(_with_role(result, role), watermark=False, locale=locale))
         assert labels["next_demo"] not in other
+
+
+def _steps(result: AuditResult | dict, locale: str = "es") -> list[str]:
+    """The "What to do now" keys of a result, in its declared voice."""
+    data = result if isinstance(result, dict) else result.model_dump(mode="json")
+    labels = _labels(locale, ownership.role_of(data))
+    return [key for key, _ in report._next_steps(data, data["verdict"], labels)]
+
+
+def _status(result: AuditResult, name: str) -> dict:
+    dimensions = result.model_dump(mode="json")["verdict"]["dimensions"]
+    return next(d for d in dimensions if d["name"] == name)
+
+
+@lru_cache(maxsize=4)
+def _own(case: str) -> AuditResult:
+    """The client's own robot in the shapes the review found wording gaps in."""
+    files: dict[str, object] = {"report_filename": "tester.html"}
+    declared = DeclaredMetadata(locale="es", trials=40, ownership="own")
+    if case == "short":  # fewer closed trades than the live comparison needs
+        files["report_bytes"] = synthetic_mt5_report(25)
+    elif case == "short_live":  # ... with an account long enough on its own
+        files["report_bytes"] = synthetic_mt5_report(25)
+        files["live_bytes"] = synthetic_mt5_report(40, seed=3)
+        files["live_filename"] = "live.html"
+    elif case == "fixture":  # the MT5 tester fixture: real ticks, five trades, an account
+        files = {
+            "report_bytes": (FIXTURES / "mt5_tester.html").read_bytes(),
+            "report_filename": "mt5_tester.html",
+            "optimization_bytes": (FIXTURES / "mt5_optimization.xml").read_bytes(),
+            "live_bytes": (FIXTURES / "mt5_history.html").read_bytes(),
+            "live_filename": "mt5_history.html",
+        }
+        declared = DeclaredMetadata(ownership="own")
+    elif case == "undeclared":  # no trial count, a thin edge: multiplicity fails at 1 trial
+        files["report_bytes"] = synthetic_mt5_report(260, edge_pips=0.2)
+        declared = DeclaredMetadata(trials_declared=False, ownership="own")
+    inputs = build_inputs(None, declared, **files)  # type: ignore[arg-type]
+    return run_audit(
+        inputs,
+        bootstrap_samples=60,
+        risk_samples=50,
+        challenge_samples=50,
+        audit_id="ownership",
+        now=NOW,
+    )
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+def test_a_backtest_too_short_to_compare_names_both_minimums(locale: str) -> None:
+    own = _labels(locale, ownership.OWN)
+    text = own["next_demo_short"]
+    assert str(MIN_BACKTEST_TRADES) in text and str(MIN_LIVE_TRADES) in text
+    for case in ("short", "short_live", "fixture"):
+        result = _own(case)
+        data = result.model_dump(mode="json")
+        assert data["trade_stats"]["trade_count"]["value"] < MIN_BACKTEST_TRADES, case
+        if case != "short":
+            # An account was uploaded, and the backtest is what keeps it unmeasured.
+            assert data["live"]["status"] == "NOT_MEASURED"
+            assert str(MIN_BACKTEST_TRADES) in data["live"]["reason"]
+        keys = _steps(result, locale)
+        assert "next_demo_short" in keys and "next_demo" not in keys, (case, keys)
+        shown = _text(render_html(result, watermark=False, locale=locale))
+        assert text in shown and own["next_demo"] not in shown, case
+        assert find_claims(shown) == []
+    # A backtest long enough keeps the plain demo step.
+    assert "next_demo" in _steps(_backtest(ownership.OWN), locale)
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+def test_an_undeclared_trial_count_is_not_asked_to_be_cut(locale: str) -> None:
+    result = _own("undeclared")
+    multiplicity = _status(result, "multiplicity")
+    assert multiplicity["status"] in ("WEAK", "FAIL")
+    assert multiplicity["inputs"]["trials_used"] == {
+        "value": 1,
+        "evidence": "NOT_MEASURED",
+        "note": "",
+    }
+    cut = ownership.LABELS["next_trials"][ownership.OWN][locale]
+    for role in (ownership.OWN, None):
+        voiced = _with_role(result, role)
+        keys = _steps(voiced, locale)
+        assert "next_trials_undeclared" in keys and "next_trials" not in keys, role
+        shown = _text(render_html(voiced, watermark=False, locale=locale))
+        assert _labels(locale, role or ownership.NEUTRAL)["next_trials_undeclared"] in shown
+        assert cut not in shown
+        assert find_claims(shown) == []
+    # The buyer and the provider keep their question: it holds whatever the count.
+    for role in (ownership.BUYER, ownership.PROVIDER):
+        assert "next_trials" in _steps(_with_role(result, role), locale)
+
+
+def test_cutting_trials_is_offered_only_when_more_than_one_was_counted() -> None:
+    def step(value: int, evidence: str, role: str = ownership.OWN) -> str:
+        dimension = {"inputs": {"trials_used": {"value": value, "evidence": evidence}}}
+        return ownership.trials_step(dimension, role)
+
+    assert step(40, "DECLARED") == step(120, "MEASURED") == "next_trials"
+    assert step(1, "DECLARED") == step(1, "MEASURED") == "next_trials_one"
+    assert step(1, "NOT_MEASURED") == "next_trials_undeclared"
+    assert step(1, "NOT_MEASURED", ownership.NEUTRAL) == "next_trials_undeclared"
+    for role in (ownership.BUYER, ownership.PROVIDER):
+        assert step(1, "NOT_MEASURED", role) == step(1, "DECLARED", role) == "next_trials"
+    for locale in LOCALES:
+        for key in ("next_trials_undeclared", "next_trials_one"):
+            text = _labels(locale, ownership.OWN)[key]
+            assert "0.95" in text and find_claims(text) == []
+
+
+def _forward_export() -> bytes:
+    """An MT5 forward optimisation export whose ranking holds (as in test_audit_forward)."""
+    names = ["Pass", "Forward Result", "Back Result", "Profit", "Expected Payoff"]
+    names += ["Profit Factor", "Recovery Factor", "Sharpe Ratio", "Custom", "Equity DD %"]
+    names += ["Trades", "FastMA", "SlowMA"]
+
+    def cell(value: object) -> str:
+        kind = "Number" if isinstance(value, int | float) else "String"
+        return f'<Cell><Data ss:Type="{kind}">{value}</Data></Cell>'
+
+    rows = ["<Row>" + "".join(cell(name) for name in names) + "</Row>"]
+    number = 0
+    for fast in (4, 8, 12, 16, 20):
+        for slow in (24, 36, 48, 60, 72):
+            back = 1000.0 - 20 * abs(fast - 12) - 5 * abs(slow - 48)
+            profit = back / 4 - 150.0
+            values = [number, 10_000 + profit, 10_000 + back, profit, 1.0, 1.2, 0.5, 0.3]
+            values += [0, 5.0, 40, fast, slow]
+            rows.append("<Row>" + "".join(cell(v) for v in values) + "</Row>")
+            number += 1
+    return (
+        '<?xml version="1.0"?>\n<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" '
+        'xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">'
+        '<Worksheet ss:Name="Tester Optimizator Results"><Table>'
+        + "".join(rows)
+        + "</Table></Worksheet></Workbook>"
+    ).encode("utf-8")
+
+
+@lru_cache(maxsize=1)
+def _with_forward() -> AuditResult:
+    inputs = build_inputs(
+        None,
+        DeclaredMetadata(locale="es", trials=40, ownership="own"),
+        report_bytes=synthetic_mt5_report(260),
+        report_filename="tester.html",
+        optimization_bytes=_forward_export(),
+    )
+    return run_audit(
+        inputs,
+        bootstrap_samples=60,
+        risk_samples=50,
+        challenge_samples=50,
+        audit_id="ownership",
+        now=NOW,
+    )
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+def test_an_uploaded_forward_export_is_not_asked_for_again(locale: str) -> None:
+    result = _with_forward()
+    assert result.model_dump(mode="json")["forward"]["status"] == "MEASURED"
+    assert _status(result, "out_of_sample")["status"] == "NOT_MEASURED"
+    keys = _steps(result, locale)
+    assert "next_oos_forward" in keys and "next_oos" not in keys
+    own = _labels(locale, ownership.OWN)
+    assert "XML" not in own["next_oos_forward"]
+    shown = _text(render_html(result, watermark=False, locale=locale))
+    assert own["next_oos_forward"] in shown and own["next_oos"] not in shown
+    assert find_claims(shown) == []
+    # Without a forward export, the step says the XML is reviewed apart from this test.
+    assert "XML" in own["next_oos"] and "next_oos" in _steps(_backtest(ownership.OWN), locale)
+
+
+@pytest.mark.parametrize("status", ["WEAK", "FAIL"])
+def test_an_out_of_sample_stretch_already_seen_is_not_reoptimised_on(status: str) -> None:
+    data = _backtest(ownership.OWN).model_dump(mode="json")
+    verdict = {
+        **data["verdict"],
+        "dimensions": [
+            {**d, "status": status} if d["name"] == "out_of_sample" else d
+            for d in data["verdict"]["dimensions"]
+        ],
+    }
+    for locale in LOCALES:
+        for role, expected in ((ownership.OWN, "next_oos_seen"), (ownership.NEUTRAL, "next_oos")):
+            keys = [k for k, _ in report._next_steps(data, verdict, _labels(locale, role))]
+            assert expected in keys, (role, keys)
+        text = _labels(locale, ownership.OWN)["next_oos_seen"]
+        assert "reoptimi" in text.lower() or "reotimi" in text.lower()
+        assert "declara" not in text.lower() and find_claims(text) == []
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+def test_the_modelling_question_does_not_send_the_developer_back_to_the_same_file(
+    locale: str,
+) -> None:
+    buyer_answer = ownership.QUESTIONS["modelling"][locale][1]
+    unread = ownership.QUESTIONS["modelling_unread"][locale][1]
+    # The sample's MT5 report prints no mode we recognise: ask for one that does.
+    sample = _sample(locale).model_dump(mode="json")
+    assert sample["test_data"]["tick_model"]["evidence"] == "NOT_MEASURED"
+    shown = _text(_sample_page(locale, ownership.OWN))
+    assert unread in shown and buyer_answer not in shown
+    # The fixture's MT5 report states real ticks: the question is answered, so it goes.
+    fixture = _own("fixture")
+    data = fixture.model_dump(mode="json")
+    assert data["test_data"]["tick_model"]["value"] == "real ticks"
+    assert "modelling" in [q["code"] for q in data["vendor_questions"]]
+    for role in (ownership.OWN, ownership.PROVIDER, None):
+        codes = [q["code"] for q in ownership.open_questions(data, role or ownership.NEUTRAL)]
+        assert not [code for code in codes if code.startswith("modelling")], role
+        page = _text(render_html(_with_role(fixture, role), watermark=False, locale=locale))
+        assert buyer_answer not in page and unread not in page
+    # The buyer still asks the seller to confirm what the header says.
+    assert "modelling" in [q["code"] for q in ownership.open_questions(data, ownership.BUYER)]
+
+
+def test_a_flagged_or_unread_tester_mode_gets_its_own_wording() -> None:
+    question = {"code": "modelling", "es": "¿Con qué modo?", "en": "Which mode?"}
+
+    def codes(test_data: dict, flags: list[str], role: str = ownership.OWN) -> list[str]:
+        data = {
+            "vendor_questions": [question, {"code": "costs", "es": "¿Costos?", "en": "Costs?"}],
+            "test_data": test_data,
+            "red_flags": [{"code": code} for code in flags],
+        }
+        return [q["code"] for q in ownership.open_questions(data, role)]
+
+    def review(model: str | None) -> dict:
+        evidence = "DECLARED" if model else "NOT_MEASURED"
+        return {"status": "MEASURED", "tick_model": {"value": model, "evidence": evidence}}
+
+    stated, coarse, unread = review("every tick"), review("open prices only"), review(None)
+    other = {"status": "NOT_MEASURED", "reason": "the file is not a MetaTrader tester report"}
+    assert codes(stated, []) == ["costs"]
+    assert codes(coarse, ["COARSE_TICK_MODEL"]) == ["modelling_flagged", "costs"]
+    assert codes(stated, ["TEST_DATA_QUALITY_LOW"]) == ["modelling_flagged", "costs"]
+    assert codes(unread, []) == ["modelling_unread", "costs"]
+    assert codes(other, []) == ["modelling", "costs"]
+    assert codes(stated, [], ownership.BUYER) == ["modelling", "costs"]
+    for locale in LOCALES:
+        for code in ("modelling_flagged", "modelling_unread"):
+            for role in (ownership.OWN, ownership.PROVIDER, ownership.NEUTRAL):
+                text = ownership.question_item(code, "¿Con qué modo?", locale, role)
+                assert ownership.QUESTIONS[code][locale][1] in text
+                assert find_claims(text) == [] and _seller_words(text, locale) == []
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+def test_the_sample_does_not_ask_its_developer_for_their_own_optimisation_file(
+    locale: str,
+) -> None:
+    sample = _sample(locale)
+    multiplicity = _status(sample, "multiplicity")
+    assert multiplicity["status"] == "WEAK"
+    assert multiplicity["inputs"]["trials_used"]["evidence"] == "MEASURED"
+    asks = {
+        "es": ("Pregunta cuántas", "pide el archivo"),
+        "en": ("Ask how many", "request the optimisation file"),
+        "pt": ("Pergunte quantas", "peça o arquivo"),
+    }[locale]
+    for role in (ownership.OWN, ownership.PROVIDER, None):
+        shown = _text(_sample_page(locale, role))
+        assert not [ask for ask in asks if ask in shown], role
+        voiced = ownership.MEANING["multiplicity.WEAK"][role or ownership.NEUTRAL][locale]
+        assert voiced in shown, role
+    assert VERDICT_MEANING[locale]["multiplicity.WEAK"] in _text(
+        _sample_page(locale, ownership.BUYER)
+    )
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+def test_the_landing_promises_questions_every_voice_gets(locale: str) -> None:
+    """The sample and an unanswered report show the questions the report leaves
+    open, not questions for a seller: the landing says so for every reader."""
+    from quant_trade.audit.pages import _COPY, _full_items
+
+    texts = [
+        *_full_items(locale),
+        *(answer for _, answer in _COPY[locale]["faq"]),
+    ]
+    promise = {
+        "es": ("preguntas para el vendedor", "Preguntas concretas para el vendedor"),
+        "en": ("questions for the vendor", "Specific questions for the robot's vendor"),
+        "pt": ("perguntas para o vendedor", "Perguntas concretas para o vendedor"),
+    }[locale]
+    joined = " ".join(texts)
+    assert not [words for words in promise if words in joined]
+    leaves_open = {"es": "deja abiertas", "en": "leaves open", "pt": "deixa abertas"}[locale]
+    assert leaves_open in _full_items(locale)[3]
+    assert sum(leaves_open in text for text in texts) >= 2
+    assert find_claims(joined) == []
+
+
+def test_the_meaning_of_a_weak_search_speaks_to_each_reader() -> None:
+    asks = re.compile(r"\b(?:Pregunta|pregunta|Pide|pide|Ask|ask|Pergunte|Peça|peça)\b")
+    for locale in LOCALES:
+        assert ownership.meaning("multiplicity", "WEAK", locale, ownership.BUYER) is None
+        for role in (ownership.OWN, ownership.PROVIDER, ownership.NEUTRAL):
+            for flags, key in (
+                ({}, "multiplicity.WEAK"),
+                ({"fund": True}, "multiplicity.WEAK.fund"),
+                ({"undeclared": True}, "multiplicity.WEAK.undeclared"),
+                ({"undeclared": True, "fund": True}, "multiplicity.WEAK.undeclared.fund"),
+            ):
+                text = ownership.meaning("multiplicity", "WEAK", locale, role, **flags)
+                assert text == ownership.MEANING[key][role][locale], (role, key)
+                assert not asks.search(text) and find_claims(text) == [], (role, key)
+            # The verdict's wording names nobody there: it stays.
+            assert ownership.meaning("multiplicity", "FAIL", locale, role, undeclared=True) is None
+            assert ownership.meaning("multiplicity", "FAIL", locale, role) is None
 
 
 def _invariants(page: str) -> dict[str, object]:
@@ -411,25 +728,45 @@ def _fund(role: str | None) -> AuditResult:
     return run_audit(inputs, bootstrap_samples=100, audit_id="fundvoice", now=NOW)
 
 
+#: The buyer's fund wording: to the manager, or to whoever offers the fund.
+OFFERED: dict[str, tuple[str, ...]] = {
+    "es": ("quien te ofrece", "Lleva las preguntas"),
+    "en": ("offers you", "whoever offers", "Take this report's questions"),
+    "pt": ("quem oferece", "Leve as perguntas"),
+}
+
+
 @pytest.mark.parametrize("locale", LOCALES)
 def test_a_fund_speaks_to_its_manager_or_neutrally(locale: str) -> None:
     to_manager = {
         "es": ("Pregunta al gestor", "Pide al gestor", "Confirma con el gestor", "Si inviertes"),
         "en": ("Ask the manager", "Confirm with the manager", "If you invest"),
         "pt": ("Pergunte ao gestor", "Peça ao gestor", "Confirme com o gestor", "Se você investe"),
-    }[locale]
+    }[locale] + OFFERED[locale]
     assert _fund(None).model_dump(mode="json")["fund"]["track_record"] is True
     for role in (ownership.OWN, None):
-        page = _text(render_html(_with_role(_fund(None), role), watermark=False, locale=locale))
+        raw = render_html(_with_role(_fund(None), role), watermark=False, locale=locale)
+        page = _text(raw)
         labels = _labels(locale, role or ownership.NEUTRAL)
         assert labels["next_intro_fund"] in page and labels["next_keep_fund"] in page
+        # "What to do now" and the PDF cover send the reader to the questions in this voice.
+        assert page.count(labels["next_questions_fund"]) == 2, role
         assert not [ask for ask in to_manager if ask in page], role
         assert _seller_words(page, locale) == []
         assert find_claims(page) == []
     provider = _text(
         render_html(_with_role(_fund(None), ownership.PROVIDER), watermark=False, locale=locale)
     )
-    assert _labels(locale, ownership.PROVIDER)["next_intro_fund"] in provider
+    labels = _labels(locale, ownership.PROVIDER)
+    assert labels["next_intro_fund"] in provider
+    assert provider.count(labels["next_questions_fund"]) == 2
+    assert not [ask for ask in OFFERED[locale] if ask in provider]
+    assert find_claims(provider) == []
+    # Only the buyer is sent to whoever offers the fund.
+    buyer = _text(
+        render_html(_with_role(_fund(None), ownership.BUYER), watermark=False, locale=locale)
+    )
+    assert report.LABELS[locale]["next_questions_fund"] in buyer
 
 
 # The public page and the tables ---------------------------------------------------------
@@ -478,7 +815,15 @@ def test_every_new_text_exists_in_three_languages_and_passes_the_guard() -> None
         assert find_claims(text) == [], text
         assert not [word for word in BANNED if word in text.lower()], text
     # New keys aside, each voiced label replaces one the report already has.
-    new = {"next_demo", "questions_intro"}
+    new = {
+        "next_demo",
+        "next_demo_short",
+        "next_trials_undeclared",
+        "next_trials_one",
+        "next_oos_forward",
+        "next_oos_seen",
+        "questions_intro",
+    }
     assert set(ownership.LABELS) - new <= set(report.LABELS["es"])
     assert set(ownership.LOCKED_GAINS) <= set(report.LOCKED_GAINS["es"])
     for key in ownership.PLAN:

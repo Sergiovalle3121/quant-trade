@@ -256,8 +256,9 @@ COPY_PT: dict[str, Any] = {
             f"{len(FLAG_TITLES)} bandeiras vermelhas e o que cada dimensão significa. "
             "O relatório completo acrescenta cada número, testes de "
             "estresse, risco e capital, simulador de desafios, a conta real frente ao backtest "
-            "se você a enviar, perguntas para o vendedor e o PDF. Veja o exemplo completo antes "
-            "de pagar.",
+            "se você a enviar, as perguntas que o relatório deixa abertas (que arquivo responde "
+            "cada uma ou, se você a comprou, o que perguntar ao vendedor) e o PDF. Veja o "
+            "exemplo completo antes de pagar.",
         ),
         (
             "Em que idioma sai o relatório?",
@@ -536,7 +537,8 @@ UI_PT: dict[str, Any] = {
         "Simulação do desafio que você escolher da {firms}, com as regras publicadas",
         "Quanto custo aguenta antes de terminar no prejuízo",
         "Risco reamostrado em um ano e o capital que pede",
-        "Perguntas concretas para o vendedor do robô ou para o gestor",
+        "As perguntas que deixa abertas: que arquivo responde cada uma ou o que perguntar ao "
+        "vendedor ou ao gestor",
         "PDF e, se você quiser, página pública com selo",
     ],
     "full_more": "Ver um relatório completo de exemplo",

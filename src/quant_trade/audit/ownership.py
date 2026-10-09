@@ -9,9 +9,12 @@ buyer's by default.
 
 The voice changes only the sentences that speak to someone: "What to do
 now", the plan to reach a better class, the questions section and the few
-lines that send the reader to a seller. The order of the sections, every
-figure, the class and the evidence tags are the same whatever the answer,
-and the public verification page and cards never show it.
+lines that send the reader to a seller. Two things follow from it: the
+developer's "What to do now" adds a demo step (``demo_step``), and every
+voice but the buyer's leaves out a question the files already answer
+(``open_questions``). The order of the sections, every figure, the class
+and the evidence tags are the same whatever the answer, and the public
+verification page and cards never show it.
 
 Each table below holds, per text, the wording for each voice that differs
 from the buyer's, in Spanish, English and Portuguese side by side; a voice a
@@ -24,7 +27,8 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
-from quant_trade.audit.live import MIN_LIVE_TRADES
+from quant_trade.audit.live import MIN_BACKTEST_TRADES, MIN_LIVE_TRADES
+from quant_trade.audit.verdict import MEANING as VERDICT_MEANING
 
 OWN = "own"
 BUYER = "buyer"
@@ -42,9 +46,9 @@ FORM: dict[str, dict[str, Any]] = {
         "label": "¿De quién es esta estrategia? (opcional)",
         "field": "De quién es la estrategia",
         "help": (
-            "Cambia solo a quién se dirigen «Qué hacer ahora», el plan y las preguntas del "
-            "informe: las cifras, la clase y las etiquetas son las mismas. Queda en el informe "
-            "como declaración tuya y no aparece en la página pública."
+            "Cambia a quién se dirigen las frases del informe y, si es tuya, añade un paso para "
+            "probarla en demo: las cifras, la clase y las etiquetas son las mismas. Queda en el "
+            "informe como declaración tuya y no aparece en la página pública."
         ),
         "choices": {
             OWN: "Es mía (la desarrollé o la opero yo)",
@@ -57,9 +61,9 @@ FORM: dict[str, dict[str, Any]] = {
         "label": "Whose strategy is this? (optional)",
         "field": "Whose strategy it is",
         "help": (
-            "It only changes whom “What to do now”, the plan and the report's questions speak "
-            "to: the figures, the class and the tags stay the same. It stays in the report as "
-            "your declaration and is not shown on the public page."
+            "It changes whom the report's sentences speak to and, if the strategy is yours, adds "
+            "a step to try it on demo: the figures, the class and the tags stay the same. It "
+            "stays in the report as your declaration and is not shown on the public page."
         ),
         "choices": {
             OWN: "It's mine (I built it or I run it)",
@@ -72,9 +76,9 @@ FORM: dict[str, dict[str, Any]] = {
         "label": "De quem é esta estratégia? (opcional)",
         "field": "De quem é a estratégia",
         "help": (
-            "Muda só a quem se dirigem «O que fazer agora», o plano e as perguntas do "
-            "relatório: os números, a classe e as etiquetas são os mesmos. Fica no relatório "
-            "como declaração sua e não aparece na página pública."
+            "Muda a quem se dirigem as frases do relatório e, se a estratégia for sua, "
+            "acrescenta uma etapa para testá-la em demo: os números, a classe e as etiquetas são "
+            "os mesmos. Fica no relatório como declaração sua e não aparece na página pública."
         ),
         "choices": {
             OWN: "É minha (eu a desenvolvi ou a opero)",
@@ -204,19 +208,64 @@ LABELS: dict[str, dict[str, dict[str, str]]] = {
             "qual período ela foi escolhida.",
         ),
     },
+    # The trial count was never declared nor counted: the deflated Sharpe was
+    # taken at 1, the most favourable case, so fewer trials would change nothing.
+    "next_trials_undeclared": {
+        OWN: _say(
+            "Declara cuántas configuraciones probaste o sube el XML de la optimización de MT5: "
+            "el informe supuso 1, el caso más favorable, y aun así el Sharpe deflactado no llega "
+            "a 0.95, así que reducir los intentos no lo cambia; lo que puede cambiarlo es un "
+            "historial más largo del mismo sistema.",
+            "Declare how many configurations you tried or upload the MT5 optimisation XML: the "
+            "report assumed 1, the most favourable case, and even so the deflated Sharpe does "
+            "not reach 0.95, so cutting trials does not change it; what can change it is a "
+            "longer history of the same system.",
+            "Declare quantas configurações você testou ou envie o XML da otimização do MT5: o "
+            "relatório supôs 1, o caso mais favorável, e mesmo assim o Sharpe deflacionado não "
+            "chega a 0.95, então reduzir as tentativas não o muda; o que pode mudá-lo é um "
+            "histórico mais longo do mesmo sistema.",
+        ),
+        NEUTRAL: _say(
+            "Conviene declarar cuántas configuraciones se probaron o subir el XML de la "
+            "optimización de MT5: el informe supuso 1, el caso más favorable, y aun así el "
+            "Sharpe deflactado no llega a 0.95.",
+            "It is worth declaring how many configurations were tried or uploading the MT5 "
+            "optimisation XML: the report assumed 1, the most favourable case, and even so the "
+            "deflated Sharpe does not reach 0.95.",
+            "Convém declarar quantas configurações foram testadas ou enviar o XML da otimização "
+            "do MT5: o relatório supôs 1, o caso mais favorável, e mesmo assim o Sharpe "
+            "deflacionado não chega a 0.95.",
+        ),
+    },
+    # One configuration declared or counted: there is no search left to cut.
+    "next_trials_one": {
+        OWN: _say(
+            "Con 1 configuración, el caso más favorable, el Sharpe deflactado no llega a 0.95: "
+            "reducir los intentos no lo cambia; lo que puede cambiarlo es un historial más "
+            "largo del mismo sistema.",
+            "With 1 configuration, the most favourable case, the deflated Sharpe does not reach "
+            "0.95: cutting trials does not change it; what can change it is a longer history of "
+            "the same system.",
+            "Com 1 configuração, o caso mais favorável, o Sharpe deflacionado não chega a 0.95: "
+            "reduzir as tentativas não o muda; o que pode mudá-lo é um histórico mais longo do "
+            "mesmo sistema.",
+        ),
+    },
     "next_oos": {
         OWN: _say(
             "Prueba la configuración en datos que el optimizador no vio: reoptimiza sin los "
             "últimos meses, corre el resultado sobre el periodo completo y declara la fecha de "
-            "corte como inicio fuera de muestra; o activa el periodo forward en la optimización "
-            "de MT5 y sube ese XML.",
+            "corte como inicio fuera de muestra. Esta prueba solo mide desde un inicio "
+            "declarado; el periodo forward de la optimización de MT5 (su XML) se revisa aparte, "
+            "en su propia sección.",
             "Test the settings on data the optimiser never saw: reoptimise without the last "
             "months, run the result over the whole period and declare the cut-off date as the "
-            "out-of-sample start; or turn on the forward period in the MT5 optimisation and "
-            "upload that XML.",
+            "out-of-sample start. This test only measures from a declared start; the forward "
+            "period of the MT5 optimisation (its XML) is reviewed separately, in its own section.",
             "Teste a configuração em dados que o otimizador não viu: reotimize sem os últimos "
             "meses, rode o resultado no período completo e declare a data de corte como início "
-            "fora da amostra; ou ative o período forward na otimização do MT5 e envie esse XML.",
+            "fora da amostra. Este teste só mede a partir de um início declarado; o período "
+            "forward da otimização do MT5 (seu XML) é revisado à parte, na sua própria seção.",
         ),
         PROVIDER: _say(
             "Te van a preguntar cómo se comportó después de su optimización: aporta un informe "
@@ -236,6 +285,36 @@ LABELS: dict[str, dict[str, dict[str, str]]] = {
             "otimização.",
         ),
     },
+    # The developer already uploaded a forward export (``forward.py`` measured it):
+    # it has its own section, and the out-of-sample test still needs a declared start.
+    "next_oos_forward": {
+        OWN: _say(
+            "Prueba la configuración en datos que el optimizador no vio: reoptimiza sin los "
+            "últimos meses, corre el resultado sobre el periodo completo y declara la fecha de "
+            "corte como inicio fuera de muestra. El periodo forward que subiste se revisa en su "
+            "propia sección; esta prueba solo mide desde un inicio declarado.",
+            "Test the settings on data the optimiser never saw: reoptimise without the last "
+            "months, run the result over the whole period and declare the cut-off date as the "
+            "out-of-sample start. The forward period you uploaded is reviewed in its own "
+            "section; this test only measures from a declared start.",
+            "Teste a configuração em dados que o otimizador não viu: reotimize sem os últimos "
+            "meses, rode o resultado no período completo e declare a data de corte como início "
+            "fora da amostra. O período forward que você enviou é revisado na sua própria "
+            "seção; este teste só mede a partir de um início declarado.",
+        ),
+    },
+    # The declared out-of-sample stretch was measured and fell short: it has been
+    # seen, so reoptimising on it would not make it unseen data again.
+    "next_oos_seen": {
+        OWN: _say(
+            "Valida la configuración en fechas posteriores a las que ya usaste: reoptimizar "
+            "sobre el tramo fuera de muestra que ya viste no cuenta como datos nuevos.",
+            "Validate the settings on dates after the ones you have already used: reoptimising "
+            "on the out-of-sample stretch you have already seen does not count as unseen data.",
+            "Valide a configuração em datas posteriores às que você já usou: reotimizar sobre o "
+            "trecho fora da amostra que você já viu não conta como dados novos.",
+        ),
+    },
     # Only the developer gets this step: before real money, enough demo trades
     # for the live comparison (``live.compare_live``) to be measured at all.
     "next_demo": {
@@ -249,6 +328,26 @@ LABELS: dict[str, dict[str, dict[str, str]]] = {
             "Antes de operá-la com dinheiro real, rode-a em uma conta demo até ter pelo menos "
             f"{MIN_LIVE_TRADES} operações fechadas e envie esse histórico junto com o backtest: "
             "com menos, a comparação com o backtest não pode ser medida.",
+        ),
+    },
+    # The same step when the backtest itself is too short for the comparison.
+    "next_demo_short": {
+        OWN: _say(
+            f"La comparación con una cuenta necesita al menos {MIN_BACKTEST_TRADES} operaciones "
+            f"cerradas en el backtest y {MIN_LIVE_TRADES} en la cuenta, y este backtest tiene "
+            f"menos de {MIN_BACKTEST_TRADES}: alarga su periodo y, antes de operarla con dinero "
+            f"real, córrela en una cuenta demo hasta tener {MIN_LIVE_TRADES} operaciones "
+            "cerradas; luego sube los dos archivos juntos.",
+            f"The comparison with an account needs at least {MIN_BACKTEST_TRADES} closed trades "
+            f"in the backtest and {MIN_LIVE_TRADES} in the account, and this backtest has fewer "
+            f"than {MIN_BACKTEST_TRADES}: lengthen its period and, before trading it with real "
+            f"money, run it on a demo account until it has {MIN_LIVE_TRADES} closed trades; "
+            "then upload both files together.",
+            f"A comparação com uma conta precisa de pelo menos {MIN_BACKTEST_TRADES} operações "
+            f"fechadas no backtest e {MIN_LIVE_TRADES} na conta, e este backtest tem menos de "
+            f"{MIN_BACKTEST_TRADES}: alongue o seu período e, antes de operá-la com dinheiro "
+            f"real, rode-a em uma conta demo até ter {MIN_LIVE_TRADES} operações fechadas; "
+            "depois envie os dois arquivos juntos.",
         ),
     },
     "next_questions": {
@@ -323,6 +422,29 @@ LABELS: dict[str, dict[str, dict[str, str]]] = {
             "found.",
             "Isto é o que convém esclarecer primeiro sobre este fundo, segundo o que a "
             "auditoria encontrou.",
+        ),
+    },
+    "next_questions_fund": {
+        OWN: _say(
+            "Responde con tus documentos las preguntas que deja abiertas este informe: cada una "
+            "dice qué la responde.",
+            "Answer with your own documents the questions this report leaves open: each one "
+            "says what answers it.",
+            "Responda com os seus documentos às perguntas que este relatório deixa abertas: "
+            "cada uma diz o que a responde.",
+        ),
+        PROVIDER: _say(
+            "Prepara las respuestas a lo que te van a preguntar quienes vean este fondo: cada "
+            "pregunta dice qué aportar.",
+            "Prepare answers to what whoever sees this fund will ask you: each question says "
+            "what to provide.",
+            "Prepare as respostas ao que vão perguntar a você os que virem este fundo: cada "
+            "pergunta diz o que fornecer.",
+        ),
+        NEUTRAL: _say(
+            "Revisa las preguntas que deja abiertas este informe y lo que responde cada una.",
+            "Go through the questions this report leaves open and what answers each one.",
+            "Revise as perguntas que este relatório deixa abertas e o que responde cada uma.",
         ),
     },
     "next_fund_fees": {
@@ -746,18 +868,184 @@ MEANING: dict[str, dict[str, dict[str, str]]] = {
             "permite medi-lo.",
         ),
     },
+    # The buyer's wording asks how many were tried and for the optimisation file.
+    "multiplicity.WEAK": {
+        OWN: _say(
+            "Parte del resultado puede venir de elegir la mejor de muchas configuraciones. "
+            "Valida la elegida en datos que no usaste al optimizar y, en la próxima versión, "
+            "optimiza menos parámetros.",
+            "Part of the result may come from picking the best of many configurations. "
+            "Validate the chosen one on data you did not use while optimising and, in the next "
+            "version, optimise fewer parameters.",
+            "Parte do resultado pode vir de escolher a melhor entre muitas configurações. "
+            "Valide a escolhida em dados que você não usou na otimização e, na próxima versão, "
+            "otimize menos parâmetros.",
+        ),
+        PROVIDER: _say(
+            "Parte del resultado puede venir de elegir la mejor de muchas configuraciones. Te "
+            "van a preguntar si la elegida se validó en datos que no se usaron al optimizar.",
+            "Part of the result may come from picking the best of many configurations. You "
+            "will be asked whether the chosen one was validated on data not used while "
+            "optimising.",
+            "Parte do resultado pode vir de escolher a melhor entre muitas configurações. Vão "
+            "perguntar a você se a escolhida foi validada em dados que não foram usados na "
+            "otimização.",
+        ),
+        NEUTRAL: _say(
+            "Parte del resultado puede venir de elegir la mejor de muchas configuraciones. "
+            "Conviene validar la elegida en datos que no se usaron al optimizar.",
+            "Part of the result may come from picking the best of many configurations. It is "
+            "worth validating the chosen one on data not used while optimising.",
+            "Parte do resultado pode vir de escolher a melhor entre muitas configurações. "
+            "Convém validar a escolhida em dados que não foram usados na otimização.",
+        ),
+    },
+    "multiplicity.WEAK.fund": {
+        OWN: _say(
+            "Parte del resultado puede venir de que este sea el mejor de varios fondos o "
+            "estrategias. Declara como intentos todos los que llevas o has cerrado: un buen "
+            "historial entre muchos pesa menos.",
+            "Part of the result may come from this being the best of several funds or "
+            "strategies. Declare as trials all the ones you run or have closed: one good record "
+            "among many weighs less.",
+            "Parte do resultado pode vir de este ser o melhor entre vários fundos ou "
+            "estratégias. Declare como tentativas todos os que você administra ou já encerrou: "
+            "um bom histórico entre muitos pesa menos.",
+        ),
+        PROVIDER: _say(
+            "Parte del resultado puede venir de que este sea el mejor de varios fondos o "
+            "estrategias. Te van a preguntar cuántos llevas o has cerrado: decláralo como "
+            "número de intentos.",
+            "Part of the result may come from this being the best of several funds or "
+            "strategies. You will be asked how many you run or have closed: declare it as the "
+            "number of trials.",
+            "Parte do resultado pode vir de este ser o melhor entre vários fundos ou "
+            "estratégias. Vão perguntar a você quantos administra ou já encerrou: declare isso "
+            "como número de tentativas.",
+        ),
+        NEUTRAL: _say(
+            "Parte del resultado puede venir de que este sea el mejor de varios fondos o "
+            "estrategias del mismo gestor. Un buen historial entre muchos pesa menos.",
+            "Part of the result may come from this being the best of several funds or "
+            "strategies from the same manager. One good record among many weighs less.",
+            "Parte do resultado pode vir de este ser o melhor entre vários fundos ou "
+            "estratégias do mesmo gestor. Um bom histórico entre muitos pesa menos.",
+        ),
+    },
+    # No trial count declared nor counted: the figure was taken at 1, the most
+    # favourable case, so "many configurations" is not what this measured.
+    "multiplicity.WEAK.undeclared": {
+        OWN: _say(
+            "Aun contando una sola configuración, el caso más favorable, el resultado no basta "
+            "para descartar la suerte. No declaraste cuántas probaste: declara el número o sube "
+            "el XML de la optimización, porque con más de una la conclusión sería más débil.",
+            "Even counting a single configuration, the most favourable case, the result is not "
+            "enough to rule out luck. You did not declare how many you tried: declare the "
+            "number or upload the optimisation XML, since with more than one the conclusion "
+            "would be weaker.",
+            "Mesmo contando uma única configuração, o caso mais favorável, o resultado não "
+            "basta para descartar a sorte. Você não declarou quantas testou: declare o número "
+            "ou envie o XML da otimização, porque com mais de uma a conclusão seria mais fraca.",
+        ),
+        PROVIDER: _say(
+            "Aun contando una sola configuración, el caso más favorable, el resultado no basta "
+            "para descartar la suerte. Te van a preguntar cuántas se probaron: declara el "
+            "número o aporta el XML de la optimización.",
+            "Even counting a single configuration, the most favourable case, the result is not "
+            "enough to rule out luck. You will be asked how many were tried: declare the "
+            "number or provide the optimisation XML.",
+            "Mesmo contando uma única configuração, o caso mais favorável, o resultado não "
+            "basta para descartar a sorte. Vão perguntar a você quantas foram testadas: declare "
+            "o número ou forneça o XML da otimização.",
+        ),
+        NEUTRAL: _say(
+            "Aun contando una sola configuración, el caso más favorable, el resultado no basta "
+            "para descartar la suerte. No se declaró cuántas se probaron: con más de una, la "
+            "conclusión sería más débil.",
+            "Even counting a single configuration, the most favourable case, the result is not "
+            "enough to rule out luck. How many were tried was not declared: with more than "
+            "one, the conclusion would be weaker.",
+            "Mesmo contando uma única configuração, o caso mais favorável, o resultado não "
+            "basta para descartar a sorte. Não foi declarado quantas foram testadas: com mais "
+            "de uma, a conclusão seria mais fraca.",
+        ),
+    },
+    "multiplicity.WEAK.undeclared.fund": {
+        OWN: _say(
+            "Aun contando un solo fondo, el caso más favorable, el resultado no basta para "
+            "descartar la suerte. No declaraste cuántos fondos o estrategias llevas: declara el "
+            "número, porque con más de uno la conclusión sería más débil.",
+            "Even counting a single fund, the most favourable case, the result is not enough to "
+            "rule out luck. You did not declare how many funds or strategies you run: declare "
+            "the number, since with more than one the conclusion would be weaker.",
+            "Mesmo contando um único fundo, o caso mais favorável, o resultado não basta para "
+            "descartar a sorte. Você não declarou quantos fundos ou estratégias administra: "
+            "declare o número, porque com mais de um a conclusão seria mais fraca.",
+        ),
+        PROVIDER: _say(
+            "Aun contando un solo fondo, el caso más favorable, el resultado no basta para "
+            "descartar la suerte. Te van a preguntar cuántos fondos o estrategias llevas o has "
+            "cerrado: decláralo.",
+            "Even counting a single fund, the most favourable case, the result is not enough to "
+            "rule out luck. You will be asked how many funds or strategies you run or have "
+            "closed: declare it.",
+            "Mesmo contando um único fundo, o caso mais favorável, o resultado não basta para "
+            "descartar a sorte. Vão perguntar a você quantos fundos ou estratégias administra "
+            "ou já encerrou: declare isso.",
+        ),
+        NEUTRAL: _say(
+            "Aun contando un solo fondo, el caso más favorable, el resultado no basta para "
+            "descartar la suerte. No se declaró cuántos fondos o estrategias lleva el gestor: "
+            "con más de uno, la conclusión sería más débil.",
+            "Even counting a single fund, the most favourable case, the result is not enough to "
+            "rule out luck. How many funds or strategies the manager runs was not declared: "
+            "with more than one, the conclusion would be weaker.",
+            "Mesmo contando um único fundo, o caso mais favorável, o resultado não basta para "
+            "descartar a sorte. Não foi declarado quantos fundos ou estratégias o gestor "
+            "administra: com mais de um, a conclusão seria mais fraca.",
+        ),
+    },
 }
 
 
+def _meaning_key(
+    name: str, status: str, *, account: bool, fund: bool, undeclared: bool
+) -> str | None:
+    """The text ``verdict.meaning`` would pick, in its order, among its own
+    keys and the ones only this module words (``.undeclared`` of a weak result)."""
+    candidates = []
+    if undeclared and fund:
+        candidates.append(f"{name}.{status}.undeclared.fund")
+    if undeclared:
+        candidates.append(f"{name}.{status}.undeclared")
+    if fund:
+        candidates.append(f"{name}.{status}.fund")
+    if account:
+        candidates.append(f"{name}.{status}.account")
+    candidates.append(f"{name}.{status}")
+    known = VERDICT_MEANING["es"]
+    return next((key for key in candidates if key in known or key in MEANING), None)
+
+
 def meaning(
-    name: str, status: str, locale: str, role: str, *, account: bool = False, fund: bool = False
+    name: str,
+    status: str,
+    locale: str,
+    role: str,
+    *,
+    account: bool = False,
+    fund: bool = False,
+    undeclared: bool = False,
 ) -> str | None:
     """A dimension's plain-language meaning in ``role``'s voice, or None to keep
-    ``verdict.meaning`` (the buyer's, and every text that names nobody)."""
+    ``verdict.meaning`` (the buyer's, and every text that names nobody).
+
+    The same flags as ``verdict.meaning`` pick the text, so a voiced wording
+    never stands in for a more specific one that already names nobody."""
     if role == BUYER:
         return None
-    suffix = ".fund" if fund else ".account" if account else ""
-    return MEANING.get(f"{name}.{status}{suffix}", {}).get(role, {}).get(locale)
+    key = _meaning_key(name, status, account=account, fund=fund, undeclared=undeclared)
+    return MEANING.get(key or "", {}).get(role, {}).get(locale)
 
 
 #: Plan texts (``plan.py``) in the voices that differ from the buyer's: the
@@ -1350,6 +1638,50 @@ QUESTIONS: dict[str, dict[str, tuple[str | None, str]]] = {
             "o relatório HTML do testador, que traz o modo de modelagem e a qualidade do histórico",
         ),
     },
+    # The modelling question when the uploaded file is a tester report that prints
+    # no mode we recognise (``testdata.review_test_data``): sending the reader
+    # back to that same report would answer nothing.
+    "modelling_unread": {
+        "es": (
+            None,
+            "un informe del probador que imprima el modo de modelado, porque el subido no "
+            "indica uno que reconozcamos (en MT5, la prueba con «Cada tick basado en ticks "
+            "reales» lo deja escrito en la calidad de históricos)",
+        ),
+        "en": (
+            None,
+            "a tester report that prints the modelling mode, since the uploaded one states none "
+            "we recognise (in MT5, a test on “Every tick based on real ticks” writes it in the "
+            "history quality)",
+        ),
+        "pt": (
+            None,
+            "um relatório do testador que imprima o modo de modelagem, porque o enviado não "
+            "indica um que reconheçamos (no MT5, o teste com «Cada tick baseado em ticks reais» "
+            "o deixa escrito na qualidade do histórico)",
+        ),
+    },
+    # The tester report states its mode, and a red flag says the mode or the
+    # history's quality falls short: what is open is the rerun.
+    "modelling_flagged": {
+        "es": (
+            "¿Qué da el mismo backtest con cada tick (ticks reales en MT5) y un historial "
+            "completo?",
+            "el mismo backtest repetido así: el modo o la calidad del informe subido tienen una "
+            "bandera roja",
+        ),
+        "en": (
+            "What does the same backtest give on every tick (real ticks in MT5) with a complete "
+            "history?",
+            "the same backtest rerun that way: the uploaded report's mode or quality carries a "
+            "red flag",
+        ),
+        "pt": (
+            "O que dá o mesmo backtest com cada tick (ticks reais no MT5) e um histórico completo?",
+            "o mesmo backtest repetido assim: o modo ou a qualidade do relatório enviado tem uma "
+            "bandeira vermelha",
+        ),
+    },
     "best_trade": {
         "es": (None, "la lista completa de operaciones cerradas, con fecha, tamaño y precio"),
         "en": (None, "the full list of closed trades, with date, size and price"),
@@ -1605,12 +1937,104 @@ def question_item(code: str, stored: str, locale: str, role: str) -> str:
     return template.format(ask=ask or stored, answer=answer)
 
 
+#: Red flags that leave the modelling question open although the tester report
+#: states its mode: the mode is coarse, or the history's quality is low.
+MODELLING_FLAGS: frozenset[str] = frozenset({"COARSE_TICK_MODEL", "TEST_DATA_QUALITY_LOW"})
+
+
+def _modelling_code(data: Mapping[str, Any]) -> str | None:
+    """Which wording the modelling question takes, or None when the files answer it."""
+    review = data.get("test_data") or {}
+    if review.get("status") != "MEASURED":
+        return "modelling"  # not a tester report: the tester's HTML would answer it
+    flags = {
+        str(flag.get("code")) for flag in data.get("red_flags") or [] if isinstance(flag, Mapping)
+    }
+    if flags & MODELLING_FLAGS:
+        return "modelling_flagged"
+    if (review.get("tick_model") or {}).get("evidence") == "NOT_MEASURED":
+        return "modelling_unread"
+    return None  # the report states its mode; its test-data section shows it
+
+
+def open_questions(data: Mapping[str, Any] | None, role: str) -> list[dict[str, str]]:
+    """The stored questions (``vendor_questions``) as ``role`` reads them.
+
+    The buyer's list stays as stored: the questions are for the seller, who
+    can confirm what the header says. Every other voice lists what the files
+    do not answer yet, so the modelling question, asked of every backtest,
+    goes when the uploaded tester report already states a mode we recognise,
+    asks about a rerun when a red flag says the mode or the quality falls
+    short, and asks for a report that prints the mode when the uploaded one
+    prints none we recognise. Copies; the stored result is unchanged."""
+    questions = [dict(q) for q in (data or {}).get("vendor_questions") or []]
+    if role == BUYER or data is None:
+        return questions
+    out: list[dict[str, str]] = []
+    for question in questions:
+        if question.get("code") == "modelling":
+            code = _modelling_code(data)
+            if code is None:
+                continue
+            question["code"] = code
+        out.append(question)
+    return out
+
+
+def trials_step(dimension: Mapping[str, Any] | None, role: str) -> str:
+    """The "What to do now" key for a weak or failed multiplicity in ``role``'s voice.
+
+    Cutting trials only helps when more than one was counted or declared: an
+    undeclared count was taken at 1, the most favourable case."""
+    trials = ((dimension or {}).get("inputs") or {}).get("trials_used") or {}
+    if trials.get("evidence") == "NOT_MEASURED":
+        return "next_trials_undeclared" if role in (OWN, NEUTRAL) else "next_trials"
+    value = trials.get("value")
+    if role == OWN and isinstance(value, (int, float)) and value <= 1:
+        return "next_trials_one"
+    return "next_trials"
+
+
+def oos_step(status: str, data: Mapping[str, Any], role: str) -> str:
+    """The "What to do now" key for the out-of-sample test in ``role``'s voice.
+
+    Only a declared start measures it (``engine._holdout``); a forward export
+    has its own section (``forward.py``). Once the declared stretch has been
+    measured and fell short, it has been seen."""
+    if role != OWN:
+        return "next_oos"
+    if status in ("WEAK", "FAIL"):
+        return "next_oos_seen"
+    if (data.get("forward") or {}).get("status") == "MEASURED":
+        return "next_oos_forward"
+    return "next_oos"
+
+
+def demo_step(data: Mapping[str, Any], role: str) -> str | None:
+    """The developer's demo step of "What to do now", or None.
+
+    Only the client's own robot with a trade list and no measured live
+    comparison. ``live.compare_live`` needs ``MIN_BACKTEST_TRADES`` closed
+    trades in the backtest and ``MIN_LIVE_TRADES`` in the account, so a
+    shorter backtest gets the wording that names both."""
+    if role != OWN:
+        return None
+    stats = data.get("trade_stats") or {}
+    if stats.get("status") != "MEASURED" or (data.get("live") or {}).get("status") == "MEASURED":
+        return None
+    count = (stats.get("trade_count") or {}).get("value")
+    if not isinstance(count, (int, float)) or count < MIN_BACKTEST_TRADES:
+        return "next_demo_short"
+    return "next_demo"
+
+
 __all__ = [
     "BUYER",
     "FORM",
     "LABELS",
     "LOCKED_GAINS",
     "MEANING",
+    "MODELLING_FLAGS",
     "NEUTRAL",
     "OWN",
     "PLAN",
@@ -1620,10 +2044,14 @@ __all__ = [
     "VOICES",
     "Voiced",
     "choice_label",
+    "demo_step",
     "gains_for",
     "labels_for",
     "meaning",
+    "oos_step",
+    "open_questions",
     "plan_text",
     "question_item",
     "role_of",
+    "trials_step",
 ]

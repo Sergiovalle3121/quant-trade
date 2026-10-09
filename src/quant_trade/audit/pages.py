@@ -449,8 +449,9 @@ _COPY: dict[str, dict[str, Any]] = {
                 f"{len(FLAG_TITLES)} banderas rojas y qué significa cada dimensión. "
                 "El informe completo añade cada cifra, pruebas "
                 "de estrés, riesgo y capital, simulador de retos, la cuenta real frente al "
-                "backtest si la subes, preguntas para el vendedor y el PDF. Mira el ejemplo "
-                "completo antes de pagar.",
+                "backtest si la subes, las preguntas que el informe deja abiertas (qué archivo "
+                "responde cada una o, si la compraste, qué preguntarle al vendedor) y el PDF. "
+                "Mira el ejemplo completo antes de pagar.",
             ),
             (
                 "¿Por qué subir el XML de optimización de MT5?",
@@ -766,8 +767,9 @@ _COPY: dict[str, dict[str, Any]] = {
                 f"{len(FLAG_TITLES)} red flags and what each dimension means. "
                 "The full report adds every figure, stress tests, risk and "
                 "capital, the challenge simulator, the live account against the backtest if you "
-                "upload it, questions for the vendor and the PDF. See the full sample before you "
-                "pay.",
+                "upload it, the questions the report leaves open (which file answers each one "
+                "or, if you bought it, what to ask the vendor) and the PDF. See the full sample "
+                "before you pay.",
             ),
             (
                 "Why upload the MT5 optimisation XML?",
@@ -1044,7 +1046,8 @@ _UI: dict[str, dict[str, Any]] = {
             "Simulación del reto que elijas de {firms}, con sus reglas publicadas",
             "Cuánto costo aguanta antes de quedar en pérdida",
             "Riesgo remuestreado a un año y el capital que pide",
-            "Preguntas concretas para el vendedor del robot o el gestor",
+            "Las preguntas que deja abiertas: qué archivo responde cada una o qué preguntar al "
+            "vendedor o al gestor",
             "PDF y, si tú quieres, página pública con sello",
         ],
         "full_more": "Ver un informe completo de ejemplo",
@@ -1284,7 +1287,8 @@ _UI: dict[str, dict[str, Any]] = {
             "Simulation of the {firms} challenge you choose, with its published rules",
             "How much cost it can bear before it ends in a loss",
             "Resampled one-year risk and the capital it needs",
-            "Specific questions for the robot's vendor or the manager",
+            "The questions it leaves open: which file answers each one, or what to ask the "
+            "vendor or the manager",
             "PDF and, if you want, a public page with a badge",
         ],
         "full_more": "See a full sample report",
