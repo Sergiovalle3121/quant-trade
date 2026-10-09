@@ -736,6 +736,15 @@ REPORT: dict[str, Any] = {
         "hero_live": "Conta real: {badge}.",
         "hero_live_money": "Resultado das operações: {result} sobre {deposits} depositados.",
         "hero_live_link": "Ver a comparação com o backtest",
+        "hero_challenge": (
+            "Desafio escolhido, {program}: atinge a meta em {full} das simulações com o "
+            "histórico completo e em {low} {low_label}."
+        ),
+        "hero_challenge_full": (
+            "Desafio escolhido, {program}: atinge a meta em {full} das simulações com o "
+            "histórico completo."
+        ),
+        "hero_challenge_link": "Ver a escada",
         "live_badge_CONSISTENT": "Coerente",
         "live_badge_EDGE": "No limite",
         "live_badge_INCONSISTENT": "Não coerente",
@@ -946,6 +955,9 @@ REPORT: dict[str, Any] = {
         "fail_daily_loss": "Rompe a perda diária",
         "fail_total_loss": "Rompe a perda total",
         "unfinished": "Não termina a tempo",
+        "unfinished_cap": (
+            "Não atinge a meta em {days} dias úteis (limite da simulação; as regras não têm prazo)"
+        ),
         "ci95": "Intervalo de 95 % de atingir a meta",
         "days_to_target": "Dias úteis até a meta (p25 / p50 / p75)",
         "best_day_line": (
@@ -959,6 +971,10 @@ REPORT: dict[str, Any] = {
             "dentro da regra do melhor dia, se a firma a tiver; em caso de empate, por nome. "
             "Compara regras; não recomenda comprar nenhum desafio."
         ),
+        "ff_basis": (
+            "Números com o histórico completo e sem o custo de referência; a escada acima "
+            "mostra quanto mudam."
+        ),
         "ff_program": "Desafio",
         "ff_pass": "Passa",
         "ff_clean": "Passa dentro da regra do melhor dia",
@@ -967,7 +983,7 @@ REPORT: dict[str, Any] = {
         "ff_risk_none": "Nada nas simulações",
         "ff_risk_fail_daily_loss": "romper a perda diária",
         "ff_risk_fail_total_loss": "romper a perda total",
-        "ff_risk_unfinished": "não atingir a meta a tempo",
+        "ff_risk_unfinished": "não atingir a meta dentro do limite da simulação",
         "ff_optimistic": (
             "Os mesmos números otimistas de cima se aplicam a esta tabela: o saldo esconde "
             "perdas abertas."
@@ -981,6 +997,29 @@ REPORT: dict[str, Any] = {
         ),
         "ff_phases": "{n} fases",
         "ff_phase": "1 fase",
+        "ch_ladder_title": "Quanto muda com o que este relatório encontrou?",
+        "ch_ladder_intro": (
+            "O mesmo programa ({program}, {phases}), reamostrado da mesma forma, com trechos "
+            "diferentes do histórico ou com o que o relatório desconta. São cenários do mesmo "
+            "histórico, não previsões: se o número cai muito fora da amostra ou com custos, o "
+            "do histórico completo é otimista."
+        ),
+        "ch_ladder_scenario": "Cenário",
+        "ch_ladder_days": "Dias de dados",
+        "ch_ladder_pass": "Atinge a meta em todas as fases",
+        "ch_ladder_full": "Histórico completo (o número acima)",
+        "ch_ladder_full_program": "Histórico completo (o número da tabela de firmas)",
+        "ch_ladder_in_sample": "Só dentro da amostra (até {date})",
+        "ch_ladder_out_of_sample": "Só fora da amostra (a partir de {date})",
+        "ch_ladder_cost": "Com o custo de referência ({bps} pb por lado)",
+        "ch_ladder_haircut": (
+            "Com a sorte de {trials} tentativas descontada (Sharpe {before} → {after}, Harvey "
+            "e Liu)"
+        ),
+        "ch_ladder_low_in_sample": "só dentro da amostra",
+        "ch_ladder_low_out_of_sample": "só fora da amostra",
+        "ch_ladder_low_reference_cost": "com o custo de referência",
+        "ch_ladder_low_luck_haircut": "com a sorte descontada",
         "assumptions": "Premissas",
         "source": "Fonte",
         "as_of": "lida em",
@@ -3812,6 +3851,27 @@ RULES: tuple[tuple[str, str], ...] = (
             "são tomadas como recomeços, então a probabilidade de passar por todas é o produto "
             "da de cada fase"
         ),
+    ),
+    (
+        "scenarios of the same history under the same simulator, seed and rules; "
+        "they are not predictions",
+        "cenários do mesmo histórico com o mesmo simulador, semente e regras; não são previsões",
+    ),
+    (
+        "fewer than 2 trials: there is no search to discount",
+        "menos de 2 tentativas: não há busca a descontar",
+    ),
+    (
+        "deposits or withdrawals inside the history: the curve is an index, not money",
+        "depósitos ou saques dentro do histórico: a curva é um índice, não dinheiro",
+    ),
+    (
+        "the curve and the trades do not reconcile in money",
+        "a curva e as operações não batem em dinheiro",
+    ),
+    (
+        "with the reference cost the balance reaches zero inside the history",
+        "com o custo de referência o saldo chega a zero dentro do histórico",
     ),
     (
         (
