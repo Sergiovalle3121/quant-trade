@@ -2426,6 +2426,11 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
         "explicar la diferencia",
     ),
     (
+        "the file prints no running balance of its own to compare with",
+        "el archivo no imprime un saldo propio con el que comparar, así que no hay nada "
+        "independiente que conciliar",
+    ),
+    (
         "a calibrated heuristic found balance-chain inconsistencies; this alone "
         "does not establish alteration",
         "una heurística calibrada encontró inconsistencias en la cadena de "

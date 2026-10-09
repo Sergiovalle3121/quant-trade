@@ -284,7 +284,12 @@ forward review, and the plateau check never reads its Profit column.
 
 A platform report dropped in the equity field by mistake (an `.htm`,
 `.html` or `.xlsx` name, or HTML content, UTF-16 included) is read as the
-report instead of failing as a malformed CSV. A CSV the parser cannot read
+report instead of failing as a malformed CSV; so is a Myfxbook, MQL5 or FX
+Blue account CSV, and an account statement sent alone in the optional live
+box is the main file (an empty one is named as the live statement). It is
+promoted only when no file was chosen in the report or curve box: a report or
+curve that arrived with a name and 0 bytes keeps its own "arrived empty"
+refusal instead of being replaced by the statement. A CSV the parser cannot read
 is explained in the form's language (header row, same number of columns),
 without the parser's English message.
 
@@ -2864,7 +2869,23 @@ an account never changes what a report says.
   The claim stays after the account is deleted (hash only). While
   `AUDIT_EMAIL_VERIFICATION_REQUIRED=true`, an account with an unconfirmed
   address gets a preview with reason `unverified` and keeps its free
-  report for after confirming. The account notice and the checkout refusal
+  report for after confirming. That preview is noted in `welcome_pending`
+  (the upload's browser mark, file fingerprint and network) only if its file
+  has not had a free report already (checked at upload with the fingerprint);
+  confirming the address (`kind != "change"`) opens in full, from any device,
+  the most recent one of the last `accounts.WELCOME_PENDING_DAYS` (7) days
+  that the same account, inbox, browser, file, network and card rules still
+  allow, gives the month's preview back and lands on
+  `done=email_verified_report`; every pending row of the account goes either
+  way, and with the report, the account or the retention purge. The preview's
+  `acct=preview_unverified` notice is worked out when the page is shown:
+  `welcome_refused_unverified` (this same report opens on confirming within
+  the 7 days, if it is still the most recent upload that can get it) only
+  while the owner is unconfirmed and this upload is the one confirming would
+  open now; `welcome_pending_other` (which upload opens, with its conditions)
+  for any other upload of an unconfirmed owner; `welcome_pending_confirmed`
+  once the address is confirmed. `welcome_confirm` states the same rule. The
+  account notice and the checkout refusal
   say so plainly (confirming unlocks the first free full report and
   purchases), and the notice after sign-up says a confirmation link was sent
   and to check spam (`welcome_confirm`, only while delivery is configured).
@@ -3292,7 +3313,8 @@ an account never changes what a report says.
   challenge for 5 minutes behind the `rigor_passkey` cookie (only its hash
   is the key), used once; `passkeys.MAX_STARTS_PER_HOUR` pages per network.
   The options are embedded in the page and `app.js` posts the device's
-  answer in an ordinary form, so the CSP stays `connect-src 'none'`. The
+  answer in an ordinary form (no fetch; the CSP allows only
+  `connect-src 'self'`, for the upload form). The
   store keeps the credential id, the public key, the counter (a counter
   that goes backwards is refused; synced passkeys report zero), the name,
   the host it was made for and dates; never a private key. Events
@@ -3930,7 +3952,8 @@ Redesign pass 36, the pay step. A wrong, used or expired access code is answered
 under the code field itself, in amber, with what to do next (copy the code as it
 arrived and redeem it again, or message us with the button above); the field is
 marked invalid for screen readers. The redeem form and the upload redirect carry
-`#canjear`, so the page comes back at the field instead of at a banner at the top.
+`#canjear` (the JSON `location` too, which the in-place upload form follows), so
+the page comes back at the field instead of at a banner at the top.
 A payment or code that worked shows a green "done" notice instead of the blue
 informational one. The optimisation XML refusal also states its limit in MB and
 splits into the problem and "What to do".
@@ -4149,7 +4172,15 @@ file's columns with an example value, preselected with the reader's guess or
 the customer's earlier choice. The page also carries the first upload's form
 fields (starting balance, trials, costs, code, consent), and asks for the same
 file again, because the service keeps no file before auditing it. A JSON
-client gets `{"error", "code", "columns"}`. An HTML report or anything else
+client gets `{"error", "code", "columns", "category", "format",
+"guidance_html", "problem", "fields_html"}`, where `fields_html` is only the
+menus (`mapping.mapping_fields`, no form and no file field). With JavaScript
+the upload form (`data-inplace`) posts with `fetch` (CSP `connect-src 'self'`)
+and shows those menus and the refusal on the same page, so the second post
+sends the file already chosen; a 401/402, a network error or an unreadable
+answer falls back to the ordinary post. Without JavaScript nothing changes.
+With `AUDIT_CONTACT_URL` set, the menus end with a line that offers to read
+the file with the customer. An HTML report or anything else
 that is not a table keeps the plain error.
 
 Nothing is spent on the mapping step. It is not an audit, so the free first
@@ -4381,6 +4412,13 @@ separate CSV curve, its currency is shown as unknown even when the trade file
 states USD; same units are an assumption, not verified conversion. Trades
 outside the curve or an uncovered last 1 %
 of its time span make the comparison `NOT_MEASURED`.
+A platform file that prints no running balance of its own (Myfxbook, MQL5, FX
+Blue, TradingView and other trade lists) has nothing independent to compare:
+its curve is an index adjusted for deposits and withdrawals, rebuilt from the
+same rows as the expected balance, so the equation is `NOT_MEASURED` ("No
+printed balance to reconcile against"), with the observed balance and the
+difference not measured and no red flag. MT4/MT5 files with a printed balance
+(on each row, or in the MT4 statement's summary) keep the comparison.
 
 The importer counts a printed Balance cell as a break only when it differs
 from the previous balance plus the row's money by more than printing rounding:

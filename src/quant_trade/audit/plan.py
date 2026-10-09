@@ -628,7 +628,24 @@ def _multiplicity_step(data: dict[str, Any], status: str, locale: str) -> tuple[
                 "passa com 0.95 ou mais e, abaixo de 0.5, não passa.",
             )
         )
-    if half is not None and _fund_record(data):
+    if half is not None and half <= 1:
+        # Below 0.5 already at a single trial: the count of trials decides nothing.
+        fund = _fund_record(data)
+        parts.append(
+            _say(
+                locale,
+                f"Ya con 1 {'fondo' if fund else 'configuración'}, el caso más favorable, queda "
+                "por debajo de 0.5: aquí decide la falta de significación, no el número de "
+                "intentos.",
+                f"Even at 1 {'fund' if fund else 'configuration'}, the most favourable case, it "
+                "is below 0.5: what decides here is the lack of significance, not the number "
+                "of trials.",
+                f"Já com 1 {'fundo' if fund else 'configuração'}, o caso mais favorável, fica "
+                "abaixo de 0.5: aqui quem decide é a falta de significância, não o número de "
+                "tentativas.",
+            )
+        )
+    elif half is not None and _fund_record(data):
         parts.append(
             _say(
                 locale,
@@ -709,15 +726,23 @@ def _multiplicity_step(data: dict[str, Any], status: str, locale: str) -> tuple[
         *_say(
             locale,
             [
-                "Menos parámetros y rangos más cortos reducen el número de intentos.",
+                "Los intentos que ya hiciste siguen contando: reoptimizar alrededor de la "
+                "configuración elegida los suma, no los borra. En la próxima versión, menos "
+                "parámetros y rangos más cortos desde el principio reducen el número de "
+                "intentos.",
                 "Valida la configuración elegida en un tramo que no se usó al optimizar.",
             ],
             [
-                "Fewer parameters and narrower ranges mean fewer trials.",
+                "The trials you already ran still count: re-optimising around the chosen "
+                "configuration adds to them, it does not erase them. In the next version, "
+                "fewer parameters and narrower ranges from the start mean fewer trials.",
                 "Validate the chosen configuration on a stretch not used while optimising.",
             ],
             [
-                "Menos parâmetros e faixas mais curtas reduzem o número de tentativas.",
+                "As tentativas que você já fez continuam contando: reotimizar em torno da "
+                "configuração escolhida soma tentativas, não as apaga. Na próxima versão, "
+                "menos parâmetros e faixas mais curtas desde o início reduzem o número de "
+                "tentativas.",
                 "Valide a configuração escolhida em um trecho que não foi usado na otimização.",
             ],
         ),

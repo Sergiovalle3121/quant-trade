@@ -2419,7 +2419,12 @@ def _upload_form(
         "</h2>"
         + f"{flash}{err}<p class='panel-note'>{icon('shield')}{_e(note)}</p>"
         + (_signin_first(copy, locale) if signin_first else "")
-        + "<form method='post' action='/audits' enctype='multipart/form-data' data-busy='busy'>"
+        # With JavaScript the answer comes back in place (data-inplace): a refusal
+        # fills upload-alert, the column menus fill map-fields, and the file stays
+        # chosen. Without it the form posts as always.
+        + "<form method='post' action='/audits' enctype='multipart/form-data' data-busy='busy' "
+        "data-inplace>"
+        + "<div id='upload-alert' role='alert' hidden></div>"
         + _drop(
             "report",
             copy["report"],
@@ -2428,6 +2433,7 @@ def _upload_form(
             locale,
             main=True,
         )
+        + "<div id='map-fields' hidden></div>"
         + mapping
         + f"<div class='or-rule' aria-hidden='true'><span>{_e(copy['or_word'])}</span></div>"
         + _drop(

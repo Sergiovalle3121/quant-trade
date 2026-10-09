@@ -94,7 +94,12 @@ from quant_trade.audit.errors_pt import FILES_PT
 from quant_trade.audit.examples import EXAMPLES_PATH
 from quant_trade.audit.faq import FAQ_PATH, faq_page
 from quant_trade.audit.guides import GUIDES_BY_PATH, guide_url
-from quant_trade.audit.importers import detect_format
+from quant_trade.audit.importers import (
+    FXBLUE_CSV,
+    MQL5_SIGNAL_CSV,
+    MYFXBOOK_CSV,
+    detect_format,
+)
 from quant_trade.audit.indexnow import clean_key, key_path
 from quant_trade.audit.legal import LEGAL_UPDATED, LegalContext, privacy_text, terms_text
 from quant_trade.audit.market import MarketData
@@ -474,10 +479,12 @@ _PRINT_HANDLER_HASH = base64.b64encode(hashlib.sha256(PRINT_HANDLER.encode()).di
 #: no visitor request leaves for a font service. Inline styles are the other
 #: relaxation (the report's CSS and chart colours are inline); forms post
 #: here, or leave for Stripe Checkout through a redirect, and no page can be
-#: framed.
+#: framed. A script may only call this same origin (``connect-src 'self'``:
+#: the upload form answers in place, keeping the chosen file); no third party
+#: is ever contacted.
 CONTENT_SECURITY_POLICY = (
     f"default-src 'none'; script-src 'self' 'unsafe-hashes' 'sha256-{_PRINT_HANDLER_HASH}'; "
-    "style-src 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'none'; "
+    "style-src 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; "
     "form-action 'self' https://checkout.stripe.com; frame-ancestors 'none'; "
     "base-uri 'none'"
 )
@@ -516,6 +523,9 @@ WELCOME_REFUSALS = ("file", "device", "network", "email", "unverified")
 #: The refusals a card verified at no charge replaces: signals that another
 #: person may share this browser or network.
 CARD_REFUSALS = ("device", "network")
+#: Days a preview uploaded before the e-mail was confirmed can still become the
+#: free full report when the address is confirmed (named in the notices too).
+WELCOME_PENDING_DAYS = acct.WELCOME_PENDING_DAYS
 STRATEGY_PDFS_PER_WINDOW = 10
 STRATEGY_PDF_WINDOW = timedelta(minutes=10)
 #: How many upload fields ``POST /audits`` takes.
@@ -622,6 +632,22 @@ class RedactSecretsFilter(logging.Filter):
             record.args = tuple(args)
         record.msg = redact_secrets(str(record.msg))
         return True
+
+
+#: Account histories exported as CSV: their rows are trades and money
+#: movements, never a curve, so one dropped in the curve box is the report.
+_ACCOUNT_CSV_FORMATS = frozenset({MYFXBOOK_CSV, MQL5_SIGNAL_CSV, FXBLUE_CSV})
+#: Those three are named by their header row, so a curve upload is sniffed on
+#: its first bytes instead of being read whole once more.
+_ACCOUNT_SNIFF_BYTES = 64 * 1024
+
+
+def _is_account_csv(data: bytes, filename: str | None) -> bool:
+    """True for a Myfxbook, MQL5 or FX Blue account history."""
+    try:
+        return detect_format(data[:_ACCOUNT_SNIFF_BYTES], filename) in _ACCOUNT_CSV_FORMATS
+    except Exception:  # noqa: BLE001 - an unreadable file keeps its own refusal
+        return False
 
 
 def looks_like_platform_report(filename: str | None, data: bytes) -> bool:
@@ -2507,6 +2533,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         "two_step_expired",
         "email_verified",
         "email_verified_welcome",
+        "email_verified_report",
     )
     account_flashes = (
         "welcome",
@@ -2524,6 +2551,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         "email_changed",
         "email_pending",
         "email_verified",
+        "email_verified_report",
         "email_verification_sent",
         "card_paid",
     )
@@ -2618,6 +2646,157 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         if not refused and cfg.email_verification_required and not db.email_verified(account.id):
             refused = "unverified"
         return refused
+
+    def _welcome_claim(
+        account_id: str,
+        email: str,
+        *,
+        device_sha256: str,
+        fingerprint: str,
+        net: str,
+        card_checked: bool,
+        reservation: str,
+        now: datetime,
+    ) -> bool:
+        """Take the free full report's claims, all or nothing: the account, the
+        inbox, the browser, the file and one of the network's monthly slots.
+
+        A card verified at no charge stands in for the browser and the network.
+        ``True`` when every claim was taken under ``reservation``.
+        """
+        month = acct.claim_month(now)
+        slots = (
+            {
+                "network": [
+                    f"welcome:ip:{acct.network_key(net)}:{month}:{n}"
+                    for n in range(_welcome_cap(net))
+                ]
+            }
+            if net and not card_checked
+            else {}
+        )
+        keys = (
+            f"welcome:account:{account_id}",
+            inbox.welcome_key(email),
+            *(() if card_checked else (f"welcome:device:{device_sha256}",)),
+            f"welcome:file:{fingerprint}",
+        )
+        return not db.claim_free(reservation, keys=keys, slots=slots, at=now)
+
+    def _pending_refusal(
+        account_id: str, *, device_sha256: str, file_sha256: str, net: str, now: datetime
+    ) -> str:
+        """Why an upload made before confirming could not open in full; ``""`` if it could.
+
+        The account, browser, file and network limits with that upload's own
+        marks (a verified card stands in for the browser and network, as in
+        ``_first_look``), and the inbox's own claim.
+        """
+        card = db.card_checked(account_id)
+        refused = db.welcome_refusal(
+            account_id,
+            device_sha256="" if card else device_sha256,
+            file_sha256=file_sha256,
+            client_ip="" if card else net,
+            since=acct.month_start(now),
+            per_ip=_welcome_cap(net),
+        )
+        if not refused:
+            email = _account_email(account_id)
+            if not email or db.free_claim_taken(inbox.welcome_key(email)):
+                refused = "email"
+        return refused
+
+    def _grantable_pending(account_id: str, now: datetime) -> Any:
+        """The pending preview that confirming the e-mail would open now, or ``None``.
+
+        The most recent one of the last ``WELCOME_PENDING_DAYS`` days that
+        ``_pending_refusal`` finds nothing against: the rule the notices state.
+        """
+        if cfg.free_mode or not acct.WELCOME_FULL_REPORT:
+            return None
+        pending = db.welcome_pending_for(
+            account_id, since=now - timedelta(days=WELCOME_PENDING_DAYS)
+        )
+        for row in pending:
+            if row.file_sha256 and not _pending_refusal(
+                account_id,
+                device_sha256=row.device_sha256,
+                file_sha256=row.file_sha256,
+                net=row.client_ip,
+                now=now,
+            ):
+                return row
+        return None
+
+    def _pending_notice(audit_id: str, ui: str) -> str | None:
+        """The notice of a preview uploaded before the e-mail was confirmed.
+
+        It says this same report opens on confirming only while that holds: the
+        owner is still unconfirmed and this upload is the one
+        ``_grantable_pending`` would open. Otherwise the rule is told with its
+        conditions, or, once confirmed, that the upload stays a preview.
+        """
+        copy = account_pages.COPY[ui]
+        owner = db.account_for_audit(audit_id)
+        if owner is None:
+            return None
+        if db.email_verified(owner):
+            return copy["welcome_pending_confirmed"]
+        if not cfg.email_delivery_ready:
+            return None
+        row = _grantable_pending(owner, datetime.now(UTC))
+        if row is not None and row.audit_id == audit_id:
+            return copy["welcome_refused_unverified"]
+        return copy["welcome_pending_other"]
+
+    def _grant_pending_welcome(account_id: str, now: datetime) -> bool:
+        """Open in full the preview uploaded before the e-mail was confirmed.
+
+        The one ``_grantable_pending`` names: the same account, inbox, browser,
+        file and network limits are checked again with the marks kept from that
+        upload. The month's preview is given back. Every pending row of the
+        account goes, granted or not.
+        """
+        try:
+            row = _grantable_pending(account_id, now)
+            if row is None:
+                return False
+            email = _account_email(account_id)
+            card = db.card_checked(account_id)
+            net = row.client_ip
+            reservation = acct.new_secret()
+            if not _welcome_claim(
+                account_id,
+                email,
+                device_sha256=row.device_sha256,
+                fingerprint=row.file_sha256,
+                net=net,
+                card_checked=card,
+                reservation=reservation,
+                now=now,
+            ):
+                db.release_free(reservation)
+                return False
+            if not db.grant_welcome(
+                row.audit_id,
+                account_id,
+                device_sha256=row.device_sha256,
+                file_sha256=row.file_sha256,
+                client_ip=net,
+                at=now,
+            ):
+                db.release_free(reservation)
+                return False
+            db.delete_free_preview(row.audit_id)
+            _reward_invite(account_id, row.device_sha256, net, now)
+            return True
+        except Exception:  # noqa: BLE001 - the address is confirmed whatever happens here
+            logger.warning("could not open the report pending a confirmed e-mail")
+            return False
+        finally:
+            with contextlib.suppress(Exception):
+                db.clear_welcome_pending(account_id)
 
     def _card_offer(request: Request, account: Any, now: datetime) -> bool:
         """A card check would give this account its free full report."""
@@ -3429,7 +3608,11 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             locale = _account_locale(path_locale, lang)
             session = _session(request)
             if session is None:
-                flash = done if done in ("email_verified", "email_verified_welcome") else ""
+                flash = (
+                    done
+                    if done in ("email_verified", "email_verified_welcome", "email_verified_report")
+                    else ""
+                )
                 return _signin_redirect(
                     locale, done=flash, next_path=account_pages.path("account", locale)
                 )
@@ -4099,8 +4282,12 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 db.delete_sessions(account_id, keep=keep)
                 _note_event(request, account_id, "email_changed")
             _settle_confirmed_invites(account_id, datetime.now(UTC))
+            # The preview uploaded before confirming becomes the free full report.
+            granted = kind != "change" and _grant_pending_welcome(account_id, datetime.now(UTC))
             done = "email_changed" if kind == "change" else "email_verified"
-            if (
+            if granted:
+                done = "email_verified_report"
+            elif (
                 kind != "change"
                 and _session(request) is None
                 and _welcome_status(account_id, _account_email(account_id)) == "available"
@@ -4903,9 +5090,22 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 detector="body_limit",
                 detected_format=upload_rejections.header_format(exc.head),
             )
+        account_only = uploads["live"]
+        # Only when no file was chosen in the report or curve box: a main file
+        # that arrived empty keeps its own refusal instead of being swapped out.
+        main_chosen = any(sent is not None and sent.filename for sent in (report, equity))
+        if account_only and not main_chosen:
+            # quien solo tiene la cuenta la deja en el recuadro opcional: es su archivo principal
+            uploads["report"], uploads["live"] = account_only, None
+            report, live = live, None
+            # The report's own format is what a refusal names from here on.
+            request.state.ops_rejection_format = upload_rejections.header_format(
+                account_only[: upload_rejections.HEADER_BYTES]
+            )
+            request.state.upload_file_inspected = True
         if not uploads["equity"] and not uploads["report"]:
             # A file that arrived with no bytes is named as empty, not as missing.
-            for what, sent in (("report", report), ("equity", equity)):
+            for what, sent in (("report", report), ("equity", equity), ("live", live)):
                 if sent is not None and sent.filename:
                     text = message("empty_upload", report_loc, what=UPLOAD_NAMES[what][report_loc])
                     return _upload_error(
@@ -4984,26 +5184,17 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                     since=start,
                     per_ip=welcome_cap,
                 )
-                if not refused:
-                    month = acct.claim_month(now)
-                    slots = (
-                        {
-                            "network": [
-                                f"welcome:ip:{acct.network_key(ip)}:{month}:{n}"
-                                for n in range(welcome_cap)
-                            ]
-                        }
-                        if ip and not card_checked
-                        else {}
-                    )
-                    keys = (
-                        f"welcome:account:{account_id}",
-                        inbox.welcome_key(account_email),
-                        *(() if card_checked else (f"welcome:device:{device_sha256}",)),
-                        f"welcome:file:{fingerprint}",
-                    )
-                    if not db.claim_free(reservation, keys=keys, slots=slots, at=now):
-                        return None
+                if not refused and _welcome_claim(
+                    account_id,
+                    account_email,
+                    device_sha256=device_sha256,
+                    fingerprint=fingerprint,
+                    net=net,
+                    card_checked=card_checked,
+                    reservation=reservation,
+                    now=now,
+                ):
+                    return None
                 welcome = False
                 welcome_refused = refused
                 refusal = preview_or_credit(account_id)
@@ -5060,11 +5251,20 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 detector="form",
             )
         report_filename = report.filename if report is not None and uploads["report"] else None
+        equity_name = equity.filename if equity is not None else None
+        # An account history (Myfxbook, MQL5, FX Blue) in the curve box is the
+        # report: its rows are trades and money movements, never a curve or a
+        # table of returns, so it is told apart before the return-series check.
+        account_csv = bool(
+            uploads["equity"]
+            and not uploads["report"]
+            and await run_in_threadpool(_is_account_csv, uploads["equity"], equity_name)
+        )
         # The primary picker accepts period-return CSV/XLSX tables too. Content
         # detection comes before platform sniffing, and uses the curve reader's
         # existing size and workbook limits.
         return_table = False
-        if bool(uploads["report"]) != bool(uploads["equity"]):
+        if bool(uploads["report"]) != bool(uploads["equity"]) and not account_csv:
             candidate = uploads["equity"] or uploads["report"]
             if candidate:
                 return_table = await run_in_threadpool(is_return_series, candidate)
@@ -5073,12 +5273,11 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 report_filename = None
         # A platform report dropped in the equity-curve field is read as the
         # report, instead of failing as a malformed CSV.
-        equity_name = equity.filename if equity is not None else None
         if (
             uploads["equity"]
             and not uploads["report"]
             and not return_table
-            and looks_like_platform_report(equity_name, uploads["equity"])
+            and (account_csv or looks_like_platform_report(equity_name, uploads["equity"]))
         ):
             uploads["report"], uploads["equity"] = uploads["equity"], None
             report_filename = equity_name
@@ -5347,6 +5546,26 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 free_preview = True
             if free_preview:
                 db.record_free_preview(audit_id, gate_account.id, client_ip=net, at=now)
+                if (
+                    welcome_refused == "unverified"
+                    and fingerprint
+                    and not _pending_refusal(
+                        gate_account.id,
+                        device_sha256=device_sha256,
+                        file_sha256=fingerprint,
+                        net=net,
+                        now=now,
+                    )
+                ):
+                    # Confirming the e-mail can open this same report in full.
+                    db.record_welcome_pending(
+                        audit_id,
+                        gate_account.id,
+                        device_sha256=device_sha256,
+                        file_sha256=fingerprint,
+                        client_ip=net,
+                        at=now,
+                    )
         if paid or _session(request) is not None:
             _link_delivered(request, audit_id, via=VIA_UPLOAD)
         location = f"/audits/{audit_id}?token={token}"
@@ -5358,15 +5577,16 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             location += f"&acct=preview_{welcome_refused}"
         elif code:
             location += "&code=" + ("applied" if paid else "rejected")
+        if code and not paid:
+            # Open the preview at the code field, where the refusal and its fix
+            # are shown: the form posted in place follows this same location.
+            location += "#canjear"
         if _wants_json(request):
             body: dict[str, Any] = {"audit_id": audit_id, "token": token, "location": location}
             if code:
                 body["access_code"] = "applied" if paid else "rejected"
             answer: Response = JSONResponse(body, status_code=201)
         else:
-            if code and not paid:
-                # Open the preview at the code field, where the refusal and its fix are shown.
-                location += "#canjear"
             answer = RedirectResponse(location, status_code=303)
         if new_device:
             # A random id for this browser: one free full report per browser.
@@ -5429,6 +5649,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             locale,
         )
         if _wants_json(request):
+            # The upload form shows the menus in place: the file stays chosen.
             return JSONResponse(
                 {
                     "error": text,
@@ -5437,11 +5658,21 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                     "category": category,
                     "format": detected,
                     "guidance_html": guidance,
+                    "problem": text,
+                    "fields_html": mapping.mapping_fields(
+                        table, locale=locale, chosen=chosen, contact_url=cfg.contact_url
+                    ),
                 },
                 status_code=422,
             )
         page = mapping.mapping_page(
-            table, text, locale=locale, carried=carried, chosen=chosen, guidance_html=guidance
+            table,
+            text,
+            locale=locale,
+            carried=carried,
+            chosen=chosen,
+            guidance_html=guidance,
+            contact_url=cfg.contact_url,
         )
         return HTMLResponse(page, status_code=422)
 
@@ -5668,10 +5899,12 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             and not record.paid
         ):
             notice = account_pages.COPY[ui][f"welcome_refused_{acct_done[8:]}"]
-            if acct_done[8:] == "unverified" and not cfg.email_delivery_ready:
-                notice = account_pages.COPY[ui]["welcome_refused_unverified_nomail"].format(
-                    contact=_operator_reach(request, ui)
-                )
+            if acct_done[8:] == "unverified":
+                notice = _pending_notice(record.id, ui)
+                if notice is None and not cfg.email_delivery_ready:
+                    notice = account_pages.COPY[ui]["welcome_refused_unverified_nomail"].format(
+                        contact=_operator_reach(request, ui)
+                    )
         elif acct_done == "nocredit" and not record.paid:
             notice = account_pages.COPY[ui]["credit_none"]
         # A rejected code is answered next to the code field, not in this banner.

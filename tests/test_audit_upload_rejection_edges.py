@@ -444,7 +444,7 @@ def test_real_rejection_guide_links_load_in_the_selected_language(
         block = re.search(r'<div[^>]*data-upload-rejection="image"[^>]*>(.*?)</div>', response.text)
         assert block is not None
         hrefs = re.findall(r'href="([^"]+)"', block.group(1))
-        assert len(hrefs) == 4
+        assert len(hrefs) == 7
         for href in hrefs:
             guide = client.get(unescape(href))
             assert guide.status_code == 200, href

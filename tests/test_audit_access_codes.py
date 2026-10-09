@@ -257,6 +257,8 @@ def test_an_invalid_code_gives_a_preview_and_the_json_says_so(tmp_path: Path) ->
     assert response.status_code == 201
     body = response.json()
     assert body["access_code"] == "rejected"
+    # The in-place form follows this location: it opens at the code field too.
+    assert body["location"].endswith("&code=rejected#canjear")
     locked = client.get(f"/audits/{body['audit_id']}.json?token={body['token']}")
     assert locked.status_code == 402
 

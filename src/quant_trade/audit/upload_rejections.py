@@ -565,6 +565,9 @@ def rejection_guidance(
         ("mt5", "MT5 HTML"),
         ("mt4", "MT4 HTML"),
         ("tradingview", "TradingView CSV / Excel"),
+        ("myfxbook", "Myfxbook CSV"),
+        ("mql5-signal", "MQL5 CSV"),
+        ("fxblue", "FX Blue CSV"),
         ("csv-universal", universal_label),
     ):
         guide = next(guide for guide in GUIDES if guide.slug == slug)
