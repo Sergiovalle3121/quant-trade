@@ -192,6 +192,23 @@ def test_a_one_phase_program_shows_the_section_figure_on_the_full_rung() -> None
     assert rows["out_of_sample"]["pass"]["value"] < rows["full"]["pass"]["value"]
 
 
+def test_the_intro_counts_phases_only_for_a_program_with_several(
+    audited: tuple[Any, AuditResult],
+) -> None:
+    """The generic reference is named after its phase ("..., phase 1"), so the
+    intro does not add "1 phase" after it; a two-phase program keeps its count."""
+    _, one = _audit(_declared(challenge=None))
+    _, two = audited
+    assert one.challenge is not None and two.challenge is not None
+    for locale in LOCALES:
+        labels = LABELS[locale]
+        single = html.unescape(_challenge_ladder_html(one.challenge["scenarios"], locale, labels))
+        double = html.unescape(_challenge_ladder_html(two.challenge["scenarios"], locale, labels))
+        assert labels["ch_ladder_title"] in single and labels["ch_ladder_title"] in double
+        assert f", {labels['ff_phase']})" not in single
+        assert f", {labels['ff_phases'].format(n=2)})" in double
+
+
 def test_without_a_start_the_sides_are_not_measured() -> None:
     _, result = _audit(_declared(oos_start=None))
     rows = _rows(result)
