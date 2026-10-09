@@ -119,6 +119,7 @@ def test_the_data_has_the_shape_the_writer_pastes() -> None:
                 "samples",
                 "reading",
                 "article",
+                "winrate",
             }
             assert ("slug" in link) == (link["kind"] in {"guide", "audience"})
             assert ("key" in link) == (link["kind"] == "article")

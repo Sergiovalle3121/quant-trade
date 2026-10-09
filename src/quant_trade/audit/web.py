@@ -54,6 +54,7 @@ from quant_trade.audit import (
     track_seal_pages,
     universal,
     upload_rejections,
+    winrate,
 )
 from quant_trade.audit import accounts as acct
 from quant_trade.audit import check as check_lib
@@ -129,6 +130,7 @@ from quant_trade.audit.pages import (
     upload_page,
     verification_card_svg,
     verification_page,
+    winrate_page,
 )
 from quant_trade.audit.payments import stripe_checkout
 from quant_trade.audit.portuguese import MESSAGES_PT, link_locale
@@ -1323,6 +1325,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     # The free calculator is a landing of its own: links on X and from creators point at it.
     visit_paths.update({path: loc for loc, path in CALCULATOR_PATH.items()})
     visit_paths.update({path: loc for loc, path in EXAMPLES_PATH.items()})
+    visit_paths.update({path: loc for loc, path in winrate.WINRATE_PATH.items()})
 
     def _funnel_visit(request: Request, response: Any) -> None:
         """Count a person's visit to the landing or a case page; remember its tag.
@@ -6243,6 +6246,44 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             reading_path, public_reading, methods=["GET"], response_class=HTMLResponse
         )
         app.add_api_route(reading_path + "/card.png", public_reading, methods=["GET"])
+
+    def public_winrate(request: Request) -> Response:
+        """The win-rate calculator. No limit of its own: no rasterization, at most 15
+        calls to the reader's Wilson interval. Its preview is the reader's own card."""
+        locale = next(k for k, path in winrate.WINRATE_PATH.items() if path == request.url.path)
+        query = request.query_params
+        values: dict[str, str] = {}
+        error, status = "", 200
+        if any(name in query for name in winrate.FIELDS):
+            try:
+                if any(len(query.getlist(name)) > 1 for name in winrate.FIELDS):
+                    raise owner_card.ClaimInputError("invalid")
+                candidate = {name: query.get(name, "").strip() for name in winrate.FIELDS}
+                winrate.parse(candidate, locale)
+                values = candidate
+            except owner_card.ClaimInputError as exc:
+                error, status = str(exc), 400
+        image_path = ""
+        if any(values.values()) and owner_card.png_available():
+            # The reader's card.png, with its own limit of 60 an hour per address.
+            image_path = (
+                reading.READING_PATH[locale]
+                + "/card.png?"
+                + urlencode({name: values.get(name, "") for name in reading.FIELDS})
+            )
+        page = winrate_page(
+            locale=locale,
+            base_url=_site_url(request),
+            values=values,
+            error=error,
+            image_path=image_path,
+        )
+        return HTMLResponse(guard_page(page), status_code=status)
+
+    for winrate_path in winrate.WINRATE_PATH.values():
+        app.add_api_route(
+            winrate_path, public_winrate, methods=["GET"], response_class=HTMLResponse
+        )
 
     def public_faq(request: Request) -> str:
         locale = next(lang for lang, path in FAQ_PATH.items() if path == request.url.path)
