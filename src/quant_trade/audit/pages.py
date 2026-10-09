@@ -1948,7 +1948,7 @@ _TOOL_ICONS: dict[str, str] = {
 
 
 def _tool_name(key: str, locale: str) -> str:
-    """The name a free tool already has in the menu and the footer."""
+    """The short name a free tool already uses (menu, footer or its own nav label)."""
     if key == "calculator":
         return str(CALCULATOR_COPY[locale]["nav"])
     if key == "winrate":

@@ -198,8 +198,8 @@ COPY: dict[str, dict[str, Any]] = {
         },
         "winrate": {
             "question": (
-                "Sua taxa de acerto é real ou é a amostra? Que taxa de acerto você precisa com o "
-                "seu alvo e o seu stop?"
+                "Sua taxa de acerto é real ou é a amostra? De que taxa de acerto você "
+                "precisa com o seu alvo e o seu stop?"
             ),
             "inputs": "Operações, taxa de acerto, alvo e stop em R.",
             "returns": (
