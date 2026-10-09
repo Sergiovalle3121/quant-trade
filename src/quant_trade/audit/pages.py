@@ -1939,13 +1939,20 @@ def _audiences(locale: str) -> str:
 
 
 #: Each free tool's icon on the landing.
-_TOOL_ICONS: dict[str, str] = {"calculator": "dice", "reading": "chart", "check": "shield"}
+_TOOL_ICONS: dict[str, str] = {
+    "calculator": "dice",
+    "winrate": "percent",
+    "reading": "chart",
+    "check": "shield",
+}
 
 
 def _tool_name(key: str, locale: str) -> str:
     """The name a free tool already has in the menu and the footer."""
     if key == "calculator":
         return str(CALCULATOR_COPY[locale]["nav"])
+    if key == "winrate":
+        return str(winrate.COPY[locale]["nav"])
     if key == "reading":
         return reading.COPY[locale]["title"]
     return str(_UI[locale]["footer_check"])
@@ -1954,6 +1961,8 @@ def _tool_name(key: str, locale: str) -> str:
 def _tool_url(key: str, locale: str) -> str:
     if key == "calculator":
         return calculator_url(locale)
+    if key == "winrate":
+        return winrate.WINRATE_PATH[locale]
     if key == "reading":
         return reading.reading_url(locale)
     return _check_url(locale)
@@ -4084,6 +4093,7 @@ def winrate_page(
         (article.text[locale].title, article_url(article.key, locale)),
         (str(CALCULATOR_COPY[locale]["nav"]), calculator_url(locale)),
         (audience.text[locale].title, audience_url(audience.slug, locale)),
+        (str(TOOLS_COPY[locale]["nav"]), tools_url(locale)),
     )
     read_more = (
         "<ul class='aud-others'>"

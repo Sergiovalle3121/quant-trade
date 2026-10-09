@@ -77,7 +77,9 @@ validated strings and `ref=aciertos` (a funnel tag) and appears only when both
 the interval and break-even were computed, since its text names them; partial
 inputs keep only the card link. A valid result's preview image and card link
 reuse the reader's `card.png` and its 60-per-hour limit; the calculator itself
-has no limit and renders no card.
+has no limit and renders no card. It is the second tool on the free tools page
+(`tools_hub.TOOL_KEYS`, its JSON-LD `ItemList` and the landing band), and its
+"Keep reading" list links back to that page.
 Tests: `tests/test_audit_winrate.py`.
 
 The public name is **Rigor** (the same word in Spanish and English: statistical
@@ -2289,7 +2291,7 @@ Routes:
 | `GET /terminos`, `GET /terms` | Terms of service (`audit/legal.py`), Spanish and English; either answers `?lang=`. |
 | `GET /privacidad`, `GET /privacy` | Privacy policy, Spanish and English. |
 | `GET /en/terms`, `/en/privacy`, `/pt/terms`, `/pt/privacy` | 301 to the legal page in that language (guessed addresses). |
-| `GET /herramientas` | The free tools page (`/en/tools`, `/pt/ferramentas`; `/tools` and `/pt/tools` redirect there): calculator, figure reader and report check. |
+| `GET /herramientas` | The free tools page (`/en/tools`, `/pt/ferramentas`; `/tools` and `/pt/tools` redirect there): luck calculator, win-rate calculator, figure reader and report check. |
 | `GET /en/calculator`, `/reading`, `/en/methodology`, `/en/articles`, `/en/guides`, `/en/sample`, `/en/check`, `/faq`, `/examples` | 301 to the page people meant (`/calculator`, `/en/reading`, `/methodology`, `/articles`, `/guides`, `/sample`, `/check`, `/en/faq`, `/en/examples`). The first two keep the query string. |
 | `POST /webhooks/stripe`, `POST /waitlist`, `GET /health` | Payment confirmation, waiting list, health check. |
 
@@ -4528,17 +4530,19 @@ URL's `options`. See
   those inputs. All calculator links carry `ref=ejemplos`.
 - **Free tools page.** `/herramientas`, `/en/tools` and `/pt/ferramentas`
   (`tools_hub.py`, rendered by `pages.tools_page`) gather the tools that need
-  no file: the luck calculator, the figure reader and the report check. Each
+  no file: the luck calculator, the win-rate calculator, the figure reader and
+  the report check (`tools_hub.TOOL_KEYS`). Each
   block says what the visitor enters and what comes back, without an account,
   and the page shows no figure of its own; a last block points to the upload
   form, the sample report and the articles. The page is in `PUBLIC_PAGES`
-  (150 sitemap URLs) with its canonical, `hreflang` alternates and a JSON-LD
+  (153 sitemap URLs with the win-rate calculator) with its canonical, `hreflang` alternates and a JSON-LD
   `ItemList` of free `WebApplication` entries (`seo.tools_structured_data`,
   price 0). The menu links it where it used to link the comparison; `/comparar`
   keeps its `noindex`, stays out of the sitemap and is still linked from the
   footer, from "My account" and from the reports. The footer also links the
-  tools page and the articles. The landing shows the three tools under the
-  cases (`_tools_band`). The reader links the calculator, the win-rate article
+  tools page and the articles. The landing shows the four tools under the
+  cases (`_tools_band`, a 2 by 2 grid; the win-rate card uses the `percent`
+  icon). The reader links the calculator, the win-rate article
   and the tools page, and ends, with or without a card, with what only the file
   can measure. The calculator links the deflated-Sharpe article and the reader;
   the examples link the reader; the prop-firm case and its article link each

@@ -18,6 +18,7 @@ from fastapi.testclient import TestClient  # noqa: E402
 from quant_trade.audit import funnel, owner_card, raster, reading, winrate  # noqa: E402
 from quant_trade.audit.articles import _num, article_url, win_rate_interval  # noqa: E402
 from quant_trade.audit.guard import find_claims  # noqa: E402
+from quant_trade.audit.pages import landing  # noqa: E402
 from quant_trade.audit.public_card import (  # noqa: E402
     PublicClaim,
     _wilson,
@@ -26,6 +27,8 @@ from quant_trade.audit.public_card import (  # noqa: E402
 )
 from quant_trade.audit.settings import AuditSettings  # noqa: E402
 from quant_trade.audit.store import make_store  # noqa: E402
+from quant_trade.audit.theme import icon  # noqa: E402
+from quant_trade.audit.tools_hub import TOOL_KEYS, TOOLS_PATH, tools_url  # noqa: E402
 from quant_trade.audit.web import create_app  # noqa: E402
 from quant_trade.audit.winrate import TABLE_TRADES, WINRATE_PATH, read  # noqa: E402
 
@@ -348,3 +351,33 @@ def test_winrate_visits_count(tmp_path: Path) -> None:
     rows = client.app.state.store.funnel_events(day)["visits"]  # type: ignore[attr-defined]
     counts = {(locale, ref): count for _, locale, ref, count in rows}
     assert counts == {("es", "aciertos"): 1, ("en", ""): 1, ("pt", ""): 1}
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+def test_tools_hub_lists_the_winrate_calculator(client: TestClient, locale: str) -> None:
+    assert TOOL_KEYS.index("winrate") == 1
+    path = WINRATE_PATH[locale]
+    hub = client.get(TOOLS_PATH[locale])
+    assert hub.status_code == 200
+    assert path in _links(hub.text)
+    assert "id='tool-winrate'" in hub.text
+    # pages.tools_page builds this ItemList with seo.tools_structured_data.
+    blocks = re.findall(r"<script type='application/ld\+json'>(.*?)</script>", hub.text, re.S)
+    tools = next(
+        item for item in (json.loads(block) for block in blocks) if item.get("@type") == "ItemList"
+    )
+    apps = [element["item"] for element in tools["itemListElement"]]
+    assert apps[1]["url"] == BASE + path
+    assert apps[1]["name"] == winrate.COPY[locale]["nav"]
+    assert find_claims(html.unescape(hub.text)) == []
+    # The landing's free tools band: four cards in the two-column grid (2 by 2).
+    main = landing(locale=locale).split("<main", 1)[1].split("</main>", 1)[0]
+    assert path in _links(main)
+    band = main.split("id='herramientas'", 1)[1].split("</section>", 1)[0]
+    assert band.count("<div class='card spot'") == len(TOOL_KEYS) == 4
+    assert "id='band-winrate'" in band
+    assert icon("percent") in band
+    # The calculator's "Keep reading" list (not only the menu) links the tools page.
+    calculator = client.get(path).text
+    further = calculator.split("<ul class='aud-others'>", 1)[1].split("</ul>", 1)[0]
+    assert tools_url(locale) in _links(further)

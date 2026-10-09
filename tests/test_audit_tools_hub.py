@@ -25,8 +25,9 @@ from quant_trade.audit.guides import guides_index_url  # noqa: E402
 from quant_trade.audit.pages import _sample_url, audit_path, landing  # noqa: E402
 from quant_trade.audit.settings import AuditSettings  # noqa: E402
 from quant_trade.audit.store import make_store  # noqa: E402
-from quant_trade.audit.tools_hub import COPY, TOOLS_PATH, tools_url  # noqa: E402
+from quant_trade.audit.tools_hub import COPY, TOOL_KEYS, TOOLS_PATH, tools_url  # noqa: E402
 from quant_trade.audit.web import create_app  # noqa: E402
+from quant_trade.audit.winrate import WINRATE_PATH  # noqa: E402
 
 BASE = "https://audit.example"
 LOCALES = ("es", "en", "pt")
@@ -103,7 +104,9 @@ def test_tools_hub_is_public_in_every_language(client: TestClient, locale: str) 
     data = [json.loads(block) for block in blocks]
     tools = next(item for item in data if item.get("@type") == "ItemList")
     apps = [element["item"] for element in tools["itemListElement"]]
-    assert len(apps) == 3
+    # One entry per tool on the page: the luck calculator, the win-rate calculator
+    # (added after this page shipped), the figure reader and the report check.
+    assert len(apps) == len(TOOL_KEYS) == 4
     for app in apps:
         assert app["@type"] == "WebApplication"
         assert app["isAccessibleForFree"] is True
@@ -121,6 +124,7 @@ def test_tools_hub_is_public_in_every_language(client: TestClient, locale: str) 
 def test_tools_hub_links_every_free_tool(client: TestClient, locale: str) -> None:
     hrefs = _hrefs(_main(client.get(TOOLS_PATH[locale]).text))
     assert calculator_url(locale) in hrefs
+    assert WINRATE_PATH[locale] in hrefs
     assert reading.READING_PATH[locale] in hrefs
     assert seo.CHECK_PATH[locale] in hrefs
     assert audit_path(locale) in hrefs
