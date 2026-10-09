@@ -19,7 +19,8 @@ def _social_svg(svg: str) -> str:
     """Fit the complete 1200x675 card into 1120x630, with 40px side padding.
 
     The nested SVG's viewBox keeps the original proportions and all text.
-    Input is the reader's trusted, server-generated card, never uploaded SVG.
+    Input is a trusted, server-generated card (the reader's or the calculator's),
+    never uploaded SVG.
     """
     card = ET.fromstring(svg)
     card.attrib.update(
@@ -41,21 +42,24 @@ def _social_svg(svg: str) -> str:
 class ReadingPNGCache:
     """Keep at most ``max_entries`` successful PNGs under parameter hashes.
 
-    Locales and the reader's eight numeric strings determine the image. Extra
-    query parameters, including referral tags, do not create cache entries.
-    Failed renders are retried on the next request so recovery needs no reset.
+    Locales and the numeric strings named in ``fields`` determine the image:
+    by default the reader's eight, and the calculator passes its own four.
+    Extra query parameters, including referral tags, do not create cache
+    entries. Failed renders are retried on the next request so recovery needs
+    no reset.
     """
 
-    def __init__(self, max_entries: int = 256) -> None:
+    def __init__(self, max_entries: int = 256, fields: tuple[str, ...] = FIELDS) -> None:
         if max_entries <= 0:
             raise ValueError("max_entries must be positive")
         self._max_entries = max_entries
+        self._fields = fields
         self._entries: OrderedDict[str, bytes] = OrderedDict()
         self._lock = Lock()
 
     def get(self, locale: str, values: Mapping[str, str], svg: str) -> bytes | None:
         """Return the existing bytes object or render a validated card once."""
-        parameters = [locale, [values.get(name, "").strip() for name in FIELDS]]
+        parameters = [locale, [values.get(name, "").strip() for name in self._fields]]
         key = hashlib.sha256(
             json.dumps(parameters, separators=(",", ":")).encode("utf-8")
         ).hexdigest()

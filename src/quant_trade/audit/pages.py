@@ -16,7 +16,7 @@ import textwrap
 from collections.abc import Mapping, Sequence
 from datetime import datetime
 from typing import Any
-from urllib.parse import urlencode
+from urllib.parse import quote, urlencode
 
 from quant_trade.audit import institutional, reading
 from quant_trade.audit.accounts import FREE_PREVIEWS_PER_MONTH as _FREE
@@ -48,9 +48,17 @@ from quant_trade.audit.audiences import (
     Audience,
     audience_url,
 )
+from quant_trade.audit.calculator import (
+    CALCULATOR_PATH,
+    CalculatorInput,
+    calculator_copy,
+    calculator_url,
+    compute,
+    parse_input,
+    share_url,
+)
 from quant_trade.audit.calculator import COPY as CALCULATOR_COPY
 from quant_trade.audit.calculator import REASONS as CALCULATOR_REASONS
-from quant_trade.audit.calculator import calculator_copy, calculator_url, compute, parse_input
 from quant_trade.audit.completed_count import completed_count_html
 from quant_trade.audit.examples import (
     EXAMPLES_COPY,
@@ -111,6 +119,7 @@ from quant_trade.audit.seo import (
 )
 from quant_trade.audit.series_ui import institutional_block, series_fields
 from quant_trade.audit.settings import PACK_CREDITS
+from quant_trade.audit.sharing import COPY as SHARING_COPY
 from quant_trade.audit.sharing import share_block
 from quant_trade.audit.theme import (
     CLASS_COLOURS,
@@ -3638,15 +3647,9 @@ def method_page(*, locale: str = "es", base_url: str = "") -> str:
 
 
 def _calculator_result(
-    words: dict[str, Any],
-    locale: str,
-    sharpe: str | None,
-    years: str | None,
-    trials: str | None,
-    periods_per_year: str | None = "252",
+    words: dict[str, Any], locale: str, parsed: CalculatorInput | str | None
 ) -> str:
     """The result block for the submitted numbers, an error, or nothing."""
-    parsed = parse_input(sharpe, years, trials, periods_per_year)
     if parsed is None:
         return ""
     if isinstance(parsed, str):
@@ -3804,6 +3807,47 @@ def reading_page(
     return _page(title, locale, body, meta_html=meta, alternates=alternates, solid_nav=True)
 
 
+def _calculator_share(
+    words: dict[str, Any], locale: str, value: CalculatorInput, base_url: str, image_path: str
+) -> str:
+    """Share buttons whose link reproduces exactly the validated inputs, tagged
+    ``ref=calculadora``; the PNG link only when the card rendered."""
+    share = SHARING_COPY[locale]
+    url = base_url.rstrip("/") + share_url(locale, value)
+    text = words["share_text"].format(url=url)
+    intent = "https://x.com/intent/post?" + urlencode({"text": text})
+    whatsapp = "https://wa.me/?text=" + quote(text, safe="")
+    telegram = (
+        "https://t.me/share/url?url="
+        + quote(url, safe="")
+        + "&text="
+        + quote(text.removesuffix(url).rstrip(), safe="")
+    )
+    links = "".join(
+        f"<a class='btn btn-ghost btn-sm' href='{_e(href)}' target='_blank' "
+        f"rel='noopener noreferrer'>{_e(share[label])}</a>"
+        for href, label in ((intent, "post"), (whatsapp, "whatsapp"), (telegram, "telegram"))
+    )
+    png = (
+        f"<p><a class='btn btn-ghost btn-sm' href='{_e(image_path)}' download>"
+        f"{_e(reading.COPY[locale]['download_png'])}</a></p>"
+        if image_path
+        else ""
+    )
+    return (
+        "<div data-public-share>"
+        f"<p class='help'>{_e(words['card_public'])}</p>"
+        f"<label for='calculator-share-text'>{_e(share['copy'])}</label>"
+        "<textarea id='calculator-share-text' readonly rows='4' style='width:100%'>"
+        f"{_e(text)}</textarea><div class='copy-row'>"
+        "<button class='btn btn-dark btn-sm' type='button' data-copy='calculator-share-text' "
+        f"data-done='{_e(share['done'])}' data-fallback='{_e(share['fallback'])}' hidden>"
+        f"{_e(share['copy'])}</button>{links}</div>"
+        "<p class='muted' data-copy-status role='status' aria-live='polite'></p>"
+        f"{png}</div>"
+    )
+
+
 def calculator_page(
     *,
     locale: str = "es",
@@ -3812,8 +3856,13 @@ def calculator_page(
     years: str | None = None,
     trials: str | None = None,
     periods_per_year: str | None = "252",
+    image_path: str = "",
 ) -> str:
-    """The free luck calculator: declared figures and frequency, the luck section's result."""
+    """The free luck calculator: declared figures and frequency, the luck section's result.
+
+    ``image_path`` is the result's own share card, set by the web layer only
+    when the card rendered; empty keeps the site's static preview.
+    """
     locale = _locale(locale)
     try:
         frequency = float(periods_per_year) if periods_per_year is not None else 252.0
@@ -3823,7 +3872,17 @@ def calculator_page(
         frequency = 252.0
     words = calculator_copy(locale, frequency)
     title = f"{words['title']} · {BRAND}"
-    meta = _public_meta(title, words["summary"], locale, calculator_url(locale), base_url)
+    meta = head_meta(
+        PageMeta(
+            title=title,
+            description=words["summary"],
+            locale=locale,
+            paths=dict(CALCULATOR_PATH),
+            image_path=image_path,
+            image_alt=title,
+        ),
+        base_url=base_url,
+    )
 
     def field(name: str, value: str | None, step: str) -> str:
         shown = f" value='{_e(value)}'" if value else ""
@@ -3854,7 +3913,12 @@ def calculator_page(
         + frequency_field
         + f"</div><button class='btn btn-dark' type='submit'>{_e(words['submit'])}</button></form>"
     )
-    result = _calculator_result(words, locale, sharpe, years, trials, periods_per_year)
+    parsed = parse_input(sharpe, years, trials, periods_per_year)
+    result = _calculator_result(words, locale, parsed)
+    # Sharing only for a measured result: an empty form or an error has nothing to show.
+    share = ""
+    if isinstance(parsed, CalculatorInput) and compute(parsed)["status"] == "MEASURED":
+        share = _calculator_share(words, locale, parsed, base_url, image_path)
     cta = (
         f"<p>{_e(words['cta'])}</p><p><a class='btn btn-dark' href='{_e(_form_url(locale))}'>"
         f"{_e(words['cta_button'])}<span class='go'>{icon('arrow')}</span></a> "
@@ -3874,6 +3938,8 @@ def calculator_page(
     sections = [(words["form_title"], form)]
     if result:
         sections.append((words["result_title"], result))
+    if share:
+        sections.append((words["share_title"], share))
     sections += [
         (words["cta_title"], cta),
         (words["why_title"], bullets(words["why"])),

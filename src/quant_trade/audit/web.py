@@ -65,7 +65,17 @@ from quant_trade.audit import pdf as pdf_lib
 from quant_trade.audit import strategies as strategies_lib
 from quant_trade.audit.articles import article_url, find_article
 from quant_trade.audit.audiences import AUDIENCES_BY_PATH, audience_url
-from quant_trade.audit.calculator import CALCULATOR_PATH
+from quant_trade.audit.calculator import (
+    CALCULATOR_PATH,
+    CARD_FIELDS,
+    CARD_REQUESTS_PER_HOUR,
+    CalculatorInput,
+    calculator_url,
+    compute,
+    parse_input,
+    share_values,
+)
+from quant_trade.audit.calculator_card import calculator_card_svg
 from quant_trade.audit.compare import (
     COMPARE_PATH,
     compare_form,
@@ -1192,6 +1202,9 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     reading_attempts = AttemptLog()
     reading_images = reading_png.ReadingPNGCache()
     reading_png_paths = {path + "/card.png" for path in reading.READING_PATH.values()}
+    calculator_attempts = AttemptLog()
+    calculator_images = reading_png.ReadingPNGCache(fields=CARD_FIELDS)
+    calculator_png_paths = {path + "/card.png" for path in CALCULATOR_PATH.values()}
     card_lookups = AttemptLog()
     failed_card_sessions = AttemptLog()
     app.state.attempt_logs = (upload_attempts, redeem_attempts, waitlist_attempts, panel_failures)
@@ -1336,7 +1349,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         if request.method != "GET" or response.status_code != 200:
             return
         path = request.url.path
-        if path in reading_png_paths:
+        if path in reading_png_paths or path in calculator_png_paths:
             return  # Public image responses never carry a visitor's referral cookie.
         kept = funnel.clean_ref(request.cookies.get(funnel.REF_COOKIE))
         arrived = funnel.clean_ref(request.query_params.get("ref"))
@@ -1416,7 +1429,9 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         ok = response.status_code == 200
         if (request.url.path.startswith("/static/") or request.url.path in ICON_PATHS) and ok:
             response.headers["Cache-Control"] = STATIC_CACHE_CONTROL
-        elif request.url.path in reading_png_paths and ok:
+        elif (
+            request.url.path in reading_png_paths or request.url.path in calculator_png_paths
+        ) and ok:
             response.headers["Cache-Control"] = "public, max-age=86400"
         else:
             public = (
@@ -6267,6 +6282,14 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             pricing_path, public_pricing, methods=["GET"], response_class=HTMLResponse
         )
 
+    def _calculator_card(locale: str, value: CalculatorInput) -> bytes | None:
+        """The result's PNG preview, from the LRU or rendered once; ``None`` if it fails."""
+        try:
+            svg = calculator_card_svg(value, locale)
+        except ValueError:
+            return None
+        return calculator_images.get(locale, share_values(value), svg)
+
     def _calculator(
         request: Request,
         locale: str,
@@ -6275,6 +6298,16 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         trials: str | None,
         periods_per_year: str | None,
     ) -> str:
+        # A measured result previews its own card. Past the hourly card limit,
+        # or when the renderer fails, the page keeps the static image: the
+        # calculator itself is never refused.
+        image_path = ""
+        parsed = parse_input(sharpe, years, trials, periods_per_year)
+        if isinstance(parsed, CalculatorInput) and compute(parsed)["status"] == "MEASURED":
+            ip = _client_ip(request, cfg.trusted_proxy_hops)
+            within = calculator_attempts.hit(ip, datetime.now(UTC)) < CARD_REQUESTS_PER_HOUR
+            if within and _calculator_card(locale, parsed) is not None:
+                image_path = calculator_url(locale) + "/card.png?" + urlencode(share_values(parsed))
         return calculator_page(
             locale=locale,
             base_url=_site_url(request),
@@ -6282,7 +6315,45 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             years=years,
             trials=trials,
             periods_per_year=periods_per_year,
+            image_path=image_path,
         )
+
+    def calculator_card_png(request: Request) -> Response:
+        """The share card of a calculator result, for link previews.
+
+        Only the four validated numbers reach the card; the language comes
+        from the path. No cookie is set (see ``_funnel_visit``) and nothing is
+        stored but the bounded in-memory LRU of rendered images.
+        """
+        page_path = request.url.path.removesuffix("/card.png")
+        locale = next(k for k, path in CALCULATOR_PATH.items() if path == page_path)
+        query = request.query_params
+        if any(len(query.getlist(name)) > 1 for name in CARD_FIELDS):
+            return Response(status_code=404)
+        ip = _client_ip(request, cfg.trusted_proxy_hops)
+        if calculator_attempts.hit(ip, datetime.now(UTC)) >= CARD_REQUESTS_PER_HOUR:
+            return PlainTextResponse(
+                guard_page(reading.COPY[locale]["limited"]),
+                status_code=429,
+                headers={"Retry-After": "3600"},
+            )
+        parsed = parse_input(
+            query.get("sharpe"),
+            query.get("years"),
+            query.get("trials"),
+            query.get("periods_per_year"),
+        )
+        if not isinstance(parsed, CalculatorInput) or compute(parsed)["status"] != "MEASURED":
+            return Response(status_code=404)
+        png = _calculator_card(locale, parsed)
+        if png is None:
+            return PlainTextResponse(
+                guard_page(reading.COPY[locale]["png_unavailable"]), status_code=503
+            )
+        return Response(png, media_type="image/png")
+
+    for calculator_path in CALCULATOR_PATH.values():
+        app.add_api_route(calculator_path + "/card.png", calculator_card_png, methods=["GET"])
 
     @app.get("/calculadora", response_class=HTMLResponse)
     def calculator_es(
