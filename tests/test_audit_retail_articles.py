@@ -119,16 +119,19 @@ def test_ai_article_reuses_calculator_table_and_public_reader(locale: str) -> No
     for row, inputs in zip(rows, LUCK_TABLE_INPUTS, strict=True):
         label = evidence_label("DECLARED", locale)
         value = compute(inputs)["luck_sharpe"]["value"]
+        trials, luck = f"{inputs.trials:,}", f"{value:.2f}"
+        if locale != "en":
+            trials, luck = trials.replace(",", "."), luck.replace(".", ",")
         assert _visible(row).split() == [
             label,
             "·",
-            f"{inputs.trials:,}",
+            trials,
             label,
             "·",
             f"{inputs.years:g}",
             label,
             "·",
-            f"{value:.2f}",
+            luck,
         ]
     assert f"href='{READING_PATH[locale]}'" in page
     costs = next(p for p in _paragraphs(RETAIL_KEYS[2], locale) if "2x" in p)
