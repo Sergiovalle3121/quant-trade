@@ -98,6 +98,8 @@ def test_the_data_has_the_shape_the_writer_pastes() -> None:
         "que-hacer-despues-del-backtest",
         "cuantas-operaciones-porcentaje-aciertos",
         "lo-eligio-el-optimizador",
+        "monte-carlo-backtest",
+        "rachas-perdedoras",
     ]
     for entry in ARTICLES_DATA:
         assert DATA_KEYS <= set(entry) <= DATA_KEYS | {"seo_title"}, entry["key"]
@@ -117,6 +119,7 @@ def test_the_data_has_the_shape_the_writer_pastes() -> None:
                 "method",
                 "contact",
                 "samples",
+                "sample",
                 "reading",
                 "article",
                 "winrate",
@@ -188,6 +191,16 @@ def test_every_article_exists_in_every_language_and_passes_the_guard() -> None:
             "es": "lo-eligio-el-optimizador",
             "en": "did-the-optimizer-pick-your-result",
             "pt": "o-otimizador-escolheu-o-resultado",
+        },
+        "monte-carlo-backtest": {
+            "es": "monte-carlo-backtest",
+            "en": "monte-carlo-backtest-what-it-shows",
+            "pt": "monte-carlo-backtest-o-que-mostra",
+        },
+        "rachas-perdedoras": {
+            "es": "rachas-perdedoras",
+            "en": "losing-streaks-how-many-are-normal",
+            "pt": "sequencias-de-perdas",
         },
     }
     for article in ARTICLES:

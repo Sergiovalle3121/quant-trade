@@ -215,6 +215,38 @@ _QUESTIONS: tuple[dict[str, tuple[str, str]], ...] = (
             "seleção entre muitas tentativas; não reconstrói buscas que você não enviou.",
         ),
     },
+    # Sources: engine._risk (analytics.drawdown_risk, shuffled_drawdown) with the
+    # seed run_audit records, engine._bootstrap feeding verdict's bootstrap p5 Sharpe,
+    # and method.COPY['resampling']. Resampled risk does not enter the verdict.
+    {
+        "es": (
+            "¿Hace Rigor una simulación de Monte Carlo?",
+            "Sí, sobre el historial que aportas. El riesgo remuestreado arma miles de "
+            "historias de un año con bloques de tus retornos (bootstrap estacionario) y el "
+            "bootstrap del Sharpe alimenta la prueba de azar, con una semilla fija que el "
+            "informe imprime. Describen la dispersión si el orden fuera intercambiable; no son "
+            "una predicción ni corrigen el sobreajuste, que miden el Sharpe deflactado y el "
+            "tramo fuera de muestra.",
+        ),
+        "en": (
+            "Does Rigor run a Monte Carlo simulation?",
+            "Yes, on the history you supply. Resampled risk builds thousands of one-year "
+            "histories from blocks of your returns (stationary bootstrap) and the Sharpe "
+            "bootstrap feeds the test against chance, with a fixed seed the report prints. "
+            "They describe the spread if the order were exchangeable; they are not a "
+            "prediction and do not correct overfitting, which deflated Sharpe and the "
+            "out-of-sample stretch measure.",
+        ),
+        "pt": (
+            "A Rigor faz uma simulação de Monte Carlo?",
+            "Sim, sobre o histórico que você envia. O risco reamostrado monta milhares de "
+            "históricos de um ano com blocos dos seus retornos (bootstrap estacionário) e o "
+            "bootstrap do Sharpe alimenta o teste contra o acaso, com uma semente fixa que o "
+            "relatório imprime. Descrevem a dispersão se a ordem fosse intercambiável; não são "
+            "uma previsão nem corrigem o sobreajuste, que o Sharpe deflacionado e o trecho fora "
+            "da amostra medem.",
+        ),
+    },
     # Sources: legal.privacy_text retention sections, including the first-free-report
     # exception and the public allow-list retained after a purge, in every language.
     {

@@ -51,7 +51,7 @@ def _card_settings(**environ: str) -> AuditSettings:
 
 
 @pytest.mark.parametrize("locale", LOCALES)
-def test_ten_localized_questions_and_all_copy_pass_the_guard(locale: str) -> None:
+def test_eleven_localized_questions_and_all_copy_pass_the_guard(locale: str) -> None:
     configurations = (
         AuditSettings(),
         _settings(AUDIT_EMAIL_VERIFICATION_REQUIRED="true"),
@@ -59,8 +59,8 @@ def test_ten_localized_questions_and_all_copy_pass_the_guard(locale: str) -> Non
     )
     for settings in configurations:
         pairs = faq_items(settings, locale)
-        assert len(pairs) == 10
-        assert len({question for question, _ in pairs}) == 10
+        assert len(pairs) == 11
+        assert len({question for question, _ in pairs}) == 11
         for question, answer in pairs:
             assert question and answer
             assert find_claims(question) == []
@@ -120,18 +120,18 @@ def test_retention_upload_limit_and_contact_follow_configuration(locale: str) ->
     pairs = faq_items(settings, locale)
     declared = evidence_label("DECLARED", locale)
     assert declared in pairs[2][1] and "7 MB" in pairs[2][1]
-    assert declared in pairs[7][1] and str(settings.retention_days) in pairs[7][1]
-    assert "30" not in pairs[7][1]
+    assert declared in pairs[8][1] and str(settings.retention_days) in pairs[8][1]
+    assert "30" not in pairs[8][1]
     # The FAQ must preserve legal.py's exception for the first free full report.
     first_free = {
         "es": "primer informe completo gratis",
         "en": "first free full report",
         "pt": "primeiro relatório completo grátis",
     }
-    assert first_free[locale] in pairs[7][1]
-    assert settings.operator_contact in pairs[9][1]
-    assert settings.contact_url in pairs[9][1]
-    assert CONTACT_COPY[locale]["none"] in faq_items(AuditSettings(), locale)[9][1]
+    assert first_free[locale] in pairs[8][1]
+    assert settings.operator_contact in pairs[10][1]
+    assert settings.contact_url in pairs[10][1]
+    assert CONTACT_COPY[locale]["none"] in faq_items(AuditSettings(), locale)[10][1]
 
 
 @pytest.mark.parametrize("locale", LOCALES)
@@ -143,7 +143,7 @@ def test_faq_json_is_valid_and_matches_every_visible_answer(locale: str) -> None
     data = json.loads(blocks[0])
     assert data["@context"] == "https://schema.org"
     assert data["@type"] == "FAQPage"
-    assert len(data["mainEntity"]) == 10
+    assert len(data["mainEntity"]) == 11
     for entry, (question, answer) in zip(
         data["mainEntity"], faq_items(settings, locale), strict=True
     ):
