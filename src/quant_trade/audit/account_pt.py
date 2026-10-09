@@ -727,6 +727,10 @@ COPY_PT: dict[str, str] = {
         "e o PDF abrem com uma conta. Guarde este link: sem conta, é a única forma de voltar a "
         "ela."
     ),
+    "anon_preview_link": (
+        "Prévia sem conta: a classe de A a D e os alertas do seu arquivo. Guarde este link: "
+        "sem conta, é a única forma de voltar a ela."
+    ),
     "anon_preview_box": (
         "Crie sua conta com o seu e-mail e este mesmo relatório abre completo, grátis, com o PDF."
     ),
@@ -744,7 +748,7 @@ COPY_PT: dict[str, str] = {
         "com o PDF, sem custo. Depois você tem {limit} prévias grátis por mês: a classe de A a "
         "D, os gráficos e as bandeiras vermelhas. Seu arquivo não foi guardado: com a conta "
         "criada você volta ao formulário para enviá-lo de novo. Se você já tem um código de "
-        "acesso, digite-o no formulário e não precisa de conta."
+        "acesso, entre na sua conta e digite-o no formulário."
     ),
     "gate_code_title": "Esse código não funciona",
     "gate_code_lead": (

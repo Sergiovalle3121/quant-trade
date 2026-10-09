@@ -33,6 +33,7 @@ from quant_trade.audit.accounts import (  # noqa: E402
     FREE_PREVIEWS_PER_MONTH,
     REPORT_KEY_COOKIE,
     claim_day,
+    month_start,
     network_cap,
     network_key,
 )
@@ -81,7 +82,13 @@ BUTTON = {
     "en": "Open my full report free",
     "pt": "Abrir meu relatório completo grátis",
 }
-NEW_KEYS = ("anon_preview", "anon_preview_box", "anon_preview_signup", "anon_preview_signin")
+NEW_KEYS = (
+    "anon_preview",
+    "anon_preview_link",
+    "anon_preview_box",
+    "anon_preview_signup",
+    "anon_preview_signin",
+)
 
 
 def _settings(tmp_path: Path, **extra: object) -> AuditSettings:
@@ -360,6 +367,7 @@ def test_a_working_code_still_asks_for_the_account(tmp_path: Path) -> None:
         follow_redirects=False,
     )
     assert sent.status_code == 401
+    assert "no necesitas cuenta" not in sent.text
     assert _audits(store) == 0
 
 
@@ -536,6 +544,260 @@ def test_a_wrong_key_links_nothing(tmp_path: Path) -> None:
     _signup_from(visitor, f"/audits/{audit_id}?lang=es", "nadie@example.com")
     assert store.account_for_audit(audit_id) is None
     assert store.anon_pending(audit_id) is not None
+
+
+# -- only the uploading browser takes it -----------------------------------------------
+def _same_browser(app: Any, ip: str, device: str) -> TestClient:
+    """A new tab without a session in the browser that holds ``device``."""
+    client = _browser(app, ip)
+    client.cookies.set(DEVICE_COOKIE, device, domain="rigor.example")
+    return client
+
+
+def _own(store: Store, account_id: str) -> list[str]:
+    return [report.audit_id for report in store.account_audits_list(account_id) if report.own]
+
+
+def _saved(store: Store, account_id: str) -> list[str]:
+    return [report.audit_id for report in store.account_audits_list(account_id) if not report.own]
+
+
+@pytest.mark.parametrize("confirmation", [False, True])
+def test_another_browser_with_the_link_never_takes_the_free_report(
+    tmp_path: Path, confirmation: bool
+) -> None:
+    app, store = _app(tmp_path, email_verification_required=confirmation)
+    uploader = _browser(app, "203.0.113.7")
+    audit_id, token = _anon_upload(uploader, 91)
+    row = store.anon_pending(audit_id)
+    assert row is not None
+    reader = _browser(app, "198.51.100.50")
+    # The reader is offered no free report: the usual box, and no promise.
+    page = reader.get(f"/audits/{audit_id}?token={token}&acct=anon_preview").text
+    assert _escaped(BOX["es"]) not in page and _escaped(BUTTON["es"]) not in page
+    assert _escaped(account_pages.COPY["es"]["anon_box"]) in page
+    assert _escaped(account_pages.COPY["es"]["anon_preview"]) not in page
+    assert _escaped(account_pages.COPY["es"]["anon_preview_link"]) in page
+
+    made = _signup_from(reader, _from_report(reader, audit_id, token, "signup"), "lee@example.com")
+    assert made.status_code == 303
+    location = made.headers["location"]
+    assert location.startswith(f"/audits/{audit_id}?token={token}&lang=es")
+    assert "acct=welcome&" not in location + "&" and "preview_" not in location
+    reader_account = store.find_account("lee@example.com")
+    assert reader_account is not None
+    if confirmation:
+        _confirm(app, store, reader_account.id)
+    record = store.get_audit(audit_id)
+    assert record is not None and not record.paid
+    assert store.account_for_audit(audit_id) is None
+    assert not store.welcome_used(reader_account.id)
+    # The pending row still waits for the uploader, with no account.
+    still = store.anon_pending(audit_id)
+    assert still is not None and still.account_id == ""
+    # Nothing of the uploader's upload reaches the reader's data.
+    data = reader.get("/cuenta/datos")
+    assert data.status_code == 200
+    assert "203.0.113.7" not in data.text and row.device_sha256 not in data.text
+    assert row.file_sha256 not in data.text
+    assert data.json()["free_first_report"] is None
+    assert data.json()["free_first_report_pending"] == []
+
+    # The uploader still opens it by creating the account from the report.
+    opened = _signup_from(
+        uploader, _from_report(uploader, audit_id, token, "signup"), "sube@example.com"
+    )
+    owner = store.find_account("sube@example.com")
+    assert owner is not None and store.account_for_audit(audit_id) == owner.id
+    if confirmation:
+        assert "acct=welcome_confirm" in opened.headers["location"]
+        _confirm(app, store, owner.id)
+    else:
+        assert opened.headers["location"].endswith("&acct=welcome")
+    record = store.get_audit(audit_id)
+    assert record is not None and record.paid
+    assert _own(store, owner.id) == [audit_id]
+
+
+def test_another_browser_saving_the_link_keeps_a_saved_preview(tmp_path: Path) -> None:
+    app, store = _app(tmp_path, email_verification_required=False)
+    uploader = _browser(app, "203.0.113.8")
+    audit_id, token = _anon_upload(uploader, 92)
+    reader = _browser(app, "198.51.100.52")
+    page = reader.get("/registro").text
+    reader.post(
+        "/registro",
+        data={"email": "guarda@example.com", "password": PASSWORD, "csrf": _csrf(page)},
+        follow_redirects=False,
+    )
+    account = store.find_account("guarda@example.com")
+    assert account is not None
+    report = reader.get(f"/audits/{audit_id}?token={token}&lang=es").text
+    saved = reader.post(
+        f"/audits/{audit_id}/save",
+        params={"token": token, "lang": "es"},
+        data={"csrf": _csrf(report)},
+        follow_redirects=False,
+    )
+    assert saved.headers["location"] == f"/audits/{audit_id}?token={token}&lang=es&acct=saved"
+    record = store.get_audit(audit_id)
+    assert record is not None and not record.paid
+    assert _saved(store, account.id) == [audit_id] and _own(store, account.id) == []
+    assert not store.welcome_used(account.id)
+    still = store.anon_pending(audit_id)
+    assert still is not None and still.account_id == ""
+    assert "203.0.113.8" not in reader.get("/cuenta/datos").text
+
+
+# -- an account's own uploads keep the month's previews ------------------------------
+def test_an_account_past_its_previews_takes_previews_without_an_account_as_saved(
+    tmp_path: Path,
+) -> None:
+    """The free report used, the previews linked from uploads without an account
+    count as the month's: past the 3, a preview goes on the account as saved."""
+    app, store = _app(tmp_path, email_verification_required=False)
+    ip = "198.51.100.60"
+    first = _browser(app, ip)
+    page = first.get("/registro").text
+    first.post(
+        "/registro",
+        data={"email": "tope@example.com", "password": PASSWORD, "csrf": _csrf(page)},
+        follow_redirects=False,
+    )
+    account = store.find_account("tope@example.com")
+    assert account is not None
+    now = datetime.now(UTC)
+    store.spend_welcome(account.id, at=now)
+    device = str(first.cookies.get(DEVICE_COOKIE) or "")
+    ids: list[str] = []
+    for seed in range(101, 101 + FREE_PREVIEWS_PER_MONTH + 1):
+        tab = _same_browser(app, ip, device) if device else _browser(app, ip)
+        audit_id, token = _anon_upload(tab, seed)
+        device = str(tab.cookies.get(DEVICE_COOKIE))
+        entered = _signin_from(tab, _from_report(tab, audit_id, token, "signin"), account.email)
+        assert entered.headers["location"] == f"/audits/{audit_id}?token={token}&lang=es"
+        assert store.account_for_audit(audit_id) == account.id
+        ids.append(audit_id)
+    # The first three are its own uploads and its three previews of the month.
+    assert set(_own(store, account.id)) == set(ids[:3])
+    assert _saved(store, account.id) == [ids[3]]
+    assert store.free_previews_since(month_start(now), account_id=account.id) == 3
+    # And an upload signed in finds the month's previews used.
+    signed_in = _same_browser(app, ip, device)
+    _signin_from(signed_in, "/auditar", account.email)
+    assert _upload(signed_in, 120).status_code == 402
+
+
+# -- what the notice promises ----------------------------------------------------------
+def _no_promise(page: str) -> None:
+    assert _escaped(account_pages.COPY["es"]["anon_preview"]) not in page
+    assert _escaped(account_pages.COPY["es"]["anon_preview_link"]) in page
+    assert "se abren con una cuenta" not in page
+    assert _escaped(BOX["es"]) not in page
+
+
+def test_the_notice_promises_the_account_only_when_it_would_open_it(tmp_path: Path) -> None:
+    app, store = _app(tmp_path, email_verification_required=False)
+    # The same file already had its free report on another account.
+    ana = _browser(app, "203.0.113.70")
+    ana_id, ana_token = _anon_upload(ana, 121)
+    page = ana.get(f"/audits/{ana_id}?token={ana_token}&acct=anon_preview").text
+    assert _escaped(account_pages.COPY["es"]["anon_preview"]) in page
+    assert "se abren con una cuenta" in html.unescape(page)
+    _signup_from(ana, _from_report(ana, ana_id, ana_token, "signup"), "ana@example.com")
+    beto = _browser(app, "198.51.100.71")
+    beto_id, beto_token = _anon_upload(beto, 121)
+    _no_promise(beto.get(f"/audits/{beto_id}?token={beto_token}&acct=anon_preview").text)
+
+    # The network already had the month's free reports.
+    now = datetime.now(UTC)
+    with store.engine.begin() as conn:
+        for n in range(10):
+            conn.execute(
+                store.welcome_reports.insert().values(
+                    account_id=f"used{n}",
+                    client_ip="192.0.2.77",
+                    created_at=now.isoformat().replace("+00:00", "Z"),
+                )
+            )
+    carla = _browser(app, "192.0.2.77")
+    carla_id, carla_token = _anon_upload(carla, 122)
+    _no_promise(carla.get(f"/audits/{carla_id}?token={carla_token}&acct=anon_preview").text)
+
+
+def test_without_mail_the_preview_promises_nothing(tmp_path: Path) -> None:
+    """Confirmation required and no way to send it: the box and the notice stay plain."""
+    app, store = _app(tmp_path, resend_api_key="")
+    visitor = _browser(app)
+    audit_id, token = _anon_upload(visitor, 123)
+    page = visitor.get(f"/audits/{audit_id}?token={token}&acct=anon_preview").text
+    _no_promise(page)
+    assert _escaped(account_pages.COPY["es"]["anon_box"]) in page
+
+
+# -- an account made another way, then "save" --------------------------------------
+@pytest.mark.parametrize("confirmation", [False, True])
+def test_an_account_made_from_the_menu_takes_the_preview_on_saving(
+    tmp_path: Path, confirmation: bool
+) -> None:
+    app, store = _app(tmp_path, email_verification_required=confirmation)
+    visitor = _browser(app, "203.0.113.80")
+    audit_id, token = _anon_upload(visitor, 124)
+    page = visitor.get("/registro").text
+    made = visitor.post(
+        "/registro",
+        data={"email": "menu@example.com", "password": PASSWORD, "csrf": _csrf(page)},
+        follow_redirects=False,
+    )
+    assert made.status_code == 303 and "/audits/" not in made.headers["location"]
+    account = store.find_account("menu@example.com")
+    assert account is not None and store.account_for_audit(audit_id) is None
+    # Signed in, the notice makes no promise: the box offers "save".
+    report = visitor.get(f"/audits/{audit_id}?token={token}&lang=es&acct=anon_preview").text
+    _no_promise(report)
+    assert _escaped(account_pages.COPY["es"]["save_button"]) in report
+    saved = visitor.post(
+        f"/audits/{audit_id}/save",
+        params={"token": token, "lang": "es"},
+        data={"csrf": _csrf(report)},
+        follow_redirects=False,
+    )
+    assert saved.status_code == 303
+    back = f"/audits/{audit_id}?token={token}&lang=es"
+    assert store.account_for_audit(audit_id) == account.id
+    assert _own(store, account.id) == [audit_id]
+    if confirmation:
+        assert saved.headers["location"] == f"{back}&acct=preview_unverified"
+        shown = visitor.get(saved.headers["location"]).text
+        assert _escaped(account_pages.COPY["es"]["welcome_refused_unverified"]) in shown
+        record = store.get_audit(audit_id)
+        assert record is not None and not record.paid
+        _confirm(app, store, account.id)
+    else:
+        assert saved.headers["location"] == f"{back}&acct=welcome"
+    record = store.get_audit(audit_id)
+    assert record is not None and record.paid
+    assert str(record.stripe_session_id).startswith(WELCOME_REFERENCE_PREFIX)
+    assert store.welcome_used(account.id)
+
+
+# -- the sign-up page and a code ---------------------------------------------------
+def test_the_sign_up_page_asks_for_the_account_for_a_code_too() -> None:
+    told = {
+        "es": "código de acceso, entra en tu cuenta y escríbelo en el formulario.",
+        "en": "access code, sign in to your account and type it in the form.",
+        "pt": "código de acesso, entre na sua conta e digite-o no formulário.",
+    }
+    for locale, words in told.items():
+        lead = account_pages.COPY[locale]["gate_signin_lead"]
+        assert lead.endswith(words), lead
+        for wrong in ("no necesitas cuenta", "you need no account", "não precisa de conta"):
+            assert wrong not in lead
+        assert find_claims(lead) == []
+        page = account_pages.gate_page(
+            locale=locale, reason="signin", limit=FREE_PREVIEWS_PER_MONTH
+        )
+        assert html.escape(words, quote=True) in page
 
 
 # -- retention and the panel ---------------------------------------------------------

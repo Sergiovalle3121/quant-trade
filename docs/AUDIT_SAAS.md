@@ -2851,32 +2851,97 @@ an account never changes what a report says.
     `anon_previews` row counts it for `/panel`, and the answer goes to
     `/audits/{id}?token=…&acct=anon_preview` (the device cookie is set as for
     any upload). The in-page upload follows the same `location`.
-  - The report says it is a preview without an account (`anon_preview`) and,
-    while the account would open it (uploaded in the last
-    `WELCOME_PENDING_DAYS` days, and neither its browser, file nor network had
-    their free report meanwhile), its box reads `anon_preview_box` with
-    "Abrir mi informe completo gratis" (sign-up) and "Ya tengo cuenta";
-    otherwise it keeps the usual `anon_box`. It stays `noindex`, opened only
-    by its key.
+  - The report says it is a preview without an account. While the account
+    would open it (this same browser uploaded it, its device cookie hashing to
+    the upload's mark; uploaded in the last `WELCOME_PENDING_DAYS` days;
+    neither its browser, file nor network had their free report meanwhile;
+    and, when confirmation is required, a confirmation e-mail can be sent),
+    a visitor without a session sees `anon_preview` ("the full report and the
+    PDF open with an account") and the box reads `anon_preview_box` with
+    "Abrir mi informe completo gratis" (sign-up) and "Ya tengo cuenta".
+    Otherwise (another browser with the link, a file or network that already
+    had its free report, a signed-in visitor, no mail transport) the notice
+    is `anon_preview_link`, without that promise, and the box is the usual
+    `anon_box`. It stays `noindex`, opened only by its key.
   - Signing up or in (password, two-step code or passkey) with `next` on that
-    report and its key in `REPORT_KEY_COOKIE` (checked as `_load` checks it)
-    links a report no account holds: as the account's own upload when this
-    browser uploaded it, else as saved. The pending row is attached
-    (`store.welcome_pending_attach`, only a row with `account_id = ""`). With
-    no confirmation required, or an address already confirmed,
-    `_grant_pending_welcome` opens it at once (`acct=welcome`); otherwise
-    confirming the address opens it, as for any pending preview (the report
-    shows `welcome_refused_unverified`). An account that already had its free
-    report, or whose browser, file, inbox or network rule refuses it, keeps
-    the report linked and locked, with the usual credit, code or card offer.
-    No limit is relaxed: the free full report is still one per account,
-    inbox, browser, file and card, and a few per network a month.
+    report and its key in `REPORT_KEY_COOKIE` (checked as `_load` checks it),
+    or "Guardar en mi cuenta" on it from an account made another way (the
+    menu, the form's "Crear cuenta gratis"), runs `_anon_to_account`. Only the
+    browser that uploaded it takes it: another browser with the link links
+    nothing on signing up or in, and its "save" is the usual saved link,
+    without the pending row, so it never gets the uploader's free report nor
+    their network address or marks in "Descargar mis datos"; the uploader can
+    still take it afterwards while no account holds it. For the uploader the
+    report goes on the account as its own upload and the pending row is
+    attached (`store.welcome_pending_attach`, only a row with
+    `account_id = ""`). With no confirmation required, or an address already
+    confirmed, `_grant_pending_welcome` opens it at once (`acct=welcome`);
+    otherwise confirming the address opens it, as for any pending preview
+    (the report shows `welcome_refused_unverified`). When the account,
+    browser, file, inbox or network rule refuses the free report, the report
+    counts as one of the month's free previews of the account and of the
+    network (the same `preview:account:` and `preview:ip:` claims and
+    `free_previews` row as an upload made signed in); past either cap it goes
+    on the account as saved, not as its own upload. It stays locked, with the
+    usual credit, code or card offer. No limit is relaxed: the free full
+    report is still one per account, inbox, browser, file and card, and a few
+    per network a month, and an account's own uploads still count against
+    its 3 previews a month. One case is left as it is: a preview waiting for
+    the address to be confirmed is not counted (confirming opens it as the
+    free report, and a counted preview given back by `delete_free_preview`
+    keeps its claim), so an account that never confirms can hold such
+    previews as its own uploads, locked.
   - Retention: the locked preview follows the usual purge; its
     `welcome_pending` and `anon_previews` rows and the day's network claims go
     at the same cutoff, and with `delete_audit`.
   - `/panel` adds "Vistas previas sin cuenta" by tag: how many previews were
     uploaded without an account and how many went on an account afterwards
     (`funnel.STAGES` `anon_previews` and `anon_linked`).
+  - **Open before turning it on** (`legal.py` is not changed on this branch;
+    the owner decides and the terms and privacy pages change first, in
+    es/en/pt with the same meaning):
+    - Terms: they say that after the free report "la vista previa gratis
+      necesita una cuenta: 3 por mes calendario y por cuenta, contadas también
+      por dirección de red". With the switch on, a network also gets the
+      previews without an account of the day, apart from the account's 3.
+      Proposed (es): «Sin cuenta, cada red puede ver la clase y las banderas
+      rojas de unos pocos archivos al día (2 por red IPv6 /64 y 6 por
+      dirección IPv4); esas vistas previas no cuentan entre las 3 de tu
+      cuenta.» (en): "Without an account, each network can see the class and
+      red flags of a few files a day (2 per IPv6 /64 network and 6 per IPv4
+      address); those previews do not count among your account's 3." (pt):
+      «Sem conta, cada rede pode ver a classe e os alertas de alguns arquivos
+      por dia (2 por rede IPv6 /64 e 6 por endereço IPv4); essas prévias não
+      contam entre as 3 da sua conta.»
+    - Privacy: it does not say that an upload without an account keeps, per
+      report, the link tag the visitor came with (`anon_previews.ref`, from
+      the `rigor_ref` cookie) next to a report that keeps `client_ip` until
+      the purge, nor that the `welcome_pending` row of a visitor who never
+      makes an account keeps the browser mark (hash), the file's SHA-256 and
+      the network address. Proposed (es): «Si subes un archivo sin cuenta: el
+      idioma, la etiqueta del enlace con la que llegaste (cookie rigor_ref),
+      la fecha y, si luego lo pasas a una cuenta, cuándo; además, el
+      identificador de tu navegador (solo como hash), el SHA-256 del archivo y
+      la dirección de red, para abrirlo como informe gratis si creas la
+      cuenta. Todo se borra con el informe o a los {days} días.» (en): "If you
+      upload a file without an account: the language, the link tag you came
+      with (rigor_ref cookie), the date and, if you later move it to an
+      account, when; also your browser's identifier (as a hash only), the
+      file's SHA-256 and the network address, to open it as the free report
+      if you create the account. All of it is deleted with the report or
+      after {days} days." (pt): «Se você enviar um arquivo sem conta: o
+      idioma, a etiqueta do link com que você chegou (cookie rigor_ref), a
+      data e, se depois você o passar para uma conta, quando; além disso, o
+      identificador do seu navegador (só como hash), o SHA-256 do arquivo e o
+      endereço de rede, para abri-lo como relatório grátis se você criar a
+      conta. Tudo é apagado com o relatório ou após {days} dias.» The other
+      way is to keep no tag per report and count only a daily total.
+    - The box's promise (`anon_preview_box`, fixed by the brief) cannot know
+      whether the inbox already had its free report: the address is only
+      known on signing up, and the notice afterwards (`welcome_refused_email`)
+      says why it stayed a preview. Kept as is; if the owner wants it
+      softened, the same condition goes in the three languages, e.g. «…se
+      abre completo, gratis, con PDF, si tu correo no lo recibió ya».
 - **Free first full report** (`accounts.WELCOME_FULL_REPORT = True`,
   `WELCOME_REPORTS_PER_IP_PER_MONTH = 3` per IPv6 /64,
   `WELCOME_REPORTS_PER_IPV4_PER_MONTH = 10` per IPv4 address; not in free

@@ -2801,20 +2801,35 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             with contextlib.suppress(Exception):
                 db.clear_welcome_pending(account_id)
 
-    def _anon_offer(record: Any, owner: str | None, now: datetime) -> bool:
-        """A preview uploaded without an account that the account would open in full.
+    def _anon_uploader(request: Request, row: Any) -> bool:
+        """This browser uploaded the preview ``row`` notes: its device cookie is
+        the one hashed at the upload. Whoever was sent the link has another."""
+        device = request.cookies.get(acct.DEVICE_COOKIE) or ""
+        return (
+            row is not None
+            and 0 < len(device) <= 128
+            and acct.same_secret(acct.hash_secret(device), row.device_sha256)
+        )
+
+    def _anon_offer(request: Request, record: Any, owner: str | None, now: datetime) -> bool:
+        """A preview this browser uploaded without an account that the account would open in full.
 
         Only with ``AUDIT_ANON_PREVIEW`` on, for a locked report no account holds,
-        uploaded in the last ``WELCOME_PENDING_DAYS`` days, whose browser, file
-        and network have not had their free report meanwhile: what the report's
-        box then promises is what signing up does.
+        uploaded in the last ``WELCOME_PENDING_DAYS`` days by this same browser
+        (``_anon_uploader``: whoever was sent the link is never offered the
+        uploader's free report), whose browser, file and network have not had
+        their free report meanwhile, and only while a required confirmation
+        e-mail can be sent: what the report's box then promises is what signing
+        up does.
         """
         if not cfg.anon_preview or cfg.free_mode or not acct.WELCOME_FULL_REPORT:
+            return False
+        if cfg.email_verification_required and not cfg.email_delivery_ready:
             return False
         if record.paid or owner is not None:
             return False
         row = db.anon_pending(record.id)
-        if row is None or not row.file_sha256:
+        if row is None or not row.file_sha256 or not _anon_uploader(request, row):
             return False
         oldest = now - timedelta(days=WELCOME_PENDING_DAYS)
         if row.created_at < oldest.astimezone(UTC).isoformat().replace("+00:00", "Z"):
@@ -2845,16 +2860,92 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         target = f"{parts.path}?{query}acct={notice}"
         return target + (f"#{parts.fragment}" if parts.fragment else "")
 
+    def _claim_month_preview(account_id: str, net: str, reservation: str, now: datetime) -> bool:
+        """Take one of the account's and the network's free previews of the month.
+
+        The slots an upload made signed in takes (``claim_preview`` in
+        ``create_audit``), all or nothing. ``True`` when taken under ``reservation``.
+        """
+        month = acct.claim_month(now)
+        slots = {
+            "account": [
+                f"preview:account:{account_id}:{month}:{n}"
+                for n in range(acct.FREE_PREVIEWS_PER_MONTH)
+            ]
+        }
+        if net:
+            cap = acct.network_cap(
+                net,
+                per_ip=acct.FREE_PREVIEWS_PER_IP_PER_MONTH,
+                per_ipv4=acct.FREE_PREVIEWS_PER_IPV4_PER_MONTH,
+            )
+            key = acct.network_key(net)
+            slots["network"] = [f"preview:ip:{key}:{month}:{n}" for n in range(cap)]
+        return not db.claim_free(reservation, keys=(), slots=slots, at=now)
+
+    def _anon_to_account(request: Request, account: Any, record: Any) -> str | None:
+        """Put on ``account`` a preview this browser uploaded without an account.
+
+        ``None`` when ``record`` is not one: the switch is off, an account holds
+        it, it has no pending row of an upload without an account, or this is
+        another browser (``_anon_uploader``). Whoever was sent the link keeps
+        "save" or paying, as with any report, and never takes the uploader's
+        free report or its marks.
+
+        Otherwise the report goes on the account as its own upload and its
+        pending row is attached (``store.welcome_pending_attach``). When the
+        account, browser, file, inbox or network rule refuses the free report,
+        the report counts as one of the month's free previews of the account
+        and the network, as an upload made signed in would; past that cap it
+        goes on the account as saved, not as its own upload. Otherwise it opens
+        as the free full report (``_grant_pending_welcome``), at once or on
+        confirming the address. Returns the ``acct`` notice, ``""`` for none.
+        """
+        if not cfg.anon_preview or cfg.free_mode or db.account_for_audit(record.id) is not None:
+            return None
+        row = db.anon_pending(record.id)
+        if row is None or not _anon_uploader(request, row):
+            return None
+        now = datetime.now(UTC)
+        if record.paid:
+            # Paid by its link meanwhile: only the link to the account is left.
+            if db.link_audit(account.id, record.id, at=now, via=VIA_UPLOAD) == "linked":
+                db.note_anon_linked(record.id, at=now)
+            return ""
+        refused = _pending_refusal(
+            account.id,
+            device_sha256=row.device_sha256,
+            file_sha256=row.file_sha256,
+            net=row.client_ip,
+            now=now,
+        )
+        reservation = acct.new_secret()
+        counted = bool(refused) and _claim_month_preview(
+            account.id, row.client_ip, reservation, now
+        )
+        via = VIA_SAVED if refused and not counted else VIA_UPLOAD
+        if db.link_audit(account.id, record.id, at=now, via=via) != "linked":
+            if counted:
+                db.release_free(reservation)
+            return ""
+        if counted:
+            db.record_free_preview(record.id, account.id, client_ip=row.client_ip, at=now)
+        db.note_anon_linked(record.id, at=now)
+        if not db.welcome_pending_attach(record.id, account.id):
+            return ""
+        if refused:
+            return f"preview_{refused}" if refused in WELCOME_REFUSALS else ""
+        if cfg.email_verification_required and not db.email_verified(account.id):
+            # Confirming the address opens it (``_grant_pending_welcome``).
+            return "preview_unverified"
+        return "welcome" if _grant_pending_welcome(account.id, now) else ""
+
     def _take_anon_report(request: Request, account: Any, next_path: str) -> str:
-        """Put on the account the report a visitor signed up or in from.
+        """Put on the account the preview a visitor signed up or in from.
 
         Only with ``AUDIT_ANON_PREVIEW`` on. ``next`` names the report and the
-        report-key cookie holds its key, checked as ``_load`` checks it. A
-        report no account holds is linked: as the account's own upload when
-        this browser uploaded it, else as saved. A preview uploaded without an
-        account is attached to the account and, once its address counts as
-        confirmed, opened as the free full report under the same account,
-        inbox, browser, file and network limits (``_grant_pending_welcome``).
+        report-key cookie holds its key, checked as ``_load`` checks it; the
+        rest is ``_anon_to_account`` (this browser's own preview only).
         Returns the ``acct`` notice for the way back, ``""`` for none.
         """
         if not cfg.anon_preview or cfg.free_mode or not next_path:
@@ -2870,36 +2961,9 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 or not token_matches(record.token_hash, token)
                 or record.purged_at
                 or not record.result_json
-                or db.account_for_audit(audit_id) is not None
             ):
                 return ""
-            now = datetime.now(UTC)
-            row = db.anon_pending(audit_id)
-            device = request.cookies.get(acct.DEVICE_COOKIE) or ""
-            uploader = (
-                row is not None
-                and 0 < len(device) <= 128
-                and acct.same_secret(acct.hash_secret(device), row.device_sha256)
-            )
-            via = VIA_UPLOAD if uploader else VIA_SAVED
-            if db.link_audit(account.id, audit_id, at=now, via=via) != "linked":
-                return ""
-            db.note_anon_linked(audit_id, at=now)
-            if row is None or record.paid or not db.welcome_pending_attach(audit_id, account.id):
-                return ""
-            refused = _pending_refusal(
-                account.id,
-                device_sha256=row.device_sha256,
-                file_sha256=row.file_sha256,
-                net=row.client_ip,
-                now=now,
-            )
-            if refused:
-                return f"preview_{refused}" if refused in WELCOME_REFUSALS else ""
-            if cfg.email_verification_required and not db.email_verified(account.id):
-                # Confirming the address opens it (``_grant_pending_welcome``).
-                return "preview_unverified"
-            return "welcome" if _grant_pending_welcome(account.id, now) else ""
+            return _anon_to_account(request, account, record) or ""
         except Exception:  # noqa: BLE001 - signing up or in never fails over the report
             logger.warning("could not put a report on the account it was opened from")
             return ""
@@ -6080,7 +6144,12 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             and not record.paid
             and db.account_for_audit(record.id) is None
         ):
-            notice = account_pages.COPY[ui]["anon_preview"]
+            # "Opens with an account" only where creating it would: signed out,
+            # this browser's upload, and the box's own offer holds.
+            opens = _session(request) is None and _anon_offer(
+                request, record, None, datetime.now(UTC)
+            )
+            notice = account_pages.COPY[ui]["anon_preview" if opens else "anon_preview_link"]
         elif (
             acct_done
             and acct_done.startswith("preview_")
@@ -6152,7 +6221,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 state="anon",
                 audit_id=record.id,
                 query=query,
-                anon_preview=_anon_offer(record, owner, datetime.now(UTC)),
+                anon_preview=_anon_offer(request, record, owner, datetime.now(UTC)),
             )
         account, csrf, _ = session
         state = "mine" if owner == account.id else ("unsaved" if owner is None else "other")
@@ -6202,9 +6271,21 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             return checked
         record, session = checked
         locale = _view_locale(record, lang)
-        outcome = db.link_audit(session[0].id, record.id, at=datetime.now(UTC))
+        account = session[0]
+        try:
+            # A preview this browser uploaded without an account goes on as on
+            # signing up from it (an account made from the menu, then "save").
+            notice = _anon_to_account(request, account, record)
+        except Exception:  # noqa: BLE001 - saving never fails over the free report
+            logger.warning("could not put a preview without an account on the account")
+            notice = None
+        if notice is None:
+            outcome = db.link_audit(account.id, record.id, at=datetime.now(UTC))
+            saved = outcome in ("linked", "already")
+        else:
+            saved = db.account_for_audit(record.id) == account.id
         back = f"/audits/{audit_id}?token={token}" if token else f"/audits/{audit_id}?"
-        done = "&acct=saved" if outcome in ("linked", "already") else ""
+        done = f"&acct={notice}" if notice else "&acct=saved" if saved else ""
         return RedirectResponse(f"{back}&lang={locale}{done}", status_code=303)
 
     @app.post("/audits/{audit_id}/credit")
