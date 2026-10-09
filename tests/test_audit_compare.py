@@ -65,7 +65,7 @@ def test_equal_figures_show_each_reports_own_evidence_and_missing_is_not_measure
     b["performance"]["sharpe"]["evidence"] = "DECLARED"
     b["performance"]["max_drawdown"] = {"evidence": "MEASURED", "value": None}
     original = deepcopy((a, b))
-    body = comparison_body(a, b, href_a="/synthetic-a", href_b="/synthetic-b", locale=locale)
+    body = comparison_body([a, b], hrefs=["/synthetic-a", "/synthetic-b"], locale=locale)
     left, right = _figure_cells(body, LABELS[locale]["kpi_sharpe"])
     assert ">0.50<" in left and ">0.50<" in right
     _assert_badge(left, "MEASURED", locale)
@@ -101,7 +101,7 @@ def test_trade_count_and_win_rate_use_the_lower_evidence_of_both_sources(
         "win_rate": {"evidence": rate_tag, "value": 0.5},
     }
     original = deepcopy((a, b))
-    body = comparison_body(a, b, href_a="/synthetic-a", href_b="/synthetic-b", locale=locale)
+    body = comparison_body([a, b], hrefs=["/synthetic-a", "/synthetic-b"], locale=locale)
     left, right = _figure_cells(body, LABELS[locale]["kpi_trades"])
     _assert_badge(left, "MEASURED", locale)
     _assert_badge(right, expected, locale)
@@ -132,7 +132,7 @@ def test_break_even_evidence_includes_pips_only_when_that_number_is_displayed(
         else f" ({LABELS[locale]['kpi_breakeven_negative']})"
     )
     original = deepcopy((a, b))
-    body = comparison_body(a, b, href_a="/synthetic-a", href_b="/synthetic-b", locale=locale)
+    body = comparison_body([a, b], hrefs=["/synthetic-a", "/synthetic-b"], locale=locale)
     for cell in _figure_cells(body, label):
         _assert_badge(cell, expected, locale)
     assert (a, b) == original
@@ -172,7 +172,7 @@ def test_all_valid_key_figures_keep_their_source_evidence(
     }
     b = deepcopy(a)
     original = deepcopy((a, b))
-    body = comparison_body(a, b, href_a="/synthetic-a", href_b="/synthetic-b", locale=locale)
+    body = comparison_body([a, b], hrefs=["/synthetic-a", "/synthetic-b"], locale=locale)
     figures = body.rsplit("<table class='cmp'>", 1)[1].split("</table>", 1)[0]
     cells = re.findall(r"<tr><td>[^<]+</td>(.*?)</tr>", figures, re.DOTALL)
     assert len(cells) == 10
@@ -191,7 +191,7 @@ def test_complete_comparison_handles_non_mapping_context_and_performance(
     a, b = _stored_result(), _stored_result()
     b[field] = value
     original = deepcopy((a, b))
-    body = comparison_body(a, b, href_a="/synthetic-a", href_b="/synthetic-b", locale=locale)
+    body = comparison_body([a, b], hrefs=["/synthetic-a", "/synthetic-b"], locale=locale)
     reason = "context_invalid" if field == "inputs" else "metric_unmeasured"
     assert REASONS[locale][reason] in unescape(body)
     assert "NOT_MEASURED" in body and "private-" not in body
@@ -208,7 +208,7 @@ def test_complete_comparison_withholds_invalid_figure_and_keeps_valid_delta(
     b["performance"]["sharpe"]["value"] = value
     b["performance"]["max_drawdown"]["value"] = -0.08
     before = deepcopy(b)
-    body = comparison_body(a, b, href_a="/synthetic-a", href_b="/synthetic-b", locale=locale)
+    body = comparison_body([a, b], hrefs=["/synthetic-a", "/synthetic-b"], locale=locale)
     assert REASONS[locale]["metric_invalid"] in body
     assert "+2.00 pp" in body and "NOT_MEASURED" in body
     assert ">nan<" not in body and ">inf<" not in body and "private-token" not in body
@@ -223,7 +223,7 @@ def test_comparison_kpi_copy_ignores_malformed_optional_sections_and_free_form_c
     b["inputs"]["first_timestamp"] = "private-token"
     b["inputs"]["source_format"] = "private-file/name"
     original = deepcopy(b)
-    body = comparison_body(a, b, href_a="/synthetic-a", href_b="/synthetic-b", locale="en")
+    body = comparison_body([a, b], hrefs=["/synthetic-a", "/synthetic-b"], locale="en")
     assert REASONS["en"]["dates_invalid"] in unescape(body)
     assert "private-" not in body and "NOT_MEASURED" in body
     assert b == original
@@ -234,7 +234,7 @@ def test_comparison_preserves_declared_figure_without_a_measured_delta() -> None
     b["performance"]["sharpe"] = {"evidence": "DECLARED", "value": 0.8}
     b["performance"]["max_drawdown"]["value"] = -0.08
     original = deepcopy(b)
-    body = comparison_body(a, b, href_a="/synthetic-a", href_b="/synthetic-b", locale="en")
+    body = comparison_body([a, b], hrefs=["/synthetic-a", "/synthetic-b"], locale="en")
     assert ">0.80<" in body and "+0.300" not in body and "+2.00 pp" in body
     assert REASONS["en"]["metric_unmeasured"] in body
     assert b == original
@@ -242,7 +242,7 @@ def test_comparison_preserves_declared_figure_without_a_measured_delta() -> None
 
 def test_native_csv_format_and_parseable_dates_keep_fixed_card_labels() -> None:
     a, b = _stored_result(), _stored_result()
-    body = comparison_body(a, b, href_a="/synthetic-a", href_b="/synthetic-b", locale="en")
+    body = comparison_body([a, b], hrefs=["/synthetic-a", "/synthetic-b"], locale="en")
     assert body.count("File: CSV") == 2
     assert body.count("2024-01-01 → 2024-12-31") == 2
 
@@ -257,7 +257,7 @@ def test_comparison_steps_link_existing_export_guides_and_keep_original_results(
     b["inputs"]["first_timestamp"] = "2024-01-02T00:00:00Z"
     b["performance"]["sharpe"]["value"] = 0.8
     original = deepcopy((a, b))
-    body = comparison_body(a, b, href_a="/synthetic-a", href_b="/synthetic-b", locale=locale)
+    body = comparison_body([a, b], hrefs=["/synthetic-a", "/synthetic-b"], locale=locale)
     assert ACTION_COPY[locale]["title"] in body
     assert EVIDENCE_STEPS[locale]["dates_different"] in body
     assert f"href='{guides}'" in body
@@ -270,7 +270,7 @@ def test_finite_but_overflowing_percentage_is_not_rendered_as_infinity() -> None
     b["performance"]["max_drawdown"]["value"] = 1e308
     b["performance"]["sharpe"]["value"] = 0.8
     original = deepcopy(b)
-    body = comparison_body(a, b, href_a="/synthetic-a", href_b="/synthetic-b", locale="en")
+    body = comparison_body([a, b], hrefs=["/synthetic-a", "/synthetic-b"], locale="en")
     assert REASONS["en"]["difference_invalid"] in body
     assert "+0.300" in body and "inf%" not in body and "NOT_MEASURED" in body
     assert b == original

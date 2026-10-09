@@ -225,7 +225,7 @@ Portuguese slug (`Audience.slug_pt`; a Spanish or English slug under
 `/pt/guias/<slug>` (`Guide.slug_pt`; the guides name the Portuguese form
 fields). The language switch on these pages offers the other two languages.
 The methodology (`/pt/metodologia`), the report check (`/pt/comprovar`) and
-the comparison of two reports (`/pt/comparar`) have Portuguese pages, linked
+the comparison of two or three reports (`/pt/comparar`) have Portuguese pages, linked
 from every Portuguese page and offered in the language bar of their Spanish and
 English twins (`tests/test_audit_trust_pages_pt.py`). Pages not translated yet
 (the terms and the privacy policy, until the Spanish ones have had their legal
@@ -950,27 +950,52 @@ Sharpe, profit factor, break-even cost) carry one plain line under the name,
 for example "lo ganado por cada 1 perdido" under the profit factor; locked
 tiles show the name only.
 
-### Comparing two reports
+### Comparing two or three reports
 
-`/comparar` (Spanish) and `/compare` (English) take the links of two of the
-customer's own reports and show them side by side: class, period and file
-format, the six dimensions and the executive-summary figures, with the
-figures that differ in bold (`audit/compare.py`). Every unlocked report has
-a small form that fills in its own link. Rules:
+`/comparar` (Spanish), `/compare` (English) and `/pt/comparar` take the links
+of two of the customer's own reports, plus an optional third (`link_c`, the
+pack of three audited side by side), and show them one column per report:
+class, period and file format, the six dimensions and the executive-summary
+figures (`audit/compare.py`, `comparison_body(results, hrefs=..., locale=...)`,
+two or three results, `compare.MAX_COMPARED = 3`). A figure is in bold
+("distinta") when it is not the same in every report. Every unlocked report
+has a small form that fills in its own link (the second field only). Rules:
 
 - the links travel in a POST body, never in a URL, so no token reaches a
-  log line; the id and token are read from the pasted address and checked
-  exactly like the report page (wrong token: 404, same report twice or an
-  unreadable link: 400);
-- only paid reports (or any report in free mode) can be compared: a locked
-  one gets 402 and the unlocked figures are never shown;
+  log line; the id and token are read from each pasted address and checked
+  exactly like the report page (wrong token: 404, the same report more than
+  once or an unreadable link: 400; an empty third field compares two);
+- only paid reports (or any report in free mode) can be compared: if any of
+  the two or three is locked the answer is the same 402 and no figure is
+  shown;
+- with two reports the body is byte for byte the two-column one it was
+  (`tests/test_audit_compare_three.py` rebuilds the old layout and compares);
+  with three the cards, the dimension table and the figure table get a third
+  column (`cmp3`; three cards in a row above 860 px, stacked below, and the
+  tables scroll inside their box on a narrow phone), and the page title is
+  "Tres informes, lado a lado";
+- the change summary (`comparison_delta.change_summary`) is still between
+  two reports. With two it follows the cards, as before. With three it is
+  shown only when all three are versions of one strategy, which is how the
+  code already says that reports are versions of one system: the signed-in
+  account filed the three in the same strategy of "Mis estrategias"
+  (`web._same_strategy`). Then there is one summary per consecutive pair,
+  1 to 2 and 2 to 3 (`numbers=(1, 2)`, `(2, 3)`: "Qué cambió del informe 2
+  al 3", report numbers in the reasons and unique section ids). Otherwise it
+  is left out and a fixed line says why (`compare.COPY[*]['summary_three']`).
+  Visitors who are not signed in, or whose account did not file the three
+  together, see the three columns without it;
 - the page is private (`noindex`), passes the profit-claim guard and says
   that a class difference shows which tests changed, not that one version
   will work better.
 
 The existing account picker (`/cuenta/comparar`, `/account/comparar`,
 `/pt/conta/comparar`) uses the signed-in customer's report list; it never exposes
-tokens or consumes credits. A new stored-evidence summary shows the class change,
+tokens or consumes credits. It takes two or three ticked reports (`?id=` repeated,
+in the order shown; the same id twice, four or more, or one not complete goes
+back to the list with `compare_pick`), and that address, with the three ids,
+is the one the language switch links and that opens the same comparison
+again. A new stored-evidence summary shows the class change,
 which dimensions changed result, and flags that appear or are absent in report 2.
 An absent flag can reflect missing data, not a resolved risk. Classification and
 tests retain their own reports' declarations, including attempts and costs.
@@ -3402,10 +3427,11 @@ an account never changes what a report says.
   purchase is not refundable (`buy_final_sale_note`), as the card form's box
   does.
 - **Comparing**: with two or more full reports, "Mis informes" lets the
-  customer tick two and open `/cuenta/comparar` (`/account/comparar`), the
-  same side-by-side view as `/comparar` without pasting private links. It is
-  a read-only GET; both reports must be on the signed-in account's list, not
-  purged and unlocked (or free mode); anything else goes back to the list.
+  customer tick two or three and open `/cuenta/comparar` (`/account/comparar`),
+  the same side-by-side view as `/comparar` without pasting private links. It
+  is a read-only GET; every report must be on the signed-in account's list,
+  not purged and unlocked (or free mode), and appear once; anything else goes
+  back to the list.
 - **Opening a report**: the owner opens `/audits/{id}` without the token; any
   other visitor still needs the token (a wrong one is a 404).
 - **Security**: scrypt password hashes (N=2^14, r=8, p=1, 16-byte salt);
@@ -5205,7 +5231,13 @@ language links, canonical URLs and sitemap entries through `PUBLIC_PAGES`.
 Navigation and footer prices links lead there; the landing retains `#pricing`
 and adds a detail link. Both report columns describe the same six dimensions,
 evidence labels, PDF, optional public page/card, comparison and contact channel.
-Comparison requires two full reports; payment does not create missing evidence.
+Comparison requires two full reports and takes up to three ("Comparación de
+hasta tres informes"); payment does not create missing evidence. The pack card
+(`PRICING_COPY[*]['pack_text']`) says "Audita 3 robots y compáralos lado a
+lado antes de comprar uno, o sigue tu cuenta 3 meses" (es/en/pt) while
+`settings.PACK_CREDITS <= compare.MAX_COMPARED`; a larger pack would fall back
+to `pack_text_plain`, the sentence without the comparison. Prices, credits and
+the pack's content are unchanged.
 The existing landing limitations text is reused without rewriting it.
 
 Prices (including cents), discounted-pack availability and quantity come from
