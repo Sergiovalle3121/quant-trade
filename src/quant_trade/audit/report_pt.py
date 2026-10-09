@@ -1053,6 +1053,51 @@ REPORT: dict[str, Any] = {
         ),
         "ff_phases": "{n} fases",
         "ff_phase": "1 fase",
+        "ff_basis_columns": (
+            "«Passa» usa o histórico completo e sem custo. As colunas de fora da amostra e com "
+            "custo são os mesmos cenários da escada acima, com cada programa."
+        ),
+        "ff_clean_short": "dentro da regra do melhor dia",
+        "ff_rules": "Regras, fonte e data",
+        "ff_rule_target": "meta {value}",
+        "ff_rule_each": "{value} em cada fase",
+        "ff_rule_in_phase": "{value} na fase {n}",
+        "ff_rule_daily_initial": "perda diária {value} do saldo inicial",
+        "ff_rule_daily_day": "perda diária {value} do saldo no início do dia",
+        "ff_rule_total_static": "perda total {value}, fixa",
+        "ff_rule_total_trailing": (
+            "perda total {value}, trailing sobre o maior saldo de fechamento diário"
+        ),
+        "ff_rule_total_lock": (
+            "perda total {value}, trailing sobre o maior saldo de fechamento diário até chegar ao "
+            "saldo inicial"
+        ),
+        "ff_rule_days": "mínimo de {n} dias de trading",
+        "ff_rule_time": "prazo de {n} dias",
+        "ff_rule_best_target": "melhor dia no máximo {value} da meta",
+        "ff_rule_best_positive": "melhor dia no máximo {value} do ganho dos dias positivos",
+        "ff_rule_markets": "mercados: {markets}, lidos em {date}",
+        "ff_rule_read": "Regras lidas em {date}",
+        "ff_source_link": "fonte",
+        "ff_market_only": "Só {markets}",
+        "ff_market_skip": (
+            "o histórico é de {history}, que este programa não admite segundo sua página; não é "
+            "simulado"
+        ),
+        "ff_mk_fx": "forex",
+        "ff_mk_metals": "metais",
+        "ff_mk_indices": "índices",
+        "ff_mk_energy": "energia",
+        "ff_mk_crypto": "cripto",
+        "ff_mk_futures": "futuros",
+        "ff_hist_fx": "forex",
+        "ff_hist_metal": "metais",
+        "ff_hist_us_equity": "índices dos EUA",
+        "ff_hist_crypto": "cripto",
+        "ff_and": "e",
+        "ch_ladder_pass_one": "Atinge a meta",
+        "ch_size_lots": "{lots} lotes",
+        "ch_size_lot_col": "Lote médio por operação",
         "ch_ladder_title": "Quanto muda com o que este relatório encontrou?",
         "ch_ladder_intro": (
             "O mesmo programa ({program}), reamostrado da mesma forma, com trechos "
@@ -1102,7 +1147,7 @@ REPORT: dict[str, Any] = {
             "porque o arquivo não o indica: 1x escala com ele, e sobre um saldo maior as mesmas "
             "operações seriam menos de 1x."
         ),
-        "ch_size_lot": "Lote ou risco por operação a 1x",
+        "ch_size_lot": "Lote médio por operação a 1x",
         "ch_size_account": (
             "Conta que o programa nomeia: {size} USD. Os seus limites em dólares são simulados "
             "como porcentagens dessa conta."
@@ -4074,10 +4119,30 @@ RULES: tuple[tuple[str, str], ...] = (
         ),
     ),
     (
-        "the audit keeps neither the lot nor the stop loss of each trade, so the lot or risk "
-        "per trade at 1x is not known",
-        "a auditoria não guarda o lote nem o stop loss de cada operação, então o lote ou o "
-        "risco por operação a 1x não é conhecido",
+        "the lots of each trade are read only from MetaTrader 4 and 5 reports, whose volume "
+        "column is the platform's lots, so the average lot at 1x is not known; 1x is still the "
+        "size the history traded at",
+        "os lotes de cada operação só são lidos dos relatórios do MetaTrader 4 e 5, cuja coluna "
+        "de volume são os lotes da plataforma, então o lote médio a 1x não é conhecido; 1x "
+        "continua sendo o tamanho com que o histórico operou",
+    ),
+    (
+        "lots per trade on average at the history's own size: the {lots} lots of the {count} "
+        "trades divided by their number; the cost section counts {traded} lots traded because "
+        "it adds entries and exits",
+        "lotes por operação em média no tamanho do próprio histórico: os {lots} lotes das "
+        "{count} operações divididos pelo seu número; a seção de custos conta {traded} lotes "
+        "negociados porque soma entradas e saídas",
+    ),
+    (
+        "the average lot per trade at 1x multiplied by the size",
+        "o lote médio por operação a 1x multiplicado pelo tamanho",
+    ),
+    (
+        "the ladder's rung for every program: the same series, simulator, seed and rules; the "
+        "chosen program's figure is the ladder's own",
+        "o cenário da escada com cada programa: a mesma série, simulador, semente e regras; o "
+        "número do programa escolhido é o da escada",
     ),
     (
         "account size in US dollars that the program names; its limits are shares of it",

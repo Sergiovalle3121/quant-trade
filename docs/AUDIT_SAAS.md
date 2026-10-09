@@ -1105,7 +1105,20 @@ The `/ejemplo` backtest trades two pairs, EURUSD and AUDUSD (`SAMPLE_SYMBOLS`,
 the pair drawn from its own random stream, so no result changes), and holds
 each trade between 1 and 7 hours (`SAMPLE_HOLD_HOURS`, also its own stream),
 so the per-instrument and "Cómo se comporta al perder" sections have real
-variety to show. The class stays C.
+variety to show. The class stays C. Its header prints what an MT5 tester
+report prints and the importer reads: "History Quality: 100% real ticks"
+(`SAMPLE_HISTORY_QUALITY`; the test-data section shows real ticks and 100 %,
+DECLARED, and the modelling question is answered for the developer) and
+"Equity Drawdown Maximal" and "Relative", the drawdown with the open trade
+counted: each trade's deepest floating loss is the low of a Brownian bridge
+from its entry to its exit with the trades' 25-pip spread, drawn from its
+own stream (`_floating_low`), so no trade, class, flag, challenge, ladder or
+size figure changes. It reads 1 570.26 (5.78 %) and 8.76 % (1 008.99),
+against 8.22 % on closed trades: the report adds "Drawdown con operaciones
+abiertas (tu plataforma)" (DECLARED), the capital section shows the
+platform's fall in money as a floor (below the resampled reference, so no
+capital figure moves) with its open-loss line, and the rows read grow by
+three.
 
 "Qué hacer ahora" / "What to do now" follows "Qué significa para ti": up to
 three checks for whoever runs the robot, from the live comparison, serious
@@ -1377,6 +1390,31 @@ and report wire them in during the integration step):
   the balance hides open losses, the table repeats that its figures are
   optimistic. MEASURED under the simulator's assumptions; it compares rules
   and never recommends buying a challenge. No class change.
+  Each row carries `rules` (one entry per phase: target, daily loss and its
+  basis, total loss and its type, minimum days, time limit, best-day rule,
+  copied from `prop_presets`) and the report folds them under the program's
+  name with "rules read on {as_of}" and a link to `source_url`; a field a
+  program does not have is left out. `ChallengeRules.markets` lists what a
+  program lets the trader trade only when a page of the firm says so
+  (`markets_source`, `markets_as_of`): Topstep is futures only ("Topstep is a
+  Futures-only program", help article 8284206), The5ers High Stakes and Hyper
+  Growth list their assets on their own pages; FTMO, FundedNext and Bootcamp
+  pages read say nothing, so they are never restricted. The history's
+  markets come from `crises.symbol_market` (`firmfit.SYMBOL_MARKETS`: a
+  currency pair or a metal pair is never a future; an index or a coin name
+  can be either); when every symbol is known and a program takes none of
+  them, the program is not simulated and goes last with `market` ("Only
+  futures: the history trades forex, ..."), no figure. With symbols the
+  audit cannot place, nothing is restricted. `firmfit.scenario_columns`
+  repeats the ladder's `out_of_sample` and `reference_cost` rungs for every
+  program, named as the ladder names them: the chosen program's figures are
+  the ladder's own, every other program runs `program_pass` on the same
+  series at 2,000 paths per phase. A rung the ladder could not measure is
+  one NOT_MEASURED line under the table with the ladder's reason. Time
+  measured with `time.perf_counter` at the production paths: about 0.8 s
+  extra on the sample report and 0.6 s with FTMO 2-Step chosen (the three
+  Topstep programs left out for a forex history are not simulated), under
+  2 s, so the columns keep the firm table's 2,000 paths.
 - `challenge.scenarios`, the challenge ladder ("¿Cuánto cambia con lo que
   encontró este informe?"): the chosen program (all its phases, through
   `firmfit.program_pass`; the generic preset is one phase) run again with
@@ -1415,8 +1453,10 @@ and report wire them in during the integration step):
   measure (too few daily returns) says why. The rows are scenarios of the
   same history, not predictions; the ladder is MEASURED, informational and
   changes neither the class, the dimensions, the challenge's own figures
-  nor the firm table, which now says that its figures come from the full
-  history without the reference cost. When the client chose the challenge,
+  nor the firm table's full-history column; the firm table repeats the
+  `out_of_sample` and `reference_cost` rungs for every program. The target
+  column reads "Reaches the target" for a one-phase program and "Reaches the
+  target in every phase" with more. When the client chose the challenge,
   one line under the verdict gives the full-history figure next to the
   lowest measured row and links to the section; when the section warns that
   the balance hides open losses (the platform's drawdown with open trades
@@ -1453,9 +1493,14 @@ and report wire them in during the integration step):
   file states none (the importer's or the column mapping's "does not state a
   starting balance" warning on a curve built from it); the report then says
   the balance was assumed and that 1x scales with it. `size_per_trade`
-  is NOT_MEASURED: the importers fold each trade's lots into units of the
-  instrument and read no stop loss, so the report does not know the lot or
-  the risk per trade behind 1x and never gives one; 1x is "the size of the
+  is the average lot per trade at 1x (MEASURED) when the costs section
+  measured `break_even_per_lot` (MetaTrader lots that can be added): every
+  trade's lots added and divided by the number of trades, which is half the
+  "lots traded" the cost section divides by (it counts entries and exits);
+  each row then has `average_lot`, that average times the size. Otherwise
+  NOT_MEASURED, with the cost section's reason for mixed lots or with
+  `SIZING_NO_SIZE` (lots are read only from MetaTrader 4 and 5 reports). No
+  stop loss is read, so no risk per trade is given; 1x is "the size of the
   history you uploaded" (each simulated day gains or loses the same share of
   the balance as a day of the file). `account_size` is DECLARED only when
   the preset's program names one (`prop_presets.ACCOUNT_SIZES`: Topstep

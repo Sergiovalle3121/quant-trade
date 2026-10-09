@@ -1774,6 +1774,51 @@ LABELS: dict[str, dict[str, str]] = {
         ),
         "ff_phases": "{n} fases",
         "ff_phase": "1 fase",
+        "ff_basis_columns": (
+            "«Pasa» usa la historia completa y sin costo. Las columnas de fuera de muestra y con "
+            "costo son los mismos escenarios de la escalera de arriba, con cada programa."
+        ),
+        "ff_clean_short": "dentro de la regla del mejor día",
+        "ff_rules": "Reglas, fuente y fecha",
+        "ff_rule_target": "objetivo {value}",
+        "ff_rule_each": "{value} en cada fase",
+        "ff_rule_in_phase": "{value} en la fase {n}",
+        "ff_rule_daily_initial": "pérdida diaria {value} del balance inicial",
+        "ff_rule_daily_day": "pérdida diaria {value} del balance al empezar el día",
+        "ff_rule_total_static": "pérdida total {value}, fija",
+        "ff_rule_total_trailing": "pérdida total {value}, trailing sobre el mayor cierre diario",
+        "ff_rule_total_lock": (
+            "pérdida total {value}, trailing sobre el mayor cierre diario hasta llegar al balance "
+            "inicial"
+        ),
+        "ff_rule_days": "mínimo {n} días de trading",
+        "ff_rule_time": "plazo de {n} días",
+        "ff_rule_best_target": "mejor día como máximo el {value} del objetivo",
+        "ff_rule_best_positive": (
+            "mejor día como máximo el {value} de la ganancia de los días positivos"
+        ),
+        "ff_rule_markets": "mercados: {markets}, leídos el {date}",
+        "ff_rule_read": "Reglas leídas el {date}",
+        "ff_source_link": "fuente",
+        "ff_market_only": "Solo {markets}",
+        "ff_market_skip": (
+            "el historial es de {history}, que este programa no admite según su página; no se "
+            "simula"
+        ),
+        "ff_mk_fx": "forex",
+        "ff_mk_metals": "metales",
+        "ff_mk_indices": "índices",
+        "ff_mk_energy": "energía",
+        "ff_mk_crypto": "cripto",
+        "ff_mk_futures": "futuros",
+        "ff_hist_fx": "forex",
+        "ff_hist_metal": "metales",
+        "ff_hist_us_equity": "índices de EE. UU.",
+        "ff_hist_crypto": "cripto",
+        "ff_and": "y",
+        "ch_ladder_pass_one": "Llega al objetivo",
+        "ch_size_lots": "{lots} lotes",
+        "ch_size_lot_col": "Lote medio por operación",
         "ch_ladder_title": "¿Cuánto cambia con lo que encontró este informe?",
         "ch_ladder_intro": (
             "El mismo programa ({program}), remuestreado igual, con distintos tramos "
@@ -1826,7 +1871,7 @@ LABELS: dict[str, dict[str, str]] = {
             "porque el archivo no lo indica: 1x escala con él, y sobre un balance mayor las "
             "mismas operaciones serían menos de 1x."
         ),
-        "ch_size_lot": "Lote o riesgo por operación a 1x",
+        "ch_size_lot": "Lote medio por operación a 1x",
         "ch_size_account": (
             "Cuenta que nombra el programa: {size} USD. Sus límites en dólares se simulan como "
             "porcentajes de esa cuenta."
@@ -3257,6 +3302,49 @@ LABELS: dict[str, dict[str, str]] = {
         ),
         "ff_phases": "{n} phases",
         "ff_phase": "1 phase",
+        "ff_basis_columns": (
+            "'Passes' uses the full history without costs. The out-of-sample and cost columns are "
+            "the same scenarios as the ladder above, for each program."
+        ),
+        "ff_clean_short": "within the best-day rule",
+        "ff_rules": "Rules, source and date",
+        "ff_rule_target": "target {value}",
+        "ff_rule_each": "{value} in each phase",
+        "ff_rule_in_phase": "{value} in phase {n}",
+        "ff_rule_daily_initial": "daily loss {value} of the initial balance",
+        "ff_rule_daily_day": "daily loss {value} of the balance at the start of the day",
+        "ff_rule_total_static": "total loss {value}, static",
+        "ff_rule_total_trailing": "total loss {value}, trailing the highest end-of-day balance",
+        "ff_rule_total_lock": (
+            "total loss {value}, trailing the highest end-of-day balance until it reaches the "
+            "starting balance"
+        ),
+        "ff_rule_days": "at least {n} trading days",
+        "ff_rule_time": "time limit of {n} days",
+        "ff_rule_best_target": "best day at most {value} of the target",
+        "ff_rule_best_positive": "best day at most {value} of the positive days' gain",
+        "ff_rule_markets": "markets: {markets}, read on {date}",
+        "ff_rule_read": "Rules read on {date}",
+        "ff_source_link": "source",
+        "ff_market_only": "Only {markets}",
+        "ff_market_skip": (
+            "the history trades {history}, which this program does not take according to its page; "
+            "not simulated"
+        ),
+        "ff_mk_fx": "forex",
+        "ff_mk_metals": "metals",
+        "ff_mk_indices": "indices",
+        "ff_mk_energy": "energy",
+        "ff_mk_crypto": "crypto",
+        "ff_mk_futures": "futures",
+        "ff_hist_fx": "forex",
+        "ff_hist_metal": "metals",
+        "ff_hist_us_equity": "US equity indices",
+        "ff_hist_crypto": "crypto",
+        "ff_and": "and",
+        "ch_ladder_pass_one": "Reaches the target",
+        "ch_size_lots": "{lots} lots",
+        "ch_size_lot_col": "Average lot per trade",
         "ch_ladder_title": "How much does it change with what this report found?",
         "ch_ladder_intro": (
             "The same program ({program}), resampled the same way, on different "
@@ -3306,7 +3394,7 @@ LABELS: dict[str, dict[str, str]] = {
             "because the file does not state one: 1x scales with it, and on a larger balance "
             "the same trades would be less than 1x."
         ),
-        "ch_size_lot": "Lot or risk per trade at 1x",
+        "ch_size_lot": "Average lot per trade at 1x",
         "ch_size_account": (
             "Account the program names: {size} USD. Its dollar limits are simulated as shares "
             "of that account."
@@ -5490,7 +5578,11 @@ def _challenge_html(
         )
     html_text += _assumptions(challenge.get("assumptions"), locale, labels)
     return html_text + _firm_fit_html(
-        challenge.get("firm_fit"), labels, optimistic=optimistic, ladder=bool(ladder)
+        challenge.get("firm_fit"),
+        labels,
+        optimistic=optimistic,
+        ladder=bool(ladder),
+        locale=locale,
     )
 
 
@@ -5528,6 +5620,11 @@ def _risk_text(key: str, labels: dict[str, str]) -> str:
         text = labels["ff_risk_unfinished"]
         return text[:1].upper() + text[1:]
     return labels[key]
+
+
+def _pass_label(phases: int, labels: dict[str, str]) -> str:
+    """The target column's name: "in every phase" only when there is more than one."""
+    return labels["ch_ladder_pass"] if phases > 1 else labels["ch_ladder_pass_one"]
 
 
 def _program_name(program: dict[str, Any], locale: str) -> str:
@@ -5588,6 +5685,7 @@ def _challenge_ladder_html(
     rows = [row for row in scenarios["rows"] if row.get("key") in CHALLENGE_LADDER_ROWS]
     clean = any(row.get("pass_within_best_day") for row in rows)
     span = 3 if clean else 2
+    target = _pass_label(phases, labels)
 
     def pct(item: dict[str, Any] | None, label: str) -> str:
         if not item:
@@ -5608,11 +5706,11 @@ def _challenge_ladder_html(
         if item.get("evidence") != "MEASURED":
             reason = localize(str(item.get("note", "")), locale)
             return (
-                f"<tr>{cells}<td colspan='{span}' data-l='{_e(labels['ch_ladder_pass'])}'>"
+                f"<tr>{cells}<td colspan='{span}' data-l='{_e(target)}'>"
                 f"<span>{_badge('NOT_MEASURED')} <span class='muted'>{_e(reason)}</span>"
                 "</span></td></tr>"
             )
-        cells += pct(item, labels["ch_ladder_pass"])
+        cells += pct(item, target)
         if clean:
             cells += pct(row.get("pass_within_best_day"), labels["ff_clean"])
         risk = _risk_text(str(row.get("main_risk", "none")), labels)
@@ -5621,7 +5719,7 @@ def _challenge_ladder_html(
     head = (
         f"<th>{_e(labels['ch_ladder_scenario'])}</th>"
         f"<th class='val'>{_e(labels['ch_ladder_days'])}</th>"
-        f"<th class='val'>{_e(labels['ch_ladder_pass'])}</th>"
+        f"<th class='val'>{_e(target)}</th>"
         + (f"<th class='val'>{_e(labels['ff_clean'])}</th>" if clean else "")
         + f"<th>{_e(labels['ff_risk'])}</th>"
     )
@@ -5681,7 +5779,9 @@ def _challenge_sizing_html(
         unfinished = labels["ch_size_unfinished_phase"].format(days=horizon)
     else:
         unfinished = labels["unfinished_cap"].format(days=horizon)
-    columns = [("pass", labels["ch_ladder_pass"])]
+    lots = any((row.get("average_lot") or {}).get("evidence") == "MEASURED" for row in rows)
+    columns = [("average_lot", labels["ch_size_lot_col"])] if lots else []
+    columns.append(("pass", _pass_label(phases, labels)))
     if clean:
         columns.append(("pass_within_best_day", labels["ff_clean"]))
     columns += [
@@ -5694,6 +5794,8 @@ def _challenge_sizing_html(
         item = row.get(key)
         if (key == "fail_daily_loss" and not daily_rule) or not item:
             return f"<td class='val muted' data-l='{_e(label)}'>{_e(labels['ff_no_rule'])}</td>"
+        if key == "average_lot":
+            return f"<td class='val' data-l='{_e(label)}'>{_e(_lot_text(item['value']))}</td>"
         shown = _firm_pct(float(item["value"]))
         return f"<td class='val' data-l='{_e(label)}'>{_e(shown)}</td>"
 
@@ -5720,6 +5822,13 @@ def _challenge_sizing_html(
             f"<p>{_e(labels['ch_size_lot'])}: {_badge('NOT_MEASURED')} "
             f"<span class='muted'>{_e(reason)}</span></p>"
         )
+    elif per_trade.get("evidence") == "MEASURED" and per_trade.get("value") is not None:
+        shown = labels["ch_size_lots"].format(lots=_lot_text(per_trade["value"]))
+        note = localize(str(per_trade.get("note") or ""), locale)
+        out += (
+            f"<p>{_e(labels['ch_size_lot'])}: <b>{_e(shown)}</b> {_badge('MEASURED')} "
+            f"<span class='muted'>{_e(note)}</span></p>"
+        )
     if account.get("evidence") == "DECLARED" and account.get("value"):
         size = f"{float(account['value']):,.0f}"
         out += (
@@ -5740,6 +5849,12 @@ def _challenge_sizing_html(
     return out
 
 
+def _lot_text(value: Any) -> str:
+    """Lots as the platform prints them: two decimals, three below a tenth."""
+    lots = float(value)
+    return f"{lots:,.2f}" if lots >= 0.1 else f"{lots:,.3f}"
+
+
 def _sizing_balance_html(sizing: dict[str, Any], labels: dict[str, str]) -> str:
     """The balance 1x's daily shares are measured on, as the capital section
     names it; an assumed one says so. Empty for a result stored without it."""
@@ -5752,54 +5867,224 @@ def _sizing_balance_html(sizing: dict[str, Any], labels: dict[str, str]) -> str:
     return f" {_e(labels[key].format(balance=shown))} {_badge(evidence)}"
 
 
+def _rule_pct(value: Any) -> str:
+    """A rule's share as its page states it: ``10%``, ``2.5%``."""
+    return f"{float(value) * 100:.4g}%"
+
+
+def _and(items: list[str], labels: dict[str, str]) -> str:
+    """``a, b and c`` in the report's language."""
+    if len(items) < 2:
+        return "".join(items)
+    return f"{', '.join(items[:-1])} {labels['ff_and']} {items[-1]}"
+
+
+def _per_phase(values: list[Any], labels: dict[str, str], *, each: bool = False) -> str:
+    """One share for every phase (``each`` says so when there are several), or
+    each phase's own when they differ."""
+    texts = [_rule_pct(value) for value in values]
+    if len(set(texts)) == 1:
+        several = each and len(texts) > 1
+        return labels["ff_rule_each"].format(value=texts[0]) if several else texts[0]
+    return ", ".join(
+        labels["ff_rule_in_phase"].format(value=text, n=index)
+        for index, text in enumerate(texts, start=1)
+    )
+
+
+def _firm_rules_html(row: dict[str, Any], labels: dict[str, str]) -> str:
+    """The rules a row was simulated with, its source and the day they were
+    read, folded under the program's name. Fields a program does not have are
+    left out; an old result without its rules shows nothing."""
+    phases = [phase for phase in row.get("rules") or [] if isinstance(phase, dict)]
+    if not phases:
+        return ""
+    first = phases[0]
+    parts = [
+        labels["ff_rule_target"].format(
+            value=_per_phase([p.get("profit_target") for p in phases], labels, each=True)
+        )
+    ]
+    if first.get("max_daily_loss") is not None:
+        key = (
+            "ff_rule_daily_day"
+            if first.get("daily_loss_basis") == "start_of_day"
+            else "ff_rule_daily_initial"
+        )
+        value = _per_phase([p.get("max_daily_loss") for p in phases], labels)
+        parts.append(labels[key].format(value=value))
+    total = {
+        "trailing_eod": "ff_rule_total_trailing",
+        "trailing_eod_lock": "ff_rule_total_lock",
+    }.get(str(first.get("total_loss_type")), "ff_rule_total_static")
+    value = _per_phase([p.get("max_total_loss") for p in phases], labels)
+    parts.append(labels[total].format(value=value))
+    days = int(first.get("min_trading_days") or 0)
+    if days > 0:
+        parts.append(labels["ff_rule_days"].format(n=days))
+    if first.get("time_limit_days"):
+        parts.append(labels["ff_rule_time"].format(n=int(first["time_limit_days"])))
+    if first.get("best_day_limit") is not None:
+        key = (
+            "ff_rule_best_positive"
+            if first.get("best_day_basis") == "positive_days"
+            else "ff_rule_best_target"
+        )
+        parts.append(labels[key].format(value=_rule_pct(first["best_day_limit"])))
+    text = _e(" · ".join(parts))
+    text = text[:1].upper() + text[1:] + "."
+    market = row.get("markets") or row.get("market") or {}
+    url = str(row.get("source_url") or "")
+    read = _e(labels["ff_rule_read"].format(date=row.get("as_of", "")))
+    if url.startswith("https://"):
+        read += f" (<a href='{_e(url)}' rel='noopener nofollow'>{_e(labels['ff_source_link'])}</a>)"
+    text += f" {read}."
+    if market.get("allowed"):
+        names = [labels.get(f"ff_mk_{m}", str(m)) for m in market["allowed"]]
+        line = labels["ff_rule_markets"].format(
+            markets=_and(names, labels), date=market.get("as_of", "")
+        )
+        line = _e(line[:1].upper() + line[1:])
+        link = str(market.get("source_url") or "")
+        if link.startswith("https://"):
+            line += (
+                f" (<a href='{_e(link)}' rel='noopener nofollow'>"
+                f"{_e(labels['ff_source_link'])}</a>)"
+            )
+        text += f" {line}."
+    return (
+        f"<details class='ff-rules'><summary class='muted'>{_e(labels['ff_rules'])}</summary>"
+        f"<small class='muted'>{text}</small></details>"
+    )
+
+
+def _market_text(market: dict[str, Any], labels: dict[str, str]) -> str:
+    """Why a program was not simulated: what it allows and what the history trades."""
+    allowed = [labels.get(f"ff_mk_{m}", str(m)) for m in market.get("allowed") or []]
+    history = [labels.get(f"ff_hist_{m}", str(m)) for m in market.get("history") or []]
+    only = labels["ff_market_only"].format(markets=_and(allowed, labels))
+    why = labels["ff_market_skip"].format(history=_and(history, labels))
+    return f"{only}: {why}."
+
+
 def _firm_fit_html(
     fit: dict[str, Any] | None,
     labels: dict[str, str],
     *,
     optimistic: bool = False,
     ladder: bool = False,
+    locale: str = "es",
 ) -> str:
-    """Every published challenge on the same resampled history, best odds first."""
+    """Every published challenge on the same resampled history, best odds first.
+
+    Each program carries its rules, source and reading date; the ladder's
+    out-of-sample and cost scenarios are repeated for every program when they
+    were measured (a column the ladder could not measure says why, once); a
+    program whose page does not take the history's markets goes last, with no
+    figure."""
     if not fit or fit.get("status") != "MEASURED" or not fit.get("firms"):
         return ""
+    columns = [c for c in fit.get("scenarios") or [] if c.get("status") == "MEASURED"]
+    missing = [c for c in fit.get("scenarios") or [] if c.get("status") != "MEASURED"]
     out = (
         f"<h3>{_e(labels['ff_title'])}</h3>"
         f"<p class='muted'>{_e(labels['ff_intro'])} {_badge('MEASURED')}</p>"
     )
     if ladder:
-        out += f"<p class='muted'>{_e(labels['ff_basis'])}</p>"
+        out += f"<p class='muted'>{_e(labels['ff_basis_columns' if columns else 'ff_basis'])}</p>"
     if optimistic:
         out += f"<p><strong>{_e(labels['ff_optimistic'])}</strong></p>"
     uniform = fit.get("uniform")
     if uniform == "all_pass":
-        return out + f"<p>{_e(labels['ff_all_pass'])}</p>"
-    if uniform == "all_fail":
+        out += f"<p>{_e(labels['ff_all_pass'])}</p>"
+    elif uniform == "all_fail":
         common = fit.get("common_risk") or "none"
         text = labels["ff_all_fail"].format(risk=labels[f"ff_risk_{common}"].lower())
-        return out + f"<p>{_e(text)}</p>"
+        out += f"<p>{_e(text)}</p>"
+    if uniform and not columns:
+        return out
 
     def pct(item: dict[str, Any] | None, label: str) -> str:
         if not item:
             return f"<td class='val muted' data-l='{_e(label)}'>{_e(labels['ff_no_rule'])}</td>"
         return f"<td class='val' data-l='{_e(label)}'>{_e(_firm_pct(float(item['value'])))}</td>"
 
-    body = "".join(
-        "<tr><td>"
-        + _e(f"{row['firm']} · {row['program']}")
-        + f"<br><small class='muted'>{_e(_phases(row['phases'], labels))}</small>"
-        + "</td>"
-        + pct(row["pass"], labels["ff_pass"])
-        + pct(row.get("pass_within_best_day"), labels["ff_clean"])
-        + f"<td data-l='{_e(labels['ff_risk'])}'>{_e(_risk_text(row['main_risk'], labels))}</td>"
-        + "</tr>"
-        for row in fit["firms"]
-    )
-    return out + (
-        f"<table class='timing firms'><thead><tr><th>{_e(labels['ff_program'])}</th>"
+    heads = [_challenge_ladder_label(column, labels) for column in columns]
+
+    def scenario(row: dict[str, Any], column: dict[str, Any], label: str) -> str:
+        figures = (row.get("scenarios") or {}).get(str(column.get("key"))) or {}
+        item = figures.get("pass") or {}
+        if item.get("evidence") != "MEASURED":
+            reason = localize(str(item.get("note") or ""), locale)
+            return (
+                f"<td class='val' data-l='{_e(label)}'><span>{_badge('NOT_MEASURED')} "
+                f"<small class='muted'>{_e(reason)}</small></span></td>"
+            )
+        clean = figures.get("pass_within_best_day")
+        within = (
+            f"<small class='muted'> · {_e(_firm_pct(float(clean['value'])))} "
+            f"{_e(labels['ff_clean_short'])}</small>"
+            if clean
+            else ""
+        )
+        shown = _e(_firm_pct(float(item["value"])))
+        return f"<td class='val' data-l='{_e(label)}'><span>{shown}{within}</span></td>"
+
+    def name(row: dict[str, Any]) -> str:
+        return (
+            "<td>"
+            + _e(f"{row['firm']} · {row['program']}")
+            + f"<br><small class='muted'>{_e(_phases(row['phases'], labels))}</small>"
+            + _firm_rules_html(row, labels)
+            + "</td>"
+        )
+
+    def line(row: dict[str, Any]) -> str:
+        if row.get("market") or not row.get("pass"):
+            span = 3 + len(columns)
+            text = _market_text(row.get("market") or {}, labels)
+            cell = f"<td colspan='{span}' class='muted'>{_e(text)}</td>"
+            return f"<tr class='ff-out'>{name(row)}{cell}</tr>"
+        return (
+            "<tr>"
+            + name(row)
+            + pct(row["pass"], labels["ff_pass"])
+            + pct(row.get("pass_within_best_day"), labels["ff_clean"])
+            + "".join(
+                scenario(row, column, head) for column, head in zip(columns, heads, strict=True)
+            )
+            + f"<td data-l='{_e(labels['ff_risk'])}'>"
+            + f"{_e(_risk_text(row['main_risk'], labels))}</td>"
+            + "</tr>"
+        )
+
+    head = (
+        f"<th>{_e(labels['ff_program'])}</th>"
         f"<th class='val'>{_e(labels['ff_pass'])}</th>"
         f"<th class='val'>{_e(labels['ff_clean'])}</th>"
-        f"<th>{_e(labels['ff_risk'])}</th></tr></thead><tbody>{body}</tbody></table>"
+        + "".join(
+            f"<th class='val'>{_e(text)}"
+            + (
+                f" {_badge(str(column['cost_bps_per_side']['evidence']))}"
+                if (column.get("cost_bps_per_side") or {}).get("evidence")
+                else ""
+            )
+            + "</th>"
+            for column, text in zip(columns, heads, strict=True)
+        )
+        + f"<th>{_e(labels['ff_risk'])}</th>"
     )
+    body = "".join(line(row) for row in fit["firms"])
+    out += (
+        f"<table class='timing firms'><thead><tr>{head}</tr></thead><tbody>{body}</tbody></table>"
+    )
+    for column in missing:
+        reason = localize(str((column.get("pass") or {}).get("note") or ""), locale)
+        label = _challenge_ladder_label(column, labels)
+        out += (
+            f"<p>{_e(label)}: {_badge('NOT_MEASURED')} <span class='muted'>{_e(reason)}</span></p>"
+        )
+    return out
 
 
 def _question_text(question: dict[str, str], locale: str) -> str:
