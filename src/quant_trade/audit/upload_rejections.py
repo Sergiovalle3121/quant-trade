@@ -292,7 +292,8 @@ REJECTION_COPY: dict[str, dict[str, tuple[str, str]]] = {
             "«Informe de tu plataforma» y deja vacío «Operaciones cerradas»: ese campo solo "
             "acompaña a una curva, nunca a un informe. «Curva de equity o serie de retornos» "
             "lleva fechas con saldos o retornos, no una lista de operaciones. En «Exportación "
-            "de optimización de MT5» va el XML de ese mismo informe.",
+            "de optimización de MT5» va la tabla de resultados de la optimización (XML) del "
+            "mismo robot, símbolo y marco temporal que el informe.",
         ),
         "rate_limited": (
             "Se alcanzó el límite de intentos de subida de esta hora.",
@@ -368,8 +369,8 @@ REJECTION_COPY: dict[str, dict[str, tuple[str, str]]] = {
             'Put the report or the trade list exported by your platform in "Your platform '
             'report" and leave "Closed trades" empty: that field only goes with a curve, '
             'never with a report. "Equity curve or return series" takes dates with balances '
-            'or returns, not a trade list. "MT5 optimisation export" takes the XML of that '
-            "same report.",
+            'or returns, not a trade list. "MT5 optimisation export" takes the optimisation '
+            "results table (XML) for the same robot, symbol and timeframe as the report.",
         ),
         "rate_limited": (
             "The upload attempt limit for this hour has been reached.",
@@ -446,7 +447,8 @@ REJECTION_COPY: dict[str, dict[str, tuple[str, str]]] = {
             '"Relatório da sua plataforma" e deixe vazio "Operações fechadas": esse campo só '
             'acompanha uma curva, nunca um relatório. "Curva de equity ou série de retornos" '
             "recebe datas com saldos ou retornos, não uma lista de operações. "
-            '"Exportação de otimização do MT5" recebe o XML desse mesmo relatório.',
+            '"Exportação de otimização do MT5" recebe a tabela de resultados da otimização '
+            "(XML) do mesmo robô, símbolo e período do relatório.",
         ),
         "rate_limited": (
             "O limite de tentativas de envio desta hora foi atingido.",

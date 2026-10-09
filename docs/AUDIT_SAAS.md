@@ -3233,8 +3233,8 @@ notice. It never shows the files, the trades, the description or the token.
 The retention purge does not take a published page down: for a published
 unpaid audit it keeps, in the `publication_views` table, only the fields the
 page reads (class, dimension statuses, input hashes, source format, engine
-name and version, declared and used trials, the audit date) and the SHA-256
-of the full result, so the page, its result hash and an embedded badge stay
+name and version, declared and used trials, the audit date, and whether it is
+a fund track record, a single boolean) and the SHA-256 of the full result, so the page, its result hash and an embedded badge stay
 exactly as they were. The description, client text findings, series,
 trades, statistics and files are deleted as for any other audit. The page
 goes away (404) when the owner unpublishes it (the private link still works
