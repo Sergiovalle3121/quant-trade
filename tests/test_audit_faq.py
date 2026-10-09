@@ -16,9 +16,20 @@ pytest.importorskip("sqlalchemy")
 
 from fastapi.testclient import TestClient  # noqa: E402
 
-from quant_trade.audit.faq import FAQ_COPY, FAQ_PATH, faq_items, faq_page  # noqa: E402
+from quant_trade.audit.faq import (  # noqa: E402
+    FAQ_COPY,
+    FAQ_PATH,
+    faq_items,
+    faq_page,
+    landing_only_questions,
+)
 from quant_trade.audit.guard import find_claims  # noqa: E402
-from quant_trade.audit.pages import CONTACT_COPY, card_markets_line  # noqa: E402
+from quant_trade.audit.pages import (  # noqa: E402
+    _COPY,
+    _LANDING_FAQ,
+    CONTACT_COPY,
+    card_markets_line,
+)
 from quant_trade.audit.report import evidence_label  # noqa: E402
 from quant_trade.audit.seo import PUBLIC_PAGES  # noqa: E402
 from quant_trade.audit.settings import AuditSettings  # noqa: E402
@@ -27,6 +38,9 @@ from quant_trade.audit.web import create_app  # noqa: E402
 
 BASE = "https://audit.example"
 LOCALES = ("es", "en", "pt")
+#: Eleven questions of this page, plus the landing's questions it does not show
+#: (five; six in Portuguese, which also answers the report's language).
+COUNT = {"es": 16, "en": 16, "pt": 17}
 
 
 def _settings(**environ: str) -> AuditSettings:
@@ -51,7 +65,7 @@ def _card_settings(**environ: str) -> AuditSettings:
 
 
 @pytest.mark.parametrize("locale", LOCALES)
-def test_eleven_localized_questions_and_all_copy_pass_the_guard(locale: str) -> None:
+def test_every_localized_question_and_all_copy_pass_the_guard(locale: str) -> None:
     configurations = (
         AuditSettings(),
         _settings(AUDIT_EMAIL_VERIFICATION_REQUIRED="true"),
@@ -59,8 +73,8 @@ def test_eleven_localized_questions_and_all_copy_pass_the_guard(locale: str) -> 
     )
     for settings in configurations:
         pairs = faq_items(settings, locale)
-        assert len(pairs) == 11
-        assert len({question for question, _ in pairs}) == 11
+        assert len(pairs) == COUNT[locale]
+        assert len({question for question, _ in pairs}) == COUNT[locale]
         for question, answer in pairs:
             assert question and answer
             assert find_claims(question) == []
@@ -129,9 +143,9 @@ def test_retention_upload_limit_and_contact_follow_configuration(locale: str) ->
         "pt": "primeiro relatório completo grátis",
     }
     assert first_free[locale] in pairs[8][1]
-    assert settings.operator_contact in pairs[10][1]
-    assert settings.contact_url in pairs[10][1]
-    assert CONTACT_COPY[locale]["none"] in faq_items(AuditSettings(), locale)[10][1]
+    assert settings.operator_contact in pairs[-1][1]
+    assert settings.contact_url in pairs[-1][1]
+    assert CONTACT_COPY[locale]["none"] in faq_items(AuditSettings(), locale)[-1][1]
 
 
 @pytest.mark.parametrize("locale", LOCALES)
@@ -143,7 +157,7 @@ def test_faq_json_is_valid_and_matches_every_visible_answer(locale: str) -> None
     data = json.loads(blocks[0])
     assert data["@context"] == "https://schema.org"
     assert data["@type"] == "FAQPage"
-    assert len(data["mainEntity"]) == 11
+    assert len(data["mainEntity"]) == COUNT[locale]
     for entry, (question, answer) in zip(
         data["mainEntity"], faq_items(settings, locale), strict=True
     ):
@@ -154,6 +168,36 @@ def test_faq_json_is_valid_and_matches_every_visible_answer(locale: str) -> None
         }
         assert f"<summary>{html.escape(question, quote=True)}</summary>" in page
         assert f"<p>{html.escape(answer, quote=True)}</p>" in page
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+def test_the_landing_questions_it_does_not_show_are_answered_here(locale: str) -> None:
+    # The landing shows six questions and links this page for the rest: each of
+    # those answers is public here, worded as on the landing, before the contact one.
+    rest = landing_only_questions(locale)
+    shown = set(_LANDING_FAQ[locale])
+    assert rest == tuple(
+        pair for index, pair in enumerate(_COPY[locale]["faq"]) if index not in shown
+    )
+    assert len(rest) == COUNT[locale] - 11
+    pairs = faq_items(AuditSettings(), locale)
+    assert pairs[10 : 10 + len(rest)] == rest
+    contact = {"es": "contacto", "en": "contact", "pt": "contato"}[locale]
+    assert contact in pairs[-1][0]
+    page = faq_page(AuditSettings(), locale=locale)
+    for question, answer in rest:
+        assert find_claims(question) == [] and find_claims(answer) == []
+        assert f"<summary>{html.escape(question, quote=True)}</summary>" in page
+        assert f"<p>{html.escape(answer, quote=True)}</p>" in page
+    # A forgotten password, how an account is protected and the badge, by name.
+    topics = {
+        "es": ("contraseña", "protegida", "sello"),
+        "en": ("password", "protected", "badge"),
+        "pt": ("senha", "protegida", "selo"),
+    }[locale]
+    questions = " ".join(question for question, _ in rest)
+    assert all(topic in questions for topic in topics)
+    assert landing_only_questions("xx") == landing_only_questions("es")
 
 
 def test_dynamic_contact_is_escaped_in_visible_copy_and_json() -> None:

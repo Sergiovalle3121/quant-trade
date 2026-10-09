@@ -167,14 +167,15 @@ def test_upload_page_contains_periodic_return_declarations(locale: str) -> None:
 
 
 @pytest.mark.parametrize("locale", ["es", "en", "pt"])
-def test_landing_has_institutional_block_and_review_request_path(locale: str) -> None:
+def test_landing_footer_links_the_institutional_review_request(locale: str) -> None:
+    # The institutional block left the short landing; the footer of every page links
+    # the review request.
     page = landing(locale=locale)
-    block = re.search(r"<section class='card institutional'.*?</section>", page)
-    assert block is not None
-    assert SERIES_COPY[locale]["institutional_title"] in block.group()
-    assert SERIES_COPY[locale]["institutional_text"] in block.group()
-    assert f"href='{REVIEW_PATHS[locale]}'" in block.group()
-    assert find_claims(_text(block.group())) == []
+    assert "class='card institutional'" not in page
+    footer = page.split("</main>", 1)[1]
+    link = f"<a href='{REVIEW_PATHS[locale]}'>{html.escape(INTAKE_COPY[locale]['title'])}</a>"
+    assert link in footer
+    assert find_claims(_text(footer)) == []
 
 
 @pytest.mark.parametrize("locale", ["es", "en", "pt"])

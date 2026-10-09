@@ -114,7 +114,7 @@ _QUESTIONS: tuple[dict[str, tuple[str, str]], ...] = (
             "exportar de cada plataforma.",
         ),
     },
-    # Sources: legal.terms_text service scope and pages.TRUST_COPY: no broker access,
+    # Sources: legal.terms_text service scope and pages._COPY['not']: no broker access,
     # execution, strategies or signals; pages._COPY['faq'] rules out forecasts.
     {
         "es": (
@@ -329,8 +329,30 @@ _QUESTIONS: tuple[dict[str, tuple[str, str]], ...] = (
 )
 
 
+def landing_only_questions(locale: str = "es") -> tuple[tuple[str, str], ...]:
+    """The landing's questions it does not show itself, in their order there.
+
+    The landing shows a few of ``pages._COPY[locale]['faq']`` (``pages._LANDING_FAQ``)
+    and links here for the rest, so each of those answers stays public on this page:
+    the markets, the MT5 optimisation XML, a forgotten password, how an account is
+    protected, the badge and, in Portuguese, the report's language. Their wording
+    lives in one place, the landing's copy."""
+    from quant_trade.audit.pages import _COPY, _LANDING_FAQ
+
+    locale = locale if locale in FAQ_PATH else "es"
+    shown = set(_LANDING_FAQ[locale])
+    return tuple(
+        (question, answer)
+        for index, (question, answer) in enumerate(_COPY[locale]["faq"])
+        if index not in shown
+    )
+
+
 def faq_items(settings: AuditSettings, locale: str = "es") -> tuple[tuple[str, str], ...]:
-    """The same localized answers feed the visible page and FAQPage JSON-LD."""
+    """The same localized answers feed the visible page and FAQPage JSON-LD.
+
+    ``_QUESTIONS`` first, then the landing's questions it does not show
+    (``landing_only_questions``), and the contact question last."""
     # Lazy imports keep FAQ_PATH usable by seo without a pages/seo cycle.
     from quant_trade.audit.pages import CONTACT_COPY, card_markets_line
     from quant_trade.audit.report import localize_tags
@@ -386,11 +408,13 @@ def faq_items(settings: AuditSettings, locale: str = "es") -> tuple[tuple[str, s
         "retention": settings.retention_days,
         "contact": contact,
     }
+    pairs = [item[locale] for item in _QUESTIONS]
+    pairs[-1:-1] = landing_only_questions(locale)
     # _page localizes evidence tags in text nodes. Apply that same transformation
-    # here so the structured answers are exactly the wording a reader sees.
+    # here so the structured questions and answers are exactly the wording a reader sees.
     return tuple(
-        (item[locale][0], localize_tags(item[locale][1].format(**values), locale))
-        for item in _QUESTIONS
+        (localize_tags(question, locale), localize_tags(answer.format(**values), locale))
+        for question, answer in pairs
     )
 
 

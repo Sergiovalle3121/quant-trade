@@ -174,19 +174,38 @@ verification survives retention purge; a missing retained view returns 410,
 and a withdrawn publication returns 404. This deliberately follows the
 repository lifecycle rather than making every purged publication return 410.
 
-## Why trust it (`pages.TRUST_COPY`, landing `#confianza`)
+## The landing for someone about to pay (`pages.landing`)
 
-The landing has a section for a first-time visitor, "Trabajo real, no humo"
-(Real work, not hype), in Spanish, English and Portuguese. Every point links
-to the page that proves it: the full sample report, the methodology and its
-papers, the check page for a report's SHA-256, the privacy policy (a file is
-never published, is deleted after the retention days if unpaid, and an account
-can be deleted) and the terms (a fix or a new credit when the report misreads the file). One
-point says Rigor sells no bots or signals and that the guard stops any text
-promising results. "Who is behind it" shows `AUDIT_OPERATOR_NAME` and
-`AUDIT_OPERATOR_ADDRESS` (in English and Portuguese, its optional
-`AUDIT_OPERATOR_ADDRESS_EN` or `_PT` wording) only when both are set, and the WhatsApp line only
-with `AUDIT_CONTACT_URL` (`tests/test_audit_landing_trust.py`).
+The landing is short, for someone about to pay for a prop-firm challenge or a
+robot: the first screen (headline, lead, button, the price after the free first
+report from settings, "your file is never published"), the sample report's
+finding, who it is for, how it works, the prices, "who is behind it", six
+questions and the closing call. Its link to the questions page reads "more
+questions": that page answers the landing's other questions
+(`faq.landing_only_questions`), so none of them leaves the site. The first
+screen never mentions a card: a card
+check is offered only on a report whose free unlock was refused
+(`account_pages.report_box`). The headline and the button are there from the
+first paint; only the illustration rises in, and `[data-reveal]` fades in
+without blur. The closing call keeps `id='subir'` for links shared as
+`/#subir` and links the free tools; the footer links the institutional review.
+
+"Who is behind it" (`pages._founder`) shows only when `AUDIT_OPERATOR_NAME` is
+set and the founder's own photo is at `audit/static/fundador.jpg` (served only
+while it is there, `theme.OPTIONAL_STATIC_FILES`): the photo is the founder's
+approval of the text, so the repository ships none. Until then the questions
+end with what Rigor does not do, one line with `AUDIT_OPERATOR_NAME` and
+`AUDIT_OPERATOR_ADDRESS` (or its `_EN`/`_PT` wording) when both are set, and
+the WhatsApp line with `AUDIT_CONTACT_URL` (`tests/test_audit_landing_compra.py`,
+`tests/test_audit_landing_trust.py`). That line (`pages.OPERATOR_LINE`) reads
+"Responsable del servicio", "Service operator" or "Responsável pelo serviço",
+never the block's heading: without the photo, "who is behind it" is nowhere on
+the page.
+
+`/precios` shows the plans as cards (first report, one report and, when on
+sale, the pack, each button to the upload page and none to a checkout) and one
+list of what every full report includes; prices drop ".00" on the page and
+keep two decimals in the Product JSON-LD.
 
 ## Portuguese pages (`audit/portuguese.py`, `/pt`)
 
@@ -2297,7 +2316,7 @@ Routes:
 
 | Route | What it does |
 |---|---|
-| `GET /` | Landing (how it works, prices, FAQ, link to the sample); `?lang=en`. `GET /en` is the English landing, a short address to share. Its `#subir` band and every start button link to the upload page; old `?extras=1` links redirect there. |
+| `GET /` | Landing (how it works, prices, FAQ, link to the sample); `?lang=en`. `GET /en` is the English landing, a short address to share. Its closing call keeps `id='subir'`, and every start button links to the upload page; old `?extras=1` links redirect there. |
 | `GET /auditar` | The upload form on its own page (`/en/audit`, `/pt/auditar`; `?extras=1` opens the extra files). Outside free mode a visitor without an account gets a 303 to sign-up with `next` back here (`/registro?next=/auditar`, `/signup?next=/en/audit`, `/pt/cadastro?next=/pt/auditar`), so nobody fills the form and loses it. A visitor who came with `?extras=1` keeps it (`next=/auditar%3Fextras%3D1`) and lands on the form with the extra files open after signing up or in; the language switch of the form and the "account first" answer to an upload that used an extra box keep it too. |
 | `GET /precios` | 301 to the landing's prices (`/#pricing`); `/pricing` and `/en/pricing` go to `/en#pricing`, `/pt/precos` to `/pt#pricing`. |
 | `GET /contacto` | Contact page (`/en/contact`, `/pt/contato`; `/soporte`, `/contact`, `/support`, `/en/support`, `/pt/suporte` redirect there), linked from every footer. It shows only what the operator set: `AUDIT_OPERATOR_CONTACT` as a mail link and `AUDIT_CONTACT_URL` as the chat link; with neither it says no channel is published yet. It also says never to send a password, recovery key or card details. |
@@ -4744,8 +4763,12 @@ Tests compare it with the exact binomial tail and check the barrier calculation
 against a separate symmetric-barrier identity. Correlation, changing payoffs,
 selection and real execution can invalidate these teaching assumptions.
 
-`faq.py` serves ten source-commented questions at `/preguntas`, `/en/faq` and
-`/pt/perguntas`, listed in `PUBLIC_PAGES`, the sitemap and footer. Runtime settings
+`faq.py` serves eleven source-commented questions at `/preguntas`, `/en/faq` and
+`/pt/perguntas`, listed in `PUBLIC_PAGES`, the sitemap and footer. Before the
+contact question it also answers the landing's questions the landing does not
+show (`faq.landing_only_questions`: markets, the MT5 optimisation XML, a
+forgotten password, account protection, the badge and, in Portuguese, the
+report's language), worded as in `pages._COPY`. Runtime settings
 supply prices, public card markets, upload size, retention and contact channels.
 It reuses the existing JSON-LD serializer; FAQPage answers match visible localized
 answers. Privacy follows `legal.py`, including retention of the first free full
