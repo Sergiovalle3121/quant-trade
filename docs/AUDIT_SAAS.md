@@ -23,7 +23,8 @@ is revealed for manual selection if clipboard access is unavailable.
 No declarations or cards are written to the database or disk. The existing
 funnel cookie recognizes lectura, without new persisted visit counters.
 
-The calculator has no rate limit and the contact page has no POST form. The
+The calculator page has no rate limit (only its share card does, below) and
+the contact page has no POST form. The
 reader uses the existing in-memory AttemptLog: 60 generation attempts per IP
 per sliding hour, across languages, SVG downloads and PNG previews (including cache hits).
 Invalid attempts count;
@@ -53,6 +54,28 @@ The web extra installs CairoSVG; `Dockerfile.web` explicitly installs
 `libcairo2` alongside the existing WeasyPrint native libraries. Real rendering
 tests use `pytest.importorskip` when CairoSVG is absent and also skip if its
 native Cairo library cannot load; mocked fallback and cache tests stay offline.
+
+The luck calculator closes the same loop. A measured result at `/calculadora`,
+`/calculator` or `/pt/calculadora` previews its own card
+(`audit/calculator_card.py`): a 1200×675 SVG with the reader card's palette and
+Arial, fitted to a 1200×630 PNG by the same `_social_svg` and served at the
+page's `card.png` child path. Every figure on it comes from
+`calculator.compute`, the call the page itself makes, so the preview and the
+page agree; the four inputs (Sharpe, years, configurations, frequency) are
+DECLARED, the outputs are computed from them, the footer is NOT_MEASURED and
+the card says it is not an audit; no p-value is shown. `share_values` turns the
+validated inputs into exact query strings (`repr` of each float), so the share
+link reproduces the result, carries `ref=calculadora` (counted on /panel) and
+"1.8" and "1.80" share one entry in a separate `ReadingPNGCache` of 256 images
+keyed by those four fields. Card renders, from the page or from `card.png`,
+share their own in-memory limit of 60 per IP and sliding hour
+(`CARD_REQUESTS_PER_HOUR`). Past it the PNG answers 429 with
+`Retry-After: 3600`, but the calculator page always answers 200 and simply
+keeps the static `og-*.png`; a failed render does the same and the PNG answers
+503. Invalid, repeated or unmeasured inputs give an empty 404. The PNG carries
+`Cache-Control: public, max-age=86400` and never a referral or visit cookie;
+nothing is written to the database or disk. Offline coverage lives in
+tests/test_audit_calculator_card.py.
 
 The free win-rate calculator (`audit/winrate.py`) lives at `/calculadora-aciertos`,
 `/en/win-rate-calculator` and `/pt/calculadora-taxa-de-acerto`, all three in the

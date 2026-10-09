@@ -19,6 +19,7 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 from typing import Any
+from urllib.parse import urlencode
 
 from quant_trade.audit.engine import sharpe_sampling_variance
 from quant_trade.audit.luck import luck_review
@@ -42,6 +43,12 @@ KURTOSIS = 3.0
 SHARPE_RANGE = (0.05, 10.0)
 YEARS_RANGE = (0.1, 50.0)
 TRIALS_RANGE = (1, 10_000_000)
+
+#: The query fields that determine a result's share card, in cache-key order.
+CARD_FIELDS = ("sharpe", "years", "trials", "periods_per_year")
+#: Card renders per address and sliding hour, the reader's own limit. The page
+#: itself is never refused: past the limit it keeps the static preview.
+CARD_REQUESTS_PER_HOUR = 60
 
 
 def calculator_url(locale: str) -> str:
@@ -87,6 +94,43 @@ def parse_input(
     if frequency not in SUPPORTED_PERIODS_PER_YEAR:
         return "error_frequency"
     return CalculatorInput(sharpe=sr, years=yrs, trials=n, periods_per_year=frequency)
+
+
+def read_input(
+    sharpe: str | None,
+    years: str | None,
+    trials: str | None,
+    periods_per_year: str | None = None,
+) -> CalculatorInput | str | None:
+    """``parse_input`` for values anyone can type into the address bar.
+
+    A trial count past float's range (``inf``, ``1e999``, hundreds of digits)
+    overflows ``int``: it is a bad number like any other, so the page shows
+    ``error_number`` and ``card.png`` answers 404 instead of a 500.
+    """
+    try:
+        return parse_input(sharpe, years, trials, periods_per_year)
+    except OverflowError:
+        return "error_number"
+
+
+def share_values(value: CalculatorInput) -> dict[str, str]:
+    """The validated inputs as query strings that parse back to the same numbers.
+
+    ``repr`` of a float round-trips exactly, so a shared link reproduces the
+    validated input, and "1.8" and "1.80" share one card in the cache.
+    """
+    return {
+        "sharpe": repr(value.sharpe),
+        "years": repr(value.years),
+        "trials": str(value.trials),
+        "periods_per_year": str(int(value.periods_per_year)),
+    }
+
+
+def share_url(locale: str, value: CalculatorInput) -> str:
+    """The page's own address for a result, tagged so /panel counts the shares."""
+    return calculator_url(locale) + "?" + urlencode({**share_values(value), "ref": "calculadora"})
 
 
 def compute(value: CalculatorInput) -> dict[str, Any]:
@@ -182,6 +226,21 @@ COPY: dict[str, dict[str, Any]] = {
         "sample_link": "Ver un informe de ejemplo",
         "read_more": "Lee también:",
         "reader_link": "Crear una tarjeta de cifras para compartir",
+        "share_title": "Compartir este resultado",
+        "share_text": (
+            "Mi Sharpe declarado frente a la suerte de las configuraciones probadas, calculado "
+            "con Rigor. Esta tarjeta no es una auditoría. {url}"
+        ),
+        "card_title": "Rigor · calculadora de suerte",
+        "card_limited": (
+            "Demasiadas tarjetas de la calculadora desde esta dirección. "
+            "Inténtalo de nuevo más tarde."
+        ),
+        # The reader's own notice, word for word: the link carries the figures.
+        "card_public": (
+            "El enlace compartido contiene las cifras que escribes; "
+            "cualquiera con el enlace puede leerlas."
+        ),
         "why_title": "Por qué la búsqueda importa",
         "why": [
             "Si pruebas 100 configuraciones sin ninguna ventaja real, la mejor de ellas casi "
@@ -278,6 +337,16 @@ COPY: dict[str, dict[str, Any]] = {
         "sample_link": "See a sample report",
         "read_more": "Read next:",
         "reader_link": "Create a shareable figures card",
+        "share_title": "Share this result",
+        "share_text": (
+            "My declared Sharpe against the luck of the configurations tried, computed with "
+            "Rigor. This card is not an audit. {url}"
+        ),
+        "card_title": "Rigor · luck calculator",
+        "card_limited": "Too many calculator cards from this address. Try again later.",
+        "card_public": (
+            "The shared link contains the figures you enter; anyone with the link can read them."
+        ),
         "why_title": "Why the search matters",
         "why": [
             "Try 100 configurations with no real edge and the best of them almost always shows "
@@ -374,6 +443,19 @@ COPY: dict[str, dict[str, Any]] = {
         "sample_link": "Ver um relatório de exemplo",
         "read_more": "Leia também:",
         "reader_link": "Criar um cartão de números para compartilhar",
+        "share_title": "Compartilhar este resultado",
+        "share_text": (
+            "Meu Sharpe declarado contra a sorte das configurações testadas, calculado com o "
+            "Rigor. Este cartão não é uma auditoria. {url}"
+        ),
+        "card_title": "Rigor · calculadora de sorte",
+        "card_limited": (
+            "Cartões da calculadora demais a partir deste endereço. Tente novamente mais tarde."
+        ),
+        "card_public": (
+            "O link compartilhado contém os números que você informa; "
+            "qualquer pessoa com o link pode lê-los."
+        ),
         "why_title": "Por que a busca importa",
         "why": [
             "Teste 100 configurações sem nenhuma vantagem real e a melhor delas quase sempre "
@@ -424,10 +506,15 @@ def calculator_copy(locale: str, periods_per_year: float = PERIODS_PER_YEAR) -> 
 
 __all__ = [
     "CALCULATOR_PATH",
+    "CARD_FIELDS",
+    "CARD_REQUESTS_PER_HOUR",
     "COPY",
     "CalculatorInput",
     "calculator_copy",
     "calculator_url",
     "compute",
     "parse_input",
+    "read_input",
+    "share_url",
+    "share_values",
 ]
