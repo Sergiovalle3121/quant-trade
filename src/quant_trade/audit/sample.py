@@ -6,11 +6,17 @@ account statement generated from a fixed seed: nobody's account, strategy
 or market data. The engine, the importers and the renderer are the
 production ones, so the sample shows exactly what a client gets, including
 an unflattering class when the synthetic data earns one.
+
+The ``/ejemplo-senal`` report is the second sample, for whoever is about to
+copy a signal: the Myfxbook export of a made-up grid account
+(``synthetic_signal_statement``), declared as a strategy the client is about
+to buy or copy (``signal_sample_result``).
 """
 
 from __future__ import annotations
 
 from collections.abc import Callable
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
 import numpy as np
@@ -330,10 +336,307 @@ def sample_result(
     )
 
 
+# ---------------------------------------------------------------------------
+# The signal sample (/ejemplo-senal): an account a copier is about to follow
+# ---------------------------------------------------------------------------
+
+#: The signal's Myfxbook export is generated from this seed: the hourly noise of
+#: each pair from ``SIGNAL_SEED + i`` and the robot's own choices (pair, side,
+#: pause between baskets) from ``SIGNAL_SEED + 10``.
+SIGNAL_SEED = 20261009
+#: Twelve months of trading, Monday to Friday, 01:00 to 21:00 on the hour.
+SIGNAL_START = "2025-09-22"
+SIGNAL_END = "2026-09-18"
+SIGNAL_SYMBOLS = ("EURUSD", "GBPUSD")
+#: The robot: a basket opens at ``SIGNAL_LOTS``, adds an entry
+#: ``SIGNAL_GRID_FACTOR`` times larger each time the price moves
+#: ``SIGNAL_GRID_PIPS`` against the last one (``SIGNAL_GRID_ENTRIES`` at most),
+#: closes whole ``SIGNAL_TARGET_PIPS`` past its average price, or at a loss
+#: ``SIGNAL_STOP_PIPS`` past its last entry once it is full; after each losing
+#: basket the next one starts ``SIGNAL_RECOVERY`` times larger.
+SIGNAL_LOTS = 0.04
+SIGNAL_GRID_PIPS = 20.0
+SIGNAL_GRID_FACTOR = 1.5
+SIGNAL_GRID_ENTRIES = 6
+SIGNAL_TARGET_PIPS = 10.0
+SIGNAL_STOP_PIPS = 30.0
+SIGNAL_RECOVERY = 2.0
+#: Commission per lot (round trip) and swap per lot and night, in USD.
+SIGNAL_COMMISSION = 7.0
+SIGNAL_SWAP = 1.5
+#: The market ranges most of the year, which is where a grid looks smooth: hourly
+#: noise (pips) pulled back towards a level by ``SIGNAL_PULL`` of the gap each
+#: hour.
+SIGNAL_NOISE_PIPS = 6.0
+SIGNAL_PULL = 0.03
+#: Moves against the open basket, which is where a grid is not smooth: from a
+#: date, ``pips`` an hour against each basket opened from then on, until
+#: ``stops`` of them have closed at a loss. With ``settle``, the move stops
+#: ``settle`` pips past the basket's last entry once the basket is full, and the
+#: market ranges there (pulled by ``SIGNAL_SETTLED_PULL``): that basket is
+#: still open, at a floating loss, when the statement is printed.
+SIGNAL_TRENDS: tuple[tuple[str, int, float, float | None], ...] = (
+    ("2026-03-16", 1, 4.0, None),
+    ("2026-06-08", 2, 4.0, None),
+    ("2026-09-14", 1, 4.0, None),
+    ("2026-09-15", 1, 3.0, 10.0),
+)
+SIGNAL_SETTLED_PULL = 0.3
+#: The account's money: the first deposit, the top-up made at 09:30 on the
+#: business day after the first losing basket (deep in the drawdown) and a
+#: withdrawal.
+SIGNAL_DEPOSIT = 1_000.0
+SIGNAL_TOP_UP = 4_000.0
+SIGNAL_WITHDRAWAL = 600.0
+SIGNAL_WITHDRAWAL_AT = "2026-08-03 10:00"
+_PIP = 0.0001
+#: The signal's pairs in a USD account: 100 000 units a lot, so a pip of one
+#: lot is worth 10 on both.
+_LOT_UNITS = 100_000
+_SIGNAL_START_PRICE = {"EURUSD": 1.1, "GBPUSD": 1.27}
+_SIGNAL_MAGIC = 92025
+
+
+@dataclass
+class _Basket:
+    """The robot's open positions on one pair and side: (time, price, lots)."""
+
+    symbol: str
+    sign: float
+    opened: pd.Timestamp
+    entries: list[tuple[pd.Timestamp, float, float]] = field(default_factory=list)
+    #: The move against it (an index of ``SIGNAL_TRENDS``), if any.
+    trend: int | None = None
+    settled: bool = False
+
+    def behind(self, price: float) -> float:
+        """Pips the price is past the last entry, against the basket."""
+        return -self.sign * (price - self.entries[-1][1]) / _PIP
+
+    def ahead(self, price: float) -> float:
+        """Pips the price is past the average entry, in the basket's favour."""
+        lots = sum(entry[2] for entry in self.entries)
+        average = sum(entry[1] * entry[2] for entry in self.entries) / lots
+        return self.sign * (price - average) / _PIP
+
+
+#: A closed trade: opened, closed, symbol, sign, lots, entry, exit, commission, swap, gross.
+_ClosedTrade = tuple[
+    pd.Timestamp, pd.Timestamp, str, float, float, float, float, float, float, float
+]
+
+
+def _signal_history() -> tuple[
+    list[_ClosedTrade], list[tuple[pd.Timestamp, float]], _Basket | None, dict[str, float]
+]:
+    """The robot's closed trades, the account's money moves, the basket still
+    open at the end and the last price of each pair."""
+    clock = pd.date_range(f"{SIGNAL_START} 01:00", f"{SIGNAL_END} 21:00", freq="h")
+    clock = clock[(clock.dayofweek < 5) & (clock.hour >= 1) & (clock.hour <= 21)]
+    noise = {
+        symbol: np.random.default_rng(SIGNAL_SEED + i).normal(0.0, SIGNAL_NOISE_PIPS, len(clock))
+        for i, symbol in enumerate(SIGNAL_SYMBOLS)
+    }
+    choices = np.random.default_rng(SIGNAL_SEED + 10)
+    level = dict(_SIGNAL_START_PRICE)
+    price = dict(_SIGNAL_START_PRICE)
+    flows = [(clock[0] - pd.Timedelta(minutes=30), SIGNAL_DEPOSIT)]
+    due = [(pd.Timestamp(SIGNAL_WITHDRAWAL_AT), -SIGNAL_WITHDRAWAL)]
+    closed: list[_ClosedTrade] = []
+    basket: _Basket | None = None
+    pause = 0
+    losses_in_row = 0
+    stops = 0
+    stopped = [0] * len(SIGNAL_TRENDS)
+    for step, now in enumerate(clock):
+        for moment, amount in [item for item in due if item[0] <= now]:
+            due.remove((moment, amount))
+            flows.append((moment, amount))
+        # The move against the open basket, if one applies to it.
+        push = 0.0
+        if basket is not None and basket.trend is None:
+            basket.trend = next(
+                (
+                    index
+                    for index, (start, count, _, _) in enumerate(SIGNAL_TRENDS)
+                    if pd.Timestamp(start) <= basket.opened and stopped[index] < count
+                ),
+                None,
+            )
+        if basket is not None and basket.trend is not None:
+            _, _, pips, settle = SIGNAL_TRENDS[basket.trend]
+            full = len(basket.entries) >= SIGNAL_GRID_ENTRIES
+            if not basket.settled and settle is not None and full:
+                basket.settled = basket.behind(price[basket.symbol]) >= settle
+                if basket.settled:
+                    level[basket.symbol] = price[basket.symbol]
+            if not basket.settled:
+                push = -basket.sign * pips
+        for symbol in SIGNAL_SYMBOLS:
+            mine = basket is not None and basket.symbol == symbol
+            drift = push if mine else 0.0
+            settled = mine and basket is not None and basket.settled
+            pull = SIGNAL_SETTLED_PULL if settled else SIGNAL_PULL
+            level[symbol] += drift * _PIP
+            gap = (level[symbol] - price[symbol]) / _PIP
+            move = drift + pull * gap + noise[symbol][step]
+            price[symbol] = round(price[symbol] + move * _PIP, 5)
+        if basket is None:
+            if pause:
+                pause -= 1
+                continue
+            symbol = SIGNAL_SYMBOLS[int(choices.integers(0, len(SIGNAL_SYMBOLS)))]
+            sign = 1.0 if choices.random() < 0.5 else -1.0
+            lots = round(SIGNAL_LOTS * SIGNAL_RECOVERY**losses_in_row, 2)
+            basket = _Basket(symbol, sign, now, [(now, price[symbol], lots)])
+            continue
+        now_price = price[basket.symbol]
+        target = basket.ahead(now_price) >= SIGNAL_TARGET_PIPS
+        if not target:
+            if len(basket.entries) < SIGNAL_GRID_ENTRIES:
+                if basket.behind(now_price) >= SIGNAL_GRID_PIPS:
+                    first = basket.entries[0][2]
+                    lots = round(first * SIGNAL_GRID_FACTOR ** len(basket.entries), 2)
+                    basket.entries.append((now, now_price, lots))
+                continue
+            if basket.behind(now_price) < SIGNAL_STOP_PIPS:
+                continue
+        result = 0.0
+        for opened, entry, lots in basket.entries:
+            gross = round(basket.sign * (now_price - entry) * _LOT_UNITS * lots, 2)
+            commission = round(-SIGNAL_COMMISSION * lots, 2)
+            swap = round(-SIGNAL_SWAP * lots * (now.normalize() - opened.normalize()).days, 2)
+            trade = (opened, now, basket.symbol, basket.sign, lots, entry, now_price)
+            closed.append((*trade, commission, swap, gross))
+            result += gross + commission + swap
+        if not target:
+            stops += 1
+            if basket.trend is not None:
+                stopped[basket.trend] += 1
+            if stops == 1:
+                top_up = (now + pd.offsets.BDay(1)).normalize() + pd.Timedelta(hours=9, minutes=30)
+                due.append((top_up, SIGNAL_TOP_UP))
+        losses_in_row = losses_in_row + 1 if result < 0 else 0
+        basket = None
+        pause = int(choices.integers(1, 7))
+    return closed, flows, basket, price
+
+
+def _duration(start: pd.Timestamp, end: pd.Timestamp) -> str:
+    seconds = int((end - start).total_seconds())
+    days, seconds = divmod(seconds, 86_400)
+    hours, seconds = divmod(seconds, 3_600)
+    return f"{days:02d}:{hours:02d}:{seconds // 60:02d}:00"
+
+
+def synthetic_signal_statement() -> bytes:
+    """The signal sample's account as a Myfxbook CSV export. Synthetic by design.
+
+    Twelve months of a grid robot on two majors (``_signal_history``): deposits
+    and a withdrawal as Myfxbook lists them, the top-up made the business day
+    after the first losing basket, and the basket the last move left full and
+    open in the "Open Trades" block, with the floating loss the balance does
+    not show. Rows are in the order the trades closed; ``Profit`` is net of
+    commission and swap, as Myfxbook prints it.
+    """
+    closed, flows, basket, price = _signal_history()
+    rows: list[tuple[pd.Timestamp, pd.Timestamp, str]] = []
+    for opened, closed_at, symbol, sign, lots, entry, exit_price, commission, swap, gross in closed:
+        rows.append(
+            (
+                closed_at,
+                opened,
+                f"{_stamp(opened)},{_stamp(closed_at)},{symbol},{'Buy' if sign > 0 else 'Sell'},"
+                f"{lots:.2f},0,0,{entry:.5f},{exit_price:.5f},{commission:.2f},{swap:.2f},"
+                f"{sign * (exit_price - entry) / _PIP:.1f},{gross + commission + swap:.2f},0.00,,"
+                f"{_SIGNAL_MAGIC},{_duration(opened, closed_at)}",
+            )
+        )
+    for moment, amount in flows:
+        action = "Deposit" if amount > 0 else "Withdrawal"
+        rows.append(
+            (
+                moment,
+                moment,
+                f"{_stamp(moment)},,,{action},0.00,0,0,0,0,0,0,0.0,{amount:.2f},0,{action},0,"
+                "00:00:00:00",
+            )
+        )
+    rows.sort(key=lambda row: (row[0], row[1]))
+    ticket = 81_000
+    lines = [_MYFXBOOK_HEAD]
+    for _, _, text in rows:
+        lines.append(f",{ticket},{text}")
+        ticket += 1
+    if basket is not None:
+        lines += [
+            "",
+            "Open Trades",
+            "Tags,Ticket,Open Date,Symbol,Action,Lots,Open Price,TP,SL,Profit,Pips,Swap",
+        ]
+        now_price = price[basket.symbol]
+        for opened, entry, lots in basket.entries:
+            gross = round(basket.sign * (now_price - entry) * _LOT_UNITS * lots, 2)
+            lines.append(
+                f",{ticket},{_stamp(opened)},{basket.symbol},"
+                f"{'Buy' if basket.sign > 0 else 'Sell'},{lots:.2f},{entry:.5f},0,0,{gross:.2f},"
+                f"{basket.sign * (now_price - entry) / _PIP:.1f},0.00"
+            )
+            ticket += 1
+    return ("\n".join(lines) + "\n").encode("utf-8")
+
+
+#: The file name the signal sample's export is audited under.
+SIGNAL_FILENAME = "SyntheticSignal.csv"
+
+
+def signal_sample_result(
+    locale: str = "es",
+    *,
+    bootstrap_samples: int = SAMPLE_BOOTSTRAP,
+    market: Callable[[str], pd.Series | None] | None = None,
+) -> AuditResult:
+    """The signal sample's audit in ``locale``; deterministic for a given sample size.
+
+    Uploaded as a copier would: the account's Myfxbook export alone, the
+    trials, cost and out-of-sample fields left blank, and the strategy
+    declared as one the client bought or is about to buy or copy, so the
+    report speaks to the buyer (``audit/ownership.py``)."""
+    declared = DeclaredMetadata(
+        trials=1,
+        trials_declared=False,
+        cost_bps_per_side=0.0,
+        cost_declared=False,
+        oos_start=None,
+        description="",
+        # A currency account: no index to hold instead, as the backtest sample.
+        benchmark_applicable=False,
+        locale=locale if locale in ("es", "en", "pt") else "es",
+        challenge=None,
+        ownership="buyer",
+    )
+    inputs = build_inputs(
+        None,
+        declared,
+        report_bytes=synthetic_signal_statement(),
+        report_filename=SIGNAL_FILENAME,
+    )
+    return run_audit(
+        inputs,
+        bootstrap_samples=bootstrap_samples,
+        now=SAMPLE_NOW,
+        audit_id="sample",
+        market=market,
+    )
+
+
 __all__ = [
     "SAMPLE_NOW",
+    "SIGNAL_SEED",
     "sample_result",
+    "signal_sample_result",
     "synthetic_live_statement",
     "synthetic_mt5_optimization",
     "synthetic_mt5_report",
+    "synthetic_signal_statement",
 ]

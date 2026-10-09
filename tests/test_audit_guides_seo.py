@@ -236,12 +236,22 @@ def test_every_sitemap_url_has_an_iso_lastmod_from_the_code(tmp_path: Path) -> N
 
     from quant_trade.audit.articles import ARTICLE_PUBLICATION_DATES
     from quant_trade.audit.legal import LEGAL_PATHS, LEGAL_UPDATED
-    from quant_trade.audit.seo import PAGE_DATES, SITE_UPDATED, page_lastmod
+    from quant_trade.audit.seo import (
+        PAGE_DATES,
+        SIGNAL_SAMPLE_PUBLISHED,
+        SITE_UPDATED,
+        page_lastmod,
+    )
 
     response = _client(tmp_path).get("/sitemap.xml")
     assert response.status_code == 200
     root = ElementTree.fromstring(response.content)
-    known = {SITE_UPDATED, LEGAL_UPDATED, *ARTICLE_PUBLICATION_DATES.values()}
+    known = {
+        SITE_UPDATED,
+        LEGAL_UPDATED,
+        SIGNAL_SAMPLE_PUBLISHED,
+        *ARTICLE_PUBLICATION_DATES.values(),
+    }
     for url in root.findall("s:url", SITEMAP_NS):
         children = [child.tag.rsplit("}", 1)[-1] for child in url]
         # The schema's order: <loc>, then <lastmod>, then the xhtml alternates.

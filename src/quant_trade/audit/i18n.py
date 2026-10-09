@@ -1017,7 +1017,20 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
         "the platform's own summary at the time of the statement",
         "resumen de la propia plataforma al momento del historial",
     ),
-    ("floating result / balance", "resultado flotante / balance"),
+    (
+        "floating result / balance the file states",
+        "resultado flotante / balance que indica el archivo",
+    ),
+    (
+        "floating result / (equity the file states - floating result)",
+        "resultado flotante / (equity que indica el archivo - resultado flotante)",
+    ),
+    (
+        "floating result / balance rebuilt from the file's deposits, withdrawals "
+        "and closed trades (the file prints no balance)",
+        "resultado flotante / balance que Rigor reconstruye con los depósitos, retiros y "
+        "operaciones cerradas del archivo (el archivo no imprime un balance)",
+    ),
     (
         "the file does not state the floating result",
         "el archivo no indica el resultado flotante",

@@ -75,11 +75,16 @@ COPY = {
 }
 
 
-def _share_url(public_id: str, locale: str) -> str:
-    url = f"https://rigorscore.com/v/{quote(public_id, safe='')}?ref=share"
+def public_report_url(public_id: str, locale: str, *, ref: str = "share") -> str:
+    """The public page of a published report, tagged with ``ref`` (``funnel.REF_TAGS``)."""
+    url = f"https://rigorscore.com/v/{quote(public_id, safe='')}?ref={ref}"
     if locale != "es":
         url += f"&lang={locale}"
     return url
+
+
+def _share_url(public_id: str, locale: str) -> str:
+    return public_report_url(public_id, locale)
 
 
 def share_text(*, overall: str, public_id: str, locale: str = "es", kind: str = "backtest") -> str:

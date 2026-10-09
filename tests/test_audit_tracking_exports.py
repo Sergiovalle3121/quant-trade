@@ -69,9 +69,23 @@ def test_myfxbook_export() -> None:
     assert report.initial_balance == 1000.0
     assert report.fees == {"commission": pytest.approx(-2.8), "swap": pytest.approx(-0.3)}
     assert report.source_format in ACCOUNT_FORMATS
-    # The open trade's result is kept as the file's floating result.
+    # The open trade's result is kept as the file's floating result. Myfxbook
+    # prints no balance: the one it is compared with is rebuilt by the account
+    # review, never listed among what the platform declares.
     assert report.metadata["declared_floating_pnl"] == "-55.00"
-    assert report.metadata["declared_balance"] == "826.90"
+    assert "declared_balance" not in report.metadata
+    from quant_trade.audit.account import account_review
+
+    review, _ = account_review(
+        source_format=report.source_format,
+        cash_flows=report.cash_flows,
+        trades=trades,
+        frame=parse_equity_csv(report.equity_csv).frame,
+        metadata=dict(report.metadata),
+    )
+    share = review["floating_share"]
+    assert share["value"] == pytest.approx(-55.0 / 826.9)
+    assert "rebuilt" in share["note"] and "prints no balance" in share["note"]
 
 
 MQL5_HISTORY = "\n".join(

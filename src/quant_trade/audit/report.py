@@ -21,7 +21,7 @@ from datetime import date
 from typing import Any
 from urllib.parse import parse_qsl, quote, urlencode, urlsplit, urlunsplit
 
-from quant_trade.audit import charts, ownership, report_pt
+from quant_trade.audit import charts, ownership, report_pt, seller_message
 from quant_trade.audit.account import is_account_history
 from quant_trade.audit.crises import (
     MARKET,
@@ -56,9 +56,15 @@ from quant_trade.audit.plan import improvement_plan
 from quant_trade.audit.prop_presets import preset_label
 from quant_trade.audit.redflags import flag_title
 from quant_trade.audit.schema import AuditResult, Dimension
-from quant_trade.audit.seo import BRAND, CHECK_PATH, TAGLINE, private_meta
+from quant_trade.audit.seo import (
+    BRAND,
+    CHECK_PATH,
+    SIGNAL_SAMPLE_PATHS,
+    TAGLINE,
+    private_meta,
+)
 from quant_trade.audit.series_ui import series_report
-from quant_trade.audit.sharing import share_block
+from quant_trade.audit.sharing import public_report_url, share_block
 from quant_trade.audit.sizing import scale_text as sizing_scale_text
 from quant_trade.audit.streaks import CLUSTERED
 from quant_trade.audit.theme import (
@@ -1836,6 +1842,7 @@ LABELS: dict[str, dict[str, str]] = {
         "flags_free": "Banderas rojas detectadas",
         "report_source": "Formato del archivo",
         "platform": "Datos que declara la plataforma",
+        "platform_checked": "Lo que Rigor comprobó en el archivo",
         "colmap": "Cómo se leyó cada columna de tu archivo",
         "optimization": "Exportación de optimización",
         "passes": "configuraciones probadas",
@@ -3314,6 +3321,7 @@ LABELS: dict[str, dict[str, str]] = {
         "flags_free": "Red flags found",
         "report_source": "File format",
         "platform": "Figures the platform states",
+        "platform_checked": "What Rigor checked in the file",
         "colmap": "How each column of your file was read",
         "optimization": "Optimisation export",
         "passes": "configurations tried",
@@ -5812,6 +5820,236 @@ def _questions_html(questions: list[dict[str, str]], locale: str, labels: dict[s
     return (f"<p class='muted'>{_e(intro)}</p>" if intro else "") + f"<ol>{items}</ol>"
 
 
+def _seller_share(share: float) -> str:
+    """A share of backtest histories as the message gives it. Short of none or
+    of all, it never rounds to "0%" or "100%", which would tell the seller that
+    no history, or every one, did as badly: it reads "<1%" or ">99%"."""
+    shown = f"{share:.0%}"
+    if shown == "0%" and share > 0:
+        return "<1%"
+    if shown == "100%" and share < 1:
+        return ">99%"
+    return shown
+
+
+def _seller_figures(data: dict[str, Any], locale: str, labels: dict[str, str]) -> list[str]:
+    """Two to four key figures for the seller's message, each with its evidence
+    tag in words, as the report shows them: the break-even cost (in pips when
+    the costs section measured them), the live account against its backtest
+    when one was uploaded (both shares of backtest histories its section
+    gives, so the one that decided the badge is always there), the trials used
+    and the maximum drawdown, with the platform's deeper one beside it when
+    the summary tiles show it. A figure the files could not give says "not
+    measured" with its reason.
+
+    When fewer than ``seller_message.MIN_FIGURES`` lines carry a measured or
+    declared figure, summary tiles the report measured (Sharpe, total return,
+    drawdown p95) complete them, and past ``seller_message.MAX_FIGURES`` lines
+    the last "not measured" one makes room."""
+    words = seller_message.words(locale)
+    unmeasured = words["not_measured"]
+    closed = bool((data.get("inputs") or {}).get("balance_only"))
+    tiles = {label: shown for label, shown, _ in _kpi_list(data, labels)}
+    # (line, whether it carries a measured or declared figure)
+    lines: list[tuple[str, bool]] = []
+
+    def tag(evidence: str) -> str:
+        return evidence_label(evidence, locale).lower()
+
+    def lower(name: str) -> str:
+        return name[:1].lower() + name[1:]
+
+    def figure(text: str, evidence: str) -> None:
+        lines.append((f"{text} ({tag(evidence)})", evidence in ("MEASURED", "DECLARED")))
+
+    def missing(name: str, reason: Any) -> None:
+        why = _localized_reason(str(reason or ""), locale)
+        lines.append((f"{name}: {unmeasured}" + (f" ({why})" if why else ""), False))
+
+    costs = data.get("costs") or {}
+    bps = costs.get("break_even_bps")
+    breakeven = _ev_value(bps)
+    if breakeven is not None and breakeven <= 0:
+        # As the summary tile says it: "-0.56 bp" would read as a cost.
+        tile = f"{labels['kpi_breakeven']} ({labels['kpi_breakeven_negative']})"
+        figure(
+            f"{labels['kpi_breakeven']}: {labels['kpi_breakeven_negative']}",
+            _kpi_evidence(tile, labels, data),
+        )
+    elif breakeven is not None:
+        parts = [labels["bps_side"], *_trader_units(costs, labels)]
+        tile = f"{labels['kpi_breakeven']} ({'; '.join(parts)})"
+        figure(
+            f"{labels['kpi_breakeven']}: {breakeven:,.2f} {'; '.join(parts)}",
+            _kpi_evidence(tile, labels, data),
+        )
+    elif report_kind(data) != "fund" and costs.get("kind") != "period_returns":
+        # A fund's monthly record has no trades to cost, and period returns carry a
+        # gross-minus-net difference, not a cost per trade (their section stresses
+        # it); a backtest without trades says so.
+        note = bps.get("note") if isinstance(bps, dict) else None
+        missing(labels["kpi_breakeven"], costs.get("reason") or note)
+    live = data.get("live")
+    if live and live.get("status") == "MEASURED":
+        text = f"{labels['live']}: {labels['live_badge_' + str(live['outcome'])]}"
+        found: list[str] = []
+        # Either share can decide the badge (live._outcome): both go, as in the section.
+        for label, key in (("live_below", "net_below"), ("live_fall_above", "fall_above")):
+            block = live.get(key) or {}
+            share = _ev_value(block)
+            if share is not None:
+                text += f"; {lower(labels[label])}: {_seller_share(share)}"
+                found.append(str(block.get("evidence") or "MEASURED"))
+        figure(text, "DECLARED" if "DECLARED" in found else "MEASURED")
+    elif live:
+        missing(labels["live"], live.get("reason"))
+    statuses = {d.get("name"): d.get("status") for d in data["verdict"].get("dimensions", [])}
+    trials = (data.get("multiplicity") or {}).get("trials_used")
+    if isinstance(trials, dict) and statuses.get("multiplicity") not in (None, "NOT_APPLICABLE"):
+        value = _ev_value(trials)
+        if value is not None and trials.get("evidence") in ("MEASURED", "DECLARED"):
+            figure(f"{labels['trials_used']}: {value:,.0f}", str(trials["evidence"]))
+        else:
+            # An undeclared count was computed with 1: the note says so; no figure is given.
+            missing(labels["trials_used"], trials.get("note"))
+    key = "kpi_drawdown_closed" if closed else "kpi_drawdown"
+    drawdown = _ev_value((data.get("performance") or {}).get("max_drawdown"))
+    falls: list[tuple[str, str]] = []
+    if drawdown is not None:
+        falls.append((f"{labels[key]}: {_pct(drawdown)}", _kpi_evidence(labels[key], labels, data)))
+    platform = labels["kpi_dd_platform"]
+    if platform in tiles:
+        # Deeper than the closed-trade curve: the summary shows both, so the
+        # message gives both rather than the milder one.
+        name = words["dd_platform"]
+        falls.append(
+            (
+                f"{lower(name) if falls else name}: {tiles[platform]}",
+                _kpi_evidence(platform, labels, data),
+            )
+        )
+    if falls:
+        lines.append(
+            (
+                "; ".join(f"{text} ({tag(evidence)})" for text, evidence in falls),
+                any(evidence in ("MEASURED", "DECLARED") for _, evidence in falls),
+            )
+        )
+    fill = ("kpi_sharpe", "kpi_return", "kpi_dd_p95_closed" if closed else "kpi_dd_p95")
+    for name in fill:
+        if sum(carries for _, carries in lines) >= seller_message.MIN_FIGURES:
+            break
+        evidence = _kpi_evidence(labels[name], labels, data)
+        if labels[name] in tiles and evidence in ("MEASURED", "DECLARED"):
+            figure(f"{labels[name]}: {tiles[labels[name]]}", evidence)
+    while len(lines) > seller_message.MAX_FIGURES:
+        # The figures stay; the last "not measured" line makes room.
+        empty = [i for i, (_, carries) in enumerate(lines) if not carries]
+        if not empty:
+            break
+        del lines[empty[-1]]
+    return [line for line, _ in lines]
+
+
+def _seller_message(
+    data: dict[str, Any], locale: str, labels: dict[str, str], public_id: str | None = None
+) -> tuple[str, int, int]:
+    """The buyer's message for the seller, as plain text in ``locale``, with the
+    number of questions it carries and of questions asked.
+
+    Built from the report only: the class, the dimensions that do not pass
+    (failed or weak) and those not measured (a class short of a full
+    conclusion says why), ``_seller_figures``, the buyer's open questions in the
+    seller's wording (``seller_message.seller_question``), the public page when
+    ``public_id`` is given (only a published report has one) and the closing
+    line. Under ``seller_message.MAX_CHARS`` as a chat counts them: when the
+    questions do not fit, the last ones are left out and the text says how
+    many more are in the report."""
+    words = seller_message.words(locale)
+    fund = report_kind(data) == "fund"
+    verdict = data["verdict"]
+    status_words = STATUS_TEXT.get(locale, STATUS_TEXT["es"])
+    by_name = {d.get("name"): d.get("status") for d in verdict.get("dimensions", [])}
+    short = [
+        f"{_dimension_title(name, locale)} ({status_words[status].lower()})"
+        for name in DIMENSION_ORDER
+        if (status := by_name.get(name)) in ("FAIL", "WEAK")
+    ]
+    # Missing pieces keep a class short of a full conclusion; "none fail" alone hides them.
+    unmeasured = [
+        _dimension_title(name, locale)
+        for name in DIMENSION_ORDER
+        if by_name.get(name) == "NOT_MEASURED"
+    ]
+    head = [
+        words["hello_fund" if fund else "hello"],
+        "",
+        words["class"].format(cls=verdict["overall"]),
+        words["dimensions"].format(items=", ".join(short)) if short else words["dimensions_none"],
+        *([words["unmeasured"].format(items=", ".join(unmeasured))] if unmeasured else []),
+        "",
+        words["figures"],
+        *(f"- {line}" for line in _seller_figures(data, locale, labels)),
+        "",
+        words["questions"],
+    ]
+    asked = [
+        seller_message.seller_question(str(q.get("code", "")), _question_text(q, locale), locale)
+        for q in ownership.open_questions(data, ownership.BUYER)
+    ]
+    tail = ["", words["thanks"], ""]
+    if public_id:
+        url = public_report_url(public_id, locale, ref=seller_message.REF)
+        tail.append(words["public"].format(url=url))
+    tail.append(words["made"])
+    text, shown = "", len(asked)
+    for shown in range(len(asked), -1, -1):
+        left = len(asked) - shown
+        trimmed = (
+            [words["trimmed_one"] if left == 1 else words["trimmed"].format(n=left)] if left else []
+        )
+        numbered = [f"{i}. {question}" for i, question in enumerate(asked[:shown], 1)]
+        text = "\n".join([*head, *numbered, *trimmed, *tail])
+        if seller_message.chat_length(text) < seller_message.MAX_CHARS:
+            break
+    return text, shown, len(asked)
+
+
+def _seller_shown(data: dict[str, Any]) -> bool:
+    """The message is the buyer's, and only when the report asks something."""
+    role = ownership.role_of(data)
+    return role == ownership.BUYER and bool(ownership.open_questions(data, role))
+
+
+def _seller_html(
+    data: dict[str, Any], locale: str, labels: dict[str, str], public_id: str | None = None
+) -> str:
+    """The message for the seller under the questions, with the site's copy
+    button (``data-copy`` in ``static/app.js``); empty in every voice but the
+    buyer's. Hidden when printed: the PDF carries the questions themselves."""
+    if not _seller_shown(data):
+        return ""
+    words = seller_message.words(locale)
+    fund = report_kind(data) == "fund"
+    text, shown, total = _seller_message(data, locale, labels, public_id)
+    note = (
+        f"<p class='muted'>{_e(words['trimmed_note'].format(shown=shown, total=total))}</p>"
+        if shown < total
+        else ""
+    )
+    rows = min(text.count("\n") + 2, 18)
+    return (
+        "<div class='seller-msg no-print' id='seller-message'>"
+        f"<h3 id='seller-message-title'>{_e(words['title_fund' if fund else 'title'])}</h3>"
+        f"<p class='muted'>{_e(words['intro'].format(who=words['who_fund' if fund else 'who']))}"
+        f"</p><textarea id='{seller_message.TEXT_ID}' readonly rows='{rows}' style='width:100%' "
+        f"aria-labelledby='seller-message-title'>{_e(text)}</textarea>{note}"
+        "<div class='copy-row'><button class='btn btn-dark btn-sm' type='button' "
+        f"data-copy='{seller_message.TEXT_ID}' data-done='{_e(words['done'])}' hidden>"
+        f"{_e(words['copy'])}</button></div></div>"
+    )
+
+
 def _source_html(data: dict[str, Any], labels: dict[str, str]) -> str:
     inputs = data["inputs"]
     out = ""
@@ -5834,17 +6072,33 @@ def _source_html(data: dict[str, Any], labels: dict[str, str]) -> str:
         for k, v in metadata.items()
         if not k.startswith("column_") and k not in (NEAR_EMPTY_DAYS, NEAR_EMPTY_FIRST)
     }
-    if metadata:
-        out += (
-            f"<p class='muted'>{_e(labels['platform'])} {_badge('DECLARED')}</p><table>"
-            + "".join(
-                f"<tr><td>{_e(platform_label(key, _locale_of(labels)))}</td>"
-                f"<td>{_e(platform_value(key, value))}</td></tr>"
-                for key, value in metadata.items()
+    # The balance chain is Rigor's own check of the rows, not a figure the
+    # platform states: it goes in its own table, labelled Measured.
+    checked = {k: metadata.pop(k) for k in RIGOR_CHECKED_METADATA if k in metadata}
+    for title, badge, rows in (
+        (labels["platform"], "DECLARED", metadata),
+        (labels["platform_checked"], "MEASURED", checked),
+    ):
+        if rows:
+            out += (
+                f"<p class='muted'>{_e(title)} {_badge(badge)}</p><table>"
+                + "".join(
+                    f"<tr><td>{_e(platform_label(key, _locale_of(labels)))}</td>"
+                    f"<td>{_e(platform_value(key, value))}</td></tr>"
+                    for key, value in rows.items()
+                )
+                + "</table>"
             )
-            + "</table>"
-        )
     return out
+
+
+#: Metadata keys an importer computes from the file's rows (the running
+#: balance re-added line by line), shown apart from what the platform states.
+RIGOR_CHECKED_METADATA = (
+    "reconstructed_final_balance",
+    "balance_chain_breaks",
+    "largest_balance_difference",
+)
 
 
 def _column_map_html(metadata: dict[str, Any], labels: dict[str, str]) -> str:
@@ -5876,8 +6130,9 @@ def _report_language_url(switch_url: str, target: str) -> str:
     The public synthetic sample has a canonical path for each language.
     """
     parts = urlsplit(switch_url)
-    if parts.path in SAMPLE_PATHS.values():
-        return SAMPLE_PATHS[target]
+    for paths in (SAMPLE_PATHS, SIGNAL_SAMPLE_PATHS):
+        if parts.path in paths.values():
+            return paths[target]
     query = [
         (name, value)
         for name, value in parse_qsl(parts.query, keep_blank_values=True)
@@ -8611,6 +8866,10 @@ def _locked_titles(
         titles.append(title)
         if title == labels["challenge"] and _sizing_shown(data.get("challenge")):
             titles.append(labels["ch_size_title"])
+        if title == labels["questions"] and _seller_shown(data):
+            # The buyer's message for the seller, named for the buyer only.
+            words = seller_message.words(_locale_of(labels))
+            titles.append(words["lock_fund" if report_kind(data) == "fund" else "lock"])
     return titles
 
 
@@ -8674,6 +8933,16 @@ SAMPLE_CTA_COPY: dict[str, dict[str, str]] = {
         ),
         "check_pdf": "Descargar el PDF del ejemplo",
         "check_link": "Ir a Comprobar un informe",
+        "other_signal": "¿Vas a copiar una señal?",
+        "other_signal_link": "Mira este otro ejemplo",
+        "signal_files": (
+            "El historial que exporta {myfxbook}. Con el de {mql5} o el de {fxblue} sale un "
+            "informe como este, salvo la pérdida abierta: esos archivos no traen las "
+            "posiciones abiertas."
+        ),
+        "myfxbook": "Myfxbook",
+        "mql5": "una señal de MQL5",
+        "fxblue": "FX Blue",
     },
     "en": {
         "lead_welcome": "Your first one, with your own file, is free when you create an account.",
@@ -8697,6 +8966,16 @@ SAMPLE_CTA_COPY: dict[str, dict[str, str]] = {
         ),
         "check_pdf": "Download the sample PDF",
         "check_link": "Go to Check a report",
+        "other_signal": "About to copy a signal?",
+        "other_signal_link": "See this other sample",
+        "signal_files": (
+            "The history {myfxbook} exports. The one from {mql5} or from {fxblue} gives a "
+            "report like this one, except for the open loss: those files do not include "
+            "the open positions."
+        ),
+        "myfxbook": "Myfxbook",
+        "mql5": "an MQL5 signal",
+        "fxblue": "FX Blue",
     },
     "pt": {
         "lead_welcome": "O primeiro com o seu arquivo é grátis ao criar uma conta.",
@@ -8720,6 +8999,16 @@ SAMPLE_CTA_COPY: dict[str, dict[str, str]] = {
         ),
         "check_pdf": "Baixar o PDF do exemplo",
         "check_link": "Ir para Comprovar um relatório",
+        "other_signal": "Vai copiar um sinal?",
+        "other_signal_link": "Veja este outro exemplo",
+        "signal_files": (
+            "O histórico que o {myfxbook} exporta. Com o de {mql5} ou o do {fxblue} sai um "
+            "relatório como este, exceto a perda aberta: esses arquivos não trazem as "
+            "posições abertas."
+        ),
+        "myfxbook": "Myfxbook",
+        "mql5": "um sinal da MQL5",
+        "fxblue": "FX Blue",
     },
 }
 #: Sign-up per language, with ``next`` back to the upload form.
@@ -8742,23 +9031,50 @@ def sample_signup_href(locale: str) -> str:
     return f"{SAMPLE_SIGNUP_PATHS[lang]}?next={quote(AUDIT_PATHS[lang], safe='/')}"
 
 
-def sample_cta_band(locale: str, offer: str = "welcome") -> str:
+#: The two public samples: the robot's backtest (``/ejemplo``) and a signal's
+#: account (``/ejemplo-senal``).
+SAMPLE_KINDS: tuple[str, ...] = ("backtest", "signal")
+
+
+def sample_cta_band(locale: str, offer: str = "welcome", kind: str = "backtest") -> str:
     """Under the sample's synthetic-data notice: the free first report and which file
-    gives a report like this. Hidden when printed; only the public sample shows it."""
+    gives a report like this. Hidden when printed; only the public samples show it.
+
+    The backtest sample (``kind="backtest"``) names the MT5 files and sends whoever
+    is about to copy a signal to the other sample; the signal sample names the
+    account exports it reads."""
     from quant_trade.audit.pages import AUDIT_PATHS
 
     lang = locale if locale in SAMPLE_CTA_COPY else "es"
     words = SAMPLE_CTA_COPY[lang]
     offer = offer if offer in ("welcome", "free", "paid") else "paid"
+    if kind == "signal":
+        links = {
+            key: f"<a href='{_e(guide_url(slug, lang))}'>{_e(words[key])}</a>"
+            for key, slug in (
+                ("myfxbook", "myfxbook"),
+                ("mql5", "mql5-signal"),
+                ("fxblue", "fxblue"),
+            )
+        }
+        files = f"{_e(words['files'])} {_e(words['signal_files']).format(**links)}"
+        other = ""
+    else:
+        files = (
+            f"{_e(words['files'])} "
+            f"<a href='{_e(guide_url('mt5', lang))}'>{_e(words['mt5'])}</a> {_e(words['joint'])} "
+            f"<a href='{_e(guide_url('mt5-optimization', lang))}'>{_e(words['optimization'])}</a>."
+        )
+        other = (
+            f"<p class='sample-cta-files'>{_e(words['other_signal'])} "
+            f"<a href='{_e(SIGNAL_SAMPLE_PATHS[lang])}'>{_e(words['other_signal_link'])}</a>.</p>"
+        )
     return (
         f"<div class='sample-cta no-print'><style>{SAMPLE_CTA_CSS}</style>"
         f"<p><b>{_e(words['lead_' + offer])}</b></p>"
         f"<a class='btn btn-primary btn-sm' href='{_e(AUDIT_PATHS[lang])}'>"
         f"{_e(words['button_' + offer])}</a>"
-        f"<p class='sample-cta-files'>{_e(words['files'])} "
-        f"<a href='{_e(guide_url('mt5', lang))}'>{_e(words['mt5'])}</a> {_e(words['joint'])} "
-        f"<a href='{_e(guide_url('mt5-optimization', lang))}'>{_e(words['optimization'])}</a>."
-        "</p></div>"
+        f"<p class='sample-cta-files'>{files}</p>{other}</div>"
     )
 
 
@@ -8808,6 +9124,7 @@ def render_html(
     tools_link: bool = False,
     sample_cta: bool = False,
     sample_offer: str = "welcome",
+    sample_kind: str = "backtest",
 ) -> str:
     """The audit as one HTML document.
 
@@ -8824,6 +9141,8 @@ def render_html(
     the configuration) and the export guides, "Create account" in place of
     "My account", and a closing block to download its PDF and check it on
     /comprobar. All of it is hidden when printed; off, the page is unchanged.
+    ``sample_kind`` says which public sample it is (``SAMPLE_KINDS``): the band
+    names the files that give that report.
 
     The verdict, the plain-language explanations, the charts, the input
     hashes and the list of red flags are always shown. In paid mode an
@@ -9462,7 +9781,8 @@ def render_html(
         ),
         (
             labels["questions"],
-            _questions_html(ownership.open_questions(data, role), locale, labels),
+            _questions_html(ownership.open_questions(data, role), locale, labels)
+            + _seller_html(data, locale, labels, public_id),
         ),
         # The dimension reasons repeat the verdict in thresholds, so they open the
         # technical tables instead of sitting between the plan and the findings.
@@ -9638,7 +9958,7 @@ def render_html(
         + "<div class='wrap wrap-mid'>"
         + watermark_html
         + _notice_html(notice, ok=notice_ok)
-        + (sample_cta_band(locale, sample_offer) if sample_cta else "")
+        + (sample_cta_band(locale, sample_offer, sample_kind) if sample_cta else "")
         + _pack_notice(labels, pack_code, pack_credits_left)
         + account_box
         + f"<div class='eyebrow rise'><span class='dot'></span>{_e(_title(data, labels))}</div>"
@@ -10041,6 +10361,7 @@ def render(
     tools_link: bool = False,
     sample_cta: bool = False,
     sample_offer: str = "welcome",
+    sample_kind: str = "backtest",
 ) -> tuple[str, str]:
     """``(html, json)`` for a result, both guarded. Raises ``AuditReportError``."""
     html_text = render_html(
@@ -10071,6 +10392,7 @@ def render(
         tools_link=tools_link,
         sample_cta=sample_cta,
         sample_offer=sample_offer,
+        sample_kind=sample_kind,
     )
     guard_texts(result, html_text)
     return html_text, to_json(result)
