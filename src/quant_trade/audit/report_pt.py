@@ -5819,6 +5819,11 @@ RULES: tuple[tuple[str, str], ...] = (
         "fluxos, conversão cambial ou posições abertas podem explicar a diferença",
     ),
     (
+        "the file prints no running balance of its own to compare with",
+        "o arquivo não imprime um saldo próprio para comparar, então não há nada "
+        "independente para conciliar",
+    ),
+    (
         "a calibrated heuristic found balance-chain inconsistencies; this alone does not "
         "establish alteration",
         "uma heurística calibrada encontrou inconsistências na cadeia de saldos; "

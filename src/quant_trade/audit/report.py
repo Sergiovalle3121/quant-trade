@@ -25,6 +25,7 @@ from quant_trade.audit.account import is_account_history
 from quant_trade.audit.crises import MARKET, MARKET_AS_OF
 from quant_trade.audit.decay import is_weaker
 from quant_trade.audit.decay import signed_amount as _signed_amount
+from quant_trade.audit.engine import _NO_PRINTED_BALANCE_REASON as NO_PRINTED_BALANCE_REASON
 from quant_trade.audit.forensics.calibration import CALIBRATION
 from quant_trade.audit.forensics.copy import CHECK_NAMES as FORENSIC_CHECK_NAMES
 from quant_trade.audit.forensics.review import METHOD_VERSION as FORENSIC_METHOD_VERSION
@@ -119,6 +120,7 @@ INTEGRITY_TEXT: dict[str, dict[str, str]] = {
         "recon_match": "Cuadra dentro de la tolerancia",
         "recon_contradiction": "El saldo final contradice las operaciones",
         "recon_unmeasured": "No se pudo cerrar la conciliación",
+        "recon_no_balance": "Sin saldo impreso con el que conciliar",
         "recon_net_equation": "Bruto − costos detallados = neto de operaciones cerradas",
         "recon_final_equation": "Capital inicial + flujos conocidos + neto = saldo esperado",
         "recon_unknown": "Sin dato",
@@ -153,6 +155,11 @@ INTEGRITY_TEXT: dict[str, dict[str, str]] = {
         ),
         "forensic_signal": "Señal que requiere revisión",
         "forensic_none": "No apareció una señal calibrada en estas comprobaciones.",
+        "forensic_none_uncalibrated": (
+            "Ninguna de estas comprobaciones está calibrada para este formato: que no aparezca "
+            "una señal no dice nada sobre si el archivo se editó. Si puedes, descárgalo tú "
+            "mismo de la plataforma."
+        ),
         "forensic_caveat": (
             "Una señal no demuestra falsificación; la ausencia de señales no prueba autenticidad."
         ),
@@ -188,6 +195,7 @@ INTEGRITY_TEXT: dict[str, dict[str, str]] = {
         "recon_match": "Matches within tolerance",
         "recon_contradiction": "The closing balance contradicts the trades",
         "recon_unmeasured": "The reconciliation could not be completed",
+        "recon_no_balance": "No printed balance to reconcile against",
         "recon_net_equation": "Gross − itemised costs = net closed-trade P&L",
         "recon_final_equation": (
             "Starting capital + known flows + net P&L = expected closing balance"
@@ -222,6 +230,11 @@ INTEGRITY_TEXT: dict[str, dict[str, str]] = {
         ),
         "forensic_signal": "Signal requiring review",
         "forensic_none": "No calibrated signal appeared in these checks.",
+        "forensic_none_uncalibrated": (
+            "None of these checks is calibrated for this format: the absence of a signal says "
+            "nothing about whether the file was edited. If you can, download it yourself from "
+            "the platform."
+        ),
         "forensic_caveat": (
             "A signal does not prove forgery; no signal does not prove authenticity."
         ),
@@ -255,6 +268,7 @@ INTEGRITY_TEXT: dict[str, dict[str, str]] = {
         "recon_match": "Confere dentro da tolerância",
         "recon_contradiction": "O saldo final contradiz as operações",
         "recon_unmeasured": "Não foi possível concluir a conciliação",
+        "recon_no_balance": "Sem saldo impresso para conciliar",
         "recon_net_equation": "Bruto − custos detalhados = líquido das operações fechadas",
         "recon_final_equation": "Capital inicial + fluxos conhecidos + líquido = saldo esperado",
         "recon_unknown": "Sem dado",
@@ -289,6 +303,11 @@ INTEGRITY_TEXT: dict[str, dict[str, str]] = {
         ),
         "forensic_signal": "Sinal que exige revisão",
         "forensic_none": "Nenhum sinal calibrado apareceu nessas verificações.",
+        "forensic_none_uncalibrated": (
+            "Nenhuma destas verificações está calibrada para este formato: a ausência de sinal "
+            "não diz nada sobre se o arquivo foi editado. Se puder, baixe-o você mesmo da "
+            "plataforma."
+        ),
         "forensic_caveat": (
             "Um sinal não comprova falsificação; a ausência de sinais não prova autenticidade."
         ),
@@ -5106,6 +5125,14 @@ RECON_REASONS: dict[str, tuple[str, str, str]] = {
         "Posições abertas ou fechamentos ausentes da lista de operações podem explicar "
         "a diferença.",
     ),
+    "the file prints no running balance of its own to compare with": (
+        "El archivo no imprime un saldo propio con el que comparar, así que no hay nada "
+        "independiente que conciliar.",
+        "The file prints no balance of its own to compare with, so there is nothing "
+        "independent to reconcile.",
+        "O arquivo não imprime um saldo próprio para comparar, então não há nada "
+        "independente para conciliar.",
+    ),
     "flows, currency conversion or open positions could explain the difference": (
         "Los flujos, el cambio de moneda o las posiciones abiertas podrían explicar la diferencia.",
         "Flows, currency conversion or open positions could explain the difference.",
@@ -5154,6 +5181,9 @@ def _reconciliation_html(recon: dict[str, Any] | None, locale: str) -> str:
         "CONTRADICTION": "recon_contradiction",
     }.get(status, "recon_unmeasured")
     raw_reason = str(recon.get("reason", ""))
+    if raw_reason == NO_PRINTED_BALANCE_REASON:
+        # Nothing failed: the file simply has no balance of its own to compare.
+        status_key = "recon_no_balance"
     reason = _recon_text(raw_reason, locale, RECON_REASONS)
     if reason and raw_reason not in RECON_REASONS and locale != "en":
         # A reason with no fixed sentence still reads in the page language.
@@ -5308,8 +5338,17 @@ def _forensics_html(forensics: dict[str, Any] | None, locale: str) -> str:
             + f"<p class='muted'>{_e(cal_line)}</p></div>"
         )
 
+    # A platform's own invariants are listed only for that platform's files,
+    # unless they raised a signal.
+    own_family = {"TV_INVARIANTS": "tradingview", "NT_INVARIANTS": "ninjatrader"}
+    listed = [
+        check
+        for check in checks
+        if check.get("status") == "SIGNAL"
+        or own_family.get(str(check.get("id", "")), family) == family
+    ]
     all_rows = ""
-    for check in checks:
+    for check in listed:
         status = copy.get("check_" + str(check.get("status", "")).lower(), copy["check_info"])
         calibration_state = (
             copy["forensic_calibrated"] if granted(check) else copy["forensic_uncalibrated"]
@@ -5326,9 +5365,12 @@ def _forensics_html(forensics: dict[str, Any] | None, locale: str) -> str:
         f"<th>{_e(copy['forensic_status'])}</th>"
         f"<th>{_e(copy['forensic_calibration'])}</th></tr></thead>"
         f"<tbody>{all_rows}</tbody></table></div></div></details>"
-        if checks
+        if listed
         else ""
     )
+    # Without a calibrated check, a quiet result reassures about nothing.
+    calibrated = any(granted(check) for check in checks)
+    none_key = "forensic_none" if calibrated else "forensic_none_uncalibrated"
     return (
         f"<p class='muted'>{_e(copy['forensic_intro'])}</p>"
         f"<p class='forensic-meta'>{_e(copy['forensic_version'])}: "
@@ -5341,7 +5383,7 @@ def _forensics_html(forensics: dict[str, Any] | None, locale: str) -> str:
             if forensics.get("truncated")
             else ""
         )
-        + ("".join(signal_cards) if signals else f"<p>{_e(copy['forensic_none'])}</p>")
+        + ("".join(signal_cards) if signals else f"<p>{_e(copy[none_key])}</p>")
         + f"<p class='forensic-caveat'>{_e(copy['forensic_caveat'])}</p>"
         + checks_html
     )

@@ -37,6 +37,7 @@ src/quant_trade/audit/web.py
 tests/audit_fixtures.py
 tests/forgery_lab.py
 tests/test_audit_access_codes.py
+tests/test_audit_account_upload_honesty.py
 tests/test_audit_articles.py
 tests/test_audit_card_payments.py
 tests/test_audit_checkout_language.py

@@ -56,7 +56,7 @@ from quant_trade.audit import stress as stress_lib
 from quant_trade.audit import testdata as testdata_lib
 from quant_trade.audit import timing as timing_lib
 from quant_trade.audit.guard import find_claims, scan_client_text
-from quant_trade.audit.importers import lead_number
+from quant_trade.audit.importers import MT4_STATEMENT_HTML, lead_number
 from quant_trade.audit.prop_presets import DEFAULT_PRESET, get_preset
 from quant_trade.audit.return_series import frame_returns, return_performance
 from quant_trade.audit.schema import (
@@ -1080,6 +1080,15 @@ _INCOMPLETE_LEDGER_WARNINGS = (
 _INCOMPLETE_LEDGER_REASON = (
     "open positions or closes missing from the trade list could explain the difference"
 )
+#: A platform file with no balance printed on its rows (Myfxbook, MQL5, FX
+#: Blue, TradingView and other trade lists): its curve is an index adjusted for
+#: deposits and withdrawals, rebuilt from the same rows as the expected balance,
+#: so it is not money to compare with.
+_NO_PRINTED_BALANCE_REASON = "the file prints no running balance of its own to compare with"
+#: The MT4 statement prints the account's Balance in its own summary, though
+#: not on each row: it keeps the comparison it had (a withdrawal after the last
+#: trade is left out of the window, and the curve then is the balance).
+_SUMMARY_BALANCE_FORMATS = frozenset({MT4_STATEMENT_HTML})
 
 
 def _incomplete_ledger(inputs: AuditInputs) -> bool:
@@ -1181,6 +1190,21 @@ def _reconciliation(inputs: AuditInputs) -> tuple[dict[str, Any], list[redflags.
         "difference": measured(difference),
         "tolerance": measured(tolerance, "0.011 per closed trade plus 1 bp of capital"),
     }
+    if (
+        inputs.balance_only
+        and reported is None
+        and inputs.source_format not in _SUMMARY_BALANCE_FORMATS
+    ):
+        # The rebuilt curve is an index adjusted for deposits and withdrawals,
+        # not a balance, and the reconstructed balance comes from the same rows
+        # as the expected one: comparing either would invent or fake a result.
+        return {
+            "status": "NOT_MEASURED",
+            "reason": _NO_PRINTED_BALANCE_REASON,
+            **common,
+            "observed_final": not_measured(_NO_PRINTED_BALANCE_REASON),
+            "difference": not_measured(_NO_PRINTED_BALANCE_REASON),
+        }, []
     if outside or (not inputs.balance_only and uncovered_tail / span > 0.01):
         return {
             "status": "NOT_MEASURED",

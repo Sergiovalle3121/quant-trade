@@ -256,7 +256,9 @@ forward review, and the plateau check never reads its Profit column.
 
 A platform report dropped in the equity field by mistake (an `.htm`,
 `.html` or `.xlsx` name, or HTML content, UTF-16 included) is read as the
-report instead of failing as a malformed CSV. A CSV the parser cannot read
+report instead of failing as a malformed CSV; so is a Myfxbook, MQL5 or FX
+Blue account CSV, and an account statement sent alone in the optional live
+box is the main file (an empty one is named as the live statement). A CSV the parser cannot read
 is explained in the form's language (header row, same number of columns),
 without the parser's English message.
 
@@ -4257,6 +4259,13 @@ separate CSV curve, its currency is shown as unknown even when the trade file
 states USD; same units are an assumption, not verified conversion. Trades
 outside the curve or an uncovered last 1 %
 of its time span make the comparison `NOT_MEASURED`.
+A platform file that prints no running balance of its own (Myfxbook, MQL5, FX
+Blue, TradingView and other trade lists) has nothing independent to compare:
+its curve is an index adjusted for deposits and withdrawals, rebuilt from the
+same rows as the expected balance, so the equation is `NOT_MEASURED` ("No
+printed balance to reconcile against"), with the observed balance and the
+difference not measured and no red flag. MT4/MT5 files with a printed balance
+(on each row, or in the MT4 statement's summary) keep the comparison.
 
 The importer counts a printed Balance cell as a break only when it differs
 from the previous balance plus the row's money by more than printing rounding:

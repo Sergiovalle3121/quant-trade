@@ -92,7 +92,12 @@ from quant_trade.audit.errors_pt import FILES_PT
 from quant_trade.audit.examples import EXAMPLES_PATH
 from quant_trade.audit.faq import FAQ_PATH, faq_page
 from quant_trade.audit.guides import GUIDES_BY_PATH, guide_url
-from quant_trade.audit.importers import detect_format
+from quant_trade.audit.importers import (
+    FXBLUE_CSV,
+    MQL5_SIGNAL_CSV,
+    MYFXBOOK_CSV,
+    detect_format,
+)
 from quant_trade.audit.indexnow import clean_key, key_path
 from quant_trade.audit.legal import LEGAL_UPDATED, LegalContext, privacy_text, terms_text
 from quant_trade.audit.market import MarketData
@@ -620,6 +625,22 @@ class RedactSecretsFilter(logging.Filter):
             record.args = tuple(args)
         record.msg = redact_secrets(str(record.msg))
         return True
+
+
+#: Account histories exported as CSV: their rows are trades and money
+#: movements, never a curve, so one dropped in the curve box is the report.
+_ACCOUNT_CSV_FORMATS = frozenset({MYFXBOOK_CSV, MQL5_SIGNAL_CSV, FXBLUE_CSV})
+#: Those three are named by their header row, so a curve upload is sniffed on
+#: its first bytes instead of being read whole once more.
+_ACCOUNT_SNIFF_BYTES = 64 * 1024
+
+
+def _is_account_csv(data: bytes, filename: str | None) -> bool:
+    """True for a Myfxbook, MQL5 or FX Blue account history."""
+    try:
+        return detect_format(data[:_ACCOUNT_SNIFF_BYTES], filename) in _ACCOUNT_CSV_FORMATS
+    except Exception:  # noqa: BLE001 - an unreadable file keeps its own refusal
+        return False
 
 
 def looks_like_platform_report(filename: str | None, data: bytes) -> bool:
@@ -4889,9 +4910,19 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 detector="body_limit",
                 detected_format=upload_rejections.header_format(exc.head),
             )
+        account_only = uploads["live"]
+        if account_only and not uploads["report"] and not uploads["equity"]:
+            # quien solo tiene la cuenta la deja en el recuadro opcional: es su archivo principal
+            uploads["report"], uploads["live"] = account_only, None
+            report, live = live, None
+            # The report's own format is what a refusal names from here on.
+            request.state.ops_rejection_format = upload_rejections.header_format(
+                account_only[: upload_rejections.HEADER_BYTES]
+            )
+            request.state.upload_file_inspected = True
         if not uploads["equity"] and not uploads["report"]:
             # A file that arrived with no bytes is named as empty, not as missing.
-            for what, sent in (("report", report), ("equity", equity)):
+            for what, sent in (("report", report), ("equity", equity), ("live", live)):
                 if sent is not None and sent.filename:
                     text = message("empty_upload", report_loc, what=UPLOAD_NAMES[what][report_loc])
                     return _upload_error(
@@ -5046,11 +5077,20 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 detector="form",
             )
         report_filename = report.filename if report is not None and uploads["report"] else None
+        equity_name = equity.filename if equity is not None else None
+        # An account history (Myfxbook, MQL5, FX Blue) in the curve box is the
+        # report: its rows are trades and money movements, never a curve or a
+        # table of returns, so it is told apart before the return-series check.
+        account_csv = bool(
+            uploads["equity"]
+            and not uploads["report"]
+            and await run_in_threadpool(_is_account_csv, uploads["equity"], equity_name)
+        )
         # The primary picker accepts period-return CSV/XLSX tables too. Content
         # detection comes before platform sniffing, and uses the curve reader's
         # existing size and workbook limits.
         return_table = False
-        if bool(uploads["report"]) != bool(uploads["equity"]):
+        if bool(uploads["report"]) != bool(uploads["equity"]) and not account_csv:
             candidate = uploads["equity"] or uploads["report"]
             if candidate:
                 return_table = await run_in_threadpool(is_return_series, candidate)
@@ -5059,12 +5099,11 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 report_filename = None
         # A platform report dropped in the equity-curve field is read as the
         # report, instead of failing as a malformed CSV.
-        equity_name = equity.filename if equity is not None else None
         if (
             uploads["equity"]
             and not uploads["report"]
             and not return_table
-            and looks_like_platform_report(equity_name, uploads["equity"])
+            and (account_csv or looks_like_platform_report(equity_name, uploads["equity"]))
         ):
             uploads["report"], uploads["equity"] = uploads["equity"], None
             report_filename = equity_name
