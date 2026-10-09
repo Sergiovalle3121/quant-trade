@@ -6094,8 +6094,12 @@ def public_view(result_json: str) -> tuple[dict[str, Any], str]:
     """The allow-listed fields the public verification page reads, and the
     SHA-256 of the full result it came from.
 
-    Nothing else survives: no description, no client text findings, no
-    series, trades, statistics or files.
+    The page also says what was audited and over which dates, so the view
+    keeps the first and last timestamps and the sampling frequency. Nothing
+    else survives: no description, no client text findings, no series, no
+    trades (nor their count), no number of observations, no statistics and no
+    files. The privacy policy and the terms (``legal.py``) list what the page
+    shows and what the purge keeps; a new field here needs that text first.
     """
     result = AuditResult.model_validate_json(result_json)
     data = result.model_dump(mode="json")
@@ -6126,7 +6130,15 @@ def public_view(result_json: str) -> tuple[dict[str, Any], str]:
         },
         "inputs": {
             key: inputs[key]
-            for key in ("digests", "dataset_digest", "source_format", "source")
+            for key in (
+                "digests",
+                "dataset_digest",
+                "source_format",
+                "source",
+                "first_timestamp",
+                "last_timestamp",
+                "frequency_label",
+            )
             if key in inputs
         }
         | {"source_is_pdf": source_is_pdf},

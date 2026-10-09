@@ -245,6 +245,9 @@ def test_a_purged_published_audit_keeps_only_its_public_page(tmp_path: Path) -> 
         "multiplicity",
     }
     assert view["fund"] == {"track_record": False}
+    # The page's data period keeps dates and frequency only: the privacy policy
+    # lists what the purge keeps, and no count of observations or trades is on it.
+    assert "observations" not in view["inputs"]
     assert set(view["declared"]) == {"trials"}
 
     # The owner can still withdraw it with the private link.

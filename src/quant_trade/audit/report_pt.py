@@ -43,6 +43,10 @@ REPORT: dict[str, Any] = {
         ),
         "generated": "Gerado",
         "audit_id": "Identificador",
+        "data_period": "Dados",
+        "data_age": "{days} dias entre o último dado e esta auditoria",
+        "data_age_one": "1 dia entre o último dado e esta auditoria",
+        "data_age_account": "O que aconteceu depois do último dado não está neste arquivo.",
         "inputs": "Arquivos auditados (sha256)",
         "verdict": "Veredito",
         "dimensions": "Dimensões",
@@ -834,8 +838,9 @@ REPORT: dict[str, Any] = {
         ),
         "publish": "Publicar verificação pública",
         "publish_help": (
-            "Cria uma página pública com a classe, as dimensões e os hashes, e um selo para o "
-            "seu site. Nunca mostra seus arquivos, operações nem descrição."
+            "Cria uma página pública com a classe, as dimensões, os hashes, o que foi auditado e "
+            "o período dos seus dados (datas e frequência), e um selo para o seu site. Nunca "
+            "mostra seus arquivos, operações nem descrição."
         ),
         "evidence_legend": (
             "Cada número leva sua etiqueta: «Medido» quando calculado a partir dos seus "
@@ -2031,6 +2036,10 @@ VERDICT: dict[str, Any] = {
             "Com o custo de referência, as operações perdem dinheiro no líquido. O resultado do "
             "backtest depende de não pagar custos."
         ),
+        "costs.FAIL.account": (
+            "Com o custo de referência, as operações desta conta perdem dinheiro no líquido. Os "
+            "preços já são os da corretora, então a margem sobre os custos é nula ou negativa."
+        ),
         "costs.NOT_MEASURED": (
             "Sem a lista de operações não é possível reaplicar os custos. Envie o relatório da "
             "plataforma para medi-los."
@@ -2066,8 +2075,8 @@ VERDICT: dict[str, Any] = {
             "descarta erros que os arquivos não mostrem."
         ),
         "data_quality.WEAK": (
-            "Há avisos nos dados que convém esclarecer antes de confiar nos números. Revise a "
-            "lista de sinais de alerta e as perguntas para o vendedor."
+            "Há avisos nos dados que convém esclarecer antes de confiar nos números. O relatório "
+            "completo lista cada aviso com sua explicação."
         ),
         "data_quality.FAIL": (
             "Há problemas graves nos dados ou na forma de operar. Os números principais não "

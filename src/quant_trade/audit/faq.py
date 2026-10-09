@@ -284,24 +284,26 @@ _QUESTIONS: tuple[dict[str, tuple[str, str]], ...] = (
         "es": (
             "¿Cómo se publica una página de verificación?",
             "Desde tu informe completo puedes elegir publicar su página de verificación "
-            "y retirarla después. Muestra la clase, las dimensiones, las huellas de los "
-            "archivos, las fechas y un aviso fijo; nunca tus archivos, operaciones, "
-            "descripción ni enlace privado. El sello enlaza a esa página y no es una "
-            "promesa de resultados.",
+            "y retirarla después. Muestra la clase, las dimensiones, qué se auditó, el "
+            "periodo de los datos, las huellas de los archivos, las fechas y un aviso fijo; "
+            "nunca tus archivos, operaciones, descripción ni enlace privado. El sello "
+            "enlaza a esa página y no es una promesa de resultados.",
         ),
         "en": (
             "How do I publish a verification page?",
             "From your full report you can choose to publish its verification page and "
-            "withdraw it later. It shows the class, dimensions, file hashes, dates and "
-            "a fixed notice; never your files, trades, description or private link. "
-            "The badge links to that page and is not a promise of results.",
+            "withdraw it later. It shows the class, dimensions, what was audited, the "
+            "data period, file hashes, dates and a fixed notice; never your files, "
+            "trades, description or private link. The badge links to that page and is "
+            "not a promise of results.",
         ),
         "pt": (
             "Como publico uma página de verificação?",
             "No relatório completo você pode escolher publicar a página de verificação "
-            "e retirá-la depois. Ela mostra a classe, as dimensões, as impressões digitais "
-            "dos arquivos, as datas e um aviso fixo; nunca arquivos, operações, descrição "
-            "ou link privado. O selo aponta para essa página e não é uma promessa de resultados.",
+            "e retirá-la depois. Ela mostra a classe, as dimensões, o que foi auditado, o "
+            "período dos dados, as impressões digitais dos arquivos, as datas e um aviso "
+            "fixo; nunca arquivos, operações, descrição ou link privado. O selo aponta "
+            "para essa página e não é uma promessa de resultados.",
         ),
     },
     # Source: pages.CONTACT_COPY and contact_page, whose public channels come

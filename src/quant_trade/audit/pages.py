@@ -105,7 +105,9 @@ from quant_trade.audit.report import (
     CLASS_LADDER,
     DIMENSION_TITLES,
     DISCLAIMER,
+    FREQUENCY_TEXT,
     STATUS_TEXT,
+    data_age_days,
     evidence_label,
     localize_tags,
     localize_text_nodes,
@@ -471,9 +473,10 @@ _COPY: dict[str, dict[str, Any]] = {
             (
                 "¿Qué pasa con mi archivo?",
                 "Se guarda para poder regenerar tu informe. Si no pagas, se borra a los "
-                "{retention} días y solo quedan la clase y los hashes. Nunca se publica: la "
-                "página de verificación muestra la clase, las dimensiones y los hashes, y solo "
-                "si tú la publicas.",
+                "{retention} días y solo quedan la clase y los hashes (y lo que muestra tu "
+                "página de verificación, si la publicaste). Nunca se publica: la página de "
+                "verificación muestra la clase, las dimensiones, los hashes, qué se auditó y el "
+                "periodo de los datos, y solo si tú la publicas.",
             ),
             (
                 "¿Y si olvido mi contraseña?",
@@ -511,10 +514,17 @@ _COPY: dict[str, dict[str, Any]] = {
         "v_meaning": "Qué significa",
         "v_inputs": "Hashes de los archivos auditados (SHA-256)",
         "v_details": "Datos de la auditoría",
+        "v_kind": "Qué se auditó",
+        "v_kind_backtest": "Backtest",
+        "v_kind_account": "Historial de cuenta real o demo",
+        "v_kind_fund": "Historial de un fondo",
+        "v_period": "Periodo de los datos",
+        "v_age": "Días entre el último dato y la auditoría",
         "v_format": "Formato del archivo",
         "v_engine": "Motor",
         "v_trials_declared": "Intentos declarados",
         "v_trials_used": "Intentos usados en el Sharpe deflactado",
+        "v_trials_undeclared": "sin declarar; se calcula con 1, el caso más favorable",
         "v_result_sha": "SHA-256 del resultado",
         "v_notice": "Aviso",
         "v_badge": "Sello para tu web",
@@ -778,9 +788,10 @@ _COPY: dict[str, dict[str, Any]] = {
             (
                 "What happens to my file?",
                 "It is kept so your report can be regenerated. If unpaid it is deleted after "
-                "{retention} days and only the class and the hashes remain. It is never "
-                "published: the verification page shows the class, the dimensions and the "
-                "hashes, and only if you publish it.",
+                "{retention} days and only the class and the hashes remain (plus what your "
+                "verification page shows, if you published it). It is never published: the "
+                "verification page shows the class, the dimensions, the hashes, what was "
+                "audited and the data period, and only if you publish it.",
             ),
             (
                 "What if I forget my password?",
@@ -818,10 +829,17 @@ _COPY: dict[str, dict[str, Any]] = {
         "v_meaning": "What it means",
         "v_inputs": "Hashes of the audited files (SHA-256)",
         "v_details": "Audit details",
+        "v_kind": "What was audited",
+        "v_kind_backtest": "Backtest",
+        "v_kind_account": "Live or demo account history",
+        "v_kind_fund": "A fund's track record",
+        "v_period": "Data period",
+        "v_age": "Days between the last data point and the audit",
         "v_format": "File format",
         "v_engine": "Engine",
         "v_trials_declared": "Trials declared",
         "v_trials_used": "Trials used in the deflated Sharpe",
+        "v_trials_undeclared": "not declared; computed at 1, the most favourable case",
         "v_result_sha": "SHA-256 of the result",
         "v_notice": "Notice",
         "v_badge": "Badge for your site",
@@ -2848,15 +2866,55 @@ def _utc_time(stamp: str, locale: str) -> str:
     return f"<time datetime='{_e(stamp)}'>{day} · {when:%H:%M} UTC</time>"
 
 
-def _meaning_of(dimension: dict[str, Any], locale: str) -> str:
+def _meaning_of(dimension: dict[str, Any], locale: str, kind: str = "backtest") -> str:
     """The fixed plain text of a dimension, in its undeclared-trials wording when
     the trial count was never declared: read from the dimension's inputs on a
-    live result, or from the fact the kept public view stores in their place."""
+    live result, or from the fact the kept public view stores in their place.
+
+    ``kind`` (``report_kind``) picks the account or fund wording where one
+    exists, as the private report does."""
     if "inputs" in dimension:
         undeclared = trials_undeclared(dimension.get("inputs"))
     else:
         undeclared = bool(dimension.get("undeclared"))
-    return meaning(dimension["name"], dimension["status"], locale, undeclared=undeclared)
+    return meaning(
+        dimension["name"],
+        dimension["status"],
+        locale,
+        account=kind == "account",
+        fund=kind == "fund",
+        undeclared=undeclared,
+    )
+
+
+def _data_period(result: dict[str, Any], locale: str) -> str:
+    """HTML of the data period: first and last dates and the sampling frequency.
+
+    Empty when the dates are missing (a public view kept before the page showed
+    them); the frequency is left out when it is missing. No count is shown:
+    the privacy policy and the terms list what this page shows and keeps
+    (class, dimensions, hashes, dates, trials, engine), and the number of
+    observations or of trades is not on that list."""
+    inputs = result.get("inputs") or {}
+    first, last = inputs.get("first_timestamp"), inputs.get("last_timestamp")
+    if not first or not last:
+        return ""
+    words = [
+        f"{_plain_date(str(first)[:10], locale)} → {_plain_date(str(last)[:10], locale)}",
+        FREQUENCY_TEXT[locale].get(str(inputs.get("frequency_label")), ""),
+    ]
+    return " · ".join(_e(word) for word in words if word)
+
+
+def _trials_used_value(item: Any, locale: str) -> str:
+    """The trial count the deflated Sharpe used; an undeclared count (computed at
+    1, the most favourable case) reads as a dash, its badge and why."""
+    if isinstance(item, dict) and item.get("evidence") == "NOT_MEASURED":
+        return (
+            f"<span class='vc'>— {_badge('NOT_MEASURED', locale)}</span> "
+            f"{_e(_COPY[locale]['v_trials_undeclared'])}"
+        )
+    return _evidence_value(item, locale)
 
 
 def verification_page(
@@ -2870,23 +2928,31 @@ def verification_page(
 ) -> str:
     """The public page of a published audit.
 
-    Built from an allow-list of fields: class, dates, dimension statuses with
-    their fixed plain-language text, input hashes, source format, engine,
-    trial counts and a fixed notice. The description, trades, files and
-    token are never read here, so they cannot leak.
+    Built from an allow-list of fields: class, what was audited (a backtest,
+    an account history or a fund's track record), the data period (first and
+    last dates and frequency), the days between the last data point and the
+    audit, dates, dimension statuses with their fixed plain-language text,
+    input hashes, source format, engine, trial counts and a fixed notice. The
+    description, trades (their list or their count), the number of
+    observations, files and token are never read here, so they cannot leak. A
+    view kept before the period was shown has no dates, and those rows are
+    left out.
     """
     locale = _locale(locale)
     copy = _COPY[locale]
     ui = _UI[locale]
     verdict = result["verdict"]
     overall = str(verdict["overall"])
+    # A backtest, an account history or a fund's track record: the class
+    # sentence, the cards and the share text all name it the same way.
+    kind = report_kind(result)
     titles = DIMENSION_TITLES.get(locale, DIMENSION_TITLES["es"])
     # The same cards as the report's "what it means for you", so a buyer
     # reads one dimension at a time on a phone.
     cards = "".join(
         f"<div class='item s-{_e(str(d['status']))}'>"
         f"<h3>{_e(titles.get(d['name'], d['name']))} {_status_chip(str(d['status']), locale)}</h3>"
-        f"<p>{_e(_meaning_of(d, locale))}</p></div>"
+        f"<p>{_e(_meaning_of(d, locale, kind))}</p></div>"
         for d in verdict["dimensions"]
     )
     inputs = result.get("inputs", {})
@@ -2900,6 +2966,21 @@ def verification_page(
     engine = result.get("engine", {})
     declared = result.get("declared", {})
     trials_used = result.get("multiplicity", {}).get("trials_used")
+    # What was audited and over which dates come first: a reader needs them to
+    # weigh the class. The days are calendar days from the last data point to
+    # the audit date, measured from the two stored dates.
+    facts = [(copy["v_kind"], _e(copy[f"v_kind_{kind}"]))]
+    period = _data_period(result, locale)
+    if period:
+        facts.append((copy["v_period"], period))
+    age = data_age_days(result)
+    if age is not None:
+        facts.append(
+            (
+                copy["v_age"],
+                f"<span class='vc'>{_e(_num(age, locale, 0))} {_badge('MEASURED', locale)}</span>",
+            )
+        )
     details = [
         (
             copy["v_format"],
@@ -2910,14 +2991,12 @@ def verification_page(
     # Words read as words, figures carry their evidence badge, and only the
     # hash keeps the code style.
     detail_rows = (
-        "".join(f"<tr><td>{_e(label)}</td><td>{_e(value)}</td></tr>" for label, value in details)
-        + "".join(
-            f"<tr><td>{_e(label)}</td><td>{_evidence_value(item, locale)}</td></tr>"
-            for label, item in (
-                (copy["v_trials_declared"], declared.get("trials")),
-                (copy["v_trials_used"], trials_used),
-            )
-        )
+        "".join(f"<tr><td>{_e(label)}</td><td>{value}</td></tr>" for label, value in facts)
+        + "".join(f"<tr><td>{_e(label)}</td><td>{_e(value)}</td></tr>" for label, value in details)
+        + f"<tr><td>{_e(copy['v_trials_declared'])}</td>"
+        f"<td>{_evidence_value(declared.get('trials'), locale)}</td></tr>"
+        f"<tr><td>{_e(copy['v_trials_used'])}</td>"
+        f"<td>{_trials_used_value(trials_used, locale)}</td></tr>"
         + f"<tr><td>{_e(copy['v_result_sha'])}</td><td><code>{_e(result_sha256)}</code></td></tr>"
     )
     page_url = f"{base_url}/v/{public_id}"
@@ -2957,7 +3036,7 @@ def verification_page(
         "<div class='v-hero rise' style='--i:2'>"
         + class_ring(overall, size="xl")
         + f"<div><div class='verdict-k'>{_e(cls_label)} {_e(overall)}</div>"
-        f"<p class='verdict-text'>{_e(class_text(overall, locale))}</p>"
+        f"<p class='verdict-text'>{_e(class_text(overall, locale, kind=kind))}</p>"
         "<div class='v-facts'>"
         f"<div><b>{_e(copy['v_audited'])}</b><span>{_utc_time(audited, locale)}</span></div>"
         f"<div><b>{_e(copy['v_published'])}</b><span>{_utc_time(published_at, locale)}</span></div>"
@@ -2989,7 +3068,7 @@ def verification_page(
             overall=overall,
             public_id=public_id,
             locale=locale,
-            kind=report_kind(result),
+            kind=kind,
         )
         + "</div></div>"
     )
@@ -3006,24 +3085,38 @@ def verification_page(
 def verification_card_svg(result: dict[str, Any], *, public_id: str, locale: str = "es") -> str:
     """A share image using a subset of the verification page's allow-list.
 
-    Only the class, audit date and public id are read. All other words are
-    fixed page copy: no client prose, figures, trades, files or private ids.
-    The same fields survive a published audit's retention purge.
+    Only the class, the kind of upload (backtest, account history or fund's
+    track record), the data period's first and last dates, the audit date and
+    the public id are read. The kind picks the class sentence drawn on the
+    card, so an account is never called a backtest; the kind and the period
+    go only in ``<desc>``. All other words are fixed page copy: no client
+    prose, figures, trades, files or private ids. The same fields survive a
+    published audit's retention purge.
     """
     locale = _locale(locale)
     copy = _COPY[locale]
     overall = str(result["verdict"]["overall"])
+    kind = report_kind(result)
     audited = str(result.get("generated_at_utc", ""))[:10]
     label = f"{CLASS_WORD[locale]} {overall}"
     title = f"{BRAND} · {label}"
     notice = BADGE_NOTICE[locale]
-    description = f"{copy['v_audited']}: {audited}. ID {public_id}. {notice}"
+    inputs = result.get("inputs") or {}
+    first = str(inputs.get("first_timestamp") or "")[:10]
+    last = str(inputs.get("last_timestamp") or "")[:10]
+    period = f"{copy['v_period']}: {first} → {last}. " if first and last else ""
+    description = (
+        f"{copy['v_kind']}: {copy[f'v_kind_{kind}']}. {period}"
+        f"{copy['v_audited']}: {audited}. ID {public_id}. {notice}"
+    )
     colour = CLASS_COLOURS.get(overall, "#a3a3aa")
     width, height = OG_IMAGE_SIZE
     font = "Inter,Segoe UI,Roboto,Helvetica,Arial,sans-serif"
     sentence = "".join(
         f"<tspan x='350' y='{260 + index * 38}'>{_e(line)}</tspan>"
-        for index, line in enumerate(textwrap.wrap(class_text(overall, locale), width=47))
+        for index, line in enumerate(
+            textwrap.wrap(class_text(overall, locale, kind=kind), width=47)
+        )
     )
     footer = "".join(
         f"<tspan x='56' y='{548 + index * 28}'>{_e(line)}</tspan>"

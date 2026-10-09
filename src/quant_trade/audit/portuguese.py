@@ -288,9 +288,10 @@ COPY_PT: dict[str, Any] = {
         (
             "O que acontece com o meu arquivo?",
             "Fica guardado para poder gerar o seu relatório de novo. Se você não pagar, é "
-            "apagado após {retention} dias e só ficam a classe e os hashes. Nunca é publicado: a "
-            "página de verificação mostra a classe, as dimensões e os hashes, e só se você a "
-            "publicar.",
+            "apagado após {retention} dias e só ficam a classe e os hashes (e o que a sua "
+            "página de verificação mostra, se você a publicou). Nunca é publicado: a página "
+            "de verificação mostra a classe, as dimensões, os hashes, o que foi auditado e o "
+            "período dos dados, e só se você a publicar.",
         ),
         (
             "E se eu esquecer minha senha?",
@@ -328,10 +329,17 @@ COPY_PT: dict[str, Any] = {
     "v_meaning": "O que significa",
     "v_inputs": "Hashes dos arquivos auditados (SHA-256)",
     "v_details": "Dados da auditoria",
+    "v_kind": "O que foi auditado",
+    "v_kind_backtest": "Backtest",
+    "v_kind_account": "Histórico de conta real ou demo",
+    "v_kind_fund": "Histórico de um fundo",
+    "v_period": "Período dos dados",
+    "v_age": "Dias entre o último dado e a auditoria",
     "v_format": "Formato do arquivo",
     "v_engine": "Motor",
     "v_trials_declared": "Tentativas declaradas",
     "v_trials_used": "Tentativas usadas no Sharpe deflacionado",
+    "v_trials_undeclared": "não declarado; calculado com 1, o caso mais favorável",
     "v_result_sha": "SHA-256 do resultado",
     "v_notice": "Aviso",
     "v_badge": "Selo para o seu site",
