@@ -66,13 +66,18 @@ trades assumed independent, a rounded rate kept as a proportion) and
 the reader's card already used, extracted without change (the card's SVG is
 byte-identical). The page compares the interval with break-even, says from
 which size in 20–10,000 trades the lower bound clears it, and shows a table of
-intervals at 30/100/300/1,000 trades and a fixed break-even table. It assumes
-every trade ends at the target or the stop and measures no costs, slippage,
-streaks or whether the rule was fixed before the results; missing inputs stay
-NOT_MEASURED. Nothing is stored: no database row, file or browser storage. The
-share link carries the validated strings and `ref=aciertos` (a funnel tag), and
-a valid result's preview image and card link reuse the reader's `card.png` and
-its 60-per-hour limit; the calculator itself has no limit and renders no card.
+intervals at 30/100/300/1,000 trades and a fixed break-even table. That
+"from N trades" sentence is left out when the declared sample is already above
+break-even and N is larger than it (or no grid size clears it), so it never
+reads as "not yet". It assumes every trade ends at the target or the stop and
+measures no costs, slippage, streaks or whether the rule was fixed before the
+results; missing inputs stay NOT_MEASURED. Nothing is stored: no database row,
+file or browser storage. The share block (text, link and X intent) carries the
+validated strings and `ref=aciertos` (a funnel tag) and appears only when both
+the interval and break-even were computed, since its text names them; partial
+inputs keep only the card link. A valid result's preview image and card link
+reuse the reader's `card.png` and its 60-per-hour limit; the calculator itself
+has no limit and renders no card.
 Tests: `tests/test_audit_winrate.py`.
 
 The public name is **Rigor** (the same word in Spanish and English: statistical

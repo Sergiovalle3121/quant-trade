@@ -148,6 +148,70 @@ def test_missing_inputs_are_not_measured(client: TestClient) -> None:
         assert win_rate_interval(0.55, trades, "es") in text
     assert "data-winrate-position" not in response.text
     assert "data-winrate-needed" not in response.text
+    # The share text names the interval and the break-even: never offered without both.
+    partial = (
+        {"win_rate": "55"},
+        {"target_r": "2", "stop_r": "1"},
+        {"trades": "40", "win_rate": "60"},
+        {"trades": "40", "target_r": "1.5", "stop_r": "1"},
+    )
+    for locale in LOCALES:
+        for params in partial:
+            page = client.get(WINRATE_PATH[locale], params=params)
+            assert page.status_code == 200, (locale, params)
+            assert "badge NOT_MEASURED" in page.text, (locale, params)
+            assert "winrate-share-text" not in page.text, (locale, params)
+            assert "winrate-share-link" not in page.text, (locale, params)
+            assert "data-public-share" not in page.text, (locale, params)
+            assert not any(
+                href.startswith("https://x.com/intent/") for href in _links(page.text)
+            ), (locale, params)
+            # The reader's card, which shows NOT_MEASURED itself, stays linked.
+            assert "data-winrate-card" in page.text, (locale, params)
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+def test_needed_sentence_never_contradicts_a_sample_already_above(
+    client: TestClient, locale: str
+) -> None:
+    # 25 declared trades already clear break-even; the grid's first size that does is 30.
+    figures = {"trades": "25", "win_rate": "60", "target_r": "1.5", "stop_r": "1"}
+    result = read(PublicClaim(trades=25, win_rate=0.60, target_r=1.5, stop_r=1))
+    assert result.position == "above"
+    assert result.trades_needed is not None and result.trades_needed > 25
+    response = client.get(WINRATE_PATH[locale], params=figures)
+    assert response.status_code == 200
+    words = winrate.COPY[locale]
+    text = _visible(response.text)
+    assert words["above"] in text
+    assert "data-winrate-needed" not in response.text
+    assert find_claims(text) == []
+    # With 40 trades the grid's 30 is below the sample: the sentence agrees and stays.
+    assert "data-winrate-needed" in client.get(WINRATE_PATH[locale], params=FIGURES).text
+
+
+def test_needed_sentence_rule_over_a_sweep() -> None:
+    from quant_trade.audit.pages import _winrate_result
+
+    shown = 0
+    for trades in (*range(2, 60), 99, 150, 10_000_000):
+        for rate in (0.55, 0.60, 0.65, 0.70, 0.401):
+            for target in (1.0, 1.5, 3.0):
+                claim = PublicClaim(trades=trades, win_rate=rate, target_r=target, stop_r=1)
+                figures = read(claim)
+                body, _ = _winrate_result(claim, {}, "es", BASE)
+                if "data-winrate-needed" not in body:
+                    # Only skipped when the declared sample already clears break-even.
+                    assert figures.position == "above", (trades, rate, target)
+                    assert figures.trades_needed is None or figures.trades_needed > trades
+                    continue
+                shown += 1
+                if figures.position == "above":
+                    assert figures.trades_needed is not None
+                    assert figures.trades_needed <= trades, (trades, rate, target)
+                elif figures.position == "inside" and figures.trades_needed is not None:
+                    assert figures.trades_needed > trades, (trades, rate, target)
+    assert shown > 0
 
 
 @pytest.mark.parametrize("locale", LOCALES)

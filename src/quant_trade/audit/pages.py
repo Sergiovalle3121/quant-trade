@@ -3851,7 +3851,14 @@ def _winrate_result(
     if figures.position is not None:
         css = {"above": "flash", "below": "warning", "inside": "help"}[figures.position]
         body += f"<p class='{css}' data-winrate-position>{_e(words[figures.position])}</p>"
-    if claim.win_rate is not None and figures.breakeven is not None:
+    # When the declared sample already clears break-even, a grid size above it (or none)
+    # would read as "not yet": the position sentence already says it, so skip "needed".
+    cleared_early = (
+        figures.position == "above"
+        and claim.trades is not None
+        and (figures.trades_needed is None or figures.trades_needed > claim.trades)
+    )
+    if claim.win_rate is not None and figures.breakeven is not None and not cleared_early:
         if figures.never:
             needed = words["needed_never"]
         elif figures.trades_needed is None:
@@ -3863,26 +3870,29 @@ def _winrate_result(
             )
         body += f"<p data-winrate-needed>{_e(needed)}</p>"
     body += f"<p class='help'>{_badge('DECLARED', locale)} {_e(words['declared_note'])}</p>"
-    absolute_url = base_url.rstrip("/") + winrate.share_url(locale, values)
-    text = words["share_text"].format(url=absolute_url)
-    intent = "https://x.com/intent/post?" + urlencode({"text": text})
-    copy_link = reading.COPY[locale]["copy_link"]
-    body += (
-        f"<section data-public-share><h3>{_e(words['share_title'])}</h3>"
-        "<textarea id='winrate-share-link' readonly hidden rows='3' style='width:100%' "
-        f"aria-label='{_e(copy_link)}'>{_e(absolute_url)}</textarea>"
-        f"<label for='winrate-share-text'>{_e(share['copy'])}</label>"
-        "<textarea id='winrate-share-text' readonly rows='5' style='width:100%'>"
-        f"{_e(text)}</textarea><div class='copy-row'>"
-        "<button class='btn btn-ghost' type='button' data-copy='winrate-share-link' "
-        f"data-done='{_e(share['done'])}' data-fallback='{_e(share['fallback'])}' hidden>"
-        f"{_e(copy_link)}</button>"
-        "<button class='btn btn-dark' type='button' data-copy='winrate-share-text' "
-        f"data-done='{_e(share['done'])}' data-fallback='{_e(share['fallback'])}' hidden>"
-        f"{_e(share['copy'])}</button><a class='btn btn-ghost' href='{_e(intent)}' "
-        f"rel='noopener noreferrer'>{_e(share['post'])}</a></div>"
-        "<p class='muted' data-copy-status role='status' aria-live='polite'></p></section>"
-    )
+    if figures.position is not None:
+        # The share text names the interval and the break-even: offer it only when both
+        # were computed. Partial inputs keep the reader's card link below.
+        absolute_url = base_url.rstrip("/") + winrate.share_url(locale, values)
+        text = words["share_text"].format(url=absolute_url)
+        intent = "https://x.com/intent/post?" + urlencode({"text": text})
+        copy_link = reading.COPY[locale]["copy_link"]
+        body += (
+            f"<section data-public-share><h3>{_e(words['share_title'])}</h3>"
+            "<textarea id='winrate-share-link' readonly hidden rows='3' style='width:100%' "
+            f"aria-label='{_e(copy_link)}'>{_e(absolute_url)}</textarea>"
+            f"<label for='winrate-share-text'>{_e(share['copy'])}</label>"
+            "<textarea id='winrate-share-text' readonly rows='5' style='width:100%'>"
+            f"{_e(text)}</textarea><div class='copy-row'>"
+            "<button class='btn btn-ghost' type='button' data-copy='winrate-share-link' "
+            f"data-done='{_e(share['done'])}' data-fallback='{_e(share['fallback'])}' hidden>"
+            f"{_e(copy_link)}</button>"
+            "<button class='btn btn-dark' type='button' data-copy='winrate-share-text' "
+            f"data-done='{_e(share['done'])}' data-fallback='{_e(share['fallback'])}' hidden>"
+            f"{_e(share['copy'])}</button><a class='btn btn-ghost' href='{_e(intent)}' "
+            f"rel='noopener noreferrer'>{_e(share['post'])}</a></div>"
+            "<p class='muted' data-copy-status role='status' aria-live='polite'></p></section>"
+        )
     card_url = reading.reading_url(locale, {name: values.get(name, "") for name in reading.FIELDS})
     body += f"<p><a href='{_e(card_url)}' data-winrate-card>{_e(words['card_link'])}</a></p>"
     return body, figures
