@@ -78,13 +78,15 @@ def test_calculator_page_renders_form_and_result_guard_clean(locale: str) -> Non
     assert filled.status_code == 200
     text = _text(filled.text)
     assert "data-calc-verdict" in filled.text
-    assert "1.47" in text and "0.76" in text
+    # The figures in the page's typography: a decimal comma in es and pt, a point in en.
+    luck, after, other = ("1.47", "0.76", "1,47") if locale == "en" else ("1,47", "0,76", "1.47")
+    assert luck in text and after in text and other not in text
     assert find_claims(text) == []
     # The inputs are the visitor's claim, never shown as measured.
     assert COPY[locale]["declared_note"] in text
 
     losing = _text(client.get(path, params={"sharpe": "1", "years": "2", "trials": "1000"}).text)
-    assert COPY[locale]["loses"].format(n="1,000") in losing
+    assert COPY[locale]["loses"].format(n="1,000" if locale == "en" else "1.000") in losing
     assert find_claims(losing) == []
 
     error = _text(client.get(path, params={"sharpe": "1", "years": "0.01", "trials": "5"}).text)
