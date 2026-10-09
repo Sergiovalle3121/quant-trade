@@ -49,6 +49,7 @@ tests/test_audit_email_pages.py
 tests/test_audit_email_routes_ui.py
 tests/test_audit_examples.py
 tests/test_audit_funnel.py
+tests/test_audit_gate_code_copy.py
 tests/test_audit_guide_entry.py
 tests/test_audit_importers.py
 tests/test_audit_indexnow.py
