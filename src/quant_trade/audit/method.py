@@ -208,6 +208,24 @@ COPY: dict[str, dict[str, object]] = {
             ("NOT_MEASURED", "Faltaban datos para medirlo, y el informe dice cuáles."),
         ],
         "flags_title": "Las banderas rojas que revisamos",
+        "resampling_title": "Remuestreo y Monte Carlo",
+        "resampling": [
+            "Varias cifras del informe salen de simulaciones de Monte Carlo: miles de sorteos "
+            "sobre el historial que subes, resumidos en percentiles y probabilidades.",
+            "Prueba de azar: un bootstrap estacionario por bloques de los retornos da el "
+            "percentil 5 del Sharpe que pide la primera pregunta.",
+            "Riesgo remuestreado a un año: historias de un año armadas con bloques de los "
+            "retornos (bootstrap estacionario) dan la caída máxima mediana, la de 1 de cada 20 "
+            "y la probabilidad de cada caída.",
+            "Órdenes al azar: los mismos retornos barajados, con el mismo Sharpe y el mismo "
+            "resultado final, dicen si la peor caída del archivo es habitual para ellos. Con "
+            "operaciones, la racha perdedora más larga se compara con la de las mismas "
+            "operaciones en orden al azar, calculada de forma exacta.",
+            "Un Monte Carlo supone que el orden del historial es intercambiable y remuestrea lo "
+            "que este contiene: no corrige el sobreajuste ni la búsqueda de configuraciones, que "
+            "miden el Sharpe deflactado, el PBO y el tramo fuera de muestra. El riesgo "
+            "remuestreado, los órdenes al azar y las rachas no cambian la clase.",
+        ],
         "repro_title": "Reproducible",
         "repro": [
             "Cada archivo queda identificado por su huella SHA-256 en el informe.",
@@ -285,6 +303,24 @@ COPY: dict[str, dict[str, object]] = {
             ("NOT_MEASURED", "Data to measure it was missing, and the report says which."),
         ],
         "flags_title": "The red flags we check",
+        "resampling_title": "Resampling and Monte Carlo",
+        "resampling": [
+            "Several figures in the report come from Monte Carlo simulations: thousands of draws "
+            "on the history you upload, summarised as percentiles and probabilities.",
+            "Test against chance: a stationary block bootstrap of the returns gives the 5th "
+            "percentile Sharpe the first question requires.",
+            "Resampled one-year risk: one-year histories built from blocks of the returns "
+            "(stationary bootstrap) give the median maximum drawdown, the 1-in-20 one and the "
+            "probability of each fall.",
+            "Random orders: the same returns shuffled, with the same Sharpe and final result, "
+            "show whether the file's worst fall is usual for them. With trades, the longest "
+            "losing streak is compared with that of the same trades in random order, computed "
+            "exactly.",
+            "A Monte Carlo assumes the history's order is exchangeable and resamples what the "
+            "history contains: it does not correct overfitting or the search for configurations, "
+            "which deflated Sharpe, PBO and the out-of-sample stretch measure. The resampled "
+            "risk, the random orders and the streaks do not change the class.",
+        ],
         "repro_title": "Reproducible",
         "repro": [
             "Every file is identified in the report by its SHA-256 fingerprint.",
@@ -366,6 +402,24 @@ COPY: dict[str, dict[str, object]] = {
             ("NOT_MEASURED", "Faltavam dados para medir, e o relatório diz quais."),
         ],
         "flags_title": "As bandeiras vermelhas que revisamos",
+        "resampling_title": "Reamostragem e Monte Carlo",
+        "resampling": [
+            "Vários números do relatório saem de simulações de Monte Carlo: milhares de sorteios "
+            "sobre o histórico que você envia, resumidos em percentis e probabilidades.",
+            "Teste contra o acaso: um bootstrap estacionário por blocos dos retornos dá o "
+            "percentil 5 do Sharpe que a primeira pergunta exige.",
+            "Risco reamostrado em um ano: históricos de um ano montados com blocos dos retornos "
+            "(bootstrap estacionário) dão a queda máxima mediana, a de 1 em cada 20 e a "
+            "probabilidade de cada queda.",
+            "Ordens aleatórias: os mesmos retornos embaralhados, com o mesmo Sharpe e o mesmo "
+            "resultado final, mostram se a pior queda do arquivo é habitual para eles. Com "
+            "operações, a maior sequência de perdas é comparada com a das mesmas operações em "
+            "ordem aleatória, calculada de forma exata.",
+            "Um Monte Carlo supõe que a ordem do histórico é intercambiável e reamostra o que "
+            "ele contém: não corrige o sobreajuste nem a busca de configurações, que o Sharpe "
+            "deflacionado, o PBO e o trecho fora da amostra medem. O risco reamostrado, as "
+            "ordens aleatórias e as sequências não mudam a classe.",
+        ],
         "repro_title": "Reproduzível",
         "repro": [
             "Cada arquivo fica identificado no relatório pela sua impressão digital SHA-256.",

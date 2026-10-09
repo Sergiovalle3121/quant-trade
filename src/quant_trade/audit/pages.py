@@ -20,6 +20,7 @@ from urllib.parse import quote, urlencode
 
 from quant_trade.audit import institutional, reading, winrate
 from quant_trade.audit.accounts import FREE_PREVIEWS_PER_MONTH as _FREE
+from quant_trade.audit.article_numbers import STREAK_ROWS
 from quant_trade.audit.articles import (
     ARTICLES,
     ARTICLES_BY_KEY,
@@ -27,6 +28,9 @@ from quant_trade.audit.articles import (
     INDEPENDENT_LUCK_EXAMPLE,
     LUCK_TABLE_COPY,
     LUCK_TABLE_INPUTS,
+    STREAK_ARTICLE_KEY,
+    STREAK_TABLE_AFTER,
+    STREAK_TABLE_COPY,
     WIN_RATE_RATES,
     WIN_RATE_TABLE_COPY,
     WIN_RATE_TRADE_COUNTS,
@@ -3655,6 +3659,7 @@ def method_page(*, locale: str = "es", base_url: str = "") -> str:
                 (words["ladder_title"], f"<ol class='ladder'>{ladder}</ol>"),
                 (words["evidence_title"], f"<ul class='mtags'>{evidence}</ul>"),
                 (words["flags_title"], f"<ul class='chips'>{flags}</ul>"),
+                (words["resampling_title"], bullets(words["resampling"])),
                 (words["repro_title"], bullets(words["repro"])),
                 (words["limits_title"], bullets(words["limits"], "minus")),
                 (words["refs_title"], f"<ol class='refs'>{refs}</ol>"),
@@ -4531,6 +4536,24 @@ def article_page(article: Article, *, locale: str = "es", base_url: str = "") ->
             f"<tbody>{rows}</tbody></table>"
         )
         sections.insert(2, (heading, table))
+    if article.key == STREAK_ARTICLE_KEY:
+        heading, rate, trades, median, rare, note = STREAK_TABLE_COPY[locale]
+        rows = "".join(
+            f"<tr><th scope='row'>DECLARED · {_num(row.win_rate * 100, locale, 0)} %</th>"
+            f"<td>DECLARED · {_num(row.trades, locale, 0)}</td>"
+            f"<td>DECLARED · {row.median_run}</td>"
+            f"<td>DECLARED · {row.rare_run}</td></tr>"
+            for row in STREAK_ROWS
+        )
+        table = (
+            f"<table class='article-streaks'><caption>{_e(note)}</caption>"
+            f"<thead><tr><th scope='col'>{_e(rate)}</th><th scope='col'>{_e(trades)}</th>"
+            f"<th scope='col'>{_e(median)}</th><th scope='col'>{_e(rare)}</th></tr></thead>"
+            f"<tbody>{rows}</tbody></table>"
+        )
+        # Right after the section that explains the calculation, found by its title.
+        after = [name for name, _body in sections].index(STREAK_TABLE_AFTER[locale])
+        sections.insert(after + 1, (heading, table))
     if text.faq:
         faq = "".join(f"<h3>{_e(q)}</h3><p>{_e(a)}</p>" for q, a in text.faq)
         sections.append((words["faq"], faq))
@@ -4579,7 +4602,7 @@ def article_page(article: Article, *, locale: str = "es", base_url: str = "") ->
 
 #: Articles each case page lists before the other cases (article keys, in order).
 AUDIENCE_ARTICLES: dict[str, tuple[str, ...]] = {
-    "retos-prop-firm": ("cuantos-intentos-reto-prop-firm",),
+    "retos-prop-firm": ("cuantos-intentos-reto-prop-firm", "rachas-perdedoras"),
     "compradores-de-robots": ("ea-sobreoptimizado", "lo-eligio-el-optimizador"),
     "copiar-senales": ("copiar-senales-mql5-myfxbook",),
 }
