@@ -19,8 +19,9 @@ PRICING_COPY: dict[str, dict[str, str]] = {
             "Consulta lo que incluyen, precios y países con tarjeta."
         ),
         "intro": (
-            "El primer informe gratis es el mismo informe completo. Lo que cambia es cuántos "
-            "informes puedes obtener, no el análisis incluido."
+            "Cada informe trae el análisis completo y el PDF. El primero es gratis con tu "
+            "cuenta; los siguientes son para la versión corregida de tu estrategia, otro robot "
+            "antes de pagarlo o tu cuenta del mes siguiente."
         ),
         "detail": "Ver detalle",
         "back": "Volver al inicio",
@@ -84,8 +85,9 @@ PRICING_COPY: dict[str, dict[str, str]] = {
             "See what is included, current prices and countries with card payment."
         ),
         "intro": (
-            "The first free report is the same full report. What changes is how many "
-            "reports you can obtain, not the analysis included."
+            "Every report carries the full analysis and the PDF. The first is free with your "
+            "account; the next ones are for the corrected version of your strategy, another "
+            "robot before you pay for it or next month's account."
         ),
         "detail": "See details",
         "back": "Back to the home page",
@@ -149,8 +151,9 @@ PRICING_COPY: dict[str, dict[str, str]] = {
             "Veja o que incluem, preços e países com cartão."
         ),
         "intro": (
-            "O primeiro relatório grátis é o mesmo relatório completo. O que muda é quantos "
-            "relatórios você pode obter, não a análise incluída."
+            "Cada relatório traz a análise completa e o PDF. O primeiro é grátis com a sua "
+            "conta; os seguintes servem para a versão corrigida da sua estratégia, outro robô "
+            "antes de pagar por ele ou a sua conta do mês seguinte."
         ),
         "detail": "Ver detalhes",
         "back": "Voltar ao início",
