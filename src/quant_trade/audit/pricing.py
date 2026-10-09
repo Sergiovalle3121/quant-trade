@@ -220,6 +220,23 @@ def usd(amount: float) -> str:
     return f"USD {whole}" if not rest else f"USD {whole}.{rest:02d}"
 
 
+def offer_text(offer: str, locale: str, *, email_verification: bool = False) -> str:
+    """The free-report sentence of :func:`start_cta` for ``offer``, so other pages
+    repeat this promise instead of writing a new one.
+
+    ``free`` (free mode): every full report is free and the form needs no account.
+    ``welcome``: the first full report is free with an account, and a confirmed
+    e-mail when ``email_verification``. Anything else (``paid``): "".
+    """
+    words = PRICING_COPY[locale if locale in PRICING_COPY else "es"]
+    if offer == "free":
+        return words["start_text_free"]
+    if offer == "welcome":
+        text = words["start_text"]
+        return f"{text} {words['email_note']}" if email_verification else text
+    return ""
+
+
 def start_cta(settings: AuditSettings, locale: str) -> str:
     """The page's closing call: the free report first, as the configuration offers it.
 
@@ -237,13 +254,12 @@ def start_cta(settings: AuditSettings, locale: str) -> str:
     locale = locale if locale in PRICING_COPY else "es"
     words = PRICING_COPY[locale]
     if settings.free_mode:
-        text, button = words["start_text_free"], words["start_button_free"]
+        offer, button = "free", words["start_button_free"]
     elif WELCOME_FULL_REPORT:
-        text, button = words["start_text"], words["start_button"]
-        if settings.email_verification_required:
-            text += " " + words["email_note"]
+        offer, button = "welcome", words["start_button"]
     else:
         return _articles_cta(locale)
+    text = offer_text(offer, locale, email_verification=settings.email_verification_required)
     return (
         f"<section class='article-cta'><h2>{_e(words['start_title'])}</h2><p>{_e(text)}</p>"
         "<div class='back-row'>"

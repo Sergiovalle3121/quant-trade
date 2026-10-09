@@ -2821,13 +2821,19 @@ def _parse_tradingview(
     return draft
 
 
+#: The smallest cumulative P&L percentage (in %) the starting capital is
+#: worked out from: at two decimals its rounding error is then at most 0.5 %.
+CAPITAL_FROM_PERCENT_MIN = 1.0
+
+
 def _capital_from_percent(cum: float, cum_pct: float) -> float | None:
     """Initial capital implied by a cumulative P&L and its (2-decimal) percentage.
 
-    Only used when the percentage is at least 1 % (rounding error at most
-    0.5 %); the estimate is snapped to the roundest number within that error.
+    Only used when the percentage is at least :data:`CAPITAL_FROM_PERCENT_MIN`
+    (rounding error at most 0.5 %); the estimate is snapped to the roundest
+    number within that error.
     """
-    if abs(cum_pct) < 1.0:
+    if abs(cum_pct) < CAPITAL_FROM_PERCENT_MIN:
         return None
     estimate = cum / (cum_pct / 100.0)
     if estimate <= 0:

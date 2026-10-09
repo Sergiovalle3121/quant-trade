@@ -10,6 +10,7 @@ src/quant_trade/audit/engine.py
 src/quant_trade/audit/errors_pt.py
 src/quant_trade/audit/examples.py
 src/quant_trade/audit/funnel.py
+src/quant_trade/audit/guide_capabilities.py
 src/quant_trade/audit/guides.py
 src/quant_trade/audit/i18n.py
 src/quant_trade/audit/importers.py
@@ -48,6 +49,7 @@ tests/test_audit_email_pages.py
 tests/test_audit_email_routes_ui.py
 tests/test_audit_examples.py
 tests/test_audit_funnel.py
+tests/test_audit_guide_entry.py
 tests/test_audit_importers.py
 tests/test_audit_indexnow.py
 tests/test_audit_landing_trust.py

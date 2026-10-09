@@ -1904,6 +1904,27 @@ def is_upload_next(next_path: str) -> bool:
     return urlsplit(next_path).path in AUDIT_PATHS.values()
 
 
+def report_contents(locale: str, offer: str = "") -> str:
+    """What a full report holds, as "What happens next" says it: the class from
+    the first to the last, the engine's checks and the statuses each comes out
+    with, and the PDF. ``offer`` adds the free-report sentence (``welcome``: the
+    first one; ``free``: every one); any other value adds nothing."""
+    from quant_trade.audit.strategies import CLASS_ORDER
+    from quant_trade.audit.verdict import DIMENSION_ORDER
+
+    locale = _locale(locale)
+    copy = COPY[locale]
+    count = len(DIMENSION_ORDER)
+    text = copy["next_report"].format(
+        first=CLASS_ORDER[0],
+        last=CLASS_ORDER[-1],
+        count=_COUNT_WORDS[locale].get(count, str(count)),
+        statuses=_listed(_status_labels(locale), locale, choice=True),
+    )
+    free = {"welcome": "next_free_welcome", "free": "next_free_all"}.get(offer)
+    return f"{text} {copy[free]}" if free else text
+
+
 def _next_steps(copy: dict[str, str], locale: str, *, email_verification: bool, offer: str) -> str:
     """ "What happens next" beside the sign-up form when ``next`` is the upload page.
 
@@ -1915,17 +1936,8 @@ def _next_steps(copy: dict[str, str], locale: str, *, email_verification: bool, 
     """
     from quant_trade.audit.guides import guides_index_url
     from quant_trade.audit.pages import PLATFORMS, SAMPLE_PAGE_PATHS
-    from quant_trade.audit.strategies import CLASS_ORDER
-    from quant_trade.audit.verdict import DIMENSION_ORDER
 
-    count = len(DIMENSION_ORDER)
-    report = copy["next_report"].format(
-        first=CLASS_ORDER[0],
-        last=CLASS_ORDER[-1],
-        count=_COUNT_WORDS[locale].get(count, str(count)),
-        statuses=_listed(_status_labels(locale), locale, choice=True),
-    )
-    report += " " + copy["next_free_welcome" if offer == "welcome" else "next_free_all"]
+    report = report_contents(locale, "welcome" if offer == "welcome" else "free")
     steps = [_e(copy["next_account"])]
     if email_verification:
         steps.append(_e(copy["next_confirm_welcome" if offer == "welcome" else "next_confirm"]))
@@ -3371,6 +3383,7 @@ __all__ = [
     "gate_page",
     "path",
     "report_box",
+    "report_contents",
     "report_href",
     "reset_page",
     "passkey_page",
