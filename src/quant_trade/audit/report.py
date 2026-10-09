@@ -21,7 +21,7 @@ from datetime import date
 from typing import Any
 from urllib.parse import parse_qsl, quote, urlencode, urlsplit, urlunsplit
 
-from quant_trade.audit import charts, ownership, report_pt
+from quant_trade.audit import charts, ownership, report_pt, seller_message
 from quant_trade.audit.account import is_account_history
 from quant_trade.audit.crises import (
     MARKET,
@@ -64,7 +64,7 @@ from quant_trade.audit.seo import (
     private_meta,
 )
 from quant_trade.audit.series_ui import series_report
-from quant_trade.audit.sharing import share_block
+from quant_trade.audit.sharing import public_report_url, share_block
 from quant_trade.audit.sizing import scale_text as sizing_scale_text
 from quant_trade.audit.streaks import CLUSTERED
 from quant_trade.audit.theme import (
@@ -5818,6 +5818,236 @@ def _questions_html(questions: list[dict[str, str]], locale: str, labels: dict[s
     return (f"<p class='muted'>{_e(intro)}</p>" if intro else "") + f"<ol>{items}</ol>"
 
 
+def _seller_share(share: float) -> str:
+    """A share of backtest histories as the message gives it. Short of none or
+    of all, it never rounds to "0%" or "100%", which would tell the seller that
+    no history, or every one, did as badly: it reads "<1%" or ">99%"."""
+    shown = f"{share:.0%}"
+    if shown == "0%" and share > 0:
+        return "<1%"
+    if shown == "100%" and share < 1:
+        return ">99%"
+    return shown
+
+
+def _seller_figures(data: dict[str, Any], locale: str, labels: dict[str, str]) -> list[str]:
+    """Two to four key figures for the seller's message, each with its evidence
+    tag in words, as the report shows them: the break-even cost (in pips when
+    the costs section measured them), the live account against its backtest
+    when one was uploaded (both shares of backtest histories its section
+    gives, so the one that decided the badge is always there), the trials used
+    and the maximum drawdown, with the platform's deeper one beside it when
+    the summary tiles show it. A figure the files could not give says "not
+    measured" with its reason.
+
+    When fewer than ``seller_message.MIN_FIGURES`` lines carry a measured or
+    declared figure, summary tiles the report measured (Sharpe, total return,
+    drawdown p95) complete them, and past ``seller_message.MAX_FIGURES`` lines
+    the last "not measured" one makes room."""
+    words = seller_message.words(locale)
+    unmeasured = words["not_measured"]
+    closed = bool((data.get("inputs") or {}).get("balance_only"))
+    tiles = {label: shown for label, shown, _ in _kpi_list(data, labels)}
+    # (line, whether it carries a measured or declared figure)
+    lines: list[tuple[str, bool]] = []
+
+    def tag(evidence: str) -> str:
+        return evidence_label(evidence, locale).lower()
+
+    def lower(name: str) -> str:
+        return name[:1].lower() + name[1:]
+
+    def figure(text: str, evidence: str) -> None:
+        lines.append((f"{text} ({tag(evidence)})", evidence in ("MEASURED", "DECLARED")))
+
+    def missing(name: str, reason: Any) -> None:
+        why = _localized_reason(str(reason or ""), locale)
+        lines.append((f"{name}: {unmeasured}" + (f" ({why})" if why else ""), False))
+
+    costs = data.get("costs") or {}
+    bps = costs.get("break_even_bps")
+    breakeven = _ev_value(bps)
+    if breakeven is not None and breakeven <= 0:
+        # As the summary tile says it: "-0.56 bp" would read as a cost.
+        tile = f"{labels['kpi_breakeven']} ({labels['kpi_breakeven_negative']})"
+        figure(
+            f"{labels['kpi_breakeven']}: {labels['kpi_breakeven_negative']}",
+            _kpi_evidence(tile, labels, data),
+        )
+    elif breakeven is not None:
+        parts = [labels["bps_side"], *_trader_units(costs, labels)]
+        tile = f"{labels['kpi_breakeven']} ({'; '.join(parts)})"
+        figure(
+            f"{labels['kpi_breakeven']}: {breakeven:,.2f} {'; '.join(parts)}",
+            _kpi_evidence(tile, labels, data),
+        )
+    elif report_kind(data) != "fund" and costs.get("kind") != "period_returns":
+        # A fund's monthly record has no trades to cost, and period returns carry a
+        # gross-minus-net difference, not a cost per trade (their section stresses
+        # it); a backtest without trades says so.
+        note = bps.get("note") if isinstance(bps, dict) else None
+        missing(labels["kpi_breakeven"], costs.get("reason") or note)
+    live = data.get("live")
+    if live and live.get("status") == "MEASURED":
+        text = f"{labels['live']}: {labels['live_badge_' + str(live['outcome'])]}"
+        found: list[str] = []
+        # Either share can decide the badge (live._outcome): both go, as in the section.
+        for label, key in (("live_below", "net_below"), ("live_fall_above", "fall_above")):
+            block = live.get(key) or {}
+            share = _ev_value(block)
+            if share is not None:
+                text += f"; {lower(labels[label])}: {_seller_share(share)}"
+                found.append(str(block.get("evidence") or "MEASURED"))
+        figure(text, "DECLARED" if "DECLARED" in found else "MEASURED")
+    elif live:
+        missing(labels["live"], live.get("reason"))
+    statuses = {d.get("name"): d.get("status") for d in data["verdict"].get("dimensions", [])}
+    trials = (data.get("multiplicity") or {}).get("trials_used")
+    if isinstance(trials, dict) and statuses.get("multiplicity") not in (None, "NOT_APPLICABLE"):
+        value = _ev_value(trials)
+        if value is not None and trials.get("evidence") in ("MEASURED", "DECLARED"):
+            figure(f"{labels['trials_used']}: {value:,.0f}", str(trials["evidence"]))
+        else:
+            # An undeclared count was computed with 1: the note says so; no figure is given.
+            missing(labels["trials_used"], trials.get("note"))
+    key = "kpi_drawdown_closed" if closed else "kpi_drawdown"
+    drawdown = _ev_value((data.get("performance") or {}).get("max_drawdown"))
+    falls: list[tuple[str, str]] = []
+    if drawdown is not None:
+        falls.append((f"{labels[key]}: {_pct(drawdown)}", _kpi_evidence(labels[key], labels, data)))
+    platform = labels["kpi_dd_platform"]
+    if platform in tiles:
+        # Deeper than the closed-trade curve: the summary shows both, so the
+        # message gives both rather than the milder one.
+        name = words["dd_platform"]
+        falls.append(
+            (
+                f"{lower(name) if falls else name}: {tiles[platform]}",
+                _kpi_evidence(platform, labels, data),
+            )
+        )
+    if falls:
+        lines.append(
+            (
+                "; ".join(f"{text} ({tag(evidence)})" for text, evidence in falls),
+                any(evidence in ("MEASURED", "DECLARED") for _, evidence in falls),
+            )
+        )
+    fill = ("kpi_sharpe", "kpi_return", "kpi_dd_p95_closed" if closed else "kpi_dd_p95")
+    for name in fill:
+        if sum(carries for _, carries in lines) >= seller_message.MIN_FIGURES:
+            break
+        evidence = _kpi_evidence(labels[name], labels, data)
+        if labels[name] in tiles and evidence in ("MEASURED", "DECLARED"):
+            figure(f"{labels[name]}: {tiles[labels[name]]}", evidence)
+    while len(lines) > seller_message.MAX_FIGURES:
+        # The figures stay; the last "not measured" line makes room.
+        empty = [i for i, (_, carries) in enumerate(lines) if not carries]
+        if not empty:
+            break
+        del lines[empty[-1]]
+    return [line for line, _ in lines]
+
+
+def _seller_message(
+    data: dict[str, Any], locale: str, labels: dict[str, str], public_id: str | None = None
+) -> tuple[str, int, int]:
+    """The buyer's message for the seller, as plain text in ``locale``, with the
+    number of questions it carries and of questions asked.
+
+    Built from the report only: the class, the dimensions that do not pass
+    (failed or weak) and those not measured (a class short of a full
+    conclusion says why), ``_seller_figures``, the buyer's open questions in the
+    seller's wording (``seller_message.seller_question``), the public page when
+    ``public_id`` is given (only a published report has one) and the closing
+    line. Under ``seller_message.MAX_CHARS`` as a chat counts them: when the
+    questions do not fit, the last ones are left out and the text says how
+    many more are in the report."""
+    words = seller_message.words(locale)
+    fund = report_kind(data) == "fund"
+    verdict = data["verdict"]
+    status_words = STATUS_TEXT.get(locale, STATUS_TEXT["es"])
+    by_name = {d.get("name"): d.get("status") for d in verdict.get("dimensions", [])}
+    short = [
+        f"{_dimension_title(name, locale)} ({status_words[status].lower()})"
+        for name in DIMENSION_ORDER
+        if (status := by_name.get(name)) in ("FAIL", "WEAK")
+    ]
+    # Missing pieces keep a class short of a full conclusion; "none fail" alone hides them.
+    unmeasured = [
+        _dimension_title(name, locale)
+        for name in DIMENSION_ORDER
+        if by_name.get(name) == "NOT_MEASURED"
+    ]
+    head = [
+        words["hello_fund" if fund else "hello"],
+        "",
+        words["class"].format(cls=verdict["overall"]),
+        words["dimensions"].format(items=", ".join(short)) if short else words["dimensions_none"],
+        *([words["unmeasured"].format(items=", ".join(unmeasured))] if unmeasured else []),
+        "",
+        words["figures"],
+        *(f"- {line}" for line in _seller_figures(data, locale, labels)),
+        "",
+        words["questions"],
+    ]
+    asked = [
+        seller_message.seller_question(str(q.get("code", "")), _question_text(q, locale), locale)
+        for q in ownership.open_questions(data, ownership.BUYER)
+    ]
+    tail = ["", words["thanks"], ""]
+    if public_id:
+        url = public_report_url(public_id, locale, ref=seller_message.REF)
+        tail.append(words["public"].format(url=url))
+    tail.append(words["made"])
+    text, shown = "", len(asked)
+    for shown in range(len(asked), -1, -1):
+        left = len(asked) - shown
+        trimmed = (
+            [words["trimmed_one"] if left == 1 else words["trimmed"].format(n=left)] if left else []
+        )
+        numbered = [f"{i}. {question}" for i, question in enumerate(asked[:shown], 1)]
+        text = "\n".join([*head, *numbered, *trimmed, *tail])
+        if seller_message.chat_length(text) < seller_message.MAX_CHARS:
+            break
+    return text, shown, len(asked)
+
+
+def _seller_shown(data: dict[str, Any]) -> bool:
+    """The message is the buyer's, and only when the report asks something."""
+    role = ownership.role_of(data)
+    return role == ownership.BUYER and bool(ownership.open_questions(data, role))
+
+
+def _seller_html(
+    data: dict[str, Any], locale: str, labels: dict[str, str], public_id: str | None = None
+) -> str:
+    """The message for the seller under the questions, with the site's copy
+    button (``data-copy`` in ``static/app.js``); empty in every voice but the
+    buyer's. Hidden when printed: the PDF carries the questions themselves."""
+    if not _seller_shown(data):
+        return ""
+    words = seller_message.words(locale)
+    fund = report_kind(data) == "fund"
+    text, shown, total = _seller_message(data, locale, labels, public_id)
+    note = (
+        f"<p class='muted'>{_e(words['trimmed_note'].format(shown=shown, total=total))}</p>"
+        if shown < total
+        else ""
+    )
+    rows = min(text.count("\n") + 2, 18)
+    return (
+        "<div class='seller-msg no-print' id='seller-message'>"
+        f"<h3 id='seller-message-title'>{_e(words['title_fund' if fund else 'title'])}</h3>"
+        f"<p class='muted'>{_e(words['intro'].format(who=words['who_fund' if fund else 'who']))}"
+        f"</p><textarea id='{seller_message.TEXT_ID}' readonly rows='{rows}' style='width:100%' "
+        f"aria-labelledby='seller-message-title'>{_e(text)}</textarea>{note}"
+        "<div class='copy-row'><button class='btn btn-dark btn-sm' type='button' "
+        f"data-copy='{seller_message.TEXT_ID}' data-done='{_e(words['done'])}' hidden>"
+        f"{_e(words['copy'])}</button></div></div>"
+    )
+
+
 def _source_html(data: dict[str, Any], labels: dict[str, str]) -> str:
     inputs = data["inputs"]
     out = ""
@@ -8618,6 +8848,10 @@ def _locked_titles(
         titles.append(title)
         if title == labels["challenge"] and _sizing_shown(data.get("challenge")):
             titles.append(labels["ch_size_title"])
+        if title == labels["questions"] and _seller_shown(data):
+            # The buyer's message for the seller, named for the buyer only.
+            words = seller_message.words(_locale_of(labels))
+            titles.append(words["lock_fund" if report_kind(data) == "fund" else "lock"])
     return titles
 
 
@@ -9529,7 +9763,8 @@ def render_html(
         ),
         (
             labels["questions"],
-            _questions_html(ownership.open_questions(data, role), locale, labels),
+            _questions_html(ownership.open_questions(data, role), locale, labels)
+            + _seller_html(data, locale, labels, public_id),
         ),
         # The dimension reasons repeat the verdict in thresholds, so they open the
         # technical tables instead of sitting between the plan and the findings.

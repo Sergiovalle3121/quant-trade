@@ -361,6 +361,77 @@ public verification page and its cards never read the answer. The public
 sample (`/ejemplo`) declares `own`, so it shows the developer's actions; the
 signal sample (`/ejemplo-senal`) declares `buyer`, so it speaks to a copier.
 
+#### The message for the seller (`audit/seller_message.py`)
+
+A buyer of a signal asked for "the questions for the seller in a message ready
+to copy into the MQL5 or Telegram chat, with the key figures and the costs in
+pips". With `buyer` declared, the questions section of the full report ends
+with a block "Mensaje para el vendedor" / "Message for the seller" /
+"Mensagem para o vendedor" ("... para el gestor" for a fund's monthly
+record): a read-only text area and a "Copiar mensaje" button that is the
+site's `data-copy` button (`static/app.js`, hidden until the script runs; no
+new script). The text is plain, in the report's language, and built only from
+the report (`report._seller_message`):
+
+- a neutral greeting ("Hola. Revisé los archivos de esta estrategia con Rigor y
+  me quedaron algunas preguntas.");
+- the class ("Clase del informe: C (A es la más alta, D la más baja).") and
+  the dimensions that fail or are weak, by the report's names, with their
+  status in words ("Costos (no supera), Número de configuraciones probadas
+  (débil)"), or "ninguna", then the dimensions not measured ("Dimensiones sin
+  medir: Costos, Fuera de muestra, Benchmark."; one that does not apply is not
+  listed). A class B from a curve alone is B because pieces are missing; without
+  that line it would read as "only one weak point";
+- two to four key figures, each with its evidence tag in words
+  (`report._seller_figures`): the break-even cost as the summary tile gives
+  it (basis points per side, then the pips of PR 479 and the money per lot
+  when measured, or "ya pierde sin costo extra"; a backtest without trades
+  says "no medido" with the costs' reason; a fund and a table of gross and
+  net period returns, which have no cost per trade, have no such line), the
+  live account against its backtest when one was uploaded (its badge and both
+  shares of backtest histories its section gives, net result as low or lower
+  and fall as deep or deeper, since either decides the badge; a share short of
+  none or of all reads "<1%" or ">99%", never "0%" or "100%"; or "no medido"
+  with the reason), the trials used in the deflated Sharpe (an undeclared
+  count says "no medido" with the engine's note, not the 1 it was computed
+  with) and the maximum drawdown, with the platform's drawdown with open
+  trades beside it ("según el informe de la plataforma", declared) whenever
+  the summary shows that red tile. At least two lines carry a measured or
+  declared figure: when the files gave fewer, the summary's Sharpe, total
+  return or drawdown p95 complete them with their own tag, and past four
+  lines the last "no medido" one makes room;
+- the open questions (`ownership.open_questions`), numbered. The stored
+  questions that speak to the buyer ("Pide el archivo de optimización", "¿Son
+  los de su bróker?") are put to the seller in `seller_message.SELLER_ASK`
+  ("¿Puedes enviar el archivo de optimización?"); the stored ones are
+  unchanged and the section above keeps them;
+- "Gracias de antemano.", the public page
+  (`https://rigorscore.com/v/<id>?ref=vendedor`, with `lang=en`/`lang=pt`)
+  only when the report is published, and "Informe hecho con Rigor
+  (rigorscore.com)". `vendedor` is a tag of `funnel.REF_TAGS`, so `/panel`
+  counts the visits the message brings.
+
+The text stays under 4,000 characters as a chat counts them (UTF-16 code
+units; Telegram takes 4,096). When the questions do not fit, the last ones
+are left out, the text ends its list with "Quedan N preguntas más en el
+informe." and a note under the text area says how many it carries. No
+"verificado", "certificado", "aprobado" or promise: every text passes
+`guard.find_claims`.
+
+Only the buyer gets the block. The developer's and the neutral voice send
+nobody to a seller, and the provider's questions section already reads, item
+by item, "Te van a preguntar: «...» Aporta ...", which is what a "lo que te
+van a preguntar" text would repeat, so the provider gets no second block.
+The locked preview does not render it; its lock box lists "Un mensaje para el
+vendedor con esas preguntas, listo para copiar" right after the questions,
+for the buyer only. The block is `no-print`: the PDF (the page under the
+print stylesheet) leaves it out and keeps the questions.
+`tests/test_audit_seller_message.py` covers the three languages, the figures
+against the report's own helpers (a badge decided by the fall, the tail
+shares, the platform's drawdown, a curve alone, period returns), the
+unmeasured dimensions, the other voices, the public link, the lock box, the
+trimming, a fund and the PDF.
+
 ### Dates and numbers in a hand-made file
 
 The curve, trades, benchmark and variants CSVs (`audit/schema.py`) and the
@@ -4903,7 +4974,8 @@ URL's `options`. See
   fund's sharing text keeps its report kind after purge, without retaining
   fund figures. Previously purged views without that flag cannot recover it
   from deleted data and retain the existing fallback classification.
-- **Attribution.** `share` and `ejemplos` are named tags in `funnel.REF_TAGS`.
+- **Attribution.** `share` and `ejemplos` are named tags in `funnel.REF_TAGS`
+  (`vendedor` too: the link in the buyer's message for the seller).
   Adding these bare names requires this deploy: there is no runtime setting
   for arbitrary tags. Existing campaign-shaped names, such as `x-es-103`,
   already work without another deploy. Active `/v/<id>` HTML and the examples
