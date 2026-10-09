@@ -1007,7 +1007,7 @@ REPORT: dict[str, Any] = {
         "ff_phase": "1 fase",
         "ch_ladder_title": "Quanto muda com o que este relatório encontrou?",
         "ch_ladder_intro": (
-            "O mesmo programa ({program}, {phases}), reamostrado da mesma forma, com trechos "
+            "O mesmo programa ({program}), reamostrado da mesma forma, com trechos "
             "diferentes do histórico ou com o que o relatório desconta. São cenários do mesmo "
             "histórico, não previsões: se o número cai muito fora da amostra ou com custos, o "
             "do histórico completo é otimista."
