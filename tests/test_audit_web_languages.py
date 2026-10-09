@@ -60,8 +60,8 @@ def test_every_public_page_exists_in_both_languages(tmp_path: Path) -> None:
             assert response.status_code == 200, path
             _assert_page(response.text, locale)
     # Spanish stays the default on the addresses already shared.
-    assert "¿Ventaja real" in client.get("/").text
-    assert "Real edge" in client.get("/en").text
+    assert "Antes de pagar un reto o un robot," in client.get("/").text
+    assert "Before you pay for a challenge or a robot," in client.get("/en").text
     assert "href='/sample' hreflang='en'" in client.get("/ejemplo").text
     assert "href='/ejemplo' hreflang='es'" in client.get("/sample").text
 

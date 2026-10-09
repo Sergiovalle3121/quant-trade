@@ -129,8 +129,8 @@ def test_calculator_links_use_the_card_inputs_and_never_fill_missing_figures(
             continue
         luck_text = f"{result['luck_sharpe']['value']:.2f}"
         after_text = f"{result['sharpe_after']['value']:.2f}"
-        # The card and its reading lines use the page's decimal mark: a comma in es and pt.
-        # The calculator page they link to keeps its own format (a point).
+        # The card, its reading lines and the calculator page they link to use the page's
+        # decimal mark: a comma in es and pt, a point in en.
         luck_shown = _num(result["luck_sharpe"]["value"], locale, 2)
         after_shown = _num(result["sharpe_after"]["value"], locale, 2)
         assert luck_shown == (luck_text if locale == "en" else luck_text.replace(".", ","))
@@ -139,8 +139,11 @@ def test_calculator_links_use_the_card_inputs_and_never_fill_missing_figures(
         assert luck is not None
         assert f"≈ {luck_shown}" in " ".join(luck.itertext())
         assert luck_shown in body and after_shown in body
-        assert f"<b>{luck_text}</b>" in response.text
-        assert f"<b>{after_text}</b>" in response.text
+        assert f"<b>{luck_shown}</b>" in response.text
+        assert f"<b>{after_shown}</b>" in response.text
+        if locale != "en":
+            assert f"<b>{luck_text}</b>" not in response.text
+            assert f"<b>{after_text}</b>" not in response.text
 
 
 @pytest.mark.parametrize("locale", LOCALES)

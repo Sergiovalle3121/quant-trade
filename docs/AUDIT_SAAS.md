@@ -174,19 +174,38 @@ verification survives retention purge; a missing retained view returns 410,
 and a withdrawn publication returns 404. This deliberately follows the
 repository lifecycle rather than making every purged publication return 410.
 
-## Why trust it (`pages.TRUST_COPY`, landing `#confianza`)
+## The landing for someone about to pay (`pages.landing`)
 
-The landing has a section for a first-time visitor, "Trabajo real, no humo"
-(Real work, not hype), in Spanish, English and Portuguese. Every point links
-to the page that proves it: the full sample report, the methodology and its
-papers, the check page for a report's SHA-256, the privacy policy (a file is
-never published, is deleted after the retention days if unpaid, and an account
-can be deleted) and the terms (a fix or a new credit when the report misreads the file). One
-point says Rigor sells no bots or signals and that the guard stops any text
-promising results. "Who is behind it" shows `AUDIT_OPERATOR_NAME` and
-`AUDIT_OPERATOR_ADDRESS` (in English and Portuguese, its optional
-`AUDIT_OPERATOR_ADDRESS_EN` or `_PT` wording) only when both are set, and the WhatsApp line only
-with `AUDIT_CONTACT_URL` (`tests/test_audit_landing_trust.py`).
+The landing is short, for someone about to pay for a prop-firm challenge or a
+robot: the first screen (headline, lead, button, the price after the free first
+report from settings, "your file is never published"), the sample report's
+finding, who it is for, how it works, the prices, "who is behind it", six
+questions and the closing call. Its link to the questions page reads "more
+questions": that page answers the landing's other questions
+(`faq.landing_only_questions`), so none of them leaves the site. The first
+screen never mentions a card: a card
+check is offered only on a report whose free unlock was refused
+(`account_pages.report_box`). The headline and the button are there from the
+first paint; only the illustration rises in, and `[data-reveal]` fades in
+without blur. The closing call keeps `id='subir'` for links shared as
+`/#subir` and links the free tools; the footer links the institutional review.
+
+"Who is behind it" (`pages._founder`) shows only when `AUDIT_OPERATOR_NAME` is
+set and the founder's own photo is at `audit/static/fundador.jpg` (served only
+while it is there, `theme.OPTIONAL_STATIC_FILES`): the photo is the founder's
+approval of the text, so the repository ships none. Until then the questions
+end with what Rigor does not do, one line with `AUDIT_OPERATOR_NAME` and
+`AUDIT_OPERATOR_ADDRESS` (or its `_EN`/`_PT` wording) when both are set, and
+the WhatsApp line with `AUDIT_CONTACT_URL` (`tests/test_audit_landing_compra.py`,
+`tests/test_audit_landing_trust.py`). That line (`pages.OPERATOR_LINE`) reads
+"Responsable del servicio", "Service operator" or "Responsável pelo serviço",
+never the block's heading: without the photo, "who is behind it" is nowhere on
+the page.
+
+`/precios` shows the plans as cards (first report, one report and, when on
+sale, the pack, each button to the upload page and none to a checkout) and one
+list of what every full report includes; prices drop ".00" on the page and
+keep two decimals in the Product JSON-LD.
 
 ## Portuguese pages (`audit/portuguese.py`, `/pt`)
 
@@ -2302,7 +2321,7 @@ Routes:
 
 | Route | What it does |
 |---|---|
-| `GET /` | Landing (how it works, prices, FAQ, link to the sample); `?lang=en`. `GET /en` is the English landing, a short address to share. Its `#subir` band and every start button link to the upload page; old `?extras=1` links redirect there. |
+| `GET /` | Landing (how it works, prices, FAQ, link to the sample); `?lang=en`. `GET /en` is the English landing, a short address to share. Its closing call keeps `id='subir'`, and every start button links to the upload page; old `?extras=1` links redirect there. |
 | `GET /auditar` | The upload form on its own page (`/en/audit`, `/pt/auditar`; `?extras=1` opens the extra files). Outside free mode a visitor without an account gets a 303 to sign-up with `next` back here (`/registro?next=/auditar`, `/signup?next=/en/audit`, `/pt/cadastro?next=/pt/auditar`), so nobody fills the form and loses it. A visitor who came with `?extras=1` keeps it (`next=/auditar%3Fextras%3D1`) and lands on the form with the extra files open after signing up or in; the language switch of the form and the "account first" answer to an upload that used an extra box keep it too. |
 | `GET /precios` | 301 to the landing's prices (`/#pricing`); `/pricing` and `/en/pricing` go to `/en#pricing`, `/pt/precos` to `/pt#pricing`. |
 | `GET /contacto` | Contact page (`/en/contact`, `/pt/contato`; `/soporte`, `/contact`, `/support`, `/en/support`, `/pt/suporte` redirect there), linked from every footer. It shows only what the operator set: `AUDIT_OPERATOR_CONTACT` as a mail link and `AUDIT_CONTACT_URL` as the chat link; with neither it says no channel is published yet. It also says never to send a password, recovery key or card details. |
@@ -3480,8 +3499,11 @@ audience slug that does not exist, so a typo fails at import, not on a
 page. A page shows the intro, the sections as `h2` and paragraphs, the
 questions as `h3`, the
 related pages (the free calculator, an export guide, an audience page or
-the method, each in the page's language) and a closing call to the free
-calculator and the free first report, worded without a promise. The guides
+the method, each in the page's language) and a closing call worded without
+a promise. The side button and the closing call follow the article's own
+next step (`Article.next_step`, from `articles.ARTICLE_NEXT_STEPS`; see
+"Conversion toward the first free report" below); an article missing from
+that table keeps the free calculator and the free first report. The guides
 index links the articles index in each language so crawlers reach it. The
 three articles are `ea-sobreoptimizado` (how to tell whether an expert
 advisor is overfitted before buying it), `backtest-costos-reales` (spread,
@@ -4779,8 +4801,12 @@ Tests compare it with the exact binomial tail and check the barrier calculation
 against a separate symmetric-barrier identity. Correlation, changing payoffs,
 selection and real execution can invalidate these teaching assumptions.
 
-`faq.py` serves ten source-commented questions at `/preguntas`, `/en/faq` and
-`/pt/perguntas`, listed in `PUBLIC_PAGES`, the sitemap and footer. Runtime settings
+`faq.py` serves eleven source-commented questions at `/preguntas`, `/en/faq` and
+`/pt/perguntas`, listed in `PUBLIC_PAGES`, the sitemap and footer. Before the
+contact question it also answers the landing's questions the landing does not
+show (`faq.landing_only_questions`: markets, the MT5 optimisation XML, a
+forgotten password, account protection, the badge and, in Portuguese, the
+report's language), worded as in `pages._COPY`. Runtime settings
 supply prices, public card markets, upload size, retention and contact channels.
 It reuses the existing JSON-LD serializer; FAQPage answers match visible localized
 answers. Privacy follows `legal.py`, including retention of the first free full
@@ -4807,7 +4833,9 @@ countries use `card_markets_line` only when `card_public` is true. The one-off
 payment description follows the existing `mode="payment"` checkout builders;
 no checkout, credit, account or e-mail behavior changes. E-mail confirmation is
 mentioned when configured and support availability follows `operator_contact`.
-The institutional link uses the existing intake form.
+The institutional link uses the existing intake form. The page closes with
+`pricing.start_cta` ("Empieza por el informe gratis"), not with the articles'
+calculator call; see "Conversion toward the first free report" below.
 
 Paid pages serialize the visible single/pack offers as Product/Offer JSON-LD
 through `seo._json_ld`, without ratings or reviews. In `free_mode` all full
@@ -4909,3 +4937,81 @@ The Windows verification environment for this change uses
 `D:\wt\.venv-pp\Scripts\python.exe` with worktree `PYTHONPATH` and `--basetemp`,
 without package installation; `test_audit_pdf*.py` and
 `test_personal_paper*.py` are excluded as requested.
+
+## Conversion toward the first free report (8 October 2026)
+
+Four pages now lead a new visitor to the free first report instead of
+ending at the calculator. Every step is read from the configuration; no
+account, payment, credit, e-mail, legal or engine rule changed.
+
+- **Pricing** (`pricing.start_cta`). `/precios`, `/en/pricing` and
+  `/pt/precos` close with "Empieza por el informe gratis": the first full
+  report is the same report as the paid ones, with the PDF, and needs an
+  account and the file the platform exports. The main button ("Crear cuenta
+  y pedir mi primer informe") goes to `audit_path(locale)`, which sends a
+  visitor without an account to sign-up with `next` back to the form; links
+  to the sample report and the export guides follow, and the luck calculator
+  is a text link. With `AUDIT_EMAIL_VERIFICATION_REQUIRED` the existing
+  e-mail note is added. In free mode the text says every full report is free
+  and only the file is needed (the form asks for no account there). Without
+  the free first report (`accounts.WELCOME_FULL_REPORT = False`) the page
+  keeps the articles' call.
+- **Sample report** (`report.render(sample_cta=True, sample_offer=...)`, only
+  from `web._sample_html`). Under the synthetic-data notice, a `no-print` band
+  says the first report with one's own file is free with an account (free
+  mode: every full report is free; `paid`: no free wording), with a button to
+  the form and "¿Qué archivo produce un informe así?" linking the MT5 and MT5
+  optimisation guides. The toolbar shows "Crear cuenta"
+  (`/registro?next=/auditar`, `/signup?next=/en/audit`,
+  `/pt/cadastro?next=/pt/auditar`) instead of "Mi cuenta". When the sample PDF
+  route exists (`pdf_lib.available()`), a closing `no-print` block, "Compruébalo
+  tú", links the PDF and `/comprobar`: the check page answers the sample PDF
+  with "Es el informe de ejemplo de Rigor, sin cambios" (it is recorded under
+  `check.SAMPLE_AUDIT_ID`), and a client's PDF or JSON with its issue date and,
+  when recorded, its class. The block says exactly that. The sample PDF is
+  rendered without any of it. With `sample_cta=False` (every client report)
+  the HTML and JSON are byte for byte what they were: the band's styles live
+  inside the band, not in the shared stylesheet.
+- **Sign-up** (`account_pages.signup_page(email_verification=, offer=)`).
+  When `next` is an upload page (`AUDIT_PATHS`), the side panel shows "Así
+  sigue" instead of the account benefits: create the account; only with
+  `email_verification_required`, open the e-mailed link (the free full report
+  waits for it); upload the file the platform already exports, with the
+  upload form's own list of platforms (`pages.PLATFORMS`) and a link to
+  `/guias`; get the class (`strategies.CLASS_ORDER`), the
+  `len(verdict.DIMENSION_ORDER)` checks with their evidence label and the PDF,
+  the first one free (free mode: every full report free). A link to the sample
+  report follows, then the existing "what we keep" card. No processing time is
+  given. Any other `next`, or a configuration without a free first report,
+  keeps the benefits. The "confirmation link sent" notice
+  (`welcome_confirm`) on the upload page and on "Mi cuenta" adds "Mientras
+  llega el correo, exporta tu archivo", linking `/guias`
+  (`account_pages.welcome_confirm_guides`). The notice on a report page, where
+  the file was already uploaded, is unchanged.
+- **Each article's next step** (`articles.ARTICLE_NEXT_STEPS`,
+  `next_step_links`, `next_step_call`). The first step is the side button
+  and the closing button; the others, plus the free first report when it is
+  not among them, are the closing call's links. `leer-informe-probador-mt5`:
+  form and MT5 guide. `ea-sobreoptimizado` and `lo-eligio-el-optimizador`:
+  form and MT5 optimisation guide. `backtest-costos-reales`: form.
+  `copiar-senales-mql5-myfxbook`: Myfxbook guide, then the form.
+  `cuantas-operaciones-porcentaje-aciertos`: the win-rate calculator opened
+  with the article's declared example (`WIN_RATE_EXAMPLE_VALUES`, 45 trades at
+  71 %). `cuantos-intentos-reto-prop-firm`: `/para/retos-prop-firm` (which
+  already links back to the article). `sharpe-deflactado-track-record` and
+  `bot-ia-backtest-suerte`: the luck calculator opened with
+  `LUCK_EXAMPLE_INPUT`, the example both articles print.
+  `auditoria-independiente-backtest`, `que-hacer-despues-del-backtest` and
+  `auditar-cartera-modelo-senales`: form and sample report. `Article.from_dict`
+  refuses an unknown kind, guide, audience page or example at import.
+
+`tests/test_audit_conversion.py` reads every page over HTTP with
+`TestClient` in the three languages: the pricing close and its configuration
+variants, the sample's band, toolbar and closing block (and that its PDF
+checks as the unchanged sample on `/comprobar`), a client's report identical
+with `sample_cta=False` and equal to the `sample_cta=True` page minus the
+three additions, the sign-up steps for each configuration and the guides link
+of the confirmation notice, and, per article and language, that the side
+button and the closing call follow the table above and that every link
+answers 200. Every new text passes `find_claims` and avoids "verificado",
+"certificado", "aprobado", "garantiza", "rentable" and processing times.

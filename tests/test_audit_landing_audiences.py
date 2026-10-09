@@ -3,6 +3,7 @@ and what they get, and says nothing about payment that is not true today."""
 
 from __future__ import annotations
 
+import html
 import re
 
 from quant_trade.audit.guard import find_claims
@@ -48,29 +49,42 @@ def test_landing_names_no_payment_method_it_cannot_show() -> None:
     assert "Stripe" in _paid_landing("es", card_payments=True)
 
 
-def test_landing_names_the_recognised_formats_under_the_platform_strip() -> None:
+def test_the_recognised_formats_are_named_under_the_strip_and_in_the_questions() -> None:
     from quant_trade.audit.audiences import PLATFORMS_EN, PLATFORMS_ES
+    from quant_trade.audit.pages import _specs
 
     for locale, names, words in (
         ("es", PLATFORMS_ES, "Y reconoce el formato de exportación de"),
         ("en", PLATFORMS_EN, "It also recognises the export format of"),
     ):
-        page = _paid_landing(locale, card_payments=False)
-        also = page.split("class='platforms-also'", 1)[1].split("</p>", 1)[0]
+        also = _specs(locale).split("class='platforms-also'", 1)[1].split("</p>", 1)[0]
         assert words in also
         assert names.replace("&", "&amp;") in also
         assert "csv" in also
         assert find_claims(also) == []
+        # The strip left the short landing; its "which file" answer names them.
+        faq = _paid_landing(locale, card_payments=False).split("id='faq'", 1)[1]
+        assert names.replace("&", "&amp;") in faq.split("</section>", 1)[0]
 
 
-def test_paid_price_card_explains_the_flow_and_lists_fund_checks() -> None:
-    for locale, cta, fund in (
-        ("es", "Empieza con la vista previa gratis", "Para fondos: calendario año por mes"),
-        ("en", "Start with the free preview", "For funds: year-by-month calendar"),
+def test_paid_price_card_explains_the_flow_and_names_a_use_for_paying() -> None:
+    for locale, cta, use, line in (
+        (
+            "es",
+            "Empezar con mi informe gratis",
+            "Para la versión corregida de tu estrategia, otro robot o tu cuenta del mes",
+            "Riesgo remuestreado a un año y el capital que pide",
+        ),
+        (
+            "en",
+            "Start with my free report",
+            "For the corrected version of your strategy, another robot or next month",
+            "Resampled one-year risk and the capital it needs",
+        ),
     ):
         page = _paid_landing(locale, card_payments=False)
-        pricing = page.split("id='pricing'", 1)[1]
-        assert cta in pricing and fund in pricing
+        pricing = html.unescape(page.split("id='pricing'", 1)[1])
+        assert cta in pricing and use in pricing and line in pricing
         assert find_claims(pricing) == []
 
 
@@ -89,14 +103,17 @@ def test_second_files_and_challenge_sit_in_a_closed_extras_box() -> None:
 
 
 def test_pricing_offers_the_free_account_that_the_preview_needs() -> None:
+    # The first price card names the account and the monthly previews; its button opens
+    # the upload page, which sends a visitor without an account to sign up first.
     for locale, words, href in (
-        ("es", "gratis al crear tu cuenta; después, 3 vistas previas", "/registro"),
-        ("en", "free when you create your account; then 3 free previews", "/signup"),
+        ("es", "Completo y con PDF al crear tu cuenta. Después, 3 vistas previas", "/auditar"),
+        ("en", "Full and with the PDF when you create your account. After that, 3", "/en/audit"),
     ):
         page = _paid_landing(locale, card_payments=False)
-        note = page.split("class='muted account-note'", 1)[1].split("</p>", 1)[0]
-        assert words in note and f"href='{href}'" in note
-        assert find_claims(note) == []
+        pricing = page.split("id='pricing'", 1)[1]
+        card = pricing.split("<div class='price' ", 1)[1].split("<div class='price featured'")[0]
+        assert words in html.unescape(card) and f"href='{href}'" in card
+        assert find_claims(html.unescape(card)) == []
 
 
 def test_account_note_links_a_live_sign_up_page(tmp_path) -> None:  # type: ignore[no-untyped-def]
