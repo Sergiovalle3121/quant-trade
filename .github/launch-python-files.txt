@@ -53,6 +53,7 @@ tests/test_audit_gate_code_copy.py
 tests/test_audit_guide_entry.py
 tests/test_audit_importers.py
 tests/test_audit_indexnow.py
+tests/test_audit_informe_claro.py
 tests/test_audit_landing_trust.py
 tests/test_audit_launch_journey.py
 tests/test_audit_launch_playbook.py

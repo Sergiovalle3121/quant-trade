@@ -21,9 +21,16 @@ from datetime import date
 from typing import Any
 from urllib.parse import parse_qsl, quote, urlencode, urlsplit, urlunsplit
 
-from quant_trade.audit import charts, report_pt
+from quant_trade.audit import charts, ownership, report_pt
 from quant_trade.audit.account import is_account_history
-from quant_trade.audit.crises import MARKET, MARKET_AS_OF
+from quant_trade.audit.crises import (
+    MARKET,
+    MARKET_AS_OF,
+    MIN_WINDOWS,
+    WINDOW_MARKET,
+    WORSE_SHARE,
+    traded_markets,
+)
 from quant_trade.audit.decay import is_weaker
 from quant_trade.audit.decay import signed_amount as _signed_amount
 from quant_trade.audit.engine import _NO_PRINTED_BALANCE_REASON as NO_PRINTED_BALANCE_REASON
@@ -158,9 +165,9 @@ INTEGRITY_TEXT: dict[str, dict[str, str]] = {
         "forensic_signal": "Señal que requiere revisión",
         "forensic_none": "No apareció una señal calibrada en estas comprobaciones.",
         "forensic_none_uncalibrated": (
-            "Ninguna de estas comprobaciones está calibrada para este formato: que no aparezca "
-            "una señal no dice nada sobre si el archivo se editó. Si puedes, descárgalo tú "
-            "mismo de la plataforma."
+            "Para este formato no se pudo aplicar ninguna comprobación calibrada: no hay señal "
+            "ni a favor ni en contra del archivo, y que no aparezca una no dice nada sobre si "
+            "se editó. Si puedes, descárgalo tú mismo de la plataforma."
         ),
         "forensic_caveat": (
             "Una señal no demuestra falsificación; la ausencia de señales no prueba autenticidad."
@@ -233,9 +240,9 @@ INTEGRITY_TEXT: dict[str, dict[str, str]] = {
         "forensic_signal": "Signal requiring review",
         "forensic_none": "No calibrated signal appeared in these checks.",
         "forensic_none_uncalibrated": (
-            "None of these checks is calibrated for this format: the absence of a signal says "
-            "nothing about whether the file was edited. If you can, download it yourself from "
-            "the platform."
+            "No calibrated check could be applied to this format: there is no signal either for "
+            "or against the file, and the absence of one says nothing about whether it was "
+            "edited. If you can, download it yourself from the platform."
         ),
         "forensic_caveat": (
             "A signal does not prove forgery; no signal does not prove authenticity."
@@ -306,9 +313,9 @@ INTEGRITY_TEXT: dict[str, dict[str, str]] = {
         "forensic_signal": "Sinal que exige revisão",
         "forensic_none": "Nenhum sinal calibrado apareceu nessas verificações.",
         "forensic_none_uncalibrated": (
-            "Nenhuma destas verificações está calibrada para este formato: a ausência de sinal "
-            "não diz nada sobre se o arquivo foi editado. Se puder, baixe-o você mesmo da "
-            "plataforma."
+            "Para este formato não foi possível aplicar nenhuma verificação calibrada: não há "
+            "sinal nem a favor nem contra o arquivo, e a ausência de um não diz nada sobre se "
+            "ele foi editado. Se puder, baixe-o você mesmo da plataforma."
         ),
         "forensic_caveat": (
             "Um sinal não comprova falsificação; a ausência de sinais não prova autenticidade."
@@ -442,6 +449,10 @@ LABELS: dict[str, dict[str, str]] = {
         "data_age": "{days} días entre el último dato y esta auditoría",
         "data_age_one": "1 día entre el último dato y esta auditoría",
         "data_age_account": "Lo que pasó después del último dato no está en este archivo.",
+        "seal_scope": (
+            "El sello prueba que la declaración del tramo no cambió después de esa fecha, no "
+            "que el tramo fuera desconocido al optimizar."
+        ),
         "inputs": "Archivos auditados (sha256)",
         "verdict": "Veredicto",
         "dimensions": "Dimensiones",
@@ -746,7 +757,7 @@ LABELS: dict[str, dict[str, str]] = {
         "luck_narrow": (
             "El Sharpe de {sharpe} supera al {luck} que darían {n} configuraciones sin "
             "habilidad, pero no con el margen que pedimos: la confianza de que no sea suerte "
-            "(DSR) es del {dsr}, y para aprobar esta dimensión pedimos {need}."
+            "(DSR) es del {dsr}, y para superar esta dimensión pedimos {need}."
         ),
         "luck_beats": (
             "El Sharpe de {sharpe} supera al {luck} que darían {n} configuraciones sin habilidad."
@@ -1304,6 +1315,22 @@ LABELS: dict[str, dict[str, str]] = {
             "mercado, no como su punto de comparación."
         ),
         "crises_no_trades": "sin operaciones cerradas en la ventana",
+        "crises_not_applicable": (
+            "No aplica a este historial: las crisis que cubre la curva son {falls}, y ninguno "
+            "de los símbolos operados ({symbols}) es de {that}."
+        ),
+        "crises_not_covered": (
+            "No aplica a este historial: las crisis que cubre la curva son {falls}; los "
+            "símbolos operados ({symbols}) incluyen {traded}, pero la curva no cubre ninguna "
+            "de las crisis de ese mercado."
+        ),
+        "crises_falls_us_equity": "caídas de acciones de EE. UU.",
+        "crises_falls_crypto": "caídas de bitcoin",
+        "crises_falls_both": "caídas de acciones de EE. UU. y de bitcoin",
+        "crises_traded_us_equity": "acciones de EE. UU.",
+        "crises_traded_crypto": "bitcoin",
+        "crises_that_market": "ese mercado",
+        "crises_those_markets": "esos mercados",
         "crises_worse": (
             "En {worse} de {n} crisis cayó más que su índice. Pregunta al vendedor qué la "
             "protege cuando el mercado cae."
@@ -1351,7 +1378,11 @@ LABELS: dict[str, dict[str, str]] = {
         "ins_mostly_one": (
             "Casi todo el resultado viene de {best} ({share}). Pregunta qué aportan los demás."
         ),
-        "ins_best_over": "Más que el resultado neto viene de {best}: los demás juntos restan",
+        "ins_best_over": (
+            "Más que el resultado neto viene de {best}: los demás juntos restan {rest} "
+            "(el {rest_share})"
+        ),
+        "ins_best_over_plain": "Más que el resultado neto viene de {best}: los demás juntos restan",
         "ins_most_lose": (
             "La mayoría de los instrumentos terminan en cero o en pérdida ({losing} de "
             "{readable}). Pregunta si la estrategia se ajustó a unos pocos mercados."
@@ -1398,6 +1429,21 @@ LABELS: dict[str, dict[str, str]] = {
         ),
         "timing_best_day": "El {share:.0%} del resultado neto sale de los {day}.",
         "timing_best_block": "El {share:.0%} del resultado neto sale de la franja {block}.",
+        "timing_best_day_over": (
+            "Los {day} suman el {share} del resultado neto: los demás días, juntos, restan "
+            "{rest} (el {rest_share})."
+        ),
+        "timing_best_day_over_plain": (
+            "Los {day} suman más que todo el resultado neto: los demás días, juntos, restan."
+        ),
+        "timing_best_block_over": (
+            "La franja {block} suma el {share} del resultado neto: las demás franjas, juntas, "
+            "restan {rest} (el {rest_share})."
+        ),
+        "timing_best_block_over_plain": (
+            "La franja {block} suma más que todo el resultado neto: las demás franjas, juntas, "
+            "restan."
+        ),
         "timing_day": "Día de entrada",
         "timing_block": "Hora de entrada",
         "timing_trades": "Operaciones",
@@ -1630,7 +1676,15 @@ LABELS: dict[str, dict[str, str]] = {
         "risk": "Riesgo remuestreado a un año",
         "risk_dd": "Drawdown máximo a un año",
         "risk_prob": "Probabilidad de una caída de al menos",
-        "risk_underwater": "Periodos seguidos bajo el máximo, en las simulaciones",
+        "risk_underwater": "Tiempo seguido bajo el máximo en las simulaciones, contado en {unit}",
+        "unit_daily_trading": "días hábiles",
+        "unit_daily_calendar": "días",
+        "unit_weekly": "semanas",
+        "unit_monthly": "meses",
+        "unit_hourly": "horas",
+        "unit_periods": "periodos de la curva",
+        "unit_periods_days": "periodos de la curva (de media, {n} días de calendario cada uno)",
+        "unit_periods_hours": "periodos de la curva (de media, {n} horas de calendario cada uno)",
         "risk_under_median": "mediana",
         "risk_under_p95": "en 1 de cada 20",
         "challenge": "Simulador de reto de prop firm",
@@ -1862,6 +1916,10 @@ LABELS: dict[str, dict[str, str]] = {
         "data_age": "{days} days between the last data point and this audit",
         "data_age_one": "1 day between the last data point and this audit",
         "data_age_account": "What happened after the last data point is not in this file.",
+        "seal_scope": (
+            "The seal shows that the stretch's declaration did not change after that date, not "
+            "that the stretch was unknown while optimising."
+        ),
         "inputs": "Audited files (sha256)",
         "verdict": "Verdict",
         "dimensions": "Dimensions",
@@ -2695,6 +2753,22 @@ LABELS: dict[str, dict[str, str]] = {
             "the market went through, not as its yardstick."
         ),
         "crises_no_trades": "no trades closed in the window",
+        "crises_not_applicable": (
+            "Does not apply to this history: the crises the curve covers are {falls}, and none "
+            "of the symbols traded ({symbols}) belongs to {that}."
+        ),
+        "crises_not_covered": (
+            "Does not apply to this history: the crises the curve covers are {falls}; the "
+            "symbols traded ({symbols}) include {traded}, but the curve covers none of that "
+            "market's crises."
+        ),
+        "crises_falls_us_equity": "falls in US equities",
+        "crises_falls_crypto": "falls in bitcoin",
+        "crises_falls_both": "falls in US equities and in bitcoin",
+        "crises_traded_us_equity": "US equities",
+        "crises_traded_crypto": "bitcoin",
+        "crises_that_market": "that market",
+        "crises_those_markets": "those markets",
         "crises_worse": (
             "In {worse} of {n} crises it fell more than its benchmark. Ask the seller what "
             "protects it when markets fall."
@@ -2742,7 +2816,13 @@ LABELS: dict[str, dict[str, str]] = {
         "ins_mostly_one": (
             "Almost all of the result comes from {best} ({share}). Ask what the others add."
         ),
-        "ins_best_over": "More than the net result comes from {best}: the others together subtract",
+        "ins_best_over": (
+            "More than the net result comes from {best}: the others together subtract {rest} "
+            "({rest_share})"
+        ),
+        "ins_best_over_plain": (
+            "More than the net result comes from {best}: the others together subtract"
+        ),
         "ins_most_lose": (
             "Most instruments end at zero or a loss ({losing} of {readable}). Ask whether the "
             "strategy was fitted to a few markets."
@@ -2783,6 +2863,22 @@ LABELS: dict[str, dict[str, str]] = {
         ),
         "timing_best_day": "{share:.0%} of the net result comes from {day}s.",
         "timing_best_block": "{share:.0%} of the net result comes from the {block} session.",
+        "timing_best_day_over": (
+            "{day}s add up to {share} of the net result: the other days together take away "
+            "{rest} ({rest_share})."
+        ),
+        "timing_best_day_over_plain": (
+            "{day}s add up to more than the whole net result: the other days together take "
+            "some of it away."
+        ),
+        "timing_best_block_over": (
+            "The {block} session adds up to {share} of the net result: the other sessions "
+            "together take away {rest} ({rest_share})."
+        ),
+        "timing_best_block_over_plain": (
+            "The {block} session adds up to more than the whole net result: the other sessions "
+            "together take some of it away."
+        ),
         "timing_day": "Entry day",
         "timing_block": "Entry time",
         "timing_trades": "Trades",
@@ -3012,7 +3108,15 @@ LABELS: dict[str, dict[str, str]] = {
         "risk": "Resampled one-year risk",
         "risk_dd": "Maximum drawdown over one year",
         "risk_prob": "Probability of a fall of at least",
-        "risk_underwater": "Consecutive periods below the peak, in the simulations",
+        "risk_underwater": "Time in a row below the peak in the simulations, counted in {unit}",
+        "unit_daily_trading": "trading days",
+        "unit_daily_calendar": "days",
+        "unit_weekly": "weeks",
+        "unit_monthly": "months",
+        "unit_hourly": "hours",
+        "unit_periods": "curve periods",
+        "unit_periods_days": "curve periods (on average {n} calendar days each)",
+        "unit_periods_hours": "curve periods (on average {n} calendar hours each)",
         "risk_under_median": "median",
         "risk_under_p95": "in 1 of every 20",
         "challenge": "Prop-firm challenge simulator",
@@ -3276,7 +3380,7 @@ KEY_LABELS: dict[str, dict[str, str]] = {
         "selection_end": "Fin de la selección",
         "holdout_start": "Inicio del tramo reservado",
         "holdout_end": "Fin del tramo reservado",
-        "sealed_at_utc": "Sellado (UTC)",
+        "sealed_at_utc": "Fecha en que Rigor selló la declaración del tramo (UTC)",
         "seal": "Sello (sha256)",
         "total_return": "Retorno total",
         "cagr": "Retorno anual compuesto",
@@ -3341,6 +3445,7 @@ KEY_LABELS: dict[str, dict[str, str]] = {
         "cost_bps_per_side": "Costo por lado (pb)",
         "oos_start": "Inicio fuera de muestra",
         "benchmark_applicable": "Aplica benchmark",
+        "ownership": "De quién es la estrategia",
         "overlap_share": "Fechas en común con el benchmark",
         "strategy_total_return": "Retorno total de la estrategia",
         "benchmark_total_return": "Retorno total del benchmark",
@@ -3355,6 +3460,9 @@ KEY_LABELS: dict[str, dict[str, str]] = {
         "initial_balance": "Balance inicial",
         "dsr_at_declared": "DSR con los intentos declarados",
         "dsr_at_trials_used": "DSR con los intentos usados",
+        "dsr_at_declared_used": (
+            "DSR con los intentos declarados, que son los mismos que los usados"
+        ),
         "trials_to_half": "Intentos que bajan el DSR a 0.5",
         "trials_used": "Intentos usados",
         "skewness": "Asimetría",
@@ -3383,7 +3491,7 @@ KEY_LABELS: dict[str, dict[str, str]] = {
         "selection_end": "Selection end",
         "holdout_start": "Holdout start",
         "holdout_end": "Holdout end",
-        "sealed_at_utc": "Sealed at (UTC)",
+        "sealed_at_utc": "Date Rigor sealed the stretch's declaration (UTC)",
         "seal": "Seal (sha256)",
         "total_return": "Total return",
         "cagr": "Compound annual return",
@@ -3443,6 +3551,7 @@ KEY_LABELS: dict[str, dict[str, str]] = {
         "cost_bps_per_side": "Cost per side (bps)",
         "oos_start": "Out-of-sample start",
         "benchmark_applicable": "Benchmark applies",
+        "ownership": "Whose strategy it is",
         "overlap_share": "Dates shared with the benchmark",
         "strategy_total_return": "Strategy total return",
         "benchmark_total_return": "Benchmark total return",
@@ -3457,6 +3566,7 @@ KEY_LABELS: dict[str, dict[str, str]] = {
         "initial_balance": "Initial balance",
         "dsr_at_declared": "DSR at the declared trials",
         "dsr_at_trials_used": "DSR at the trials used",
+        "dsr_at_declared_used": "DSR at the declared trials, which are the same as the trials used",
         "trials_to_half": "Trials that bring DSR to 0.5",
         "trials_used": "Trials used",
         "trials": "Trials",
@@ -3557,6 +3667,7 @@ PERCENT_KEYS = {
     "losing_run_odds",
     "dsr_at_declared",
     "dsr_at_trials_used",
+    "dsr_at_declared_used",
     "percent_gain",
     "result_on_deposits",
     "withdrawn_share",
@@ -3602,6 +3713,13 @@ def _table_money(value: float) -> str:
     if not math.isfinite(value):
         return f"{value:,.2f}"
     return _signed_amount(value).removeprefix("+")
+
+
+def _count_text(value: Any) -> str:
+    """A whole count with the report's thousands separator; anything else as given."""
+    if isinstance(value, int) and not isinstance(value, bool):
+        return f"{value:,}"
+    return str(value)
 
 
 def _fmt(value: Any, *, key: str = "") -> str:
@@ -3846,6 +3964,10 @@ def _is_evidence(value: Any) -> bool:
 
 
 def _locale_of(labels: dict[str, str]) -> str:
+    # Labels in a declared voice (``ownership.Voiced``) carry their language.
+    voiced = getattr(labels, "locale", None)
+    if voiced:
+        return str(voiced)
     return next((locale for locale, table in LABELS.items() if table is labels), "en")
 
 
@@ -3941,7 +4063,12 @@ def _evidence_rows(section: dict[str, Any], labels: dict[str, str], *, skip: set
         if key in skip or not _is_evidence(value):
             continue
         raw = value["value"]
-        shown = _e(labels["yes" if raw else "no"]) if isinstance(raw, bool) else _fmt(raw, key=key)
+        if key == "ownership":
+            shown = _e(ownership.choice_label(raw, _locale_of(labels)))
+        elif isinstance(raw, bool):
+            shown = _e(labels["yes" if raw else "no"])
+        else:
+            shown = _fmt(raw, key=key)
         note = localize(value.get("note", ""), _locale_of(labels))
         rows.append(
             f"<tr><td>{_e(_key_label(key, labels))}</td><td class='val'>{shown}</td>"
@@ -3960,6 +4087,33 @@ def _evidence_rows(section: dict[str, Any], labels: dict[str, str], *, skip: set
         + "".join(rows)
         + "</tbody></table>"
     )
+
+
+def _one_dsr_row(multiplicity: dict[str, Any], declared: dict[str, Any]) -> dict[str, Any]:
+    """The multiplicity rows as shown: when the trials declared and the trials
+    used are the same number, the two DSR rows are the same figure, so one row
+    says so. Nothing declared (1 is assumed) keeps only the row of the trials
+    used, whose note says the count was not declared."""
+    trials = declared.get("trials") or {}
+    stated = trials.get("evidence") == "DECLARED"
+    count = trials.get("value") if stated else 1
+    used = (multiplicity.get("trials_used") or {}).get("value")
+    if (
+        not isinstance(count, int | float)
+        or not isinstance(used, int | float)
+        or int(count) != int(used)
+        or "dsr_at_declared" not in multiplicity
+        or "dsr_at_trials_used" not in multiplicity
+    ):
+        return multiplicity
+    shown: dict[str, Any] = {}
+    for key, value in multiplicity.items():
+        if key == "dsr_at_declared":
+            if stated:
+                shown["dsr_at_declared_used"] = multiplicity["dsr_at_trials_used"]
+        elif key != "dsr_at_trials_used" or not stated:
+            shown[key] = value
+    return shown
 
 
 def _status_line(section: dict[str, Any], labels: dict[str, str]) -> str:
@@ -4005,7 +4159,12 @@ def _dimension_title(name: str, locale: str) -> str:
 
 
 def _meaning_html(
-    verdict: dict[str, Any], locale: str, *, account: bool = False, fund: bool = False
+    verdict: dict[str, Any],
+    locale: str,
+    *,
+    account: bool = False,
+    fund: bool = False,
+    role: str = ownership.BUYER,
 ) -> str:
     by_name = {d["name"]: d for d in verdict["dimensions"]}
     items = []
@@ -4013,13 +4172,22 @@ def _meaning_html(
         dimension = by_name.get(name)
         if dimension is None:
             continue
-        text = meaning(
+        undeclared = trials_undeclared(dimension.get("inputs"))
+        text = ownership.meaning(
+            name,
+            dimension["status"],
+            locale,
+            role,
+            account=account,
+            fund=fund,
+            undeclared=undeclared,
+        ) or meaning(
             name,
             dimension["status"],
             locale,
             account=account,
             fund=fund,
-            undeclared=trials_undeclared(dimension.get("inputs")),
+            undeclared=undeclared,
         )
         items.append(
             f"<div class='item s-{_e(dimension['status'])}'>"
@@ -4269,7 +4437,13 @@ def _kpi_list(data: dict[str, Any], labels: dict[str, str]) -> list[tuple[str, s
     if count is not None and rate is not None:
         out.append((labels["kpi_trades"], f"{count:,.0f} · {rate:.0%}", ""))
     breakeven = _ev_value(costs.get("break_even_bps"))
-    reference = _ev_value(costs.get("reference_bps")) or 0.0
+    # An assumed reference is tagged NOT_MEASURED but is still the one the costs used.
+    reference_value = (costs.get("reference_bps") or {}).get("value")
+    reference = (
+        float(reference_value)
+        if isinstance(reference_value, int | float) and not isinstance(reference_value, bool)
+        else 0.0
+    )
     if breakeven is not None and breakeven <= 0:
         # Negative already before any extra cost: "-0.56 bp" would read as a cost.
         label = f"{labels['kpi_breakeven']} ({labels['kpi_breakeven_negative']})"
@@ -4819,8 +4993,55 @@ def _hidden_loss_note(data: dict[str, Any], labels: dict[str, str]) -> str:
     )
 
 
+#: Periods per year at which one period of the curve has a calendar name: a
+#: name is used only when the curve's density is close to it, since the time
+#: under water is counted in the curve's own points (a curve with one row per
+#: trade can have the density of hours without being hourly).
+PERIOD_UNITS: tuple[tuple[float, float, str], ...] = (
+    (11.0, 13.0, "unit_monthly"),
+    (48.0, 56.0, "unit_weekly"),
+    (235.0, 270.0, "unit_daily_trading"),
+    (345.0, 385.0, "unit_daily_calendar"),
+    (5600.0, 9000.0, "unit_hourly"),
+)
+DAYS_PER_YEAR = 365.25
+
+
+def _period_unit(periods_per_year: float | None, labels: dict[str, str]) -> str:
+    """What one period of the uploaded curve is (trading days, weeks...), as a
+    reader counts it, when the curve's density matches that name. Otherwise
+    the curve's own periods, with their average calendar length worked out
+    from the same density (365.25 / periods per year)."""
+    if periods_per_year is None or not math.isfinite(periods_per_year) or periods_per_year <= 0:
+        return labels["unit_periods"]
+    for low, high, key in PERIOD_UNITS:
+        if low <= periods_per_year <= high:
+            return labels[key]
+    days = DAYS_PER_YEAR / periods_per_year
+    if days >= 1:
+        return labels["unit_periods_days"].format(n=f"{days:,.0f}" if days >= 10 else f"{days:.1f}")
+    hours = days * 24
+    return labels["unit_periods_hours"].format(n=f"{hours:.0f}" if hours >= 10 else f"{hours:.1f}")
+
+
+def _whole_cell(item: dict[str, Any]) -> str:
+    """A count of periods: a whole number (the simulations' percentile can fall
+    between two), with its evidence tag."""
+    value = item.get("value")
+    if isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value):
+        shown = f"{math.floor(float(value) + 0.5):,}"
+    else:
+        shown = "—"
+    return f"<span class='vc'>{shown} {_badge(item.get('evidence', 'NOT_MEASURED'))}</span>"
+
+
 def _risk_html(
-    risk: dict[str, Any] | None, locale: str, labels: dict[str, str], hidden_note: str = ""
+    risk: dict[str, Any] | None,
+    locale: str,
+    labels: dict[str, str],
+    hidden_note: str = "",
+    *,
+    periods_per_year: float | None = None,
 ) -> str:
     if not risk:
         return f"<p class='muted'>{_e(labels['none'])}</p>"
@@ -4850,10 +5071,11 @@ def _risk_html(
             + "</table>"
         )
         under = risk["longest_underwater_periods"]
+        unit = _period_unit(periods_per_year, labels)
         html_text += (
-            f"<p>{_e(labels['risk_underwater'])}: {_e(labels['risk_under_median'])} "
-            f"{_value_cell(under['p50'], percent=False)}, {_e(labels['risk_under_p95'])} "
-            f"{_value_cell(under['p95'], percent=False)}</p>"
+            f"<p>{_e(labels['risk_underwater'].format(unit=unit))}: "
+            f"{_e(labels['risk_under_median'])} {_whole_cell(under['p50'])}, "
+            f"{_e(labels['risk_under_p95'])} {_whole_cell(under['p95'])}</p>"
         )
     html_text += _shuffle_html(risk.get("versus_shuffle"), labels)
     return html_text + _assumptions(risk.get("assumptions"), locale, labels)
@@ -4876,9 +5098,8 @@ def _shuffle_html(shuffle: dict[str, Any] | None, labels: dict[str, str]) -> str
     samples = int((shuffle.get("method") or {}).get("samples") or 0)
     line = labels["shuffle_line"].format(
         observed=f"{abs(observed):.1%}",
-        # One thousand orders reads "1,000" in English; Spanish and Portuguese
-        # write four-digit counts without a separator.
-        samples=f"{samples:,}" if _locale_of(labels) == "en" else str(samples),
+        # The same thousands separator as every other count in the report.
+        samples=f"{samples:,}",
         low=f"{abs(low):.1%}",
         high=f"{abs(high):.1%}",
         mid=f"{abs(mid):.1%}",
@@ -5233,11 +5454,21 @@ def _question_text(question: dict[str, str], locale: str) -> str:
 
 
 def _questions_html(questions: list[dict[str, str]], locale: str, labels: dict[str, str]) -> str:
+    """The open questions, in the voice the labels carry: to put to the seller,
+    to answer with one's own files, or that clients will ask."""
     if not questions:
         return f"<p class='muted'>{_e(labels['none'])}</p>"
-    return (
-        "<ol>" + "".join(f"<li>{_e(_question_text(q, locale))}</li>" for q in questions) + "</ol>"
+    role = getattr(labels, "role", ownership.BUYER)
+    intro = labels.get("questions_intro", "")
+    items = "".join(
+        "<li>"
+        + _e(
+            ownership.question_item(str(q.get("code", "")), _question_text(q, locale), locale, role)
+        )
+        + "</li>"
+        for q in questions
     )
+    return (f"<p class='muted'>{_e(intro)}</p>" if intro else "") + f"<ol>{items}</ol>"
 
 
 def _source_html(data: dict[str, Any], labels: dict[str, str]) -> str:
@@ -5489,6 +5720,9 @@ def _reconciliation_html(recon: dict[str, Any] | None, locale: str) -> str:
                 value = str(coverage[key])
                 if key in ("trade_currency", "curve_currency") and value == "not supplied":
                     value = copy["recon_currency_not_supplied"]
+                elif isinstance(coverage[key], int) and not isinstance(coverage[key], bool):
+                    # A count reads with the report's thousands separator.
+                    value = f"{coverage[key]:,}"
                 else:
                     value = _recon_text(value, locale, RECON_COVERAGE_VALUES)
                 coverage_items.append(f"<li><b>{_e(copy[label_key])}:</b> {_e(value)}</li>")
@@ -5618,7 +5852,7 @@ def _forensics_html(forensics: dict[str, Any] | None, locale: str) -> str:
         f"<p class='forensic-meta'>{_e(copy['forensic_version'])}: "
         f"<code>{_e(forensics.get('method_version', '—'))}</code> · "
         f"{_e(copy['forensic_family'])}: <code>{_e(forensics.get('family', '—'))}</code> · "
-        f"{_e(copy['forensic_rows'])}: {_e(forensics.get('rows_read', '—'))} "
+        f"{_e(copy['forensic_rows'])}: {_e(_count_text(forensics.get('rows_read', '—')))} "
         f"{_badge('MEASURED')}</p>"
         + (
             f"<p class='integrity-status bad'>{_e(copy['forensic_truncated'])}</p>"
@@ -6399,6 +6633,43 @@ def _timing_fact(share: float, sentence: str, evidence: str = "MEASURED") -> str
     return f"<div class='fact'><b>{share:.0%}</b><p>{_e(sentence)} {_badge(evidence)}</p></div>"
 
 
+def _rest_of(
+    best: dict[str, Any], rows: list[dict[str, Any]], total: float | None
+) -> tuple[str, str] | None:
+    """What the groups other than ``best`` add up to, as money and as a share of
+    the net result, both without a sign (the sentence says they take it away);
+    ``None`` when a row or the total is missing."""
+    net = next(
+        (_ev_value(row.get("net")) for row in rows if row.get("key") == best.get("key")), None
+    )
+    if total is None or net is None or total == 0:
+        return None
+    rest = total - net
+    return _table_money(abs(rest)), f"{abs(rest / total):.0%}"
+
+
+def _best_share_text(
+    best: dict[str, Any],
+    rows: list[dict[str, Any]],
+    total: float | None,
+    labels: dict[str, str],
+    key: str,
+    **names: str,
+) -> str:
+    """The best group's share of the net result. Above 100 % the other groups
+    lose money together and the sentence says how much; without that figure it
+    says so without a percentage."""
+    share = float(best["share"]["value"])
+    if share <= 1:
+        return labels[key].format(share=share, **names)
+    rest = _rest_of(best, rows, total)
+    if rest is None:
+        return labels[key + "_over_plain"].format(**names)
+    return labels[key + "_over"].format(
+        share=f"{share:.0%}", rest=rest[0], rest_share=rest[1], **names
+    )
+
+
 def _timing_html(timing: dict[str, Any] | None, locale: str, labels: dict[str, str]) -> str:
     """Trades by weekday and four-hour block, with the best group's share."""
     if not timing or timing.get("status") != "MEASURED":
@@ -6410,15 +6681,30 @@ def _timing_html(timing: dict[str, Any] | None, locale: str, labels: dict[str, s
     days = WEEKDAYS.get(locale, WEEKDAYS["es"])
     out = f"<p class='muted'>{_e(labels['timing_intro'])}</p>"
     facts = ""
+    total = _ev_value(timing.get("net"))
     best_day = timing.get("best_weekday")
     if best_day:
         share = best_day["share"]["value"]
-        text = labels["timing_best_day"].format(share=share, day=days[best_day["key"]])
+        text = _best_share_text(
+            best_day,
+            timing.get("weekdays") or [],
+            total,
+            labels,
+            "timing_best_day",
+            day=days[best_day["key"]],
+        )
         facts += _timing_fact(share, text, best_day["share"].get("evidence", "MEASURED"))
     best_block = timing.get("best_block")
     if best_block:
         share = best_block["share"]["value"]
-        text = labels["timing_best_block"].format(share=share, block=_block_name(best_block["key"]))
+        text = _best_share_text(
+            best_block,
+            timing.get("blocks") or [],
+            total,
+            labels,
+            "timing_best_block",
+            block=_block_name(best_block["key"]),
+        )
         facts += _timing_fact(share, text, best_block["share"].get("evidence", "MEASURED"))
     if facts:
         out += f"<div class='facts'>{facts}</div>"
@@ -6795,7 +7081,7 @@ def _ride_ratio_cells(
                 " neg" if value < 0 else "",
                 _pct(value, signed=True),
                 tail,
-                labels[label].format(k=int(tail["count"]), n=int(tail["of"])),
+                labels[label].format(k=f"{int(tail['count']):,}", n=f"{int(tail['of']):,}"),
             )
         )
     return cells
@@ -6966,6 +7252,19 @@ def _behaviour_html(behaviour: dict[str, Any] | None, locale: str, labels: dict[
     return out
 
 
+def _instrument_best_text(review: dict[str, Any], share: float, labels: dict[str, str]) -> str:
+    """The best instrument's line; above 100 % with what the others take away."""
+    best = (review.get("best") or {}).get("key", "")
+    if share <= 1:
+        return labels["ins_best"].format(best=best)
+    rows = review.get("rows") or []
+    total = sum(_ev_value(row.get("net")) or 0.0 for row in rows)
+    rest = _rest_of(review.get("best") or {}, rows, total)
+    if rest is None:
+        return labels["ins_best_over_plain"].format(best=best)
+    return labels["ins_best_over"].format(best=best, rest=rest[0], rest_share=rest[1])
+
+
 def _instruments_html(review: dict[str, Any] | None, locale: str, labels: dict[str, str]) -> str:
     """Count, net result and hit rate per instrument; no class change."""
     if not review or review.get("status") != "MEASURED":
@@ -6999,7 +7298,7 @@ def _instruments_html(review: dict[str, Any] | None, locale: str, labels: dict[s
         tone = " neg" if {"one_carries", "mostly_one"} & set(findings) else ""
         out += (
             f"<div class='facts'><div class='fact{tone}'><b>{share:.0%}</b>"
-            f"<p>{_e(labels['ins_best_over' if share > 1 else 'ins_best'].format(best=best))} "
+            f"<p>{_e(_instrument_best_text(review, share, labels))} "
             f"{_badge(review['best']['share']['evidence'])}</p></div></div>"
         )
 
@@ -7274,7 +7573,7 @@ def _regime_html(regime: dict[str, Any] | None, locale: str, labels: dict[str, s
 
     body = (
         row("regime_time", "time_share", lambda v: _pct(v, places=0), False)
-        + row("regime_returns", "returns", lambda v: f"{int(v)}", False)
+        + row("regime_returns", "returns", lambda v: f"{int(v):,}", False)
         + row("regime_monthly", "monthly_return", lambda v: _pct(v, places=2), True)
         + row("regime_sharpe", "sharpe", lambda v: f"{v:.2f}", False)
     )
@@ -7401,23 +7700,132 @@ def _currency_html(section: dict[str, Any] | None, locale: str, labels: dict[str
     return out
 
 
+#: Symbols named in the line that says the crises do not apply.
+CRISES_SYMBOLS_SHOWN = 6
+#: The importers clip a report's comma-separated symbol field at this length.
+SYMBOL_FIELD_LIMIT = 200
+
+
 def _crises_shown(stress: dict[str, Any] | None) -> bool:
     return bool(stress) and (stress or {}).get("status") == "MEASURED"
 
 
-def _crises_html(
-    stress: dict[str, Any] | None, labels: dict[str, str], *, fund: bool = False
+def _traded_symbols(data: dict[str, Any]) -> list[str]:
+    """The instrument names a stored result keeps: the per-instrument rows, the
+    platform report's own symbol field and the one currency pair of the costs,
+    once each; empty when the file names none, or only part of them."""
+    names = [
+        str(row.get("key") or "")
+        for row in (data.get("instruments") or {}).get("rows") or []
+        if row.get("key") != _INSTRUMENTS_OTHER
+    ]
+    # An account statement's symbol field lists every symbol, comma separated
+    # and clipped at 200 characters: a clipped last name is left out.
+    listed = str(((data.get("inputs") or {}).get("report_metadata") or {}).get("symbol") or "")
+    parts = listed.split(",")
+    names += parts[:-1] if len(listed) >= SYMBOL_FIELD_LIMIT else parts
+    names.append(str((data.get("costs") or {}).get("pip_symbol") or ""))
+    seen: dict[str, str] = {}
+    for name in names:
+        if name.strip():
+            seen.setdefault(name.strip().casefold(), name.strip())
+    count = ((data.get("instruments") or {}).get("instruments") or {}).get("value")
+    if isinstance(count, int) and count > len(seen):
+        # Some instruments are not named in the stored result: the list is partial.
+        return []
+    return list(seen.values())
+
+
+def _crises_rows(
+    stress: dict[str, Any] | None, symbols: list[str] | None
+) -> tuple[list[dict[str, Any]], set[str] | None]:
+    """The covered windows the section shows, and the markets traded (``None``
+    when a symbol is uncertain or the file names none: every window is shown).
+
+    With every market known, a window is shown when its fall is in a market
+    traded. When none is, the windows compared with the client's own index
+    stay: that comparison is with the client's yardstick, whatever the market."""
+    rows = list((stress or {}).get("windows") or [])
+    markets = traded_markets(symbols) if symbols else None
+    if markets is None:
+        return rows, None
+    kept = [row for row in rows if WINDOW_MARKET.get(row["key"]) in markets]
+    return kept or [row for row in rows if "benchmark" in row], markets
+
+
+def _crises_apply(data: dict[str, Any]) -> bool:
+    """False when the crises section shows no window because none of the
+    covered falls is in a market the history trades."""
+    stress = data.get("crises")
+    if not _crises_shown(stress) or not (stress or {}).get("windows"):
+        return True
+    return bool(_crises_rows(stress, _traded_symbols(data))[0])
+
+
+def _crises_worse(stress: dict[str, Any], rows: list[dict[str, Any]]) -> tuple[int, int] | None:
+    """How many of the shown windows fell more than the index, and out of how
+    many compared, when that is a finding. With every covered window shown it
+    is the stored finding; with fewer it is the same rule (``crises.WORSE_SHARE``
+    of at least ``crises.MIN_WINDOWS``) on the windows shown, for display only."""
+    if len(rows) == len(stress.get("windows") or []):
+        if "fell_more_in_crises" not in (stress.get("findings") or []):
+            return None
+        return int(stress["worse_than_benchmark"]["value"]), int(stress["compared"]["value"])
+    compared = [row for row in rows if "benchmark" in row]
+    worse = sum(
+        1 for row in compared if float(row["fund"]["value"]) < float(row["benchmark"]["value"])
+    )
+    if len(compared) >= MIN_WINDOWS and worse >= WORSE_SHARE * len(compared):
+        return worse, len(compared)
+    return None
+
+
+def _crises_not_applicable(
+    stress: dict[str, Any], markets: set[str], symbols: list[str], labels: dict[str, str]
 ) -> str:
-    """A fund or any dated curve through the dated market falls it covers."""
+    """Why no covered window is shown: the markets of the falls the curve
+    covers, and, when a market traded has falls in the list, that the curve
+    covers none of them."""
+    covered = sorted(
+        {WINDOW_MARKET.get(row["key"], "") for row in stress.get("windows") or []} - {""}
+    )
+    falls = labels["crises_falls_" + (covered[0] if len(covered) == 1 else "both")]
+    shown = ", ".join(symbols[:CRISES_SYMBOLS_SHOWN]) + (
+        "…" if len(symbols) > CRISES_SYMBOLS_SHOWN else ""
+    )
+    missing = sorted(markets & set(WINDOW_MARKET.values()))
+    if missing:
+        traded = ", ".join(labels["crises_traded_" + market] for market in missing)
+        return labels["crises_not_covered"].format(symbols=shown, traded=traded, falls=falls)
+    that = labels["crises_that_market" if len(covered) == 1 else "crises_those_markets"]
+    return labels["crises_not_applicable"].format(symbols=shown, falls=falls, that=that)
+
+
+def _crises_html(
+    stress: dict[str, Any] | None,
+    labels: dict[str, str],
+    *,
+    fund: bool = False,
+    symbols: list[str] | None = None,
+) -> str:
+    """A fund or any dated curve through the dated market falls it covers.
+
+    When the market of every traded symbol is known (``crises.traded_markets``),
+    only the falls of those markets are shown (``_crises_rows``); a history
+    trading none of them says so in one line instead of a table of unrelated
+    markets, unless the windows carry the client's own index. Otherwise every
+    covered fall is shown, as before."""
     if not stress or not _crises_shown(stress):
         return ""
     out = ""
     subject = labels["fund_stress_fund" if fund else "crises_subject"]
-    rows = stress.get("windows") or []
+    covered = len(stress.get("windows") or [])
+    rows, markets = _crises_rows(stress, symbols)
     with_index = any("benchmark" in row for row in rows)
-    if "fell_more_in_crises" in (stress.get("findings") or []):
+    worse = _crises_worse(stress, rows)
+    if worse is not None:
         text = labels["fund_stress_worse" if fund else "crises_worse"].format(
-            worse=int(stress["worse_than_benchmark"]["value"]), n=int(stress["compared"]["value"])
+            worse=worse[0], n=worse[1]
         )
         out += (
             f"<div class='live-verdict lv-WEAK beh'><span class='badge WEAK'>"
@@ -7460,6 +7868,9 @@ def _crises_html(
             f"<tbody>{body}</tbody></table>"
         )
         out += _market_note([row["key"] for row in rows], labels)
+    elif covered and markets is not None:
+        text = _crises_not_applicable(stress, markets, symbols or [], labels)
+        out += f"<p class='muted'>{_e(text)}</p>"
     else:
         out += f"<p class='muted'>{_e(labels['fund_stress_none'])}</p>"
     if stress.get("worst_12m"):
@@ -7755,7 +8166,7 @@ def data_age_days(data: Mapping[str, Any]) -> int | None:
 
 
 def _data_age_text(days: int, labels: dict[str, str]) -> str:
-    return labels["data_age_one"] if days == 1 else labels["data_age"].format(days=days)
+    return labels["data_age_one"] if days == 1 else labels["data_age"].format(days=f"{days:,}")
 
 
 def _title(data: dict[str, Any], labels: dict[str, str]) -> str:
@@ -7834,7 +8245,7 @@ def _ladder_html(current: str, labels: dict[str, str]) -> str:
 
 def _locked_gains(titles: list[str], labels: dict[str, str], locale: str) -> list[str]:
     """Each locked section as what it tells the buyer, in the report's order."""
-    gains = LOCKED_GAINS.get(locale, LOCKED_GAINS["es"])
+    gains = ownership.gains_for(LOCKED_GAINS.get(locale, LOCKED_GAINS["es"]), labels)
     by_title = {labels[key]: text for key, text in gains.items() if key in labels}
     out: list[str] = []
     for title in titles:
@@ -8064,7 +8475,10 @@ def render_html(
     data = result.model_dump(mode="json")
     declared_locale = data["declared"].get("locale", "es")
     locale = locale if locale in LABELS else declared_locale
-    labels = LABELS.get(locale, LABELS["es"])
+    # Whose strategy it is decides to whom the sentences speak; the figures stay.
+    role = ownership.role_of(data)
+    base = LABELS.get(locale, LABELS["es"])
+    labels = ownership.labels_for(base, _locale_of(base), role)
     locked = watermark and not free_mode
     verdict = data["verdict"]
     if locale != declared_locale or locale == "pt":
@@ -8299,7 +8713,9 @@ def render_html(
         )
     multiplicity_html = (
         _status_line(data["multiplicity"], labels)
-        + _evidence_rows(data["multiplicity"], labels, skip={"sensitivity"})
+        + _evidence_rows(
+            _one_dsr_row(data["multiplicity"], data["declared"]), labels, skip={"sensitivity"}
+        )
         + f"<p class='muted'>{_e(labels['variance_policy'])}</p>"
         + sens_html
     )
@@ -8457,6 +8873,7 @@ def render_html(
                 )
             )
             + "</table>"
+            + f"<p class='muted'>{_e(labels['seal_scope'])}</p>"
         )
 
     not_measured = [
@@ -8549,7 +8966,12 @@ def render_html(
             else []
         ),
         *(
-            [(labels["crises"], _crises_html(data.get("crises"), labels))]
+            [
+                (
+                    labels["crises"],
+                    _crises_html(data.get("crises"), labels, symbols=_traded_symbols(data)),
+                )
+            ]
             if _crises_shown(data.get("crises"))
             else []
         ),
@@ -8598,7 +9020,16 @@ def render_html(
             if _trade_section_shown(data, "trade_stats")
             else []
         ),
-        (labels["risk"], _risk_html(data.get("risk"), locale, labels, hidden)),
+        (
+            labels["risk"],
+            _risk_html(
+                data.get("risk"),
+                locale,
+                labels,
+                hidden,
+                periods_per_year=_ev_value((data.get("inputs") or {}).get("periods_per_year")),
+            ),
+        ),
         *(
             [(labels["plateau"], _plateau_html(data.get("plateau"), labels))]
             if (data.get("plateau") or {}).get("status") == "MEASURED"
@@ -8668,7 +9099,10 @@ def render_html(
             if _trade_section_shown(data, "challenge")
             else []
         ),
-        (labels["questions"], _questions_html(data.get("vendor_questions", []), locale, labels)),
+        (
+            labels["questions"],
+            _questions_html(ownership.open_questions(data, role), locale, labels),
+        ),
         # The dimension reasons repeat the verdict in thresholds, so they open the
         # technical tables instead of sitting between the plan and the findings.
         (labels["reasons_detail"], _reasons_html(verdict, locale, labels)),
@@ -8714,7 +9148,13 @@ def render_html(
             + "".join(
                 f"<li>{_e(gain)}</li>"
                 for gain in _locked_gains(
-                    [title for title, body in detail if not _only_unmeasured(body)],
+                    [
+                        title
+                        for title, body in detail
+                        if not _only_unmeasured(body)
+                        # Falls of markets the history does not trade are not on offer.
+                        and (title != labels["crises"] or _crises_apply(data))
+                    ],
                     labels,
                     locale,
                 )
@@ -8930,7 +9370,11 @@ def render_html(
         section(
             labels["meaning"],
             _meaning_html(
-                verdict, locale, account=is_account_history(data), fund=_fund_record(data)
+                verdict,
+                locale,
+                account=is_account_history(data),
+                fund=_fund_record(data),
+                role=role,
             ),
             "r-meaning",
         ),
@@ -9118,10 +9562,14 @@ def _pdf_cover(
 def _next_steps(
     data: dict[str, Any], verdict: dict[str, Any], labels: dict[str, str]
 ) -> list[tuple[str, str]]:
-    """The "what to do now" items as (label key, section title), in order."""
-    status = {str(item["name"]): str(item["status"]) for item in verdict.get("dimensions", [])}
+    """The "what to do now" items as (label key, section title), in order, in
+    the voice the labels carry (``ownership``'s step helpers pick the key)."""
+    dimensions = {str(item["name"]): item for item in verdict.get("dimensions", [])}
+    status = {name: str(item["status"]) for name, item in dimensions.items()}
     open_ = {"WEAK", "FAIL"}
     account = is_account_history(data)
+    role = getattr(labels, "role", ownership.BUYER)
+    asked = ownership.open_questions(data, role)
     steps: list[tuple[str, str]] = []
     if _fund_record(data):
         # A fund's record is its real history: no robot, no optimisation, no
@@ -9131,7 +9579,7 @@ def _next_steps(
             steps.append(("next_flags", labels["red_flags"]))
         if (fund.get("fees") or {}).get("status") == "MEASURED":
             steps.append(("next_fund_fees", labels["fund"]))
-        if data.get("vendor_questions"):
+        if asked:
             steps.append(("next_questions_fund", labels["questions"]))
         steps.append(("next_keep_fund", ""))
         return steps
@@ -9145,11 +9593,16 @@ def _next_steps(
     elif status.get("costs") == "WEAK":
         steps.append(("next_costs", labels["costs"]))
     if not account and status.get("multiplicity") in open_:
-        steps.append(("next_trials", labels["plan"]))
+        steps.append((ownership.trials_step(dimensions.get("multiplicity"), role), labels["plan"]))
     if not account and (status.get("out_of_sample") in open_ | {"NOT_MEASURED"}):
-        steps.append(("next_oos", labels["plan"]))
+        steps.append((ownership.oos_step(status["out_of_sample"], data, role), labels["plan"]))
     steps = steps[:3]
-    if data.get("vendor_questions"):
+    demo = None if account else ownership.demo_step(data, role)
+    if demo:
+        # The developer's own robot with a trade list and no live comparison yet:
+        # what ``live.compare_live`` needs to measure one.
+        steps.append((demo, labels["live"] if live else ""))
+    if asked:
         steps.append(("next_questions", labels["questions"]))
     steps.append(("next_keep", ""))
     return steps
@@ -9161,10 +9614,11 @@ def _next_steps_html(
     labels: dict[str, str],
     anchors: dict[str, str],
 ) -> str:
-    """ "What to do now": the few things a buyer should clear up first, in
-    order, from the dimensions that did not pass and the live comparison.
-    The class plan speaks to whoever builds the robot; this speaks to whoever
-    runs it. Questions to ask and checks to make, never a trading instruction."""
+    """ "What to do now": the few things to clear up first, in order, from the
+    dimensions that did not pass and the live comparison, in the voice the
+    labels carry (``ownership``): the buyer's questions to the seller, the
+    developer's tests, what a provider's clients will ask, or a neutral
+    wording. Questions to ask and checks to make, never a trading instruction."""
     steps = _next_steps(data, verdict, labels)
     intro = labels["next_intro_fund" if _fund_record(data) else "next_intro"]
 

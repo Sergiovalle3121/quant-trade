@@ -4897,7 +4897,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         cost_bps: Annotated[str, Form(max_length=20)] = "",
         oos_start: Annotated[str, Form()] = "",
         description: Annotated[str, Form()] = "",
-        benchmark_applicable: Annotated[str, Form()] = "yes",
+        benchmark_applicable: Annotated[str, Form()] = "",
         locale: Annotated[str, Form()] = "es",
         consent: Annotated[str, Form()] = "",
         challenge: Annotated[str, Form()] = "",
@@ -4906,6 +4906,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         net_of_fees: Annotated[str, Form(max_length=8)] = "",
         return_frequency: Annotated[str, Form(max_length=16)] = "",
         return_unit: Annotated[str, Form(max_length=16)] = "",
+        ownership: Annotated[str, Form(max_length=16)] = "",
     ) -> Response:
         # The report's language, which the refusals below also speak.
         report_loc = _report_locale(locale)
@@ -4924,6 +4925,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             "net_of_fees": net_of_fees,
             "return_frequency": return_frequency,
             "return_unit": return_unit,
+            "ownership": ownership,
         }
         form = await request.form()
         # Keep explicit column choices for every refusal, including header/size checks.
@@ -5231,15 +5233,22 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 trials=int(trials) if trials.strip() else 1,
                 trials_declared=bool(trials.strip()),
                 cost_bps_per_side=float(cost_bps) if cost_bps.strip() else 0.0,
+                cost_declared=bool(cost_bps.strip()),
                 oos_start=oos_start.strip() or None,
                 description=description,
                 benchmark_applicable=benchmark_applicable.lower() not in ("no", "false", "0"),
+                # The form preselects "no answer", which counts as "yes": only an
+                # explicit "yes" or "no" is an answer the client gave.
+                benchmark_declared=benchmark_applicable.strip().lower()
+                in ("yes", "true", "1", "no", "false", "0"),
                 locale=report_loc,
                 initial_balance=_positive_or_none(initial_balance),
                 challenge=challenge.strip() or None,
                 net_of_fees=net_of_fees.lower() in ("on", "yes", "true", "1"),
                 return_frequency=return_frequency.strip() or None,
                 return_unit=return_unit.strip() or None,
+                # Whose strategy it is: blank ("I'd rather not say") declares nothing.
+                ownership=ownership.strip() or None,
             )
         except (ValidationError, ValueError):
             return _upload_error(

@@ -70,17 +70,29 @@ REAL_FILLS_NOTE = (
 )
 
 
-def reference_note(assumed: bool, fees_reported: bool, real_fills: bool = False) -> str:
-    """Where the reference cost comes from, in the audit's own words."""
+def reference_note(
+    assumed: bool, fees_reported: bool, real_fills: bool = False, *, cost_declared: bool = True
+) -> str:
+    """Where the reference cost comes from, in the audit's own words.
+
+    ``cost_declared`` is False when the client left the cost blank: the note
+    then never says the client declared a zero cost."""
     if assumed and real_fills and not fees_reported:
         return REAL_FILLS_NOTE
     if assumed and fees_reported:
+        if not cost_declared:
+            return (
+                "assumed slippage: no cost was declared; charged on top of the fees the "
+                "report itemises"
+            )
         return (
             "assumed slippage: the client declared zero cost; charged on top of the fees "
             "the report itemises"
         )
     if assumed:
-        return "assumed: client declared zero cost"
+        return (
+            "assumed: client declared zero cost" if cost_declared else "assumed: no cost declared"
+        )
     if fees_reported:
         return "declared by the client; charged on top of the fees the report itemises"
     return "declared by the client"

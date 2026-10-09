@@ -85,6 +85,8 @@ from quant_trade.audit.guides import (
 from quant_trade.audit.legal import LegalText, legal_url
 from quant_trade.audit.method import COPY as METHOD_COPY
 from quant_trade.audit.method import dimension_rows, method_url, references
+from quant_trade.audit.ownership import FORM as OWNERSHIP_FORM
+from quant_trade.audit.ownership import ROLES as OWNERSHIP_ROLES
 from quant_trade.audit.portuguese import (
     AUDIENCES_PT,
     CLASS_B_PT,
@@ -301,6 +303,7 @@ _COPY: dict[str, dict[str, Any]] = {
             "Son rentabilidades de un fondo, ya netas de sus comisiones (solo historial mensual)"
         ),
         "benchmark_applicable": "¿Aplica un benchmark?",
+        "unanswered": "Sin respuesta (cuenta como sí)",
         "yes": "Sí",
         "no": "No",
         "locale": "Idioma del informe",
@@ -447,8 +450,9 @@ _COPY: dict[str, dict[str, Any]] = {
                 f"{len(FLAG_TITLES)} banderas rojas y qué significa cada dimensión. "
                 "El informe completo añade cada cifra, pruebas "
                 "de estrés, riesgo y capital, simulador de retos, la cuenta real frente al "
-                "backtest si la subes, preguntas para el vendedor y el PDF. Mira el ejemplo "
-                "completo antes de pagar.",
+                "backtest si la subes, las preguntas que el informe deja abiertas (qué archivo "
+                "responde cada una o, si la compraste, qué preguntarle al vendedor) y el PDF. "
+                "Mira el ejemplo completo antes de pagar.",
             ),
             (
                 "¿Por qué subir el XML de optimización de MT5?",
@@ -623,6 +627,7 @@ _COPY: dict[str, dict[str, Any]] = {
             "These are a fund's returns, already net of its fees (monthly track record only)"
         ),
         "benchmark_applicable": "Does a benchmark apply?",
+        "unanswered": "No answer (counts as yes)",
         "yes": "Yes",
         "no": "No",
         "locale": "Report language",
@@ -764,8 +769,9 @@ _COPY: dict[str, dict[str, Any]] = {
                 f"{len(FLAG_TITLES)} red flags and what each dimension means. "
                 "The full report adds every figure, stress tests, risk and "
                 "capital, the challenge simulator, the live account against the backtest if you "
-                "upload it, questions for the vendor and the PDF. See the full sample before you "
-                "pay.",
+                "upload it, the questions the report leaves open (which file answers each one "
+                "or, if you bought it, what to ask the vendor) and the PDF. See the full sample "
+                "before you pay.",
             ),
             (
                 "Why upload the MT5 optimisation XML?",
@@ -1011,8 +1017,8 @@ _UI: dict[str, dict[str, Any]] = {
                 "chart",
                 "Mercado tranquilo y agitado",
                 "Cada rentabilidad se asigna según el VIX del día anterior, y cada crisis de "
-                "fecha pública que cubre tu historial se mide por separado: ves si el resultado "
-                "depende de un solo tipo de mercado.",
+                "fecha pública que cubre tu historial se mide por separado, salvo las de "
+                "mercados que no operas: ves si el resultado depende de un solo tipo de mercado.",
             ),
             (
                 "globe",
@@ -1042,7 +1048,8 @@ _UI: dict[str, dict[str, Any]] = {
             "Simulación del reto que elijas de {firms}, con sus reglas publicadas",
             "Cuánto costo aguanta antes de quedar en pérdida",
             "Riesgo remuestreado a un año y el capital que pide",
-            "Preguntas concretas para el vendedor del robot o el gestor",
+            "Las preguntas que deja abiertas: qué archivo responde cada una o qué preguntar al "
+            "vendedor o al gestor",
             "PDF y, si tú quieres, página pública con sello",
         ],
         "full_more": "Ver un informe completo de ejemplo",
@@ -1251,8 +1258,8 @@ _UI: dict[str, dict[str, Any]] = {
                 "chart",
                 "Calm and agitated markets",
                 "Each return is placed by the previous day's VIX, and every publicly dated "
-                "crisis your history covers is measured on its own: you see whether the result "
-                "depends on one kind of market.",
+                "crisis your history covers is measured on its own, except those of markets you "
+                "do not trade: you see whether the result depends on one kind of market.",
             ),
             (
                 "globe",
@@ -1282,7 +1289,8 @@ _UI: dict[str, dict[str, Any]] = {
             "Simulation of the {firms} challenge you choose, with its published rules",
             "How much cost it can bear before it ends in a loss",
             "Resampled one-year risk and the capital it needs",
-            "Specific questions for the robot's vendor or the manager",
+            "The questions it leaves open: which file answers each one, or what to ask the "
+            "vendor or the manager",
             "PDF and, if you want, a public page with a badge",
         ],
         "full_more": "See a full sample report",
@@ -2262,6 +2270,21 @@ def _signin_first(copy: dict[str, Any], locale: str) -> str:
 REPORT_ACCEPT = ".htm,.html,.csv,.txt,.tsv,.xlsx,.xls,.ods,.xml,.zip,.pdf"
 
 
+def _ownership_field(locale: str, chosen: str) -> str:
+    """The optional "Whose strategy is this?" field, on "I'd rather not say"
+    unless the client chose another answer (kept after a refusal). It only sets
+    to whom the report speaks (``audit/ownership.py``)."""
+    words = OWNERSHIP_FORM[locale]
+    chosen = chosen if chosen in OWNERSHIP_ROLES else ""
+    options = "".join(
+        f"<option value='{_e(value)}'"
+        + (" selected" if value == chosen else "")
+        + f">{_e(text)}</option>"
+        for value, text in words["choices"].items()
+    )
+    return _field(words["label"], f"<select name='ownership'>{options}</select>", words["help"])
+
+
 def _upload_form(
     copy: dict[str, Any],
     locale: str,
@@ -2382,11 +2405,13 @@ def _upload_form(
         + _field(
             copy["benchmark_applicable"],
             "<select name='benchmark_applicable'>"
+            # Left unanswered it counts as "yes", shown as a default and not
+            # as the client's declaration; "yes" and "no" are answers.
             + "".join(
-                f"<option value='{option}'"
-                + (" selected" if values.get("benchmark_applicable", "yes") == option else "")
+                f"<option value='{value_}'"
+                + (" selected" if values.get("benchmark_applicable", "") == value_ else "")
                 + f">{_e(copy[option])}</option>"
-                for option in ("yes", "no")
+                for value_, option in (("", "unanswered"), ("yes", "yes"), ("no", "no"))
             )
             + "</select>",
         )
@@ -2455,6 +2480,7 @@ def _upload_form(
             f"value='{value('trials')}'>",
             copy["trials_help"],
         )
+        + _ownership_field(locale, values.get("ownership", ""))
         # The one-file case stays short; the second files and the challenge open on demand.
         + f"<details class='adv extras'{' open' if extras_open else ''}><summary><span>"
         f"{_e(ui['extras'])} <small>· {_e(ui['extras_note'])}</small></span>"

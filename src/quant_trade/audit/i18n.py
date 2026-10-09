@@ -139,10 +139,11 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
     ),
     # Institutional intake: the same notices also have native ES/PT page copy.
     (
-        "These details are DECLARED: supplied by the person requesting the review. "
-        "This form has no attachments; upload the series later through the usual flow.",
-        "Los datos son DECLARED: los aporta quien solicita la revisión. "
-        "Aquí no se adjuntan archivos; la serie se sube después por el flujo habitual.",
+        "These details carry the DECLARED label: they are supplied by the person requesting "
+        "the review. This form has no attachments; upload the series later through the usual "
+        "flow.",
+        "Estos datos llevan la etiqueta «DECLARED»: los aporta quien solicita la "
+        "revisión. Aquí no se adjuntan archivos; la serie se sube después por el flujo habitual.",
     ),
     (
         "Check the fields. Use text without HTML and a valid email address.",
@@ -2096,6 +2097,13 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
         "costos que desglosa el informe",
     ),
     ("assumed: client declared zero cost", "supuesto: el cliente declaró costo cero"),
+    (
+        "assumed slippage: no cost was declared; charged on top of the fees the report itemises",
+        "deslizamiento supuesto: no se declaró un costo; se cobra además de los costos que "
+        "desglosa el informe",
+    ),
+    ("assumed: no cost declared", "supuesto: no se declaró un costo"),
+    ("default value, not declared", "valor por defecto, no declarado"),
     (
         "assumed slippage: an account history's prices are the broker's fills, so the spread "
         "is already in each result; charged on top",
