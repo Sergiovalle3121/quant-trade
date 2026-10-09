@@ -293,6 +293,73 @@ refusal instead of being replaced by the statement. A CSV the parser cannot read
 is explained in the form's language (header row, same number of columns),
 without the parser's English message.
 
+### Whose strategy it is (`audit/ownership.py`)
+
+An optional field under the trials, "¿De quién es esta estrategia?" / "Whose
+strategy is this?" / "De quem é esta estratégia?", offers four answers: "Es
+mía (la desarrollé o la opero yo)", "La compré o la voy a comprar / copiar",
+"Soy el proveedor y la muestro a otros" and "Prefiero no decirlo", the
+default. An answer is stored as `declared.ownership` (`own`, `buyer` or
+`provider`, tagged DECLARED, listed with the other declarations in the
+report); "Prefiero no decirlo" declares nothing and the key is absent. A
+refused upload keeps the answer like the other declarations (the form's
+`carried` values and `mapping.CARRIED_FIELDS`). An unknown value is refused
+as an invalid declaration.
+
+The answer changes only to whom the sentences speak, never the order of the
+sections, a figure, the class or a tag:
+
+- `buyer`: the wording as it was, with the questions to put to the seller.
+- `own`: developer actions. "Qué hacer ahora" asks to test the settings on
+  data the optimiser never saw (reoptimise without the last months and
+  declare the cut-off as the out-of-sample start: only a declared start
+  measures that test, and a forward export has its own section in
+  `forward.py`, so a forward export already uploaded is not asked for
+  again); once a declared out-of-sample stretch was measured and fell short,
+  to validate on later dates, since reoptimising on a stretch already seen
+  does not make it unseen data. It asks to cut the trials in the next
+  version only when more than one was declared or counted: an undeclared
+  count was taken at 1, the most favourable case, so the step asks to
+  declare it and says that a longer history, not fewer trials, can change
+  the deflated Sharpe (`ownership.trials_step`). When the backtest has a
+  trade list and no live comparison is measured, it asks to run the robot
+  on demo until it has `MIN_LIVE_TRADES` closed trades and upload that
+  history; with fewer than `MIN_BACKTEST_TRADES` closed trades in the
+  backtest the step names both minimums of `live.compare_live` instead
+  (`ownership.demo_step`). The questions section becomes "Preguntas que
+  deja abiertas este informe", each question with what answers it.
+- `provider`: what clients will ask on seeing the report ("Te van a
+  preguntar…") and what to provide for each question (the equity curve with
+  floating results, the closed accounts, the tester's HTML report, the
+  optimisation XML...).
+- no answer: a neutral wording that serves all three; the buyer's wording is
+  never the default.
+
+The voice covers "Qué hacer ahora" (and the PDF cover's first steps, a
+fund's included), the questions section and its title in the lock box, the
+plan's actions and titles that sent the reader to a provider or manager
+(`ownership.PLAN`), the lines that named the seller (live account at the
+edge, the pairing with too few matches, the crises, the luck table, the
+account without a floating figure, the evidence legend) and the meanings
+that sent the reader to someone: an unmeasured out-of-sample stretch on an
+account history or a fund, and a weak multiplicity (with its wording for a
+fund and for an undeclared count). Outside the buyer's voice the questions
+list only what the files do not answer yet (`ownership.open_questions`): the
+modelling question, asked of every backtest, goes when the tester report
+already states a mode `testdata.py` recognises, asks about a rerun when a
+red flag says the mode or the history's quality falls short, and asks for a
+report that prints the mode when the uploaded one prints none we recognise;
+the buyer still asks the seller to confirm the header. The landing describes
+that section for every reader ("las preguntas que el informe deja
+abiertas"), not as questions for a vendor. Each text keeps the buyer's wording
+where it was and lists only the voices that differ, in Spanish, English and
+Portuguese side by side; `tests/test_audit_ownership.py` checks that the
+developer and neutral reports say neither "vendedor", "proveedor" nor "si
+compraste" (nor their English and Portuguese), that figures, class and tags
+are identical across voices, and that every new text passes the guard. The
+public verification page and its cards never read the answer. The public
+sample (`/ejemplo`) declares `own`, so it shows the developer's actions.
+
 ### Dates and numbers in a hand-made file
 
 The curve, trades, benchmark and variants CSVs (`audit/schema.py`) and the
@@ -1006,7 +1073,8 @@ Every leaf value in the JSON carries an evidence tag:
 
 - `MEASURED`: computed from the uploaded bytes.
 - `DECLARED`: asserted by the client (trials, cost, out-of-sample start,
-  the reference cost assumed when the client declares zero). Not verifiable.
+  whose strategy it is, the reference cost assumed when the client declares
+  zero). Not verifiable.
 - `NOT_MEASURED`: could not be computed from what was supplied; the reason
   is stated next to it.
 

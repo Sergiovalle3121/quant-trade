@@ -4906,6 +4906,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         net_of_fees: Annotated[str, Form(max_length=8)] = "",
         return_frequency: Annotated[str, Form(max_length=16)] = "",
         return_unit: Annotated[str, Form(max_length=16)] = "",
+        ownership: Annotated[str, Form(max_length=16)] = "",
     ) -> Response:
         # The report's language, which the refusals below also speak.
         report_loc = _report_locale(locale)
@@ -4924,6 +4925,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             "net_of_fees": net_of_fees,
             "return_frequency": return_frequency,
             "return_unit": return_unit,
+            "ownership": ownership,
         }
         form = await request.form()
         # Keep explicit column choices for every refusal, including header/size checks.
@@ -5245,6 +5247,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 net_of_fees=net_of_fees.lower() in ("on", "yes", "true", "1"),
                 return_frequency=return_frequency.strip() or None,
                 return_unit=return_unit.strip() or None,
+                # Whose strategy it is: blank ("I'd rather not say") declares nothing.
+                ownership=ownership.strip() or None,
             )
         except (ValidationError, ValueError):
             return _upload_error(

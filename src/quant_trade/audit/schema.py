@@ -228,6 +228,17 @@ class DeclaredMetadata(BaseModel):
     return_unit: Literal["fraction", "percent"] | None = None
     #: Prop-firm challenge preset to simulate; ``None`` means the default preset.
     challenge: str | None = Field(None, max_length=64)
+    #: Whose strategy it is (``audit/ownership.py``): the client's own, one they
+    #: bought or will buy or copy, or one they provide to others. It only sets
+    #: to whom the report's sentences speak; ``None`` (no answer) declares nothing.
+    ownership: Literal["own", "buyer", "provider"] | None = None
+
+    @field_validator("ownership", mode="before")
+    @classmethod
+    def _no_answer(cls, value: Any) -> Any:
+        if isinstance(value, str) and not value.strip():
+            return None
+        return value.strip() if isinstance(value, str) else value
 
     @field_validator("challenge")
     @classmethod

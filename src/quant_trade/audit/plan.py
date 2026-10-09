@@ -20,7 +20,7 @@ import math
 from dataclasses import dataclass, field
 from typing import Any, TypeVar
 
-from quant_trade.audit import report_pt
+from quant_trade.audit import ownership, report_pt
 from quant_trade.audit.account import is_account_history
 from quant_trade.audit.engine import HOLDOUT_MIN_OBSERVATIONS
 from quant_trade.audit.redflags import OBSERVATIONS_WARN, flag_title
@@ -84,6 +84,15 @@ def _say(locale: str, es: _T, en: _T, pt: _T) -> _T:
 
 #: Past this multiple of the history it has, the plan stops counting what is missing.
 NEED_CAP = 10
+
+
+def _voiced(texts: list[str], keys: tuple[str, ...], locale: str, role: str) -> list[str]:
+    """``texts`` in the declared voice (``audit/ownership.py``): the i-th takes
+    ``keys[i]``'s wording for ``role`` when it has one, else stays as written."""
+    return [
+        (ownership.plan_text(keys[i], locale, role) if i < len(keys) else None) or text
+        for i, text in enumerate(texts)
+    ]
 
 
 def _plural(count: int, one: str, many: str) -> str:
@@ -503,7 +512,7 @@ def _significance_step(data: dict[str, Any], status: str, locale: str) -> tuple[
     if (data.get("fund") or {}).get("track_record"):
         # A fund's record has no parameters or demo account: more of it is the
         # manager's full history, or the months still to come.
-        return finding, _say(
+        fund_actions = _say(
             locale,
             [
                 "Pide al gestor el historial completo del fondo desde su inicio, sin años "
@@ -523,6 +532,7 @@ def _significance_step(data: dict[str, Any], status: str, locale: str) -> tuple[
                 "dados que ninguém escolheu de antemão.",
             ],
         )
+        return finding, _voiced(fund_actions, ("fund_history",), locale, ownership.role_of(data))
     if is_account_history(data):
         # An account is already the real or demo history: more of it is the
         # same account, kept running with the same settings.
@@ -579,22 +589,27 @@ def _multiplicity_step(data: dict[str, Any], status: str, locale: str) -> tuple[
                 "why the class cannot go above B.",
                 "Não foi declarado quantos fundos ou estratégias o mesmo gestor administra; por "
                 "isso a classe não pode passar de B.",
-            ), _say(
+            ), _voiced(
+                _say(
+                    locale,
+                    [
+                        "Pregunta al gestor cuántos fondos o estrategias lleva o ha cerrado y "
+                        "decláralo (aunque sea 1) al subir el historial: Rigor lo descuenta.",
+                    ],
+                    [
+                        "Ask the manager how many funds or strategies they run or have closed and "
+                        "declare it (even if it is 1) when you upload the record: Rigor discounts "
+                        "it.",
+                    ],
+                    [
+                        "Pergunte ao gestor quantos fundos ou estratégias administra ou já "
+                        "encerrou e declare esse número (mesmo que seja 1) ao enviar o "
+                        "histórico: o Rigor o desconta.",
+                    ],
+                ),
+                ("fund_trials_undeclared",),
                 locale,
-                [
-                    "Pregunta al gestor cuántos fondos o estrategias lleva o ha cerrado y "
-                    "decláralo (aunque sea 1) al subir el historial: Rigor lo descuenta.",
-                ],
-                [
-                    "Ask the manager how many funds or strategies they run or have closed and "
-                    "declare it (even if it is 1) when you upload the record: Rigor discounts "
-                    "it.",
-                ],
-                [
-                    "Pergunte ao gestor quantos fundos ou estratégias administra ou já encerrou "
-                    "e declare esse número (mesmo que seja 1) ao enviar o histórico: o Rigor o "
-                    "desconta.",
-                ],
+                ownership.role_of(data),
             )
         return _say(
             locale,
@@ -742,21 +757,27 @@ def _multiplicity_step(data: dict[str, Any], status: str, locale: str) -> tuple[
     if _fund_record(data):
         # A fund has no optimisation to export: its trials are the other funds
         # and strategies the same manager runs or has closed.
-        return " ".join(parts), _say(
+        return " ".join(parts), _voiced(
+            _say(
+                locale,
+                [
+                    "Pregunta al gestor cuántos fondos o estrategias lleva o ha cerrado y "
+                    "decláralo como número de intentos: un buen historial entre muchos pesa "
+                    "menos.",
+                ],
+                [
+                    "Ask the manager how many funds or strategies they run or have closed and "
+                    "declare it as the number of trials: one good record among many weighs less.",
+                ],
+                [
+                    "Pergunte ao gestor quantos fundos ou estratégias administra ou já encerrou e "
+                    "declare isso como número de tentativas: um bom histórico entre muitos pesa "
+                    "menos.",
+                ],
+            ),
+            ("fund_trials",),
             locale,
-            [
-                "Pregunta al gestor cuántos fondos o estrategias lleva o ha cerrado y decláralo "
-                "como número de intentos: un buen historial entre muchos pesa menos.",
-            ],
-            [
-                "Ask the manager how many funds or strategies they run or have closed and "
-                "declare it as the number of trials: one good record among many weighs less.",
-            ],
-            [
-                "Pergunte ao gestor quantos fundos ou estratégias administra ou já encerrou e "
-                "declare isso como número de tentativas: um bom histórico entre muitos pesa "
-                "menos.",
-            ],
+            ownership.role_of(data),
         )
     if not counted:
         upload = _say(
@@ -814,7 +835,7 @@ def _multiplicity_step(data: dict[str, Any], status: str, locale: str) -> tuple[
 def _costs_step(data: dict[str, Any], status: str, locale: str) -> tuple[str, list[str]]:
     costs = data.get("costs") or {}
     if (status == "NOT_MEASURED" or costs.get("status") != "MEASURED") and _fund_record(data):
-        return _fund_costs(locale)
+        return _fund_costs(locale, ownership.role_of(data))
     if status == "NOT_MEASURED" or costs.get("status") != "MEASURED":
         finding = _say(
             locale,
@@ -913,7 +934,7 @@ def _costs_step(data: dict[str, Any], status: str, locale: str) -> tuple[str, li
     return finding, actions
 
 
-def _account_oos(locale: str) -> tuple[str, list[str]]:
+def _account_oos(locale: str, role: str = ownership.BUYER) -> tuple[str, list[str]]:
     """The out-of-sample step for an account history, which has no optimisation date."""
     finding = _say(
         locale,
@@ -945,10 +966,10 @@ def _account_oos(locale: str) -> tuple[str, list[str]]:
             "os dois operação por operação.",
         ],
     )
-    return finding, actions
+    return finding, _voiced(actions, ("account_oos_declare", "account_oos_backtest"), locale, role)
 
 
-def _fund_oos(locale: str) -> tuple[str, list[str]]:
+def _fund_oos(locale: str, role: str = ownership.BUYER) -> tuple[str, list[str]]:
     """The out-of-sample step for a fund's track record, which has no optimisation date."""
     finding = _say(
         locale,
@@ -977,10 +998,10 @@ def _fund_oos(locale: str) -> tuple[str, list[str]]:
             "que vem depois é medido como dados novos.",
         ],
     )
-    return finding, actions
+    return finding, _voiced(actions, ("fund_oos",), locale, role)
 
 
-def _fund_costs(locale: str) -> tuple[str, list[str]]:
+def _fund_costs(locale: str, role: str = ownership.BUYER) -> tuple[str, list[str]]:
     """The cost step for a fund's track record, whose costs are inside each month."""
     finding = _say(
         locale,
@@ -1002,7 +1023,7 @@ def _fund_costs(locale: str) -> tuple[str, list[str]]:
         "Confirme com o gestor se os números são líquidos das taxas de administração e de "
         "performance, e declare isso: o relatório mostra quanto pesam as taxas.",
     )
-    return finding, [action]
+    return finding, _voiced([action], ("fund_costs",), locale, role)
 
 
 def _oos_step(data: dict[str, Any], status: str, locale: str) -> tuple[str, list[str]]:
@@ -1031,9 +1052,9 @@ def _oos_step(data: dict[str, Any], status: str, locale: str) -> tuple[str, list
                 f"({inputs.get('first_timestamp', '')} → {inputs.get('last_timestamp', '')}).",
             )
         elif is_account_history(data):
-            return _account_oos(locale)
+            return _account_oos(locale, ownership.role_of(data))
         elif reason == FUND_OOS_REASON:
-            return _fund_oos(locale)
+            return _fund_oos(locale, ownership.role_of(data))
         else:
             finding = _say(
                 locale,
@@ -1224,12 +1245,16 @@ def _data_quality_step(data: dict[str, Any], status: str, locale: str) -> tuple[
     )
     seen: set[str] = set()
     actions = []
+    role = ownership.role_of(data)
     for flag in flags:
         code = str(flag.get("code", ""))
         if code in seen:
             continue
         seen.add(code)
-        hint = FLAG_HINTS.get(code, GENERIC_FLAG_HINT)[locale]
+        hint = (
+            ownership.plan_text(f"flag_{code}", locale, role)
+            or FLAG_HINTS.get(code, GENERIC_FLAG_HINT)[locale]
+        )
         actions.append(f"{flag_title(code, locale)}. {hint}")
     return finding, actions
 
@@ -1259,6 +1284,8 @@ def improvement_plan(data: dict[str, Any], locale: str = "es") -> list[PlanStep]
     dimensions = [Dimension.model_validate(d) for d in verdict.get("dimensions", [])]
     current = str(verdict.get("overall", ""))
     by_name = {d.name: d for d in dimensions}
+    role = ownership.role_of(data)
+    fund, account = _fund_record(data), is_account_history(data)
     steps: list[PlanStep] = []
     for name in PLAN_ORDER:
         dimension = by_name.get(name)
@@ -1273,10 +1300,17 @@ def improvement_plan(data: dict[str, Any], locale: str = "es") -> list[PlanStep]
                 dimension=name,
                 status=dimension.status,
                 title=(
+                    ownership.plan_text(
+                        f"title_{'fund' if fund else 'account'}_{name}", locale, role
+                    )
+                    if fund or account
+                    else None
+                )
+                or (
                     FUND_TITLES[locale].get(name, TITLES[locale][name])
-                    if _fund_record(data)
+                    if fund
                     else ACCOUNT_TITLES[locale].get(name, TITLES[locale][name])
-                    if is_account_history(data)
+                    if account
                     else TITLES[locale][name]
                 ),
                 finding=finding,

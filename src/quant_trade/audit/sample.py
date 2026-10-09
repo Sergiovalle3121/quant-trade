@@ -305,6 +305,10 @@ def sample_result(
         benchmark_applicable=False,
         locale=locale if locale in ("es", "en", "pt") else "es",
         challenge=None,
+        # An optimised EA, declared as the client's own: the landing speaks to
+        # whoever is about to pay for a challenge with their own robot, so the
+        # sample shows the developer's steps (``audit/ownership.py``).
+        ownership="own",
     )
     inputs = build_inputs(
         None,
