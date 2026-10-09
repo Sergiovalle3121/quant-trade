@@ -260,7 +260,9 @@ def test_the_guide_formats_and_the_balance_points_match_what_the_importers_do() 
             assert "declared_floating_pnl" in imported.metadata, name
         if fmt in CAPABILITIES["myfxbook_floating"].formats:
             # The sample's export holds an "Open Trades" block and a deposit.
-            assert {"declared_floating_pnl", "declared_balance"} <= set(imported.metadata), name
+            # The balance it is compared with is rebuilt by the account review.
+            assert "declared_floating_pnl" in imported.metadata, name
+            assert "declared_balance" not in imported.metadata, name
     assert import_report(ZERODHA, "tradebook.csv").source_format == UNIVERSAL_FILLS_CSV
     optimisation = parse_optimization((FIXTURES / "mt5_optimization.xml").read_bytes())
     assert optimisation.source_format == MT5_OPTIMIZATION_XML and optimisation.passes >= 1

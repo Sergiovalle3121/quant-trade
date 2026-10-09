@@ -1842,6 +1842,7 @@ LABELS: dict[str, dict[str, str]] = {
         "flags_free": "Banderas rojas detectadas",
         "report_source": "Formato del archivo",
         "platform": "Datos que declara la plataforma",
+        "platform_checked": "Lo que Rigor comprobó en el archivo",
         "colmap": "Cómo se leyó cada columna de tu archivo",
         "optimization": "Exportación de optimización",
         "passes": "configuraciones probadas",
@@ -3320,6 +3321,7 @@ LABELS: dict[str, dict[str, str]] = {
         "flags_free": "Red flags found",
         "report_source": "File format",
         "platform": "Figures the platform states",
+        "platform_checked": "What Rigor checked in the file",
         "colmap": "How each column of your file was read",
         "optimization": "Optimisation export",
         "passes": "configurations tried",
@@ -6070,17 +6072,33 @@ def _source_html(data: dict[str, Any], labels: dict[str, str]) -> str:
         for k, v in metadata.items()
         if not k.startswith("column_") and k not in (NEAR_EMPTY_DAYS, NEAR_EMPTY_FIRST)
     }
-    if metadata:
-        out += (
-            f"<p class='muted'>{_e(labels['platform'])} {_badge('DECLARED')}</p><table>"
-            + "".join(
-                f"<tr><td>{_e(platform_label(key, _locale_of(labels)))}</td>"
-                f"<td>{_e(platform_value(key, value))}</td></tr>"
-                for key, value in metadata.items()
+    # The balance chain is Rigor's own check of the rows, not a figure the
+    # platform states: it goes in its own table, labelled Measured.
+    checked = {k: metadata.pop(k) for k in RIGOR_CHECKED_METADATA if k in metadata}
+    for title, badge, rows in (
+        (labels["platform"], "DECLARED", metadata),
+        (labels["platform_checked"], "MEASURED", checked),
+    ):
+        if rows:
+            out += (
+                f"<p class='muted'>{_e(title)} {_badge(badge)}</p><table>"
+                + "".join(
+                    f"<tr><td>{_e(platform_label(key, _locale_of(labels)))}</td>"
+                    f"<td>{_e(platform_value(key, value))}</td></tr>"
+                    for key, value in rows.items()
+                )
+                + "</table>"
             )
-            + "</table>"
-        )
     return out
+
+
+#: Metadata keys an importer computes from the file's rows (the running
+#: balance re-added line by line), shown apart from what the platform states.
+RIGOR_CHECKED_METADATA = (
+    "reconstructed_final_balance",
+    "balance_chain_breaks",
+    "largest_balance_difference",
+)
 
 
 def _column_map_html(metadata: dict[str, Any], labels: dict[str, str]) -> str:

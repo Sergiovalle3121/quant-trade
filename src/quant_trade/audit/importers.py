@@ -4032,8 +4032,10 @@ def _parse_myfxbook(header: list[str], rows: list[list[str]]) -> _Draft:
 def _floating_from_open(draft: _Draft, open_rows: list[list[str]], cash: list[_Cash]) -> None:
     """The open positions' result a Myfxbook export lists after "Open Trades".
 
-    Stored as the file's own (DECLARED) floating result with the balance the
-    rows imply, so the account review can say how much the balance hides.
+    Stored as the file's own (DECLARED) floating result. The balance it is
+    compared with is not printed by the file: the account review rebuilds it
+    from the deposits, withdrawals and closed trades (``account_review``), so
+    it is never shown among what the platform declares.
     """
     header_at = next(
         (i for i, row in enumerate(open_rows) if "profit" in {c.strip().lower() for c in row}),
@@ -4047,8 +4049,6 @@ def _floating_from_open(draft: _Draft, open_rows: list[list[str]], cash: list[_C
     if not floating:
         return
     draft.metadata["declared_floating_pnl"] = f"{sum(floating):.2f}"
-    if any(item.is_flow for item in cash):
-        draft.metadata["declared_balance"] = f"{sum(item.amount for item in cash):.2f}"
 
 
 def _is_mql5_signal_header(header: list[str]) -> bool:

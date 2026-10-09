@@ -191,7 +191,8 @@ def test_the_export_is_a_myfxbook_csv_the_importer_reads_as_it_is() -> None:
     assert amounts == [SIGNAL_DEPOSIT, SIGNAL_TOP_UP, -SIGNAL_WITHDRAWAL]
     # The positions still open: a floating loss the balance does not carry.
     assert float(imported.metadata["declared_floating_pnl"]) < 0
-    assert float(imported.metadata["declared_balance"]) > 0
+    # The file prints no balance: none is listed as declared by the platform.
+    assert "declared_balance" not in imported.metadata
 
 
 def test_the_report_declares_the_buyer_and_raises_the_flags_a_copier_needs() -> None:
@@ -525,3 +526,20 @@ def test_every_new_text_passes_the_guard_and_promises_nothing() -> None:
             assert not re.search(r"(?<![A-Za-z])\d", text), text
         if locale == "pt":
             assert not any("informe" in text or "archivo" in text for text in texts)
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+def test_the_platform_block_holds_only_what_the_file_states(tmp_path: Path, locale: str) -> None:
+    """Myfxbook prints no balance. The balance chain Rigor re-adds is its own
+    check (Measured), apart from what the platform states (Declared)."""
+    from quant_trade.audit.report import LABELS, RIGOR_CHECKED_METADATA, platform_label
+
+    text = _visible(_client(tmp_path).get(SIGNAL_SAMPLE_PATHS[locale]).text)
+    labels = LABELS[locale]
+    declared = _between(text, labels["platform"], labels["platform_checked"])
+    checked = text.split(labels["platform_checked"], 1)[1][:400]
+    for key in RIGOR_CHECKED_METADATA:
+        name = platform_label(key, locale)
+        assert name not in declared, key
+        assert name in checked, key
+    assert find_claims(declared) == [] and find_claims(checked) == []

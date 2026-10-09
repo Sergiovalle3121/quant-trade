@@ -1124,6 +1124,7 @@ REPORT: dict[str, Any] = {
         "flags_free": "Bandeiras vermelhas detectadas",
         "report_source": "Formato do arquivo",
         "platform": "Dados que a plataforma declara",
+        "platform_checked": "O que a Rigor conferiu no arquivo",
         "colmap": "Como cada coluna do seu arquivo foi lida",
         "optimization": "Exportação de otimização",
         "passes": "configurações testadas",
@@ -3716,8 +3717,18 @@ RULES: tuple[tuple[str, str], ...] = (
         "resumo da própria plataforma no momento do extrato",
     ),
     (
-        "floating result / balance",
-        "resultado flutuante / saldo",
+        "floating result / balance the file states",
+        "resultado flutuante / saldo que o arquivo indica",
+    ),
+    (
+        "floating result / (equity the file states - floating result)",
+        "resultado flutuante / (equity que o arquivo indica - resultado flutuante)",
+    ),
+    (
+        "floating result / balance rebuilt from the file's deposits, withdrawals "
+        "and closed trades (the file prints no balance)",
+        "resultado flutuante / saldo que a Rigor reconstrói com os depósitos, saques e "
+        "operações fechadas do arquivo (o arquivo não imprime um saldo)",
     ),
     (
         "the file does not state the floating result",

@@ -161,8 +161,18 @@ def account_review(
     if final_equity is None:
         final_equity = _declared_number(metadata, "declared_equity")
     balance = _declared_number(metadata, "declared_balance")
+    share_note = "floating result / balance the file states"
     if balance is None and final_equity is not None and floating is not None:
         balance = final_equity - floating
+        share_note = "floating result / (equity the file states - floating result)"
+    if balance is None and floating is not None and flows:
+        # A file that lists open positions but prints no balance (Myfxbook):
+        # the balance its own rows imply, rebuilt here, never a declared one.
+        balance = deposited - withdrawn + money
+        share_note = (
+            "floating result / balance rebuilt from the file's deposits, withdrawals "
+            "and closed trades (the file prints no balance)"
+        )
     floating_share = (
         floating / balance if floating is not None and balance and balance > 0 else None
     )
@@ -192,7 +202,7 @@ def account_review(
             else not_measured("the file does not state the floating result")
         ),
         "floating_share": (
-            declared(floating_share, "floating result / balance")
+            declared(floating_share, share_note)
             if floating_share is not None
             else not_measured("the file does not state the floating result")
         ),
