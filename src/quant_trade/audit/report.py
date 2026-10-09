@@ -1414,6 +1414,9 @@ LABELS: dict[str, dict[str, str]] = {
             "la historia completa."
         ),
         "hero_challenge_link": "Ver la escalera",
+        "hero_challenge_optimistic": (
+            "Son cifras optimistas: el balance de operaciones cerradas no ve las pérdidas abiertas."
+        ),
         "live_badge_CONSISTENT": "Coherente",
         "live_badge_EDGE": "En el borde",
         "live_badge_INCONSISTENT": "No coherente",
@@ -2791,6 +2794,9 @@ LABELS: dict[str, dict[str, str]] = {
             "the full history."
         ),
         "hero_challenge_link": "See the ladder",
+        "hero_challenge_optimistic": (
+            "These figures are optimistic: the closed-trade balance does not see the open losses."
+        ),
         "live_badge_CONSISTENT": "Consistent",
         "live_badge_EDGE": "At the edge",
         "live_badge_INCONSISTENT": "Not consistent",
@@ -4893,6 +4899,18 @@ def _open_loss_note(
     )
 
 
+def _challenge_optimistic(
+    challenge: dict[str, Any], platform_dd: float | None, labels: dict[str, str], hidden_note: str
+) -> bool:
+    """Whether open losses the closed-trade balance cannot see make the
+    challenge's figures optimistic: the platform's open-trade drawdown breaks
+    the total loss limit, or the red flags found hidden open losses."""
+    return bool(
+        _open_loss_note(challenge, platform_dd, labels)
+        or (hidden_note and challenge.get("status") == "MEASURED")
+    )
+
+
 def _challenge_html(
     challenge: dict[str, Any] | None,
     locale: str,
@@ -4928,7 +4946,7 @@ def _challenge_html(
     html_text += _status_line(challenge, labels)
     open_loss = _open_loss_note(challenge, platform_dd, labels)
     html_text += open_loss or (hidden_note if challenge.get("status") == "MEASURED" else "")
-    optimistic = bool(open_loss or (hidden_note and challenge.get("status") == "MEASURED"))
+    optimistic = _challenge_optimistic(challenge, platform_dd, labels, hidden_note)
     ladder = ""
     if challenge.get("status") == "MEASURED":
         probability = challenge["probability"]
@@ -8601,7 +8619,7 @@ def render_html(
         + f"<div><div class='verdict-k'>{_e(labels['verdict'])}</div>"
         + _verdict_html(str(verdict["summary"]))
         + ("" if locked else _hero_live(data, labels, live_anchor))
-        + ("" if locked else _hero_challenge(data, labels, challenge_anchor))
+        + ("" if locked else _hero_challenge(data, labels, challenge_anchor, hidden))
         + f"<p class='muted evidence-legend'>{_e(labels['evidence_legend'])}</p>"
         + "</div></div>"
         + (
@@ -8765,10 +8783,13 @@ def _hero_live(data: dict[str, Any], labels: dict[str, str], anchor: str) -> str
     return f"<p class='verdict-live {tone}'>{_e(text)}{_e(money)} {_badge('MEASURED')}{link}</p>"
 
 
-def _hero_challenge(data: dict[str, Any], labels: dict[str, str], anchor: str) -> str:
+def _hero_challenge(
+    data: dict[str, Any], labels: dict[str, str], anchor: str, hidden_note: str = ""
+) -> str:
     """One line under the verdict when the client chose a challenge: the
     full-history figure next to the lowest rung of the ladder, so the most
-    optimistic figure is never the only one at the top of the report."""
+    optimistic figure is never the only one at the top of the report. When
+    the section warns that the balance hides open losses, so does the line."""
     challenge = data.get("challenge") or {}
     if challenge.get("status") != "MEASURED" or challenge.get("selected_by") != "client":
         return ""
@@ -8795,8 +8816,14 @@ def _hero_challenge(data: dict[str, Any], labels: dict[str, str], anchor: str) -
         )
     else:
         text = labels["hero_challenge_full"].format(program=program, full=_firm_pct(full_value))
+    platform_dd = _ev_value((data.get("performance") or {}).get("platform_equity_drawdown"))
+    warning = (
+        f" <strong>{_e(labels['hero_challenge_optimistic'])}</strong>"
+        if _challenge_optimistic(challenge, platform_dd, labels, hidden_note)
+        else ""
+    )
     link = f" <a href='#{_e(anchor)}'>{_e(labels['hero_challenge_link'])}</a>" if anchor else ""
-    return f"<p class='verdict-live'>{_e(text)} {_badge('MEASURED')}{link}</p>"
+    return f"<p class='verdict-live'>{_e(text)} {_badge('MEASURED')}{warning}{link}</p>"
 
 
 def _pdf_cover(

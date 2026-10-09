@@ -124,8 +124,17 @@ LADDER_NOTE = (
     "they are not predictions"
 )
 LADDER_NO_SEARCH = "fewer than 2 trials: there is no search to discount"
+#: No count declared and none in the files: 1 is assumed, which is not a fact
+#: about the search, so the haircut row says the count is missing instead.
+LADDER_UNDECLARED = (
+    "trial count not declared: the haircut needs to know how many configurations were tried"
+)
 LADDER_FLOWS = "deposits or withdrawals inside the history: the curve is an index, not money"
+#: Only a reconciliation that found a contradiction proves the mismatch.
 LADDER_NOT_MONEY = "the curve and the trades do not reconcile in money"
+#: A reconciliation that was not measured proves nothing either way.
+LADDER_NOT_SHOWN = "the curve was not shown to be money"
+LADDER_NOT_SHOWN_WHY = "the curve was not shown to be money: {why}"
 LADDER_RUIN = "with the reference cost the balance reaches zero inside the history"
 SERIES_MAX_POINTS = 400
 WITHHELD_TEXT = "[withheld: promotional wording]"
@@ -1519,6 +1528,7 @@ def _challenge(
     reference: dict[str, Any] | None = None,
     money_curve: bool = False,
     luck: dict[str, Any] | None = None,
+    reconciliation: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     key = inputs.declared.challenge or DEFAULT_PRESET
     rules = get_preset(key)
@@ -1554,6 +1564,7 @@ def _challenge(
             reference=reference,
             money_curve=money_curve,
             luck=luck,
+            reconciliation=reconciliation,
         )
     return out
 
@@ -1618,6 +1629,27 @@ def _with_reference_cost(inputs: AuditInputs, bps: float) -> pd.Series | None:
     )
 
 
+def _not_money_reason(inputs: AuditInputs, reconciliation: dict[str, Any] | None) -> str:
+    """Why the reference cost cannot be taken off the curve as money.
+
+    Only a contradiction found by the reconciliation says the curve and the
+    trades do not match; a reconciliation that was not measured gives its own
+    reason, as the reconciliation section does, and raises nothing more."""
+    assert inputs.trades is not None
+    first_entry = min(trade.entry_time for trade in inputs.trades.trades)
+    if any(when > first_entry for when, _ in inputs.cash_flows):
+        return LADDER_FLOWS
+    recon = reconciliation or {}
+    reason = str(recon.get("reason") or "")
+    if recon.get("status") == "CONTRADICTION":
+        return LADDER_NOT_MONEY
+    if inputs.equity.source != "equity" and reason:
+        return reason  # "uploaded returns are not money"
+    if recon.get("status") == "NOT_MEASURED" and reason:
+        return LADDER_NOT_SHOWN_WHY.format(why=reason)
+    return LADDER_NOT_SHOWN
+
+
 def _challenge_scenarios(
     inputs: AuditInputs,
     daily: pd.Series,
@@ -1630,6 +1662,7 @@ def _challenge_scenarios(
     reference: dict[str, Any] | None,
     money_curve: bool,
     luck: dict[str, Any] | None,
+    reconciliation: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """The chosen program on the full history, on each side of the declared
     out-of-sample start, with the reference cost and with the luck of the
@@ -1661,9 +1694,7 @@ def _challenge_scenarios(
     if not trades or bps <= 0:
         rows.append(rung("reference_cost", None, reason="no trades uploaded", **cost))
     elif not money_curve:
-        first_entry = min(trade.entry_time for trade in trades)
-        flows = any(when > first_entry for when, _ in inputs.cash_flows)
-        reason = LADDER_FLOWS if flows else LADDER_NOT_MONEY
+        reason = _not_money_reason(inputs, reconciliation)
         rows.append(rung("reference_cost", None, reason=reason, **cost))
     else:
         charged = _with_reference_cost(inputs, bps)
@@ -1671,11 +1702,17 @@ def _challenge_scenarios(
         rows.append(rung("reference_cost", charged, reason=ruin, **cost))
 
     luck = luck or {}
+    _, evidence, source = trial_count(inputs)
     if luck.get("status") != "MEASURED":
         reason = str(luck.get("reason") or "statistical significance not measured")
         rows.append(rung("luck_haircut", None, reason=reason))
-    elif not luck.get("counted") or float(luck["sharpe"]["value"]) <= 0:
-        rows.append(rung("luck_haircut", None, reason=LADDER_NO_SEARCH))
+    elif not luck.get("counted"):
+        # An undeclared count is computed with 1, the most favourable case; that
+        # is not evidence that nothing was searched, as the luck section says.
+        reason = LADDER_UNDECLARED if evidence == NOT_MEASURED else LADDER_NO_SEARCH
+        rows.append(rung("luck_haircut", None, reason=reason))
+    elif float(luck["sharpe"]["value"]) <= 0:
+        rows.append(rung("luck_haircut", None, reason=luck_lib.NO_GAIN))
     else:
         sharpe = float(luck["sharpe"]["value"])
         after = float(luck["sharpe_after"]["value"])
@@ -1683,7 +1720,6 @@ def _challenge_scenarios(
         # The same days with the mean cut to the share of the Sharpe the
         # haircut leaves: the spread is unchanged, so the volatility is too.
         adjusted = daily - float(daily.mean()) * (1.0 - ratio)
-        _, evidence, source = trial_count(inputs)
         trials = {"value": int(luck["trials"]), "evidence": evidence, "note": source}
         rows.append(
             rung(
@@ -2143,6 +2179,7 @@ def run_audit(
             reference=costs.get("reference_bps") if costs.get("status") == "MEASURED" else None,
             money_curve=money_curve,
             luck=luck,
+            reconciliation=reconciliation,
         )
     )
 

@@ -5,28 +5,40 @@ from __future__ import annotations
 
 import html
 import re
+from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 import pandas as pd
 import pytest
-from audit_fixtures import signed_in
+from audit_fixtures import csv_bytes, positive_drift, signed_in, trades_following
 
 from quant_trade.audit import analytics, firmfit
 from quant_trade.audit.engine import (
     LADDER_FLOWS,
     LADDER_NO_SEARCH,
     LADDER_NOT_MONEY,
+    LADDER_NOT_SHOWN,
+    LADDER_NOT_SHOWN_WHY,
     LADDER_NOTE,
     LADDER_RUIN,
+    LADDER_UNDECLARED,
     _challenge_scenarios,
+    _not_money_reason,
     run_audit,
 )
 from quant_trade.audit.guard import find_claims
 from quant_trade.audit.i18n import localize, untranslated
 from quant_trade.audit.prop_presets import PRESETS, get_preset
-from quant_trade.audit.report import LABELS, _challenge_ladder_html, _firm_fit_html
+from quant_trade.audit.report import (
+    LABELS,
+    _challenge_ladder_html,
+    _firm_fit_html,
+    _hero_challenge,
+    _hidden_loss_note,
+    render_html,
+)
 from quant_trade.audit.sample import _sample_report, synthetic_live_statement
 from quant_trade.audit.schema import AuditResult, DeclaredMetadata, build_inputs
 
@@ -40,7 +52,22 @@ OLD_UNFINISHED = {
     "en": "Does not finish in time",
     "pt": "Não termina a tempo",
 }
-NEW_REASONS = (LADDER_NOTE, LADDER_NO_SEARCH, LADDER_FLOWS, LADDER_NOT_MONEY, LADDER_RUIN)
+#: The reasons a reconciliation that was not measured gives for a separate curve.
+UNRECONCILED = (
+    "trades extend outside the curve dates",
+    "closed trades do not cover the final part of the curve",
+    "flows, currency conversion or open positions could explain the difference",
+)
+NEW_REASONS = (
+    LADDER_NOTE,
+    LADDER_NO_SEARCH,
+    LADDER_UNDECLARED,
+    LADDER_FLOWS,
+    LADDER_NOT_MONEY,
+    LADDER_NOT_SHOWN,
+    *(LADDER_NOT_SHOWN_WHY.format(why=why) for why in UNRECONCILED),
+    LADDER_RUIN,
+)
 
 
 def _declared(**changes: Any) -> DeclaredMetadata:
@@ -174,8 +201,19 @@ def test_without_a_start_the_sides_are_not_measured() -> None:
         assert rows[key]["pass"]["note"] == "no out-of-sample start declared"
 
 
-def test_without_a_trial_count_there_is_no_haircut() -> None:
+def test_without_a_declared_trial_count_the_haircut_says_the_count_is_missing() -> None:
+    # Computed with 1, the most favourable case: not evidence that nothing was
+    # searched, so the row does not say "fewer than 2 trials".
     _, result = _audit(_declared(trials_declared=False))
+    assert result.luck is not None and not result.luck["counted"]
+    row = _rows(result)["luck_haircut"]
+    assert row["pass"]["evidence"] == "NOT_MEASURED"
+    assert row["pass"]["note"] == LADDER_UNDECLARED
+
+
+def test_one_declared_trial_has_no_search_to_discount() -> None:
+    _, result = _audit(_declared(trials=1))
+    assert result.luck is not None and not result.luck["counted"]
     row = _rows(result)["luck_haircut"]
     assert row["pass"]["evidence"] == "NOT_MEASURED"
     assert row["pass"]["note"] == LADDER_NO_SEARCH
@@ -196,7 +234,9 @@ def test_a_curve_that_is_not_money_or_a_cost_that_ruins_it_leaves_the_rung_out(
     daily = analytics.daily_returns_from_equity(inputs.equity.frame)
     sim = analytics.simulate_challenge(daily, get_preset(KEY), samples=500, seed=12345)
 
-    def cost_row(reference: dict[str, Any], money_curve: bool) -> dict[str, Any]:
+    def cost_row(
+        reference: dict[str, Any], money_curve: bool, recon: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
         scenarios = _challenge_scenarios(
             inputs,
             daily,
@@ -208,15 +248,79 @@ def test_a_curve_that_is_not_money_or_a_cost_that_ruins_it_leaves_the_rung_out(
             reference=reference,
             money_curve=money_curve,
             luck=result.luck,
+            reconciliation=recon,
         )
         return next(row for row in scenarios["rows"] if row["key"] == "reference_cost")
 
     declared = result.costs["reference_bps"]
-    assert cost_row(declared, False)["pass"]["note"] == LADDER_NOT_MONEY
+    # Only a contradiction says the curve and the trades do not reconcile.
+    contradiction = {
+        "status": "CONTRADICTION",
+        "reason": "printed balance contradicts deal amounts",
+    }
+    assert cost_row(declared, False, contradiction)["pass"]["note"] == LADDER_NOT_MONEY
+    for why in UNRECONCILED:
+        unmeasured = cost_row(declared, False, {"status": "NOT_MEASURED", "reason": why})
+        assert unmeasured["pass"]["note"] == LADDER_NOT_SHOWN_WHY.format(why=why)
+    assert cost_row(declared, False)["pass"]["note"] == LADDER_NOT_SHOWN
     ruin = cost_row({**declared, "value": 1_000_000.0}, True)
     assert ruin["pass"] == {"value": None, "evidence": "NOT_MEASURED", "note": LADDER_RUIN}
     same = cost_row(declared, True)
     assert same == _rows(result)["reference_cost"]
+
+
+def _separate_upload(trades: pd.DataFrame, curve: pd.DataFrame) -> AuditResult:
+    inputs = build_inputs(
+        csv_bytes(curve),
+        _declared(oos_start=None),
+        trades_bytes=csv_bytes(trades),
+        now=NOW,
+    )
+    return run_audit(inputs, now=NOW, bootstrap_samples=50, risk_samples=50, challenge_samples=300)
+
+
+def test_an_unmeasured_reconciliation_is_not_called_a_mismatch() -> None:
+    curve = positive_drift(601)
+    # Exact P&L, but only over the first half of the curve.
+    tail = _separate_upload(trades_following(curve.iloc[:300], every=10), curve)
+    # Every row covered, the money doubled: an unexplained gap, not a finding.
+    doubled = trades_following(curve, every=25)
+    doubled["quantity"] = doubled["quantity"] * 2
+    gap = _separate_upload(doubled, curve)
+    for result, why in (
+        (tail, "closed trades do not cover the final part of the curve"),
+        (gap, "flows, currency conversion or open positions could explain the difference"),
+    ):
+        assert result.reconciliation is not None
+        assert result.reconciliation["status"] == "NOT_MEASURED"
+        assert result.reconciliation["reason"] == why
+        row = _rows(result)["reference_cost"]
+        assert row["pass"]["evidence"] == "NOT_MEASURED"
+        assert row["pass"]["note"] == LADDER_NOT_SHOWN_WHY.format(why=why)
+        assert untranslated(result.model_dump(mode="json")) == []
+        assert result.challenge is not None
+        for locale in LOCALES:
+            page = html.unescape(
+                _challenge_ladder_html(result.challenge["scenarios"], locale, LABELS[locale])
+            )
+            assert localize(LADDER_NOT_SHOWN_WHY.format(why=why), locale) in page
+            assert localize(why, locale) in page
+            assert localize(LADDER_NOT_MONEY, locale) not in page
+            assert find_claims(page) == []
+    # The same curve with trades that realise it exactly is money.
+    exact = _separate_upload(trades_following(curve, every=25), curve)
+    assert exact.reconciliation is not None and exact.reconciliation["status"] == "MATCH"
+    assert _rows(exact)["reference_cost"]["pass"]["evidence"] == "MEASURED"
+
+
+def test_returns_are_not_money_in_their_own_words() -> None:
+    inputs = build_inputs(
+        None, _declared(), report_bytes=_sample_report(), report_filename="a.html", now=NOW
+    )
+    returns = replace(inputs, equity=replace(inputs.equity, source="returns"))
+    recon = {"status": "NOT_MEASURED", "reason": "uploaded returns are not money"}
+    assert _not_money_reason(returns, recon) == "uploaded returns are not money"
+    assert _not_money_reason(inputs, None) == LADDER_NOT_SHOWN
 
 
 def test_program_pass_matches_the_firm_table_for_every_program() -> None:
@@ -244,6 +348,7 @@ def test_new_sentences_read_in_every_language_and_pass_the_guard() -> None:
             assert shown != text and find_claims(shown) == [], (locale, text)
     keys = [key for key in LABELS["es"] if key.startswith("ch_ladder_")]
     keys += ["hero_challenge", "hero_challenge_full", "hero_challenge_link", "unfinished_cap"]
+    keys += ["hero_challenge_optimistic"]
     keys += ["ff_basis", "ff_risk_unfinished"]
     assert len(keys) > 15
     for locale in LOCALES:
@@ -264,7 +369,8 @@ def test_the_ladder_html_reads_not_measured_rows_with_their_reason() -> None:
         )
         assert labels["ch_ladder_title"] in page and labels["ff_optimistic"] in page
         assert localize("no out-of-sample start declared", locale) in page
-        assert localize(LADDER_NO_SEARCH, locale) in page
+        assert localize(LADDER_UNDECLARED, locale) in page
+        assert localize(LADDER_NO_SEARCH, locale) not in page
         low = labels["ch_ladder_low_in_sample"]
         assert low[:1].upper() + low[1:] in page
         assert find_claims(page) == []
@@ -273,6 +379,59 @@ def test_the_ladder_html_reads_not_measured_rows_with_their_reason() -> None:
     assert LABELS["es"]["ff_basis"] not in html.unescape(
         _firm_fit_html(result.challenge["firm_fit"], LABELS["es"])
     )
+
+
+def _with_open_losses(result: AuditResult, **changes: Any) -> dict[str, Any]:
+    data = result.model_dump(mode="json")
+    data.update(changes)
+    return data
+
+
+def _platform_dd(result: AuditResult, value: float) -> dict[str, Any]:
+    # The performance block with the platform's drawdown with open trades.
+    drawdown = {"value": value, "evidence": "DECLARED", "note": "x"}
+    return {**result.performance, "platform_equity_drawdown": drawdown}
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+def test_the_hero_line_repeats_the_open_loss_warning(
+    audited: tuple[Any, AuditResult], locale: str
+) -> None:
+    _, result = audited
+    labels = LABELS[locale]
+    warning = labels["hero_challenge_optimistic"]
+    plain = html.unescape(_hero_challenge(result.model_dump(mode="json"), labels, "x"))
+    assert HERO[locale] in plain and warning not in plain
+    # The platform's drawdown with open trades breaks FTMO's 10 % total loss.
+    deep = _with_open_losses(result, performance=_platform_dd(result, -0.15))
+    line = html.unescape(_hero_challenge(deep, labels, "x"))
+    assert HERO[locale] in line and warning in line
+    assert find_claims(line) == []
+    # Inside the limit, no warning.
+    inside = _with_open_losses(result, performance=_platform_dd(result, -0.05))
+    assert warning not in html.unescape(_hero_challenge(inside, labels, "x"))
+    # Open losses the red flags found behind a balance-only file.
+    flag = {"code": "HIDDEN_FLOATING_DRAWDOWN", "severity": "FAIL", "detail": "x"}
+    hidden = _with_open_losses(result, red_flags=[*result.red_flags, flag])
+    note = _hidden_loss_note(hidden, labels)
+    assert note
+    assert warning in html.unescape(_hero_challenge(hidden, labels, "x", note))
+
+
+def test_the_report_puts_the_warning_next_to_the_hero_figure(
+    audited: tuple[Any, AuditResult],
+) -> None:
+    _, result = audited
+    deep = AuditResult.model_validate(
+        _with_open_losses(result, performance=_platform_dd(result, -0.15))
+    )
+    text = _visible(render_html(deep, watermark=False, locale="es"))
+    hero = text.index(HERO["es"])
+    assert text.index(LABELS["es"]["hero_challenge_optimistic"]) < text.index(
+        LABELS["es"]["hero_challenge_link"], hero
+    )
+    assert LABELS["es"]["open_loss_badge"] in text
+    assert find_claims(text) == []
 
 
 # --------------------------------------------------------------------- web

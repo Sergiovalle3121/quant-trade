@@ -745,6 +745,9 @@ REPORT: dict[str, Any] = {
             "histórico completo."
         ),
         "hero_challenge_link": "Ver a escada",
+        "hero_challenge_optimistic": (
+            "São números otimistas: o saldo das operações fechadas não vê as perdas abertas."
+        ),
         "live_badge_CONSISTENT": "Coerente",
         "live_badge_EDGE": "No limite",
         "live_badge_INCONSISTENT": "Não coerente",
@@ -3862,12 +3865,22 @@ RULES: tuple[tuple[str, str], ...] = (
         "menos de 2 tentativas: não há busca a descontar",
     ),
     (
+        "trial count not declared: the haircut needs to know how many configurations were tried",
+        "o número de tentativas não foi declarado: o desconto precisa saber quantas "
+        "configurações foram testadas",
+    ),
+    (
         "deposits or withdrawals inside the history: the curve is an index, not money",
         "depósitos ou saques dentro do histórico: a curva é um índice, não dinheiro",
     ),
     (
         "the curve and the trades do not reconcile in money",
         "a curva e as operações não batem em dinheiro",
+    ),
+    ("the curve was not shown to be money", "não foi possível comprovar que a curva é dinheiro"),
+    (
+        "the curve was not shown to be money: {why}",
+        "não foi possível comprovar que a curva é dinheiro: {why}",
     ),
     (
         "with the reference cost the balance reaches zero inside the history",

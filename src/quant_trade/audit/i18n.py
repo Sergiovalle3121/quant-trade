@@ -1219,12 +1219,22 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
         "menos de 2 intentos: no hay búsqueda que descontar",
     ),
     (
+        "trial count not declared: the haircut needs to know how many configurations were tried",
+        "no se declaró el número de intentos: el descuento necesita saber cuántas "
+        "configuraciones se probaron",
+    ),
+    (
         "deposits or withdrawals inside the history: the curve is an index, not money",
         "depósitos o retiros dentro del historial: la curva es un índice, no dinero",
     ),
     (
         "the curve and the trades do not reconcile in money",
         "la curva y las operaciones no cuadran en dinero",
+    ),
+    ("the curve was not shown to be money", "no se pudo comprobar que la curva sea dinero"),
+    (
+        "the curve was not shown to be money: {why}",
+        "no se pudo comprobar que la curva sea dinero: {why}",
     ),
     (
         "with the reference cost the balance reaches zero inside the history",
@@ -2718,6 +2728,9 @@ def _translate_values(values: dict[str, str], locale: str = "es") -> dict[str, s
     if "source" in out:
         source = out["source"]
         out["source"] = trials.get(source, initial.get(source, source))
+    if "why" in out:
+        # A reason the engine wrote elsewhere, quoted whole.
+        out["why"] = _render(out["why"], locale) or out["why"]
     return out
 
 
