@@ -3458,8 +3458,11 @@ audience slug that does not exist, so a typo fails at import, not on a
 page. A page shows the intro, the sections as `h2` and paragraphs, the
 questions as `h3`, the
 related pages (the free calculator, an export guide, an audience page or
-the method, each in the page's language) and a closing call to the free
-calculator and the free first report, worded without a promise. The guides
+the method, each in the page's language) and a closing call worded without
+a promise. The side button and the closing call follow the article's own
+next step (`Article.next_step`, from `articles.ARTICLE_NEXT_STEPS`; see
+"Conversion toward the first free report" below); an article missing from
+that table keeps the free calculator and the free first report. The guides
 index links the articles index in each language so crawlers reach it. The
 three articles are `ea-sobreoptimizado` (how to tell whether an expert
 advisor is overfitted before buying it), `backtest-costos-reales` (spread,
@@ -4769,7 +4772,9 @@ countries use `card_markets_line` only when `card_public` is true. The one-off
 payment description follows the existing `mode="payment"` checkout builders;
 no checkout, credit, account or e-mail behavior changes. E-mail confirmation is
 mentioned when configured and support availability follows `operator_contact`.
-The institutional link uses the existing intake form.
+The institutional link uses the existing intake form. The page closes with
+`pricing.start_cta` ("Empieza por el informe gratis"), not with the articles'
+calculator call; see "Conversion toward the first free report" below.
 
 Paid pages serialize the visible single/pack offers as Product/Offer JSON-LD
 through `seo._json_ld`, without ratings or reviews. In `free_mode` all full
@@ -4871,3 +4876,81 @@ The Windows verification environment for this change uses
 `D:\wt\.venv-pp\Scripts\python.exe` with worktree `PYTHONPATH` and `--basetemp`,
 without package installation; `test_audit_pdf*.py` and
 `test_personal_paper*.py` are excluded as requested.
+
+## Conversion toward the first free report (8 October 2026)
+
+Four pages now lead a new visitor to the free first report instead of
+ending at the calculator. Every step is read from the configuration; no
+account, payment, credit, e-mail, legal or engine rule changed.
+
+- **Pricing** (`pricing.start_cta`). `/precios`, `/en/pricing` and
+  `/pt/precos` close with "Empieza por el informe gratis": the first full
+  report is the same report as the paid ones, with the PDF, and needs an
+  account and the file the platform exports. The main button ("Crear cuenta
+  y pedir mi primer informe") goes to `audit_path(locale)`, which sends a
+  visitor without an account to sign-up with `next` back to the form; links
+  to the sample report and the export guides follow, and the luck calculator
+  is a text link. With `AUDIT_EMAIL_VERIFICATION_REQUIRED` the existing
+  e-mail note is added. In free mode the text says every full report is free
+  and only the file is needed (the form asks for no account there). Without
+  the free first report (`accounts.WELCOME_FULL_REPORT = False`) the page
+  keeps the articles' call.
+- **Sample report** (`report.render(sample_cta=True, sample_offer=...)`, only
+  from `web._sample_html`). Under the synthetic-data notice, a `no-print` band
+  says the first report with one's own file is free with an account (free
+  mode: every full report is free; `paid`: no free wording), with a button to
+  the form and "¿Qué archivo produce un informe así?" linking the MT5 and MT5
+  optimisation guides. The toolbar shows "Crear cuenta"
+  (`/registro?next=/auditar`, `/signup?next=/en/audit`,
+  `/pt/cadastro?next=/pt/auditar`) instead of "Mi cuenta". When the sample PDF
+  route exists (`pdf_lib.available()`), a closing `no-print` block, "Compruébalo
+  tú", links the PDF and `/comprobar`: the check page answers the sample PDF
+  with "Es el informe de ejemplo de Rigor, sin cambios" (it is recorded under
+  `check.SAMPLE_AUDIT_ID`), and a client's PDF or JSON with its issue date and,
+  when recorded, its class. The block says exactly that. The sample PDF is
+  rendered without any of it. With `sample_cta=False` (every client report)
+  the HTML and JSON are byte for byte what they were: the band's styles live
+  inside the band, not in the shared stylesheet.
+- **Sign-up** (`account_pages.signup_page(email_verification=, offer=)`).
+  When `next` is an upload page (`AUDIT_PATHS`), the side panel shows "Así
+  sigue" instead of the account benefits: create the account; only with
+  `email_verification_required`, open the e-mailed link (the free full report
+  waits for it); upload the file the platform already exports, with the
+  upload form's own list of platforms (`pages.PLATFORMS`) and a link to
+  `/guias`; get the class (`strategies.CLASS_ORDER`), the
+  `len(verdict.DIMENSION_ORDER)` checks with their evidence label and the PDF,
+  the first one free (free mode: every full report free). A link to the sample
+  report follows, then the existing "what we keep" card. No processing time is
+  given. Any other `next`, or a configuration without a free first report,
+  keeps the benefits. The "confirmation link sent" notice
+  (`welcome_confirm`) on the upload page and on "Mi cuenta" adds "Mientras
+  llega el correo, exporta tu archivo", linking `/guias`
+  (`account_pages.welcome_confirm_guides`). The notice on a report page, where
+  the file was already uploaded, is unchanged.
+- **Each article's next step** (`articles.ARTICLE_NEXT_STEPS`,
+  `next_step_links`, `next_step_call`). The first step is the side button
+  and the closing button; the others, plus the free first report when it is
+  not among them, are the closing call's links. `leer-informe-probador-mt5`:
+  form and MT5 guide. `ea-sobreoptimizado` and `lo-eligio-el-optimizador`:
+  form and MT5 optimisation guide. `backtest-costos-reales`: form.
+  `copiar-senales-mql5-myfxbook`: Myfxbook guide, then the form.
+  `cuantas-operaciones-porcentaje-aciertos`: the win-rate calculator opened
+  with the article's declared example (`WIN_RATE_EXAMPLE_VALUES`, 45 trades at
+  71 %). `cuantos-intentos-reto-prop-firm`: `/para/retos-prop-firm` (which
+  already links back to the article). `sharpe-deflactado-track-record` and
+  `bot-ia-backtest-suerte`: the luck calculator opened with
+  `LUCK_EXAMPLE_INPUT`, the example both articles print.
+  `auditoria-independiente-backtest`, `que-hacer-despues-del-backtest` and
+  `auditar-cartera-modelo-senales`: form and sample report. `Article.from_dict`
+  refuses an unknown kind, guide, audience page or example at import.
+
+`tests/test_audit_conversion.py` reads every page over HTTP with
+`TestClient` in the three languages: the pricing close and its configuration
+variants, the sample's band, toolbar and closing block (and that its PDF
+checks as the unchanged sample on `/comprobar`), a client's report identical
+with `sample_cta=False` and equal to the `sample_cta=True` page minus the
+three additions, the sign-up steps for each configuration and the guides link
+of the confirmation notice, and, per article and language, that the side
+button and the closing call follow the table above and that every link
+answers 200. Every new text passes `find_claims` and avoids "verificado",
+"certificado", "aprobado", "garantiza", "rentable" and processing times.

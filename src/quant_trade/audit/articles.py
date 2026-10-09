@@ -14,6 +14,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
+from urllib.parse import urlencode
 
 from quant_trade.audit import winrate
 from quant_trade.audit.audiences import AUDIENCE_PAGES, audience_url
@@ -227,6 +228,8 @@ class Article:
     text: dict[str, ArticleText]
     #: Links shown under the article, see ``RELATED_KINDS``.
     related: tuple[dict[str, str], ...]
+    #: The article's own next step, see ``ARTICLE_NEXT_STEPS``.
+    next_step: tuple[dict[str, str], ...] = ()
 
     def slug_for(self, locale: str) -> str:
         return self.slug.get(locale, self.slug["es"])
@@ -265,11 +268,26 @@ class Article:
                 raise ValueError(f"article {data['key']}: unknown audience page {link!r}")
             if link["kind"] == "article" and link.get("key") not in article_keys:
                 raise ValueError(f"article {data['key']}: unknown article {link!r}")
+        next_step = tuple(
+            {str(k): str(v) for k, v in step.items()}
+            for step in ARTICLE_NEXT_STEPS.get(str(data["key"]), DEFAULT_NEXT_STEP)
+        )
+        for step in next_step:
+            kind = step.get("kind")
+            if kind not in NEXT_STEP_KINDS:
+                raise ValueError(f"article {data['key']}: unknown next step {step!r}")
+            if kind == "guide" and step.get("slug") not in GUIDES_BY_SLUG:
+                raise ValueError(f"article {data['key']}: unknown guide {step!r}")
+            if kind == "audience" and step.get("slug") not in audience_slugs:
+                raise ValueError(f"article {data['key']}: unknown audience page {step!r}")
+            if "example" in step and step["example"] != NEXT_STEP_EXAMPLES.get(str(kind)):
+                raise ValueError(f"article {data['key']}: unknown example {step!r}")
         return cls(
             key=str(data["key"]),
             slug={locale: str(data["slug"][locale]) for locale in LOCALES},
             text=text,
             related=related,
+            next_step=next_step,
         )
 
 
@@ -338,6 +356,151 @@ ARTICLES_COPY: dict[str, dict[str, str]] = {
         ),
         "all": "Todos os artigos",
         "back": "Voltar ao início",
+    },
+}
+
+#: The kinds of next step: the upload form (``audit``), an export guide by its
+#: Spanish slug (``guide``), the sample report (``sample``), an audience page by
+#: its Spanish slug (``audience``) and the two free calculators (``calculator``,
+#: ``winrate``), which open with the article's declared example when the step
+#: names it (``NEXT_STEP_EXAMPLES``).
+NEXT_STEP_KINDS: frozenset[str] = frozenset(
+    {"audit", "guide", "sample", "audience", "calculator", "winrate"}
+)
+NEXT_STEP_EXAMPLES: dict[str, str] = {"calculator": "luck", "winrate": "win-rate"}
+
+#: Each article's own next step, chosen for whoever reads it: the first entry is
+#: the side button and the closing call's button, the others are links of the
+#: closing call. A reader with a file goes to the form and the guide for that
+#: file; a reader without one, to the calculator the article uses.
+ARTICLE_NEXT_STEPS: dict[str, tuple[dict[str, str], ...]] = {
+    "leer-informe-probador-mt5": ({"kind": "audit"}, {"kind": "guide", "slug": "mt5"}),
+    "ea-sobreoptimizado": ({"kind": "audit"}, {"kind": "guide", "slug": "mt5-optimization"}),
+    "lo-eligio-el-optimizador": (
+        {"kind": "audit"},
+        {"kind": "guide", "slug": "mt5-optimization"},
+    ),
+    "backtest-costos-reales": ({"kind": "audit"},),
+    "copiar-senales-mql5-myfxbook": ({"kind": "guide", "slug": "myfxbook"}, {"kind": "audit"}),
+    "cuantas-operaciones-porcentaje-aciertos": ({"kind": "winrate", "example": "win-rate"},),
+    "cuantos-intentos-reto-prop-firm": ({"kind": "audience", "slug": "retos-prop-firm"},),
+    "sharpe-deflactado-track-record": ({"kind": "calculator", "example": "luck"},),
+    "bot-ia-backtest-suerte": ({"kind": "calculator", "example": "luck"},),
+    "auditoria-independiente-backtest": ({"kind": "audit"}, {"kind": "sample"}),
+    "que-hacer-despues-del-backtest": ({"kind": "audit"}, {"kind": "sample"}),
+    "auditar-cartera-modelo-senales": ({"kind": "audit"}, {"kind": "sample"}),
+}
+#: An article missing from the table keeps the old closing call.
+DEFAULT_NEXT_STEP: tuple[dict[str, str], ...] = ({"kind": "calculator"}, {"kind": "audit"})
+
+#: The words of the next steps. ``title_<kind>`` and ``text_<kind>`` head the
+#: closing call after the kind of its first step (``_example`` when it opens the
+#: article's example); ``audience:<slug>`` is that page's button.
+NEXT_STEP_COPY: dict[str, dict[str, str]] = {
+    "es": {
+        "sample": "Ver un informe de ejemplo",
+        "guide": "Guía de exportación: {platform}",
+        "calculator_example": "Abrir la calculadora de suerte con este ejemplo",
+        "winrate_example": "Abrir la calculadora de % de aciertos con este ejemplo",
+        "audience:retos-prop-firm": "Simular un reto con mi historial",
+        "title_audit": "Ponlo a prueba con tu archivo",
+        "text_audit": (
+            "Sube el archivo que ya exporta tu plataforma, sin convertirlo. Con tu cuenta, el "
+            "primer informe completo es gratis, con PDF."
+        ),
+        "title_guide": "Empieza por el archivo",
+        "text_guide": (
+            "La guía explica qué archivo exportar y dónde subirlo. Con tu cuenta, el primer "
+            "informe completo es gratis, con PDF."
+        ),
+        "title_calculator_example": "Ponlo a prueba con tus cifras",
+        "text_calculator_example": (
+            "La calculadora de suerte abre con las cifras declaradas de este artículo; cámbialas "
+            "por las tuyas. Es gratis y no pide registro. Con tu cuenta, el primer informe "
+            "completo también es gratis."
+        ),
+        "title_winrate_example": "Ponlo a prueba con tus cifras",
+        "text_winrate_example": (
+            "La calculadora de % de aciertos abre con el ejemplo declarado de este artículo; "
+            "cámbialo por tus cifras. Es gratis y no pide registro. Con tu cuenta, el primer "
+            "informe completo también es gratis."
+        ),
+        "title_audience": "Simula el reto con tu historial",
+        "text_audience": (
+            "La página sobre retos de prop firms explica qué subir para ver con qué frecuencia "
+            "tocarías la pérdida diaria o la total con tus propias operaciones. Con tu cuenta, "
+            "el primer informe completo es gratis, con PDF."
+        ),
+    },
+    "en": {
+        "sample": "See a sample report",
+        "guide": "Export guide: {platform}",
+        "calculator_example": "Open the luck calculator with this example",
+        "winrate_example": "Open the win rate calculator with this example",
+        "audience:retos-prop-firm": "Simulate a challenge with my history",
+        "title_audit": "Put it to the test with your file",
+        "text_audit": (
+            "Upload the file your platform already exports, without converting it. With an "
+            "account, your first full report is free, with the PDF."
+        ),
+        "title_guide": "Start with the file",
+        "text_guide": (
+            "The guide explains which file to export and where to upload it. With an account, "
+            "your first full report is free, with the PDF."
+        ),
+        "title_calculator_example": "Put it to the test with your figures",
+        "text_calculator_example": (
+            "The luck calculator opens with this article's declared figures; replace them with "
+            "yours. It is free and needs no sign-up. With an account, your first full report is "
+            "free too."
+        ),
+        "title_winrate_example": "Put it to the test with your figures",
+        "text_winrate_example": (
+            "The win rate calculator opens with this article's declared example; replace it "
+            "with your figures. It is free and needs no sign-up. With an account, your first "
+            "full report is free too."
+        ),
+        "title_audience": "Simulate the challenge with your history",
+        "text_audience": (
+            "The prop-firm challenge page explains what to upload to see how often you would "
+            "hit the daily or total loss limit with your own trades. With an account, your "
+            "first full report is free, with the PDF."
+        ),
+    },
+    "pt": {
+        "sample": "Ver um relatório de exemplo",
+        "guide": "Guia de exportação: {platform}",
+        "calculator_example": "Abrir a calculadora de sorte com este exemplo",
+        "winrate_example": "Abrir a calculadora de taxa de acerto com este exemplo",
+        "audience:retos-prop-firm": "Simular um desafio com o meu histórico",
+        "title_audit": "Coloque à prova com o seu arquivo",
+        "text_audit": (
+            "Envie o arquivo que a sua plataforma já exporta, sem convertê-lo. Com a sua conta, "
+            "o primeiro relatório completo é grátis, com o PDF."
+        ),
+        "title_guide": "Comece pelo arquivo",
+        "text_guide": (
+            "O guia explica que arquivo exportar e onde enviá-lo. Com a sua conta, o primeiro "
+            "relatório completo é grátis, com o PDF."
+        ),
+        "title_calculator_example": "Coloque à prova com os seus números",
+        "text_calculator_example": (
+            "A calculadora de sorte abre com os números declarados deste artigo; troque-os "
+            "pelos seus. É grátis e não pede cadastro. Com a sua conta, o primeiro relatório "
+            "completo também é grátis."
+        ),
+        "title_winrate_example": "Coloque à prova com os seus números",
+        "text_winrate_example": (
+            "A calculadora de taxa de acerto abre com o exemplo declarado deste artigo; "
+            "troque-o pelos seus números. É grátis e não pede cadastro. Com a sua conta, o "
+            "primeiro relatório completo também é grátis."
+        ),
+        "title_audience": "Simule o desafio com o seu histórico",
+        "text_audience": (
+            "A página sobre desafios de prop firms explica o que enviar para ver com que "
+            "frequência você tocaria o limite de perda diária ou total com as suas próprias "
+            "operações. Com a sua conta, o primeiro relatório completo é grátis, com o PDF."
+        ),
     },
 }
 
@@ -6918,6 +7081,61 @@ def related_links(article: Article, locale: str) -> tuple[tuple[str, str], ...]:
     return tuple(links)
 
 
+def next_step_links(article: Article, locale: str) -> tuple[tuple[str, str], ...]:
+    """The article's next step as (label, path) in ``locale``, the button first."""
+    # Imported here to avoid the pages -> articles import cycle.
+    from quant_trade.audit.pages import SAMPLE_PAGE_PATHS, audit_path
+
+    words = NEXT_STEP_COPY[locale]
+    links: list[tuple[str, str]] = []
+    for step in article.next_step or DEFAULT_NEXT_STEP:
+        kind = step["kind"]
+        example = "example" in step
+        if kind == "audit":
+            links.append((ARTICLES_COPY[locale]["report"], audit_path(locale)))
+        elif kind == "sample":
+            links.append((words["sample"], SAMPLE_PAGE_PATHS[locale]))
+        elif kind == "guide":
+            guide = GUIDES_BY_SLUG[step["slug"]]
+            label = words["guide"].format(platform=guide.platform_for(locale))
+            links.append((label, guide_url(guide.slug, locale)))
+        elif kind == "calculator" and example:
+            # The articles' own declared luck example, through the same calculator.
+            query = urlencode(
+                {
+                    "sharpe": f"{LUCK_EXAMPLE_INPUT.sharpe:g}",
+                    "years": f"{LUCK_EXAMPLE_INPUT.years:g}",
+                    "trials": str(LUCK_EXAMPLE_INPUT.trials),
+                }
+            )
+            links.append((words["calculator_example"], f"{CALCULATOR_PATH[locale]}?{query}"))
+        elif kind == "calculator":
+            links.append((ARTICLES_COPY[locale]["calculator"], CALCULATOR_PATH[locale]))
+        elif kind == "winrate" and example:
+            # The article's worked example: its trade count and declared win rate.
+            query = urlencode(
+                {name: WIN_RATE_EXAMPLE_VALUES[name] for name in ("trades", "win_rate")}
+            )
+            links.append((words["winrate_example"], f"{winrate.WINRATE_PATH[locale]}?{query}"))
+        elif kind == "winrate":
+            links.append((winrate.COPY[locale]["nav"], winrate.WINRATE_PATH[locale]))
+        else:
+            page = next(p for p in AUDIENCE_PAGES if p.slug == step["slug"])
+            label = words.get(f"audience:{page.slug}", page.text[locale].title)
+            links.append((label, audience_url(page.slug, locale)))
+    return tuple(links)
+
+
+def next_step_call(article: Article, locale: str) -> tuple[str, str]:
+    """The closing call's heading and text, after the kind of the article's first step."""
+    first = (article.next_step or DEFAULT_NEXT_STEP)[0]
+    kind = first["kind"] + ("_example" if "example" in first else "")
+    words = NEXT_STEP_COPY[locale]
+    if f"title_{kind}" in words:
+        return words[f"title_{kind}"], words[f"text_{kind}"]
+    return ARTICLES_COPY[locale]["cta_title"], ARTICLES_COPY[locale]["cta_text"]
+
+
 __all__ = [
     "ARTICLES",
     "ARTICLES_BY_KEY",
@@ -6925,6 +7143,10 @@ __all__ = [
     "ARTICLES_COPY",
     "ARTICLES_DATA",
     "ARTICLES_PATH",
+    "ARTICLE_NEXT_STEPS",
+    "DEFAULT_NEXT_STEP",
+    "NEXT_STEP_COPY",
+    "NEXT_STEP_KINDS",
     "RELATED_KINDS",
     "Article",
     "ArticleSection",
@@ -6932,5 +7154,7 @@ __all__ = [
     "article_url",
     "articles_index_url",
     "find_article",
+    "next_step_call",
+    "next_step_links",
     "related_links",
 ]

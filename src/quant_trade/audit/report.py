@@ -29,6 +29,7 @@ from quant_trade.audit.forensics.calibration import CALIBRATION
 from quant_trade.audit.forensics.copy import CHECK_NAMES as FORENSIC_CHECK_NAMES
 from quant_trade.audit.forensics.review import METHOD_VERSION as FORENSIC_METHOD_VERSION
 from quant_trade.audit.guard import assert_report_clean
+from quant_trade.audit.guides import guide_url
 from quant_trade.audit.holding import EDGE_SE
 from quant_trade.audit.i18n import localize
 from quant_trade.audit.importers import (
@@ -7572,6 +7573,139 @@ def _pack_notice(labels: dict[str, str], code: str, left: int) -> str:
     )
 
 
+#: The sample report's own way on: who sees /ejemplo has no account yet. Only the
+#: public sample asks for these (``render(sample_cta=True)``); a client's report
+#: never carries them. ``offer`` follows the service's configuration: ``welcome``
+#: (the first full report is free with an account), ``free`` (free mode: every
+#: full report is free) or ``paid`` (no free first report).
+SAMPLE_CTA_COPY: dict[str, dict[str, str]] = {
+    "es": {
+        "lead_welcome": "El primero con tu archivo es gratis al crear cuenta.",
+        "lead_free": "Ahora todos los informes completos son gratis, también el de tu archivo.",
+        "lead_paid": "Audita tu propio archivo de la misma forma.",
+        "button_welcome": "Crear cuenta y subir mi archivo",
+        "button_free": "Subir mi archivo",
+        "button_paid": "Subir mi archivo",
+        "files": "¿Qué archivo produce un informe así?",
+        "mt5": "El informe del probador de MetaTrader 5",
+        "joint": "y, si optimizaste,",
+        "optimization": "el XML de optimización",
+        "signup": "Crear cuenta",
+        "check_title": "Compruébalo tú",
+        "check_text": (
+            "Descarga el PDF de este ejemplo y súbelo a «Comprobar un informe». La página "
+            "calcula la huella SHA-256 del archivo y dice si salió así de Rigor: con este PDF "
+            "verás que es el informe de ejemplo y que no se editó. Con el PDF o el JSON de un "
+            "informe de cliente muestra además la fecha en que lo emitió Rigor y, cuando está "
+            "registrada, su clase."
+        ),
+        "check_pdf": "Descargar el PDF del ejemplo",
+        "check_link": "Ir a Comprobar un informe",
+    },
+    "en": {
+        "lead_welcome": "Your first one, with your own file, is free when you create an account.",
+        "lead_free": "All full reports are currently free, yours included.",
+        "lead_paid": "Audit your own file the same way.",
+        "button_welcome": "Create an account and upload my file",
+        "button_free": "Upload my file",
+        "button_paid": "Upload my file",
+        "files": "Which file produces a report like this?",
+        "mt5": "The MetaTrader 5 strategy tester report",
+        "joint": "and, if you optimised,",
+        "optimization": "the optimisation XML",
+        "signup": "Create account",
+        "check_title": "Check it yourself",
+        "check_text": (
+            "Download this sample's PDF and upload it to 'Check a report'. The page computes "
+            "the file's SHA-256 fingerprint and says whether it left Rigor like this: with this "
+            "PDF you will see that it is the sample report and that it was not edited. With the "
+            "PDF or JSON of a client's report it also shows the date Rigor issued it and, "
+            "when it is on record, its class."
+        ),
+        "check_pdf": "Download the sample PDF",
+        "check_link": "Go to Check a report",
+    },
+    "pt": {
+        "lead_welcome": "O primeiro com o seu arquivo é grátis ao criar uma conta.",
+        "lead_free": "Agora todos os relatórios completos são grátis, inclusive o do seu arquivo.",
+        "lead_paid": "Audite o seu próprio arquivo da mesma forma.",
+        "button_welcome": "Criar conta e enviar o meu arquivo",
+        "button_free": "Enviar o meu arquivo",
+        "button_paid": "Enviar o meu arquivo",
+        "files": "Que arquivo produz um relatório assim?",
+        "mt5": "O relatório do testador de estratégias do MetaTrader 5",
+        "joint": "e, se você otimizou,",
+        "optimization": "o XML de otimização",
+        "signup": "Criar conta",
+        "check_title": "Confira você mesmo",
+        "check_text": (
+            "Baixe o PDF deste exemplo e envie-o em «Comprovar um relatório». A página calcula "
+            "a impressão digital SHA-256 do arquivo e diz se ele saiu assim do Rigor: com este "
+            "PDF você vê que é o relatório de exemplo e que não foi editado. Com o PDF ou o JSON "
+            "do relatório de um cliente, mostra também a data em que o Rigor o emitiu e, quando "
+            "está registrada, a sua classe."
+        ),
+        "check_pdf": "Baixar o PDF do exemplo",
+        "check_link": "Ir para Comprovar um relatório",
+    },
+}
+#: Sign-up per language, with ``next`` back to the upload form.
+SAMPLE_SIGNUP_PATHS: dict[str, str] = {"es": "/registro", "en": "/signup", "pt": "/pt/cadastro"}
+#: Scoped to the sample's band, so a client's report keeps its exact styles.
+SAMPLE_CTA_CSS = (
+    ".sample-cta{display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px;margin:14px 0;"
+    "padding:14px 16px;border:1px solid var(--border);border-radius:14px;"
+    "background:var(--surface);font-size:.92rem;line-height:1.5}"
+    ".sample-cta p{margin:0}.sample-cta .sample-cta-files{flex-basis:100%;color:var(--text-2)}"
+    ".sample-cta-files a{color:var(--text);text-decoration:underline;text-underline-offset:3px}"
+)
+
+
+def sample_signup_href(locale: str) -> str:
+    """The sample's "Create account": sign-up in ``locale``, back to the upload form after."""
+    from quant_trade.audit.pages import AUDIT_PATHS
+
+    lang = locale if locale in SAMPLE_SIGNUP_PATHS else "es"
+    return f"{SAMPLE_SIGNUP_PATHS[lang]}?next={quote(AUDIT_PATHS[lang], safe='/')}"
+
+
+def sample_cta_band(locale: str, offer: str = "welcome") -> str:
+    """Under the sample's synthetic-data notice: the free first report and which file
+    gives a report like this. Hidden when printed; only the public sample shows it."""
+    from quant_trade.audit.pages import AUDIT_PATHS
+
+    lang = locale if locale in SAMPLE_CTA_COPY else "es"
+    words = SAMPLE_CTA_COPY[lang]
+    offer = offer if offer in ("welcome", "free", "paid") else "paid"
+    return (
+        f"<div class='sample-cta no-print'><style>{SAMPLE_CTA_CSS}</style>"
+        f"<p><b>{_e(words['lead_' + offer])}</b></p>"
+        f"<a class='btn btn-primary btn-sm' href='{_e(AUDIT_PATHS[lang])}'>"
+        f"{_e(words['button_' + offer])}</a>"
+        f"<p class='sample-cta-files'>{_e(words['files'])} "
+        f"<a href='{_e(guide_url('mt5', lang))}'>{_e(words['mt5'])}</a> {_e(words['joint'])} "
+        f"<a href='{_e(guide_url('mt5-optimization', lang))}'>{_e(words['optimization'])}</a>."
+        "</p></div>"
+    )
+
+
+def sample_check_block(locale: str, pdf_url: str, busy: str) -> str:
+    """The sample's closing block: download its PDF and check it on /comprobar.
+
+    The check page answers the sample with "unchanged"; a client's file also
+    gets its issue date and class. Hidden when printed."""
+    lang = locale if locale in SAMPLE_CTA_COPY else "es"
+    words = SAMPLE_CTA_COPY[lang]
+    return (
+        f"<section class='rsec no-print sample-check'><h2>{_e(words['check_title'])}</h2>"
+        f"<p>{_e(words['check_text'])}</p>"
+        f"<p class='sample-check-links'><a class='btn btn-primary' href='{_e(pdf_url)}' download "
+        f"data-busy='{_e(busy)}'>{_e(words['check_pdf'])}</a> "
+        f"<a class='link-more' href='{_e(CHECK_PATH[lang])}'>{_e(words['check_link'])}"
+        f"{icon('arrow')}</a></p></section>"
+    )
+
+
 def render_html(
     result: AuditResult,
     *,
@@ -7599,6 +7733,8 @@ def render_html(
     notice_ok: bool = False,
     account_box: str = "",
     tools_link: bool = False,
+    sample_cta: bool = False,
+    sample_offer: str = "welcome",
 ) -> str:
     """The audit as one HTML document.
 
@@ -7610,6 +7746,11 @@ def render_html(
     the page's search and preview tags; without it the page is ``noindex``,
     as every client report is. ``tools_link`` adds the free tools page to the
     footer's links (the public sample report), hidden when printed.
+    ``sample_cta`` is the public sample's own way on (never a client's report):
+    a band under its notice with the free first report (``sample_offer``, from
+    the configuration) and the export guides, "Create account" in place of
+    "My account", and a closing block to download its PDF and check it on
+    /comprobar. All of it is hidden when printed; off, the page is unchanged.
 
     The verdict, the plain-language explanations, the charts, the input
     hashes and the list of red flags are always shown. In paid mode an
@@ -8345,7 +8486,12 @@ def render_html(
         f"<span class='new-audit-long'>{_e(labels['new_audit'])}</span>"
         "<span class='new-audit-short' aria-hidden='true'>"
         f"{_e(labels['new_audit_short'])}</span></a> "
-        + f"<a class='nav-account' href='{account_href}'>{_e(labels['my_account'])}</a> "
+        + (
+            f"<a class='nav-account' href='{_e(sample_signup_href(locale))}'>"
+            f"{_e(SAMPLE_CTA_COPY.get(locale, SAMPLE_CTA_COPY['es'])['signup'])}</a> "
+            if sample_cta
+            else f"<a class='nav-account' href='{account_href}'>{_e(labels['my_account'])}</a> "
+        )
         + print_html
         + _report_language_links(locale, switch_url, labels["report_languages"])
         + "</div>"
@@ -8377,6 +8523,7 @@ def render_html(
         + "<div class='wrap wrap-mid'>"
         + watermark_html
         + _notice_html(notice, ok=notice_ok)
+        + (sample_cta_band(locale, sample_offer) if sample_cta else "")
         + _pack_notice(labels, pack_code, pack_credits_left)
         + account_box
         + f"<div class='eyebrow rise'><span class='dot'></span>{_e(_title(data, labels))}</div>"
@@ -8489,6 +8636,7 @@ def render_html(
         section(labels["declared"], declared_html),
         section(labels["not_measured"], nm_html),
         section(labels["seal"], seal_html),
+        sample_check_block(locale, pdf_url, labels["pdf_busy"]) if sample_cta and pdf_url else "",
         footer,
     ]
     # The detail sections (or the lock box) sit between the plan and the inputs.
@@ -8717,6 +8865,8 @@ def render(
     notice_ok: bool = False,
     account_box: str = "",
     tools_link: bool = False,
+    sample_cta: bool = False,
+    sample_offer: str = "welcome",
 ) -> tuple[str, str]:
     """``(html, json)`` for a result, both guarded. Raises ``AuditReportError``."""
     html_text = render_html(
@@ -8745,6 +8895,8 @@ def render(
         notice_ok=notice_ok,
         account_box=account_box,
         tools_link=tools_link,
+        sample_cta=sample_cta,
+        sample_offer=sample_offer,
     )
     guard_texts(result, html_text)
     return html_text, to_json(result)
