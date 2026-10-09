@@ -39,6 +39,21 @@ def test_parse_input_reads_numbers_and_rejects_out_of_range() -> None:
     assert parse_input("nan", "3", "10") == "error_number"
 
 
+def test_trials_read_thousands_as_people_type_them() -> None:
+    """ "1.000" is a thousand in es/pt and "1,000" in en: before, "1.000" read
+    as one trial and gave a far smaller luck figure without any warning."""
+    thousand = CalculatorInput(sharpe=1.8, years=3.0, trials=1000)
+    nbsp, narrow = "\u00a0", "\u202f"
+    for typed in ("1.000", "1,000", "1 000", f"1{nbsp}000", f"1{narrow}000", "1000", "1e3"):
+        assert parse_input("1,8", "3", typed) == thousand, typed
+    assert parse_input("1,8", "3", "12.500").trials == 12500
+    assert parse_input("1,8", "3", "1.000.000").trials == 1_000_000
+    assert parse_input("1,8", "3", "100.0").trials == 100
+    # A fraction is not a number of configurations ("1,5" used to read as 15).
+    for typed in ("1,5", "12.5", "1.0001"):
+        assert parse_input("1,8", "3", typed) == "error_number", typed
+
+
 def test_more_configurations_raise_the_luck_and_cut_more() -> None:
     small = compute(CalculatorInput(sharpe=1.8, years=3.0, trials=10))
     large = compute(CalculatorInput(sharpe=1.8, years=3.0, trials=1000))

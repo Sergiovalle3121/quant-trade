@@ -6988,7 +6988,16 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 # A missing page, not a missing audit: the ordinary 404 text.
                 raise HTTPException(status_code=404, detail="page_missing")
             return RedirectResponse(guide_url(other.slug, path_locale), status_code=301)
-        return HTMLResponse(guide_page(guide, locale=locale, base_url=_site_url(request)))
+        return HTMLResponse(
+            guide_page(
+                guide,
+                locale=locale,
+                base_url=_site_url(request),
+                # The free report as the sign-up page states it.
+                offer=_offer(),
+                email_verification=cfg.email_verification_required,
+            )
+        )
 
     def _audience(request: Request, slug: str, path_locale: str, locale: str) -> Response:
         page = AUDIENCES_BY_PATH[path_locale].get(slug)
