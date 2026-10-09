@@ -108,6 +108,7 @@ from quant_trade.audit.seo import (
     head_meta,
     page_paths,
     private_meta,
+    tools_structured_data,
     web_application_structured_data,
 )
 from quant_trade.audit.series_ui import institutional_block, series_fields
@@ -123,6 +124,8 @@ from quant_trade.audit.theme import (
     icon,
     logo,
 )
+from quant_trade.audit.tools_hub import COPY as TOOLS_COPY
+from quant_trade.audit.tools_hub import TOOL_KEYS, TOOLS_PATH, tools_url
 from quant_trade.audit.verdict import DIMENSION_ORDER, class_text, meaning, trials_undeclared
 
 #: The fixed wording of the badge and of the verification page's notice. It
@@ -833,6 +836,7 @@ _UI: dict[str, dict[str, Any]] = {
         "nav_faq": "Preguntas",
         "nav_account": "Mi cuenta",
         "nav_compare": "Comparar",
+        "nav_tools": "Herramientas",
         "nav_menu": "Menú",
         "cta": "Empezar gratis",
         "cta_full": "Empieza con la vista previa gratis",
@@ -1077,6 +1081,7 @@ _UI: dict[str, dict[str, Any]] = {
         "nav_faq": "FAQ",
         "nav_account": "My account",
         "nav_compare": "Compare",
+        "nav_tools": "Free tools",
         "nav_menu": "Menu",
         "cta": "Start free",
         "cta_full": "Start with the free preview",
@@ -1482,7 +1487,7 @@ def _nav(
         f"<a href='{_sample_url(locale)}'>{_e(ui['nav_sample'])}</a>"
         f"<a href='{PRICING_PATH[locale]}'>{_e(ui['nav_pricing'])}</a>"
         f"<a href='{_e(guides_index_url(locale))}'>{_e(ui['nav_guides'])}</a>"
-        f"<a href='{_compare_url(locale)}'>{_e(ui['nav_compare'])}</a>"
+        f"<a href='{tools_url(locale)}'>{_e(ui['nav_tools'])}</a>"
         f"<a href='{home}#faq'>{_e(ui['nav_faq'])}</a>"
     )
     switch = _lang_menu(locale, switch_href, alternates)
@@ -1593,11 +1598,14 @@ def _footer(locale: str) -> str:
     product = (
         f"<li><a href='{home}#how'>{_e(ui['nav_how'])}</a></li>"
         f"<li><a href='{_sample_url(locale)}'>{_e(ui['nav_sample'])}</a></li>"
+        f"<li><a href='{tools_url(locale)}'>{_e(TOOLS_COPY[locale]['nav'])}</a></li>"
         f"<li><a href='{examples_url(locale)}'>{_e(EXAMPLES_COPY[locale]['nav'])}</a></li>"
         f"<li><a href='{reading.reading_url(locale)}'>{_e(reading.COPY[locale]['title'])}</a></li>"
         f"<li><a href='{sample}.pdf' download>{_e(ui['footer_sample_pdf'])}</a></li>"
         f"<li><a href='{PRICING_PATH[locale]}'>{_e(ui['nav_pricing'])}</a></li>"
         f"<li><a href='{_e(guides_index_url(locale))}'>{_e(ui['nav_guides'])}</a></li>"
+        f"<li><a href='{_e(articles_index_url(locale))}'>"
+        f"{_e(ARTICLES_COPY[locale]['eyebrow'])}</a></li>"
         f"<li><a href='{_compare_url(locale)}'>{_e(ui['nav_compare'])}</a></li>"
         f"<li><a href='{_check_url(locale)}'>{_e(ui['footer_check'])}</a></li>"
         f"<li><a href='{_e(method_url(locale))}'>{_e(_method_title(locale))}</a></li>"
@@ -1927,6 +1935,55 @@ def _audiences(locale: str) -> str:
         "<section class='section light' id='para-quien'><div class='wrap'>"
         + _section_head(words["eyebrow"], _title_pair(words["title"]), words["lead"])
         + f"<div class='cards cards-2'>{''.join(cards)}</div>{extra}</div></section>"
+    )
+
+
+#: Each free tool's icon on the landing.
+_TOOL_ICONS: dict[str, str] = {"calculator": "dice", "reading": "chart", "check": "shield"}
+
+
+def _tool_name(key: str, locale: str) -> str:
+    """The name a free tool already has in the menu and the footer."""
+    if key == "calculator":
+        return str(CALCULATOR_COPY[locale]["nav"])
+    if key == "reading":
+        return reading.COPY[locale]["title"]
+    return str(_UI[locale]["footer_check"])
+
+
+def _tool_url(key: str, locale: str) -> str:
+    if key == "calculator":
+        return calculator_url(locale)
+    if key == "reading":
+        return reading.reading_url(locale)
+    return _check_url(locale)
+
+
+def _article_link(key: str, locale: str) -> str:
+    """A link to an article, with its title in ``locale``."""
+    title = ARTICLES_BY_KEY[key].text[locale].title
+    return f"<a href='{_e(article_url(key, locale))}'>{_e(title)}</a>"
+
+
+def _tools_band(locale: str) -> str:
+    """The free tools on the landing: no file, no account, declared figures only."""
+    words = TOOLS_COPY[locale]
+    cards = "".join(
+        f"<div class='card spot' data-reveal style='--i:{i % 2}'>"
+        f"<div class='icon'>{icon(_TOOL_ICONS[key])}</div>"
+        f"<h3 id='band-{key}'>{_e(_tool_name(key, locale))}</h3>"
+        f"<p>{_e(words[key]['question'])}</p>"
+        f"<p><a href='{_e(_tool_url(key, locale))}' aria-describedby='band-{key}'>"
+        f"{_e(words['open'])}</a></p></div>"
+        for i, key in enumerate(TOOL_KEYS)
+    )
+    return (
+        "<section class='section light' id='herramientas'><div class='wrap'>"
+        + _section_head(words["band_eyebrow"], _title_pair(words["band_title"]), words["band_lead"])
+        + f"<div class='cards cards-2'>{cards}</div>"
+        f"<p class='muted audience-also'><a href='{_e(tools_url(locale))}'>"
+        f"{_e(words['all_tools'])}</a> · <a href='{_e(articles_index_url(locale))}'>"
+        f"{_e(words['articles_link'])}</a></p></div></section>"
     )
 
 
@@ -2670,6 +2727,7 @@ def landing(
         + ("<div class='wrap'>" + count_html + "</div>" if count_html else "")
         + _specs(locale)
         + _audiences(locale)
+        + _tools_band(locale)
         + "<div class='section light'><div class='wrap'>"
         + institutional_block(locale, institutional.REVIEW_PATHS[locale])
         + "</div></div>"
@@ -3653,9 +3711,15 @@ def reading_page(
     if error:
         message = words["limited"] if error == "limited" else INPUT_COPY[locale][error]
         body += f"<p class='error' role='alert'>{_e(message)}</p>"
+    see_also = (
+        f"<p>{_e(words['see_also'])} "
+        f"<a href='{_e(calculator_url(locale))}'>{_e(CALCULATOR_COPY[locale]['nav'])}</a> · "
+        f"{_article_link('cuantas-operaciones-porcentaje-aciertos', locale)} · "
+        f"<a href='{_e(tools_url(locale))}'>{_e(TOOLS_COPY[locale]['nav'])}</a></p>"
+    )
     body += (
         f"<p>{_e(words['note'])}</p><p>{_e(words['optional'])}</p>"
-        f"<p>{_e(words['public'])}</p>"
+        f"<p>{_e(words['public'])}</p>{see_also}"
         f"<form method='get' action='{reading.reading_url(locale)}' class='calc-form'>"
         "<div class='form-grid'>"
     )
@@ -3709,6 +3773,17 @@ def reading_page(
             f"rel='noopener noreferrer'>{_e(share['post'])}</a></div>"
             "<p class='muted' data-copy-status role='status' aria-live='polite'></p></section>"
         )
+    # With or without a card: what only the file can show, and the way to it.
+    body += (
+        f"<section class='article-cta'><h2>{_e(words['beyond_title'])}</h2>"
+        f"<p>{_e(words['beyond'])}</p><div class='back-row'>"
+        f"<a class='btn btn-dark' href='{_e(audit_path(locale))}'>{_e(words['beyond_button'])}"
+        f"<span class='go'>{icon('arrow')}</span></a>"
+        f"<a class='link-more' href='{_e(_sample_url(locale))}'>{_e(words['sample_link'])}"
+        f"{icon('arrow')}</a>"
+        f"<a class='link-more' href='{_e(guides_index_url(locale))}'>{_e(words['guides_link'])}"
+        f"{icon('arrow')}</a></div></section>"
+    )
     alternates = {
         lang: reading.reading_url(lang, values if svg else None) for lang in reading.READING_PATH
     }
@@ -3786,6 +3861,9 @@ def calculator_page(
         f"<p>{_e(words['cta'])}</p><p><a class='btn btn-dark' href='{_e(_form_url(locale))}'>"
         f"{_e(words['cta_button'])}<span class='go'>{icon('arrow')}</span></a> "
         f"<a href='{_e(_sample_url(locale))}'>{_e(words['sample_link'])}</a></p>"
+        f"<p>{_e(words['read_more'])} "
+        f"{_article_link('sharpe-deflactado-track-record', locale)} · "
+        f"<a href='{_e(reading.reading_url(locale))}'>{_e(words['reader_link'])}</a></p>"
     )
 
     def bullets(items: list[str], mark: str = "check") -> str:
@@ -4213,6 +4291,8 @@ def examples_page(*, locale: str = "es", base_url: str = "") -> str:
     body = (
         _page_hero(words["eyebrow"], words["title"], words["intro"], crumbs)
         + "<div class='paper page-main'><div class='wrap wrap-mid'>"
+        + f"<p><a class='link-more' href='{_e(reading.reading_url(locale))}'>"
+        f"{_e(words['reader_link'])}{icon('arrow')}</a></p>"
         + examples_content(locale)
         + f"<section class='article-cta'><h2>{_e(cta['cta_title'])}</h2>"
         f"<p>{_e(cta['cta'])}</p><a class='btn btn-dark' href='{_form_url(locale)}'>"
@@ -4220,6 +4300,62 @@ def examples_page(*, locale: str = "es", base_url: str = "") -> str:
         "</div></div>"
     )
     return _page(title, locale, body, meta_html=meta, alternates=EXAMPLES_PATH, solid_nav=True)
+
+
+def tools_page(*, locale: str = "es", base_url: str = "") -> str:
+    """The free tools that need no file: what each one asks for and what it gives."""
+    locale = _locale(locale)
+    words = TOOLS_COPY[locale]
+    title = f"{words['seo_title']} · {BRAND}"
+    base = base_url.rstrip("/")
+    meta = _public_meta(title, words["summary"], locale, tools_url(locale), base_url)
+    meta += tools_structured_data(
+        [
+            (_tool_name(key, locale), words[key]["question"], base + _tool_url(key, locale))
+            for key in TOOL_KEYS
+        ],
+        locale,
+    )
+    tools = ""
+    for key in TOOL_KEYS:
+        tool = words[key]
+        points = "".join(
+            f"<li>{icon('check')}<span>{item}</span></li>"
+            for item in (
+                f"<strong>{_e(words['inputs'])}:</strong> {_e(tool['inputs'])}",
+                f"<strong>{_e(words['returns'])}:</strong> {_e(tool['returns'])}",
+                _e(words["no_account"]),
+            )
+        )
+        tools += (
+            f"<section class='article-cta'><h2 id='tool-{key}'>{_e(_tool_name(key, locale))}</h2>"
+            f"<p>{_e(tool['question'])}</p>"
+            f"<ul class='checks' style='margin-top:16px'>{points}</ul>"
+            f"<div class='back-row'><a class='btn btn-dark' href='{_e(_tool_url(key, locale))}' "
+            f"aria-describedby='tool-{key}'>{_e(words['open'])}"
+            f"<span class='go'>{icon('arrow')}</span></a></div></section>"
+        )
+    report = (
+        f"<section class='article-cta'><h2>{_e(words['report_title'])}</h2>"
+        f"<p>{_e(words['report_text'])}</p><div class='back-row'>"
+        f"<a class='btn btn-dark' href='{_e(audit_path(locale))}'>{_e(words['report_button'])}"
+        f"<span class='go'>{icon('arrow')}</span></a>"
+        f"<a class='link-more' href='{_e(_sample_url(locale))}'>{_e(words['sample_link'])}"
+        f"{icon('arrow')}</a>"
+        f"<a class='link-more' href='{_e(articles_index_url(locale))}'>"
+        f"{_e(words['articles_link'])}{icon('arrow')}</a></div></section>"
+    )
+    crumbs = f"<a href='{_e(_home(locale))}'>{_e(GUIDES_COPY[locale]['back'])}</a>" + (
+        _language_crumbs(TOOLS_PATH, locale)
+    )
+    body = (
+        _page_hero(words["eyebrow"], words["title"], words["intro"], crumbs)
+        + "<div class='paper page-main'><div class='wrap wrap-mid'>"
+        + tools
+        + report
+        + "</div></div>"
+    )
+    return _page(title, locale, body, meta_html=meta, alternates=TOOLS_PATH, solid_nav=True)
 
 
 def articles_index_page(*, locale: str = "es", base_url: str = "") -> str:
@@ -4333,6 +4469,14 @@ def article_page(article: Article, *, locale: str = "es", base_url: str = "") ->
     return _page(title, locale, body, meta_html=meta, alternates=alternates, solid_nav=True)
 
 
+#: Articles each case page lists before the other cases (article keys, in order).
+AUDIENCE_ARTICLES: dict[str, tuple[str, ...]] = {
+    "retos-prop-firm": ("cuantos-intentos-reto-prop-firm",),
+    "compradores-de-robots": ("ea-sobreoptimizado", "lo-eligio-el-optimizador"),
+    "copiar-senales": ("copiar-senales-mql5-myfxbook",),
+}
+
+
 def audience_page(
     audience: Audience,
     *,
@@ -4385,6 +4529,12 @@ def audience_page(
         for page in AUDIENCE_PAGES
         if page.slug != audience.slug
     )
+    articles = "".join(
+        f"<li><a href='{_e(article_url(key, locale))}'>"
+        f"<span>{_e(ARTICLES_BY_KEY[key].text[locale].title)}</span>{icon('arrow')}</a></li>"
+        for key in AUDIENCE_ARTICLES.get(audience.slug, ())
+    )
+    reads = [(words["read"], f"<ul class='aud-others'>{articles}</ul>")] if articles else []
     # Robot buyers land on the form with the live-account box already open.
     start = audit_path(locale) + ("?extras=1" if audience.open_extras else "")
     start_label = words["start"]
@@ -4418,6 +4568,7 @@ def audience_page(
                     else f"<div class='aud-price'><p>{_e(price)}</p>{buttons}</div>",
                 ),
                 (words["faq"], f"<div class='faq'>{faq}</div>"),
+                *reads,
                 (words["others"], f"<ul class='aud-others'>{others}</ul>"),
             ],
             locale,
@@ -4450,6 +4601,7 @@ __all__ = [
     "legal_page",
     "method_page",
     "sample_meta",
+    "tools_page",
     "verification_card_svg",
     "verification_page",
 ]

@@ -180,6 +180,8 @@ COPY: dict[str, dict[str, Any]] = {
         ),
         "cta_button": "Auditar mi archivo",
         "sample_link": "Ver un informe de ejemplo",
+        "read_more": "Lee también:",
+        "reader_link": "Crear una tarjeta de cifras para compartir",
         "why_title": "Por qué la búsqueda importa",
         "why": [
             "Si pruebas 100 configuraciones sin ninguna ventaja real, la mejor de ellas casi "
@@ -274,6 +276,8 @@ COPY: dict[str, dict[str, Any]] = {
         ),
         "cta_button": "Audit my file",
         "sample_link": "See a sample report",
+        "read_more": "Read next:",
+        "reader_link": "Create a shareable figures card",
         "why_title": "Why the search matters",
         "why": [
             "Try 100 configurations with no real edge and the best of them almost always shows "
@@ -368,6 +372,8 @@ COPY: dict[str, dict[str, Any]] = {
         ),
         "cta_button": "Auditar meu arquivo",
         "sample_link": "Ver um relatório de exemplo",
+        "read_more": "Leia também:",
+        "reader_link": "Criar um cartão de números para compartilhar",
         "why_title": "Por que a busca importa",
         "why": [
             "Teste 100 configurações sem nenhuma vantagem real e a melhor delas quase sempre "

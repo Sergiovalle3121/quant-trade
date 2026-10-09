@@ -2289,6 +2289,8 @@ Routes:
 | `GET /terminos`, `GET /terms` | Terms of service (`audit/legal.py`), Spanish and English; either answers `?lang=`. |
 | `GET /privacidad`, `GET /privacy` | Privacy policy, Spanish and English. |
 | `GET /en/terms`, `/en/privacy`, `/pt/terms`, `/pt/privacy` | 301 to the legal page in that language (guessed addresses). |
+| `GET /herramientas` | The free tools page (`/en/tools`, `/pt/ferramentas`; `/tools` and `/pt/tools` redirect there): calculator, figure reader and report check. |
+| `GET /en/calculator`, `/reading`, `/en/methodology`, `/en/articles`, `/en/guides`, `/en/sample`, `/en/check`, `/faq`, `/examples` | 301 to the page people meant (`/calculator`, `/en/reading`, `/methodology`, `/articles`, `/guides`, `/sample`, `/check`, `/en/faq`, `/en/examples`). The first two keep the query string. |
 | `POST /webhooks/stripe`, `POST /waitlist`, `GET /health` | Payment confirmation, waiting list, health check. |
 
 Languages. Spanish is the default on every route, and the Spanish URLs and
@@ -3407,7 +3409,10 @@ Launch basics (2026-09-28, `tests/test_audit_launch_basics.py`):
 - **Short addresses.** The addresses that forward to a page (`/soporte`,
   `/contact`, `/pricing`, `/en/terms`...) and the icon addresses are
   handlers without parameters: the target and the file are fixed in the
-  code, and a query string cannot change them.
+  code, and a query string cannot change them. Two of them,
+  `/en/calculator` and `/reading`, pass the query string along
+  (`_forward(..., keep_query=True)`) so a shared calculator or reader link
+  keeps its figures; their target path is still fixed in the code.
 - **Sample title.** The tab title of `/ejemplo` and `/pt/exemplo` ends in
   "ejemplo" and "exemplo" instead of the report id "sample". The report and
   its numbers are untouched.
@@ -4521,6 +4526,29 @@ URL's `options`. See
   development is not treated as backtest history. The first case has no
   declared Sharpe/history/trial count, so its calculator link does not invent
   those inputs. All calculator links carry `ref=ejemplos`.
+- **Free tools page.** `/herramientas`, `/en/tools` and `/pt/ferramentas`
+  (`tools_hub.py`, rendered by `pages.tools_page`) gather the tools that need
+  no file: the luck calculator, the figure reader and the report check. Each
+  block says what the visitor enters and what comes back, without an account,
+  and the page shows no figure of its own; a last block points to the upload
+  form, the sample report and the articles. The page is in `PUBLIC_PAGES`
+  (150 sitemap URLs) with its canonical, `hreflang` alternates and a JSON-LD
+  `ItemList` of free `WebApplication` entries (`seo.tools_structured_data`,
+  price 0). The menu links it where it used to link the comparison; `/comparar`
+  keeps its `noindex`, stays out of the sitemap and is still linked from the
+  footer, from "My account" and from the reports. The footer also links the
+  tools page and the articles. The landing shows the three tools under the
+  cases (`_tools_band`). The reader links the calculator, the win-rate article
+  and the tools page, and ends, with or without a card, with what only the file
+  can measure. The calculator links the deflated-Sharpe article and the reader;
+  the examples link the reader; the prop-firm case and its article link each
+  other, and the prop-firm, robot-buyer and signal-copier cases list their
+  articles (`pages.AUDIENCE_ARTICLES`). Guessed addresses (`/tools`,
+  `/pt/tools`, `/en/calculator`, `/reading`, `/en/methodology`, `/en/articles`,
+  `/en/guides`, `/en/sample`, `/en/check`, `/faq`, `/examples`) answer 301 to
+  the page they meant; each one gave a 404 before, and no address that already
+  answered 200 changed. Offline regressions: `test_audit_tools_hub.py` and
+  `test_audit_theme.py::test_navigation_has_a_phone_menu_and_links_the_free_tools`.
 - **Conservative measured count.** Only completed customer uploads explicitly
   marked in the additive `audit_count_eligibility` table contribute. The engine
   and renderer must finish before that mark is written, in the audit insert's
