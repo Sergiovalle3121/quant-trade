@@ -442,8 +442,9 @@ _COPY: dict[str, dict[str, Any]] = {
             ),
             (
                 "¿Qué recibo?",
-                "Gratis, la vista previa: clase de A a D, gráficas, banderas rojas "
-                "y qué significa cada dimensión. El informe completo añade cada cifra, pruebas "
+                "Gratis, la vista previa: clase de A a D, gráficas, la revisión de "
+                f"{len(FLAG_TITLES)} banderas rojas y qué significa cada dimensión. "
+                "El informe completo añade cada cifra, pruebas "
                 "de estrés, riesgo y capital, simulador de retos, la cuenta real frente al "
                 "backtest si la subes, preguntas para el vendedor y el PDF. Mira el ejemplo "
                 "completo antes de pagar.",
@@ -758,8 +759,9 @@ _COPY: dict[str, dict[str, Any]] = {
             ),
             (
                 "What do I get?",
-                "For free, the preview: A to D class, charts, red flags and what each "
-                "dimension means. The full report adds every figure, stress tests, risk and "
+                "For free, the preview: A to D class, charts, the check for "
+                f"{len(FLAG_TITLES)} red flags and what each dimension means. "
+                "The full report adds every figure, stress tests, risk and "
                 "capital, the challenge simulator, the live account against the backtest if you "
                 "upload it, questions for the vendor and the PDF. See the full sample before you "
                 "pay.",
