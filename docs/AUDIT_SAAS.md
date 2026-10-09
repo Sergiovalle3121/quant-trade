@@ -2110,16 +2110,27 @@ Each sample also has the public page a publication of its report would get
 `card.png`. They go through the `/v/{public_id}` routes, functions and caching
 (`pages.verification_page`, badge, cards; `?lang=` and `noindex` as any `/v`),
 from the view a retention purge keeps (`store.public_view`) of the sample's
-Spanish report, built in memory once per set of public series, with the
-synthetic-data notice and a link to the full sample on top. Nothing is read
-from or written to the database. The two ids cannot be real ones: a real id is
-`secrets.token_urlsafe(9)`, always 12 characters, and `/v` answers the reserved
-ids before any lookup. The report's publish block links the one of its kind
-(an account history the signal's), the FAQ's publishing answer and the page for
-funds and signal providers link both, and each sample links its own from its
-band. `/comprobar` answers a sample's PDF as before.
-`tests/test_audit_sample_publication.py` compares each page, badge and card
-with those of a real publication of the same report, before and after a purge.
+Spanish report, built in memory once per set of public series from the same
+run as the sample's report page and PDF, with the synthetic-data notice and a
+link to the full sample on top. A publication has one hash, so the page shows
+the Spanish report's in every language: its notice links that report, and in
+English and Portuguese (whose reports are other results with other hashes) the
+notice and the sample band say the page is made from the Spanish version.
+Nothing is read from or written to the database. The two ids cannot be real
+ones: a real id is `secrets.token_urlsafe(9)`, always 12 characters, and `/v`
+answers the reserved ids before any lookup. Only what would pass a sample off
+as someone's audit is said its own way (`sample_publication.sample_page`): the
+tab title and link preview start with "Sample", the share text says what the
+page is (never "I audited my...") under its own funnel tag (`v-ejemplo`, not
+`share`), the badge code is shown as the sample's without a copy button, and
+"Published" is the day the pages came out (`SAMPLE_PAGES_PUBLISHED`, a bare
+date), never the audit's date. The report's publish block links the closest
+sample (an account history or a fund's track record the signal's), the FAQ's
+publishing and badge answers and the page for funds and signal providers link
+both, and each sample links its own from its band. `/comprobar` answers a
+sample's PDF as before. `tests/test_audit_sample_publication.py` compares each
+page, badge and card with those of a real publication of the same report,
+before and after a purge, with only those words different.
 
 Sharpe after the cash rate (`audit/cashrate.py`). With public data on, the
 report adds one line under the key figures: the Sharpe ratio of the returns

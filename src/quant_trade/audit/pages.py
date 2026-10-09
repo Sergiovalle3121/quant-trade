@@ -117,7 +117,7 @@ from quant_trade.audit.report import (
     report_kind,
     source_name,
 )
-from quant_trade.audit.sample_publication import public_pages_line
+from quant_trade.audit.sample_publication import SamplePage, public_pages_line
 from quant_trade.audit.seo import (
     BRAND,
     OG_IMAGE_SIZE,
@@ -2963,7 +2963,8 @@ def _utc_time(stamp: str, locale: str) -> str:
     """An ISO UTC stamp as a readable ``<time>`` (24 sep 2026 · 17:30 UTC).
 
     The exact stamp stays in the ``datetime`` attribute; anything that does
-    not parse is shown as it came.
+    not parse is shown as it came. A bare date (a public sample's day of
+    publication) is shown without a time of day.
     """
     try:
         when = datetime.fromisoformat(stamp.replace("Z", "+00:00"))
@@ -2974,6 +2975,8 @@ def _utc_time(stamp: str, locale: str) -> str:
         day = f"{when.day} {month} {when.year}"
     else:
         day = f"{month} {when.day}, {when.year}"
+    if len(stamp) == len("2026-10-09"):
+        return f"<time datetime='{_e(stamp)}'>{day}</time>"
     return f"<time datetime='{_e(stamp)}'>{day} · {when:%H:%M} UTC</time>"
 
 
@@ -3036,7 +3039,7 @@ def verification_page(
     result_sha256: str,
     base_url: str,
     locale: str = "es",
-    notice_html: str = "",
+    sample: SamplePage | None = None,
 ) -> str:
     """The public page of a published audit.
 
@@ -3050,9 +3053,11 @@ def verification_page(
     view kept before the period was shown has no dates, and those rows are
     left out.
 
-    ``notice_html`` goes on top, above the title: only a public sample's page
-    (``sample_publication.sample_notice_html``) has one; a publication's page
-    never does, and without it nothing else on the page changes.
+    ``sample`` is only a public sample's page (``sample_publication.sample_page``),
+    which is nobody's audit: its notice goes on top, above the title; its title
+    and link preview start with "Sample"; its share text is its own; and its
+    badge code is shown as the sample's, without a copy button. A publication's
+    page never has one, and without it nothing on the page changes.
     """
     locale = _locale(locale)
     copy = _COPY[locale]
@@ -3129,6 +3134,9 @@ def verification_page(
     description = copy["v_description"].format(
         cls_label=cls_label, overall=overall, date=audited[:10], notice=BADGE_NOTICE[locale]
     )
+    if sample is not None:
+        title = f"{sample.title_word} · {title}"
+        description = f"{sample.meta_lead} · {description}"
     alternates = {lang: f"/v/{public_id}?lang={lang}" for lang in CLASS_WORD}
     alternates["es"] = f"/v/{public_id}"
     # Never indexed (an unpublished page should not linger in search), but it
@@ -3150,7 +3158,7 @@ def verification_page(
         + aurora()
         + grid_bg()
         + "<div class='wrap'>"
-        + notice_html
+        + (sample.notice_html if sample is not None else "")
         + f"<div class='eyebrow rise'><span class='dot'></span>{_e(ui['v_eyebrow'])}</div>"
         f"<h1 class='rise' style='--i:1'>{_e(copy['v_title'])}</h1>"
         "<div class='v-hero rise' style='--i:2'>"
@@ -3179,16 +3187,24 @@ def verification_page(
         f"<section class='rsec'><h2>{_e(copy['v_badge'])}</h2><div class='badge-preview'>"
         f"<img src='/v/{_e(public_id)}/badge.svg?lang={_e(locale)}' "
         f"alt='{_e(BADGE_NOTICE[locale])}' width='480' height='72'></div>"
-        f"<p class='muted' style='margin-top:18px'>{_e(copy['v_badge_help'])}</p>"
+        f"<p class='muted' style='margin-top:18px'>"
+        f"{_e(sample.badge_help if sample is not None else copy['v_badge_help'])}</p>"
         f"<pre><code id='badge-code'>{_e(snippet)}</code></pre>"
-        f"<div class='copy-row'><button class='btn btn-dark btn-sm' type='button' "
-        f"data-copy='badge-code' data-done='{_e(ui['v_copied'])}' hidden>{_e(ui['v_copy'])}"
-        "</button></div></section>"
+        + (
+            ""
+            if sample is not None
+            else "<div class='copy-row'><button class='btn btn-dark btn-sm' type='button' "
+            f"data-copy='badge-code' data-done='{_e(ui['v_copied'])}' hidden>{_e(ui['v_copy'])}"
+            "</button></div>"
+        )
+        + "</section>"
         + share_block(
             overall=overall,
             public_id=public_id,
             locale=locale,
             kind=kind,
+            template=sample.share_template if sample is not None else None,
+            ref=sample.share_ref if sample is not None else "share",
         )
         + "</div></div>"
     )

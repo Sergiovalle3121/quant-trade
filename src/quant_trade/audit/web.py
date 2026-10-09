@@ -165,7 +165,7 @@ from quant_trade.audit.sample import sample_result, signal_sample_result
 from quant_trade.audit.sample_publication import (
     SAMPLE_KIND_BY_PUBLIC_ID,
     SAMPLE_PUBLICATION_LOCALE,
-    sample_notice_html,
+    sample_page,
     sample_publication,
 )
 from quant_trade.audit.schema import (
@@ -6368,8 +6368,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             result_sha256=digest,
             base_url=_site_url(request),
             locale=locale,
-            # Empty for a publication: only a public sample's page has a notice.
-            notice_html=sample_notice_html(public_id, locale),
+            # None for a publication: only a public sample's page has its own words.
+            sample=sample_page(public_id, locale),
         )
 
     sample_cache: dict[tuple[str, str, str, tuple[str, ...]], str] = {}
@@ -6399,15 +6399,40 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         ready = market_data.ready() if market_data is not None else ()
         return (market_data.closes if market_data is not None and ready else None), ready
 
-    sample_views: dict[tuple[str, tuple[str, ...]], tuple[Any, dict[str, Any], str]] = {}
+    # Each sample's audit per language, for the set of public series it was built
+    # with: its page, its PDF and its public page share one run, so /v/ejemplo reads
+    # the Spanish result /ejemplo already built (and the other way round).
+    sample_audits: dict[tuple[str, str], tuple[tuple[str, ...], AuditResult]] = {}
+    sample_audit_locks: dict[tuple[str, str], threading.Lock] = {}
+    sample_audit_guard = threading.Lock()
+
+    def _sample_audit(
+        kind: str, locale: str, market: Callable[[str], Any] | None, ready: tuple[str, ...]
+    ) -> AuditResult:
+        """The sample's result in ``locale`` for the series ``ready``: run once and
+        kept until the series change. One lock per sample and language, so a run
+        never holds up another language, and two requests never run the same one."""
+        key = (kind, locale)
+        with sample_audit_guard:
+            lock = sample_audit_locks.setdefault(key, threading.Lock())
+        with lock:
+            kept = sample_audits.get(key)
+            if kept is None or kept[0] != ready:
+                kept = (ready, samples[kind].result(locale, market=market))
+                sample_audits[key] = kept
+            return kept[1]
+
+    sample_views: dict[tuple[str, tuple[str, ...]], tuple[Any, Any, dict[str, Any], str]] = {}
     # Its own lock: building a sample's view never holds up the sample pages.
     sample_view_lock = threading.Lock()
 
     def _sample_publication(public_id: str) -> tuple[Any, Any, dict[str, Any], str]:
-        """``_published`` for a public sample's reserved id: the view a purge keeps
-        of the sample's Spanish report, with the public series in memory as its
-        page has them. Built once per sample and set of series, and kept; nothing
-        is read from or written to the database."""
+        """``_published`` for a public sample's reserved id: its publication (the day
+        it was published), its record (the audit's date and class), the view a purge
+        keeps of the sample's Spanish report and its hash, with the public series in
+        memory as its page has them. Built once per sample and set of series, from
+        the run its report page shares, and kept; nothing is read from or written to
+        the database."""
         kind = SAMPLE_KIND_BY_PUBLIC_ID[public_id]
         with sample_view_lock:
             market, ready = _sample_market()
@@ -6415,11 +6440,9 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 del sample_views[stale]
             key = (kind, ready)
             if key not in sample_views:
-                result = samples[kind].result(SAMPLE_PUBLICATION_LOCALE, market=market)
+                result = _sample_audit(kind, SAMPLE_PUBLICATION_LOCALE, market, ready)
                 sample_views[key] = sample_publication(public_id, result)
-            publication, view, digest = sample_views[key]
-        # The publication and the record in one: its id, date and class.
-        return publication, publication, view, digest
+            return sample_views[key]
 
     def _sample_html(locale: str, base_url: str, kind: str = "backtest") -> str:
         """Built once per sample, locale, address and set of public series in
@@ -6435,7 +6458,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 del sample_cache[stale]
             if key not in sample_cache:
                 html_text, _ = render(
-                    sample.result(locale, market=market),
+                    _sample_audit(kind, locale, market, ready),
                     watermark=False,
                     free_mode=True,
                     notice=sample.banner[locale],
@@ -6472,7 +6495,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 del sample_pdfs[stale]
             if key not in sample_pdfs:
                 page, _ = render(
-                    sample.result(locale, market=market),
+                    _sample_audit(kind, locale, market, ready),
                     watermark=False,
                     free_mode=True,
                     notice=sample.banner[locale],

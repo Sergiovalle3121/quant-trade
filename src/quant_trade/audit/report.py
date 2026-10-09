@@ -9348,8 +9348,9 @@ def render_html(
             kind=report_kind(data),
         )
     elif publish_url and not locked:
-        # Before publishing, the owner can see the page a sample of the same kind
-        # gets (``sample_publication``): an account history, the signal's.
+        # Before publishing, the owner can see the page the closest sample gets
+        # (``sample_publication.sample_public_id``): an account history or a fund's
+        # track record, the signal's; a backtest, the backtest's.
         example = sample_public_path(sample_public_id(report_kind(data)), locale)
         example_words = PUBLIC_PAGE_LINK.get(locale, PUBLIC_PAGE_LINK["es"])
         publish_html = (

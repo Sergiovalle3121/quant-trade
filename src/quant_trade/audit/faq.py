@@ -83,6 +83,15 @@ _PUBLICATION: dict[str, tuple[str, str]] = {
     ),
 }
 
+#: The landing's question on the badge (``pages._COPY[locale]['faq']``), answered on
+#: this page (``landing_only_questions``): its answer also ends with both samples'
+#: public pages, where the badge can be seen before publishing.
+BADGE_QUESTION: dict[str, str] = {
+    "es": "¿Cómo se usa el sello?",
+    "en": "How is the badge used?",
+    "pt": "Como se usa o selo?",
+}
+
 # Every answer cites the existing source of its behavior. Placeholders are
 # resolved at request time, so prices, countries and retention cannot go stale.
 _QUESTIONS: tuple[dict[str, tuple[str, str]], ...] = (
@@ -457,13 +466,16 @@ def faq_page(settings: AuditSettings, *, locale: str = "es", base_url: str | Non
     crumbs = f"<a href='{_home(locale)}'>{_e(words['back'])}</a>" + _language_crumbs(
         FAQ_PATH, locale
     )
-    # The publishing answer ends with both samples' public pages; the structured
-    # data keeps the answer's own words.
-    publishing = localize_tags(_PUBLICATION[locale][0], locale)
+    # The publishing and badge answers end with both samples' public pages; the
+    # structured data keeps the answers' own words.
+    with_example = {
+        localize_tags(_PUBLICATION[locale][0], locale),
+        localize_tags(BADGE_QUESTION[locale], locale),
+    }
     example = public_pages_line(locale, css="faq-example")
     answers = "".join(
         f"<details><summary>{_e(question)}</summary><p>{_e(answer)}</p>"
-        + (example if question == publishing else "")
+        + (example if question in with_example else "")
         + "</details>"
         for question, answer in pairs
     )
