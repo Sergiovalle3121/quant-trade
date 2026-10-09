@@ -1056,7 +1056,7 @@ _UI: dict[str, dict[str, Any]] = {
             "Redactando el veredicto",
         ],
         "faq_eyebrow": "Preguntas",
-        "faq_more": "Todas las preguntas, con precios, pagos y contacto",
+        "faq_more": "Más preguntas: precios, pagos, tu cuenta y contacto",
         "final_title": ("Antes de arriesgar dinero en una estrategia,", "mírala con lupa."),
         "final_lead": "Sube el informe y recibe la clase, las gráficas y su explicación sin costo.",
         "final_tools": "¿Aún sin archivo? Prueba las herramientas gratis, sin registro.",
@@ -1296,7 +1296,7 @@ _UI: dict[str, dict[str, Any]] = {
             "Writing the verdict",
         ],
         "faq_eyebrow": "Questions",
-        "faq_more": "All the questions, with prices, payment and contact",
+        "faq_more": "More questions: prices, payment, your account and contact",
         "final_title": ("Before you put money on a strategy,", "take a close look."),
         "final_lead": "Upload the report and get the class, the charts and their explanation free.",
         "final_tools": "No file yet? Try the free tools, no sign-up.",
@@ -2474,7 +2474,8 @@ def _upload_form(
 #: The landing's questions, by their place in ``_COPY[locale]['faq']`` (Portuguese has
 #: one more, on the report's language): what you get, which file, what happens to it,
 #: the evidence labels, what Rigor does not predict and that it never reaches a
-#: broker. The rest, and the answers on prices and payment, live on ``FAQ_PATH``.
+#: broker. The others in ``_COPY[locale]['faq']`` are answered on ``FAQ_PATH``
+#: (``faq.landing_only_questions``), next to the answers on prices, payment and contact.
 _LANDING_FAQ: dict[str, tuple[int, ...]] = {
     "es": (2, 0, 7, 4, 5, 6),
     "en": (2, 0, 7, 4, 5, 6),
@@ -2483,11 +2484,13 @@ _LANDING_FAQ: dict[str, tuple[int, ...]] = {
 
 
 #: The operator's name and address under the questions, while "who is behind it"
-#: (``_founder``) is not shown; the settings let each language word the address.
+#: (``_founder``) is not shown; the settings let each language word the address. It
+#: never borrows that block's heading (``FOUNDER_COPY[locale]['title']``): without the
+#: founder's photo, "who is behind it" does not appear on the page at all.
 OPERATOR_LINE: dict[str, str] = {
-    "es": "Quién está detrás: {name}, {address}.",
-    "en": "Who is behind it: {name}, {address}.",
-    "pt": "Quem está por trás: {name}, {address}.",
+    "es": "Responsable del servicio: {name}, {address}.",
+    "en": "Service operator: {name}, {address}.",
+    "pt": "Responsável pelo serviço: {name}, {address}.",
 }
 #: The WhatsApp line under the questions (``cfg.contact_url``), on the same terms.
 ASK_LINE: dict[str, tuple[str, str]] = {

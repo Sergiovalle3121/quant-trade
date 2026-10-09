@@ -562,7 +562,7 @@ UI_PT: dict[str, Any] = {
         "Redigindo o veredito",
     ],
     "faq_eyebrow": "Perguntas",
-    "faq_more": "Todas as perguntas, com preços, pagamentos e contato",
+    "faq_more": "Mais perguntas: preços, pagamentos, sua conta e contato",
     "final_title": ("Antes de arriscar dinheiro numa estratégia,", "olhe com lupa."),
     "final_lead": "Envie o relatório e receba a classe, os gráficos e a explicação sem custo.",
     "final_tools": "Ainda sem arquivo? Use as ferramentas grátis, sem cadastro.",

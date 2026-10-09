@@ -23,6 +23,20 @@ def _text(page: str) -> str:
     return html.unescape(re.sub(r"<[^>]+>", " ", page))
 
 
+def _shown_once(locale: str, answer: str) -> bool:
+    """Whether a visitor reads ``answer`` exactly once: on the landing, which keeps six
+    questions, or on the questions page (``FAQ_PATH``), which answers the rest."""
+    from quant_trade.audit.faq import faq_page
+    from quant_trade.audit.settings import AuditSettings
+
+    shown = f"<p>{html.escape(answer, quote=True)}</p>"
+    pages = (
+        landing(locale=locale, free_mode=False, signed_in=False),
+        faq_page(AuditSettings(), locale=locale),
+    )
+    return sum(page.count(shown) for page in pages) == 1
+
+
 @pytest.mark.parametrize("locale", sorted(SIGNUP))
 def test_every_start_button_opens_the_upload_page(locale: str) -> None:
     # The web layer sends a visitor without an account from that page to sign-up.
@@ -103,6 +117,8 @@ def test_the_faq_says_a_forgotten_password_needs_no_email(locale: str) -> None:
     # Two-step sign-in: the reset also asks for the code from the app.
     two_step = {"es": "dos pasos", "en": "two-step", "pt": "duas etapas"}
     assert two_step[locale] in answers[0]
+    # A visitor reads it on the questions page, since the landing keeps six.
+    assert _shown_once(locale, answers[0])
 
 
 @pytest.mark.parametrize("locale", sorted(SIGNUP))
@@ -128,7 +144,7 @@ def test_the_cash_card_uses_the_accounts_currency_for_the_sharpe_and_the_alpha(
 
 
 @pytest.mark.parametrize("locale", sorted(SIGNUP))
-def test_the_landing_says_how_an_account_is_protected(locale: str) -> None:
+def test_the_questions_say_how_an_account_is_protected(locale: str) -> None:
     from quant_trade.audit.pages import _COPY
 
     two_of_three, sessions = {
@@ -139,6 +155,7 @@ def test_the_landing_says_how_an_account_is_protected(locale: str) -> None:
     answers = [answer for _, answer in _COPY[locale]["faq"] if two_of_three in answer]
     assert len(answers) == 1 and sessions in answers[0] and "90" in answers[0]
     assert not find_claims(answers[0])
+    assert _shown_once(locale, answers[0])
     # Passkeys (#362) and the protection card (#365) are named where Mi cuenta names them.
     passkey, card = {
         "es": ("llave de acceso", "Protección de tu cuenta"),

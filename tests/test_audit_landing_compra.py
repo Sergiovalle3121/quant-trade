@@ -178,7 +178,7 @@ def test_the_landing_is_short_and_keeps_its_ways_out(locale: str, with_photo: Pa
 
 @pytest.mark.parametrize("locale", sorted(HOMES))
 def test_the_landing_asks_six_questions_and_links_the_rest(locale: str) -> None:
-    from quant_trade.audit.faq import FAQ_PATH
+    from quant_trade.audit.faq import FAQ_PATH, faq_page
 
     page = _paid_landing(locale)
     faq = page.split("id='faq'", 1)[1].split("</section>", 1)[0]
@@ -196,6 +196,14 @@ def test_the_landing_asks_six_questions_and_links_the_rest(locale: str) -> None:
     assert f"href='{FAQ_PATH[locale]}'" in faq
     # What Rigor does not do is said here, with or without "who is behind it".
     assert html.escape(_COPY[locale]["not"], quote=True) in faq
+    # The link leads to the rest: every other landing question is answered there,
+    # so none of them is left off the site.
+    rest = [pair for i, pair in enumerate(copy) if i not in expected]
+    assert len(rest) == len(copy) - 6 >= 5
+    questions = faq_page(AuditSettings(), locale=locale)
+    for question, answer in rest:
+        assert f"<summary>{html.escape(question, quote=True)}</summary>" in questions
+        assert f"<p>{html.escape(answer, quote=True)}</p>" in questions
 
 
 def test_the_landing_example_comes_right_after_the_first_screen() -> None:
@@ -234,12 +242,37 @@ def test_without_the_photo_there_is_no_founder_block(locale: str, without_photo:
     assert FOUNDER_X_URL not in page
     text = FOUNDER_COPY[locale]["text"].format(name="Sergio Valle")
     assert html.escape(text, quote=True) not in page
-    # The operator's name and address stay, in one plain line under the questions.
+    # The operator's name and address stay, in one plain line under the questions,
+    # worded without the block's heading: "who is behind it" is nowhere on the page.
     faq = page.split("id='faq'", 1)[1].split("</section>", 1)[0]
     line = OPERATOR_LINE[locale].format(name="Sergio Valle", address="México")
     assert html.escape(line, quote=True) in faq
+    title = FOUNDER_COPY[locale]["title"]
+    assert not line.startswith(title) and title.lower() not in line.lower()
+    free = _paid_landing(locale, free_mode=True, operator=("Sergio Valle", "México"))
+    for shown in (page, free):
+        assert title.lower() not in _text(shown).lower()
+        assert find_claims(_text(shown)) == []
     assert "href='https://wa.me/000' rel='noopener'" in faq
     assert "wa.me" not in _paid_landing(locale, contact_url="").split("id='faq'", 1)[1]
+
+
+@pytest.mark.parametrize("locale", sorted(HOMES))
+def test_the_served_landing_without_the_photo_never_says_who_is_behind_it(
+    tmp_path: Path, locale: str, without_photo: Path
+) -> None:
+    settings = _settings(
+        tmp_path,
+        AUDIT_OPERATOR_NAME="Sergio Valle",
+        AUDIT_OPERATOR_ADDRESS="Ciudad de México, México",
+        AUDIT_CONTACT_URL="https://wa.me/000",
+    )
+    for served in (settings, replace(settings, free_mode=True)):
+        page = _client(served).get(HOMES[locale]).text
+        assert "id='quien'" not in page
+        assert FOUNDER_COPY[locale]["title"].lower() not in _text(page).lower()
+        faq = page.split("id='faq'", 1)[1].split("</section>", 1)[0]
+        assert "Sergio Valle" in _text(faq)
 
 
 def test_the_repository_ships_no_founder_photo() -> None:

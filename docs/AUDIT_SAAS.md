@@ -180,7 +180,10 @@ The landing is short, for someone about to pay for a prop-firm challenge or a
 robot: the first screen (headline, lead, button, the price after the free first
 report from settings, "your file is never published"), the sample report's
 finding, who it is for, how it works, the prices, "who is behind it", six
-questions and the closing call. The first screen never mentions a card: a card
+questions and the closing call. Its link to the questions page reads "more
+questions": that page answers the landing's other questions
+(`faq.landing_only_questions`), so none of them leaves the site. The first
+screen never mentions a card: a card
 check is offered only on a report whose free unlock was refused
 (`account_pages.report_box`). The headline and the button are there from the
 first paint; only the illustration rises in, and `[data-reveal]` fades in
@@ -194,7 +197,10 @@ approval of the text, so the repository ships none. Until then the questions
 end with what Rigor does not do, one line with `AUDIT_OPERATOR_NAME` and
 `AUDIT_OPERATOR_ADDRESS` (or its `_EN`/`_PT` wording) when both are set, and
 the WhatsApp line with `AUDIT_CONTACT_URL` (`tests/test_audit_landing_compra.py`,
-`tests/test_audit_landing_trust.py`).
+`tests/test_audit_landing_trust.py`). That line (`pages.OPERATOR_LINE`) reads
+"Responsable del servicio", "Service operator" or "Responsável pelo serviço",
+never the block's heading: without the photo, "who is behind it" is nowhere on
+the page.
 
 `/precios` shows the plans as cards (first report, one report and, when on
 sale, the pack, each button to the upload page and none to a checkout) and one
@@ -4757,8 +4763,12 @@ Tests compare it with the exact binomial tail and check the barrier calculation
 against a separate symmetric-barrier identity. Correlation, changing payoffs,
 selection and real execution can invalidate these teaching assumptions.
 
-`faq.py` serves ten source-commented questions at `/preguntas`, `/en/faq` and
-`/pt/perguntas`, listed in `PUBLIC_PAGES`, the sitemap and footer. Runtime settings
+`faq.py` serves eleven source-commented questions at `/preguntas`, `/en/faq` and
+`/pt/perguntas`, listed in `PUBLIC_PAGES`, the sitemap and footer. Before the
+contact question it also answers the landing's questions the landing does not
+show (`faq.landing_only_questions`: markets, the MT5 optimisation XML, a
+forgotten password, account protection, the badge and, in Portuguese, the
+report's language), worded as in `pages._COPY`. Runtime settings
 supply prices, public card markets, upload size, retention and contact channels.
 It reuses the existing JSON-LD serializer; FAQPage answers match visible localized
 answers. Privacy follows `legal.py`, including retention of the first free full
