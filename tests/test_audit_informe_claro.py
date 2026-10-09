@@ -24,7 +24,7 @@ pytest.importorskip("sqlalchemy")
 
 from fastapi.testclient import TestClient  # noqa: E402
 
-from quant_trade.audit import i18n, report_pt  # noqa: E402
+from quant_trade.audit import i18n, ownership, report_pt  # noqa: E402
 from quant_trade.audit.costs import reference_note  # noqa: E402
 from quant_trade.audit.crises import symbol_market, traded_markets  # noqa: E402
 from quant_trade.audit.engine import DEFAULT_NOT_DECLARED, run_audit  # noqa: E402
@@ -350,7 +350,8 @@ def test_falling_more_than_the_index_survives_the_market_filter(
     data = _with_index(sample_data, ("US500", "NAS100"))
     assert _traded_symbols(data) == ["US500", "NAS100"]
     section = _section(_page(data, locale), LABELS[locale]["crises"])
-    labels = LABELS[locale]
+    # The sample declares whose strategy it is: the warning speaks in that voice.
+    labels = ownership.labels_for(LABELS[locale], locale, ownership.role_of(data))
     assert labels["crises_worse"].format(worse=2, n=2) in section
     assert labels["fund_stress_covid"] in section and labels["fund_stress_rates_2022"] in section
     assert labels["fund_stress_crypto_2022"] not in section
@@ -365,7 +366,7 @@ def test_the_clients_own_index_keeps_the_crises_of_other_markets(
     its warning stay, it is not reduced to "does not apply"."""
     data = _with_index(sample_data, ("AUDUSD", "EURUSD"))
     section = _section(_page(data, locale), LABELS[locale]["crises"])
-    labels = LABELS[locale]
+    labels = ownership.labels_for(LABELS[locale], locale, ownership.role_of(data))
     assert labels["crises_worse"].format(worse=3, n=3) in section
     assert labels["fund_stress_index"] in section
     for key in ("covid", "rates_2022", "crypto_2022"):
