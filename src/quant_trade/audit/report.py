@@ -5186,7 +5186,8 @@ def _shuffle_html(shuffle: dict[str, Any] | None, labels: dict[str, str]) -> str
 
 def _pips_by_symbol_html(block: dict[str, Any] | None, locale: str, labels: dict[str, str]) -> str:
     """The break-even and reference costs in pips of each pair traded (a metal
-    stays in basis points, with the reason), under the costs table."""
+    stays in basis points, with the reason), under the costs table; the other
+    symbols traded are named under it, so the table never reads as all of them."""
     rows = (block or {}).get("rows") or []
     if not block or not rows:
         return ""
@@ -5220,6 +5221,7 @@ def _pips_by_symbol_html(block: dict[str, Any] | None, locale: str, labels: dict
             + cell(row.get("reference_pips"), "reference_pips")
             + "</tr>"
         )
+    others = str((block.get("others") or {}).get("note") or "")
     return (
         f"<h3>{_e(labels['cost_pips_title'])}</h3>"
         f"<p class='muted'>{_e(localize(str(block.get('note', '')), locale))}</p>"
@@ -5229,6 +5231,7 @@ def _pips_by_symbol_html(block: dict[str, Any] | None, locale: str, labels: dict
         f"<th class='val'>{_e(_key_label('reference_pips', labels))}</th></tr>"
         + body
         + "</table></div>"
+        + (f"<p class='muted'>{_e(localize(others, locale))}</p>" if others else "")
     )
 
 

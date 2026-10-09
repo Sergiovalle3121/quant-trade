@@ -4618,22 +4618,57 @@ RULES: tuple[tuple[str, str], ...] = (
         "não há um tamanho de pip definido para os metais; o custo deste símbolo fica em pb",
     ),
     (
-        "cost per lot and side at which the ledger nets to zero: the net at 0x, "
+        "other symbols traded ({symbols}) stay in bps: the audit defines no pip size for them",
+        "os outros símbolos operados ({symbols}) ficam em pb: a auditoria não define um "
+        "tamanho de pip para eles",
+    ),
+    (
+        "cost per lot and side at which the ledger nets to zero: the net the file prints, "
         "{net} {currency}, over {lots} lots traded counting entries and exits",
-        "custo por lote e lado com o qual o resultado fica em zero: o líquido a 0x, "
-        "{net} {currency}, dividido por {lots} lotes negociados contando entradas e saídas",
+        "custo por lote e lado com o qual o resultado fica em zero: o líquido que o arquivo "
+        "imprime, {net} {currency}, dividido por {lots} lotes negociados contando entradas e "
+        "saídas",
     ),
     (
         "extra cost per lot and side, on top of the report's fees, at which the ledger nets "
-        "to zero: the net at 0x, {net} {currency}, over {lots} lots traded counting entries "
-        "and exits",
+        "to zero: the net the file prints after those fees, {net} {currency}, over {lots} lots "
+        "traded counting entries and exits",
         "custo extra por lote e lado, além dos custos do relatório, com o qual o resultado "
-        "fica em zero: o líquido a 0x, {net} {currency}, dividido por {lots} lotes "
-        "negociados contando entradas e saídas",
+        "fica em zero: o líquido que o arquivo imprime depois desses custos, {net} "
+        "{currency}, dividido por {lots} lotes negociados contando entradas e saídas",
     ),
     (
-        "the file does not give each trade's volume in lots",
-        "o arquivo não dá o volume de cada operação em lotes",
+        "cost per lot and side at which the ledger nets to zero: the net the file prints, "
+        "{net} {currency}, over {lots} lots traded counting entries and exits; the lots of "
+        "the {count} currency pairs are added as the platform prints them",
+        "custo por lote e lado com o qual o resultado fica em zero: o líquido que o arquivo "
+        "imprime, {net} {currency}, dividido por {lots} lotes negociados contando entradas e "
+        "saídas; os lotes dos {count} pares de moedas são somados como a plataforma os imprime",
+    ),
+    (
+        "extra cost per lot and side, on top of the report's fees, at which the ledger nets "
+        "to zero: the net the file prints after those fees, {net} {currency}, over {lots} lots "
+        "traded counting entries and exits; the lots of the {count} currency pairs are added "
+        "as the platform prints them",
+        "custo extra por lote e lado, além dos custos do relatório, com o qual o resultado "
+        "fica em zero: o líquido que o arquivo imprime depois desses custos, {net} "
+        "{currency}, dividido por {lots} lotes negociados contando entradas e saídas; os "
+        "lotes dos {count} pares de moedas são somados como a plataforma os imprime",
+    ),
+    (
+        "the money per lot is given only for MetaTrader 4 and 5 reports, whose volume column "
+        "is the platform's lots",
+        "o dinheiro por lote só é dado para os relatórios do MetaTrader 4 e 5, cuja coluna "
+        "de volume são os lotes da plataforma",
+    ),
+    (
+        "the trades are on several symbols and not all are pairs of USD, EUR, GBP, JPY, CHF, "
+        "AUD, NZD or CAD: a lot of one instrument is not the same size as a lot of another (a "
+        "lot of gold is not a lot of EURUSD), so their lots are not added together",
+        "as operações são de vários símbolos e nem todos são pares de USD, EUR, GBP, JPY, "
+        "CHF, AUD, NZD ou CAD: um lote de um instrumento não tem o mesmo tamanho que um lote "
+        "de outro (um lote de ouro não é um lote de EURUSD), então os seus lotes não são "
+        "somados",
     ),
     (
         "no traded notional",

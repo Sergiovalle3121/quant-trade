@@ -5,16 +5,26 @@ from __future__ import annotations
 
 import html
 import re
+from pathlib import Path
 from typing import Any
 
 import numpy as np
 import pytest
 
 from quant_trade.audit.engine import (
-    PER_LOT_NO_LOTS,
+    PER_LOT_MIXED,
+    PER_LOT_NOTE,
     PER_LOT_NOTE_FEES,
+    PER_LOT_NOTE_FEES_PAIRS,
+    PER_LOT_NOTE_PAIRS,
+    PER_LOT_ONLY_METATRADER,
     PIPS_BY_SYMBOL_NOTE,
     PIPS_NO_METAL_SIZE,
+    PIPS_OTHERS_NOTE,
+    _costs,
+    _stress,
+    _symbol_code,
+    fx_pair,
     run_audit,
 )
 from quant_trade.audit.guard import find_claims
@@ -29,7 +39,11 @@ from quant_trade.audit.report import (
     _kpi_list,
     render_html,
 )
-from quant_trade.audit.sample import _sample_report, synthetic_mt5_report
+from quant_trade.audit.sample import (
+    _sample_report,
+    synthetic_live_statement,
+    synthetic_mt5_report,
+)
 from quant_trade.audit.schema import AuditResult, DeclaredMetadata, build_inputs
 
 LOCALES = ("es", "en", "pt")
@@ -47,8 +61,31 @@ TRADES: tuple[tuple[str, str, float, float, float, float], ...] = (
     ("USDJPY", "buy", 0.3, 149.000, 148.800, 700.0),
     ("EURUSD", "sell", 1.0, 1.08000, 1.08100, 100_000.0),
 )
+#: The same history without the metal: two currency pairs only.
+PAIRS = tuple(row for row in TRADES if row[0] != "XAUUSD")
+#: Exchange prefixes, a pair and a metal behind them, and two symbols with no
+#: pip size (a peso pair and an index): USDMXN 5,800 USD per peso, US30 1 USD.
+PREFIXED: tuple[tuple[str, str, float, float, float, float], ...] = (
+    ("OANDA:XAUUSD", "buy", 0.1, 2000.00, 2010.00, 100.0),
+    ("FX:EURUSD", "buy", 1.0, 1.10000, 1.10200, 100_000.0),
+    ("USDMXN", "buy", 1.0, 17.0000, 17.0500, 5_800.0),
+    ("FX:EURUSD", "sell", 0.5, 1.10500, 1.10300, 100_000.0),
+    ("US30", "buy", 1.0, 38_000.0, 38_100.0, 1.0),
+    ("USDMXN", "sell", 1.0, 17.1000, 17.0000, 5_800.0),
+    ("FX:EURUSD", "buy", 0.2, 1.09000, 1.08900, 100_000.0),
+)
+#: Gold alone, under two broker names of the same symbol.
+GOLD: tuple[tuple[str, str, float, float, float, float], ...] = (
+    ("XAUUSD", "buy", 0.1, 2000.00, 2010.00, 100.0),
+    ("XAUUSD.r", "sell", 0.2, 2020.00, 2015.00, 100.0),
+    ("XAUUSD", "buy", 0.1, 2030.00, 2028.00, 100.0),
+)
+#: Gold and silver: two metals, no pair (a lot of silver is 5,000 oz).
+METALS = (*GOLD, ("XAGUSD", "buy", 0.1, 23.000, 23.100, 5_000.0))
 #: Commission per lot on every deal (entry and exit), in USD.
 COMMISSION_PER_LOT = 3.5
+FIXTURES = Path(__file__).parent / "fixtures" / "audit_imports"
+AND = {"es": "y", "en": "and", "pt": "e"}
 
 
 def _profit(side: str, lots: float, entry: float, exit_price: float, per_unit: float) -> float:
@@ -123,6 +160,12 @@ def mixed() -> dict[str, Any]:
     return _audit(_mt5_report(TRADES), cost_bps_per_side=1.0).model_dump(mode="json")
 
 
+@pytest.fixture(scope="module")
+def pairs() -> dict[str, Any]:
+    """The two pairs without the metal, with a declared cost of 1 bp."""
+    return _audit(_mt5_report(PAIRS), cost_bps_per_side=1.0).model_dump(mode="json")
+
+
 def _by_hand_bps() -> float:
     """``break_even_bps`` by its closed form, from the rows written above."""
     gross = sum(_profit(s, lots, a, b, k) for _, s, lots, a, b, k in TRADES)
@@ -170,25 +213,64 @@ def test_pips_by_symbol_match_the_formula_for_two_pairs_and_a_metal(
     assert "pip_size" not in metal
     for key in ("break_even_pips", "reference_pips"):
         assert metal[key] == {"value": None, "evidence": "NOT_MEASURED", "note": PIPS_NO_METAL_SIZE}
+    # Every symbol traded is a pair or a metal: no other symbol to name.
+    assert "others" not in block
 
 
-def test_the_money_per_lot_squares_with_the_report_by_hand(mixed: dict[str, Any]) -> None:
-    costs = mixed["costs"]
-    profits = sum(_profit(s, lots, a, b, k) for _, s, lots, a, b, k in TRADES)
-    commissions = sum(2 * round(COMMISSION_PER_LOT * t[2], 2) for t in TRADES)
-    lots = sum(t[2] for t in TRADES)
-    assert profits == pytest.approx(628.0) and commissions == pytest.approx(33.6)
-    assert lots == pytest.approx(4.8)
-    expected = (profits - commissions) / (2 * lots)  # 594.40 over 9.60 lots
+def test_the_money_per_lot_squares_with_the_report_by_hand(pairs: dict[str, Any]) -> None:
+    costs = pairs["costs"]
+    profits = sum(_profit(s, lots, a, b, k) for _, s, lots, a, b, k in PAIRS)
+    commissions = sum(2 * round(COMMISSION_PER_LOT * t[2], 2) for t in PAIRS)
+    lots = sum(t[2] for t in PAIRS)
+    assert profits == pytest.approx(628.0) and commissions == pytest.approx(31.5)
+    assert lots == pytest.approx(4.5)
+    expected = (profits - commissions) / (2 * lots)  # 596.50 over 9.00 lots
     per_lot = costs["break_even_per_lot"]
     assert per_lot["evidence"] == "MEASURED"
     assert per_lot["value"] == pytest.approx(expected, rel=1e-9)
-    assert per_lot["value"] == pytest.approx(61.9166667, rel=1e-6)
+    assert per_lot["value"] == pytest.approx(66.2777778, rel=1e-6)
     assert costs["per_lot_currency"] == "USD"
-    assert per_lot["note"] == PER_LOT_NOTE_FEES.format(net="594.40", currency="USD", lots="9.60")
-    # The net it divides is the 0x row of the costs table.
+    # Two currency pairs: their lots are added, and the note says so.
+    assert per_lot["note"] == PER_LOT_NOTE_FEES_PAIRS.format(
+        net="596.50", currency="USD", lots="9.00", count=2
+    )
+
+
+def test_with_a_metal_among_the_symbols_the_lots_are_not_added(mixed: dict[str, Any]) -> None:
+    """A lot of XAUUSD (100 oz) is not a lot of EURUSD: no money per lot."""
+    costs = mixed["costs"]
+    assert costs["break_even_per_lot"] == {
+        "value": None,
+        "evidence": "NOT_MEASURED",
+        "note": PER_LOT_MIXED,
+    }
+    assert "per_lot_currency" not in costs
+
+
+def test_the_money_per_lot_uses_the_net_the_file_prints() -> None:
+    """The per-lot net is each row's profit after the commission the file
+    itemises, the stress tile's "with all": not the 0x row of the costs table,
+    which re-prices each trade with the contract size the importer infers and
+    is a few cents off on the sample."""
+    inputs = build_inputs(
+        None,
+        DeclaredMetadata(),
+        report_bytes=_sample_report(),
+        report_filename="SyntheticSampleEA.html",
+    )
+    assert inputs.trades is not None and inputs.trade_lots
+    costs, *_ = _costs(inputs)
+    net = _stress(inputs, inputs.equity.frame)["trades"]["original"]["value"]
+    printed = sum(t.pnl for t in inputs.trades.trades) + sum(inputs.reported_fees.values())
+    assert net == pytest.approx(printed, abs=1e-6)
+    lots = 2.0 * sum(inputs.trade_lots)
+    per_lot = costs["break_even_per_lot"]
+    assert per_lot["value"] == pytest.approx(net / lots, rel=1e-12)
+    assert per_lot["note"] == PER_LOT_NOTE_FEES_PAIRS.format(
+        net=f"{net:,.2f}", currency="USD", lots=f"{lots:,.2f}", count=2
+    )
     zero = next(row for row in costs["rows"] if row["multiplier"] == 0)
-    assert zero["net_pnl"]["value"] == pytest.approx(profits - commissions)
+    assert abs(zero["net_pnl"]["value"] - net) > 0.01
 
 
 def test_one_pair_keeps_its_keys() -> None:
@@ -213,26 +295,104 @@ def test_one_pair_keeps_its_keys() -> None:
         "evidence": "DECLARED",
         "note": where,
     }
+    # One symbol: its lots are the money per lot's, with no note about pairs.
+    per_lot = costs["break_even_per_lot"]
+    assert per_lot["evidence"] == "MEASURED"
+    assert per_lot["note"].startswith(PER_LOT_NOTE_FEES.split("{", 1)[0])
+    assert "currency pairs" not in per_lot["note"]
 
 
 @pytest.mark.parametrize(
-    "fixture", ["tradingview_g1.csv", "ninjatrader.csv", "quantconnect_trades.csv"]
+    "fixture",
+    ["tradingview_g1.csv", "ninjatrader.csv", "quantconnect_trades.csv", "myfxbook.csv"],
 )
-def test_no_lots_in_the_file_is_not_measured(fixture: str) -> None:
-    from pathlib import Path
-
-    data = (Path(__file__).parent / "fixtures" / "audit_imports" / fixture).read_bytes()
+def test_a_file_outside_metatrader_gives_no_money_per_lot(fixture: str) -> None:
+    """The reason is true of every such file: a Myfxbook export prints its
+    'Units/Lots', but no contract size is assumed outside MetaTrader."""
+    if fixture == "myfxbook.csv":
+        data = synthetic_live_statement()
+    else:
+        data = (FIXTURES / fixture).read_bytes()
     inputs = build_inputs(None, DeclaredMetadata(), report_bytes=data, report_filename=fixture)
+    if fixture == "myfxbook.csv":
+        assert inputs.source_format == "myfxbook_csv"
     assert inputs.trade_lots is None
-    from quant_trade.audit.engine import _costs
-
     costs, *_ = _costs(inputs)
     assert costs["break_even_per_lot"] == {
         "value": None,
         "evidence": "NOT_MEASURED",
-        "note": PER_LOT_NO_LOTS,
+        "note": PER_LOT_ONLY_METATRADER,
     }
     assert "per_lot_currency" not in costs
+
+
+def test_an_exchange_prefix_is_dropped() -> None:
+    assert _symbol_code("OANDA:XAUUSD") == "XAUUSD"
+    assert _symbol_code("XAUUSD.r") == "XAUUSD"
+    assert fx_pair(["FX:EURUSD", "EURUSD.m"], {}) == "EURUSD"
+    assert fx_pair(["OANDA:XAUUSD"], {}) is None
+    # A platform's description with a colon in it is not a prefix.
+    assert fx_pair([], {"symbol": "EURUSD (Euro: US Dollar)"}) == "EURUSD"
+    one = tuple(row for row in PREFIXED if row[0] == "FX:EURUSD")
+    costs = _audit(_mt5_report(one)).model_dump(mode="json")["costs"]
+    assert costs["pip_symbol"] == "EURUSD" and "pips_by_symbol" not in costs
+
+
+@pytest.fixture(scope="module")
+def prefixed() -> AuditResult:
+    return _audit(_mt5_report(PREFIXED), cost_bps_per_side=1.0)
+
+
+def test_other_symbols_are_named_and_a_prefixed_metal_keeps_its_name(
+    prefixed: AuditResult,
+) -> None:
+    costs = prefixed.model_dump(mode="json")["costs"]
+    block = costs["pips_by_symbol"]
+    assert [row["symbol"] for row in block["rows"]] == ["EURUSD", "XAUUSD"]
+    assert [row["trades"] for row in block["rows"]] == [3, 1]
+    assert block["rows"][1]["break_even_pips"]["note"] == PIPS_NO_METAL_SIZE
+    # USDMXN and US30 have no pip size: they are named, most traded first.
+    assert block["others"] == {
+        "symbols": ["USDMXN", "US30"],
+        "note": PIPS_OTHERS_NOTE.format(symbols="USDMXN, US30"),
+    }
+    assert costs["break_even_per_lot"]["note"] == PER_LOT_MIXED
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+def test_the_report_names_the_symbols_left_in_bps(prefixed: AuditResult, locale: str) -> None:
+    page = render_html(prefixed, watermark=False, locale=locale)
+    text = _visible(page)
+    note = prefixed.model_dump(mode="json")["costs"]["pips_by_symbol"]["others"]["note"]
+    assert localize(note, locale) in text
+    assert "USDMXN, US30" in localize(note, locale)
+    assert "OANDAX" not in text and "FXEURU" not in text
+    assert find_claims(page) == []
+    if locale != "en":
+        assert untranslated(prefixed.model_dump(mode="json"), locale) == []
+        assert "the audit defines no pip size" not in text
+
+
+@pytest.mark.parametrize(("trades", "lots_added"), [(GOLD, True), (METALS, False)])
+def test_metals_alone_have_no_table_in_pips(
+    trades: tuple[tuple[str, str, float, float, float, float], ...], lots_added: bool
+) -> None:
+    """Gold alone (or gold and silver) has no figure in pips: no table whose
+    only rows read "not measured"."""
+    result = _audit(_mt5_report(trades), cost_bps_per_side=1.0)
+    costs = result.model_dump(mode="json")["costs"]
+    assert "pips_by_symbol" not in costs and "break_even_pips" not in costs
+    per_lot = costs["break_even_per_lot"]
+    if lots_added:
+        # One symbol (XAUUSD.r is XAUUSD): its own lots, no pairs to add.
+        assert per_lot["evidence"] == "MEASURED"
+        assert per_lot["note"].startswith(PER_LOT_NOTE_FEES.split("{", 1)[0])
+        assert "currency pairs" not in per_lot["note"]
+    else:
+        assert per_lot["note"] == PER_LOT_MIXED
+    for locale in LOCALES:
+        page = render_html(result, watermark=False, locale=locale)
+        assert LABELS[locale]["cost_pips_title"] not in _visible(page)
 
 
 def _visible(page: str) -> str:
@@ -242,7 +402,7 @@ def _visible(page: str) -> str:
 
 @pytest.mark.parametrize("locale", LOCALES)
 def test_the_report_says_the_pips_and_the_money_per_lot(locale: str) -> None:
-    result = _audit(_mt5_report(TRADES), cost_bps_per_side=1.0, locale=locale)
+    result = _audit(_mt5_report(PAIRS), cost_bps_per_side=1.0, locale=locale)
     data = result.model_dump(mode="json")
     costs = data["costs"]
     labels = LABELS[locale]
@@ -266,46 +426,143 @@ def test_the_report_says_the_pips_and_the_money_per_lot(locale: str) -> None:
     assert f"{costs['break_even_bps']['value']:,.2f} {tile}" in text
     assert labels["cost_pips_title"] in text
     assert localize(PIPS_BY_SYMBOL_NOTE, locale) in text
-    assert localize(PIPS_NO_METAL_SIZE, locale) in text
     assert f"{KEY_LABELS[locale]['break_even_per_lot']} {lot} USD" in text
     assert localize(costs["break_even_per_lot"]["note"], locale) in text
     assert find_claims(text) == []
     assert find_claims(page) == []
     if locale != "en":
         assert untranslated(data, locale) == []
-        for english in ("per side on", "the whole history", "per lot and side", "no pip size"):
+        for english in ("per side on", "the whole history", "per lot and side", "currency pairs"):
+            assert english not in text
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+def test_with_a_metal_the_report_says_why_there_is_no_money_per_lot(locale: str) -> None:
+    result = _audit(_mt5_report(TRADES), cost_bps_per_side=1.0, locale=locale)
+    data = result.model_dump(mode="json")
+    costs = data["costs"]
+    labels = LABELS[locale]
+    text = _visible(render_html(result, watermark=False, locale=locale))
+    rows = {row["symbol"]: row for row in costs["pips_by_symbol"]["rows"]}
+    eur = f"{rows['EURUSD']['break_even_pips']['value']:,.1f}"
+    jpy = f"{rows['USDJPY']['break_even_pips']['value']:,.1f}"
+    # The tile keeps the pips and says no money per lot.
+    tile = (
+        f"{labels['kpi_breakeven']} ({labels['bps_side']}; ≈ "
+        + labels["kpi_pips_on"].format(pips=eur, symbol="EURUSD")
+        + " / "
+        + labels["kpi_pips_on"].format(pips=jpy, symbol="USDJPY")
+        + ")"
+    )
+    assert tile in text
+    assert localize(PER_LOT_MIXED, locale) in text
+    assert localize(PIPS_NO_METAL_SIZE, locale) in text
+    assert find_claims(text) == []
+    if locale != "en":
+        assert untranslated(data, locale) == []
+        for english in ("not added together", "no pip size"):
             assert english not in text
 
 
 @pytest.mark.parametrize("locale", LOCALES)
 def test_the_tile_keeps_the_provenance_of_every_figure_it_shows(
-    mixed: dict[str, Any], locale: str
+    pairs: dict[str, Any], locale: str
 ) -> None:
     labels = LABELS[locale]
     label = next(
-        name for name, _, _ in _kpi_list(mixed, labels) if name.startswith(labels["kpi_breakeven"])
+        name for name, _, _ in _kpi_list(pairs, labels) if name.startswith(labels["kpi_breakeven"])
     )
-    assert _kpi_evidence(label, labels, mixed) == "MEASURED"
-    changed = {**mixed, "costs": {**mixed["costs"]}}
+    assert _kpi_evidence(label, labels, pairs) == "MEASURED"
+    changed = {**pairs, "costs": {**pairs["costs"]}}
     changed["costs"]["break_even_per_lot"] = {
-        **mixed["costs"]["break_even_per_lot"],
+        **pairs["costs"]["break_even_per_lot"],
         "evidence": "DECLARED",
     }
     assert _kpi_evidence(label, labels, changed) == "DECLARED"
 
 
 @pytest.mark.parametrize("locale", LOCALES)
-def test_the_plan_quotes_the_history_own_figures(mixed: dict[str, Any], locale: str) -> None:
+def test_the_plan_quotes_the_history_own_figures(
+    mixed: dict[str, Any], pairs: dict[str, Any], locale: str
+) -> None:
     finding, actions = _costs_step(mixed, "WEAK", locale)
     rows = {row["symbol"]: row for row in mixed["costs"]["pips_by_symbol"]["rows"]}
     assert f"EURUSD {rows['EURUSD']['break_even_pips']['value']:,.2f}" in finding
     assert f"USDJPY {rows['USDJPY']['break_even_pips']['value']:,.2f}" in finding
-    assert f"{mixed['costs']['break_even_per_lot']['value']:,.2f} USD" in finding
-    assert "XAUUSD" not in finding
+    # The metal has no pips, and with it the lots are not added: no money per lot.
+    assert "XAUUSD" not in finding and " USD " not in finding
     # The generic EURUSD-at-1.10 line is gone: the history has its own figures.
     assert not any("1.10" in action for action in actions)
-    assert "EURUSD" in actions[0] and "USDJPY" in actions[0]
+    # The broker line names every symbol traded, the metal too.
+    assert f"EURUSD, USDJPY {AND[locale]} XAUUSD." in actions[0]
     assert find_claims(" ".join([finding, *actions])) == []
+    finding, actions = _costs_step(pairs, "WEAK", locale)
+    assert f"{pairs['costs']['break_even_per_lot']['value']:,.2f} USD" in finding
+    assert f"EURUSD {AND[locale]} USDJPY." in actions[0]
+    assert find_claims(" ".join([finding, *actions])) == []
+
+
+def _plan_data(bps: float, symbols: list[str], others: list[str] | None = None) -> dict[str, Any]:
+    """A costs section with one pips row per symbol (a metal reads not measured)."""
+
+    def pips(value: float | None) -> dict[str, Any]:
+        if value is None:
+            return {"value": None, "evidence": "NOT_MEASURED", "note": PIPS_NO_METAL_SIZE}
+        return {"value": value, "evidence": "MEASURED", "note": ""}
+
+    rows = [
+        {
+            "symbol": name,
+            "trades": 10 - index,
+            "break_even_pips": pips(None if name.startswith("XA") else bps * 1.1),
+            "reference_pips": pips(None if name.startswith("XA") else 0.55),
+        }
+        for index, name in enumerate(symbols)
+    ]
+    block: dict[str, Any] = {"note": PIPS_BY_SYMBOL_NOTE, "rows": rows}
+    if others:
+        block["others"] = {"symbols": others, "note": PIPS_OTHERS_NOTE.format(symbols="…")}
+    return {
+        "costs": {
+            "status": "MEASURED",
+            "break_even_bps": {"value": bps, "evidence": "MEASURED", "note": ""},
+            "reference_bps": {"value": 0.5, "evidence": "NOT_MEASURED", "note": ""},
+            "pips_by_symbol": block,
+            "break_even_per_lot": {"value": None, "evidence": "NOT_MEASURED", "note": ""},
+        }
+    }
+
+
+EACH_SYMBOL = {"es": "cada símbolo que operas", "en": "each symbol you trade"}
+EACH_SYMBOL["pt"] = "cada símbolo que você opera"
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+def test_the_plan_names_the_metal_traded_most(locale: str) -> None:
+    _, actions = _costs_step(_plan_data(3.0, ["XAUUSD", "EURUSD"]), "WEAK", locale)
+    assert f"XAUUSD {AND[locale]} EURUSD." in actions[0]
+    # A partial list would leave a symbol out: the line says each symbol instead.
+    for data in (
+        _plan_data(3.0, ["EURUSD"], others=["US30"]),
+        _plan_data(3.0, ["EURUSD", "GBPUSD", "AUDUSD", "XAUUSD"]),
+    ):
+        _, actions = _costs_step(data, "WEAK", locale)
+        assert EACH_SYMBOL[locale] in actions[0] and "1.10" not in actions[0]
+        assert find_claims(actions[0]) == []
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+def test_the_plan_keeps_the_example_when_the_ledger_already_loses(locale: str) -> None:
+    """MT4 statement: two XAUUSD trades and one EURUSD, negative before any
+    extra cost. The finding quotes no pips of its own, so the example stays."""
+    data = (FIXTURES / "mt4_statement.htm").read_bytes()
+    result = _audit(data, cost_bps_per_side=1.5).model_dump(mode="json")
+    assert result["costs"]["break_even_bps"]["value"] < 0
+    finding, actions = _costs_step(result, "WEAK", locale)
+    assert "EURUSD" not in finding
+    assert "1.10" in actions[0]
+    _, actions = _costs_step(_plan_data(-2.0, ["XAUUSD", "EURUSD"]), "WEAK", locale)
+    assert "1.10" in actions[0]
 
 
 @pytest.mark.parametrize("locale", LOCALES)
@@ -403,3 +660,26 @@ def test_every_new_label_exists_in_every_language_and_passes_the_guard() -> None
         assert find_claims(KEY_LABELS[locale]["break_even_per_lot"]) == []
     assert LABELS["pt"]["kpi_per_lot"] != LABELS["en"]["kpi_per_lot"]
     assert KEY_LABELS["pt"]["break_even_per_lot"] != KEY_LABELS["en"]["break_even_per_lot"]
+
+
+def test_every_new_reason_reads_in_every_language_and_passes_the_guard() -> None:
+    values = {"net": "1,234.50", "currency": "USD", "lots": "9.00", "count": "2"}
+    for english in (
+        PER_LOT_NOTE.format(**values),
+        PER_LOT_NOTE_FEES.format(**values),
+        PER_LOT_NOTE_PAIRS.format(**values),
+        PER_LOT_NOTE_FEES_PAIRS.format(**values),
+        PER_LOT_NOTE.format(**{**values, "currency": "in file units"}),
+        PER_LOT_ONLY_METATRADER,
+        PER_LOT_MIXED,
+        PIPS_OTHERS_NOTE.format(symbols="USDMXN, US30"),
+    ):
+        shown = {locale: localize(english, locale) for locale in LOCALES}
+        assert shown["en"] == english
+        assert len(set(shown.values())) == 3, english
+        for text in shown.values():
+            assert find_claims(text) == []
+            assert "{" not in text
+    assert "en unidades del archivo" in localize(
+        PER_LOT_NOTE.format(**{**values, "currency": "in file units"}), "es"
+    )
