@@ -54,6 +54,27 @@ The web extra installs CairoSVG; `Dockerfile.web` explicitly installs
 tests use `pytest.importorskip` when CairoSVG is absent and also skip if its
 native Cairo library cannot load; mocked fallback and cache tests stay offline.
 
+The free win-rate calculator (`audit/winrate.py`) lives at `/calculadora-aciertos`,
+`/en/win-rate-calculator` and `/pt/calculadora-taxa-de-acerto`, all three in the
+sitemap. Its GET form takes four DECLARED fields (`trades`, `win_rate` as a
+percentage, `target_r`, `stop_r`) through `reading.claim_from_query`, so the
+bounds and the localized 400 errors are the owner card's; repeated parameters
+are refused. Every figure comes from the reader's functions:
+`public_card._wilson` (the 95 % Wilson interval on the declared proportion,
+trades assumed independent, a rounded rate kept as a proportion) and
+`public_card.breakeven_rate`, `stop / (target + stop)`, which is the expression
+the reader's card already used, extracted without change (the card's SVG is
+byte-identical). The page compares the interval with break-even, says from
+which size in 20–10,000 trades the lower bound clears it, and shows a table of
+intervals at 30/100/300/1,000 trades and a fixed break-even table. It assumes
+every trade ends at the target or the stop and measures no costs, slippage,
+streaks or whether the rule was fixed before the results; missing inputs stay
+NOT_MEASURED. Nothing is stored: no database row, file or browser storage. The
+share link carries the validated strings and `ref=aciertos` (a funnel tag), and
+a valid result's preview image and card link reuse the reader's `card.png` and
+its 60-per-hour limit; the calculator itself has no limit and renders no card.
+Tests: `tests/test_audit_winrate.py`.
+
 The public name is **Rigor** (the same word in Spanish and English: statistical
 rigor is what the audit sells). It replaced "Contraprueba" on 2026-09-24.
 `seo.BRAND` and `seo.TAGLINE` hold it; it shows in every page head, report

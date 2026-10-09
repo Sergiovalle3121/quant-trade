@@ -15,6 +15,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
+from quant_trade.audit import winrate
 from quant_trade.audit.audiences import AUDIENCE_PAGES, audience_url
 from quant_trade.audit.calculator import CALCULATOR_PATH, PERIODS_PER_YEAR, CalculatorInput, compute
 from quant_trade.audit.calculator import COPY as CALCULATOR_COPY
@@ -44,9 +45,19 @@ LOCALES: tuple[str, ...] = ("es", "en", "pt")
 
 #: The pages an article may point to: the free calculator, an export guide
 #: (by its Spanish slug), an audience page (by its Spanish slug), another article
-#: (by its stable key) or the method.
+#: (by its stable key), the method or the win-rate calculator.
 RELATED_KINDS: frozenset[str] = frozenset(
-    {"calculator", "guide", "audience", "method", "contact", "samples", "reading", "article"}
+    {
+        "calculator",
+        "guide",
+        "audience",
+        "method",
+        "contact",
+        "samples",
+        "reading",
+        "article",
+        "winrate",
+    }
 )
 
 
@@ -4182,6 +4193,7 @@ ARTICLES_DATA: tuple[dict[str, Any], ...] = (
             ],
         },
         "related": [
+            {"kind": "winrate"},
             {"kind": "calculator"},
             {"kind": "method"},
             {"kind": "samples"},
@@ -6355,6 +6367,7 @@ ARTICLES_DATA += (
             ],
         },
         "related": [
+            {"kind": "winrate"},
             {"kind": "reading"},
             {"kind": "reading", "example": "win-rate"},
             {"kind": "calculator"},
@@ -6894,6 +6907,8 @@ def related_links(article: Article, locale: str) -> tuple[tuple[str, str], ...]:
             links.append((CONTACT_COPY[locale]["eyebrow"], CONTACT_PATHS[locale]))
         elif kind == "samples":
             links.append((EXAMPLES_COPY[locale]["title"], EXAMPLES_PATH[locale]))
+        elif kind == "winrate":
+            links.append((winrate.COPY[locale]["nav"], winrate.WINRATE_PATH[locale]))
         elif kind == "reading":
             if link.get("example") == "win-rate":
                 label = {

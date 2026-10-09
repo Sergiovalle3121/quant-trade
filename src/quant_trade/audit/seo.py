@@ -34,6 +34,7 @@ from quant_trade.audit.guides import GUIDES, guide_url, guides_index_url
 from quant_trade.audit.method import METHOD_PATH
 from quant_trade.audit.pricing import PRICING_PATH
 from quant_trade.audit.reading import READING_PATH
+from quant_trade.audit.winrate import WINRATE_PATH
 
 LOCALES: tuple[str, ...] = ("es", "en", "pt")
 
@@ -69,6 +70,7 @@ PUBLIC_PAGES: tuple[dict[str, str], ...] = (
     dict(METHOD_PATH),
     dict(CALCULATOR_PATH),
     dict(READING_PATH),
+    dict(WINRATE_PATH),
     dict(FAQ_PATH),
     dict(PRICING_PATH),
     *({lang: audience_url(a.slug, lang) for lang in ("es", "en", "pt")} for a in AUDIENCE_PAGES),
@@ -267,6 +269,24 @@ def faq_structured_data(items: tuple[tuple[str, str], ...]) -> str:
     )
 
 
+def web_application_structured_data(name: str, description: str, url: str, locale: str) -> str:
+    """A free web tool as schema.org's WebApplication; only fixed copy and its address."""
+    return _json_ld(
+        {
+            "@context": "https://schema.org",
+            "@type": "WebApplication",
+            "name": name,
+            "description": description,
+            "url": url,
+            "applicationCategory": "FinanceApplication",
+            "operatingSystem": "Web",
+            "isAccessibleForFree": True,
+            "inLanguage": locale,
+            "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"},
+        }
+    )
+
+
 def page_paths(path: str) -> dict[str, str]:
     """The language versions of a public ``path`` (``{}`` when it is not public)."""
     return next((dict(pair) for pair in PUBLIC_PAGES if path in pair.values()), {})
@@ -391,4 +411,5 @@ __all__ = [
     "private_meta",
     "robots_txt",
     "sitemap_xml",
+    "web_application_structured_data",
 ]
