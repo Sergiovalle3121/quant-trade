@@ -1083,10 +1083,23 @@ REPORT: dict[str, Any] = {
             "simulações, contando todas as fases. A tabela mostra o que muda com o tamanho; não "
             "aconselha nenhum."
         ),
+        "ch_size_cap": (
+            "«Atinge a meta» conta só o que chega dentro desse limite, que a simulação põe e as "
+            "regras não. Com menos tamanho a meta demora mais: as simulações que passam a «não "
+            "atinge» ficaram sem dias; não romperam uma perda, que tem suas próprias colunas."
+        ),
         "ch_size_one": (
             "1x é o tamanho do histórico que você enviou: cada dia simulado ganha ou perde a "
             "mesma porcentagem do saldo que um dia do arquivo. 0.5x é a metade desse tamanho e "
             "2x, o dobro."
+        ),
+        "ch_size_balance": (
+            "As porcentagens de 1x são medidas sobre o saldo inicial do arquivo ({balance})."
+        ),
+        "ch_size_balance_assumed": (
+            "As porcentagens de 1x são medidas sobre um saldo inicial de {balance} que foi suposto "
+            "porque o arquivo não o indica: 1x escala com ele, e sobre um saldo maior as mesmas "
+            "operações seriam menos de 1x."
         ),
         "ch_size_lot": "Lote ou risco por operação a 1x",
         "ch_size_account": (
@@ -1094,11 +1107,14 @@ REPORT: dict[str, Any] = {
             "como porcentagens dessa conta."
         ),
         "ch_size_no_account": (
-            "As regras deste programa são porcentagens do saldo inicial: a tabela é a mesma "
-            "para qualquer tamanho de conta."
+            "As regras simuladas não fixam um tamanho de conta: são porcentagens (do saldo "
+            "inicial ou do dia), então a tabela não depende do tamanho da conta."
         ),
         "ch_size_size": "Tamanho",
-        "ch_size_unfinished": "Não atinge a meta dentro do limite ({days} dias úteis)",
+        "ch_size_unfinished_phase": (
+            "Não atinge a meta em {days} dias úteis por fase (limite da simulação; as regras não "
+            "têm prazo)"
+        ),
         "ch_size_assumption": "Método e premissa: {note}.",
         "assumptions": "Premissas",
         "source": "Fonte",
@@ -4028,12 +4044,14 @@ RULES: tuple[tuple[str, str], ...] = (
         (
             "the ladder's full-history row with every daily return multiplied by the size; it "
             "assumes that changing the size scales every daily return in the same proportion, "
-            "as linear leverage does when the costs per trade and the execution do not change"
+            "as linear leverage does when the costs grow in proportion to the size (the same "
+            "cost per lot) and the execution does not worsen with more volume"
         ),
         (
             "a linha do histórico completo da escada com cada retorno diário multiplicado pelo "
             "tamanho; supõe que mudar o tamanho escala cada retorno diário na mesma proporção, "
-            "como faz a alavancagem linear quando os custos por operação e a execução não mudam"
+            "como faz a alavancagem linear quando os custos crescem na proporção do tamanho (o "
+            "mesmo custo por lote) e a execução não piora com mais volume"
         ),
     ),
     (
@@ -4048,9 +4066,25 @@ RULES: tuple[tuple[str, str], ...] = (
         "porcentagens dela",
     ),
     (
-        "the program's rules are shares of the starting balance; it names no account size",
-        "as regras do programa são porcentagens do saldo inicial; ele não nomeia um tamanho de "
-        "conta",
+        "the simulated rules fix no account size: they are shares (of the starting balance or "
+        "of the day's), so the table does not depend on the account size",
+        "as regras simuladas não fixam um tamanho de conta: são porcentagens (do saldo inicial "
+        "ou do dia), então a tabela não depende do tamanho da conta",
+    ),
+    (
+        "starting balance of the history; the daily shares at 1x are measured on it",
+        "saldo inicial do histórico; as porcentagens diárias a 1x são medidas sobre ele",
+    ),
+    (
+        "first value of the file's balance curve; the daily shares at 1x are measured on it",
+        "primeiro valor da curva de saldo do arquivo; as porcentagens diárias a 1x são medidas "
+        "sobre ele",
+    ),
+    (
+        "assumed because the file does not state a starting balance; the daily shares at 1x "
+        "are measured on it, so 1x scales with it",
+        "suposto porque o arquivo não indica um saldo inicial; as porcentagens diárias a 1x "
+        "são medidas sobre ele, então 1x escala com ele",
     ),
     (
         (

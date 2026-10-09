@@ -6,10 +6,11 @@ from __future__ import annotations
 import html
 import re
 from dataclasses import replace
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
+import numpy as np
 import pandas as pd
 import pytest
 from audit_fixtures import csv_bytes, positive_drift, returns_frame, signed_in
@@ -18,6 +19,9 @@ from quant_trade.audit import analytics, engine, firmfit
 from quant_trade.audit.engine import (
     RETURNS_NOT_MONEY,
     SIZING_ACCOUNT_NOTE,
+    SIZING_BALANCE_ASSUMED,
+    SIZING_BALANCE_CURVE,
+    SIZING_BALANCE_NOTE,
     SIZING_MULTIPLIERS,
     SIZING_NO_ACCOUNT,
     SIZING_NO_SIZE,
@@ -30,6 +34,7 @@ from quant_trade.audit.prop_presets import ACCOUNT_SIZES, PRESETS, get_preset
 from quant_trade.audit.report import (
     LABELS,
     LOCKED_GAINS,
+    _badge,
     _challenge_sizing_html,
     render_html,
 )
@@ -48,7 +53,15 @@ NEW_NOTES = (
     SIZING_NO_SIZE,
     SIZING_ACCOUNT_NOTE,
     SIZING_NO_ACCOUNT,
+    SIZING_BALANCE_NOTE,
+    SIZING_BALANCE_CURVE,
+    SIZING_BALANCE_ASSUMED,
     firmfit.OUTCOME_NOTE,
+)
+#: The importer's own warning when the file states no starting balance.
+ASSUMED_WARNING = (
+    "the file does not state a starting balance; 10,000 was assumed, which scales every "
+    "return and drawdown"
 )
 #: Advice the table must never give, in any of its languages.
 ADVICE = (
@@ -314,7 +327,7 @@ def test_new_sentences_read_in_every_language_and_pass_the_guard(
             shown = localize(text, locale)
             assert shown != text and find_claims(shown) == [], (locale, text)
     keys = [key for key in LABELS["es"] if key.startswith("ch_size_")]
-    assert len(keys) == 9
+    assert len(keys) == 12
     for locale in LOCALES:
         texts = [LABELS[locale][key] for key in keys] + [LOCKED_GAINS[locale]["ch_size_title"]]
         for key in keys:
@@ -367,7 +380,11 @@ def test_the_report_shows_the_size_table_and_the_open_loss_warning(
         labels["ch_ladder_pass"],
         labels["fail_daily_loss"],
         labels["fail_total_loss"],
-        labels["ch_size_unfinished"].format(days=250),
+        # FTMO 2-Step: the simulator's cap, the ladder's words, once per phase.
+        labels["ch_size_unfinished_phase"].format(days=250),
+        labels["ch_size_cap"],
+        # The sample report states its balance: 1x is measured on it.
+        labels["ch_size_balance"].format(balance="10,000"),
         *SIZES,
     ):
         assert needed in block, (locale, needed)
@@ -491,3 +508,198 @@ def test_an_upload_shows_the_size_table_in_its_language(tmp_path: Path) -> None:
     block = _size_block(text, LABELS["pt"])
     assert LABELS["pt"]["ch_size_one"] in block and all(size in block for size in SIZES)
     assert find_claims(text) == []
+
+
+# ------------------------------------------------------- what 1x and the cap mean
+
+
+def test_half_size_loses_passes_to_the_cap_not_to_the_limits(
+    audited: tuple[Any, AuditResult],
+) -> None:
+    """Why the table says whose cap it is: at 0.5x FTMO 2-Step reaches the
+    target less often only because more paths run out of simulated days."""
+    _, result = audited
+    rows = _rows(_sizing(result))
+    half, one = rows["0.5x"], rows["1x"]
+    assert float(half["pass"]["value"]) < float(one["pass"]["value"])
+    assert float(half["unfinished"]["value"]) > float(one["unfinished"]["value"])
+    for limit in ("fail_daily_loss", "fail_total_loss"):
+        assert float(half[limit]["value"]) <= float(one[limit]["value"]), limit
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+def test_the_cap_column_says_it_is_the_simulation_cap_per_phase(
+    audited: tuple[Any, AuditResult], locale: str
+) -> None:
+    _, result = audited
+    assert result.challenge is not None
+    labels = LABELS[locale]
+    rules = result.challenge["rules"]
+    two = html.unescape(
+        _challenge_sizing_html(_sizing(result), locale, labels, rules=rules, horizon=250)
+    )
+    assert labels["ch_size_unfinished_phase"].format(days=250) in two
+    # The intro says the target column counts only what arrives within the cap.
+    intro = two.split("</p>", 1)[0]
+    assert labels["ch_size_cap"] in intro and labels["ch_size_intro"].split("(")[0] in intro
+    # One phase: the ladder's own words, with no "per phase".
+    single = _chosen("ftmo-1step")
+    one = html.unescape(
+        _challenge_sizing_html(single["sizing"], locale, labels, rules=single["rules"], horizon=250)
+    )
+    assert labels["unfinished_cap"].format(days=250) in one and labels["ch_size_cap"] in one
+    assert labels["ch_size_unfinished_phase"].format(days=250) not in one
+    # A deadline the rules set is no simulator cap: neither sentence applies.
+    deadline = {**rules, "time_limit_days": 30}
+    timed = html.unescape(
+        _challenge_sizing_html(_sizing(result), locale, labels, rules=deadline, horizon=21)
+    )
+    assert f"data-l='{labels['unfinished']}'" in timed
+    assert labels["ch_size_cap"] not in timed
+    assert labels["ch_size_unfinished_phase"].format(days=21) not in timed
+    for text in (labels["ch_size_cap"], labels["ch_size_unfinished_phase"]):
+        assert find_claims(text) == []
+
+
+def _no_balance_trades(n: int = 300, seed: int = 3) -> bytes:
+    """A trade list that states no balance anywhere: the importer assumes 10,000."""
+    rng = np.random.default_rng(seed)
+    lines = ["Symbol,Side,Quantity,Entry Time,Exit Time,Entry Price,Exit Price,Profit"]
+    day = datetime(2023, 1, 2, 10, 0)
+    for _ in range(n):
+        while day.weekday() >= 5:
+            day += timedelta(days=1)
+        move = float(rng.normal(0.0003, 0.003))
+        close = day + timedelta(hours=2)
+        lines.append(
+            f"EURUSD,Buy,1,{day:%Y-%m-%d %H:%M:%S},{close:%Y-%m-%d %H:%M:%S},"
+            f"1.10000,{1.1 + move:.5f},{move * 100_000:.2f}"
+        )
+        day += timedelta(days=1)
+    return ("\n".join(lines) + "\n").encode()
+
+
+def _no_balance_inputs(**changes: Any) -> Any:
+    values: dict[str, Any] = {"challenge": "topstep-50k-combine", "oos_start": None}
+    values.update(changes)
+    return build_inputs(
+        None,
+        _declared(**values),
+        report_bytes=_no_balance_trades(),
+        report_filename="trades.csv",
+        now=NOW,
+    )
+
+
+@pytest.fixture(scope="module")
+def no_balance() -> AuditResult:
+    inputs = _no_balance_inputs()
+    assert inputs.initial_balance == 10_000.0
+    assert f"report: {ASSUMED_WARNING}" in inputs.warnings
+    return run_audit(inputs, now=NOW, bootstrap_samples=50, risk_samples=50, challenge_samples=300)
+
+
+def test_an_assumed_balance_is_named_and_never_declared(no_balance: AuditResult) -> None:
+    sizing = _sizing(no_balance)
+    assert sizing["status"] == "MEASURED"
+    assert sizing["starting_balance"] == {
+        "value": 10_000.0,
+        "evidence": "NOT_MEASURED",
+        "note": SIZING_BALANCE_ASSUMED,
+    }
+    # The program still names its own account: the two are not the same base.
+    assert sizing["account_size"]["value"] == 50_000.0
+    assert untranslated(no_balance.model_dump(mode="json")) == []
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+def test_the_report_says_1x_rests_on_an_assumed_balance(
+    no_balance: AuditResult, locale: str
+) -> None:
+    assert no_balance.challenge is not None
+    labels = LABELS[locale]
+    text = _visible(render_html(no_balance, watermark=False, locale=locale))
+    block = _size_block(text, labels)
+    assumed = labels["ch_size_balance_assumed"].format(balance="10,000")
+    assert assumed in block
+    # On the 1x line, before the lot and the program's account.
+    assert block.index(labels["ch_size_one"]) < block.index(assumed)
+    assert block.index(assumed) < block.index(labels["ch_size_lot"])
+    assert block.index(assumed) < block.index(labels["ch_size_account"].split("{")[0])
+    assert labels["ch_size_balance"].split("{")[0] not in block
+    page = html.unescape(
+        _challenge_sizing_html(
+            _sizing(no_balance),
+            locale,
+            labels,
+            rules=no_balance.challenge["rules"],
+            horizon=250,
+        )
+    )
+    assert f"{assumed} {html.unescape(_badge('NOT_MEASURED'))}" in page
+    assert find_claims(text) == []
+    assert not [word for word in ADVICE if word in assumed.lower()], (locale, assumed)
+
+
+def test_the_balance_1x_is_measured_on_follows_the_curve_it_comes_from() -> None:
+    # Declared on the form, the importer builds the curve from it.
+    declared_balance = engine._challenge(
+        _no_balance_inputs(initial_balance=50_000), samples=200, seed=1
+    )["sizing"]["starting_balance"]
+    assert declared_balance == {
+        "value": 50_000.0,
+        "evidence": "DECLARED",
+        "note": SIZING_BALANCE_NOTE,
+    }
+    # An uploaded curve carries its own shares: its first value, measured.
+    curve = csv_bytes(positive_drift(400))
+    inputs = build_inputs(curve, _declared(oos_start=None), now=NOW)
+    first = float(inputs.equity.frame["equity"].iloc[0])
+    sizing = engine._challenge(inputs, samples=200, seed=1)["sizing"]
+    assert sizing["starting_balance"] == {
+        "value": first,
+        "evidence": "MEASURED",
+        "note": SIZING_BALANCE_CURVE,
+    }
+    # Uploaded beside a report that states no balance, the curve still rules.
+    both = build_inputs(
+        curve,
+        _declared(oos_start=None),
+        report_bytes=_no_balance_trades(),
+        report_filename="trades.csv",
+        now=NOW,
+    )
+    assert f"report: {ASSUMED_WARNING}" in both.warnings and not both.balance_only
+    assert engine._sizing_balance(both)["evidence"] == "MEASURED"
+    # The column mapping builds the curve itself from the assumed balance.
+    mapped = replace(inputs, warnings=[f"report: {ASSUMED_WARNING}", *inputs.warnings])
+    assert engine._sizing_balance(mapped) == {
+        "value": first,
+        "evidence": "NOT_MEASURED",
+        "note": SIZING_BALANCE_ASSUMED,
+    }
+    # A live statement's assumption is not the backtest's.
+    live = replace(inputs, warnings=[f"live: {ASSUMED_WARNING}"])
+    assert engine._sizing_balance(live)["evidence"] == "MEASURED"
+
+
+def test_the_notes_say_what_scales_and_what_the_rules_fix() -> None:
+    # Costs that grow with the size, not the same money per trade.
+    assert "in proportion to the size (the same cost per lot)" in SIZING_NOTE
+    assert "costs per trade" not in SIZING_NOTE
+    assert "en proporción al tamaño (el mismo costo por lote)" in localize(SIZING_NOTE, "es")
+    assert "na proporção do tamanho (o mesmo custo por lote)" in localize(SIZING_NOTE, "pt")
+    # The firms sell named sizes; the simulated rules fix none, and some are
+    # shares of the day's balance (The5ers High Stakes).
+    assert "names no account" not in SIZING_NO_ACCOUNT
+    assert get_preset("the5ers-high-stakes-step1").daily_loss_basis == "start_of_day"
+    for locale, day in (("es", "del día"), ("en", "of the day's"), ("pt", "do dia")):
+        assert day in LABELS[locale]["ch_size_no_account"], locale
+        assert day in localize(SIZING_NO_ACCOUNT, locale), locale
+    sizing = _chosen("the5ers-high-stakes-step1")["sizing"]
+    assert sizing["status"] == "MEASURED"
+    assert sizing["account_size"] == {
+        "value": None,
+        "evidence": "NOT_MEASURED",
+        "note": SIZING_NO_ACCOUNT,
+    }

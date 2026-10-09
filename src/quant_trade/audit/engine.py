@@ -145,7 +145,8 @@ SIZING_MULTIPLIERS: tuple[float, ...] = (0.5, 1.0, 1.5, 2.0)
 SIZING_NOTE = (
     "the ladder's full-history row with every daily return multiplied by the size; it assumes "
     "that changing the size scales every daily return in the same proportion, as linear "
-    "leverage does when the costs per trade and the execution do not change"
+    "leverage does when the costs grow in proportion to the size (the same cost per lot) and "
+    "the execution does not worsen with more volume"
 )
 SIZING_NO_SIZE = (
     "the audit keeps neither the lot nor the stop loss of each trade, so the lot or risk per "
@@ -155,8 +156,22 @@ SIZING_ACCOUNT_NOTE = (
     "account size in US dollars that the program names; its limits are shares of it"
 )
 SIZING_NO_ACCOUNT = (
-    "the program's rules are shares of the starting balance; it names no account size"
+    "the simulated rules fix no account size: they are shares (of the starting balance or of "
+    "the day's), so the table does not depend on the account size"
 )
+#: The balance the daily shares at 1x are measured on, as the capital section
+#: names it: the imported report's, the first value of an uploaded curve, or
+#: the one the reader assumed because the file states none.
+SIZING_BALANCE_NOTE = "starting balance of the history; the daily shares at 1x are measured on it"
+SIZING_BALANCE_CURVE = (
+    "first value of the file's balance curve; the daily shares at 1x are measured on it"
+)
+SIZING_BALANCE_ASSUMED = (
+    "assumed because the file does not state a starting balance; the daily shares at 1x are "
+    "measured on it, so 1x scales with it"
+)
+#: The importers' warning (also the column mapping's) when they assume a balance.
+_ASSUMED_BALANCE_WARNING = "the file does not state a starting balance"
 SERIES_MAX_POINTS = 400
 WITHHELD_TEXT = "[withheld: promotional wording]"
 NO_LOCAL_CASH = (
@@ -1869,6 +1884,7 @@ def _challenge_sizing(
         "status": "MEASURED",
         "program": scenarios.get("program"),
         "note": SIZING_NOTE,
+        "starting_balance": _sizing_balance(inputs),
         "size_per_trade": not_measured(SIZING_NO_SIZE),
         "account_size": (
             declared(account, SIZING_ACCOUNT_NOTE)
@@ -1877,6 +1893,30 @@ def _challenge_sizing(
         ),
         "rows": sized,
     }
+
+
+def _sizing_balance(inputs: AuditInputs) -> dict[str, Any]:
+    """The balance the size table's daily shares at 1x are measured on.
+
+    A report's curve rebuilt from its trades starts at the report's balance
+    (DECLARED). A curve the client uploaded, or one built from the columns
+    the client chose, carries its own shares: its first value (MEASURED).
+    When the reader assumed the balance because the file states none, the
+    value is kept but tagged NOT_MEASURED: 1x then scales with that guess."""
+    rebuilt = inputs.balance_only and inputs.initial_balance is not None
+    first = float(inputs.equity.frame["equity"].iloc[0])
+    value = float(inputs.initial_balance or first) if rebuilt else first
+    # A curve uploaded beside the report brings its own balance: the report's
+    # assumed one does not reach the shares then.
+    assumed = (rebuilt or inputs.initial_balance is None) and any(
+        warning.startswith("report: ") and _ASSUMED_BALANCE_WARNING in warning
+        for warning in inputs.warnings
+    )
+    if assumed:
+        return {"value": value, "evidence": NOT_MEASURED, "note": SIZING_BALANCE_ASSUMED}
+    return (
+        declared(value, SIZING_BALANCE_NOTE) if rebuilt else measured(value, SIZING_BALANCE_CURVE)
+    )
 
 
 def _round(value: float) -> float:

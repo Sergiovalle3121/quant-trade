@@ -1270,7 +1270,8 @@ and report wire them in during the integration step):
   (`SIZING_MULTIPLIERS`), through `firmfit.program_outcomes`, which is
   `program_pass` (same simulator, seed, paths per phase and rules, all the
   program's phases) plus how the program ends when it is not passed. JSON:
-  `{"status", "program", "note", "size_per_trade", "account_size", "rows"}`;
+  `{"status", "program", "note", "starting_balance", "size_per_trade",
+  "account_size", "rows"}`;
   each row is `{"key": "0.5x" | "1x" | "1.5x" | "2x", "multiplier", "days",
   "pass", "main_risk", "pass_within_best_day" (when the program has a
   best-day rule), "fail_daily_loss", "fail_total_loss", "unfinished"}`, all
@@ -1281,7 +1282,16 @@ and report wire them in during the integration step):
   `full` row itself (same `days`, `pass`, `main_risk` and
   `pass_within_best_day`). The `note` says the assumption: changing the size
   scales every daily return in the same proportion, as linear leverage does
-  when the costs per trade and the execution do not change. `size_per_trade`
+  when the costs grow in proportion to the size (the same cost per lot) and
+  the execution does not worsen with more volume. `starting_balance` is the
+  balance the daily shares at 1x are measured on, as the capital section
+  names it: DECLARED for a report's curve rebuilt from its trades (the
+  report's balance, or the one declared on the form), MEASURED for a curve
+  the client uploaded or built from chosen columns (its first value), and
+  NOT_MEASURED with the value kept when the reader assumed 10,000 because the
+  file states none (the importer's or the column mapping's "does not state a
+  starting balance" warning on a curve built from it); the report then says
+  the balance was assumed and that 1x scales with it. `size_per_trade`
   is NOT_MEASURED: the importers fold each trade's lots into units of the
   instrument and read no stop loss, so the report does not know the lot or
   the risk per trade behind 1x and never gives one; 1x is "the size of the
@@ -1289,8 +1299,9 @@ and report wire them in during the integration step):
   the balance as a day of the file). `account_size` is DECLARED only when
   the preset's program names one (`prop_presets.ACCOUNT_SIZES`: Topstep
   50K/100K/150K, whose dollar limits are shares of that account); otherwise
-  NOT_MEASURED, and the report says the rules are shares of the starting
-  balance, so the table is the same for any account size. The whole block is
+  NOT_MEASURED, and the report says the simulated rules fix no account size
+  (they are shares of the starting balance or of the day's), so the table
+  does not depend on the account size. The whole block is
   NOT_MEASURED, with the same reason, when the challenge or the ladder's
   `full` row is not measured, and with "uploaded returns are not money"
   (`RETURNS_NOT_MONEY`, the reconciliation's own reason) for a returns
@@ -1298,7 +1309,12 @@ and report wire them in during the integration step):
   target in every phase, within the best-day rule when the program has one,
   of breaking the daily limit ("no rule" for programs without one), of
   breaking the total limit and of not reaching the target within the
-  simulator's cap, in the ladder's formats (`_firm_pct`), and repeats the
+  simulator's cap (the ladder's `unfinished_cap` words; "per phase" for a
+  program of several phases, since each phase has 250 business days of its
+  own), in the ladder's formats (`_firm_pct`). Without a deadline in the
+  rules the intro adds that "reaches the target" counts only what gets there
+  within that cap, so a smaller size moving simulations to "does not reach"
+  is read as days running out, not as broken limits. It repeats the
   open-loss warning ("cifras optimistas") under the same condition as the
   ladder (`_challenge_optimistic`). It shows what changes with the size and
   advises none. In the locked preview its title is listed after the

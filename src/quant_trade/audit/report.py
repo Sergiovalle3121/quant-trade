@@ -1791,10 +1791,26 @@ LABELS: dict[str, dict[str, str]] = {
             "todas las simulaciones, contando todas las fases. La tabla muestra qué cambia con "
             "el tamaño; no aconseja ninguno."
         ),
+        # Without a deadline in the rules the cap is the simulator's: a smaller
+        # size reaches the target later, which is not more risk.
+        "ch_size_cap": (
+            "«Llega al objetivo» cuenta solo lo que llega dentro de ese tope, que pone la "
+            "simulación y no las reglas. Con menos tamaño el objetivo tarda más: las "
+            "simulaciones que pasan a «no llega» se quedaron sin días; no rompieron una pérdida, "
+            "que tiene sus propias columnas."
+        ),
         "ch_size_one": (
             "1x es el tamaño del historial que subiste: cada día simulado gana o pierde el "
             "mismo porcentaje del balance que un día del archivo. 0.5x es la mitad de ese "
             "tamaño y 2x, el doble."
+        ),
+        "ch_size_balance": (
+            "Los porcentajes de 1x se miden sobre el balance inicial del archivo ({balance})."
+        ),
+        "ch_size_balance_assumed": (
+            "Los porcentajes de 1x se miden sobre un balance inicial de {balance} que se supuso "
+            "porque el archivo no lo indica: 1x escala con él, y sobre un balance mayor las "
+            "mismas operaciones serían menos de 1x."
         ),
         "ch_size_lot": "Lote o riesgo por operación a 1x",
         "ch_size_account": (
@@ -1802,11 +1818,15 @@ LABELS: dict[str, dict[str, str]] = {
             "porcentajes de esa cuenta."
         ),
         "ch_size_no_account": (
-            "Las reglas de este programa son porcentajes del balance inicial: la tabla es la "
-            "misma para cualquier tamaño de cuenta."
+            "Las reglas que se simulan no fijan un tamaño de cuenta: son porcentajes (del "
+            "balance inicial o del día), así que la tabla no depende del tamaño de la cuenta."
         ),
         "ch_size_size": "Tamaño",
-        "ch_size_unfinished": "No llega al objetivo dentro del tope ({days} días hábiles)",
+        # Each phase of the program has the simulator's cap of its own.
+        "ch_size_unfinished_phase": (
+            "No llega al objetivo en {days} días hábiles por fase (tope de la simulación; las "
+            "reglas no ponen plazo)"
+        ),
         "ch_size_assumption": "Método y supuesto: {note}.",
         "assumptions": "Supuestos",
         "source": "Fuente",
@@ -3245,10 +3265,24 @@ LABELS: dict[str, dict[str, str]] = {
             "the cap share out all the simulations, counting every phase. The table shows "
             "what changes with the size; it advises none."
         ),
+        "ch_size_cap": (
+            "“Reaches the target” counts only what gets there within that cap, which the "
+            "simulation sets and the rules do not. At a smaller size the target takes longer: "
+            "the simulations that move to “does not reach” ran out of days; they did not break "
+            "a loss limit, which has its own columns."
+        ),
         "ch_size_one": (
             "1x is the size of the history you uploaded: each simulated day gains or loses "
             "the same share of the balance as a day of the file. 0.5x is half that size and "
             "2x is double."
+        ),
+        "ch_size_balance": (
+            "The shares at 1x are measured on the file's starting balance ({balance})."
+        ),
+        "ch_size_balance_assumed": (
+            "The shares at 1x are measured on a starting balance of {balance} that was assumed "
+            "because the file does not state one: 1x scales with it, and on a larger balance "
+            "the same trades would be less than 1x."
         ),
         "ch_size_lot": "Lot or risk per trade at 1x",
         "ch_size_account": (
@@ -3256,11 +3290,14 @@ LABELS: dict[str, dict[str, str]] = {
             "of that account."
         ),
         "ch_size_no_account": (
-            "This program's rules are shares of the starting balance: the table is the same "
-            "for any account size."
+            "The simulated rules fix no account size: they are shares (of the starting balance "
+            "or of the day's), so the table does not depend on the account size."
         ),
         "ch_size_size": "Size",
-        "ch_size_unfinished": "Does not reach the target within the cap ({days} business days)",
+        "ch_size_unfinished_phase": (
+            "Does not reach the target within {days} business days per phase (the simulation's "
+            "cap; the rules set no deadline)"
+        ),
         "ch_size_assumption": "Method and assumption: {note}.",
         "assumptions": "Assumptions",
         "source": "Source",
@@ -5496,11 +5533,15 @@ def _challenge_sizing_html(
     rows = sizing["rows"]
     clean = any(row.get("pass_within_best_day") for row in rows)
     daily_rule = rules.get("max_daily_loss") is not None
-    unfinished = (
-        labels["ch_size_unfinished"].format(days=horizon)
-        if rules.get("time_limit_days") is None and horizon
-        else labels["unfinished"]
-    )
+    # Without a deadline in the rules, "unfinished" is the simulator's cap, the
+    # ladder's own words; each phase of a longer program has a cap of its own.
+    capped = rules.get("time_limit_days") is None and bool(horizon)
+    if not capped:
+        unfinished = labels["unfinished"]
+    elif phases > 1:
+        unfinished = labels["ch_size_unfinished_phase"].format(days=horizon)
+    else:
+        unfinished = labels["unfinished_cap"].format(days=horizon)
     columns = [("pass", labels["ch_ladder_pass"])]
     if clean:
         columns.append(("pass_within_best_day", labels["ff_clean"]))
@@ -5526,11 +5567,13 @@ def _challenge_sizing_html(
     )
     per_trade = sizing.get("size_per_trade") or {}
     account = sizing.get("account_size") or {}
+    intro = labels["ch_size_intro"].format(program=scope)
+    if capped:
+        intro += " " + labels["ch_size_cap"]
     out = (
         title
-        + f"<p class='muted'>{_e(labels['ch_size_intro'].format(program=scope))} "
-        + f"{_badge('MEASURED')}</p>"
-        + f"<p>{_e(labels['ch_size_one'])}</p>"
+        + f"<p class='muted'>{_e(intro)} {_badge('MEASURED')}</p>"
+        + f"<p>{_e(labels['ch_size_one'])}{_sizing_balance_html(sizing, labels)}</p>"
     )
     if per_trade.get("evidence") == "NOT_MEASURED":
         reason = localize(str(per_trade.get("note") or ""), locale)
@@ -5556,6 +5599,18 @@ def _challenge_sizing_html(
     if optimistic:
         out += f"<p><strong>{_e(labels['ff_optimistic'])}</strong></p>"
     return out
+
+
+def _sizing_balance_html(sizing: dict[str, Any], labels: dict[str, str]) -> str:
+    """The balance 1x's daily shares are measured on, as the capital section
+    names it; an assumed one says so. Empty for a result stored without it."""
+    balance = sizing.get("starting_balance") or {}
+    if not balance.get("value"):
+        return ""
+    shown = _fmt(float(balance["value"]), key="starting_balance")
+    evidence = str(balance.get("evidence") or "NOT_MEASURED")
+    key = "ch_size_balance_assumed" if evidence == "NOT_MEASURED" else "ch_size_balance"
+    return f" {_e(labels[key].format(balance=shown))} {_badge(evidence)}"
 
 
 def _firm_fit_html(

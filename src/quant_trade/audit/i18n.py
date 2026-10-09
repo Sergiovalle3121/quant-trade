@@ -1257,11 +1257,12 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
     (
         "the ladder's full-history row with every daily return multiplied by the size; it "
         "assumes that changing the size scales every daily return in the same proportion, as "
-        "linear leverage does when the costs per trade and the execution do not change",
+        "linear leverage does when the costs grow in proportion to the size (the same cost per "
+        "lot) and the execution does not worsen with more volume",
         "la fila de historia completa de la escalera con cada retorno diario multiplicado por "
         "el tamaño; supone que cambiar el tamaño escala cada retorno diario en la misma "
-        "proporción, como hace el apalancamiento lineal cuando no cambian los costos por "
-        "operación ni la ejecución",
+        "proporción, como hace el apalancamiento lineal cuando los costos crecen en proporción "
+        "al tamaño (el mismo costo por lote) y la ejecución no empeora con más volumen",
     ),
     (
         "the audit keeps neither the lot nor the stop loss of each trade, so the lot or risk "
@@ -1275,9 +1276,25 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
         "porcentajes de ella",
     ),
     (
-        "the program's rules are shares of the starting balance; it names no account size",
-        "las reglas del programa son porcentajes del balance inicial; no nombra un tamaño de "
-        "cuenta",
+        "the simulated rules fix no account size: they are shares (of the starting balance or "
+        "of the day's), so the table does not depend on the account size",
+        "las reglas que se simulan no fijan un tamaño de cuenta: son porcentajes (del balance "
+        "inicial o del día), así que la tabla no depende del tamaño de la cuenta",
+    ),
+    (
+        "starting balance of the history; the daily shares at 1x are measured on it",
+        "balance inicial del historial; los porcentajes diarios a 1x se miden sobre él",
+    ),
+    (
+        "first value of the file's balance curve; the daily shares at 1x are measured on it",
+        "primer valor de la curva de balance del archivo; los porcentajes diarios a 1x se miden "
+        "sobre él",
+    ),
+    (
+        "assumed because the file does not state a starting balance; the daily shares at 1x "
+        "are measured on it, so 1x scales with it",
+        "supuesto porque el archivo no indica un balance inicial; los porcentajes diarios a 1x "
+        "se miden sobre él, así que 1x escala con él",
     ),
     (
         "share of the resampled paths that end the program this way: each phase is a fresh "
