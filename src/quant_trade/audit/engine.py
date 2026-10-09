@@ -1301,8 +1301,9 @@ def _costs(
     by_symbol = _pips_by_symbol(inputs, be, ref, assumed)
     if by_symbol is not None:
         section["pips_by_symbol"] = by_symbol
-    section["break_even_per_lot"] = _break_even_per_lot(inputs, charged)
-    if section["break_even_per_lot"]["evidence"] == MEASURED:
+    per_lot = _break_even_per_lot(inputs, charged)
+    section["break_even_per_lot"] = per_lot
+    if per_lot["evidence"] == MEASURED:
         section["per_lot_currency"] = inputs.account_currency
     if inputs.reported_fees:
         section["reported_fees"] = {
