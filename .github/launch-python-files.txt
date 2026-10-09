@@ -72,8 +72,10 @@ tests/test_audit_schema.py
 tests/test_audit_settings.py
 tests/test_audit_share_funnel.py
 tests/test_audit_sharing.py
+tests/test_audit_upload_inplace.py
 tests/test_audit_user_accounts.py
 tests/test_audit_web_languages.py
+tests/test_audit_welcome_pending.py
 tests/test_forensics_balance.py
 tests/test_forensics_review.py
 tests/test_forensics_totals.py

@@ -104,9 +104,9 @@ COPY_PT: dict[str, str] = {
     "signed_out": "Você saiu da conta.",
     "welcome": "Conta criada. Envie um arquivo agora: o relatório fica salvo aqui.",
     "welcome_confirm": (
-        "Conta criada. Enviamos um link de confirmação para o seu e-mail: abra-o para "
-        "liberar seu primeiro relatório completo gratuito e as compras. Se não encontrar, "
-        "confira a pasta de spam."
+        "Conta criada. Você já pode enviar seu arquivo: ao abrir o link que enviamos por "
+        "e-mail, seu primeiro relatório abre completo e grátis. Se não encontrar, confira a "
+        "pasta de spam."
     ),
     "account_title": "Meus relatórios",
     "account_lead": "Tudo o que você auditou com esta conta, num só lugar.",
@@ -175,8 +175,8 @@ COPY_PT: dict[str, str] = {
         "é uma prévia. O primeiro relatório gratuito é um por pessoa."
     ),
     "welcome_refused_unverified": (
-        "Confirme seu e-mail pelo link que enviamos e seu próximo arquivo receberá o primeiro "
-        "relatório completo gratuito. Até lá, isto é uma prévia."
+        "Confirme seu e-mail com o link que enviamos e este mesmo relatório abre completo, "
+        "grátis, sem enviá-lo de novo. Enquanto isso, esta é uma prévia."
     ),
     "welcome_refused_unverified_nomail": (
         "A confirmação de e-mail não está disponível no momento, então isto é uma "
@@ -383,6 +383,10 @@ COPY_PT: dict[str, str] = {
     "email_pending": ("A troca está pendente. Abra o link enviado ao novo e-mail para concluí-la."),
     "email_verified": "E-mail confirmado. Você já pode usar compras e recompensas disponíveis.",
     "email_verified_signin": "E-mail confirmado. Entre.",
+    "email_verified_report": (
+        "E-mail confirmado. Seu relatório já está completo, com o PDF: ele está na sua lista de "
+        "relatórios."
+    ),
     "email_verified_welcome_signin": (
         "E-mail confirmado. Entre para usar seu primeiro relatório completo grátis."
     ),

@@ -2794,7 +2794,14 @@ an account never changes what a report says.
   The claim stays after the account is deleted (hash only). While
   `AUDIT_EMAIL_VERIFICATION_REQUIRED=true`, an account with an unconfirmed
   address gets a preview with reason `unverified` and keeps its free
-  report for after confirming. The account notice and the checkout refusal
+  report for after confirming. That preview is noted in `welcome_pending`
+  (the upload's browser mark, file fingerprint and network); confirming the
+  address (`kind != "change"`) opens the most recent one of the last
+  `WELCOME_PENDING_DAYS` (7) days in full, from any device, if the same
+  account, inbox, browser, file, network and card rules still allow it, gives
+  the month's preview back and lands on `done=email_verified_report`; every
+  pending row of the account goes either way, and with the report, the account
+  or the retention purge. The account notice and the checkout refusal
   say so plainly (confirming unlocks the first free full report and
   purchases), and the notice after sign-up says a confirmation link was sent
   and to check spam (`welcome_confirm`, only while delivery is configured).
@@ -3222,7 +3229,8 @@ an account never changes what a report says.
   challenge for 5 minutes behind the `rigor_passkey` cookie (only its hash
   is the key), used once; `passkeys.MAX_STARTS_PER_HOUR` pages per network.
   The options are embedded in the page and `app.js` posts the device's
-  answer in an ordinary form, so the CSP stays `connect-src 'none'`. The
+  answer in an ordinary form (no fetch; the CSP allows only
+  `connect-src 'self'`, for the upload form). The
   store keeps the credential id, the public key, the counter (a counter
   that goes backwards is refused; synced passkeys report zero), the name,
   the host it was made for and dates; never a private key. Events
@@ -4027,7 +4035,15 @@ file's columns with an example value, preselected with the reader's guess or
 the customer's earlier choice. The page also carries the first upload's form
 fields (starting balance, trials, costs, code, consent), and asks for the same
 file again, because the service keeps no file before auditing it. A JSON
-client gets `{"error", "code", "columns"}`. An HTML report or anything else
+client gets `{"error", "code", "columns", "category", "format",
+"guidance_html", "problem", "fields_html"}`, where `fields_html` is only the
+menus (`mapping.mapping_fields`, no form and no file field). With JavaScript
+the upload form (`data-inplace`) posts with `fetch` (CSP `connect-src 'self'`)
+and shows those menus and the refusal on the same page, so the second post
+sends the file already chosen; a 401/402, a network error or an unreadable
+answer falls back to the ordinary post. Without JavaScript nothing changes.
+With `AUDIT_CONTACT_URL` set, the menus end with a line that offers to read
+the file with the customer. An HTML report or anything else
 that is not a table keeps the plain error.
 
 Nothing is spent on the mapping step. It is not an audit, so the free first

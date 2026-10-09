@@ -146,9 +146,9 @@ COPY: dict[str, dict[str, str]] = {
         "signed_out": "Saliste de tu cuenta.",
         "welcome": "Cuenta creada. Ya puedes subir un archivo: el informe se guarda aquí.",
         "welcome_confirm": (
-            "Cuenta creada. Te enviamos un enlace de confirmación a tu correo: ábrelo para "
-            "desbloquear tu primer informe completo gratis y las compras. Si no lo ves, revisa "
-            "la carpeta de spam."
+            "Cuenta creada. Ya puedes subir tu archivo: al abrir el enlace que te enviamos por "
+            "correo, tu primer informe se abre completo y gratis. Si no lo ves, revisa la "
+            "carpeta de spam."
         ),
         "account_title": "Mis informes",
         "account_lead": "Todo lo que auditaste con esta cuenta, en un solo lugar.",
@@ -217,8 +217,8 @@ COPY: dict[str, dict[str, str]] = {
             "es una vista previa. El primer informe gratis es uno por persona."
         ),
         "welcome_refused_unverified": (
-            "Confirma tu correo con el enlace que te enviamos y tu siguiente archivo recibirá "
-            "el primer informe completo gratis. Mientras tanto, esto es una vista previa."
+            "Confirma tu correo con el enlace que te enviamos y este mismo informe se abre "
+            "completo, gratis, sin volver a subirlo. Mientras tanto, esto es una vista previa."
         ),
         "welcome_refused_unverified_nomail": (
             "La confirmación de correo no está disponible en este momento, así que esto es "
@@ -430,6 +430,10 @@ COPY: dict[str, dict[str, str]] = {
             "Correo confirmado. Ya puedes usar las compras y las recompensas disponibles."
         ),
         "email_verified_signin": "Correo confirmado. Inicia sesión.",
+        "email_verified_report": (
+            "Correo confirmado. Tu informe ya está completo, con PDF: lo tienes en tu lista de "
+            "informes."
+        ),
         "email_verified_welcome_signin": (
             "Correo confirmado. Inicia sesión para usar tu primer informe completo gratis."
         ),
@@ -868,8 +872,8 @@ COPY: dict[str, dict[str, str]] = {
         "signed_out": "You signed out.",
         "welcome": "Account created. Upload a file now: the report is saved here.",
         "welcome_confirm": (
-            "Account created. We sent a confirmation link to your e-mail: open it to unlock "
-            "your first free full report and purchases. If you do not see it, check your spam "
+            "Account created. You can upload your file now: when you open the link we e-mailed "
+            "you, your first report opens in full, free. If you do not see it, check your spam "
             "folder."
         ),
         "account_title": "My reports",
@@ -939,8 +943,8 @@ COPY: dict[str, dict[str, str]] = {
             "it is a preview. The free first report is one per person."
         ),
         "welcome_refused_unverified": (
-            "Confirm your e-mail with the link we sent and your next file will get the free "
-            "first full report. Until then, this is a preview."
+            "Confirm your e-mail with the link we sent you and this same report opens in full, "
+            "free, without uploading it again. Until then, this is a preview."
         ),
         "welcome_refused_unverified_nomail": (
             "E-mail confirmation is not available right now, so this is a preview. To sort "
@@ -1148,6 +1152,10 @@ COPY: dict[str, dict[str, str]] = {
         ),
         "email_verified": "E-mail confirmed. You can now use available purchases and rewards.",
         "email_verified_signin": "E-mail confirmed. Sign in.",
+        "email_verified_report": (
+            "E-mail confirmed. Your report is now complete, with the PDF: it is in your list "
+            "of reports."
+        ),
         "email_verified_welcome_signin": (
             "E-mail confirmed. Sign in to use your first full report, free."
         ),

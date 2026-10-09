@@ -477,10 +477,12 @@ _PRINT_HANDLER_HASH = base64.b64encode(hashlib.sha256(PRINT_HANDLER.encode()).di
 #: no visitor request leaves for a font service. Inline styles are the other
 #: relaxation (the report's CSS and chart colours are inline); forms post
 #: here, or leave for Stripe Checkout through a redirect, and no page can be
-#: framed.
+#: framed. A script may only call this same origin (``connect-src 'self'``:
+#: the upload form answers in place, keeping the chosen file); no third party
+#: is ever contacted.
 CONTENT_SECURITY_POLICY = (
     f"default-src 'none'; script-src 'self' 'unsafe-hashes' 'sha256-{_PRINT_HANDLER_HASH}'; "
-    "style-src 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'none'; "
+    "style-src 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; "
     "form-action 'self' https://checkout.stripe.com; frame-ancestors 'none'; "
     "base-uri 'none'"
 )
@@ -519,6 +521,9 @@ WELCOME_REFUSALS = ("file", "device", "network", "email", "unverified")
 #: The refusals a card verified at no charge replaces: signals that another
 #: person may share this browser or network.
 CARD_REFUSALS = ("device", "network")
+#: Days a preview uploaded before the e-mail was confirmed can still become the
+#: free full report when the address is confirmed.
+WELCOME_PENDING_DAYS = 7
 STRATEGY_PDFS_PER_WINDOW = 10
 STRATEGY_PDF_WINDOW = timedelta(minutes=10)
 #: How many upload fields ``POST /audits`` takes.
@@ -2525,6 +2530,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         "two_step_expired",
         "email_verified",
         "email_verified_welcome",
+        "email_verified_report",
     )
     account_flashes = (
         "welcome",
@@ -2542,6 +2548,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         "email_changed",
         "email_pending",
         "email_verified",
+        "email_verified_report",
         "email_verification_sent",
         "card_paid",
     )
@@ -2629,6 +2636,107 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         if not refused and cfg.email_verification_required and not db.email_verified(account.id):
             refused = "unverified"
         return refused
+
+    def _welcome_claim(
+        account_id: str,
+        email: str,
+        *,
+        device_sha256: str,
+        fingerprint: str,
+        net: str,
+        card_checked: bool,
+        reservation: str,
+        now: datetime,
+    ) -> bool:
+        """Take the free full report's claims, all or nothing: the account, the
+        inbox, the browser, the file and one of the network's monthly slots.
+
+        A card verified at no charge stands in for the browser and the network.
+        ``True`` when every claim was taken under ``reservation``.
+        """
+        month = acct.claim_month(now)
+        slots = (
+            {
+                "network": [
+                    f"welcome:ip:{acct.network_key(net)}:{month}:{n}"
+                    for n in range(_welcome_cap(net))
+                ]
+            }
+            if net and not card_checked
+            else {}
+        )
+        keys = (
+            f"welcome:account:{account_id}",
+            inbox.welcome_key(email),
+            *(() if card_checked else (f"welcome:device:{device_sha256}",)),
+            f"welcome:file:{fingerprint}",
+        )
+        return not db.claim_free(reservation, keys=keys, slots=slots, at=now)
+
+    def _grant_pending_welcome(account_id: str, now: datetime) -> bool:
+        """Open in full the preview uploaded before the e-mail was confirmed.
+
+        Only the most recent one of the last ``WELCOME_PENDING_DAYS`` days, and
+        only if the free full report would have been given at upload: the same
+        account, inbox, browser, file and network limits are checked again with
+        the marks kept from that upload (a verified card stands in for the
+        browser and network, as in ``_first_look``). The month's preview is
+        given back. Every pending row of the account goes, granted or not.
+        """
+        try:
+            if cfg.free_mode or not acct.WELCOME_FULL_REPORT:
+                return False
+            pending = db.welcome_pending_for(
+                account_id, since=now - timedelta(days=WELCOME_PENDING_DAYS)
+            )
+            row = pending[0] if pending else None
+            if row is None or not row.file_sha256:
+                return False
+            email = _account_email(account_id)
+            card = db.card_checked(account_id)
+            net = row.client_ip
+            refused = db.welcome_refusal(
+                account_id,
+                device_sha256="" if card else row.device_sha256,
+                file_sha256=row.file_sha256,
+                client_ip="" if card else net,
+                since=acct.month_start(now),
+                per_ip=_welcome_cap(net),
+            )
+            if refused or not email or db.free_claim_taken(inbox.welcome_key(email)):
+                return False
+            reservation = acct.new_secret()
+            if not _welcome_claim(
+                account_id,
+                email,
+                device_sha256=row.device_sha256,
+                fingerprint=row.file_sha256,
+                net=net,
+                card_checked=card,
+                reservation=reservation,
+                now=now,
+            ):
+                db.release_free(reservation)
+                return False
+            if not db.grant_welcome(
+                row.audit_id,
+                account_id,
+                device_sha256=row.device_sha256,
+                file_sha256=row.file_sha256,
+                client_ip=net,
+                at=now,
+            ):
+                db.release_free(reservation)
+                return False
+            db.delete_free_preview(row.audit_id)
+            _reward_invite(account_id, row.device_sha256, net, now)
+            return True
+        except Exception:  # noqa: BLE001 - the address is confirmed whatever happens here
+            logger.warning("could not open the report pending a confirmed e-mail")
+            return False
+        finally:
+            with contextlib.suppress(Exception):
+                db.clear_welcome_pending(account_id)
 
     def _card_offer(request: Request, account: Any, now: datetime) -> bool:
         """A card check would give this account its free full report."""
@@ -3436,7 +3544,11 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             locale = _account_locale(path_locale, lang)
             session = _session(request)
             if session is None:
-                flash = done if done in ("email_verified", "email_verified_welcome") else ""
+                flash = (
+                    done
+                    if done in ("email_verified", "email_verified_welcome", "email_verified_report")
+                    else ""
+                )
                 return _signin_redirect(
                     locale, done=flash, next_path=account_pages.path("account", locale)
                 )
@@ -4106,8 +4218,12 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 db.delete_sessions(account_id, keep=keep)
                 _note_event(request, account_id, "email_changed")
             _settle_confirmed_invites(account_id, datetime.now(UTC))
+            # The preview uploaded before confirming becomes the free full report.
+            granted = kind != "change" and _grant_pending_welcome(account_id, datetime.now(UTC))
             done = "email_changed" if kind == "change" else "email_verified"
-            if (
+            if granted:
+                done = "email_verified_report"
+            elif (
                 kind != "change"
                 and _session(request) is None
                 and _welcome_status(account_id, _account_email(account_id)) == "available"
@@ -5001,26 +5117,17 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                     since=start,
                     per_ip=welcome_cap,
                 )
-                if not refused:
-                    month = acct.claim_month(now)
-                    slots = (
-                        {
-                            "network": [
-                                f"welcome:ip:{acct.network_key(ip)}:{month}:{n}"
-                                for n in range(welcome_cap)
-                            ]
-                        }
-                        if ip and not card_checked
-                        else {}
-                    )
-                    keys = (
-                        f"welcome:account:{account_id}",
-                        inbox.welcome_key(account_email),
-                        *(() if card_checked else (f"welcome:device:{device_sha256}",)),
-                        f"welcome:file:{fingerprint}",
-                    )
-                    if not db.claim_free(reservation, keys=keys, slots=slots, at=now):
-                        return None
+                if not refused and _welcome_claim(
+                    account_id,
+                    account_email,
+                    device_sha256=device_sha256,
+                    fingerprint=fingerprint,
+                    net=net,
+                    card_checked=card_checked,
+                    reservation=reservation,
+                    now=now,
+                ):
+                    return None
                 welcome = False
                 welcome_refused = refused
                 refusal = preview_or_credit(account_id)
@@ -5372,6 +5479,16 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 free_preview = True
             if free_preview:
                 db.record_free_preview(audit_id, gate_account.id, client_ip=net, at=now)
+                if welcome_refused == "unverified" and fingerprint:
+                    # Confirming the e-mail can open this same report in full.
+                    db.record_welcome_pending(
+                        audit_id,
+                        gate_account.id,
+                        device_sha256=device_sha256,
+                        file_sha256=fingerprint,
+                        client_ip=net,
+                        at=now,
+                    )
         if paid or _session(request) is not None:
             _link_delivered(request, audit_id, via=VIA_UPLOAD)
         location = f"/audits/{audit_id}?token={token}"
@@ -5454,6 +5571,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             locale,
         )
         if _wants_json(request):
+            # The upload form shows the menus in place: the file stays chosen.
             return JSONResponse(
                 {
                     "error": text,
@@ -5462,11 +5580,21 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                     "category": category,
                     "format": detected,
                     "guidance_html": guidance,
+                    "problem": text,
+                    "fields_html": mapping.mapping_fields(
+                        table, locale=locale, chosen=chosen, contact_url=cfg.contact_url
+                    ),
                 },
                 status_code=422,
             )
         page = mapping.mapping_page(
-            table, text, locale=locale, carried=carried, chosen=chosen, guidance_html=guidance
+            table,
+            text,
+            locale=locale,
+            carried=carried,
+            chosen=chosen,
+            guidance_html=guidance,
+            contact_url=cfg.contact_url,
         )
         return HTMLResponse(page, status_code=422)
 
