@@ -2375,10 +2375,10 @@ Routes:
 | Route | What it does |
 |---|---|
 | `GET /` | Landing (how it works, prices, FAQ, link to the sample); `?lang=en`. `GET /en` is the English landing, a short address to share. Its closing call keeps `id='subir'`, and every start button links to the upload page; old `?extras=1` links redirect there. |
-| `GET /auditar` | The upload form on its own page (`/en/audit`, `/pt/auditar`; `?extras=1` opens the extra files). Outside free mode a visitor without an account gets a 303 to sign-up with `next` back here (`/registro?next=/auditar`, `/signup?next=/en/audit`, `/pt/cadastro?next=/pt/auditar`), so nobody fills the form and loses it. A visitor who came with `?extras=1` keeps it (`next=/auditar%3Fextras%3D1`) and lands on the form with the extra files open after signing up or in; the language switch of the form and the "account first" answer to an upload that used an extra box keep it too. |
+| `GET /auditar` | The upload form on its own page (`/en/audit`, `/pt/auditar`; `?extras=1` opens the extra files). Outside free mode a visitor without an account gets a 303 to sign-up with `next` back here (`/registro?next=/auditar`, `/signup?next=/en/audit`, `/pt/cadastro?next=/pt/auditar`), so nobody fills the form and loses it. A visitor who came with `?extras=1` keeps it (`next=/auditar%3Fextras%3D1`) and lands on the form with the extra files open after signing up or in; the language switch of the form and the "account first" answer to an upload that used an extra box keep it too. With `AUDIT_ANON_PREVIEW=true` there is no redirect: the form is served, and its note says that without an account the file's A to D class and red flags are shown, and that with an e-mail the first full report is free (`pages._COPY[...]["anon_preview_note"]`); see "Preview without an account" below. |
 | `GET /precios` | 301 to the landing's prices (`/#pricing`); `/pricing` and `/en/pricing` go to `/en#pricing`, `/pt/precos` to `/pt#pricing`. |
 | `GET /contacto` | Contact page (`/en/contact`, `/pt/contato`; `/soporte`, `/contact`, `/support`, `/en/support`, `/pt/suporte` redirect there), linked from every footer. It shows only what the operator set: `AUDIT_OPERATOR_CONTACT` as a mail link and `AUDIT_CONTACT_URL` as the chat link; with neither it says no channel is published yet. It also says never to send a password, recovery key or card details. |
-| `POST /audits` | Upload. An optional `access_code` field redeems a code (paid mode with codes on). |
+| `POST /audits` | Upload. An optional `access_code` field redeems a code (paid mode with codes on). With `AUDIT_ANON_PREVIEW=true`, an upload without an account and without a working code is stored as a locked preview and answers 303 to `/audits/{id}?token=…&acct=anon_preview` (201 with that `location` for JSON). |
 | `GET /audits/{id}?token=…` | The report, in the language chosen at upload; `&lang=en` or `&lang=es` shows it in the other one. `GET /audits/{id}.json?token=…` the record (402 while locked). |
 | `POST /audits/{id}/checkout?token=…` | Stripe Checkout (503 without Stripe). Form field `plan=single` (default) or `plan=pack`; the return link `?session_id=…` is confirmed with Stripe before anything unlocks. Needs a signed-in account: a visitor is sent to sign in and back to the report, a report on another account is refused (403), and the order is recorded on the buyer's account (`tests/test_audit_card_payments.py::test_checkout_needs_the_signed_in_account_that_owns_the_report`). |
 | `POST /cuenta/comprar` (`/account/comprar`, `/pt/conta/comprar`) | Buy credits by card from "My account": `plan=single` (1 credit, the report price) or `plan=pack` (3 credits, the pack price), with `billing_country` from `AUDIT_APPROVED_MARKETS` and the required `final_sale=yes` box. Live Stripe only (no button and `?error=buy_off` in test mode, without markets or while new checkouts are paused). The order is a `checkout_orders` row whose `audit_id` is `account:<account id>`; the signed webhook puts the credits on an access code linked to the account and unlocks no report. A test-mode payment, another account, amount, plan or billing country grants nothing (`tests/test_audit_account_credit_purchase.py`). |
@@ -2432,6 +2432,7 @@ with an empty value):
 | `AUDIT_ACCESS_CODES` | `false` | Offer manual access-code sales and typed-code redemption. With `AUDIT_FREE_MODE=false` it turns on paid mode without Stripe. Credits already on an account remain spendable when this is `false`. |
 | `AUDIT_REFERRAL_REWARDS` | `true` | Set `false` to stop new invite rewards and hide the reward promise during an incident. Previously granted credits remain usable. |
 | `AUDIT_REFERRAL_GLOBAL_MONTHLY_CAP` | `100` | Maximum rewarded invites across the whole service per UTC month, reserved transactionally in `referral_global_slots`. At one credit per invite this caps the new monthly credit obligation. `0` stops new rewards. |
+| `AUDIT_ANON_PREVIEW` | `false` | Paid mode only. `true` lets a visitor without an account upload and see the file's class and red flags (a locked preview, `accounts.ANON_PREVIEWS_PER_NETWORK_PER_DAY = 2` per IPv6 /64 and `ANON_PREVIEWS_PER_IPV4_PER_DAY = 6` per IPv4 address a UTC day); signing up or in from that report puts it on the account and opens it as the free first full report under the usual limits. `false` keeps "account first": every page and route answers exactly as before. It changes the free tier's rule, so only the owner turns it on. |
 | `AUDIT_EMAIL_VERIFICATION_REQUIRED` | `false` | Migration default. When `true`, both addresses must be confirmed before an invite reward and a buyer's address before a new Checkout. Sign-up still works; the free first full report waits until the address is confirmed (earlier uploads are previews with reason `unverified`). **Public paid launch requires `true` and e-mail delivery (Resend's API or SMTP, see the next two rows) verified end to end.** |
 | `AUDIT_EMAIL_TOKEN_SECRET`, `AUDIT_SMTP_HOST`, `AUDIT_SMTP_PORT`, `AUDIT_SMTP_USERNAME`, `AUDIT_SMTP_PASSWORD`, `AUDIT_SMTP_FROM`, `AUDIT_SMTP_SECURITY` | empty / `587` / `starttls` | Stable secret of at least 32 characters shared by replicas and encrypted SMTP transport. SMTP is one of two transports: when `AUDIT_RESEND_API_KEY` is set (next row but one) the mail goes through Resend's HTTPS API and the `AUDIT_SMTP_HOST`, port, user, password and security variables are not used; the sender is `AUDIT_EMAIL_FROM`, or `AUDIT_SMTP_FROM` when that is empty. `/ready` fails when verification is required but delivery is not configured. Test real delivery, retries and legacy account confirmation before launch. No usable token or link is stored in the outbox. |
 | `AUDIT_SKIP_EMAIL_DNS` | `false` | `true` stops the sign-up DNS check that refuses domains taking no mail (for a staging copy without DNS). |
@@ -2830,6 +2831,52 @@ an account never changes what a report says.
   someone can open several accounts with made-up addresses; the per-network
   cap and the 5 sign-ups per hour per network only slow that down. Enabling
   SMTP and verified-email gating closes the reward and new-Checkout paths.
+- **Preview without an account** (`AUDIT_ANON_PREVIEW`, off by default; not
+  in free mode). With the switch off, everything above holds unchanged:
+  `/auditar` sends a visitor without an account to sign-up and an anonymous
+  upload gets the 401 sign-in page. With it on, the free tier's rule becomes
+  "see the class first, create the account to open it":
+  - `/auditar` serves the form; its note says what is shown without an
+    account and that the first full report is free with an e-mail.
+  - `POST /audits` without a session and without a working code (a working
+    code still asks for the account) keeps the cross-site check, the consent
+    and the hourly limit, then takes one of the network's previews of the
+    UTC day after parsing (`free_claims` keys
+    `anon:ip:<network hash>:<day>:<n>`; `accounts.ANON_PREVIEWS_PER_NETWORK_PER_DAY
+    = 2` per IPv6 /64, `ANON_PREVIEWS_PER_IPV4_PER_DAY = 6` per IPv4 address,
+    `accounts.network_cap`). Past it the answer is the 401 sign-in page (JSON
+    `free_tier_signin`) and nothing is stored. Otherwise the report is stored
+    locked (`paid=False`), a `welcome_pending` row with `account_id = ""`
+    keeps the upload's browser mark, file fingerprint and network, an
+    `anon_previews` row counts it for `/panel`, and the answer goes to
+    `/audits/{id}?token=…&acct=anon_preview` (the device cookie is set as for
+    any upload). The in-page upload follows the same `location`.
+  - The report says it is a preview without an account (`anon_preview`) and,
+    while the account would open it (uploaded in the last
+    `WELCOME_PENDING_DAYS` days, and neither its browser, file nor network had
+    their free report meanwhile), its box reads `anon_preview_box` with
+    "Abrir mi informe completo gratis" (sign-up) and "Ya tengo cuenta";
+    otherwise it keeps the usual `anon_box`. It stays `noindex`, opened only
+    by its key.
+  - Signing up or in (password, two-step code or passkey) with `next` on that
+    report and its key in `REPORT_KEY_COOKIE` (checked as `_load` checks it)
+    links a report no account holds: as the account's own upload when this
+    browser uploaded it, else as saved. The pending row is attached
+    (`store.welcome_pending_attach`, only a row with `account_id = ""`). With
+    no confirmation required, or an address already confirmed,
+    `_grant_pending_welcome` opens it at once (`acct=welcome`); otherwise
+    confirming the address opens it, as for any pending preview (the report
+    shows `welcome_refused_unverified`). An account that already had its free
+    report, or whose browser, file, inbox or network rule refuses it, keeps
+    the report linked and locked, with the usual credit, code or card offer.
+    No limit is relaxed: the free full report is still one per account,
+    inbox, browser, file and card, and a few per network a month.
+  - Retention: the locked preview follows the usual purge; its
+    `welcome_pending` and `anon_previews` rows and the day's network claims go
+    at the same cutoff, and with `delete_audit`.
+  - `/panel` adds "Vistas previas sin cuenta" by tag: how many previews were
+    uploaded without an account and how many went on an account afterwards
+    (`funnel.STAGES` `anon_previews` and `anon_linked`).
 - **Free first full report** (`accounts.WELCOME_FULL_REPORT = True`,
   `WELCOME_REPORTS_PER_IP_PER_MONTH = 3` per IPv6 /64,
   `WELCOME_REPORTS_PER_IPV4_PER_MONTH = 10` per IPv4 address; not in free

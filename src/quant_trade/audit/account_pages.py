@@ -786,6 +786,16 @@ COPY: dict[str, dict[str, str]] = {
         ),
         "anon_signup": "Crear cuenta",
         "anon_signin": "Entrar",
+        "anon_preview": (
+            "Vista previa sin cuenta: la clase de A a D y las banderas rojas de tu archivo. El "
+            "informe completo y el PDF se abren con una cuenta. Guarda este enlace: sin cuenta, "
+            "es la única forma de volver a abrirla."
+        ),
+        "anon_preview_box": (
+            "Crea tu cuenta con tu correo y este mismo informe se abre completo, gratis, con PDF."
+        ),
+        "anon_preview_signup": "Abrir mi informe completo gratis",
+        "anon_preview_signin": "Ya tengo cuenta",
         "credit_button": "Desbloquear con 1 crédito de tu cuenta",
         "credit_left": "Tienes {n} créditos.",
         "credit_left_one": "Tienes 1 crédito.",
@@ -1530,6 +1540,17 @@ COPY: dict[str, dict[str, str]] = {
         "anon_box": "Create a free account to save this report and find it without the link.",
         "anon_signup": "Create account",
         "anon_signin": "Sign in",
+        "anon_preview": (
+            "Preview without an account: your file's A to D class and red flags. The full "
+            "report and the PDF open with an account. Keep this link: without an account, it "
+            "is the only way back to it."
+        ),
+        "anon_preview_box": (
+            "Create your account with your email and this same report opens in full, free, "
+            "with the PDF."
+        ),
+        "anon_preview_signup": "Open my full report free",
+        "anon_preview_signin": "I have an account",
         "credit_button": "Unlock with 1 credit from your account",
         "credit_left": "You have {n} credits.",
         "credit_left_one": "You have 1 credit.",
@@ -3294,6 +3315,7 @@ def report_box(
     credits: int = 0,
     locked: bool = False,
     card_offer: bool = False,
+    anon_preview: bool = False,
 ) -> str:
     """The account line on a report page.
 
@@ -3302,20 +3324,27 @@ def report_box(
     account). ``query`` is the report's own query string (token and language)
     for the forms; ``credits`` offers the one-click unlock when ``locked``.
     A signed-out visitor goes to sign-up or sign-in through a form, so the
-    report's key is never written inside a ``next`` address.
+    report's key is never written inside a ``next`` address. ``anon_preview``
+    (a preview uploaded without an account that the account would open in
+    full) says so, with "open my full report" as the main button.
     """
     locale = _locale(locale)
     copy = COPY[locale]
     base = f"/audits/{audit_id}"
     parts: list[str] = []
     if state == "anon":
+        box, signup, signin, main = (
+            ("anon_preview_box", "anon_preview_signup", "anon_preview_signin", "btn-primary")
+            if anon_preview
+            else ("anon_box", "anon_signup", "anon_signin", "btn-dark")
+        )
         parts.append(
-            f"<span>{_e(copy['anon_box'])}</span>"
+            f"<span>{_e(copy[box])}</span>"
             f"<form method='post' action='{_e(base)}/account{_e(query)}'>"
-            "<button class='btn btn-dark btn-sm' type='submit' name='go' value='signup'>"
-            f"{_e(copy['anon_signup'])}</button> "
+            f"<button class='btn {main} btn-sm' type='submit' name='go' value='signup'>"
+            f"{_e(copy[signup])}</button> "
             "<button class='btn btn-ghost btn-sm' type='submit' name='go' value='signin'>"
-            f"{_e(copy['anon_signin'])}</button></form>"
+            f"{_e(copy[signin])}</button></form>"
         )
     elif state == "mine":
         parts.append(

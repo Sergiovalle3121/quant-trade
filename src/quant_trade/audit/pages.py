@@ -323,6 +323,10 @@ _COPY: dict[str, dict[str, Any]] = {
             "Antes de subir, crea tu cuenta gratis: tu primer informe sale completo, con PDF, "
             "sin pagar."
         ),
+        "anon_preview_note": (
+            "Sin cuenta ves la clase de A a D y las banderas rojas de tu archivo. Con tu correo, "
+            "el primer informe completo es gratis."
+        ),
         "signin_create": "Crear cuenta gratis",
         "signin_enter": "Ya tengo cuenta",
         "waitlist_title": "Recibe guías y novedades",
@@ -644,6 +648,10 @@ _COPY: dict[str, dict[str, Any]] = {
         "signin_first": (
             "Before you upload, create your free account: your first report comes out in full, "
             "with the PDF, at no cost."
+        ),
+        "anon_preview_note": (
+            "Without an account you see your file's A to D class and red flags. With your "
+            "email, the first full report is free."
         ),
         "signin_create": "Create a free account",
         "signin_enter": "I have an account",
@@ -2244,11 +2252,16 @@ def _field(label: str, control: str, help_text: str = "") -> str:
     )
 
 
-def _signin_first(copy: dict[str, Any], locale: str) -> str:
-    """Before the file: the upload needs an account (or a bought code)."""
+def _signin_first(copy: dict[str, Any], locale: str, *, anon_preview: bool = False) -> str:
+    """Before the file: the upload needs an account (or a bought code).
+
+    With ``anon_preview`` the file goes through without one, and the note says
+    what that shows and what the account adds.
+    """
     signup, signin, _ = _ACCOUNT_PATHS.get(locale, _ACCOUNT_PATHS["es"])
+    text = copy["anon_preview_note" if anon_preview else "signin_first"]
     return (
-        f"<div class='signin-first'><p>{_e(copy['signin_first'])}</p>"
+        f"<div class='signin-first'><p>{_e(text)}</p>"
         "<div class='inline-form'>"
         f"<a class='btn btn-primary' href='{signup}'>{_e(copy['signin_create'])}</a>"
         f"<a class='btn btn-ghost' href='{signin}'>{_e(copy['signin_enter'])}</a>"
@@ -2273,6 +2286,7 @@ def _upload_form(
     extras_open: bool = False,
     signin_first: bool = False,
     carried: Mapping[str, str] | None = None,
+    anon_preview: bool = False,
 ) -> str:
     ui = _UI[locale]
     linked = link_locale(locale)
@@ -2420,7 +2434,7 @@ def _upload_form(
         + f"<h2 class='label' style='font-size:1.2rem;margin-bottom:6px'>{_e(copy['form_title'])}"
         "</h2>"
         + f"{flash}{err}<p class='panel-note'>{icon('shield')}{_e(note)}</p>"
-        + (_signin_first(copy, locale) if signin_first else "")
+        + (_signin_first(copy, locale, anon_preview=anon_preview) if signin_first else "")
         # With JavaScript the answer comes back in place (data-inplace): a refusal
         # fills upload-alert, the column menus fill map-fields, and the file stays
         # chosen. Without it the form posts as always.
@@ -2753,11 +2767,14 @@ def upload_page(
     carried: Mapping[str, str] | None = None,
     rejection_html: str = "",
     notice_link_html: str = "",
+    anon_preview: bool = False,
 ) -> str:
     """The upload form on its own page, so the landing can stay short.
 
     ``signed_in=False`` in paid mode keeps the "account first" note above the fields
-    (the web layer normally sends such a visitor to sign-up before this page).
+    (the web layer normally sends such a visitor to sign-up before this page);
+    with ``anon_preview`` (``AUDIT_ANON_PREVIEW`` on) the visitor uploads without
+    an account and the note says what that shows instead.
     ``notice`` is one line above the fields, such as "confirmation link sent";
     ``notice_link_html`` is trusted, fixed markup after it (a link to the guides).
     ``carried`` restores only declaration fields after a refusal; file pickers and
@@ -2797,6 +2814,7 @@ def upload_page(
         extras_open=extras_open,
         signin_first=signed_in is False and not free_mode,
         carried=carried,
+        anon_preview=anon_preview,
     )
     # The language switch keeps the extra boxes open.
     alternates = {

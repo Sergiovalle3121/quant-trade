@@ -194,6 +194,12 @@ class AuditSettings:
     #: require a confirmed email. Sign-up works; the free first report waits
     #: for a confirmed address.
     email_verification_required: bool = False
+    #: Paid mode only: a visitor without an account may upload and see the
+    #: file's class and red flags (a locked preview, a few per network a day);
+    #: creating the account opens that same report as the free first full
+    #: report, under the usual limits. Off by default: the upload then needs
+    #: an account first, exactly as before (``AUDIT_ANON_PREVIEW=true``).
+    anon_preview: bool = False
     email_token_secret: str = field(default="", repr=False)
     smtp_host: str = ""
     smtp_port: int = 587
@@ -464,6 +470,7 @@ class AuditSettings:
             .strip()
             .lower()
             in TRUE_VALUES,
+            anon_preview=env.get("AUDIT_ANON_PREVIEW", "").strip().lower() in TRUE_VALUES,
             email_token_secret=_email_token_secret(env),
             smtp_host=env.get("AUDIT_SMTP_HOST", "").strip(),
             smtp_port=int(env.get("AUDIT_SMTP_PORT", "").strip() or "587"),

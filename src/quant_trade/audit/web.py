@@ -1898,6 +1898,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                     days=funnel.FUNNEL_DAYS,
                     example=f"{_site_url(request)}{audience_url('retos-prop-firm', 'es')}?ref=f6",
                     country_rows=db.funnel_country_events(funnel.since_day(now)),
+                    anon_previews=cfg.anon_preview,
                 )
                 + attempts_html,
                 panel_path=app.state.panel_path,
@@ -2121,9 +2122,10 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             notice = account_pages.COPY[locale]["welcome_confirm"]
             # While the e-mail arrives, the export guides.
             notice_link = account_pages.welcome_confirm_guides(locale)
-        if not signed_in and not cfg.free_mode:
+        if not signed_in and not cfg.free_mode and not cfg.anon_preview:
             # Uploads need an account: sign up (or sign in) first, then come back here,
-            # so nobody fills the form and loses it.
+            # so nobody fills the form and loses it. With AUDIT_ANON_PREVIEW the form
+            # is served: the upload is a preview until the account exists.
             signup = _ACCOUNT_PATHS[locale][0]
             back = AUDIT_PATHS[locale] + (f"?{acct.NEXT_EXTRAS_QUERY}" if extras else "")
             return RedirectResponse(f"{signup}?next={quote(back, safe='/')}", status_code=303)
@@ -2139,6 +2141,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 signed_in=signed_in,
                 notice=notice,
                 notice_link_html=notice_link,
+                anon_preview=cfg.anon_preview,
             )
         )
 
@@ -2798,6 +2801,109 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             with contextlib.suppress(Exception):
                 db.clear_welcome_pending(account_id)
 
+    def _anon_offer(record: Any, owner: str | None, now: datetime) -> bool:
+        """A preview uploaded without an account that the account would open in full.
+
+        Only with ``AUDIT_ANON_PREVIEW`` on, for a locked report no account holds,
+        uploaded in the last ``WELCOME_PENDING_DAYS`` days, whose browser, file
+        and network have not had their free report meanwhile: what the report's
+        box then promises is what signing up does.
+        """
+        if not cfg.anon_preview or cfg.free_mode or not acct.WELCOME_FULL_REPORT:
+            return False
+        if record.paid or owner is not None:
+            return False
+        row = db.anon_pending(record.id)
+        if row is None or not row.file_sha256:
+            return False
+        oldest = now - timedelta(days=WELCOME_PENDING_DAYS)
+        if row.created_at < oldest.astimezone(UTC).isoformat().replace("+00:00", "Z"):
+            return False
+        return not db.welcome_refusal(
+            "",
+            device_sha256=row.device_sha256,
+            file_sha256=row.file_sha256,
+            client_ip=row.client_ip,
+            since=acct.month_start(now),
+            per_ip=_welcome_cap(row.client_ip),
+        )
+
+    def _waits_for_email(request: Request, audit_id: str) -> bool:
+        """The signed-in account holds ``audit_id`` as a preview waiting for its e-mail."""
+        session = _session(request)
+        if session is None:
+            return False
+        rows = db.welcome_pending_for(session[0].id, since=datetime(2000, 1, 1, tzinfo=UTC))
+        return any(row.audit_id == audit_id for row in rows)
+
+    def _with_notice(next_path: str, notice: str) -> str:
+        """``next_path`` with ``acct=<notice>`` for the report's banner; as is for ``""``."""
+        if not notice:
+            return next_path
+        parts = urlsplit(next_path)
+        query = f"{parts.query}&" if parts.query else ""
+        target = f"{parts.path}?{query}acct={notice}"
+        return target + (f"#{parts.fragment}" if parts.fragment else "")
+
+    def _take_anon_report(request: Request, account: Any, next_path: str) -> str:
+        """Put on the account the report a visitor signed up or in from.
+
+        Only with ``AUDIT_ANON_PREVIEW`` on. ``next`` names the report and the
+        report-key cookie holds its key, checked as ``_load`` checks it. A
+        report no account holds is linked: as the account's own upload when
+        this browser uploaded it, else as saved. A preview uploaded without an
+        account is attached to the account and, once its address counts as
+        confirmed, opened as the free full report under the same account,
+        inbox, browser, file and network limits (``_grant_pending_welcome``).
+        Returns the ``acct`` notice for the way back, ``""`` for none.
+        """
+        if not cfg.anon_preview or cfg.free_mode or not next_path:
+            return ""
+        match = re.fullmatch(r"/audits/([A-Za-z0-9_-]{1,64})", urlsplit(next_path).path)
+        audit_id, _, token = (request.cookies.get(acct.REPORT_KEY_COOKIE) or "").partition(".")
+        if match is None or audit_id != match.group(1) or not token:
+            return ""
+        try:
+            record = db.get_audit(audit_id)
+            if (
+                record is None
+                or not token_matches(record.token_hash, token)
+                or record.purged_at
+                or not record.result_json
+                or db.account_for_audit(audit_id) is not None
+            ):
+                return ""
+            now = datetime.now(UTC)
+            row = db.anon_pending(audit_id)
+            device = request.cookies.get(acct.DEVICE_COOKIE) or ""
+            uploader = (
+                row is not None
+                and 0 < len(device) <= 128
+                and acct.same_secret(acct.hash_secret(device), row.device_sha256)
+            )
+            via = VIA_UPLOAD if uploader else VIA_SAVED
+            if db.link_audit(account.id, audit_id, at=now, via=via) != "linked":
+                return ""
+            db.note_anon_linked(audit_id, at=now)
+            if row is None or record.paid or not db.welcome_pending_attach(audit_id, account.id):
+                return ""
+            refused = _pending_refusal(
+                account.id,
+                device_sha256=row.device_sha256,
+                file_sha256=row.file_sha256,
+                net=row.client_ip,
+                now=now,
+            )
+            if refused:
+                return f"preview_{refused}" if refused in WELCOME_REFUSALS else ""
+            if cfg.email_verification_required and not db.email_verified(account.id):
+                # Confirming the address opens it (``_grant_pending_welcome``).
+                return "preview_unverified"
+            return "welcome" if _grant_pending_welcome(account.id, now) else ""
+        except Exception:  # noqa: BLE001 - signing up or in never fails over the report
+            logger.warning("could not put a report on the account it was opened from")
+            return ""
+
     def _card_offer(request: Request, account: Any, now: datetime) -> bool:
         """A card check would give this account its free full report."""
         if not cfg.card_public or db.card_checked(account.id):
@@ -3021,7 +3127,10 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             # The confirmation link was queued with the account.
             mailed = cfg.email_verification_required and cfg.email_delivery_ready
             if next_path:
-                response: Response = _back_to(request, next_path, mailed=mailed)
+                notice = _take_anon_report(request, account, next_path)
+                # With the link sent, the report's own notice says what confirming opens.
+                back = next_path if mailed else _with_notice(next_path, notice)
+                response: Response = _back_to(request, back, mailed=mailed)
             else:
                 response = _account_redirect(locale, "welcome_confirm" if mailed else "welcome")
             _start_session(response, account, request, event="signup")
@@ -3144,7 +3253,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 )
                 return response
             if next_path:
-                response = _back_to(request, next_path)
+                notice = _take_anon_report(request, found[0], next_path)
+                response = _back_to(request, _with_notice(next_path, notice))
             else:
                 response = _account_redirect(found[0].locale if lang is None else locale)
             _start_session(response, found[0], request, event="signin")
@@ -3237,7 +3347,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             if not db.end_two_step_challenge(digest) and not done:
                 return again("code_bad", 400)  # pragma: no cover - finished twice at once
             if next_path and not done:
-                response: Response = _back_to(request, next_path)
+                notice = _take_anon_report(request, account, next_path)
+                response: Response = _back_to(request, _with_notice(next_path, notice))
             else:
                 response = _account_redirect(locale, done)
             response.delete_cookie(acct.TWO_STEP_COOKIE, path="/")
@@ -3572,7 +3683,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             if pending is not None:
                 db.end_two_step_challenge(pending[0])
             if next_path:
-                response: Response = _back_to(request, next_path)
+                notice = _take_anon_report(request, account, next_path)
+                response: Response = _back_to(request, _with_notice(next_path, notice))
             else:
                 response = _account_redirect(account.locale if lang is None else locale)
             response.delete_cookie(pk.COOKIE, path="/")
@@ -4972,25 +5084,38 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         welcome = False
         free_preview = False
         spend_credit = False
+        #: AUDIT_ANON_PREVIEW: no account and no working code, so the upload is
+        #: a locked preview (a few per network a day) that signing up can open.
+        anonymous = False
         device = request.cookies.get(acct.DEVICE_COOKIE) or ""
         new_device = ""
         if not (0 < len(device) <= 128):
             device = new_device = acct.new_secret()
+
+        def signin_gate() -> Response:
+            # Whoever filled an extra box finds them open after signing up.
+            # The challenge list always sends its first choice: that is no choice.
+            chose_extras = bool(
+                (optimization is not None and optimization.filename)
+                or (live is not None and live.filename)
+                or challenge.strip() not in ("", DEFAULT_PRESET)
+            )
+            return _gate(request, report_loc, "signin", 401, extras=chose_extras)
+
         if not cfg.free_mode:
             session = _session(request)
             # Account first: every upload, code or not, belongs to an account.
-            if session is None:
-                # Whoever filled an extra box finds them open after signing up.
-                # The challenge list always sends its first choice: that is no choice.
-                chose_extras = bool(
-                    (optimization is not None and optimization.filename)
-                    or (live is not None and live.filename)
-                    or challenge.strip() not in ("", DEFAULT_PRESET)
-                )
-                return _gate(request, report_loc, "signin", 401, extras=chose_extras)
+            if session is None and not cfg.anon_preview:
+                return signin_gate()
             typed = access_code.strip()[:_CODE_MAX] if cfg.access_codes_enabled else ""
             usable = bool(typed) and await run_in_threadpool(db.code_usable, typed, now)
-            if not usable:
+            if session is None:
+                # A working code still belongs to an account; without one the
+                # file is seen as a preview without an account.
+                if usable:
+                    return signin_gate()
+                anonymous = True
+            elif not usable:
                 gate_account = session[0]
         # Strong signatures can decide a refusal from a bounded prefix. Starlette
         # has already spooled multipart, but no importer or whole-file read runs.
@@ -5211,6 +5336,30 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 return _gate(request, report_loc, "quota" if full == "account" else "network", 402)
             return None
 
+        # The day's previews without an account, per network (an IPv6 /64 or
+        # an IPv4 address): this first look answers at once, the claim taken
+        # after parsing is what holds when uploads arrive together.
+        anon_slots: list[str] = []
+        if anonymous:
+            anon_cap = acct.network_cap(
+                net,
+                per_ip=acct.ANON_PREVIEWS_PER_NETWORK_PER_DAY,
+                per_ipv4=acct.ANON_PREVIEWS_PER_IPV4_PER_DAY,
+            )
+            day = acct.claim_day(now)
+            anon_slots = [f"anon:ip:{acct.network_key(ip)}:{day}:{n}" for n in range(anon_cap)]
+            if all(db.free_claim_taken(slot) for slot in anon_slots):
+                return _gate(request, report_loc, "signin", 401)
+
+        def claim_anon_preview(inputs: Any) -> Response | None:
+            """Take one of the network's previews of the day, or ask for the account."""
+            nonlocal fingerprint
+            fingerprint = acct.content_fingerprint(inputs.equity.frame)
+            if db.claim_free(reservation, keys=(), slots={"network": anon_slots}, at=now):
+                db.release_free(reservation)
+                return _gate(request, report_loc, "signin", 401)
+            return None
+
         if gate_account is not None:
             account_email = gate_account.email
             first_look = _first_look(gate_account, device_sha256, net, now)
@@ -5286,7 +5435,10 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         live_name = live_digest_name(live_filename) if uploads["live"] else None
         # A code is only redeemed where something is locked; in free mode it
         # is ignored so no credit is spent on a report that is free anyway.
+        # A preview without an account carries none (a working code asked for one).
         code = access_code.strip()[:_CODE_MAX] if cfg.access_codes_enabled else ""
+        if anonymous:
+            code = ""
         # Named columns belong to the report: a file sent with them in the
         # curve field is read with them, before any automatic reader.
         if report_columns and uploads["equity"] and not uploads["report"]:
@@ -5447,6 +5599,10 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 refusal = claim_free_use(gate_account.id, inputs)
                 if refusal is not None:
                     return refusal
+            elif anonymous:
+                refusal = claim_anon_preview(inputs)
+                if refusal is not None:
+                    return refusal
             try:
                 return _run_and_store(
                     inputs, ip, uploads, report_name, code or None, live_name=live_name
@@ -5494,10 +5650,30 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             "audit", audit_outcome, time.monotonic() - audit_started, locale=report_loc
         )
         if not isinstance(outcome, tuple):
-            if gate_account is not None:
+            if gate_account is not None or anonymous:
                 db.release_free(reservation)
             return outcome
         audit_id, token, paid = outcome
+        if anonymous:
+            try:
+                # Signing up from this report attaches the row and opens it in
+                # full under the free report's limits, with these marks.
+                db.record_welcome_pending(
+                    audit_id,
+                    "",
+                    device_sha256=device_sha256,
+                    file_sha256=fingerprint,
+                    client_ip=net,
+                    at=now,
+                )
+                db.record_anon_preview(
+                    audit_id,
+                    locale=report_loc,
+                    ref=funnel.clean_ref(request.cookies.get(funnel.REF_COOKIE)),
+                    at=now,
+                )
+            except Exception:  # the stored preview matters more than the offer
+                logger.warning("could not note a preview uploaded without an account")
         if mapper and report_columns and uploads["report"]:
             try:
                 table = mapping.read_table(uploads["report"])
@@ -5569,7 +5745,9 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         if paid or _session(request) is not None:
             _link_delivered(request, audit_id, via=VIA_UPLOAD)
         location = f"/audits/{audit_id}?token={token}"
-        if welcomed:
+        if anonymous:
+            location += "&acct=anon_preview"
+        elif welcomed:
             location += "&acct=welcome"
         elif credit_used:
             location += "&acct=upload_credit"
@@ -5892,6 +6070,17 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             notice = account_pages.COPY[ui]["saved_notice"]
         elif acct_done == "welcome_confirm" and _confirm_pending(request):
             notice = account_pages.COPY[ui]["welcome_confirm"]
+            if cfg.anon_preview and not record.paid and _waits_for_email(request, record.id):
+                # Back on the preview it signed up from: what confirming opens.
+                notice = _pending_notice(record.id, ui) or notice
+        elif (
+            acct_done == "anon_preview"
+            and cfg.anon_preview
+            and not cfg.free_mode
+            and not record.paid
+            and db.account_for_audit(record.id) is None
+        ):
+            notice = account_pages.COPY[ui]["anon_preview"]
         elif (
             acct_done
             and acct_done.startswith("preview_")
@@ -5963,6 +6152,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 state="anon",
                 audit_id=record.id,
                 query=query,
+                anon_preview=_anon_offer(record, owner, datetime.now(UTC)),
             )
         account, csrf, _ = session
         state = "mine" if owner == account.id else ("unsaved" if owner is None else "other")

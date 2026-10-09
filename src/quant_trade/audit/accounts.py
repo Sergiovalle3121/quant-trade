@@ -92,6 +92,13 @@ WELCOME_REPORTS_PER_IPV4_UNVERIFIED = 3
 #: Days a preview uploaded before the e-mail was confirmed can still become the
 #: free full report when the address is confirmed (the most recent one only).
 WELCOME_PENDING_DAYS = 7
+#: With ``AUDIT_ANON_PREVIEW`` on, a visitor without an account sees the class
+#: and red flags of a file (a locked preview) this many times a UTC day per
+#: network: an IPv6 /64, or an IPv4 address, which a mobile carrier often
+#: shares among many strangers (CGNAT) and so gets the larger cap
+#: (``network_cap``). Past it, the upload asks for the account.
+ANON_PREVIEWS_PER_NETWORK_PER_DAY = 2
+ANON_PREVIEWS_PER_IPV4_PER_DAY = 6
 #: "Invita a un colega": an account whose invite link brings a new account
 #: gets this many full-report credits once the new account's free first
 #: report exists (so the free tier's browser, file and address limits
@@ -623,6 +630,8 @@ def join_report_key(next_path: str, cookie: str | None) -> str:
 
 
 __all__ = [
+    "ANON_PREVIEWS_PER_IPV4_PER_DAY",
+    "ANON_PREVIEWS_PER_NETWORK_PER_DAY",
     "CSRF_COOKIE",
     "DEVICE_COOKIE",
     "EMAIL_HOOKS",
@@ -652,6 +661,7 @@ __all__ = [
     "WELCOME_REPORTS_PER_IP_PER_MONTH",
     "burn_time",
     "common_password",
+    "claim_day",
     "claim_month",
     "content_fingerprint",
     "hash_password",
@@ -690,6 +700,11 @@ def content_fingerprint(frame: Any) -> str:
 
 def claim_month(at: datetime) -> str:
     return at.strftime("%Y-%m")
+
+
+def claim_day(at: datetime) -> str:
+    """The UTC day the anonymous previews are counted in."""
+    return at.astimezone(UTC).strftime("%Y-%m-%d")
 
 
 def network_address(client_ip: str) -> str:

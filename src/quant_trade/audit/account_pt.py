@@ -722,6 +722,16 @@ COPY_PT: dict[str, str] = {
     "anon_box": "Crie uma conta grátis para salvar este relatório e encontrá-lo sem o link.",
     "anon_signup": "Criar conta",
     "anon_signin": "Entrar",
+    "anon_preview": (
+        "Prévia sem conta: a classe de A a D e os alertas do seu arquivo. O relatório completo "
+        "e o PDF abrem com uma conta. Guarde este link: sem conta, é a única forma de voltar a "
+        "ela."
+    ),
+    "anon_preview_box": (
+        "Crie sua conta com o seu e-mail e este mesmo relatório abre completo, grátis, com o PDF."
+    ),
+    "anon_preview_signup": "Abrir meu relatório completo grátis",
+    "anon_preview_signin": "Já tenho conta",
     "credit_button": "Desbloquear com 1 crédito da sua conta",
     "credit_left": "Você tem {n} créditos.",
     "credit_left_one": "Você tem 1 crédito.",

@@ -137,6 +137,10 @@ COPY_PT: dict[str, Any] = {
         "Antes de enviar, crie a sua conta grátis: o seu primeiro relatório sai completo, com "
         "PDF, sem pagar."
     ),
+    "anon_preview_note": (
+        "Sem conta você vê a classe de A a D e os alertas do seu arquivo. Com o seu e-mail, o "
+        "primeiro relatório completo é grátis."
+    ),
     "signin_create": "Criar conta grátis",
     "signin_enter": "Já tenho conta",
     "waitlist_title": "Receba guias e novidades",
