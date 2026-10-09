@@ -985,7 +985,9 @@ def privacy_text(ctx: LegalContext, locale: str = "es") -> LegalText:
                     "free report), only to tell you what happened since; it is deleted after 90 "
                     "days without a visit or with your account.",
                     "To know which of our own links brings visitors: visits to the home "
-                    "and case pages are counted per day, language and link tag (such as "
+                    "page, the case pages and the free tools (calculator, figures card, "
+                    "examples and the tools page) are counted per day, language and link "
+                    "tag (such as "
                     "?ref=f4 in a link we posted), with no address; a cookie named "
                     f"{SEEN_COOKIE} holds only today's date so a browser counts once a day. "
                     "When you "
@@ -1162,7 +1164,9 @@ def privacy_text(ctx: LegalContext, locale: str = "es") -> LegalText:
                 "informe gratis), solo para avisarte de lo que pasó desde entonces; se borra a "
                 "los 90 días sin visitas o con tu cuenta.",
                 "Para saber cuál de nuestros propios enlaces trae visitas: las visitas a la "
-                "página principal y a las de cada caso se cuentan por día, idioma y etiqueta "
+                "página principal, a las de cada caso y a las herramientas gratis (calculadora, "
+                "tarjeta de cifras, ejemplos y página de herramientas) se cuentan por día, idioma "
+                "y etiqueta "
                 "del enlace (como ?ref=f4 en un enlace que publicamos), sin dirección; una "
                 f"cookie llamada {SEEN_COOKIE} guarda solo la fecha de hoy para contar cada "
                 "navegador una vez al día. Si llegas desde un enlace con etiqueta, una cookie "
@@ -1350,7 +1354,9 @@ def _privacy_pt(
                 "sua marca aleatória, para mostrar o que ocorreu desde então; o registro é "
                 "eliminado após 90 dias sem visita ou com a conta.",
                 "Para contar visitas vindas de nossos próprios links: as visitas à página "
-                "inicial e às páginas de casos são contadas por dia, idioma e etiqueta do "
+                "inicial, às páginas de casos e às ferramentas grátis (calculadora, cartão de "
+                "números, exemplos e página de ferramentas) são contadas por dia, idioma e "
+                "etiqueta do "
                 "link (como ?ref=f4), sem endereço de rede. O cookie "
                 f"{SEEN_COOKIE} guarda só a data de hoje para contar um navegador uma vez "
                 "por dia. Se você chega por um link etiquetado, o cookie "
