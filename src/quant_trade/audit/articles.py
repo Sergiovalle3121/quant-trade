@@ -24,7 +24,7 @@ from quant_trade.audit.examples import EXAMPLES_COPY, EXAMPLES_PATH
 from quant_trade.audit.guides import GUIDES_BY_SLUG, guide_url
 from quant_trade.audit.method import COPY as METHOD_COPY
 from quant_trade.audit.method import METHOD_PATH
-from quant_trade.audit.public_card import _wilson
+from quant_trade.audit.public_card import _num, _wilson
 from quant_trade.audit.reading import COPY as READING_COPY
 from quant_trade.audit.reading import READING_PATH, reading_url
 from quant_trade.audit.retail_numbers import (
@@ -59,15 +59,6 @@ RELATED_KINDS: frozenset[str] = frozenset(
         "winrate",
     }
 )
-
-
-_SWAP_SEPARATORS = str.maketrans({",": ".", ".": ","})
-
-
-def _num(value: float, locale: str, decimals: int) -> str:
-    """An editorial number with the language's separators: 1,000.5 in en, 1.000,5 in es/pt."""
-    formatted = f"{value:,.{decimals}f}"
-    return formatted if locale == "en" else formatted.translate(_SWAP_SEPARATORS)
 
 
 #: Illustrative declarations, never measurements of a client's file. The same
@@ -285,14 +276,15 @@ class Article:
 #: Index and page paths per language. An article lives at ``<index>/<slug>``.
 ARTICLES_PATH: dict[str, str] = {"es": "/articulos", "en": "/articles", "pt": "/pt/artigos"}
 
-#: The words the index and every article page share.
+#: The words the index and every article page share. ``summary`` is the index's meta
+#: description: keep it naming the topics the articles cover, without a promise.
 ARTICLES_COPY: dict[str, dict[str, str]] = {
     "es": {
         "eyebrow": "Artículos",
         "title": "Artículos sobre backtests",
         "summary": (
-            "Artículos cortos sobre backtests: sobreoptimización, costos reales y cómo leer "
-            "el informe del probador de estrategias. Sin registro."
+            "Artículos sobre backtests: costos reales, informe de MT5, Sharpe deflactado, prop "
+            "firms, señales, bots con IA, % de aciertos y optimizador. Sin registro."
         ),
         "intro": "Lecturas cortas sobre qué mirar en un backtest antes de confiar en él.",
         "related": "Relacionado",
@@ -311,8 +303,8 @@ ARTICLES_COPY: dict[str, dict[str, str]] = {
         "eyebrow": "Articles",
         "title": "Articles about backtests",
         "summary": (
-            "Short articles about backtests: overfitting, real costs and how to read the strategy "
-            "tester report. No sign-up needed to read them."
+            "Articles about backtests: real costs, the MT5 report, deflated Sharpe, prop firms, "
+            "signals, AI bots, win rate and the optimiser. No sign-up needed."
         ),
         "intro": "Short reads on what to look at in a backtest before you trust it.",
         "related": "Related",
@@ -331,8 +323,8 @@ ARTICLES_COPY: dict[str, dict[str, str]] = {
         "eyebrow": "Artigos",
         "title": "Artigos sobre backtests",
         "summary": (
-            "Artigos curtos sobre backtests: sobreajuste, custos reais e como ler o relatório "
-            "do testador de estratégias. Sem cadastro."
+            "Artigos sobre backtests: custos reais, relatório do MT5, Sharpe deflacionado, prop "
+            "firms, sinais, robôs com IA, taxa de acerto e otimizador. Sem cadastro."
         ),
         "intro": "Leituras curtas sobre o que observar num backtest antes de confiar nele.",
         "related": "Relacionado",

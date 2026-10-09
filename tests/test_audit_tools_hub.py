@@ -73,6 +73,10 @@ def _main(page: str) -> str:
     return page.split("<main", 1)[1].split("</main>", 1)[0]
 
 
+def _visible_text(page: str) -> str:
+    return html.unescape(re.sub(r"<[^>]+>", " ", page))
+
+
 def _texts(value: object) -> Iterator[str]:
     """Every string in a copy entry, however it is nested."""
     if isinstance(value, str):
@@ -206,6 +210,21 @@ def test_reader_has_content_links_and_the_report_step(client: TestClient, locale
     beyond = html.escape(words["beyond_title"], quote=True)
     assert text.index(beyond) > text.index("data-public-share")
     assert find_claims(html.unescape(text)) == []
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+def test_sample_report_footer_links_the_free_tools(client: TestClient, locale: str) -> None:
+    response = client.get(_sample_url(locale))
+    assert response.status_code == 200
+    page = response.text
+    foot = page[page.index("<div class='report-foot'>") :]
+    links = foot[foot.index("<nav class='rf-links'>") : foot.index("</nav>")]
+    # A link, so hidden when the report is printed, in the report's own language.
+    link = f"<a class='no-print' href='{tools_url(locale)}'>{html.escape(COPY[locale]['nav'])}</a>"
+    assert link in links
+    assert page.count(f"href='{tools_url(locale)}'") >= 1
+    assert client.get(tools_url(locale)).status_code == 200
+    assert find_claims(_visible_text(links)) == []
 
 
 @pytest.mark.parametrize("locale", LOCALES)

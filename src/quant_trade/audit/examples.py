@@ -13,7 +13,7 @@ from typing import Literal
 from urllib.parse import urlencode
 
 from quant_trade.audit.calculator import CalculatorInput, calculator_url, compute
-from quant_trade.audit.public_card import PublicClaim, public_card_svg
+from quant_trade.audit.public_card import PublicClaim, _num, public_card_svg
 
 EXAMPLES_PATH = {"es": "/ejemplos", "en": "/en/examples", "pt": "/pt/exemplos"}
 WEEKS_PER_YEAR = 52
@@ -74,7 +74,7 @@ EXAMPLES_COPY = {
         "short-history_title": "Un historial corto para concluir",
         "short-history_line1": (
             "DECLARED · {weeks} semanas fuera de muestra; conversión aproximada a "
-            "{years:.6f} años bajo el supuesto de {weeks_per_year} semanas por año."
+            "{years} años bajo el supuesto de {weeks_per_year} semanas por año."
         ),
         "short-history_line2": (
             "NOT_MEASURED · Una sola configuración no tiene búsqueda que descontar; "
@@ -82,8 +82,8 @@ EXAMPLES_COPY = {
         ),
         "many-trials_title": "Elegir entre muchas configuraciones",
         "many-trials_line1": (
-            "DECLARED · Calculado con esas cifras: Sharpe esperado por suerte {luck:.2f}; "
-            "Sharpe después del descuento {after:.2f}, bajo los supuestos de la calculadora."
+            "DECLARED · Calculado con esas cifras: Sharpe esperado por suerte {luck}; "
+            "Sharpe después del descuento {after}, bajo los supuestos de la calculadora."
         ),
         "many-trials_line2": (
             "NOT_MEASURED · Elegir el mejor resultado de una búsqueda requiere tener en "
@@ -117,7 +117,7 @@ EXAMPLES_COPY = {
         ),
         "short-history_title": "A short history to draw conclusions from",
         "short-history_line1": (
-            "DECLARED · {weeks} weeks out of sample; approximately {years:.6f} years "
+            "DECLARED · {weeks} weeks out of sample; approximately {years} years "
             "assuming {weeks_per_year} weeks per year."
         ),
         "short-history_line2": (
@@ -126,8 +126,8 @@ EXAMPLES_COPY = {
         ),
         "many-trials_title": "Picking among many configurations",
         "many-trials_line1": (
-            "DECLARED · Computed from those figures: expected Sharpe from luck {luck:.2f}; "
-            "Sharpe after the haircut {after:.2f}, under the calculator's assumptions."
+            "DECLARED · Computed from those figures: expected Sharpe from luck {luck}; "
+            "Sharpe after the haircut {after}, under the calculator's assumptions."
         ),
         "many-trials_line2": (
             "NOT_MEASURED · Picking the best result of a search requires accounting for "
@@ -162,7 +162,7 @@ EXAMPLES_COPY = {
         "short-history_title": "Um histórico curto para concluir",
         "short-history_line1": (
             "DECLARED · {weeks} semanas fora da amostra; conversão aproximada para "
-            "{years:.6f} anos supondo {weeks_per_year} semanas por ano."
+            "{years} anos supondo {weeks_per_year} semanas por ano."
         ),
         "short-history_line2": (
             "NOT_MEASURED · Uma só configuração não tem busca a descontar; "
@@ -170,8 +170,8 @@ EXAMPLES_COPY = {
         ),
         "many-trials_title": "Escolher entre muitas configurações",
         "many-trials_line1": (
-            "DECLARED · Calculado com esses números: Sharpe esperado por sorte {luck:.2f}; "
-            "Sharpe após o desconto {after:.2f}, sob as suposições da calculadora."
+            "DECLARED · Calculado com esses números: Sharpe esperado por sorte {luck}; "
+            "Sharpe após o desconto {after}, sob as suposições da calculadora."
         ),
         "many-trials_line2": (
             "NOT_MEASURED · Escolher o melhor resultado de uma busca exige considerar "
@@ -208,11 +208,12 @@ def examples_content(locale: str = "es") -> str:
             'aria-labelledby="title desc"',
             f'aria-labelledby="{example.key}-title {example.key}-desc"',
         ).replace("<svg ", '<svg style="display:block;width:100%;height:auto" ', 1)
-        values: dict[str, float | int] = {}
+        # Figures in the card's typography: a decimal comma in es and pt.
+        values: dict[str, str | int] = {}
         if example.key == "short-history":
             values = {
                 "weeks": SHORT_HISTORY_WEEKS,
-                "years": SHORT_HISTORY_WEEKS / WEEKS_PER_YEAR,
+                "years": _num(SHORT_HISTORY_WEEKS / WEEKS_PER_YEAR, lang, 6),
                 "weeks_per_year": WEEKS_PER_YEAR,
             }
         elif example.key == "many-trials":
@@ -220,8 +221,8 @@ def examples_content(locale: str = "es") -> str:
             assert inputs is not None
             result = compute(inputs)
             values = {
-                "luck": result["luck_sharpe"]["value"],
-                "after": result["sharpe_after"]["value"],
+                "luck": _num(result["luck_sharpe"]["value"], lang, 2),
+                "after": _num(result["sharpe_after"]["value"], lang, 2),
             }
         readings = "".join(
             "<p class='example-reading'>"

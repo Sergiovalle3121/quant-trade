@@ -6094,6 +6094,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                     locale=locale,
                     head_meta=sample_meta(locale, base_url),
                     pdf_url=(SAMPLE_PDF_PATHS[locale] if pdf_ok else None),
+                    tools_link=True,
                 )
                 # The tab title ends with the report's id, "sample": show the
                 # page's own word. Nothing inside the report changes.

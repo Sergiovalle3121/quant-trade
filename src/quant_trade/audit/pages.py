@@ -3378,10 +3378,12 @@ def institutional_review_page(
     words = institutional.COPY[locale]
     title = words["received"] if received else words["title"]
     lead = words["next"] if received else words["lead"]
+    # The tab and the search result carry the brand; the heading stays as written.
+    page_title = f"{title} · {BRAND}"
     meta = (
-        private_meta(title, locale, lead)
+        private_meta(page_title, locale, lead)
         if received or error
-        else _public_meta(title, lead, locale, institutional.REVIEW_PATHS[locale], base_url)
+        else _public_meta(page_title, lead, locale, institutional.REVIEW_PATHS[locale], base_url)
     )
     content = (
         f"<p><a href='{_home(locale)}'>{_e(words['back'])}</a></p>"
@@ -3398,7 +3400,7 @@ def institutional_review_page(
         + "</div></div>"
     )
     return _page(
-        title,
+        page_title,
         locale,
         body,
         meta_html=meta,
@@ -3416,7 +3418,8 @@ def contact_page(
     locale = _locale(locale)
     words = CONTACT_COPY[locale]
     path = CONTACT_PATHS[locale]
-    meta = _public_meta(f"{words['title']} · {BRAND}", words["lead"], locale, path, base_url)
+    page_title = f"{words['title']} · {BRAND}"
+    meta = _public_meta(page_title, words["lead"], locale, path, base_url)
     cards = []
     if "@" in email and " " not in email:
         cards.append(("chat", words["email"], words["email_text"], f"mailto:{email}", email))
@@ -3457,9 +3460,7 @@ def contact_page(
         + f"<h2 class='label' style='margin-top:28px'>{_e(words['links_title'])}</h2>"
         + f"<p>{links}</p></div></div>"
     )
-    return _page(
-        words["title"], locale, body, meta_html=meta, alternates=CONTACT_PATHS, solid_nav=True
-    )
+    return _page(page_title, locale, body, meta_html=meta, alternates=CONTACT_PATHS, solid_nav=True)
 
 
 def compare_page(

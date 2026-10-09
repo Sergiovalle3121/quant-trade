@@ -20,7 +20,9 @@ from fastapi.testclient import TestClient  # noqa: E402
 from httpx import Response  # noqa: E402
 
 from quant_trade.audit.guard import find_claims  # noqa: E402
-from quant_trade.audit.seo import LOCALES, PUBLIC_PAGES  # noqa: E402
+from quant_trade.audit.institutional import REVIEW_PATHS  # noqa: E402
+from quant_trade.audit.pages import CONTACT_PATHS  # noqa: E402
+from quant_trade.audit.seo import BRAND, LOCALES, PUBLIC_PAGES  # noqa: E402
 from quant_trade.audit.settings import AuditSettings  # noqa: E402
 from quant_trade.audit.store import make_store  # noqa: E402
 from quant_trade.audit.web import create_app  # noqa: E402
@@ -183,6 +185,24 @@ def test_public_metadata_lengths(public_site: PublicSite, locale: str, path: str
     title, description = page.titles[0].strip(), page.descriptions[0].strip()
     assert 15 <= len(title) <= 65, f"{len(title)} characters: {title}"
     assert 50 <= len(description) <= 160, f"{len(description)} characters: {description}"
+
+
+@pytest.mark.parametrize(("locale", "path"), PAGE_CASES)
+def test_public_titles_name_the_brand(public_site: PublicSite, locale: str, path: str) -> None:
+    title = public_site.pages[path].titles[0].strip()
+    assert BRAND in title, title
+
+
+@pytest.mark.parametrize(
+    "path", [*CONTACT_PATHS.values(), *REVIEW_PATHS.values()], ids=lambda path: path
+)
+def test_contact_and_institutional_titles_end_with_the_brand(
+    public_site: PublicSite, path: str
+) -> None:
+    title = public_site.pages[path].titles[0].strip()
+    assert title.endswith(f" · {BRAND}"), title
+    assert len(title) <= 65, title
+    assert find_claims(title) == []
 
 
 @pytest.mark.parametrize("locale", LOCALES)

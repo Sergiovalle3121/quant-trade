@@ -78,7 +78,8 @@ def _strings(value: object) -> list[str]:
 def test_breakeven_rate_is_the_reader_expression() -> None:
     assert breakeven_rate(1.5, 1) == 0.4
     assert breakeven_rate(1, 1) == 0.5
-    assert "40.0 %" in public_card_svg(PublicClaim(target_r=1.5, stop_r=1))
+    assert "40,0 %" in public_card_svg(PublicClaim(target_r=1.5, stop_r=1))
+    assert "40.0 %" in public_card_svg(PublicClaim(target_r=1.5, stop_r=1, locale="en"))
 
 
 def test_read_uses_repository_functions() -> None:
