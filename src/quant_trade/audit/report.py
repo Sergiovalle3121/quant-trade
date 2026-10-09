@@ -63,6 +63,8 @@ from quant_trade.audit.theme import (
     logo_mark,
     ring_svg,
 )
+from quant_trade.audit.tools_hub import COPY as TOOLS_COPY
+from quant_trade.audit.tools_hub import tools_url
 from quant_trade.audit.verdict import (
     DEFAULT_THRESHOLDS,
     DIMENSION_ORDER,
@@ -7596,6 +7598,7 @@ def render_html(
     pay_links: tuple[str, str, str] | None = None,
     notice_ok: bool = False,
     account_box: str = "",
+    tools_link: bool = False,
 ) -> str:
     """The audit as one HTML document.
 
@@ -7605,7 +7608,8 @@ def render_html(
     ``switch_url`` identifies the same report in another language; it is used
     to build links for all three supported languages. ``head_meta`` is
     the page's search and preview tags; without it the page is ``noindex``,
-    as every client report is.
+    as every client report is. ``tools_link`` adds the free tools page to the
+    footer's links (the public sample report), hidden when printed.
 
     The verdict, the plain-language explanations, the charts, the input
     hashes and the list of red flags are always shown. In paid mode an
@@ -8418,6 +8422,12 @@ def render_html(
         f"<a class='no-print' href='{_e(method_url(locale))}'>"
         f"{_e(METHOD_COPY.get(locale, METHOD_COPY['es'])['title'])}</a>"
     ]
+    if tools_link:
+        # The sample report's way to the tools that need no file; a link, so not printed.
+        links.append(
+            f"<a class='no-print' href='{_e(tools_url(locale))}'>"
+            f"{_e(TOOLS_COPY.get(locale, TOOLS_COPY['es'])['nav'])}</a>"
+        )
     if legal_links:
         links += [
             # Each report links to the terms and privacy pages of its own language.
@@ -8706,6 +8716,7 @@ def render(
     pay_links: tuple[str, str, str] | None = None,
     notice_ok: bool = False,
     account_box: str = "",
+    tools_link: bool = False,
 ) -> tuple[str, str]:
     """``(html, json)`` for a result, both guarded. Raises ``AuditReportError``."""
     html_text = render_html(
@@ -8733,6 +8744,7 @@ def render(
         pay_links=pay_links,
         notice_ok=notice_ok,
         account_box=account_box,
+        tools_link=tools_link,
     )
     guard_texts(result, html_text)
     return html_text, to_json(result)

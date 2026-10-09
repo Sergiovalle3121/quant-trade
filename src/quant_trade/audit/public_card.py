@@ -50,7 +50,7 @@ COPY = {
         ),
         "null_note": "Sin Sharpe declarado: dispersión bajo la hipótesis nula.",
         "luck_missing": "Faltan años y/o configuraciones.",
-        "luck_short": "Se requieren al menos 0.1 años para esta aproximación.",
+        "luck_short": "Se requieren al menos 0,1 años para esta aproximación.",
         "breakeven": "Aciertos de equilibrio antes de costos",
         "breakeven_note": "Supuesto: cada operación termina en el objetivo o en el stop.",
         "breakeven_missing": "Faltan objetivo y/o stop en R.",
@@ -122,7 +122,7 @@ COPY = {
         ),
         "null_note": "Sem Sharpe declarado: dispersão sob a hipótese nula.",
         "luck_missing": "Faltam anos e/ou configurações.",
-        "luck_short": "Esta aproximação requer pelo menos 0.1 anos.",
+        "luck_short": "Esta aproximação requer pelo menos 0,1 anos.",
         "breakeven": "Taxa de acertos de equilíbrio antes dos custos",
         "breakeven_note": "Suposto: cada operação termina no alvo ou no stop.",
         "breakeven_missing": "Faltam alvo e/ou stop em R.",
@@ -192,17 +192,37 @@ def breakeven_rate(target_r: float, stop_r: float) -> float:
     return stop_r / (target_r + stop_r)
 
 
-def _pct(value: float) -> str:
-    return f"{value * 100:.1f} %"
+_SWAP_SEPARATORS = str.maketrans({",": ".", ".": ","})
+
+
+def _separators(text: str, locale: str) -> str:
+    """``text`` written with a point, in the language's typography: kept in en, with a
+    decimal comma (and a point between thousands) in es and pt. Only the format changes."""
+    return text if locale == "en" else text.translate(_SWAP_SEPARATORS)
+
+
+def _num(value: float, locale: str, decimals: int) -> str:
+    """An editorial number with the language's separators: 1,000.5 in en, 1.000,5 in es/pt.
+
+    It lives here, not in ``articles`` (which imports this module), so the reader's card,
+    the articles and the win-rate calculator share one typography without an import cycle."""
+    return _separators(f"{value:,.{decimals}f}", locale)
+
+
+def _pct(value: float, locale: str) -> str:
+    """A proportion as a percentage with one decimal: 56.5 % in en, 56,5 % in es/pt."""
+    return f"{_num(value * 100, locale, 1)} %"
 
 
 def _readings(claim: PublicClaim) -> list[tuple[str, str | None, str]]:
     """Title key, computed value (or absent), and the visible assumption/reason."""
-    copy = COPY[claim.locale]
+    locale = claim.locale
+    copy = COPY[locale]
     readings: list[tuple[str, str | None, str]] = []
     if claim.trades is not None and claim.win_rate is not None:
         low, high = _wilson(claim.win_rate, claim.trades)
-        readings.append(("wilson", f"{_pct(low)} – {_pct(high)}", copy["wilson_note"]))
+        interval = f"{_pct(low, locale)} – {_pct(high, locale)}"
+        readings.append(("wilson", interval, copy["wilson_note"]))
     else:
         readings.append(("wilson", None, copy["wilson_missing"]))
     if claim.trades is None:
@@ -212,9 +232,8 @@ def _readings(claim: PublicClaim) -> list[tuple[str, str | None, str]]:
     else:
         # The same expected maximum of normals as luck.py; a fair coin has p(1-p)=.25.
         rates = [0.5 + expected_max_sharpe(n, 0.25 / claim.trades) for n in (20, 100)]
-        readings.append(
-            ("coin", f"N=20: {_pct(rates[0])} · N=100: {_pct(rates[1])}", copy["coin_note"])
-        )
+        coin = f"N=20: {_pct(rates[0], locale)} · N=100: {_pct(rates[1], locale)}"
+        readings.append(("coin", coin, copy["coin_note"]))
     if claim.years is None or claim.trials is None:
         readings.append(("luck", None, copy["luck_missing"]))
     elif claim.years < 0.1:
@@ -232,10 +251,10 @@ def _readings(claim: PublicClaim) -> list[tuple[str, str | None, str]]:
         note = copy["luck_note"]
         if claim.sharpe is None:
             note += " " + copy["null_note"]
-        readings.append(("luck", f"≈ {luck:.2f}", note))
+        readings.append(("luck", f"≈ {_num(luck, locale, 2)}", note))
     if claim.target_r is not None and claim.stop_r is not None:
         rate = breakeven_rate(claim.target_r, claim.stop_r)
-        readings.append(("breakeven", _pct(rate), copy["breakeven_note"]))
+        readings.append(("breakeven", _pct(rate, locale), copy["breakeven_note"]))
     else:
         readings.append(("breakeven", None, copy["breakeven_missing"]))
     return readings
@@ -303,7 +322,11 @@ def public_card_svg(claim: PublicClaim) -> str:
         shown = (
             copy["missing"]
             if value is None
-            else (_pct(value) if name == "win_rate" else f"{value:g}")
+            else (
+                _pct(value, claim.locale)
+                if name == "win_rate"
+                else _separators(f"{value:g}", claim.locale)
+            )
         )
         text(x, y + 29, shown, 24)
         parts.append("</g>")

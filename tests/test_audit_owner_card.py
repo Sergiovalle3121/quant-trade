@@ -67,8 +67,9 @@ def test_form_uses_the_cli_claim_model_and_percentage(locale: str) -> None:
     assert svg == public_card_svg(expected)
     root = ElementTree.fromstring(svg)
     assert root.tag.endswith("svg")
-    assert "71.0 %" in svg
-    assert "3.24" in svg
+    # The card's typography: a decimal comma in es and pt, a point in en.
+    assert ("71.0 %" if locale == "en" else "71,0 %") in svg
+    assert ("3.24" if locale == "en" else "3,24") in svg
     assert find_claims(svg) == []
 
 
@@ -224,7 +225,7 @@ def test_valid_request_preview_and_download_are_private(
     answer = client.post("/panel/public-card", data=data)
     assert answer.status_code == 200
     assert "<svg" in answer.text
-    assert "71.0 %" in answer.text
+    assert ("71.0 %" if locale == "en" else "71,0 %") in answer.text
     assert owner_card.COPY[locale]["png_unavailable"] in answer.text
     assert "value='svg'" in answer.text
     assert "value='png'" not in answer.text

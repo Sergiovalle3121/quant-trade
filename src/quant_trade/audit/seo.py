@@ -2,7 +2,8 @@
 
 Public pages (landing, sample, guides, terms, privacy) get a title, a
 description, a canonical URL, their other-language alternate and Open Graph
-tags, and are the only pages listed in ``sitemap.xml``. Private pages (a
+tags, and are the only pages listed in ``sitemap.xml``, each with the date
+of its last change (``page_lastmod``). Private pages (a
 client's report or unpaid preview, errors) are ``noindex``, and
 ``robots.txt`` keeps crawlers out of ``/audits/``, where report URLs carry
 the owner's token. A public verification page previews its class and date
@@ -32,6 +33,7 @@ from quant_trade.audit.calculator import CALCULATOR_PATH
 from quant_trade.audit.examples import EXAMPLES_PATH
 from quant_trade.audit.faq import FAQ_PATH
 from quant_trade.audit.guides import GUIDES, guide_url, guides_index_url
+from quant_trade.audit.legal import LEGAL_PATHS, LEGAL_UPDATED
 from quant_trade.audit.method import METHOD_PATH
 from quant_trade.audit.pricing import PRICING_PATH
 from quant_trade.audit.reading import READING_PATH
@@ -89,6 +91,35 @@ PUBLIC_PAGES: tuple[dict[str, str], ...] = (
         "pt": "/pt/revisao-institucional",
     },
 )
+
+#: The date of the last change to the copy every public page shares (navigation,
+#: footer, titles). A page with a date of its own in the code uses that instead:
+#: an article its publication date, the legal pages ``LEGAL_UPDATED``. Change it
+#: whenever such shared copy changes; never per request.
+SITE_UPDATED = "2026-10-08"
+
+
+def _page_dates() -> dict[str, str]:
+    """The pages whose date lives in the code, by path. No date is made up per URL."""
+    dates = {
+        article_url(article.key, lang): ARTICLE_PUBLICATION_DATES[article.key]
+        for article in ARTICLES
+        for lang in LOCALES
+    }
+    # The index changes when an article is added: its date is the newest article's.
+    newest = max(ARTICLE_PUBLICATION_DATES.values())
+    dates.update({articles_index_url(lang): newest for lang in LOCALES})
+    dates.update({path: LEGAL_UPDATED for pages in LEGAL_PATHS.values() for path in pages.values()})
+    return dates
+
+
+PAGE_DATES: dict[str, str] = _page_dates()
+
+
+def page_lastmod(path: str) -> str:
+    """The ``<lastmod>`` of a public ``path``: its own date, or ``SITE_UPDATED``."""
+    return PAGE_DATES.get(path, SITE_UPDATED)
+
 
 #: Paths crawlers are asked to skip: report URLs carry the owner's token.
 DISALLOWED_PATHS: tuple[str, ...] = (
@@ -401,7 +432,9 @@ def robots_txt(base_url: str) -> str:
 
 
 def sitemap_xml(base_url: str) -> str:
-    """Every public page in each of its languages, each with its alternates."""
+    """Every public page in each of its languages, each with its date and alternates.
+
+    ``<lastmod>`` goes right after ``<loc>``, as the sitemap schema orders them."""
     base = _e(base_url.rstrip("/"))
     urls = []
     for pair in PUBLIC_PAGES:
@@ -414,7 +447,10 @@ def sitemap_xml(base_url: str) -> str:
         default = _e(pair.get("es", pair[langs[0]]))
         alternates += f"<xhtml:link rel='alternate' hreflang='x-default' href='{base}{default}'/>"
         for lang in langs:
-            urls.append(f"<url><loc>{base}{_e(pair[lang])}</loc>{alternates}</url>")
+            urls.append(
+                f"<url><loc>{base}{_e(pair[lang])}</loc>"
+                f"<lastmod>{page_lastmod(pair[lang])}</lastmod>{alternates}</url>"
+            )
     return (
         "<?xml version='1.0' encoding='UTF-8'?>"
         "<urlset xmlns='http://www.sitemaps.org/schemas/sitemap/0.9' "
@@ -429,12 +465,15 @@ __all__ = [
     "NOINDEX_PATHS",
     "OG_IMAGE_LOCALE",
     "OG_LOCALE",
+    "PAGE_DATES",
     "PUBLIC_PAGES",
     "SITE_NAME",
+    "SITE_UPDATED",
     "TAGLINE",
     "PageMeta",
     "head_meta",
     "is_private_path",
+    "page_lastmod",
     "page_paths",
     "private_meta",
     "robots_txt",

@@ -341,6 +341,48 @@ def test_the_sitemap_and_the_route_tables_list_every_article(tmp_path: Path) -> 
             assert BASE + article_url(article.key, locale) in locs, (article.key, locale)
 
 
+def test_the_sitemap_dates_each_article_with_its_publication_date(tmp_path: Path) -> None:
+    from datetime import date
+
+    from quant_trade.audit.articles import ARTICLE_PUBLICATION_DATES
+
+    client = _client(tmp_path)
+    root = ElementTree.fromstring(client.get("/sitemap.xml").content)
+    dated = {
+        url.findtext("s:loc", namespaces=SITEMAP_NS): url.findtext(
+            "s:lastmod", namespaces=SITEMAP_NS
+        )
+        for url in root.findall("s:url", SITEMAP_NS)
+    }
+    for locale in LOCALES:
+        for article in ARTICLES:
+            lastmod = dated[BASE + article_url(article.key, locale)]
+            assert lastmod is not None, (article.key, locale)
+            assert re.fullmatch(r"\d{4}-\d{2}-\d{2}", lastmod), lastmod
+            assert date.fromisoformat(lastmod).isoformat() == lastmod
+            assert lastmod == ARTICLE_PUBLICATION_DATES[article.key]
+            # The page's own structured data gives the same date.
+            page = client.get(article_url(article.key, locale)).text
+            assert f'"dateModified": "{lastmod}"' in page
+        # The index changes with its newest article.
+        newest = max(ARTICLE_PUBLICATION_DATES.values())
+        assert dated[BASE + articles_index_url(locale)] == newest
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+def test_the_index_description_names_the_current_topics_within_limits(
+    tmp_path: Path, locale: str
+) -> None:
+    page = _client(tmp_path).get(articles_index_url(locale)).text
+    description = _meta(page, "description")
+    assert description == ARTICLES_COPY[locale]["summary"]
+    assert 50 <= len(description) <= 160, len(description)
+    assert find_claims(description) == []
+    # The topics of the current articles, not only the first three.
+    for topic in ("backtests", "MT5", "Sharpe", "prop firms"):
+        assert topic in description, topic
+
+
 def test_the_guides_index_links_the_articles(tmp_path: Path) -> None:
     client = _client(tmp_path)
     for locale in LOCALES:

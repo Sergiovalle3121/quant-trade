@@ -29,7 +29,7 @@ FULL = PublicClaim(
 def test_hand_checked_arithmetic_preserves_the_declared_rate() -> None:
     # Wilson on p=.71, not the invented integer count round(.71*45).
     assert _wilson(0.71, 45) == pytest.approx((0.56515869, 0.82180764), abs=1e-8)
-    results = {key: value for key, value, _ in _readings(FULL)}
+    results = {key: value for key, value, _ in _readings(replace(FULL, locale="en"))}
     assert results == {
         "wilson": "56.5 % – 82.2 %",
         "coin": "N=20: 64.2 % · N=100: 68.9 %",
@@ -38,18 +38,44 @@ def test_hand_checked_arithmetic_preserves_the_declared_rate() -> None:
     }
 
 
+@pytest.mark.parametrize(("locale", "mark"), [("es", ","), ("en", "."), ("pt", ",")])
+def test_card_figures_use_the_languages_decimal_mark(locale: str, mark: str) -> None:
+    """The same values in each language's typography: a decimal comma in es and pt."""
+    claim = replace(FULL, locale=locale)  # type: ignore[arg-type]
+    results = {key: value for key, value, _ in _readings(claim)}
+    assert results == {
+        "wilson": f"56{mark}5 % – 82{mark}2 %",
+        "coin": f"N=20: 64{mark}2 % · N=100: 68{mark}9 %",
+        "luck": f"≈ 1{mark}47",
+        "breakeven": f"33{mark}3 %",
+    }
+    root = ET.fromstring(public_card_svg(claim))
+    shown = {
+        node.attrib["data-field"]: [text.text for text in node.findall("s:text", NS)][1]
+        for node in root.iter("{http://www.w3.org/2000/svg}g")
+        if "data-field" in node.attrib
+    }
+    assert shown["win_rate"] == f"71{mark}0 %"
+    assert shown["profit_factor"] == f"3{mark}24"
+    assert shown["sharpe"] == f"1{mark}9"
+    assert shown["trades"] == "45" and shown["trials"] == "100"
+    other = "." if mark == "," else ","
+    for key, value in results.items():
+        assert other not in value, key
+
+
 @pytest.mark.parametrize("sharpe", [0.5, 1.9, 4.0])
 def test_sharpe_reuses_the_calculators_account(sharpe: float) -> None:
-    claim = replace(FULL, sharpe=sharpe)
+    claim = replace(FULL, sharpe=sharpe, locale="en")
     expected = compute(CalculatorInput(sharpe=sharpe, years=3, trials=100))
     assert _readings(claim)[2][1] == f"≈ {expected['luck_sharpe']['value']:.2f}"
 
 
 def test_luck_without_declared_sharpe_discloses_null_dispersion() -> None:
     result = _readings(PublicClaim(years=3, trials=100))[2]
-    assert result[1] == "≈ 1.46"  # 2.530602894 / sqrt(755) * sqrt(252).
+    assert result[1] == "≈ 1,46"  # 2.530602894 / sqrt(755) * sqrt(252), in Spanish.
     assert COPY["es"]["null_note"] in result[2]
-    assert _readings(PublicClaim(years=3, trials=1))[2][1] == "≈ 0.00"
+    assert _readings(PublicClaim(years=3, trials=1, locale="en"))[2][1] == "≈ 0.00"
 
 
 @pytest.mark.parametrize("locale", ["es", "en", "pt"])
@@ -151,11 +177,11 @@ def test_reader_brand_and_link_fit_inside_the_social_image_height(
 def test_independent_inputs_do_not_hide_other_readings() -> None:
     result = _readings(PublicClaim(trades=45))
     assert result[0][1] is None
-    assert result[1][1] == "N=20: 64.2 % · N=100: 68.9 %"
+    assert result[1][1] == "N=20: 64,2 % · N=100: 68,9 %"
     assert _readings(PublicClaim(trades=5))[1][1] is None
     assert _readings(PublicClaim(trades=20))[1][1] is not None
     assert _readings(PublicClaim(years=0.01, trials=100))[2][1] is None
-    assert _readings(PublicClaim(target_r=1, stop_r=1))[3][1] == "50.0 %"
+    assert _readings(PublicClaim(target_r=1, stop_r=1))[3][1] == "50,0 %"
     assert _wilson(0, 45)[0] == 0
     assert _wilson(1, 45)[1] == pytest.approx(1)
 

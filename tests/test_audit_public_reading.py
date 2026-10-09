@@ -101,7 +101,8 @@ def test_public_form_and_result_are_localized_and_guard_clean(
     assert root.attrib["{http://www.w3.org/XML/1998/namespace}lang"] == locale
     text = " ".join(root.itertext())
     assert reading.COPY[locale]["attribution"] in text
-    assert "71.0 %" in text and "3.24" in text
+    mark = "." if locale == "en" else ","
+    assert f"71{mark}0 %" in text and f"3{mark}24" in text
     assert evidence_label("DECLARED", locale) in text
     assert evidence_label("NOT_MEASURED", locale) in text
     assert re.search(r"\bMEASURED\b", text) is None
@@ -112,6 +113,29 @@ def test_public_form_and_result_are_localized_and_guard_clean(
         assert not any(name.lower().startswith("on") for name in node.attrib)
         if "data-evidence" in node.attrib:
             assert node.attrib["data-evidence"] in {"DECLARED", "NOT_MEASURED"}
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+def test_card_figures_use_the_languages_decimal_mark_and_the_link_keeps_the_point(
+    client: TestClient, locale: str
+) -> None:
+    """Spanish and Portuguese read 56,5 %; English 56.5 %. The values and the shared
+    address are the same in every language: its parameters keep the point."""
+    response = client.get(reading.READING_PATH[locale], params=FIGURES)
+    assert response.status_code == 200
+    text = " ".join(ET.fromstring(_card(response.text)).itertext())
+    mark, other = (".", ",") if locale == "en" else (",", ".")
+    for figure in ("71{}0 %", "3{}24", "1{}8", "56{}5 % – 82{}2 %", "50{}0 %"):
+        assert figure.format(mark, mark) in text, figure
+    for figure in ("71{}0 %", "3{}24", "56{}5 % – 82{}2 %"):
+        assert figure.format(other, other) not in text, figure
+    assert find_claims(text) == []
+    link = _share(response.text).split()[-1]
+    assert urlsplit(link).path == reading.READING_PATH[locale]
+    assert parse_qs(urlsplit(link).query) == {
+        **{name: [value] for name, value in FIGURES.items()},
+        "ref": ["lectura"],
+    }
 
 
 @pytest.mark.parametrize("locale", LOCALES)

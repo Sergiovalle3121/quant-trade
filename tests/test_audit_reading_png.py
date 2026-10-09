@@ -79,6 +79,36 @@ def test_png_route_has_public_cache_headers_without_referral_cookie(
 
 
 @pytest.mark.parametrize("locale", LOCALES)
+def test_png_card_uses_the_languages_decimal_mark_but_its_address_keeps_the_point(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, locale: str
+) -> None:
+    rendered: list[str] = []
+
+    def capture(svg: str) -> bytes:
+        rendered.append(svg)
+        return MOCK_PNG
+
+    monkeypatch.setattr(raster, "card_png", capture)
+    client = _client(tmp_path, monkeypatch)
+    figures = {**FIGURES, "win_rate": "71"}
+    path = reading.READING_PATH[locale]
+    response = client.get(path + "/card.png", params=figures)
+    assert response.status_code == 200
+    assert response.content == MOCK_PNG
+    assert len(rendered) == 1
+    # The rasterised SVG is what the picture shows: the card in the page's typography.
+    text = " ".join(ET.fromstring(rendered[0]).itertext())
+    mark, other = (".", ",") if locale == "en" else (",", ".")
+    assert f"56{mark}5 % – 82{mark}2 %" in text
+    assert f"71{mark}0 %" in text and f"3{mark}24" in text
+    assert f"56{other}5 %" not in text and f"3{other}24" not in text
+    page = client.get(path, params=figures)
+    image = urlsplit(_meta(page.text, "og:image"))
+    assert image.path == path + "/card.png"
+    assert parse_qs(image.query) == {name: [value] for name, value in figures.items()}
+
+
+@pytest.mark.parametrize("locale", LOCALES)
 def test_valid_page_previews_exact_figures_and_excludes_other_query_fields(
     client: TestClient, locale: str
 ) -> None:

@@ -305,12 +305,13 @@ def test_win_rate_reader_link_reproduces_the_declared_example(
     assert table is not None
     expected_interval = "56.5–82.2 %" if locale == "en" else "56,5–82,2 %"
     assert expected_interval in _visible(table.group(1))
-    # The reader's card prints each bound through public_card._pct, with a point in every
-    # language; the article's table localises the separator. Same bounds, two typographies.
+    # The reader's card prints each bound through public_card._pct in the article's
+    # typography: a decimal comma in es and pt, a point in en. Same bounds, same separator.
     reader_text = _visible(reading.group(1))
     low, high = _wilson(0.71, 45)
-    assert f"{_pct(low)} – {_pct(high)}" in reader_text
-    assert "56.5 % – 82.2 %" in reader_text
+    assert f"{_pct(low, locale)} – {_pct(high, locale)}" in reader_text
+    assert ("56.5 % – 82.2 %" if locale == "en" else "56,5 % – 82,2 %") in reader_text
+    assert ("56,5" if locale == "en" else "56.5") not in reader_text
     assert _interval_bounds(reader_text) == _interval_bounds(expected_interval)
 
 
