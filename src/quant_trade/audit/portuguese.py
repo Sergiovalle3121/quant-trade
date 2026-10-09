@@ -203,14 +203,15 @@ COPY_PT: dict[str, Any] = {
         "Cada auditoria seguinte é paga pela sua conta, e os seus relatórios ficam guardados lá.",
     ],
     "prices_title": "Preços",
-    "price_free_title": "Prévia",
+    "price_free_title": "Primeiro relatório",
     "price_free": (
-        "Classe de A a D, explicação de cada dimensão, gráficos, bandeiras vermelhas e hashes."
+        "Completo e com PDF ao criar a sua conta. Depois, {n} prévias grátis por mês com a "
+        "classe, os gráficos e as bandeiras vermelhas."
     ),
     "price_full_title": "Relatório completo",
     "price_full": (
-        "Todo o detalhe numérico sem marca d'água, simulador de desafio, risco reamostrado, "
-        "perguntas para o vendedor e página pública de verificação com selo."
+        "Para a versão corrigida da sua estratégia, outro robô ou a conta do mês seguinte. "
+        "Pela sua conta você o compara lado a lado com o seu relatório anterior."
     ),
     "price_free_mode": (
         "Neste momento o serviço está em modo gratuito: o relatório completo é entregue com "
@@ -226,12 +227,7 @@ COPY_PT: dict[str, Any] = {
         "ou no relatório."
     ),
     "contact": "Pedir um código",
-    "price_pack": "Pacote de {n} relatórios: USD {price:.0f} (USD {each:.0f} cada um).",
-    "account_note": (
-        "O seu primeiro relatório completo, grátis ao criar a sua conta; depois, "
-        f"{_FREE} prévias grátis por mês, e os seus relatórios e créditos num só lugar."
-    ),
-    "account_link": "Criar conta",
+    "price_pack": "Pacote de {n} relatórios: {price} ({each} cada um).",
     "faq_title": "Perguntas frequentes",
     "faq": [
         (
@@ -367,11 +363,16 @@ UI_PT: dict[str, Any] = {
     "nav_compare": "Comparar",
     "nav_tools": "Ferramentas",
     "nav_menu": "Menu",
-    "cta": "Começar grátis",
-    "cta_full": "Comece com a prévia grátis",
+    "cta": "Auditar meu arquivo grátis",
+    "cta_full": "Começar com meu relatório grátis",
     "cta_short": "Auditar",
-    "hero_a": "Vantagem real",
-    "hero_b": "ou pura sorte?",
+    "hero_a": "Antes de pagar um desafio ou um robô,",
+    "hero_b": "veja se é vantagem ou sorte.",
+    "hero_anchor": (
+        "Um desafio ou um robô custa centenas de dólares. Seu primeiro relatório completo é "
+        "grátis; depois, {price} por relatório."
+    ),
+    "hero_safe": "Seu arquivo nunca é publicado.",
     "nav_lang": "Idioma",
     "trust": [
         ("shield", "Não se conecta à sua corretora nem recomenda operações"),
@@ -382,8 +383,9 @@ UI_PT: dict[str, Any] = {
     "mock_k": "Veredito",
     "cta_sample": "Ver um relatório de exemplo",
     "hero_lead": (
-        "Envie o backtest ou o histórico que você já tem. O Rigor o testa contra custos, "
-        "testes repetidos e dados com erros, e dá uma classe de A a D."
+        "Envie o backtest ou o histórico que você já tem. A Rigor o testa contra custos, "
+        "configurações testadas e as regras dos desafios de prop firm, e dá uma classe de "
+        "A\u00a0a\u00a0D com cada número explicado."
     ),
     "mock_cap": "Ilustração com dados sintéticos",
     "mock_is": "Dentro da amostra",
@@ -520,7 +522,6 @@ UI_PT: dict[str, Any] = {
     "pricing_eyebrow": "Preços",
     "plan_free": "Prévia",
     "plan_free_amount": "Grátis",
-    "plan_free_note": f"o seu primeiro relatório completo; depois, {_FREE} prévias por mês",
     "plan_full": "Relatório completo",
     "plan_full_note": "por auditoria",
     "plan_badge": "Completo",
@@ -531,23 +532,13 @@ UI_PT: dict[str, Any] = {
         "Bandeiras vermelhas e impressões digitais dos seus arquivos",
     ],
     "full_items": [
-        "Todo o detalhe numérico, sem marca d'água",
-        "Simulador de desafio de prop firm",
+        "Simulação do desafio que você escolher da {firms}, com as regras publicadas",
+        "Quanto custo aguenta antes de terminar no prejuízo",
         "Risco reamostrado em um ano e o capital que pede",
-        "Testes de estresse: o resultado sem as suas melhores operações",
-        "A conta real frente ao seu backtest",
-        "Perguntas para o vendedor do robô ou para o gestor",
-        "Se funciona em cada mercado ou se um carrega o resto",
-        "Para fundos: calendário ano por mês, pior mês e tempo para se recuperar e, com o "
-        "seu índice, quanto é caixa, quanto é mercado e quanto sobra",
-        "O dinheiro real por trás do % de uma conta: depósitos, recargas e perdas abertas",
-        "Frente ao caixa e ao mercado: o Sharpe sem o que o caixa pagava, VIX tranquilo ou "
-        "agitado e crises conhecidas",
-        "Conforme a moeda da conta: conversão ou inflação própria, com dados disponíveis",
-        "Se a sua rentabilidade média mudou em algum momento, e quando "
-        "(com 250 rentabilidades ou mais)",
-        "Página pública de verificação com selo",
+        "Perguntas concretas para o vendedor do robô ou para o gestor",
+        "PDF e, se você quiser, página pública com selo",
     ],
+    "full_more": "Ver um relatório completo de exemplo",
     "upload_eyebrow": "Comece aqui",
     "upload_title": ("A sua auditoria,", "em um só arquivo."),
     "upload_lead": (
@@ -558,8 +549,7 @@ UI_PT: dict[str, Any] = {
         "O seu arquivo nunca é publicado.",
         (
             "O seu primeiro relatório completo, grátis ao criar a sua conta; depois, "
-            f"{_FREE} prévias grátis por mês. Às vezes pedimos validar um "
-            "cartão; nunca é cobrado."
+            f"{_FREE} prévias grátis por mês."
         ),
         "Apagado automaticamente se você não desbloquear o relatório.",
     ],
@@ -580,8 +570,10 @@ UI_PT: dict[str, Any] = {
         "Redigindo o veredito",
     ],
     "faq_eyebrow": "Perguntas",
+    "faq_more": "Mais perguntas: preços, pagamentos, sua conta e contato",
     "final_title": ("Antes de arriscar dinheiro numa estratégia,", "olhe com lupa."),
     "final_lead": "Envie o relatório e receba a classe, os gráficos e a explicação sem custo.",
+    "final_tools": "Ainda sem arquivo? Use as ferramentas grátis, sem cadastro.",
     "footer_product": "Produto",
     "footer_legal": "Jurídico",
     "footer_news": "Novidades",
@@ -670,45 +662,6 @@ INVESTOR_PT: dict[str, Any] = {
         "Sem conexão com a corretora dela nem com o seu dinheiro",
     ),
     "cta": "Como revisar a conta",
-}
-
-#: Why trust Rigor before paying, each point with the page that proves it.
-TRUST_PT: dict[str, Any] = {
-    "eyebrow": "Trabalho real, não fumaça",
-    "title": ("Sem robôs, sem sinais,", "sem promessas."),
-    "lead": (
-        "O Rigor não vende estratégias nem resultados: mede o arquivo que você envia e mostra "
-        "como mede. Tudo desta seção você pode conferir antes de pagar."
-    ),
-    "items": [
-        (
-            "eye",
-            "Veja um relatório inteiro antes de pagar",
-            "O exemplo é um relatório completo, com o PDF, feito com dados sintéticos: você vê "
-            "exatamente o que recebe.",
-            "Ver o exemplo",
-            "sample",
-        ),
-        (
-            "shield",
-            "Não vendemos robôs nem sinais",
-            "Não executamos ordens nem pedimos as chaves da sua corretora, e nenhum relatório "
-            "promete resultados: um filtro automático barra qualquer texto que o faça.",
-            "",
-            "",
-        ),
-        (
-            "lock",
-            "O seu arquivo é seu",
-            "Nunca é publicado. Se você não desbloquear o relatório, é apagado após {retention} "
-            "dias, e você pode apagar a sua conta e os seus relatórios quando quiser.",
-            "Política de privacidade",
-            "privacy",
-        ),
-    ],
-    "who": "Quem está por trás: {name}, {address}.",
-    "ask": "Dúvidas antes de enviar? Escreva pelo WhatsApp; responde uma pessoa.",
-    "ask_link": "Escrever pelo WhatsApp",
 }
 
 #: Report words the landing shows (the illustration, the dimension cards).
@@ -850,7 +803,6 @@ __all__ = [
     "LANGUAGE_NAMES",
     "MONTHS_PT",
     "STATUS_TEXT_PT",
-    "TRUST_PT",
     "UI_PT",
     "link_locale",
 ]

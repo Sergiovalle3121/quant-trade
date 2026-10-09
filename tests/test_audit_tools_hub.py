@@ -152,14 +152,16 @@ def test_tools_hub_metadata_is_unique_and_in_bounds() -> None:
     assert len(titles) == 3
 
 
-def test_landing_shows_the_free_tools_band() -> None:
+def test_landing_links_the_free_tools_from_its_closing_call() -> None:
+    # The tools band left the short landing; one line under the closing call leads
+    # to the hub, and the menu and the footer keep their links.
     for locale in LOCALES:
-        main = _main(landing(locale=locale))
-        hrefs = _hrefs(main)
-        assert calculator_url(locale) in hrefs
-        assert reading.READING_PATH[locale] in hrefs
-        assert tools_url(locale) in hrefs
-        assert COPY[locale]["band_lead"] in html.unescape(main)
+        page = landing(locale=locale)
+        main = _main(page)
+        closing = main.split("id='subir'", 1)[1]
+        assert tools_url(locale) in _hrefs(closing)
+        assert tools_url(locale) in _hrefs(page.split("</main>", 1)[1])
+        assert COPY[locale]["band_lead"] not in html.unescape(main)
         assert find_claims(html.unescape(main)) == []
 
 

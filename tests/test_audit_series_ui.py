@@ -167,14 +167,15 @@ def test_upload_page_contains_periodic_return_declarations(locale: str) -> None:
 
 
 @pytest.mark.parametrize("locale", ["es", "en", "pt"])
-def test_landing_has_institutional_block_and_review_request_path(locale: str) -> None:
+def test_landing_footer_links_the_institutional_review_request(locale: str) -> None:
+    # The institutional block left the short landing; the footer of every page links
+    # the review request.
     page = landing(locale=locale)
-    block = re.search(r"<section class='card institutional'.*?</section>", page)
-    assert block is not None
-    assert SERIES_COPY[locale]["institutional_title"] in block.group()
-    assert SERIES_COPY[locale]["institutional_text"] in block.group()
-    assert f"href='{REVIEW_PATHS[locale]}'" in block.group()
-    assert find_claims(_text(block.group())) == []
+    assert "class='card institutional'" not in page
+    footer = page.split("</main>", 1)[1]
+    link = f"<a href='{REVIEW_PATHS[locale]}'>{html.escape(INTAKE_COPY[locale]['title'])}</a>"
+    assert link in footer
+    assert find_claims(_text(footer)) == []
 
 
 @pytest.mark.parametrize("locale", ["es", "en", "pt"])
@@ -192,7 +193,9 @@ def test_calculator_page_preserves_declared_frequency(locale: str, periods: int)
     assumption = copy["assumptions"][0].split(" (DECLARED)")[0]
     assert assumption in _text(page)
     result = compute(CalculatorInput(1.8, 3, 100, periods))
-    assert f"{result['luck_sharpe']['value']:.2f}" in page
+    # The figure in the page's typography: a decimal comma in es and pt, a point in en.
+    luck = f"{result['luck_sharpe']['value']:.2f}"
+    assert (luck if locale == "en" else luck.replace(".", ",")) in page
     assert find_claims(_text(page.split("<main", 1)[1].split("</main>", 1)[0])) == []
 
 

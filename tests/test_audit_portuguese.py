@@ -78,7 +78,7 @@ def test_portuguese_landing_passes_the_guard_and_is_marked_portuguese() -> None:
     text = _text(page)
     assert "não prevemos resultados" in text
     assert "não nos conectamos a nenhuma corretora" in text
-    assert "não é uma promessa de resultados" in text
+    assert "com as suposições escritas, não previsões" in text
 
 
 def test_portuguese_landing_has_no_spanish_left() -> None:
@@ -112,7 +112,8 @@ def test_every_link_on_the_portuguese_landing_opens(tmp_path: Path) -> None:
         for href in HREF.findall(page.text)
         if href.startswith("/") and not href.startswith("//")
     }
-    assert "/pt" in links and "/pt/exemplo" in links and "/pt/cadastro" in links
+    # The start buttons open the Portuguese upload page (sign-up first without an account).
+    assert "/pt" in links and "/pt/exemplo" in links and "/pt/auditar" in links
     for href in sorted(links - {""}):
         response = client.get(href, follow_redirects=False)
         assert response.status_code < 400, (href, response.status_code)
@@ -190,7 +191,7 @@ def test_every_case_page_exists_in_portuguese(tmp_path: Path, page) -> None:
     text = _text(response.text)
     assert find_claims(text) == []
     assert page.text["pt"].title in text
-    for spanish in ("Qué subes", "Qué no hace", "Empezar gratis", "Otros casos", "archivo"):
+    for spanish in ("Qué subes", "Qué no hace", "Auditar mi archivo", "Otros casos", "archivo"):
         assert spanish not in text, spanish
     # The other languages, the start button and every link open.
     for lang in ("es", "en"):

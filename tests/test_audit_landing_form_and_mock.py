@@ -19,28 +19,43 @@ LOCALES = ("es", "en", "pt")
 
 
 @pytest.mark.parametrize(
-    ("paths", "sentence"),
+    ("paths", "sentence", "free_report"),
     [
-        (("/", "/auditar"), "A veces pedimos validar una tarjeta; nunca se cobra."),
-        (("/en", "/en/audit"), "Sometimes we ask to verify a card; it is never charged."),
-        (("/pt", "/pt/auditar"), "Às vezes pedimos validar um cartão; nunca é cobrado."),
+        (
+            ("/", "/auditar"),
+            "A veces pedimos validar una tarjeta; nunca se cobra.",
+            "Tu primer informe completo, gratis al crear tu cuenta",
+        ),
+        (
+            ("/en", "/en/audit"),
+            "Sometimes we ask to verify a card; it is never charged.",
+            "Your first full report, free when you create your account",
+        ),
+        (
+            ("/pt", "/pt/auditar"),
+            "Às vezes pedimos validar um cartão; nunca é cobrado.",
+            "O seu primeiro relatório completo, grátis ao criar a sua conta",
+        ),
     ],
 )
-def test_landing_and_upload_explain_card_verification_once(
-    tmp_path: Path, paths: tuple[str, str], sentence: str
+def test_landing_and_upload_leave_the_card_to_the_step_that_asks_for_it(
+    tmp_path: Path, paths: tuple[str, str], sentence: str, free_report: str
 ) -> None:
+    # A card check is offered only on a report whose free unlock was refused
+    # (account_pages.report_box, card_offer); the landing and the upload page do
+    # not mention it.
     settings = AuditSettings(database_url=f"sqlite:///{tmp_path}/audit.db")
     client = TestClient(create_app(settings, make_store(settings.database_url)))
     for path in paths:
         response = client.get(path)
         assert response.status_code == 200
         page = html.unescape(response.text)
-        assert page.count(sentence) == 1
+        assert sentence not in page
         if path == paths[1]:
             beside_drop = page.split("<div class='sticky'>", 1)[1].split(
                 "<div class='panel' data-reveal>", 1
             )[0]
-            assert sentence in beside_drop
+            assert free_report in beside_drop
             assert "<div class='drop drop-main'>" in page
         assert find_claims(response.text) == []
 

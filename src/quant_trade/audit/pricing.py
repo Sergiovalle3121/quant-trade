@@ -25,20 +25,27 @@ PRICING_COPY: dict[str, dict[str, str]] = {
         "detail": "Ver detalle",
         "back": "Volver al inicio",
         "included_title": "Qué incluye cada informe",
-        "feature": "Contenido",
-        "first": "Primer informe completo, gratis al crear cuenta",
         "full": "Informe completo",
-        "included": "Incluido",
-        "quantity": "Cuántos informes",
-        "first_quantity": "DECLARED · Un primer informe completo por cuenta.",
-        "single": "DECLARED · USD {price:.2f} por informe adicional.",
-        "pack": "DECLARED · Paquete de {n} informes completos: USD {price:.2f}.",
+        "first_quantity": "Un primer informe completo por cuenta.",
+        "first_text": "Completo, con PDF.",
+        "single": "{price} por informe adicional.",
+        "single_note": "por informe adicional",
+        "pack": "Paquete de {n} informes completos: {price}.",
         "pack_name": "Paquete de {n} informes completos",
+        "pack_title": "{n} informes",
+        "pack_each": "{each} por informe",
+        "pack_text": "Audita {n} robots antes de comprar uno o sigue tu cuenta {n} meses.",
+        "card_button": "Subir mi archivo",
+        "includes_title": "Cada informe completo incluye",
         "evidence": "Etiquetas de evidencia",
+        "evidence_text": (
+            "Cada cifra dice si se midió en tu archivo, si la declaraste tú (o tu plataforma) "
+            "o si no se pudo medir."
+        ),
         "public": "Verificación pública y tarjeta",
         "optional": "Opcional: tú decides si publicas la página y compartes la tarjeta.",
         "compare": "Comparación de dos informes",
-        "compare_note": "Incluida; requiere dos informes completos.",
+        "compare_note": "Desde tu cuenta, lado a lado con otro informe completo tuyo.",
         "support": "Soporte por correo",
         "support_note": "El mismo canal de contacto para ambos informes.",
         "no_email": "El operador aún no ha publicado un correo de soporte.",
@@ -55,6 +62,20 @@ PRICING_COPY: dict[str, dict[str, str]] = {
         "one_off": "Los pagos son únicos: no hay suscripción ni cargos recurrentes.",
         "institutional": "Para gestoras: solicitar una revisión institucional",
         "limits": "Lo que Rigor no hace",
+        "start_title": "Empieza por el informe gratis",
+        "start_text": (
+            "El primer informe completo es el mismo informe que los de pago, con PDF. "
+            "Necesitas una cuenta y el archivo que exporta tu plataforma."
+        ),
+        "start_button": "Crear cuenta y pedir mi primer informe",
+        "start_text_free": (
+            "Ahora todos los informes completos son gratis, con PDF. Solo necesitas el archivo "
+            "que exporta tu plataforma."
+        ),
+        "start_button_free": "Pedir mi informe gratis",
+        "start_sample": "Ver el informe de ejemplo",
+        "start_guides": "Guías de exportación",
+        "start_calculator": "¿Aún sin archivo? La calculadora de suerte es gratis y sin registro.",
     },
     "en": {
         "title": "Full report pricing",
@@ -69,20 +90,27 @@ PRICING_COPY: dict[str, dict[str, str]] = {
         "detail": "See details",
         "back": "Back to the home page",
         "included_title": "What each report includes",
-        "feature": "Content",
-        "first": "First full report, free when you create an account",
         "full": "Full report",
-        "included": "Included",
-        "quantity": "How many reports",
-        "first_quantity": "DECLARED · One first full report per account.",
-        "single": "DECLARED · USD {price:.2f} per additional report.",
-        "pack": "DECLARED · Pack of {n} full reports: USD {price:.2f}.",
+        "first_quantity": "One first full report per account.",
+        "first_text": "Full, with the PDF.",
+        "single": "{price} per additional report.",
+        "single_note": "per additional report",
+        "pack": "Pack of {n} full reports: {price}.",
         "pack_name": "Pack of {n} full reports",
+        "pack_title": "{n} reports",
+        "pack_each": "{each} per report",
+        "pack_text": "Audit {n} robots before buying one, or follow your account for {n} months.",
+        "card_button": "Upload my file",
+        "includes_title": "Every full report includes",
         "evidence": "Evidence labels",
+        "evidence_text": (
+            "Every figure says whether it was measured in your file, declared by you (or your "
+            "platform) or could not be measured."
+        ),
         "public": "Public verification and card",
         "optional": "Optional: you decide whether to publish the page and share the card.",
         "compare": "Compare two reports",
-        "compare_note": "Included; requires two full reports.",
+        "compare_note": "From your account, side by side with another full report of yours.",
         "support": "E-mail support",
         "support_note": "The same contact channel for both reports.",
         "no_email": "The operator has not published a support e-mail yet.",
@@ -99,6 +127,20 @@ PRICING_COPY: dict[str, dict[str, str]] = {
         "one_off": "Payments are one-off: there is no subscription or recurring charge.",
         "institutional": "For asset managers: request an institutional review",
         "limits": "What Rigor does not do",
+        "start_title": "Start with the free report",
+        "start_text": (
+            "The first full report is the same report as the paid ones, with the PDF. "
+            "You need an account and the file your platform exports."
+        ),
+        "start_button": "Create an account and get my first report",
+        "start_text_free": (
+            "All full reports are currently free, with the PDF. You only need the file your "
+            "platform exports."
+        ),
+        "start_button_free": "Get my free report",
+        "start_sample": "See the sample report",
+        "start_guides": "Export guides",
+        "start_calculator": "No file yet? The luck calculator is free and needs no sign-up.",
     },
     "pt": {
         "title": "Preços dos relatórios",
@@ -113,20 +155,27 @@ PRICING_COPY: dict[str, dict[str, str]] = {
         "detail": "Ver detalhes",
         "back": "Voltar ao início",
         "included_title": "O que cada relatório inclui",
-        "feature": "Conteúdo",
-        "first": "Primeiro relatório completo, grátis ao criar uma conta",
         "full": "Relatório completo",
-        "included": "Incluído",
-        "quantity": "Quantos relatórios",
-        "first_quantity": "DECLARED · Um primeiro relatório completo por conta.",
-        "single": "DECLARED · USD {price:.2f} por relatório adicional.",
-        "pack": "DECLARED · Pacote de {n} relatórios completos: USD {price:.2f}.",
+        "first_quantity": "Um primeiro relatório completo por conta.",
+        "first_text": "Completo, com PDF.",
+        "single": "{price} por relatório adicional.",
+        "single_note": "por relatório adicional",
+        "pack": "Pacote de {n} relatórios completos: {price}.",
         "pack_name": "Pacote de {n} relatórios completos",
+        "pack_title": "{n} relatórios",
+        "pack_each": "{each} por relatório",
+        "pack_text": "Audite {n} robôs antes de comprar um ou acompanhe sua conta por {n} meses.",
+        "card_button": "Enviar meu arquivo",
+        "includes_title": "Cada relatório completo inclui",
         "evidence": "Rótulos de evidência",
+        "evidence_text": (
+            "Cada número diz se foi medido no seu arquivo, declarado por você (ou pela sua "
+            "plataforma) ou se não pôde ser medido."
+        ),
         "public": "Verificação pública e cartão",
         "optional": "Opcional: você decide se publica a página e compartilha o cartão.",
         "compare": "Comparação de dois relatórios",
-        "compare_note": "Incluída; requer dois relatórios completos.",
+        "compare_note": "Pela sua conta, lado a lado com outro relatório completo seu.",
         "support": "Suporte por e-mail",
         "support_note": "O mesmo canal de contato para ambos os relatórios.",
         "no_email": "O operador ainda não publicou um e-mail de suporte.",
@@ -143,8 +192,68 @@ PRICING_COPY: dict[str, dict[str, str]] = {
         "one_off": "Os pagamentos são únicos: não há assinatura nem cobranças recorrentes.",
         "institutional": "Para gestoras: solicitar uma revisão institucional",
         "limits": "O que a Rigor não faz",
+        "start_title": "Comece pelo relatório grátis",
+        "start_text": (
+            "O primeiro relatório completo é o mesmo relatório dos pagos, com o PDF. "
+            "Você precisa de uma conta e do arquivo que a sua plataforma exporta."
+        ),
+        "start_button": "Criar conta e pedir o meu primeiro relatório",
+        "start_text_free": (
+            "Agora todos os relatórios completos são grátis, com o PDF. Você só precisa do "
+            "arquivo que a sua plataforma exporta."
+        ),
+        "start_button_free": "Pedir o meu relatório grátis",
+        "start_sample": "Ver o relatório de exemplo",
+        "start_guides": "Guias de exportação",
+        "start_calculator": "Ainda sem arquivo? A calculadora de sorte é grátis e sem cadastro.",
     },
 }
+
+
+def usd(amount: float) -> str:
+    """A price as the pages show it: ``USD 29`` for whole dollars, ``USD 17.35`` with cents."""
+    cents = round(amount * 100)
+    whole, rest = divmod(cents, 100)
+    return f"USD {whole}" if not rest else f"USD {whole}.{rest:02d}"
+
+
+def start_cta(settings: AuditSettings, locale: str) -> str:
+    """The page's closing call: the free report first, as the configuration offers it.
+
+    Free mode: every full report is free and the form needs no account. Otherwise,
+    with the welcome report on, the first full report is free with an account (and
+    a confirmed e-mail when that is required). Without either, the articles' call.
+    """
+    # Lazy imports, as in ``pricing_page``: pages imports this module.
+    from quant_trade.audit.accounts import WELCOME_FULL_REPORT
+    from quant_trade.audit.calculator import calculator_url
+    from quant_trade.audit.guides import guides_index_url
+    from quant_trade.audit.pages import SAMPLE_PAGE_PATHS, _articles_cta, _e, audit_path
+    from quant_trade.audit.theme import icon
+
+    locale = locale if locale in PRICING_COPY else "es"
+    words = PRICING_COPY[locale]
+    if settings.free_mode:
+        text, button = words["start_text_free"], words["start_button_free"]
+    elif WELCOME_FULL_REPORT:
+        text, button = words["start_text"], words["start_button"]
+        if settings.email_verification_required:
+            text += " " + words["email_note"]
+    else:
+        return _articles_cta(locale)
+    return (
+        f"<section class='article-cta'><h2>{_e(words['start_title'])}</h2><p>{_e(text)}</p>"
+        "<div class='back-row'>"
+        f"<a class='btn btn-dark' href='{_e(audit_path(locale))}'>{_e(button)}"
+        f"<span class='go'>{icon('arrow')}</span></a>"
+        f"<a class='link-more' href='{_e(SAMPLE_PAGE_PATHS[locale])}'>"
+        f"{_e(words['start_sample'])}{icon('arrow')}</a>"
+        f"<a class='link-more' href='{_e(guides_index_url(locale))}'>"
+        f"{_e(words['start_guides'])}{icon('arrow')}</a></div>"
+        f"<p class='start-calculator' style='margin-top:12px'>"
+        f"<a href='{_e(calculator_url(locale))}'>{_e(words['start_calculator'])}</a></p>"
+        "</section>"
+    )
 
 
 def pricing_page(
@@ -155,23 +264,26 @@ def pricing_page(
     from quant_trade.audit.institutional import REVIEW_PATHS
     from quant_trade.audit.pages import (
         _COPY,
+        _UI,
         CONTACT_PATHS,
-        _articles_cta,
         _e,
         _home,
         _language_crumbs,
         _page,
         _page_hero,
         _public_meta,
+        audit_path,
         card_markets_line,
     )
     from quant_trade.audit.report import DIMENSION_TITLES
     from quant_trade.audit.seo import BRAND, _json_ld
+    from quant_trade.audit.theme import icon
     from quant_trade.audit.verdict import DIMENSION_ORDER
 
     locale = locale if locale in PRICING_PATH else "es"
     words = PRICING_COPY[locale]
     landing = _COPY[locale]
+    ui = _UI[locale]
     base = (settings.base_url if base_url is None else base_url).rstrip("/")
     url = base + PRICING_PATH[locale]
     title = f"{words['title']} · {BRAND}"
@@ -186,12 +298,11 @@ def pricing_page(
     prices = ""
     if not settings.free_mode:
         offers = [(words["full"], settings.price_usd)]
-        prices = f"<p>{_e(words['single'].format(price=settings.price_usd))}</p>"
+        prices = f"<p>{_e(words['single'].format(price=usd(settings.price_usd)))}</p>"
         if settings.pack_price_usd:
             offers.append((words["pack_name"].format(n=PACK_CREDITS), settings.pack_price_usd))
-            prices += (
-                f"<p>{_e(words['pack'].format(n=PACK_CREDITS, price=settings.pack_price_usd))}</p>"
-            )
+            pack = words["pack"].format(n=PACK_CREDITS, price=usd(settings.pack_price_usd))
+            prices += f"<p>{_e(pack)}</p>"
         product["offers"] = [
             {
                 "@type": "Offer",
@@ -208,44 +319,73 @@ def pricing_page(
     email_available = "@" in settings.operator_contact and " " not in settings.operator_contact
     contact = f"<a href='{CONTACT_PATHS[locale]}'>{_e(words['contact'])}</a>"
     support = _e(words["support_note"] if email_available else words["no_email"])
-    features = [
-        (DIMENSION_TITLES[locale][name], _e(words["included"])) for name in DIMENSION_ORDER
-    ] + [
-        (words["evidence"], "MEASURED · DECLARED · NOT_MEASURED"),
-        ("PDF", _e(words["included"])),
-        (words["public"], _e(words["optional"])),
-        (words["compare"], _e(words["compare_note"])),
-        (words["support"], f"{support} {contact}"),
-    ]
-    # Two report columns in paid mode; one shared column when everything is free.
-    columns = 1 if settings.free_mode else 2
-    rows = "".join(
-        f"<tr><th scope='row'>{_e(label)}</th>" + f"<td>{value}</td>" * columns + "</tr>"
-        for label, value in features
-    )
+    start = audit_path(locale)
     if settings.free_mode:
-        plan_headers = f"<th scope='col'>{_e(words['all_reports'])}</th>"
+        cards = [(words["all_reports"], ui["plan_free_amount"], "", words["free"], "")]
+        button = words["start_button_free"]
         intro = words["free"]
         note = f"<p>{_e(landing['price_free_mode'])}</p>"
     else:
-        plan_headers = (
-            f"<th scope='col'>{_e(words['first'])}</th><th scope='col'>{_e(words['full'])}</th>"
-        )
-        rows = (
-            f"<tr><th scope='row'>{_e(words['quantity'])}</th>"
-            f"<td>{_e(words['first_quantity'])}</td><td>{prices}</td></tr>"
-        ) + rows
+        first = words["first_text"]
+        if settings.email_verification_required:
+            first += " " + words["email_note"]
+        cards = [
+            (
+                landing["price_free_title"],
+                ui["plan_free_amount"],
+                words["first_quantity"],
+                first,
+                ui["cta_full"],
+            ),
+            (
+                words["full"],
+                usd(settings.price_usd),
+                words["single_note"],
+                landing["price_full"],
+                "",
+            ),
+        ]
+        if settings.pack_price_usd:
+            each = usd(settings.pack_price_usd / PACK_CREDITS)
+            cards.append(
+                (
+                    words["pack_title"].format(n=PACK_CREDITS),
+                    usd(settings.pack_price_usd),
+                    words["pack_each"].format(each=each),
+                    words["pack_text"].format(n=PACK_CREDITS),
+                    "",
+                )
+            )
+        button = words["card_button"]
         intro = words["intro"]
-        note = f"<p>{_e(words['email_note'])}</p>" if settings.email_verification_required else ""
+        note = ""
+    # Every card's button opens the upload page: payment happens from a report,
+    # never from this page (see the module docstring).
+    plans = "".join(
+        "<div class='plan-card'>"
+        f"<h2>{_e(name)}</h2><p class='plan-price'>{_e(amount)}</p>"
+        + (f"<p class='plan-note'>{_e(small)}</p>" if small else "")
+        + f"<p>{_e(text)}</p>"
+        f"<a class='btn btn-dark' href='{_e(start)}'>{_e(label or button)}</a></div>"
+        for name, amount, small, text, label in cards
+    )
+    included = [_e(DIMENSION_TITLES[locale][name]) for name in DIMENSION_ORDER] + [
+        f"<b>{_e(words['evidence'])}</b> {_e(words['evidence_text'])}",
+        "PDF",
+        f"<b>{_e(words['public'])}</b> {_e(words['optional'])}",
+        f"<b>{_e(words['compare'])}</b> {_e(words['compare_note'])}",
+        f"<b>{_e(words['support'])}</b> {support} {contact}",
+    ]
+    items = "".join(f"<li>{icon('check')}<span>{item}</span></li>" for item in included)
     markets = (
-        "DECLARED · " + card_markets_line(tuple(settings.approved_markets), locale)
+        card_markets_line(tuple(settings.approved_markets), locale)
         if settings.card_public
         else words["no_card"]
     )
     payment = (
         f"<p>{_e(words['free'])}</p>"
         if settings.free_mode
-        else f"<p>{_e(markets)}</p><p>{_e(words['one_off'])}</p>"
+        else f"{prices}<p>{_e(markets)}</p><p>{_e(words['one_off'])}</p>"
     )
     if settings.access_codes_enabled:
         payment += f"<p>{_e(landing['pay_code'])} {contact}</p>"
@@ -255,13 +395,12 @@ def pricing_page(
     body = (
         _page_hero(words["title"], words["title"], intro, crumbs)
         + "<div class='paper page-main'><div class='wrap'>"
-        f"<section class='rsec'><h2>{_e(words['included_title'])}</h2>{note}"
-        "<div style='overflow-x:auto'><table>"
-        f"<thead><tr><th scope='col'>{_e(words['feature'])}</th>{plan_headers}</tr></thead>"
-        f"<tbody>{rows}</tbody></table></div><p>{_e(words['data_note'])}</p></section>"
+        f"<section class='rsec'>{note}<div class='plan-cards'>{plans}</div></section>"
+        f"<section class='rsec'><h2>{_e(words['includes_title'])}</h2>"
+        f"<ul class='checks plan-includes'>{items}</ul><p>{_e(words['data_note'])}</p></section>"
         f"<section class='rsec'><h2>{_e(words['payment'])}</h2>{payment}"
         f"<p><a href='{REVIEW_PATHS[locale]}'>{_e(words['institutional'])}</a></p></section>"
         f"<section class='rsec'><h2>{_e(words['limits'])}</h2>"
-        f"<p>{_e(landing['not'])}</p></section>" + _articles_cta(locale) + "</div></div>"
+        f"<p>{_e(landing['not'])}</p></section>" + start_cta(settings, locale) + "</div></div>"
     )
     return _page(title, locale, body, meta_html=meta, alternates=PRICING_PATH, solid_nav=True)

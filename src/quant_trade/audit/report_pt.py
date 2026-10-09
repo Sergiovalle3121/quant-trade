@@ -1443,6 +1443,35 @@ REPORT: dict[str, Any] = {
             ],
         ],
         "flags_title": "Os sinais de alerta que revisamos",
+        "resampling_title": "Reamostragem e Monte Carlo",
+        "resampling": [
+            (
+                "Vários números do relatório saem de simulações de Monte Carlo: milhares de "
+                "sorteios sobre o histórico que você envia, resumidos em percentis e "
+                "probabilidades."
+            ),
+            (
+                "Teste contra o acaso: um bootstrap estacionário por blocos dos retornos dá o "
+                "percentil 5 do Sharpe que a primeira pergunta exige."
+            ),
+            (
+                "Risco reamostrado em um ano: históricos de um ano montados com blocos dos "
+                "retornos (bootstrap estacionário) dão a queda máxima mediana, a de 1 em cada 20 "
+                "e a probabilidade de cada queda."
+            ),
+            (
+                "Ordens aleatórias: os mesmos retornos embaralhados, com o mesmo Sharpe e o mesmo "
+                "resultado final, mostram se a pior queda do arquivo é habitual para eles. Com "
+                "operações, a maior sequência de perdas é comparada com a das mesmas operações "
+                "em ordem aleatória, calculada de forma exata."
+            ),
+            (
+                "Um Monte Carlo supõe que a ordem do histórico é intercambiável e reamostra o que "
+                "ele contém: não corrige o sobreajuste nem a busca de configurações, que o Sharpe "
+                "deflacionado, o PBO e o trecho fora da amostra medem. O risco reamostrado, as "
+                "ordens aleatórias e as sequências não mudam a classe."
+            ),
+        ],
         "repro_title": "Reproduzível",
         "repro": [
             "Cada arquivo é identificado no relatório pela sua impressão digital SHA-256.",
