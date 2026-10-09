@@ -108,6 +108,22 @@ COPY_PT: dict[str, str] = {
         "liberar seu primeiro relatório completo gratuito e as compras. Se não encontrar, "
         "confira a pasta de spam."
     ),
+    "welcome_confirm_guides": "Enquanto o e-mail chega, exporte o seu arquivo",
+    "next_title": "Como continua",
+    "next_account": "Crie a conta com o seu e-mail e uma senha.",
+    "next_confirm_welcome": (
+        "Abra o link que enviamos por e-mail: o relatório completo grátis espera essa etapa."
+    ),
+    "next_confirm": "Abra o link que enviamos por e-mail para confirmar a conta.",
+    "next_upload": ("Envie o arquivo que a sua plataforma já exporta, sem convertê-lo: {formats}."),
+    "next_guides": "Como exportá-lo, plataforma por plataforma",
+    "next_report": (
+        "Você recebe a classe, de {first} a {last}, os {count} pontos com o seu rótulo "
+        "MEASURED, DECLARED ou NOT_MEASURED, e o PDF."
+    ),
+    "next_free_welcome": "O primeiro é grátis.",
+    "next_free_all": "Agora todos os relatórios completos são grátis.",
+    "next_sample": "Ver um relatório de exemplo",
     "account_title": "Meus relatórios",
     "account_lead": "Tudo o que você auditou com esta conta, num só lugar.",
     "signed_in_as": "Conectado como",

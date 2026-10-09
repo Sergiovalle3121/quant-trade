@@ -35,6 +35,8 @@ from quant_trade.audit.articles import (
     article_url,
     articles_index_faq,
     articles_index_url,
+    next_step_call,
+    next_step_links,
     related_links,
     win_rate_interval,
 )
@@ -2810,12 +2812,14 @@ def upload_page(
     notice: str = "",
     carried: Mapping[str, str] | None = None,
     rejection_html: str = "",
+    notice_link_html: str = "",
 ) -> str:
     """The upload form on its own page, so the landing can stay short.
 
     ``signed_in=False`` in paid mode keeps the "account first" note above the fields
     (the web layer normally sends such a visitor to sign-up before this page).
-    ``notice`` is one line above the fields, such as "confirmation link sent".
+    ``notice`` is one line above the fields, such as "confirmation link sent";
+    ``notice_link_html`` is trusted, fixed markup after it (a link to the guides).
     ``carried`` restores only declaration fields after a refusal; file pickers and
     access codes remain empty. ``rejection_html`` is trusted, localized guidance.
     Client declarations are escaped form values, never report claims or logs."""
@@ -2840,7 +2844,13 @@ def upload_page(
         copy,
         locale,
         note=note,
-        flash=f"<div class='flash'>{_e(notice)}</div>" if notice else "",
+        flash=(
+            f"<div class='flash'>{_e(notice)}"
+            + (f" {notice_link_html}" if notice_link_html else "")
+            + "</div>"
+            if notice
+            else ""
+        ),
         err=rejection_html,
         access_codes=access_codes,
         retention_days=retention_days,
@@ -4530,6 +4540,23 @@ def article_page(article: Article, *, locale: str = "es", base_url: str = "") ->
     crumbs = f"<a href='{_e(articles_index_url(locale))}'>{_e(words['all'])}</a>" + (
         _language_crumbs(alternates, locale)
     )
+    # The article's own next step: its first link is the side button and the
+    # closing button; the free first report stays among the closing links.
+    steps = list(next_step_links(article, locale))
+    (label, href), others = steps[0], steps[1:]
+    report = (words["report"], audit_path(locale))
+    if report not in steps:
+        others.append(report)
+    cta_title, cta_text = next_step_call(article, locale)
+    closing = (
+        f"<div class='back-row'><a class='btn btn-dark' href='{_e(href)}'>{_e(label)}"
+        f"<span class='go'>{icon('arrow')}</span></a>"
+        + "".join(
+            f"<a class='link-more' href='{_e(other_href)}'>{_e(other_label)}{icon('arrow')}</a>"
+            for other_label, other_href in others
+        )
+        + "</div>"
+    )
     body = (
         _page_hero(words["eyebrow"], text.title, text.summary, crumbs)
         + "<div class='paper page-main'><div class='wrap'>"
@@ -4537,11 +4564,11 @@ def article_page(article: Article, *, locale: str = "es", base_url: str = "") ->
             sections,
             locale,
             lead=f"<p>{_e(text.intro)}</p>",
-            aside=f"<a class='btn btn-dark btn-sm toc-cta' href='{_e(calculator_url(locale))}'>"
-            f"{_e(words['calculator'])}<span class='go'>{icon('arrow')}</span></a>",
+            aside=f"<a class='btn btn-dark btn-sm toc-cta' href='{_e(href)}'>"
+            f"{_e(label)}<span class='go'>{icon('arrow')}</span></a>",
         )
-        + f"<section class='article-cta'><h2>{_e(words['cta_title'])}</h2>"
-        f"<p>{_e(words['cta_text'])}</p>{_articles_cta(locale)}</section></div></div>"
+        + f"<section class='article-cta'><h2>{_e(cta_title)}</h2>"
+        f"<p>{_e(cta_text)}</p>{closing}</section></div></div>"
     )
     return _page(title, locale, body, meta_html=meta, alternates=alternates, solid_nav=True)
 

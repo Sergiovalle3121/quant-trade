@@ -150,6 +150,23 @@ COPY: dict[str, dict[str, str]] = {
             "desbloquear tu primer informe completo gratis y las compras. Si no lo ves, revisa "
             "la carpeta de spam."
         ),
+        "welcome_confirm_guides": "Mientras llega el correo, exporta tu archivo",
+        "next_title": "Así sigue",
+        "next_account": "Crea la cuenta con tu correo y una contraseña.",
+        "next_confirm_welcome": (
+            "Abre el enlace que te enviamos por correo: el informe completo gratis espera a ese "
+            "paso."
+        ),
+        "next_confirm": "Abre el enlace que te enviamos por correo para confirmar la cuenta.",
+        "next_upload": "Sube el archivo que ya exporta tu plataforma, sin convertirlo: {formats}.",
+        "next_guides": "Cómo exportarlo, plataforma por plataforma",
+        "next_report": (
+            "Recibes la clase, de {first} a {last}, las {count} comprobaciones con su etiqueta "
+            "MEASURED, DECLARED o NOT_MEASURED y el PDF."
+        ),
+        "next_free_welcome": "El primero es gratis.",
+        "next_free_all": "Ahora todos los informes completos son gratis.",
+        "next_sample": "Ver un informe de ejemplo",
         "account_title": "Mis informes",
         "account_lead": "Todo lo que auditaste con esta cuenta, en un solo lugar.",
         "signed_in_as": "Sesión iniciada como",
@@ -872,6 +889,24 @@ COPY: dict[str, dict[str, str]] = {
             "your first free full report and purchases. If you do not see it, check your spam "
             "folder."
         ),
+        "welcome_confirm_guides": "While the e-mail arrives, export your file",
+        "next_title": "What happens next",
+        "next_account": "Create the account with your e-mail and a password.",
+        "next_confirm_welcome": (
+            "Open the link we e-mail you: the free full report waits for that step."
+        ),
+        "next_confirm": "Open the link we e-mail you to confirm the account.",
+        "next_upload": (
+            "Upload the file your platform already exports, without converting it: {formats}."
+        ),
+        "next_guides": "How to export it, platform by platform",
+        "next_report": (
+            "You get the class, from {first} to {last}, the {count} checks with their "
+            "MEASURED, DECLARED or NOT_MEASURED label, and the PDF."
+        ),
+        "next_free_welcome": "The first one is free.",
+        "next_free_all": "All full reports are currently free.",
+        "next_sample": "See a sample report",
         "account_title": "My reports",
         "account_lead": "Everything you audited with this account, in one place.",
         "signed_in_as": "Signed in as",
@@ -1507,6 +1542,13 @@ background:#fff}
 .acct-check{display:flex;gap:10px;align-items:flex-start;margin:-4px 0 16px;font-size:.95rem}
 .acct-check input{margin-top:4px;width:auto}
 .acct-side{display:grid;gap:18px}
+.acct-next h2{margin:0 0 14px;font-size:1rem}
+.acct-steps{counter-reset:step}
+.acct-steps li{counter-increment:step}
+.acct-steps li::before{content:counter(step);flex:none;width:22px;height:22px;margin-top:1px;
+border-radius:50%;display:grid;place-items:center;font:600 .78rem/1 var(--mono);
+background:var(--text);color:var(--bg)}
+.acct-next p{margin:16px 0 0}
 .acct-stores{border-color:color-mix(in srgb,var(--ok) 32%,var(--border))}
 .acct-stores h3{display:flex;align-items:center;margin:0 0 12px;font-size:1rem}
 .acct-stores h3 svg{flex:none;width:30px;height:30px;margin-right:10px;padding:6px;
@@ -1750,10 +1792,25 @@ def _shell(
     )
 
 
-def _alert(copy: dict[str, str], error: str = "", flash: str = "") -> str:
+def welcome_confirm_guides(locale: str) -> str:
+    """The line the "confirmation link sent" notice adds: export the file meanwhile."""
+    from quant_trade.audit.guides import guides_index_url
+
+    copy = COPY[_locale(locale)]
+    return (
+        f"<a href='{_e(guides_index_url(_locale(locale)))}'>"
+        f"{_e(copy['welcome_confirm_guides'])}</a>"
+    )
+
+
+def _alert(copy: dict[str, str], error: str = "", flash: str = "", *, locale: str = "") -> str:
+    """``locale`` lets the "confirmation link sent" notice link the export guides."""
     out = ""
     if flash and flash in copy:
-        out += f"<div class='flash' role='status'>{_e(copy[flash])}</div>"
+        extra = (
+            f" {welcome_confirm_guides(locale)}" if flash == "welcome_confirm" and locale else ""
+        )
+        out += f"<div class='flash' role='status'>{_e(copy[flash])}{extra}</div>"
     if error and error in copy:
         out += f"<div class='error' role='alert'>{_e(copy[error])}</div>"
     return out
@@ -1764,6 +1821,64 @@ def _benefits(copy: dict[str, str]) -> str:
         f"<li>{icon('check')}<span>{_e(item)}</span></li>" for item in copy["benefits"].split("|")
     )
     return f"<div class='acct-card acct-perks'><ul class='acct-list'>{items}</ul></div>"
+
+
+#: Six as a word in each language; any other count is written in digits.
+_COUNT_WORDS: dict[str, dict[int, str]] = {"es": {6: "seis"}, "en": {6: "six"}, "pt": {6: "seis"}}
+#: How the last item of a list joins the others.
+_AND: dict[str, str] = {"es": "y", "en": "and", "pt": "e"}
+
+
+def _listed(items: Sequence[str], locale: str) -> str:
+    """``a, b y c`` in the page's language."""
+    if len(items) < 2:
+        return "".join(items)
+    return f"{', '.join(items[:-1])} {_AND[locale]} {items[-1]}"
+
+
+def is_upload_next(next_path: str) -> bool:
+    """``next`` is an upload page: the visitor came to audit a file."""
+    from urllib.parse import urlsplit
+
+    from quant_trade.audit.pages import AUDIT_PATHS
+
+    return urlsplit(next_path).path in AUDIT_PATHS.values()
+
+
+def _next_steps(copy: dict[str, str], locale: str, *, email_verification: bool, offer: str) -> str:
+    """ "What happens next" beside the sign-up form when ``next`` is the upload page.
+
+    Every step comes from the configuration: the e-mail step only when a confirmed
+    address is required, the free report as the service offers it (``welcome``:
+    the first full report with an account; ``free``: every full report). The
+    formats are the upload form's own list and the counts are the engine's.
+    """
+    from quant_trade.audit.guides import guides_index_url
+    from quant_trade.audit.pages import PLATFORMS, SAMPLE_PAGE_PATHS
+    from quant_trade.audit.strategies import CLASS_ORDER
+    from quant_trade.audit.verdict import DIMENSION_ORDER
+
+    count = len(DIMENSION_ORDER)
+    report = copy["next_report"].format(
+        first=CLASS_ORDER[0],
+        last=CLASS_ORDER[-1],
+        count=_COUNT_WORDS[locale].get(count, str(count)),
+    )
+    report += " " + copy["next_free_welcome" if offer == "welcome" else "next_free_all"]
+    steps = [_e(copy["next_account"])]
+    if email_verification:
+        steps.append(_e(copy["next_confirm_welcome" if offer == "welcome" else "next_confirm"]))
+    steps.append(
+        _e(copy["next_upload"].format(formats=_listed(PLATFORMS, locale)))
+        + f" <a href='{_e(guides_index_url(locale))}'>{_e(copy['next_guides'])}</a>"
+    )
+    steps.append(_e(report))
+    items = "".join(f"<li><span>{step}</span></li>" for step in steps)
+    return (
+        f"<div class='acct-card acct-perks acct-next'><h2>{_e(copy['next_title'])}</h2>"
+        f"<ol class='acct-list acct-steps'>{items}</ol>"
+        f"<p><a href='{_e(SAMPLE_PAGE_PATHS[locale])}'>{_e(copy['next_sample'])}</a></p></div>"
+    )
 
 
 def _stores_short(copy: dict[str, str], locale: str) -> str:
@@ -1849,10 +1964,15 @@ def signup_page(
     invite: str = "",
     typo_of: str = "",
     typo_kept: bool = False,
+    email_verification: bool = False,
+    offer: str = "welcome",
 ) -> str:
     """The sign-up form; ``typo_of`` asks whether that address was meant as ``email``.
 
     ``typo_kept`` shows the "keep what I typed" box ticked, after another error.
+    With ``next`` on the upload page the side panel says what happens next, from
+    ``email_verification`` and ``offer`` (``welcome``, ``free`` or ``paid``; with
+    ``paid`` and any other ``next`` it lists the account's benefits as before).
     """
     locale = _locale(locale)
     copy = COPY[locale]
@@ -1901,9 +2021,14 @@ def signup_page(
         "</button></form>" + f"<p class='acct-alt'>{_e(copy['have_account'])} "
         f"<a href='{_e(signin)}'>{_e(copy['signin_link'])}</a></p>"
     )
+    side = (
+        _next_steps(copy, locale, email_verification=email_verification, offer=offer)
+        if offer in ("welcome", "free") and is_upload_next(next_path)
+        else _benefits(copy)
+    )
     body = (
         f"<div class='acct-grid'><div class='acct-form'>{form}</div>"
-        f"<div class='acct-side'>{_benefits(copy)}{_stores_short(copy, locale)}</div></div>"
+        f"<div class='acct-side'>{side}{_stores_short(copy, locale)}</div></div>"
     )
     return _shell(
         locale,
@@ -3071,7 +3196,7 @@ def account_page(
     body = (
         # The message stays with the four links, which follow the reader down
         # the page: a redirect that lands on a block lower down still shows it.
-        _parts_nav(copy, _alert(copy, error, flash) + _strategy_alert(locale, error))
+        _parts_nav(copy, _alert(copy, error, flash, locale=locale) + _strategy_alert(locale, error))
         + (_visit_notice(copy, locale, notice) if notice else "")
         + header
         + kpis
