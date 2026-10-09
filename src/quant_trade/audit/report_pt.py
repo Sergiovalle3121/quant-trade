@@ -47,6 +47,10 @@ REPORT: dict[str, Any] = {
         "data_age": "{days} dias entre o último dado e esta auditoria",
         "data_age_one": "1 dia entre o último dado e esta auditoria",
         "data_age_account": "O que aconteceu depois do último dado não está neste arquivo.",
+        "seal_scope": (
+            "O selo prova que a declaração do trecho não mudou depois dessa data, não que o "
+            "trecho fosse desconhecido ao otimizar."
+        ),
         "inputs": "Arquivos auditados (sha256)",
         "verdict": "Veredito",
         "dimensions": "Dimensões",
@@ -351,7 +355,7 @@ REPORT: dict[str, Any] = {
         "luck_narrow": (
             "O Sharpe de {sharpe} supera o {luck} que {n} configurações sem habilidade dariam, "
             "mas não com a margem que exigimos: a confiança de que não seja sorte (DSR) é de "
-            "{dsr}, e para cumprir esta dimensão exigimos {need}."
+            "{dsr}, e para superar esta dimensão exigimos {need}."
         ),
         "luck_beats": (
             "O Sharpe de {sharpe} supera o {luck} que {n} configurações sem habilidade dariam."
@@ -611,6 +615,10 @@ REPORT: dict[str, Any] = {
         ),
         "crises_subject": "Estratégia",
         "crises_no_trades": "nenhuma operação fechada na janela",
+        "crises_not_applicable": (
+            "Não se aplica a este histórico: estas crises são quedas de ações dos EUA e do "
+            "bitcoin, e nenhum dos símbolos operados ({symbols}) é desses mercados."
+        ),
         "crises_worse": (
             "Em {worse} de {n} crises caiu mais que seu índice. Pergunte ao vendedor o que a "
             "protege quando o mercado cai."
@@ -659,6 +667,10 @@ REPORT: dict[str, Any] = {
             "Quase todo o resultado vem de {best} ({share}). Pergunte o que os demais acrescentam."
         ),
         "ins_best_over": (
+            "Mais do que o resultado líquido vem de {best}: os demais juntos subtraem {rest} "
+            "({rest_share})"
+        ),
+        "ins_best_over_plain": (
             "Mais do que o resultado líquido vem de {best}: os demais juntos subtraem"
         ),
         "ins_most_lose": (
@@ -708,6 +720,22 @@ REPORT: dict[str, Any] = {
         ),
         "timing_best_day": "{share:.0%} do resultado líquido sai das operações de {day}.",
         "timing_best_block": "{share:.0%} do resultado líquido sai da faixa {block}.",
+        "timing_best_day_over": (
+            "As operações de {day} somam {share} do resultado líquido: os demais dias, juntos, "
+            "subtraem {rest} ({rest_share})."
+        ),
+        "timing_best_day_over_plain": (
+            "As operações de {day} somam mais que todo o resultado líquido: os demais dias, "
+            "juntos, subtraem uma parte."
+        ),
+        "timing_best_block_over": (
+            "A faixa {block} soma {share} do resultado líquido: as demais faixas, juntas, "
+            "subtraem {rest} ({rest_share})."
+        ),
+        "timing_best_block_over_plain": (
+            "A faixa {block} soma mais que todo o resultado líquido: as demais faixas, juntas, "
+            "subtraem uma parte."
+        ),
         "timing_day": "Dia de entrada",
         "timing_block": "Horário de entrada",
         "timing_trades": "Operações",
@@ -939,7 +967,13 @@ REPORT: dict[str, Any] = {
         "risk": "Risco reamostrado em um ano",
         "risk_dd": "Drawdown máximo em um ano",
         "risk_prob": "Probabilidade de uma queda de pelo menos",
-        "risk_underwater": "Períodos seguidos abaixo do topo, nas simulações",
+        "risk_underwater": "Tempo seguido abaixo do topo nas simulações, contado em {unit}",
+        "unit_daily_trading": "dias úteis",
+        "unit_daily_calendar": "dias",
+        "unit_weekly": "semanas",
+        "unit_monthly": "meses",
+        "unit_hourly": "horas",
+        "unit_periods": "períodos da curva",
         "risk_under_median": "mediana",
         "risk_under_p95": "em 1 de cada 20",
         "challenge": "Simulador de desafio de mesa proprietária (prop firm)",
@@ -1648,7 +1682,7 @@ REPORT: dict[str, Any] = {
         "selection_end": "Fim da seleção",
         "holdout_start": "Início do trecho reservado",
         "holdout_end": "Fim do trecho reservado",
-        "sealed_at_utc": "Selado em (UTC)",
+        "sealed_at_utc": "Data em que o Rigor selou a declaração do trecho (UTC)",
         "seal": "Selo (sha256)",
         "total_return": "Retorno total",
         "cagr": "Retorno anual composto",
@@ -1722,6 +1756,7 @@ REPORT: dict[str, Any] = {
         "initial_balance": "Saldo inicial",
         "dsr_at_declared": "DSR com as tentativas declaradas",
         "dsr_at_trials_used": "DSR com as tentativas usadas",
+        "dsr_at_declared_used": "DSR com as tentativas declaradas, que são as mesmas usadas",
         "trials_to_half": "Tentativas que levam o DSR a 0.5",
         "trials_used": "Tentativas usadas",
         "trials": "Tentativas",
@@ -4572,6 +4607,21 @@ RULES: tuple[tuple[str, str], ...] = (
     (
         "assumed: client declared zero cost",
         "suposto: o cliente declarou custo zero",
+    ),
+    (
+        ("assumed slippage: no cost was declared; charged on top of the fees the report itemises"),
+        (
+            "slippage suposto: nenhum custo foi declarado; é cobrado além dos custos que o "
+            "relatório detalha"
+        ),
+    ),
+    (
+        "assumed: no cost declared",
+        "suposto: nenhum custo declarado",
+    ),
+    (
+        "default value, not declared",
+        "valor padrão, não declarado",
     ),
     (
         (

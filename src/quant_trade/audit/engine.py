@@ -170,7 +170,7 @@ def sharpe_sampling_variance(sharpe: float, skew: float, kurtosis: float, n: int
 
 
 def _trials_text(trials: int) -> str:
-    return "1 trial" if trials == 1 else f"{trials} trials"
+    return "1 trial" if trials == 1 else f"{trials:,} trials"
 
 
 def _annualised_sharpe(returns: pd.Series, ppy: float) -> float:
@@ -466,6 +466,14 @@ def _significance(returns: pd.Series) -> tuple[dict[str, Any], dict[str, float] 
 
 #: The trial count when the client declares none and no file shows one.
 UNDECLARED_TRIALS = "not declared; computed with 1, the most favourable case"
+#: A form field the client left as it came (blank, or its preselected answer).
+DEFAULT_NOT_DECLARED = "default value, not declared"
+
+
+def _by_default(value: Any) -> dict[str, Any]:
+    """A value the client did not write: the default the audit used, never
+    tagged DECLARED."""
+    return {"value": value, "evidence": NOT_MEASURED, "note": DEFAULT_NOT_DECLARED}
 
 
 def trial_count(inputs: AuditInputs) -> tuple[int, str, str]:
@@ -1036,7 +1044,15 @@ def _costs(
     gross = cost_lib.gross_pnls(inputs.trades.trades, inputs.trades.sides)
     section = {
         "status": "MEASURED",
-        "reference_bps": declared(ref, cost_lib.reference_note(assumed, fees_reported, real_fills)),
+        "reference_bps": declared(
+            ref,
+            cost_lib.reference_note(
+                assumed,
+                fees_reported,
+                real_fills,
+                cost_declared=inputs.declared.cost_declared,
+            ),
+        ),
         "reported_costs_in_rows": fees_reported,
         "rows": [
             {
@@ -2366,9 +2382,17 @@ def run_audit(
                 if inputs.declared.trials_declared
                 else not_measured(UNDECLARED_TRIALS)
             ),
-            "cost_bps_per_side": declared(inputs.declared.cost_bps_per_side),
+            "cost_bps_per_side": (
+                declared(inputs.declared.cost_bps_per_side)
+                if inputs.declared.cost_declared
+                else _by_default(inputs.declared.cost_bps_per_side)
+            ),
             "oos_start": declared(_iso(oos)) if oos is not None else not_measured("not declared"),
-            "benchmark_applicable": declared(inputs.declared.benchmark_applicable),
+            "benchmark_applicable": (
+                declared(inputs.declared.benchmark_applicable)
+                if inputs.declared.benchmark_declared
+                else _by_default(inputs.declared.benchmark_applicable)
+            ),
             "initial_balance": (
                 declared(inputs.declared.initial_balance)
                 if inputs.declared.initial_balance is not None

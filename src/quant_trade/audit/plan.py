@@ -461,13 +461,13 @@ def _significance_step(data: dict[str, Any], status: str, locale: str) -> tuple[
         # Hundreds of years of history is not an ask anyone can meet: say so plainly.
         finding = _say(
             locale,
-            f"PSR {_fmt(psr, 3)} con {n:.0f} observaciones. Con el mismo comportamiento, ni "
+            f"PSR {_fmt(psr, 3)} con {n:,.0f} observaciones. Con el mismo comportamiento, ni "
             f"con {NEED_CAP} veces más historial llegaría a 0.95: con estos datos el resultado "
             "no se distingue del azar.",
-            f"PSR {_fmt(psr, 3)} with {n:.0f} observations. With the same behaviour, not even "
+            f"PSR {_fmt(psr, 3)} with {n:,.0f} observations. With the same behaviour, not even "
             f"{NEED_CAP} times more history would take it to 0.95: on this data the result "
             "cannot be told apart from chance.",
-            f"PSR {_fmt(psr, 3)} com {n:.0f} observações. Com o mesmo comportamento, nem com "
+            f"PSR {_fmt(psr, 3)} com {n:,.0f} observações. Com o mesmo comportamento, nem com "
             f"{NEED_CAP} vezes mais histórico chegaria a 0.95: com estes dados o resultado não "
             "se distingue do acaso.",
         )
@@ -477,13 +477,13 @@ def _significance_step(data: dict[str, Any], status: str, locale: str) -> tuple[
         span_text = f" ({span})" if span else ""
         finding = _say(
             locale,
-            f"PSR {_fmt(psr, 3)} con {n:.0f} observaciones. Con el mismo comportamiento, "
+            f"PSR {_fmt(psr, 3)} con {n:,.0f} observaciones. Con el mismo comportamiento, "
             f"llegaría a 0.95 con unas {math.ceil(need):,} observaciones: faltan "
             f"{math.ceil(extra):,}{span_text}.",
-            f"PSR {_fmt(psr, 3)} with {n:.0f} observations. With the same behaviour it "
+            f"PSR {_fmt(psr, 3)} with {n:,.0f} observations. With the same behaviour it "
             f"would reach 0.95 at about {math.ceil(need):,} observations: "
             f"{math.ceil(extra):,} more{span_text}.",
-            f"PSR {_fmt(psr, 3)} com {n:.0f} observações. Com o mesmo comportamento, "
+            f"PSR {_fmt(psr, 3)} com {n:,.0f} observações. Com o mesmo comportamento, "
             f"chegaria a 0.95 com cerca de {math.ceil(need):,} observações: faltam "
             f"{math.ceil(extra):,}{span_text}.",
         )
@@ -521,6 +521,27 @@ def _significance_step(data: dict[str, Any], status: str, locale: str) -> tuple[
                 "Peça ao gestor o histórico completo do fundo desde o início, sem anos cortados.",
                 "Audite de novo quando o fundo publicar mais meses: cada mês novo conta como "
                 "dados que ninguém escolheu de antemão.",
+            ],
+        )
+    if is_account_history(data):
+        # An account is already the real or demo history: more of it is the
+        # same account, kept running with the same settings.
+        return finding, _say(
+            locale,
+            [
+                "Sube un periodo más largo de la misma cuenta, sin cambiar la configuración.",
+                "Mejor aún, vuelve a auditarla cuando sume más meses con la misma "
+                "configuración: cada mes nuevo cuenta como datos que el optimizador nunca vio.",
+            ],
+            [
+                "Upload a longer period of the same account, with unchanged settings.",
+                "Better still, audit it again once it adds more months with the same "
+                "settings: each new month counts as data the optimiser never saw.",
+            ],
+            [
+                "Envie um período mais longo da mesma conta, sem mudar a configuração.",
+                "Melhor ainda, audite-a de novo quando somar mais meses com a mesma "
+                "configuração: cada mês novo conta como dados que o otimizador nunca viu.",
             ],
         )
     actions = _say(
@@ -619,11 +640,11 @@ def _multiplicity_step(data: dict[str, Any], status: str, locale: str) -> tuple[
         parts.append(
             _say(
                 locale,
-                f"DSR {_fmt(dsr, 3)} con {trials:.0f} {'intento' if trials == 1 else 'intentos'}; "
+                f"DSR {_fmt(dsr, 3)} con {trials:,.0f} {'intento' if trials == 1 else 'intentos'}; "
                 "supera con 0.95 o más, y por debajo de 0.5 no supera.",
-                f"DSR {_fmt(dsr, 3)} at {trials:.0f} {'trial' if trials == 1 else 'trials'}; "
+                f"DSR {_fmt(dsr, 3)} at {trials:,.0f} {'trial' if trials == 1 else 'trials'}; "
                 "it passes at 0.95 or more and fails below 0.5.",
-                f"DSR {_fmt(dsr, 3)} com {trials:.0f} "
+                f"DSR {_fmt(dsr, 3)} com {trials:,.0f} "
                 f"{'tentativa' if trials == 1 else 'tentativas'}; "
                 "passa com 0.95 ou mais e, abaixo de 0.5, não passa.",
             )
@@ -649,20 +670,20 @@ def _multiplicity_step(data: dict[str, Any], status: str, locale: str) -> tuple[
         parts.append(
             _say(
                 locale,
-                f"Con {half:.0f} o más fondos o estrategias del mismo gestor cae por debajo "
+                f"Con {half:,.0f} o más fondos o estrategias del mismo gestor cae por debajo "
                 "de 0.5.",
-                f"With {half:.0f} or more funds or strategies from the same manager it falls "
+                f"With {half:,.0f} or more funds or strategies from the same manager it falls "
                 "below 0.5.",
-                f"Com {half:.0f} ou mais fundos ou estratégias do mesmo gestor cai abaixo de 0.5.",
+                f"Com {half:,.0f} ou mais fundos ou estratégias do mesmo gestor cai abaixo de 0.5.",
             )
         )
     elif half is not None:
         parts.append(
             _say(
                 locale,
-                f"Con {half:.0f} o más configuraciones probadas cae por debajo de 0.5.",
-                f"With {half:.0f} or more configurations tried it falls below 0.5.",
-                f"Com {half:.0f} ou mais configurações testadas cai abaixo de 0.5.",
+                f"Con {half:,.0f} o más configuraciones probadas cae por debajo de 0.5.",
+                f"With {half:,.0f} or more configurations tried it falls below 0.5.",
+                f"Com {half:,.0f} ou mais configurações testadas cai abaixo de 0.5.",
             )
         )
     if pbo is not None and pbo >= 0.5:

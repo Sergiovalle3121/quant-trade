@@ -5231,9 +5231,12 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 trials=int(trials) if trials.strip() else 1,
                 trials_declared=bool(trials.strip()),
                 cost_bps_per_side=float(cost_bps) if cost_bps.strip() else 0.0,
+                cost_declared=bool(cost_bps.strip()),
                 oos_start=oos_start.strip() or None,
                 description=description,
                 benchmark_applicable=benchmark_applicable.lower() not in ("no", "false", "0"),
+                # The form preselects "yes": only a "no" is an answer the client gave.
+                benchmark_declared=benchmark_applicable.strip().lower() in ("no", "false", "0"),
                 locale=report_loc,
                 initial_balance=_positive_or_none(initial_balance),
                 challenge=challenge.strip() or None,

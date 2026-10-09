@@ -182,19 +182,19 @@ def trials_phrase(trials: int, evidence: str, locale: str) -> str:
             "DECLARED": "declarado" if one else "declarados",
             "MEASURED": "contado en los archivos" if one else "contados en los archivos",
         }.get(evidence, TRIAL_SOURCE["es"]["NOT_MEASURED"])
-        return f"{trials} {noun} {source}"
+        return f"{trials:,} {noun} {source}"
     if locale == "pt":
         noun = "tentativa" if one else "tentativas"
         source = {
             "DECLARED": "declarada" if one else "declaradas",
             "MEASURED": "contada nos arquivos" if one else "contadas nos arquivos",
         }.get(evidence, TRIAL_SOURCE["pt"]["NOT_MEASURED"])
-        return f"{trials} {noun} {source}"
+        return f"{trials:,} {noun} {source}"
     noun = "trial" if one else "trials"
     if evidence == "DECLARED":
-        return f"{trials} declared {noun}"
+        return f"{trials:,} declared {noun}"
     source = TRIAL_SOURCE["en"].get(evidence, "declared")
-    return f"{trials} {noun} {source}"
+    return f"{trials:,} {noun} {source}"
 
 
 def assess_multiplicity(

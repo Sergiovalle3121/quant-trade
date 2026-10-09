@@ -145,8 +145,11 @@ def test_figures_carry_their_unit_and_plain_names() -> None:
     # Header: the engine version and seed say what they are.
     assert "versión del motor 0.1.0" in page and "semilla de las simulaciones" in page
     assert "quant_trade.audit" not in page
-    # Resampled time under the peak says median and 1 in 20, not p50/p95.
-    assert "Periodos seguidos bajo el máximo, en las simulaciones: mediana" in page
+    # Resampled time under the peak says its unit, median and 1 in 20, not p50/p95.
+    assert (
+        "Tiempo seguido bajo el máximo en las simulaciones, contado en días hábiles: mediana"
+        in page
+    )
     assert "en 1 de cada 20" in page
     # The capital cards say whose balance they scale to.
     assert "Tamaño sobre el balance inicial del archivo (10,000)" in page

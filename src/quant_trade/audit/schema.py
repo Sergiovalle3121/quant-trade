@@ -207,9 +207,15 @@ class DeclaredMetadata(BaseModel):
     #: tagged NOT_MEASURED, and never held against the client.
     trials_declared: bool = True
     cost_bps_per_side: float = Field(0.0, ge=0.0, le=1000.0)
+    #: False when the form's cost field was left blank: 0 is then the default
+    #: value, shown as not declared (the computation is the same).
+    cost_declared: bool = True
     oos_start: datetime | None = None
     description: str = Field("", max_length=2000)
     benchmark_applicable: bool = True
+    #: False when the form kept its preselected answer (a benchmark applies):
+    #: the default value, shown as not declared (the computation is the same).
+    benchmark_declared: bool = True
     locale: Literal["es", "en", "pt"] = "es"
     #: Starting balance, used only when an imported report does not state one.
     initial_balance: float | None = Field(None, gt=0.0, le=1e12)
