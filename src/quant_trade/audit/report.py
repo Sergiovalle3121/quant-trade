@@ -8683,7 +8683,11 @@ SAMPLE_CTA_COPY: dict[str, dict[str, str]] = {
         "check_link": "Ir a Comprobar un informe",
         "other_signal": "¿Vas a copiar una señal?",
         "other_signal_link": "Mira este otro ejemplo",
-        "signal_files": "El historial que exportan {myfxbook}, {mql5} o {fxblue}.",
+        "signal_files": (
+            "El historial que exporta {myfxbook}. Con el de {mql5} o el de {fxblue} sale un "
+            "informe como este, salvo la pérdida abierta: esos archivos no traen las "
+            "posiciones abiertas."
+        ),
         "myfxbook": "Myfxbook",
         "mql5": "una señal de MQL5",
         "fxblue": "FX Blue",
@@ -8712,7 +8716,11 @@ SAMPLE_CTA_COPY: dict[str, dict[str, str]] = {
         "check_link": "Go to Check a report",
         "other_signal": "About to copy a signal?",
         "other_signal_link": "See this other sample",
-        "signal_files": "The history exported by {myfxbook}, {mql5} or {fxblue}.",
+        "signal_files": (
+            "The history {myfxbook} exports. The one from {mql5} or from {fxblue} gives a "
+            "report like this one, except for the open loss: those files do not include "
+            "the open positions."
+        ),
         "myfxbook": "Myfxbook",
         "mql5": "an MQL5 signal",
         "fxblue": "FX Blue",
@@ -8741,7 +8749,11 @@ SAMPLE_CTA_COPY: dict[str, dict[str, str]] = {
         "check_link": "Ir para Comprovar um relatório",
         "other_signal": "Vai copiar um sinal?",
         "other_signal_link": "Veja este outro exemplo",
-        "signal_files": "O histórico exportado pelo {myfxbook}, por {mql5} ou pelo {fxblue}.",
+        "signal_files": (
+            "O histórico que o {myfxbook} exporta. Com o de {mql5} ou o do {fxblue} sai um "
+            "relatório como este, exceto a perda aberta: esses arquivos não trazem as "
+            "posições abertas."
+        ),
         "myfxbook": "Myfxbook",
         "mql5": "um sinal da MQL5",
         "fxblue": "FX Blue",

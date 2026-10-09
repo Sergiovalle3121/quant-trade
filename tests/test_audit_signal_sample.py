@@ -12,7 +12,9 @@ sitemap lists it with its own date. Every page is read over HTTP with
 
 from __future__ import annotations
 
+import csv
 import html
+import io
 import re
 import socket
 from collections.abc import Iterator
@@ -32,6 +34,7 @@ from quant_trade.audit import account, ownership, web  # noqa: E402
 from quant_trade.audit.audiences import AUDIENCE_PAGES, audience_url  # noqa: E402
 from quant_trade.audit.check import COPY as CHECK_COPY  # noqa: E402
 from quant_trade.audit.guard import find_claims  # noqa: E402
+from quant_trade.audit.guide_capabilities import CAPABILITIES, GUIDE_FORMATS  # noqa: E402
 from quant_trade.audit.guides import GUIDES, GUIDES_COPY, guide_url  # noqa: E402
 from quant_trade.audit.importers import MYFXBOOK_CSV, import_report  # noqa: E402
 from quant_trade.audit.pages import (  # noqa: E402
@@ -47,6 +50,7 @@ from quant_trade.audit.redflags import (  # noqa: E402
     HIGH_WINRATE,
     MARTINGALE_FAIL_INCREASE_SHARE,
     NO_STOP_LOSS_MULTIPLE,
+    flag_title,
 )
 from quant_trade.audit.report import (  # noqa: E402
     SAMPLE_CTA_COPY,
@@ -81,6 +85,8 @@ LOCALES = ("es", "en", "pt")
 BASE = "https://rigor.example"
 #: The synthetic-data words of the notice, as /ejemplo says them.
 SYNTHETIC = {"es": "datos sintéticos", "en": "synthetic data", "pt": "dados sintéticos"}
+#: The open loss, in the words of the flag that reports it (FLOATING_LOSS_AT_END).
+OPEN_LOSS = {"es": "pérdida abierta", "en": "open loss", "pt": "perda aberta"}
 #: Endorsement and result words the new copy must never use, in any language.
 ENDORSEMENT = re.compile(
     r"verifica|certifica|aprobad|aprovad|garant|rentab|rentáve|lucrativ|profitab|guarante"
@@ -226,17 +232,38 @@ def test_the_flags_that_stay_at_warn_or_do_not_come_out_say_why() -> None:
     # FLOATING_LOSS_AT_END stays at WARN: the open loss is under the FAIL share of
     # the balance (account.FLOATING_FAIL).
     assert raised["FLOATING_LOSS_AT_END"]["value"] > -account.FLOATING_FAIL
-    # Not raised: NEGATIVE_PAYOFF_HIGH_WINRATE (a grid's early entries close at a
-    # loss in most baskets, so the win rate stays under HIGH_WINRATE) and
-    # NO_STOP_EVIDENCE (the robot has a stop past its sixth entry, so the worst
-    # loss stays under NO_STOP_LOSS_MULTIPLE times the average loss).
+    # Not raised: NEGATIVE_PAYOFF_HIGH_WINRATE (the win rate stays under
+    # HIGH_WINRATE: in most baskets that add entries the first entry closes at a
+    # loss, and every entry of a stopped basket does; a basket of one entry closes
+    # in profit) and NO_STOP_EVIDENCE (the robot has a stop past its sixth entry,
+    # so the worst loss stays under NO_STOP_LOSS_MULTIPLE times the average loss).
     imported = import_report(synthetic_signal_statement(), SIGNAL_FILENAME)
     pnl = [trade.pnl for trade in imported.trades.trades]
     losses = [-value for value in pnl if value < 0]
     assert sum(value > 0 for value in pnl) / len(pnl) <= HIGH_WINRATE
+    baskets = _baskets()
+    assert sum(len(basket) for basket in baskets) == len(pnl)
+    added = [basket for basket in baskets if len(basket) > 1]
+    first_lost = [basket for basket in added if basket[0] < 0]
+    stopped = [basket for basket in added if max(basket) < 0]
+    # Most of the baskets that add entries, not most of the baskets.
+    assert len(added) < 2 * len(first_lost) < len(baskets)
+    assert stopped and all(basket[0] > 0 for basket in baskets if len(basket) == 1)
     assert max(losses) / (sum(losses) / len(losses)) < NO_STOP_LOSS_MULTIPLE
     assert "NEGATIVE_PAYOFF_HIGH_WINRATE" not in raised
     assert "NO_STOP_EVIDENCE" not in raised
+
+
+def _baskets() -> list[list[float]]:
+    """The export's closed trades by basket (same close date and symbol), read with
+    the csv module: each basket's results in the order its entries opened."""
+    text = synthetic_signal_statement().decode("utf-8").split("\nOpen Trades", 1)[0]
+    baskets: dict[tuple[str, str], list[tuple[int, float]]] = {}
+    for row in csv.DictReader(io.StringIO(text)):
+        if row["Action"] in ("Buy", "Sell"):
+            key = (row["Close Date"], row["Symbol"])
+            baskets.setdefault(key, []).append((int(row["Ticket"]), float(row["Profit"])))
+    return [[profit for _, profit in sorted(entries)] for entries in baskets.values()]
 
 
 # -- 2. The three pages ----------------------------------------------------------------
@@ -425,6 +452,41 @@ def test_the_first_sample_only_gains_the_link_to_the_signal_sample(
     for text in (words["other_signal"], words["other_signal_link"]):
         assert find_claims(text) == [] and ENDORSEMENT.search(text) is None
     assert client.get(signal).status_code == 200
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+def test_the_band_promises_the_open_loss_only_with_the_export_that_lists_it(
+    locale: str,
+) -> None:
+    """Of the three exports the band names, only Myfxbook's lists the open positions
+    (its "Open Trades" block): the band says what the other two leave out."""
+    open_loss = OPEN_LOSS[locale]
+    assert flag_title("FLOATING_LOSS_AT_END", locale).lower().startswith(open_loss)
+    reads_open = frozenset[str]().union(
+        *(
+            capability.formats
+            for capability in CAPABILITIES.values()
+            if capability.fields.get("flag") == "flag:FLOATING_LOSS_AT_END"
+        )
+    )
+    with_open = {slug for slug in SIGNAL_SAMPLE_GUIDES if GUIDE_FORMATS[slug] & reads_open}
+    assert with_open == {"myfxbook"}
+    others = [guide_url(slug, locale) for slug in ("mql5-signal", "fxblue")]
+    for offer in ("welcome", "free", "paid"):
+        band = sample_cta_band(locale, offer, kind="signal")
+        files = _between(band, "<p class='sample-cta-files'>", "</p>")
+        # The sentence with Myfxbook names only it; the next one names the other two
+        # and says the open loss is what their report leaves out.
+        first, rest = files.split(f"href='{guide_url('myfxbook', locale)}'>", 1)[1].split(". ", 1)
+        assert not any(href in first for href in others)
+        assert all(href in rest for href in others)
+        assert open_loss in html.unescape(rest)
+        assert find_claims(html.unescape(files)) == []
+    # The guides' link to the sample promises no flag; its description, which names
+    # the open loss, says the export is Myfxbook's.
+    words = SIGNAL_SAMPLE_COPY[locale]
+    assert open_loss not in words["link"].lower()
+    assert open_loss in words["description"] and "Myfxbook" in words["description"]
 
 
 # -- 4. The sitemap --------------------------------------------------------------------
