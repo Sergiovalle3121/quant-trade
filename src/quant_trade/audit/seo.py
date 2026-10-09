@@ -36,6 +36,7 @@ from quant_trade.audit.method import METHOD_PATH
 from quant_trade.audit.pricing import PRICING_PATH
 from quant_trade.audit.reading import READING_PATH
 from quant_trade.audit.tools_hub import TOOLS_PATH
+from quant_trade.audit.winrate import WINRATE_PATH
 
 LOCALES: tuple[str, ...] = ("es", "en", "pt")
 
@@ -71,6 +72,7 @@ PUBLIC_PAGES: tuple[dict[str, str], ...] = (
     dict(METHOD_PATH),
     dict(CALCULATOR_PATH),
     dict(READING_PATH),
+    dict(WINRATE_PATH),
     dict(TOOLS_PATH),
     dict(FAQ_PATH),
     dict(PRICING_PATH),

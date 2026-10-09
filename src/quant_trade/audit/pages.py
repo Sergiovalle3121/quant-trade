@@ -18,7 +18,7 @@ from datetime import datetime
 from typing import Any
 from urllib.parse import quote, urlencode
 
-from quant_trade.audit import institutional, reading
+from quant_trade.audit import institutional, reading, winrate
 from quant_trade.audit.accounts import FREE_PREVIEWS_PER_MONTH as _FREE
 from quant_trade.audit.articles import (
     ARTICLES,
@@ -93,6 +93,7 @@ from quant_trade.audit.portuguese import (
 )
 from quant_trade.audit.pricing import PRICING_COPY, PRICING_PATH
 from quant_trade.audit.prop_presets import AS_OF, DEFAULT_PRESET, PRESETS, preset_label
+from quant_trade.audit.public_card import PublicClaim
 from quant_trade.audit.redflags import FLAG_TITLES
 from quant_trade.audit.report import (
     CLASS_LADDER,
@@ -116,6 +117,7 @@ from quant_trade.audit.seo import (
     page_paths,
     private_meta,
     tools_structured_data,
+    web_application_structured_data,
 )
 from quant_trade.audit.series_ui import institutional_block, series_fields
 from quant_trade.audit.settings import PACK_CREDITS
@@ -1946,13 +1948,20 @@ def _audiences(locale: str) -> str:
 
 
 #: Each free tool's icon on the landing.
-_TOOL_ICONS: dict[str, str] = {"calculator": "dice", "reading": "chart", "check": "shield"}
+_TOOL_ICONS: dict[str, str] = {
+    "calculator": "dice",
+    "winrate": "percent",
+    "reading": "chart",
+    "check": "shield",
+}
 
 
 def _tool_name(key: str, locale: str) -> str:
-    """The name a free tool already has in the menu and the footer."""
+    """The short name a free tool already uses (menu, footer or its own nav label)."""
     if key == "calculator":
         return str(CALCULATOR_COPY[locale]["nav"])
+    if key == "winrate":
+        return str(winrate.COPY[locale]["nav"])
     if key == "reading":
         return reading.COPY[locale]["title"]
     return str(_UI[locale]["footer_check"])
@@ -1961,6 +1970,8 @@ def _tool_name(key: str, locale: str) -> str:
 def _tool_url(key: str, locale: str) -> str:
     if key == "calculator":
         return calculator_url(locale)
+    if key == "winrate":
+        return winrate.WINRATE_PATH[locale]
     if key == "reading":
         return reading.reading_url(locale)
     return _check_url(locale)
@@ -3951,6 +3962,241 @@ def calculator_page(
     )
     body = (
         _page_hero(words["eyebrow"], words["title"], words["summary"], crumbs)
+        + "<div class='paper page-main'><div class='wrap'>"
+        + _doc(
+            sections,
+            locale,
+            aside=f"<a class='btn btn-dark btn-sm toc-cta' href='{_e(_form_url(locale))}'>"
+            f"{_e(GUIDES_COPY[locale]['form'])}<span class='go'>{icon('arrow')}</span></a>",
+        )
+        + "</div></div>"
+    )
+    return _page(title, locale, body, meta_html=meta, alternates=alternates, solid_nav=True)
+
+
+def _winrate_result(
+    claim: PublicClaim, values: Mapping[str, str], locale: str, base_url: str
+) -> tuple[str, winrate.WinRateReading]:
+    """The result for validated inputs: figures, comparisons, sharing and the reader's card."""
+    from quant_trade.audit.public_card import COPY as CARD_COPY
+    from quant_trade.audit.sharing import COPY as SHARE_COPY
+
+    words, card, share = winrate.COPY[locale], CARD_COPY[locale], SHARE_COPY[locale]
+    figures = winrate.read(claim)
+    computed = f"{_badge('DECLARED', locale)} <span class='muted'>{_e(card['computed'])}</span>"
+    missing = _badge("NOT_MEASURED", locale)
+    if figures.interval is not None and claim.win_rate is not None and claim.trades is not None:
+        interval = (
+            f"<b>{_e(win_rate_interval(claim.win_rate, claim.trades, locale))}</b> {computed}"
+        )
+    else:
+        interval = f"{missing} <span class='muted'>{_e(card['wilson_missing'])}</span>"
+    if figures.breakeven is not None:
+        breakeven = f"<b>{_e(_num(figures.breakeven * 100, locale, 1))} %</b> {computed}"
+    else:
+        breakeven = f"{missing} <span class='muted'>{_e(card['breakeven_missing'])}</span>"
+    body = (
+        "<table class='calc-result'><tbody>"
+        f"<tr><th scope='row'>{_e(words['interval'])}</th><td>{interval}</td></tr>"
+        f"<tr><th scope='row'>{_e(words['breakeven'])}</th><td>{breakeven}</td></tr>"
+        "</tbody></table>"
+    )
+    if figures.position is not None:
+        css = {"above": "flash", "below": "warning", "inside": "help"}[figures.position]
+        body += f"<p class='{css}' data-winrate-position>{_e(words[figures.position])}</p>"
+    # When the declared sample already clears break-even, a grid size above it (or none)
+    # would read as "not yet": the position sentence already says it, so skip "needed".
+    cleared_early = (
+        figures.position == "above"
+        and claim.trades is not None
+        and (figures.trades_needed is None or figures.trades_needed > claim.trades)
+    )
+    if claim.win_rate is not None and figures.breakeven is not None and not cleared_early:
+        if figures.never:
+            needed = words["needed_never"]
+        elif figures.trades_needed is None:
+            needed = words["needed_none"]
+        else:
+            needed = words["needed"].format(
+                rate=f"{_num(claim.win_rate * 100, locale, 1)} %",
+                n=_num(figures.trades_needed, locale, 0),
+            )
+        body += f"<p data-winrate-needed>{_e(needed)}</p>"
+    body += f"<p class='help'>{_badge('DECLARED', locale)} {_e(words['declared_note'])}</p>"
+    if figures.position is not None:
+        # The share text names the interval and the break-even: offer it only when both
+        # were computed. Partial inputs keep the reader's card link below.
+        absolute_url = base_url.rstrip("/") + winrate.share_url(locale, values)
+        text = words["share_text"].format(url=absolute_url)
+        intent = "https://x.com/intent/post?" + urlencode({"text": text})
+        copy_link = reading.COPY[locale]["copy_link"]
+        body += (
+            f"<section data-public-share><h3>{_e(words['share_title'])}</h3>"
+            "<textarea id='winrate-share-link' readonly hidden rows='3' style='width:100%' "
+            f"aria-label='{_e(copy_link)}'>{_e(absolute_url)}</textarea>"
+            f"<label for='winrate-share-text'>{_e(share['copy'])}</label>"
+            "<textarea id='winrate-share-text' readonly rows='5' style='width:100%'>"
+            f"{_e(text)}</textarea><div class='copy-row'>"
+            "<button class='btn btn-ghost' type='button' data-copy='winrate-share-link' "
+            f"data-done='{_e(share['done'])}' data-fallback='{_e(share['fallback'])}' hidden>"
+            f"{_e(copy_link)}</button>"
+            "<button class='btn btn-dark' type='button' data-copy='winrate-share-text' "
+            f"data-done='{_e(share['done'])}' data-fallback='{_e(share['fallback'])}' hidden>"
+            f"{_e(share['copy'])}</button><a class='btn btn-ghost' href='{_e(intent)}' "
+            f"rel='noopener noreferrer'>{_e(share['post'])}</a></div>"
+            "<p class='muted' data-copy-status role='status' aria-live='polite'></p></section>"
+        )
+    card_url = reading.reading_url(locale, {name: values.get(name, "") for name in reading.FIELDS})
+    body += f"<p><a href='{_e(card_url)}' data-winrate-card>{_e(words['card_link'])}</a></p>"
+    return body, figures
+
+
+def winrate_page(
+    *,
+    locale: str = "es",
+    base_url: str = "",
+    values: Mapping[str, str] | None = None,
+    error: str = "",
+    image_path: str = "",
+) -> str:
+    """The free win-rate calculator: the reader's Wilson interval and break-even rate."""
+    from quant_trade.audit.owner_card import COPY as INPUT_COPY
+    from quant_trade.audit.owner_card import ClaimInputError
+    from quant_trade.audit.public_card import COPY as CARD_COPY
+    from quant_trade.audit.public_card import breakeven_rate
+
+    locale = _locale(locale)
+    words = winrate.COPY[locale]
+    shown = {name: (values or {}).get(name, "").strip() for name in winrate.FIELDS}
+    claim = None
+    if not error and any(shown.values()):
+        try:
+            claim = winrate.parse(shown, locale)
+        except ClaimInputError as exc:
+            error = str(exc)
+    if error:
+        shown = dict.fromkeys(winrate.FIELDS, "")  # never echo a rejected input
+
+    def field(name: str, low: str, high: str, step: str) -> str:
+        return (
+            f"<div class='field'><label for='w-{name}'>{_e(words[name])} "
+            f"{_badge('DECLARED', locale)}</label>"
+            f"<input type='number' id='w-{name}' name='{name}' min='{low}' max='{high}' "
+            f"step='{step}' inputmode='decimal' value='{_e(shown[name])}' autocomplete='off' "
+            f"aria-describedby='w-{name}-help'>"
+            f"<p class='help' id='w-{name}-help'>{_e(words[name + '_help'])}</p></div>"
+        )
+
+    form = ""
+    if error:
+        message = INPUT_COPY[locale].get(error, INPUT_COPY[locale]["invalid"])
+        form += f"<p class='error' role='alert'>{_e(message)}</p>"
+    form += (
+        f"<p>{_e(words['optional'])}</p>"
+        f"<form method='get' action='{_e(winrate.winrate_url(locale))}' class='calc-form'>"
+        "<div class='form-grid'>"
+        + field("trades", "1", "10000000", "1")
+        + field("win_rate", "0", "100", "any")
+        + field("target_r", "0", "1000000", "any")
+        + field("stop_r", "0", "1000000", "any")
+        + f"</div><button class='btn btn-dark' type='submit'>{_e(words['submit'])}</button></form>"
+    )
+    sections = [(words["form_title"], form)]
+    if claim is not None:
+        result, figures = _winrate_result(claim, shown, locale, base_url)
+        sections.append((words["result_title"], result))
+        if claim.win_rate is not None:
+            breakeven = figures.breakeven
+            above = "" if breakeven is None else f"<th scope='col'>{_e(words['col_above'])}</th>"
+            rows = "".join(
+                f"<tr><th scope='row'>{_e(_num(trades, locale, 0))}</th>"
+                f"<td>{_e(win_rate_interval(claim.win_rate, trades, locale))}</td>"
+                + (
+                    ""
+                    if breakeven is None
+                    else f"<td>{_e(words['yes'] if low > breakeven else words['no'])}</td>"
+                )
+                + "</tr>"
+                for trades, (low, _high) in figures.rows
+            )
+            sections.append(
+                (
+                    words["table_title"],
+                    "<table class='winrate-table'><thead><tr>"
+                    f"<th scope='col'>{_e(words['col_trades'])}</th>"
+                    f"<th scope='col'>{_e(words['col_interval'])}</th>{above}</tr></thead>"
+                    f"<tbody>{rows}</tbody></table>",
+                )
+            )
+    be_rows = "".join(
+        f"<tr><td>{_e(_num(target, locale, 1))}</td><td>{_e(_num(stop, locale, 1))}</td>"
+        f"<td>{_e(_num(breakeven_rate(target, stop) * 100, locale, 1))} %</td></tr>"
+        for target, stop in winrate.BREAKEVEN_EXAMPLES
+    )
+    sections.append(
+        (
+            words["be_table_title"],
+            "<table class='winrate-breakeven'><thead><tr>"
+            f"<th scope='col'>{_e(words['col_target'])}</th>"
+            f"<th scope='col'>{_e(words['col_stop'])}</th>"
+            f"<th scope='col'>{_e(words['col_breakeven'])}</th></tr></thead>"
+            f"<tbody>{be_rows}</tbody></table>",
+        )
+    )
+    how = (
+        "<ul class='checks'>"
+        + "".join(f"<li>{icon('check')}<span>{_e(item)}</span></li>" for item in words["how"])
+        + "</ul>"
+    )
+    cta = (
+        f"<p>{_e(words['cta'])}</p><p><a class='btn btn-dark' href='{_e(audit_path(locale))}'>"
+        f"{_e(words['cta_button'])}<span class='go'>{icon('arrow')}</span></a> "
+        f"<a href='{_e(_sample_url(locale))}'>{_e(words['sample_link'])}</a></p>"
+    )
+    article = ARTICLES_BY_KEY["cuantas-operaciones-porcentaje-aciertos"]
+    audience = next(page for page in AUDIENCE_PAGES if page.slug == "retos-prop-firm")
+    further = (
+        (article.text[locale].title, article_url(article.key, locale)),
+        (str(CALCULATOR_COPY[locale]["nav"]), calculator_url(locale)),
+        (audience.text[locale].title, audience_url(audience.slug, locale)),
+        (str(TOOLS_COPY[locale]["nav"]), tools_url(locale)),
+    )
+    read_more = (
+        "<ul class='aud-others'>"
+        + "".join(
+            f"<li><a href='{_e(href)}'><span>{_e(label)}</span>{icon('arrow')}</a></li>"
+            for label, href in further
+        )
+        + "</ul>"
+    )
+    sections += [
+        (words["how_title"], how),
+        (words["cta_title"], cta),
+        (words["read_title"], read_more),
+    ]
+    title = f"{words['seo_title']} · {BRAND}"
+    meta = head_meta(
+        PageMeta(
+            title=title,
+            description=words["summary"],
+            locale=locale,
+            paths=dict(winrate.WINRATE_PATH),
+            image_path=image_path,
+            image_alt=CARD_COPY[locale]["title"] if image_path else title,
+        ),
+        base_url=base_url,
+    ) + web_application_structured_data(
+        words["nav"],
+        words["summary"],
+        base_url.rstrip("/") + winrate.winrate_url(locale),
+        locale,
+    )
+    alternates = dict(winrate.WINRATE_PATH)
+    crumbs = f"<a href='{_e(_home(locale))}'>{_e(GUIDES_COPY[locale]['back'])}</a>" + (
+        _language_crumbs(alternates, locale)
+    )
+    body = (
+        _page_hero(words["eyebrow"], words["title"], words["lead"], crumbs)
         + "<div class='paper page-main'><div class='wrap'>"
         + _doc(
             sections,

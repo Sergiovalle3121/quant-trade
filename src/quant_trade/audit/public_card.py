@@ -187,6 +187,11 @@ def _wilson(rate: float, trades: int) -> tuple[float, float]:
     return max(0.0, centre - half), min(1.0, centre + half)
 
 
+def breakeven_rate(target_r: float, stop_r: float) -> float:
+    """Win rate at which fixed-R wins and losses cancel, before costs."""
+    return stop_r / (target_r + stop_r)
+
+
 def _pct(value: float) -> str:
     return f"{value * 100:.1f} %"
 
@@ -229,7 +234,7 @@ def _readings(claim: PublicClaim) -> list[tuple[str, str | None, str]]:
             note += " " + copy["null_note"]
         readings.append(("luck", f"≈ {luck:.2f}", note))
     if claim.target_r is not None and claim.stop_r is not None:
-        rate = claim.stop_r / (claim.target_r + claim.stop_r)
+        rate = breakeven_rate(claim.target_r, claim.stop_r)
         readings.append(("breakeven", _pct(rate), copy["breakeven_note"]))
     else:
         readings.append(("breakeven", None, copy["breakeven_missing"]))
