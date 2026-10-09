@@ -252,8 +252,9 @@ COPY_PT: dict[str, Any] = {
         ),
         (
             "O que eu recebo?",
-            "De graça, a prévia: classe de A a D, gráficos, bandeiras vermelhas e o "
-            "que cada dimensão significa. O relatório completo acrescenta cada número, testes de "
+            "De graça, a prévia: classe de A a D, gráficos, a revisão de "
+            f"{len(FLAG_TITLES)} bandeiras vermelhas e o que cada dimensão significa. "
+            "O relatório completo acrescenta cada número, testes de "
             "estresse, risco e capital, simulador de desafios, a conta real frente ao backtest "
             "se você a enviar, perguntas para o vendedor e o PDF. Veja o exemplo completo antes "
             "de pagar.",

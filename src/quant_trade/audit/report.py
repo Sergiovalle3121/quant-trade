@@ -1701,7 +1701,7 @@ LABELS: dict[str, dict[str, str]] = {
         "ff_phase": "1 fase",
         "ch_ladder_title": "¿Cuánto cambia con lo que encontró este informe?",
         "ch_ladder_intro": (
-            "El mismo programa ({program}, {phases}), remuestreado igual, con distintos tramos "
+            "El mismo programa ({program}), remuestreado igual, con distintos tramos "
             "del historial o con lo que el informe descuenta. Son escenarios del mismo "
             "historial, no predicciones: si la cifra cae mucho fuera de muestra o con costos, "
             "la de la historia completa es optimista."
@@ -3082,7 +3082,7 @@ LABELS: dict[str, dict[str, str]] = {
         "ff_phase": "1 phase",
         "ch_ladder_title": "How much does it change with what this report found?",
         "ch_ladder_intro": (
-            "The same program ({program}, {phases}), resampled the same way, on different "
+            "The same program ({program}), resampled the same way, on different "
             "stretches of the history or with what the report discounts. These are scenarios "
             "of the same history, not predictions: if the figure drops sharply out of sample "
             "or with costs, the full-history figure is optimistic."
@@ -5119,9 +5119,11 @@ def _challenge_ladder_html(
         return ""
     program = scenarios.get("program") or {}
     phases = int(program.get("phases") or 1)
-    intro = labels["ch_ladder_intro"].format(
-        program=_program_name(program, locale), phases=_phases(phases, labels)
-    )
+    # A one-phase program already names its phase ("..., phase 1"): no count.
+    scope = _program_name(program, locale)
+    if phases > 1:
+        scope += ", " + _phases(phases, labels)
+    intro = labels["ch_ladder_intro"].format(program=scope)
     rows = [row for row in scenarios["rows"] if row.get("key") in CHALLENGE_LADDER_ROWS]
     clean = any(row.get("pass_within_best_day") for row in rows)
     span = 3 if clean else 2

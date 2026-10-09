@@ -17,6 +17,7 @@ the upload form, where the same figures come from the real returns.
 from __future__ import annotations
 
 import math
+import re
 from dataclasses import dataclass
 from typing import Any
 from urllib.parse import urlencode
@@ -63,6 +64,31 @@ class CalculatorInput:
     periods_per_year: float = PERIODS_PER_YEAR
 
 
+#: Digit groups of three after a dot or a comma: "1.000" and "12.500" as typed
+#: in Spanish or Portuguese, "1,000" in English. Trials count whole
+#: configurations, so such a separator is never a decimal point here.
+_THOUSANDS = re.compile(r"\d{1,3}(?:[.,]\d{3})+")
+_SPACES = (" ", "\u00a0", "\u202f")  # space, no-break space, narrow no-break
+
+
+def _trial_count(raw: Any) -> int:
+    """A whole number of trials from what someone typed.
+
+    "1.000", "1,000" and "1 000" are a thousand (before, "1.000" read as 1 and
+    "1,5" as 15). A count with a fraction ("1,5", "12.5") is not a number of
+    configurations: ``ValueError``. Past float's range ``int`` raises
+    ``OverflowError``, which :func:`read_input` turns into ``error_number``."""
+    text = str(raw).strip()
+    for space in _SPACES:
+        text = text.replace(space, "")
+    if _THOUSANDS.fullmatch(text):
+        return int(re.sub(r"[.,]", "", text))
+    value = float(text.replace(",", "."))
+    if math.isfinite(value) and not value.is_integer():
+        raise ValueError("a trial count is a whole number")
+    return int(value)
+
+
 def parse_input(
     sharpe: str | None,
     years: str | None,
@@ -76,7 +102,7 @@ def parse_input(
     try:
         sr = float(str(sharpe).replace(",", "."))
         yrs = float(str(years).replace(",", "."))
-        n = int(float(str(trials).replace(",", "").replace(" ", "")))
+        n = _trial_count(trials)
     except (TypeError, ValueError):
         return "error_number"
     if not all(math.isfinite(v) for v in (sr, yrs)):
