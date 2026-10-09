@@ -182,19 +182,19 @@ def trials_phrase(trials: int, evidence: str, locale: str) -> str:
             "DECLARED": "declarado" if one else "declarados",
             "MEASURED": "contado en los archivos" if one else "contados en los archivos",
         }.get(evidence, TRIAL_SOURCE["es"]["NOT_MEASURED"])
-        return f"{trials} {noun} {source}"
+        return f"{trials:,} {noun} {source}"
     if locale == "pt":
         noun = "tentativa" if one else "tentativas"
         source = {
             "DECLARED": "declarada" if one else "declaradas",
             "MEASURED": "contada nos arquivos" if one else "contadas nos arquivos",
         }.get(evidence, TRIAL_SOURCE["pt"]["NOT_MEASURED"])
-        return f"{trials} {noun} {source}"
+        return f"{trials:,} {noun} {source}"
     noun = "trial" if one else "trials"
     if evidence == "DECLARED":
-        return f"{trials} declared {noun}"
+        return f"{trials:,} declared {noun}"
     source = TRIAL_SOURCE["en"].get(evidence, "declared")
-    return f"{trials} {noun} {source}"
+    return f"{trials:,} {noun} {source}"
 
 
 def assess_multiplicity(
@@ -283,6 +283,7 @@ def assess_costs(
     reference_is_assumption: bool,
     fees_reported: bool = False,
     real_fills: bool = False,
+    cost_declared: bool = True,
     thresholds: Thresholds = DEFAULT_THRESHOLDS,
 ) -> Dimension:
     if not rows:
@@ -296,10 +297,13 @@ def assess_costs(
     at_pass = _row_at(rows, thresholds.cost_pass_multiplier)
     multiple = f"{thresholds.cost_pass_multiplier:g}x"
     inputs: dict[str, Any] = {
+        # A reference the audit assumed is not the client's figure: never DECLARED.
         "reference_bps_per_side": {
             "value": reference_bps,
-            "evidence": "DECLARED",
-            "note": reference_note(reference_is_assumption, fees_reported, real_fills),
+            "evidence": "NOT_MEASURED" if reference_is_assumption else "DECLARED",
+            "note": reference_note(
+                reference_is_assumption, fees_reported, real_fills, cost_declared=cost_declared
+            ),
         },
         "net_pnl_at_1x": measured(at_one.net_pnl) if at_one else not_measured("no 1x row"),
         f"net_pnl_at_{multiple}": (

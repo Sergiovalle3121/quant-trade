@@ -104,10 +104,28 @@ def test_the_sample_keeps_only_the_current_set_of_series(tmp_path: Path, monkeyp
             holder["data"] = self
 
     client = _client(tmp_path, monkeypatch, _Late)
-    assert CASH_WORDS not in client.get("/ejemplo").text
+    offline = client.get("/ejemplo").text
+    assert CASH_WORDS not in offline
+    # The sample's public page reads the same run, so it shows the same hash.
+    assert _shown_hash(client.get("/v/ejemplo").text) == _foot_hash(offline)
     assert holder["data"].refresh(CASH.key)
+    online = client.get("/ejemplo").text
+    assert CASH_WORDS in online
     assert CASH_WORDS in client.get("/ejemplo").text
-    assert CASH_WORDS in client.get("/ejemplo").text
+    # Once the rate is in memory, both follow it: a new result, a new hash.
+    assert _foot_hash(online) != _foot_hash(offline)
+    assert _shown_hash(client.get("/v/ejemplo").text) == _foot_hash(online)
+
+
+def _foot_hash(page: str) -> str:
+    """The result's SHA-256 at the foot of a full report."""
+    return page.split("<p class='rf-sha'>", 1)[1].split("<code>", 1)[1].split("</code>", 1)[0]
+
+
+def _shown_hash(page: str) -> str:
+    """The result's SHA-256 a public page shows, the last code cell of its details."""
+    details = page.split("<table class='kv'>")[-1].split("</table>", 1)[0]
+    return details.rsplit("<code>", 1)[1].split("</code>", 1)[0]
 
 
 MONTHS = pd.date_range("2015-01-01", "2027-01-01", freq="MS")

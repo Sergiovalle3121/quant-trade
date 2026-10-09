@@ -207,9 +207,15 @@ class DeclaredMetadata(BaseModel):
     #: tagged NOT_MEASURED, and never held against the client.
     trials_declared: bool = True
     cost_bps_per_side: float = Field(0.0, ge=0.0, le=1000.0)
+    #: False when the form's cost field was left blank: 0 is then the default
+    #: value, shown as not declared (the computation is the same).
+    cost_declared: bool = True
     oos_start: datetime | None = None
     description: str = Field("", max_length=2000)
     benchmark_applicable: bool = True
+    #: False when the form kept its preselected answer (a benchmark applies):
+    #: the default value, shown as not declared (the computation is the same).
+    benchmark_declared: bool = True
     locale: Literal["es", "en", "pt"] = "es"
     #: Starting balance, used only when an imported report does not state one.
     initial_balance: float | None = Field(None, gt=0.0, le=1e12)
@@ -222,6 +228,17 @@ class DeclaredMetadata(BaseModel):
     return_unit: Literal["fraction", "percent"] | None = None
     #: Prop-firm challenge preset to simulate; ``None`` means the default preset.
     challenge: str | None = Field(None, max_length=64)
+    #: Whose strategy it is (``audit/ownership.py``): the client's own, one they
+    #: bought or will buy or copy, or one they provide to others. It only sets
+    #: to whom the report's sentences speak; ``None`` (no answer) declares nothing.
+    ownership: Literal["own", "buyer", "provider"] | None = None
+
+    @field_validator("ownership", mode="before")
+    @classmethod
+    def _no_answer(cls, value: Any) -> Any:
+        if isinstance(value, str) and not value.strip():
+            return None
+        return value.strip() if isinstance(value, str) else value
 
     @field_validator("challenge")
     @classmethod
@@ -1235,6 +1252,9 @@ class AuditInputs:
     source_format: str = "csv"
     #: The instrument of each trade when the source names it.
     trade_symbols: list[str] | None = None
+    #: The volume of each trade in the platform's lots, when the format prints
+    #: lots (``importers.LOT_FORMATS``); ``None`` otherwise.
+    trade_lots: list[float] | None = None
     #: Signed cost totals a platform report itemises (negative is a cost).
     reported_fees: dict[str, float] = field(default_factory=dict)
     #: The platform's descriptive fields and own summary figures (DECLARED).
@@ -1405,6 +1425,7 @@ def build_inputs(
         extra = {
             "source_format": imported.source_format,
             "trade_symbols": list(imported.symbols) or None,
+            "trade_lots": list(imported.lots) if imported.lots else None,
             "reported_fees": dict(imported.fees),
             "report_metadata": dict(imported.metadata),
             "initial_balance": imported.initial_balance,

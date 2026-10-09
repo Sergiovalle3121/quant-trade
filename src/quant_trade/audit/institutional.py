@@ -57,8 +57,8 @@ COPY: dict[str, dict[str, Any]] = {
         "benchmark": {"yes": "Sí", "no": "No"},
         "choose": "Selecciona una opción",
         "submit": "Enviar solicitud",
-        "note": "Los datos son DECLARED: los aporta quien solicita la revisión. "
-        "Aquí no se adjuntan archivos; la serie se sube después por el flujo habitual.",
+        "note": "Estos datos llevan la etiqueta «DECLARED»: los aporta quien solicita la "
+        "revisión. Aquí no se adjuntan archivos; la serie se sube después por el flujo habitual.",
         "privacy": "Privacidad",
         "received": "Solicitud recibida",
         "next": "Te escribimos en 1 día hábil. Prepara la serie bruta y neta y tu benchmark.",
@@ -90,8 +90,9 @@ COPY: dict[str, dict[str, Any]] = {
         "benchmark": {"yes": "Yes", "no": "No"},
         "choose": "Choose an option",
         "submit": "Send request",
-        "note": "These details are DECLARED: supplied by the person requesting the review. "
-        "This form has no attachments; upload the series later through the usual flow.",
+        "note": "These details carry the DECLARED label: they are supplied by the person "
+        "requesting the review. This form has no attachments; upload the series later through "
+        "the usual flow.",
         "privacy": "Privacy",
         "received": "Request received",
         "next": (
@@ -125,8 +126,9 @@ COPY: dict[str, dict[str, Any]] = {
         "benchmark": {"yes": "Sim", "no": "Não"},
         "choose": "Selecione uma opção",
         "submit": "Enviar solicitação",
-        "note": "Os dados são DECLARED: fornecidos por quem solicita a revisão. "
-        "Este formulário não recebe arquivos; a série será enviada depois pelo fluxo habitual.",
+        "note": "Estes dados levam a etiqueta «DECLARED»: são fornecidos por quem solicita a "
+        "revisão. Este formulário não recebe arquivos; a série será enviada depois pelo fluxo "
+        "habitual.",
         "privacy": "Privacidade",
         "received": "Solicitação recebida",
         "next": "Escrevemos em 1 dia útil. Prepare a série bruta e líquida e seu benchmark.",

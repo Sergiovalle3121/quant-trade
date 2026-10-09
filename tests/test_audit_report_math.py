@@ -175,7 +175,8 @@ def test_the_worst_fall_is_placed_among_random_orders(locale: str, position: str
     shown = html.unescape(report._shuffle_html(_shuffle(position, 0.012), labels))
     assert labels["shuffle_title"] in shown
     assert "8.0%" in shown and "12.0%" in shown and "34.0%" in shown
-    assert ("1,000" in shown) == (locale == "en")
+    # The same thousands separator as every other count in the report, in each language.
+    assert "1,000" in shown and "1000" not in shown
     assert labels[f"shuffle_{position}"].split(":")[0] in shown
     assert find_claims(shown) == []
 

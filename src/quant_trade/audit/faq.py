@@ -52,6 +52,46 @@ FAQ_COPY: dict[str, dict[str, str]] = {
     },
 }
 
+# Sources: web.publish/publish_locked, legal.terms_text badge section,
+# legal.privacy_text publication retention and pages.verification_page allow-list.
+# Its answer on the page ends with a link to both samples' public pages
+# (sample_publication).
+_PUBLICATION: dict[str, tuple[str, str]] = {
+    "es": (
+        "¿Cómo se publica una página de verificación?",
+        "Desde tu informe completo puedes elegir publicar su página de verificación "
+        "y retirarla después. Muestra la clase, las dimensiones, qué se auditó, el "
+        "periodo de los datos, las huellas de los archivos, las fechas y un aviso fijo; "
+        "nunca tus archivos, operaciones, descripción ni enlace privado. El sello "
+        "enlaza a esa página y no es una promesa de resultados.",
+    ),
+    "en": (
+        "How do I publish a verification page?",
+        "From your full report you can choose to publish its verification page and "
+        "withdraw it later. It shows the class, dimensions, what was audited, the "
+        "data period, file hashes, dates and a fixed notice; never your files, "
+        "trades, description or private link. The badge links to that page and is "
+        "not a promise of results.",
+    ),
+    "pt": (
+        "Como publico uma página de verificação?",
+        "No relatório completo você pode escolher publicar a página de verificação "
+        "e retirá-la depois. Ela mostra a classe, as dimensões, o que foi auditado, o "
+        "período dos dados, as impressões digitais dos arquivos, as datas e um aviso "
+        "fixo; nunca arquivos, operações, descrição ou link privado. O selo aponta "
+        "para essa página e não é uma promessa de resultados.",
+    ),
+}
+
+#: The landing's question on the badge (``pages._COPY[locale]['faq']``), answered on
+#: this page (``landing_only_questions``): its answer also ends with both samples'
+#: public pages, where the badge can be seen before publishing.
+BADGE_QUESTION: dict[str, str] = {
+    "es": "¿Cómo se usa el sello?",
+    "en": "How is the badge used?",
+    "pt": "Como se usa o selo?",
+}
+
 # Every answer cites the existing source of its behavior. Placeholders are
 # resolved at request time, so prices, countries and retention cannot go stale.
 _QUESTIONS: tuple[dict[str, tuple[str, str]], ...] = (
@@ -278,34 +318,8 @@ _QUESTIONS: tuple[dict[str, tuple[str, str]], ...] = (
             "privacidade detalha os dados e os prazos.",
         ),
     },
-    # Sources: web.publish/publish_locked, legal.terms_text badge section,
-    # legal.privacy_text publication retention and pages.verification_page allow-list.
-    {
-        "es": (
-            "¿Cómo se publica una página de verificación?",
-            "Desde tu informe completo puedes elegir publicar su página de verificación "
-            "y retirarla después. Muestra la clase, las dimensiones, qué se auditó, el "
-            "periodo de los datos, las huellas de los archivos, las fechas y un aviso fijo; "
-            "nunca tus archivos, operaciones, descripción ni enlace privado. El sello "
-            "enlaza a esa página y no es una promesa de resultados.",
-        ),
-        "en": (
-            "How do I publish a verification page?",
-            "From your full report you can choose to publish its verification page and "
-            "withdraw it later. It shows the class, dimensions, what was audited, the "
-            "data period, file hashes, dates and a fixed notice; never your files, "
-            "trades, description or private link. The badge links to that page and is "
-            "not a promise of results.",
-        ),
-        "pt": (
-            "Como publico uma página de verificação?",
-            "No relatório completo você pode escolher publicar a página de verificação "
-            "e retirá-la depois. Ela mostra a classe, as dimensões, o que foi auditado, o "
-            "período dos dados, as impressões digitais dos arquivos, as datas e um aviso "
-            "fixo; nunca arquivos, operações, descrição ou link privado. O selo aponta "
-            "para essa página e não é uma promessa de resultados.",
-        ),
-    },
+    # Sources: see _PUBLICATION.
+    _PUBLICATION,
     # Source: pages.CONTACT_COPY and contact_page, whose public channels come
     # from settings.operator_contact/contact_url and have no invented default.
     {
@@ -433,6 +447,8 @@ def faq_page(settings: AuditSettings, *, locale: str = "es", base_url: str | Non
         _page_hero,
         _public_meta,
     )
+    from quant_trade.audit.report import localize_tags
+    from quant_trade.audit.sample_publication import public_pages_line
     from quant_trade.audit.seo import BRAND, faq_structured_data
 
     locale = locale if locale in FAQ_PATH else "es"
@@ -450,8 +466,17 @@ def faq_page(settings: AuditSettings, *, locale: str = "es", base_url: str | Non
     crumbs = f"<a href='{_home(locale)}'>{_e(words['back'])}</a>" + _language_crumbs(
         FAQ_PATH, locale
     )
+    # The publishing and badge answers end with both samples' public pages; the
+    # structured data keeps the answers' own words.
+    with_example = {
+        localize_tags(_PUBLICATION[locale][0], locale),
+        localize_tags(BADGE_QUESTION[locale], locale),
+    }
+    example = public_pages_line(locale, css="faq-example")
     answers = "".join(
-        f"<details><summary>{_e(question)}</summary><p>{_e(answer)}</p></details>"
+        f"<details><summary>{_e(question)}</summary><p>{_e(answer)}</p>"
+        + (example if question in with_example else "")
+        + "</details>"
         for question, answer in pairs
     )
     body = (

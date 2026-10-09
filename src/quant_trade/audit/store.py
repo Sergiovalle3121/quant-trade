@@ -2792,6 +2792,10 @@ class Store(OpsStoreMixin):
         existing = self.publication_for_audit(audit_id)
         if existing is not None:
             return existing
+        # Always 12 characters of A-Z a-z 0-9 _ - (9 random bytes in base64url), so
+        # never one of the public samples' reserved ids, "ejemplo" (7) and
+        # "ejemplo-senal" (13): /v answers those before any lookup
+        # (sample_publication.SAMPLE_PUBLIC_IDS).
         public_id = secrets.token_urlsafe(9)
         try:
             with self.engine.begin() as conn:

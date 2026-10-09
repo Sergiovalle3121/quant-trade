@@ -774,7 +774,7 @@ def test_two_full_reports_on_the_account_compare_without_pasting_links(tmp_path:
     assert refused(f"id={ids[0]}")  # one report
     assert refused(f"id={ids[0]}&id={ids[0]}")  # the same report twice
     assert refused(f"id={ids[0]}&id={ids[2]}")  # a locked preview
-    assert refused(f"id={ids[0]}&id={ids[1]}&id={ids[2]}")  # three
+    assert refused(f"id={ids[0]}&id={ids[1]}&id={ids[2]}")  # three, one a preview
     assert refused(f"id={ids[0]}&id=nope", "/account")
 
     # Someone else's reports never compare, even with the right ids.

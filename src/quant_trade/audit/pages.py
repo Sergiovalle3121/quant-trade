@@ -85,6 +85,8 @@ from quant_trade.audit.guides import (
 from quant_trade.audit.legal import LegalText, legal_url
 from quant_trade.audit.method import COPY as METHOD_COPY
 from quant_trade.audit.method import dimension_rows, method_url, references
+from quant_trade.audit.ownership import FORM as OWNERSHIP_FORM
+from quant_trade.audit.ownership import ROLES as OWNERSHIP_ROLES
 from quant_trade.audit.portuguese import (
     AUDIENCES_PT,
     CLASS_B_PT,
@@ -115,9 +117,11 @@ from quant_trade.audit.report import (
     report_kind,
     source_name,
 )
+from quant_trade.audit.sample_publication import SamplePage, public_pages_line
 from quant_trade.audit.seo import (
     BRAND,
     OG_IMAGE_SIZE,
+    SIGNAL_SAMPLE_PATHS,
     TAGLINE,
     PageMeta,
     article_structured_data,
@@ -211,6 +215,57 @@ SAMPLE_BANNER: dict[str, str] = {
     ),
 }
 
+#: The second sample (``SIGNAL_SAMPLE_PATHS``, ``sample.signal_sample_result``): its
+#: notice opens by saying what the signal is, then repeats the synthetic-data notice.
+SIGNAL_SAMPLE_BANNER: dict[str, str] = {
+    "es": (
+        "Es una señal inventada para mostrar qué ve quien va a copiar una señal, y no es de "
+        "nadie. Informe de ejemplo con datos sintéticos generados por computadora, en el "
+        "formato del CSV que exporta Myfxbook: no es la cuenta ni la estrategia de nadie. Así "
+        "se ve un informe completo."
+    ),
+    "en": (
+        "This is a made-up signal, built to show what someone about to copy a signal sees, and "
+        "it belongs to nobody. Sample report built from computer-generated synthetic data, in "
+        "the format of the CSV Myfxbook exports: it is nobody's account or strategy. This is "
+        "what a full report looks like."
+    ),
+    "pt": (
+        "É um sinal inventado para mostrar o que vê quem vai copiar um sinal, e não é de "
+        "ninguém. Relatório de exemplo feito com dados sintéticos gerados por computador, no "
+        "formato do CSV que o Myfxbook exporta: não é a conta nem a estratégia de ninguém. "
+        "Assim fica um relatório completo."
+    ),
+}
+
+#: The signal sample's search title and description, and the words of the links to it.
+SIGNAL_SAMPLE_COPY: dict[str, dict[str, str]] = {
+    "es": {
+        "title": "Informe de ejemplo de una señal para copiar (datos sintéticos)",
+        "description": (
+            "Informe de ejemplo de una señal inventada, exportada de Myfxbook: martingala, "
+            "rejilla, depósito en plena pérdida y pérdida abierta, como los ve quien copia."
+        ),
+        "link": "Ver el informe de ejemplo de una señal",
+    },
+    "en": {
+        "title": "Sample report of a signal to copy (synthetic data)",
+        "description": (
+            "Sample report of a made-up signal exported from Myfxbook: martingale, a grid, a "
+            "deposit deep in a loss and an open loss, as someone about to copy it sees them."
+        ),
+        "link": "See the sample report of a signal",
+    },
+    "pt": {
+        "title": "Relatório de exemplo de um sinal para copiar (dados sintéticos)",
+        "description": (
+            "Relatório de exemplo de um sinal inventado exportado do Myfxbook: martingale, "
+            "grade, depósito em plena perda e perda aberta, como os vê quem vai copiá-lo."
+        ),
+        "link": "Ver o relatório de exemplo de um sinal",
+    },
+}
+
 _COPY: dict[str, dict[str, Any]] = {
     "es": {
         "title": f"{BRAND} · Auditoría de backtests",
@@ -301,6 +356,7 @@ _COPY: dict[str, dict[str, Any]] = {
             "Son rentabilidades de un fondo, ya netas de sus comisiones (solo historial mensual)"
         ),
         "benchmark_applicable": "¿Aplica un benchmark?",
+        "unanswered": "Sin respuesta (cuenta como sí)",
         "yes": "Sí",
         "no": "No",
         "locale": "Idioma del informe",
@@ -451,8 +507,9 @@ _COPY: dict[str, dict[str, Any]] = {
                 f"{len(FLAG_TITLES)} banderas rojas y qué significa cada dimensión. "
                 "El informe completo añade cada cifra, pruebas "
                 "de estrés, riesgo y capital, simulador de retos, la cuenta real frente al "
-                "backtest si la subes, preguntas para el vendedor y el PDF. Mira el ejemplo "
-                "completo antes de pagar.",
+                "backtest si la subes, las preguntas que el informe deja abiertas (qué archivo "
+                "responde cada una o, si la compraste, qué preguntarle al vendedor) y el PDF. "
+                "Mira el ejemplo completo antes de pagar.",
             ),
             (
                 "¿Por qué subir el XML de optimización de MT5?",
@@ -627,6 +684,7 @@ _COPY: dict[str, dict[str, Any]] = {
             "These are a fund's returns, already net of its fees (monthly track record only)"
         ),
         "benchmark_applicable": "Does a benchmark apply?",
+        "unanswered": "No answer (counts as yes)",
         "yes": "Yes",
         "no": "No",
         "locale": "Report language",
@@ -772,8 +830,9 @@ _COPY: dict[str, dict[str, Any]] = {
                 f"{len(FLAG_TITLES)} red flags and what each dimension means. "
                 "The full report adds every figure, stress tests, risk and "
                 "capital, the challenge simulator, the live account against the backtest if you "
-                "upload it, questions for the vendor and the PDF. See the full sample before you "
-                "pay.",
+                "upload it, the questions the report leaves open (which file answers each one "
+                "or, if you bought it, what to ask the vendor) and the PDF. See the full sample "
+                "before you pay.",
             ),
             (
                 "Why upload the MT5 optimisation XML?",
@@ -1019,8 +1078,8 @@ _UI: dict[str, dict[str, Any]] = {
                 "chart",
                 "Mercado tranquilo y agitado",
                 "Cada rentabilidad se asigna según el VIX del día anterior, y cada crisis de "
-                "fecha pública que cubre tu historial se mide por separado: ves si el resultado "
-                "depende de un solo tipo de mercado.",
+                "fecha pública que cubre tu historial se mide por separado, salvo las de "
+                "mercados que no operas: ves si el resultado depende de un solo tipo de mercado.",
             ),
             (
                 "globe",
@@ -1050,7 +1109,8 @@ _UI: dict[str, dict[str, Any]] = {
             "Simulación del reto que elijas de {firms}, con sus reglas publicadas",
             "Cuánto costo aguanta antes de quedar en pérdida",
             "Riesgo remuestreado a un año y el capital que pide",
-            "Preguntas concretas para el vendedor del robot o el gestor",
+            "Las preguntas que deja abiertas: qué archivo responde cada una o qué preguntar al "
+            "vendedor o al gestor",
             "PDF y, si tú quieres, página pública con sello",
         ],
         "full_more": "Ver un informe completo de ejemplo",
@@ -1259,8 +1319,8 @@ _UI: dict[str, dict[str, Any]] = {
                 "chart",
                 "Calm and agitated markets",
                 "Each return is placed by the previous day's VIX, and every publicly dated "
-                "crisis your history covers is measured on its own: you see whether the result "
-                "depends on one kind of market.",
+                "crisis your history covers is measured on its own, except those of markets you "
+                "do not trade: you see whether the result depends on one kind of market.",
             ),
             (
                 "globe",
@@ -1290,7 +1350,8 @@ _UI: dict[str, dict[str, Any]] = {
             "Simulation of the {firms} challenge you choose, with its published rules",
             "How much cost it can bear before it ends in a loss",
             "Resampled one-year risk and the capital it needs",
-            "Specific questions for the robot's vendor or the manager",
+            "The questions it leaves open: which file answers each one, or what to ask the "
+            "vendor or the manager",
             "PDF and, if you want, a public page with a badge",
         ],
         "full_more": "See a full sample report",
@@ -1602,6 +1663,20 @@ def sample_meta(locale: str, base_url: str) -> str:
     title = f"{copy['sample_link']} · {copy['title']}"
     path = SAMPLE_PAGE_PATHS.get(locale, "/sample")
     return _public_meta(title, copy["sample_description"], locale, path, base_url, "sample")
+
+
+def signal_sample_meta(locale: str, base_url: str) -> str:
+    """Head tags for the signal sample: indexable like the first sample, same card."""
+    locale = _locale(locale)
+    words = SIGNAL_SAMPLE_COPY[locale]
+    return _public_meta(
+        f"{words['title']} · {BRAND}",
+        words["description"],
+        locale,
+        SIGNAL_SAMPLE_PATHS[locale],
+        base_url,
+        "sample",
+    )
 
 
 def _guide_links(locale: str) -> str:
@@ -2275,6 +2350,21 @@ def _signin_first(copy: dict[str, Any], locale: str, *, anon_preview: bool = Fal
 REPORT_ACCEPT = ".htm,.html,.csv,.txt,.tsv,.xlsx,.xls,.ods,.xml,.zip,.pdf"
 
 
+def _ownership_field(locale: str, chosen: str) -> str:
+    """The optional "Whose strategy is this?" field, on "I'd rather not say"
+    unless the client chose another answer (kept after a refusal). It only sets
+    to whom the report speaks (``audit/ownership.py``)."""
+    words = OWNERSHIP_FORM[locale]
+    chosen = chosen if chosen in OWNERSHIP_ROLES else ""
+    options = "".join(
+        f"<option value='{_e(value)}'"
+        + (" selected" if value == chosen else "")
+        + f">{_e(text)}</option>"
+        for value, text in words["choices"].items()
+    )
+    return _field(words["label"], f"<select name='ownership'>{options}</select>", words["help"])
+
+
 def _upload_form(
     copy: dict[str, Any],
     locale: str,
@@ -2396,11 +2486,13 @@ def _upload_form(
         + _field(
             copy["benchmark_applicable"],
             "<select name='benchmark_applicable'>"
+            # Left unanswered it counts as "yes", shown as a default and not
+            # as the client's declaration; "yes" and "no" are answers.
             + "".join(
-                f"<option value='{option}'"
-                + (" selected" if values.get("benchmark_applicable", "yes") == option else "")
+                f"<option value='{value_}'"
+                + (" selected" if values.get("benchmark_applicable", "") == value_ else "")
                 + f">{_e(copy[option])}</option>"
-                for option in ("yes", "no")
+                for value_, option in (("", "unanswered"), ("yes", "yes"), ("no", "no"))
             )
             + "</select>",
         )
@@ -2469,6 +2561,7 @@ def _upload_form(
             f"value='{value('trials')}'>",
             copy["trials_help"],
         )
+        + _ownership_field(locale, values.get("ownership", ""))
         # The one-file case stays short; the second files and the challenge open on demand.
         + f"<details class='adv extras'{' open' if extras_open else ''}><summary><span>"
         f"{_e(ui['extras'])} <small>· {_e(ui['extras_note'])}</small></span>"
@@ -2888,7 +2981,8 @@ def _utc_time(stamp: str, locale: str) -> str:
     """An ISO UTC stamp as a readable ``<time>`` (24 sep 2026 · 17:30 UTC).
 
     The exact stamp stays in the ``datetime`` attribute; anything that does
-    not parse is shown as it came.
+    not parse is shown as it came. A bare date (a public sample's day of
+    publication) is shown without a time of day.
     """
     try:
         when = datetime.fromisoformat(stamp.replace("Z", "+00:00"))
@@ -2899,6 +2993,8 @@ def _utc_time(stamp: str, locale: str) -> str:
         day = f"{when.day} {month} {when.year}"
     else:
         day = f"{month} {when.day}, {when.year}"
+    if len(stamp) == len("2026-10-09"):
+        return f"<time datetime='{_e(stamp)}'>{day}</time>"
     return f"<time datetime='{_e(stamp)}'>{day} · {when:%H:%M} UTC</time>"
 
 
@@ -2961,6 +3057,7 @@ def verification_page(
     result_sha256: str,
     base_url: str,
     locale: str = "es",
+    sample: SamplePage | None = None,
 ) -> str:
     """The public page of a published audit.
 
@@ -2973,6 +3070,12 @@ def verification_page(
     observations, files and token are never read here, so they cannot leak. A
     view kept before the period was shown has no dates, and those rows are
     left out.
+
+    ``sample`` is only a public sample's page (``sample_publication.sample_page``),
+    which is nobody's audit: its notice goes on top, above the title; its title
+    and link preview start with "Sample"; its share text is its own; and its
+    badge code is shown as the sample's, without a copy button. A publication's
+    page never has one, and without it nothing on the page changes.
     """
     locale = _locale(locale)
     copy = _COPY[locale]
@@ -3049,6 +3152,9 @@ def verification_page(
     description = copy["v_description"].format(
         cls_label=cls_label, overall=overall, date=audited[:10], notice=BADGE_NOTICE[locale]
     )
+    if sample is not None:
+        title = f"{sample.title_word} · {title}"
+        description = f"{sample.meta_lead} · {description}"
     alternates = {lang: f"/v/{public_id}?lang={lang}" for lang in CLASS_WORD}
     alternates["es"] = f"/v/{public_id}"
     # Never indexed (an unpublished page should not linger in search), but it
@@ -3066,8 +3172,12 @@ def verification_page(
         base_url=base_url,
     )
     hero = (
-        "<section class='page-hero'>" + aurora() + grid_bg() + "<div class='wrap'>"
-        f"<div class='eyebrow rise'><span class='dot'></span>{_e(ui['v_eyebrow'])}</div>"
+        "<section class='page-hero'>"
+        + aurora()
+        + grid_bg()
+        + "<div class='wrap'>"
+        + (sample.notice_html if sample is not None else "")
+        + f"<div class='eyebrow rise'><span class='dot'></span>{_e(ui['v_eyebrow'])}</div>"
         f"<h1 class='rise' style='--i:1'>{_e(copy['v_title'])}</h1>"
         "<div class='v-hero rise' style='--i:2'>"
         + class_ring(overall, size="xl")
@@ -3095,16 +3205,24 @@ def verification_page(
         f"<section class='rsec'><h2>{_e(copy['v_badge'])}</h2><div class='badge-preview'>"
         f"<img src='/v/{_e(public_id)}/badge.svg?lang={_e(locale)}' "
         f"alt='{_e(BADGE_NOTICE[locale])}' width='480' height='72'></div>"
-        f"<p class='muted' style='margin-top:18px'>{_e(copy['v_badge_help'])}</p>"
+        f"<p class='muted' style='margin-top:18px'>"
+        f"{_e(sample.badge_help if sample is not None else copy['v_badge_help'])}</p>"
         f"<pre><code id='badge-code'>{_e(snippet)}</code></pre>"
-        f"<div class='copy-row'><button class='btn btn-dark btn-sm' type='button' "
-        f"data-copy='badge-code' data-done='{_e(ui['v_copied'])}' hidden>{_e(ui['v_copy'])}"
-        "</button></div></section>"
+        + (
+            ""
+            if sample is not None
+            else "<div class='copy-row'><button class='btn btn-dark btn-sm' type='button' "
+            f"data-copy='badge-code' data-done='{_e(ui['v_copied'])}' hidden>{_e(ui['v_copy'])}"
+            "</button></div>"
+        )
+        + "</section>"
         + share_block(
             overall=overall,
             public_id=public_id,
             locale=locale,
             kind=kind,
+            template=sample.share_template if sample is not None else None,
+            ref=sample.share_ref if sample is not None else "share",
         )
         + "</div></div>"
     )
@@ -3265,9 +3383,11 @@ PAGE_DESCRIPTIONS: dict[str, dict[str, str]] = {
         ),
     },
     "compare": {
-        "es": "Compara dos de tus informes de Rigor, lado a lado, para ver qué cambió.",
-        "en": "Compare two of your Rigor reports, side by side, to see what changed.",
-        "pt": "Compare dois dos seus relatórios do Rigor, lado a lado, para ver o que mudou.",
+        "es": "Compara dos o tres de tus informes de Rigor, lado a lado, para ver qué cambió.",
+        "en": "Compare two or three of your Rigor reports, side by side, to see what changed.",
+        "pt": (
+            "Compare dois ou três dos seus relatórios do Rigor, lado a lado, para ver o que mudou."
+        ),
     },
     "signup": {
         "es": "Crea tu cuenta de Rigor para subir tus archivos y guardar tus informes.",
@@ -3522,24 +3642,27 @@ def compare_page(
     locale: str = "es",
     lead: str = "",
     alternates: dict[str, str] | None = None,
+    title: str = "",
 ) -> str:
-    """The private page that compares two reports (``audit/compare.py`` builds ``content``)."""
+    """The private page that compares two or three reports (``audit/compare.py``
+    builds ``content``); ``title`` names three reports or the form."""
     from quant_trade.audit.compare import COMPARE_CSS, COMPARE_PATH, COPY
 
     locale = _locale(locale)
     copy = COPY[locale]
+    title = title or copy["title"]
     body = (
-        _page_hero(copy["eyebrow"], copy["title"], lead or copy["lead"])
+        _page_hero(copy["eyebrow"], title, lead or copy["lead"])
         + f"<div class='paper page-main'><div class='wrap'><style>{COMPARE_CSS}</style>"
         + content
         + "</div></div>"
     )
     # A comparison reached from Mi cuenta passes its own addresses.
     return _page(
-        copy["title"],
+        title,
         locale,
         body,
-        meta_html=private_meta(copy["title"], locale, PAGE_DESCRIPTIONS["compare"][locale]),
+        meta_html=private_meta(title, locale, PAGE_DESCRIPTIONS["compare"][locale]),
         alternates=alternates or dict(COMPARE_PATH),
         solid_nav=True,
     )
@@ -4269,6 +4392,9 @@ def winrate_page(
 
 #: Guides for an account's history rather than a backtest, listed apart on /guias.
 ACCOUNT_GUIDES = frozenset({"cuenta-proveedor", "myfxbook", "mql5-signal", "fxblue"})
+#: The tracking-site exports: their "What you get" also links the signal sample,
+#: a report of the same kind of file.
+SIGNAL_SAMPLE_GUIDES = frozenset({"myfxbook", "mql5-signal", "fxblue"})
 _GUIDE_GROUPS: dict[str, tuple[tuple[str, str], tuple[str, str]]] = {
     "es": (
         ("Backtests", "Informes del probador de estrategias y listas de operaciones."),
@@ -4393,12 +4519,18 @@ def _guide_offer(guide: Guide, locale: str, *, offer: str, email_verification: b
         else f"<p><a href='{_e(PRICING_PATH[locale])}'>{_e(_UI[locale]['nav_pricing'])}</a></p>"
     )
     tool = GUIDE_TOOL.get(guide.slug, "calculator")
+    signal = (
+        f" · <a href='{_e(SIGNAL_SAMPLE_PATHS[locale])}'>"
+        f"{_e(SIGNAL_SAMPLE_COPY[locale]['link'])}</a>"
+        if guide.slug in SIGNAL_SAMPLE_GUIDES
+        else ""
+    )
     return (
         "".join(f"<p>{_e(line)}</p>" for line in lines)
         + f"<p><a class='btn btn-dark' href='{_e(_form_url(locale))}'>{_e(words['upload_this'])}"
         f"<span class='go'>{icon('arrow')}</span></a> "
         f"<a href='{_e(SAMPLE_PAGE_PATHS[locale])}'>{_e(PRICING_COPY[locale]['start_sample'])}</a>"
-        f"</p>{after}"
+        f"{signal}</p>{after}"
         f"<p>{_e(words['tool'])} <a href='{_e(_tool_url(tool, locale))}'>"
         f"{_e(_tool_name(tool, locale))}</a>. {_e(TOOLS_COPY[locale][tool]['question'])}</p>"
     )
@@ -4789,13 +4921,30 @@ def audience_page(
     if audience.contact_cta:
         start = institutional.REVIEW_PATHS[locale]
         start_label = institutional.COPY[locale]["title"]
+    sample_label = words["sample"]
+    if audience.sample == "signal":
+        sample = SIGNAL_SAMPLE_PATHS[locale]
+        sample_label = SIGNAL_SAMPLE_COPY[locale]["link"]
     buttons = (
         "<div class='hero-cta'>"
         f"<a class='btn btn-dark' href='{_e(start)}'>{_e(start_label)}"
         f"<span class='go'>{icon('arrow')}</span></a>"
-        f"<a class='link-more' href='{_e(sample)}'>{_e(words['sample'])}{icon('arrow')}</a>"
+        f"<a class='link-more' href='{_e(sample)}'>{_e(sample_label)}{icon('arrow')}</a>"
         "</div>"
     )
+    lead = buttons
+    if audience.sample == "signal":
+        # Whoever is about to copy a signal sees what they would get first.
+        lead = (
+            "<div class='hero-cta'>"
+            f"<a class='btn btn-dark' href='{_e(sample)}'>{_e(sample_label)}"
+            f"<span class='go'>{icon('arrow')}</span></a>"
+            f"<a class='link-more' href='{_e(start)}'>{_e(start_label)}{icon('arrow')}</a>"
+            "</div>"
+        )
+    if audience.public_example:
+        # What the provider's clients would see, before uploading anything.
+        lead += public_pages_line(locale, css="aud-example")
     alternates = {lang: audience_url(audience.slug, lang) for lang in ("es", "en", "pt")}
     crumbs = f"<a href='{_e(_home(locale))}'>{_e(words['home'])}</a>" + _language_crumbs(
         alternates, locale
@@ -4820,7 +4969,7 @@ def audience_page(
                 (words["others"], f"<ul class='aud-others'>{others}</ul>"),
             ],
             locale,
-            lead=buttons,
+            lead=lead,
             aside=f"<a class='btn btn-dark btn-sm toc-cta' href='{_e(start)}'>"
             f"{_e(start_label)}<span class='go'>{icon('arrow')}</span></a>",
         )
@@ -4839,6 +4988,9 @@ def audience_page(
 __all__ = [
     "BADGE_NOTICE",
     "SAMPLE_BANNER",
+    "SIGNAL_SAMPLE_BANNER",
+    "SIGNAL_SAMPLE_COPY",
+    "SIGNAL_SAMPLE_PATHS",
     "VERIFICATION_NOTICE",
     "audience_page",
     "badge_svg",
@@ -4849,6 +5001,7 @@ __all__ = [
     "legal_page",
     "method_page",
     "sample_meta",
+    "signal_sample_meta",
     "tools_page",
     "verification_card_svg",
     "verification_page",

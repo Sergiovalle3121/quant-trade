@@ -61,11 +61,21 @@ NOINDEX = "noindex, nofollow"
 #: The page that checks a report file was not edited (``audit/check.py``).
 CHECK_PATH: dict[str, str] = {"es": "/comprobar", "en": "/check", "pt": "/pt/comprovar"}
 
+#: The second public sample report, a made-up signal for whoever is about to
+#: copy one (``sample.signal_sample_result``), and the day it was published.
+SIGNAL_SAMPLE_PATHS: dict[str, str] = {
+    "es": "/ejemplo-senal",
+    "en": "/en/sample-signal",
+    "pt": "/pt/exemplo-sinal",
+}
+SIGNAL_SAMPLE_PUBLISHED = "2026-10-09"
+
 #: Each public page as its path per language. The sitemap lists exactly these.
 #: Spanish and English exist for every page; Portuguese only where translated.
 PUBLIC_PAGES: tuple[dict[str, str], ...] = (
     {"es": "/", "en": "/en", "pt": "/pt"},
     {"es": "/ejemplo", "en": "/sample", "pt": "/pt/exemplo"},
+    dict(SIGNAL_SAMPLE_PATHS),
     dict(EXAMPLES_PATH),
     {lang: guides_index_url(lang) for lang in ("es", "en", "pt")},
     {lang: articles_index_url(lang) for lang in ("es", "en", "pt")},
@@ -110,6 +120,7 @@ def _page_dates() -> dict[str, str]:
     newest = max(ARTICLE_PUBLICATION_DATES.values())
     dates.update({articles_index_url(lang): newest for lang in LOCALES})
     dates.update({path: LEGAL_UPDATED for pages in LEGAL_PATHS.values() for path in pages.values()})
+    dates.update({path: SIGNAL_SAMPLE_PUBLISHED for path in SIGNAL_SAMPLE_PATHS.values()})
     return dates
 
 
@@ -468,6 +479,8 @@ __all__ = [
     "PAGE_DATES",
     "PUBLIC_PAGES",
     "SITE_NAME",
+    "SIGNAL_SAMPLE_PATHS",
+    "SIGNAL_SAMPLE_PUBLISHED",
     "SITE_UPDATED",
     "TAGLINE",
     "PageMeta",

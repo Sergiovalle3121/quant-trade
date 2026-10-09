@@ -160,15 +160,21 @@ COPY_PT: dict[str, str] = {
     "pdf": "PDF",
     "public_page": "Página pública",
     "compare_pick_label": "Escolher para comparar",
-    "compare_button": "Comparar os dois escolhidos",
-    "compare_help": "Marque dois relatórios completos e compare lado a lado, sem colar links.",
-    "compare_pick": "Escolha exatamente dois relatórios completos da sua lista para comparar.",
+    "compare_button": "Comparar os escolhidos",
+    "compare_help": (
+        "Marque dois ou três relatórios completos e compare lado a lado, sem colar links."
+    ),
+    "compare_pick": "Escolha dois ou três relatórios completos da sua lista para comparar.",
     "compare_back": "Voltar aos meus relatórios",
     "compare_mine": "São relatórios da sua conta? Compare a partir da sua lista, sem links.",
     "compare_mine_button": "Escolher dos meus relatórios",
     "compare_lead": (
         "Dois relatórios da sua conta. Serve para ver o que mudou entre duas versões de uma "
         "estratégia ou entre dois robôs."
+    ),
+    "compare_lead_three": (
+        "Três relatórios da sua conta. Serve para ver em que diferem três versões de uma "
+        "estratégia ou três robôs."
     ),
     "status_full": "Completo",
     "status_preview": "Prévia",
