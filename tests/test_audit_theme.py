@@ -305,16 +305,18 @@ def test_report_navigation_compacts_only_its_upload_and_document_actions() -> No
 
 def test_landing_leads_with_the_product_and_real_key_figures() -> None:
     from quant_trade.audit.audiences import RECOGNISED_PLATFORMS
-    from quant_trade.audit.pages import PLATFORMS
+    from quant_trade.audit.pages import PLATFORMS, _specs
     from quant_trade.audit.prop_presets import PRESETS
     from quant_trade.audit.redflags import FLAG_TITLES
 
     for locale in ("es", "en"):
         page = landing(locale=locale)
-        # The illustration sits under the headline and says it is synthetic.
-        assert page.index("<h1") < page.index("class='stage") < page.index("class='specs'")
+        # The illustration sits under the headline and says it is synthetic; the
+        # sample's finding comes next (the key figures left the short landing).
+        assert page.index("<h1") < page.index("class='stage") < page.index("id='ejemplo'")
         assert ("sintéticos" if locale == "es" else "synthetic") in page
-        specs = page.split("class='specs'", 1)[1].split("</div></div>", 1)[0]
+        assert "class='specs'" not in page
+        specs = _specs(locale).split("class='specs'", 1)[1].split("</div></div>", 1)[0]
         platforms = len({*PLATFORMS, *RECOGNISED_PLATFORMS} - {"CSV"})
         firm_challenges = sum(1 for rules in PRESETS.values() if rules.firm != "Generic")
         assert firm_challenges == len(PRESETS) - 1
@@ -341,8 +343,10 @@ def test_long_pages_have_an_index_that_links_every_section(tmp_path: Path) -> No
 
 
 def test_the_class_range_never_breaks_across_lines() -> None:
-    assert "A a D." in landing(locale="es")
-    assert "A to D." in landing(locale="en")
+    # The first screen's lead keeps the class range on one line too.
+    assert "A a D con" in landing(locale="es")
+    assert "A to D class" in landing(locale="en")
+    assert "A a D com" in landing(locale="pt")
     assert "@media (max-width:620px){.statement{" in STYLE
 
 

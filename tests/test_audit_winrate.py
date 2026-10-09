@@ -27,7 +27,6 @@ from quant_trade.audit.public_card import (  # noqa: E402
 )
 from quant_trade.audit.settings import AuditSettings  # noqa: E402
 from quant_trade.audit.store import make_store  # noqa: E402
-from quant_trade.audit.theme import icon  # noqa: E402
 from quant_trade.audit.tools_hub import TOOL_KEYS, TOOLS_PATH, tools_url  # noqa: E402
 from quant_trade.audit.web import create_app  # noqa: E402
 from quant_trade.audit.winrate import TABLE_TRADES, WINRATE_PATH, read  # noqa: E402
@@ -371,13 +370,10 @@ def test_tools_hub_lists_the_winrate_calculator(client: TestClient, locale: str)
     assert apps[1]["url"] == BASE + path
     assert apps[1]["name"] == winrate.COPY[locale]["nav"]
     assert find_claims(html.unescape(hub.text)) == []
-    # The landing's free tools band: four cards in the two-column grid (2 by 2).
+    # The short landing links the hub from its closing call; the hub has the four tools.
     main = landing(locale=locale).split("<main", 1)[1].split("</main>", 1)[0]
-    assert path in _links(main)
-    band = main.split("id='herramientas'", 1)[1].split("</section>", 1)[0]
-    assert band.count("<div class='card spot'") == len(TOOL_KEYS) == 4
-    assert "id='band-winrate'" in band
-    assert icon("percent") in band
+    assert tools_url(locale) in _links(main)
+    assert len(TOOL_KEYS) == 4
     # The calculator's "Keep reading" list (not only the menu) links the tools page.
     calculator = client.get(path).text
     further = calculator.split("<ul class='aud-others'>", 1)[1].split("</ul>", 1)[0]

@@ -114,7 +114,7 @@ _QUESTIONS: tuple[dict[str, tuple[str, str]], ...] = (
             "exportar de cada plataforma.",
         ),
     },
-    # Sources: legal.terms_text service scope and pages.TRUST_COPY: no broker access,
+    # Sources: legal.terms_text service scope and pages._COPY['not']: no broker access,
     # execution, strategies or signals; pages._COPY['faq'] rules out forecasts.
     {
         "es": (

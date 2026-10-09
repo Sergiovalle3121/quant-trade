@@ -2081,8 +2081,6 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             signed_in=_session(request) is not None,
             operator=(cfg.operator_name, cfg.operator_address_for(locale)),
             card_markets=tuple(cfg.approved_markets),
-            # The note promises the free first report after confirming the address.
-            email_confirmation=cfg.email_verification_required and acct.WELCOME_FULL_REPORT,
             completed_audits=completed_counter.get(),
         )
         return HTMLResponse(page)

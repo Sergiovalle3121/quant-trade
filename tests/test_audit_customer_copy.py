@@ -98,8 +98,9 @@ def test_the_portuguese_site_says_the_report_comes_in_portuguese(tmp_path: Path)
         text = _text(page)
         for stale in STALE_PT:
             assert stale not in text, (path, stale)
-    landing_text = _text(pages["/pt"])
-    assert "Em português, espanhol ou inglês, à sua escolha no formulário." in landing_text
+    # The short landing keeps six questions; the upload page, where the language is
+    # picked, says the report comes in Portuguese.
+    assert "O relatório sai em português, espanhol ou inglês." in _text(pages["upload"])
     assert "Leia antes de enviar:" in _text(pages["upload"])
     # The two pages to read before sending are the Portuguese ones.
     assert "href='/pt/termos?lang=pt'" in pages["upload"]

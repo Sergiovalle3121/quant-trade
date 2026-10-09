@@ -33,45 +33,27 @@ def test_every_start_button_opens_the_upload_page(locale: str) -> None:
     ):
         page = landing(locale=locale, access_codes=True, **kwargs)
         assert "#subir'" not in page and "action='/audits'" not in page
-        # Hero, prices, the start band, the closing call, the top bar and the phone menu.
-        assert page.count(f"href='{AUDIT_PATHS[locale]}'") >= 6
+        # Hero, prices (one card free, two paid), the closing call, the top bar and the
+        # phone menu.
+        cards = 1 if kwargs["free_mode"] else 2
+        assert page.count(f"href='{AUDIT_PATHS[locale]}'") >= 4 + cards
 
 
 @pytest.mark.parametrize("locale", sorted(SIGNUP))
-def test_the_landing_sells_what_the_full_report_now_measures(locale: str) -> None:
-    # The long feature cards left the landing (too much text); the price card still
-    # names what the full report measures, and the language menu offers all three.
+def test_the_price_card_lists_five_lines_and_opens_a_full_sample(locale: str) -> None:
+    # The price card keeps five lines for someone about to pay (#portada-compra); a
+    # full sample report is one click away, and the language menu offers all three.
     ui = _UI[locale]
-    words = {
-        "es": ("efectivo", "VIX", "inflación"),
-        "en": ("cash", "VIX", "inflation"),
-        "pt": ("caixa", "VIX", "inflação"),
-    }[locale]
     page = landing(locale=locale, free_mode=False, signed_in=False)
+    pricing = page.split("id='pricing'", 1)[1].split("</section>", 1)[0]
+    assert len(ui["full_items"]) == 5
+    assert pricing.count("<li>") >= 5
+    sample = {"es": "/ejemplo?lang=es", "en": "/sample?lang=en", "pt": "/pt/exemplo"}[locale]
+    assert f"href='{sample}'" in pricing and ui["full_more"] in _text(pricing)
     text = _text(page)
-    for word in words:
-        assert word in " ".join(ui["full_items"]), word
-        assert word in text, word
     assert "class='langs'" in page
     for name in ("Español", "English", "Português"):
         assert name in text
-    assert find_claims(text) == []
-
-
-@pytest.mark.parametrize(
-    ("locale", "own_inflation", "available"),
-    [
-        ("es", "inflación propia", "con datos disponibles"),
-        ("en", "its own inflation", "where data is available"),
-        ("pt", "inflação própria", "com dados disponíveis"),
-    ],
-)
-def test_landing_names_each_currency_inflation_and_its_data_limit(
-    locale: str, own_inflation: str, available: str
-) -> None:
-    text = _text(landing(locale=locale, free_mode=False, signed_in=False))
-    assert own_inflation in text
-    assert available in text
     assert find_claims(text) == []
 
 
@@ -121,7 +103,6 @@ def test_the_faq_says_a_forgotten_password_needs_no_email(locale: str) -> None:
     # Two-step sign-in: the reset also asks for the code from the app.
     two_step = {"es": "dos pasos", "en": "two-step", "pt": "duas etapas"}
     assert two_step[locale] in answers[0]
-    assert words[locale] in _text(landing(locale=locale, free_mode=False, signed_in=False))
 
 
 @pytest.mark.parametrize("locale", sorted(SIGNUP))
@@ -168,17 +149,6 @@ def test_the_landing_says_how_an_account_is_protected(locale: str) -> None:
 
 
 @pytest.mark.parametrize("locale", sorted(SIGNUP))
-def test_the_full_report_list_names_the_fund_split(locale: str) -> None:
-    words = {
-        "es": ("cuánto es efectivo", "cuánto es mercado"),
-        "en": ("how much is cash", "how much is the market"),
-        "pt": ("quanto é caixa", "quanto é mercado"),
-    }[locale]
-    items = " ".join(_UI[locale]["full_items"])
-    assert all(word in items for word in words)
-
-
-@pytest.mark.parametrize("locale", sorted(SIGNUP))
 def test_the_fund_page_names_the_cash_market_and_alpha_split(locale: str) -> None:
     from quant_trade.audit.audiences import AUDIENCE_PAGES
 
@@ -195,19 +165,6 @@ def test_the_currency_card_says_each_currency_after_its_own_inflation(locale: st
     # Since #346 and #358 each currency is deflated by its own prices, not US ones.
     assert own[locale] in card and "FRED" in card
     assert not find_claims(card)
-
-
-@pytest.mark.parametrize("locale", sorted(SIGNUP))
-def test_the_full_report_list_names_the_mean_shift(locale: str) -> None:
-    line = {
-        "es": "Si su rentabilidad media cambió en algún momento, y cuándo (con 250 "
-        "rentabilidades o más)",
-        "en": "Whether its average return changed at some point, and when (with 250 "
-        "returns or more)",
-        "pt": "Se a sua rentabilidade média mudou em algum momento, e quando (com 250 "
-        "rentabilidades ou mais)",
-    }[locale]
-    assert line in _UI[locale]["full_items"]
 
 
 @pytest.mark.parametrize("locale", sorted(SIGNUP))

@@ -18,7 +18,7 @@ from datetime import datetime
 from typing import Any
 from urllib.parse import quote, urlencode
 
-from quant_trade.audit import institutional, reading, winrate
+from quant_trade.audit import accounts, institutional, reading, winrate
 from quant_trade.audit.accounts import FREE_PREVIEWS_PER_MONTH as _FREE
 from quant_trade.audit.article_numbers import STREAK_ROWS
 from quant_trade.audit.articles import (
@@ -94,11 +94,10 @@ from quant_trade.audit.portuguese import (
     LANGUAGE_NAMES,
     MONTHS_PT,
     STATUS_TEXT_PT,
-    TRUST_PT,
     UI_PT,
     link_locale,
 )
-from quant_trade.audit.pricing import PRICING_COPY, PRICING_PATH
+from quant_trade.audit.pricing import PRICING_COPY, PRICING_PATH, usd
 from quant_trade.audit.prop_presets import AS_OF, DEFAULT_PRESET, PRESETS, preset_label
 from quant_trade.audit.public_card import PublicClaim
 from quant_trade.audit.redflags import FLAG_TITLES
@@ -126,7 +125,7 @@ from quant_trade.audit.seo import (
     tools_structured_data,
     web_application_structured_data,
 )
-from quant_trade.audit.series_ui import institutional_block, series_fields
+from quant_trade.audit.series_ui import series_fields
 from quant_trade.audit.settings import PACK_CREDITS
 from quant_trade.audit.sharing import COPY as SHARING_COPY
 from quant_trade.audit.sharing import share_block
@@ -139,10 +138,11 @@ from quant_trade.audit.theme import (
     grid_bg,
     icon,
     logo,
+    static_ready,
 )
 from quant_trade.audit.tools_hub import COPY as TOOLS_COPY
 from quant_trade.audit.tools_hub import TOOL_KEYS, TOOLS_PATH, tools_url
-from quant_trade.audit.verdict import DIMENSION_ORDER, class_text, meaning, trials_undeclared
+from quant_trade.audit.verdict import class_text, meaning, trials_undeclared
 
 #: The fixed wording of the badge and of the verification page's notice. It
 #: states what the audit is and denies what it is not; it never mentions
@@ -392,14 +392,15 @@ _COPY: dict[str, dict[str, Any]] = {
             "ahí.",
         ],
         "prices_title": "Precios",
-        "price_free_title": "Vista previa",
+        "price_free_title": "Primer informe",
         "price_free": (
-            "Clase de A a D, explicación de cada dimensión, gráficas, banderas rojas y hashes."
+            "Completo y con PDF al crear tu cuenta. Después, {n} vistas previas gratis al mes "
+            "con la clase, las gráficas y las banderas rojas."
         ),
         "price_full_title": "Informe completo",
         "price_full": (
-            "Todo el detalle numérico sin marca de agua, simulador de reto, riesgo remuestreado, "
-            "preguntas para el vendedor y página de verificación pública con sello."
+            "Para la versión corregida de tu estrategia, otro robot o tu cuenta del mes "
+            "siguiente. Desde tu cuenta lo comparas lado a lado con tu informe anterior."
         ),
         "price_free_mode": (
             "Ahora mismo el servicio está en modo gratuito: el informe completo se entrega con "
@@ -414,12 +415,7 @@ _COPY: dict[str, dict[str, Any]] = {
             "pago te enviamos un código de acceso y lo escribes en el formulario o en el informe."
         ),
         "contact": "Pedir un código",
-        "price_pack": "Paquete de {n} informes: USD {price:.0f} (USD {each:.0f} cada uno).",
-        "account_note": (
-            "Tu primer informe completo, gratis al crear tu cuenta; después, "
-            f"{_FREE} vistas previas gratis al mes, y tus informes y créditos en un solo lugar."
-        ),
-        "account_link": "Crear cuenta",
+        "price_pack": "Paquete de {n} informes: {price} ({each} cada uno).",
         "faq_title": "Preguntas frecuentes",
         "faq": [
             (
@@ -704,12 +700,15 @@ _COPY: dict[str, dict[str, Any]] = {
             "Each further audit is paid from your account, and your reports stay saved there.",
         ],
         "prices_title": "Pricing",
-        "price_free_title": "Preview",
-        "price_free": ("A to D class, what each dimension means, charts, red flags and hashes."),
+        "price_free_title": "First report",
+        "price_free": (
+            "Full and with the PDF when you create your account. After that, {n} free previews "
+            "a month with the class, the charts and the red flags."
+        ),
         "price_full_title": "Full report",
         "price_full": (
-            "Every number without a watermark, challenge simulator, resampled risk, questions "
-            "for the vendor and a public verification page with a badge."
+            "For the corrected version of your strategy, another robot or next month's "
+            "account. From your account you compare it side by side with your previous report."
         ),
         "price_free_mode": (
             "The service is in free mode right now: the full report is delivered with a "
@@ -724,12 +723,7 @@ _COPY: dict[str, dict[str, Any]] = {
             "confirmed you receive an access code and enter it in the form or in the report."
         ),
         "contact": "Ask for a code",
-        "price_pack": "Pack of {n} reports: USD {price:.0f} (USD {each:.0f} each).",
-        "account_note": (
-            "Your first full report, free when you create your account; then "
-            f"{_FREE} free previews a month, and your reports and credits in one place."
-        ),
-        "account_link": "Create an account",
+        "price_pack": "Pack of {n} reports: {price} ({each} each).",
         "faq_title": "Frequently asked questions",
         "faq": [
             (
@@ -854,11 +848,16 @@ _UI: dict[str, dict[str, Any]] = {
         "nav_compare": "Comparar",
         "nav_tools": "Herramientas",
         "nav_menu": "Menú",
-        "cta": "Empezar gratis",
-        "cta_full": "Empieza con la vista previa gratis",
+        "cta": "Auditar mi archivo gratis",
+        "cta_full": "Empezar con mi informe gratis",
         "cta_short": "Auditar",
-        "hero_a": "¿Ventaja real",
-        "hero_b": "o pura suerte?",
+        "hero_a": "Antes de pagar un reto o un robot,",
+        "hero_b": "mira si es ventaja o suerte.",
+        "hero_anchor": (
+            "Un reto o un robot cuesta cientos de dólares. Tu primer informe completo es "
+            "gratis; después, {price} por informe."
+        ),
+        "hero_safe": "Tu archivo nunca se publica.",
         "nav_lang": "Idioma",
         "trust": [
             ("shield", "No se conecta a tu bróker ni recomienda operaciones"),
@@ -870,7 +869,8 @@ _UI: dict[str, dict[str, Any]] = {
         "cta_sample": "Ver un informe de ejemplo",
         "hero_lead": (
             "Sube el backtest o el historial que ya tienes. Rigor lo pone a prueba contra "
-            "costos, pruebas repetidas y datos con errores, y te da una clase de A a D."
+            "costos, configuraciones probadas y las reglas de los retos de prop firm, y te da "
+            "una clase de A\u00a0a\u00a0D con cada cifra explicada."
         ),
         "mock_cap": "Ilustración con datos sintéticos",
         "mock_is": "Dentro de muestra",
@@ -1008,7 +1008,6 @@ _UI: dict[str, dict[str, Any]] = {
         "pricing_eyebrow": "Precios",
         "plan_free": "Vista previa",
         "plan_free_amount": "Gratis",
-        "plan_free_note": f"tu primer informe completo; después, {_FREE} vistas previas al mes",
         "plan_full": "Informe completo",
         "plan_full_note": "por auditoría",
         "plan_badge": "Completo",
@@ -1019,23 +1018,13 @@ _UI: dict[str, dict[str, Any]] = {
             "Banderas rojas y huellas de tus archivos",
         ],
         "full_items": [
-            "Todo el detalle numérico, sin marca de agua",
-            "Simulador de reto de prop firm",
+            "Simulación del reto que elijas de {firms}, con sus reglas publicadas",
+            "Cuánto costo aguanta antes de quedar en pérdida",
             "Riesgo remuestreado a un año y el capital que pide",
-            "Pruebas de estrés: el resultado sin sus mejores operaciones",
-            "La cuenta real frente a su backtest",
-            "Preguntas para el vendedor del robot o el gestor",
-            "Si funciona en cada mercado o uno carga con el resto",
-            "Para fondos: calendario año por mes, peor mes y tiempo en recuperarse y, con su "
-            "índice, cuánto es efectivo, cuánto es mercado y cuánto queda",
-            "El dinero real detrás del % de una cuenta: depósitos, recargas y pérdidas abiertas",
-            "Frente al efectivo y al mercado: el Sharpe sin lo que pagaba el efectivo, "
-            "VIX tranquilo o agitado y crisis conocidas",
-            "Según la moneda de la cuenta: conversión o inflación propia, con datos disponibles",
-            "Si su rentabilidad media cambió en algún momento, y cuándo "
-            "(con 250 rentabilidades o más)",
-            "Página de verificación pública con sello",
+            "Preguntas concretas para el vendedor del robot o el gestor",
+            "PDF y, si tú quieres, página pública con sello",
         ],
+        "full_more": "Ver un informe completo de ejemplo",
         "upload_eyebrow": "Empieza aquí",
         "upload_title": ("Tu auditoría,", "en un solo archivo."),
         "upload_lead": (
@@ -1046,8 +1035,7 @@ _UI: dict[str, dict[str, Any]] = {
             "Tu archivo nunca se publica.",
             (
                 "Tu primer informe completo, gratis al crear tu cuenta; después, "
-                f"{_FREE} vistas previas gratis al mes. A veces pedimos validar "
-                "una tarjeta; nunca se cobra."
+                f"{_FREE} vistas previas gratis al mes."
             ),
             "Borrado automático si no desbloqueas el informe.",
         ],
@@ -1068,8 +1056,10 @@ _UI: dict[str, dict[str, Any]] = {
             "Redactando el veredicto",
         ],
         "faq_eyebrow": "Preguntas",
+        "faq_more": "Todas las preguntas, con precios, pagos y contacto",
         "final_title": ("Antes de arriesgar dinero en una estrategia,", "mírala con lupa."),
         "final_lead": "Sube el informe y recibe la clase, las gráficas y su explicación sin costo.",
+        "final_tools": "¿Aún sin archivo? Prueba las herramientas gratis, sin registro.",
         "footer_product": "Producto",
         "footer_legal": "Legal",
         "footer_news": "Novedades",
@@ -1099,11 +1089,16 @@ _UI: dict[str, dict[str, Any]] = {
         "nav_compare": "Compare",
         "nav_tools": "Free tools",
         "nav_menu": "Menu",
-        "cta": "Start free",
-        "cta_full": "Start with the free preview",
+        "cta": "Audit my file free",
+        "cta_full": "Start with my free report",
         "cta_short": "Audit",
-        "hero_a": "Real edge",
-        "hero_b": "or just luck?",
+        "hero_a": "Before you pay for a challenge or a robot,",
+        "hero_b": "see whether it is edge or luck.",
+        "hero_anchor": (
+            "A challenge or a robot costs hundreds of dollars. Your first full report is free; "
+            "after that, {price} per report."
+        ),
+        "hero_safe": "Your file is never published.",
         "nav_lang": "Language",
         "trust": [
             ("shield", "Never connects to your broker or recommends trades"),
@@ -1114,8 +1109,9 @@ _UI: dict[str, dict[str, Any]] = {
         "mock_k": "Verdict",
         "cta_sample": "See a sample report",
         "hero_lead": (
-            "Upload the backtest or track record you already have. Rigor tests it against "
-            "costs, repeated trials and broken data, and gives you a class from A to D."
+            "Upload the backtest or account history you already have. Rigor tests it against "
+            "costs, the configurations tried and prop-firm challenge rules, and gives you an "
+            "A\u00a0to\u00a0D class with every figure explained."
         ),
         "mock_cap": "Illustration with synthetic data",
         "mock_is": "In sample",
@@ -1252,7 +1248,6 @@ _UI: dict[str, dict[str, Any]] = {
         "pricing_eyebrow": "Pricing",
         "plan_free": "Preview",
         "plan_free_amount": "Free",
-        "plan_free_note": f"your first full report; then {_FREE} previews a month",
         "plan_full": "Full report",
         "plan_full_note": "per audit",
         "plan_badge": "Complete",
@@ -1263,23 +1258,13 @@ _UI: dict[str, dict[str, Any]] = {
             "Red flags and your files' fingerprints",
         ],
         "full_items": [
-            "Every number in detail, no watermark",
-            "Prop-firm challenge simulator",
+            "Simulation of the {firms} challenge you choose, with its published rules",
+            "How much cost it can bear before it ends in a loss",
             "Resampled one-year risk and the capital it needs",
-            "Stress tests: the result without its best trades",
-            "The live account against its backtest",
-            "Questions to ask the robot's vendor or the manager",
-            "Whether it works on each market or one carries the rest",
-            "For funds: year-by-month calendar, worst month and time to recover and, with its "
-            "index, how much is cash, how much is the market and what is left",
-            "The real money behind an account's %: deposits, top-ups and open losses",
-            "Against cash and the market: the Sharpe without what cash paid, calm or "
-            "agitated VIX and known crises",
-            "Based on the account currency: conversion or its own inflation, where data "
-            "is available",
-            "Whether its average return changed at some point, and when (with 250 returns or more)",
-            "Public verification page with a badge",
+            "Specific questions for the robot's vendor or the manager",
+            "PDF and, if you want, a public page with a badge",
         ],
+        "full_more": "See a full sample report",
         "upload_eyebrow": "Start here",
         "upload_title": ("Your audit,", "from a single file."),
         "upload_lead": (
@@ -1290,8 +1275,7 @@ _UI: dict[str, dict[str, Any]] = {
             "Your file is never published.",
             (
                 "Your first full report, free when you create your account; then "
-                f"{_FREE} free previews a month. Sometimes we ask to verify a card; "
-                "it is never charged."
+                f"{_FREE} free previews a month."
             ),
             "Deleted automatically if you do not unlock the report.",
         ],
@@ -1312,8 +1296,10 @@ _UI: dict[str, dict[str, Any]] = {
             "Writing the verdict",
         ],
         "faq_eyebrow": "Questions",
+        "faq_more": "All the questions, with prices, payment and contact",
         "final_title": ("Before you put money on a strategy,", "take a close look."),
         "final_lead": "Upload the report and get the class, the charts and their explanation free.",
+        "final_tools": "No file yet? Try the free tools, no sign-up.",
         "footer_product": "Product",
         "footer_legal": "Legal",
         "footer_news": "News",
@@ -1627,6 +1613,8 @@ def _footer(locale: str) -> str:
         f"<li><a href='{_e(method_url(locale))}'>{_e(_method_title(locale))}</a></li>"
         f"<li><a href='{_e(calculator_url(locale))}'>{_e(CALCULATOR_COPY[locale]['nav'])}</a></li>"
         f"<li><a href='{FAQ_PATH[locale]}'>{_e(FAQ_COPY[locale]['title'])}</a></li>"
+        f"<li><a href='{institutional.REVIEW_PATHS[locale]}'>"
+        f"{_e(institutional.COPY[locale]['title'])}</a></li>"
     )
     legal = (
         f"<li><a href='{_e(legal_url('terms', locale))}'>{_e(copy['terms_link'])}</a></li>"
@@ -1727,45 +1715,30 @@ def _status_chip(status: str, locale: str) -> str:
     return f"<span class='badge {_e(status)}'>{_e(text)}</span>"
 
 
-def _hero(locale: str, sample: str, *, email_confirmation: bool = False) -> str:
+def _hero(locale: str, sample: str, *, price_usd: float = 0.0, free_mode: bool = True) -> str:
     ui = _UI[locale]
-    confirmation = {
-        "es": (
-            "Confirma tu correo para recibir el primer informe completo gratis. "
-            "Si se requiere, validas una tarjeta sin cargo."
-        ),
-        "en": (
-            "Confirm your email to receive the first full report free. "
-            "If required, you verify a card without a charge."
-        ),
-        "pt": (
-            "Confirme seu e-mail para receber o primeiro relatório completo grátis. "
-            "Se necessário, valide um cartão sem cobrança."
-        ),
-    }
-    confirmation_html = (
-        f"<p class='muted welcome-confirmation'>{_e(confirmation[locale])}</p>"
-        if email_confirmation
+    trust = "".join(f"<li>{icon(name)}{_e(text)}</li>" for name, text in ui["trust"])
+    # The anchor names the free first report and the price after it, so it needs both.
+    anchor = (
+        f"<p class='hero-anchor'>{_e(ui['hero_anchor'].format(price=usd(price_usd)))}</p>"
+        if not free_mode and price_usd > 0 and accounts.WELCOME_FULL_REPORT
         else ""
     )
-    trust = "".join(f"<li>{icon(name)}{_e(text)}</li>" for name, text in ui["trust"])
     # Text on the left, the report on the right: the first screen shows the product.
+    # The words are there from the first paint; only the illustration rises in.
     return (
         "<section class='hero hero-split dark'>" + aurora() + grid_bg() + "<div class='wrap'>"
         "<div class='hero-grid'><div class='hero-copy'>"
-        f"<div class='pill rise' style='--i:0'><span class='dot'></span>"
-        f"{_e(TAGLINE[locale])}</div>"
-        f"<h1 class='display'><span class='l rise' style='--i:1'>{_e(ui['hero_a'])}</span>"
-        f"<em class='l rise' style='--i:2'>{_e(ui['hero_b'])}</em></h1>"
-        f"<p class='lead rise' style='--i:3'>{_e(ui['hero_lead'])}</p>"
-        "<div class='hero-cta rise' style='--i:4'>"
+        f"<div class='pill'><span class='dot'></span>{_e(TAGLINE[locale])}</div>"
+        f"<h1 class='display'><span class='l'>{_e(ui['hero_a'])}</span>"
+        f"<em class='l'>{_e(ui['hero_b'])}</em></h1>"
+        f"<p class='lead'>{_e(ui['hero_lead'])}</p>"
+        "<div class='hero-cta'>"
         f"<a class='btn btn-primary btn-lg' href='{audit_path(locale)}'>{_e(ui['cta'])}"
         f"<span class='go'>{icon('arrow')}</span></a>"
         f"<a class='link-more' href='{_e(sample)}'>{_e(ui['cta_sample'])}{icon('arrow')}</a></div>"
-        f"{confirmation_html}"
-        f"<ul class='trust rise' style='--i:5'>{trust}</ul></div>"
-        + _mock(locale)
-        + "</div></div></section>"
+        f"{anchor}<p class='hero-safe'>{_e(ui['hero_safe'])}</p>"
+        f"<ul class='trust'>{trust}</ul></div>" + _mock(locale) + "</div></div></section>"
     )
 
 
@@ -1954,15 +1927,6 @@ def _audiences(locale: str) -> str:
     )
 
 
-#: Each free tool's icon on the landing.
-_TOOL_ICONS: dict[str, str] = {
-    "calculator": "dice",
-    "winrate": "percent",
-    "reading": "chart",
-    "check": "shield",
-}
-
-
 def _tool_name(key: str, locale: str) -> str:
     """The short name a free tool already uses (menu, footer or its own nav label)."""
     if key == "calculator":
@@ -1990,208 +1954,26 @@ def _article_link(key: str, locale: str) -> str:
     return f"<a href='{_e(article_url(key, locale))}'>{_e(title)}</a>"
 
 
-def _tools_band(locale: str) -> str:
-    """The free tools on the landing: no file, no account, declared figures only."""
-    words = TOOLS_COPY[locale]
-    cards = "".join(
-        f"<div class='card spot' data-reveal style='--i:{i % 2}'>"
-        f"<div class='icon'>{icon(_TOOL_ICONS[key])}</div>"
-        f"<h3 id='band-{key}'>{_e(_tool_name(key, locale))}</h3>"
-        f"<p>{_e(words[key]['question'])}</p>"
-        f"<p><a href='{_e(_tool_url(key, locale))}' aria-describedby='band-{key}'>"
-        f"{_e(words['open'])}</a></p></div>"
-        for i, key in enumerate(TOOL_KEYS)
-    )
+def _example_section(locale: str) -> str:
+    """The sample report's finding, right under the first screen."""
     return (
-        "<section class='section light' id='herramientas'><div class='wrap'>"
-        + _section_head(words["band_eyebrow"], _title_pair(words["band_title"]), words["band_lead"])
-        + f"<div class='cards cards-2'>{cards}</div>"
-        f"<p class='muted audience-also'><a href='{_e(tools_url(locale))}'>"
-        f"{_e(words['all_tools'])}</a> · <a href='{_e(articles_index_url(locale))}'>"
-        f"{_e(words['articles_link'])}</a></p></div></section>"
-    )
-
-
-def _problems(locale: str) -> str:
-    ui = _UI[locale]
-    items = "".join(
-        f"<div data-reveal style='--i:{i}'><span class='n'>0{i + 1}</span>"
-        f"<h3>{_e(title)}</h3><p>{_e(text)}</p></div>"
-        for i, (title, text) in enumerate(ui["problems"])
-    )
-    return (
-        "<section class='section light'><div class='wrap'>"
-        + _section_head(ui["problem_eyebrow"], _title_pair(ui["problem_title"]), ui["problem_lead"])
-        + f"<div class='trio'>{items}</div>"
+        "<section class='section light' id='ejemplo'><div class='wrap'>"
         + _example_case(locale)
         + "</div></section>"
     )
 
 
 def _example_case(locale: str) -> str:
-    """One real finding from the sample report, under the three problems."""
+    """One real finding from the sample report (synthetic data)."""
     words = _UI[locale]["example_case"]
     points = "".join(f"<li>{icon('check')}<span>{_e(p)}</span></li>" for p in words["points"])
     return (
-        "<div class='investor' data-reveal style='margin-top:40px'>"
+        "<div class='investor' data-reveal>"
         f"<div><span class='eyebrow'><span class='dot'></span>{_e(words['eyebrow'])}</span>"
-        f"<h3>{_e(words['title'])}</h3><p>{_e(words['text'])}</p>"
+        f"<h2>{_e(words['title'])}</h2><p>{_e(words['text'])}</p>"
         f"<a class='btn btn-dark' href='{_sample_url(locale)}'>"
         f"{_e(words['cta'])}<span class='go'>{icon('arrow')}</span></a></div>"
         f"<ul class='checks'>{points}</ul></div>"
-    )
-
-
-def _dimensions(locale: str, copy: dict[str, Any]) -> str:
-    ui = _UI[locale]
-    titles = _dimension_titles(locale)
-    cards = "".join(
-        f"<div class='card spot' data-reveal style='--i:{i % 3}'>"
-        f"<div class='icon'>{icon(_DIMENSION_ICONS[name])}</div>"
-        f"<h3>{_e(titles[name])}</h3><p>{_e(text)}</p></div>"
-        for i, (name, text) in enumerate(zip(DIMENSION_ORDER, copy["measure"], strict=False))
-    )
-    # Where each number comes from, in one line under the cards.
-    legend = "".join(f"<li>{_badge(tag, locale)}{_e(text)}</li>" for tag, text in ui["evidence"])
-    return (
-        "<section class='section dark' id='measure'><div class='wrap'>"
-        + _section_head(copy["measure_title"], _title_pair(ui["dims_title"]))
-        + f"<p class='statement'>{_e(ui['dims_lead'])}</p>"
-        + f"<div class='cards'>{cards}</div>"
-        + f"<ul class='dims-legend' data-reveal>{legend}</ul>"
-        + "</div></section>"
-    )
-
-
-#: Why a stranger can trust Rigor before paying: each claim comes with the
-#: page where they can check it. Nothing here promises a result.
-TRUST_COPY: dict[str, dict[str, Any]] = {
-    "es": {
-        "eyebrow": "Trabajo real, no humo",
-        "title": ("Sin bots, sin señales,", "sin promesas."),
-        "lead": (
-            "Rigor no vende estrategias ni resultados: mide el archivo que subes y te enseña "
-            "cómo lo mide. Todo lo de esta sección lo puedes comprobar antes de pagar."
-        ),
-        "items": [
-            (
-                "eye",
-                "Mira un informe entero antes de pagar",
-                "El ejemplo es un informe completo, con su PDF, hecho con datos sintéticos: ves "
-                "exactamente lo que recibes.",
-                "Ver el ejemplo",
-                "sample",
-            ),
-            (
-                "shield",
-                "No vendemos bots ni señales",
-                "No ejecutamos órdenes ni pedimos las claves de tu bróker, y ningún informe "
-                "promete resultados: un filtro automático frena cualquier texto que lo haga.",
-                "",
-                "",
-            ),
-            (
-                "lock",
-                "Tu archivo es tuyo",
-                "Nunca se publica. Si no desbloqueas el informe, se borra a los {retention} "
-                "días, y puedes borrar tu cuenta y tus informes cuando quieras.",
-                "Política de privacidad",
-                "privacy",
-            ),
-        ],
-        "who": "Quién está detrás: {name}, {address}.",
-        "ask": "¿Dudas antes de subir? Escríbenos por WhatsApp; responde una persona.",
-        "ask_link": "Escribir por WhatsApp",
-    },
-    "en": {
-        "eyebrow": "Real work, not hype",
-        "title": ("No bots, no signals,", "no promises."),
-        "lead": (
-            "Rigor sells no strategies and no results: it measures the file you upload and "
-            "shows you how it measures it. You can check everything in this section before "
-            "you pay."
-        ),
-        "items": [
-            (
-                "eye",
-                "See a whole report before you pay",
-                "The sample is a full report, with its PDF, built from synthetic data: you see "
-                "exactly what you get.",
-                "See the sample",
-                "sample",
-            ),
-            (
-                "shield",
-                "We sell no bots and no signals",
-                "We place no orders and ask for no broker keys, and no report promises results: "
-                "an automatic filter stops any text that does.",
-                "",
-                "",
-            ),
-            (
-                "lock",
-                "Your file stays yours",
-                "It is never published. If you do not unlock the report it is deleted after "
-                "{retention} days, and you can delete your account and your reports whenever "
-                "you like.",
-                "Privacy policy",
-                "privacy",
-            ),
-        ],
-        "who": "Who is behind it: {name}, {address}.",
-        "ask": "Questions before you upload? Write to us on WhatsApp; a person answers.",
-        "ask_link": "Write on WhatsApp",
-    },
-    "pt": TRUST_PT,
-}
-
-
-def _trust(
-    locale: str,
-    *,
-    retention_days: int,
-    operator: tuple[str, str],
-    contact_url: str,
-    free_mode: bool = False,
-) -> str:
-    """Why trust Rigor, each point with the page that proves it."""
-    words = TRUST_COPY[locale]
-    hrefs = {
-        "sample": _sample_url(locale),
-        "method": method_url(locale),
-        "check": _check_url(locale),
-        "privacy": legal_url("privacy", locale),
-        "terms": legal_url("terms", locale),
-    }
-    cards = "".join(
-        f"<div class='card spot' data-reveal style='--i:{i % 3}'>"
-        f"<div class='icon'>{icon(name)}</div><h3>{_e(title)}</h3>"
-        f"<p>{_e(text.format(retention=retention_days))}</p>"
-        + (f"<p><a href='{_e(hrefs[target])}'>{_e(label)}</a></p>" if target else "")
-        + "</div>"
-        for i, (name, title, text, label, target) in enumerate(
-            item for item in words["items"] if not (free_mode and item[4] == "terms")
-        )
-    )
-    name, address = operator
-    who = (
-        f"<p class='trust-who'>{_e(words['who'].format(name=name, address=address))}</p>"
-        if name and address
-        else ""
-    )
-    ask = (
-        f"<p class='trust-ask'>{_e(words['ask'])} "
-        f"<a href='{_e(contact_url)}' rel='noopener'>{_e(words['ask_link'])}</a></p>"
-        if contact_url
-        else ""
-    )
-    limits = f"<p class='trust-not'>{_e(_COPY[locale]['not'])}</p>"
-    return (
-        "<section class='section light' id='confianza'><div class='wrap'>"
-        + _section_head(words["eyebrow"], _title_pair(words["title"]), words["lead"])
-        + f"<div class='cards'>{cards}</div>"
-        + f"<div class='trust-foot' data-reveal>{limits}{who}{ask}</div>"
-        + "</div></section>"
     )
 
 
@@ -2248,6 +2030,19 @@ def _how_html(copy: dict[str, Any], locale: str) -> str:
     )
 
 
+def _firm_names(locale: str) -> str:
+    """The firms whose published challenge rules the simulator carries, in words."""
+    names = sorted({rules.firm for rules in PRESETS.values() if rules.firm != "Generic"})
+    joiner = {"es": " o ", "en": " or ", "pt": " ou "}[locale]
+    return names[0] if len(names) == 1 else ", ".join(names[:-1]) + joiner + names[-1]
+
+
+def _full_items(locale: str) -> list[str]:
+    """What the full report adds, as the price card lists it (``_UI['full_items']``)."""
+    firms = _firm_names(locale)
+    return [item.format(firms=firms) for item in _UI[locale]["full_items"]]
+
+
 def _checks(items: list[str]) -> str:
     return (
         "<ul class='checks'>"
@@ -2298,13 +2093,19 @@ def _prices_html(
 ) -> str:
     ui = _UI[locale]
     head = _section_head(ui["pricing_eyebrow"], f"<h2 class='h2'>{_e(copy['prices_title'])}</h2>")
+    # Five lines on the landing; the sample report shows everything a full report has.
+    more = (
+        f"<p class='price-more'><a href='{_sample_url(locale)}'>{_e(ui['full_more'])}"
+        f"{icon('arrow')}</a></p>"
+    )
     if free_mode:
         body = (
             "<div class='prices prices-one'><div class='price featured' data-reveal>"
             f"<span class='price-name'>{_e(ui['plan_full'])}</span>"
             f"<div class='price-amount'>{_e(ui['plan_free_amount'])}</div>"
             f"<p class='muted'>{_e(copy['price_free_mode'])}</p>"
-            + _checks(ui["free_items"] + ui["full_items"])
+            + _checks(ui["free_items"] + _full_items(locale))
+            + more
             + f"<a class='btn btn-primary' href='{audit_path(locale)}'>{_e(ui['cta'])}</a>"
             + "</div></div>"
         )
@@ -2326,35 +2127,33 @@ def _prices_html(
             "<div class='prices'>"
             f"<div class='price' data-reveal style='--i:0'><span class='price-name'>"
             f"{_e(copy['price_free_title'])}</span>"
-            f"<div class='price-amount'>{_e(ui['plan_free_amount'])}"
-            f"<small>{_e(ui['plan_free_note'])}</small></div>"
-            f"<p class='muted'>{_e(copy['price_free'])}</p>"
-            + _checks(ui["free_items"])
+            f"<div class='price-amount'>{_e(ui['plan_free_amount'])}</div>"
+            f"<p class='muted'>{_e(copy['price_free'].format(n=_FREE))}</p>"
             + f"<a class='btn btn-ghost' href='{audit_path(locale)}'>{_e(ui['cta'])}</a></div>"
             f"<div class='price featured' data-reveal style='--i:1'>"
             f"<span class='ribbon'>{_e(ui['plan_badge'])}</span>"
             f"<span class='price-name'>{_e(copy['price_full_title'])}"
-            f"</span><div class='price-amount'>USD {price_usd:.0f}"
+            f"</span><div class='price-amount'>{_e(usd(price_usd))}"
             f"<small>{_e(ui['plan_full_note'])}</small></div>"
             f"<p class='muted'>{_e(copy['price_full'])}</p>"
             + (
                 "<p class='price-pack'><strong>"
                 + _e(
                     copy["price_pack"].format(
-                        n=PACK_CREDITS, price=pack_price_usd, each=pack_price_usd / PACK_CREDITS
+                        n=PACK_CREDITS,
+                        price=usd(pack_price_usd),
+                        each=usd(pack_price_usd / PACK_CREDITS),
                     )
                 )
                 + "</strong></p>"
                 if pack_price_usd
                 else ""
             )
-            + _checks(ui["full_items"])
+            + _checks(_full_items(locale))
+            + more
             + f"<a class='btn btn-primary' href='{audit_path(locale)}'>{_e(ui['cta_full'])}</a>"
             + "</div></div>"
             + (f"<ul class='checks pay-ways' data-reveal>{''.join(ways)}</ul>" if ways else "")
-            + f"<p class='muted account-note' data-reveal>{_e(copy['account_note'])} "
-            f"<a href='{_ACCOUNT_PATHS.get(locale, _ACCOUNT_PATHS['es'])[0]}'>"
-            f"{_e(copy['account_link'])}</a></p>"
             + f"<p class='method-link' data-reveal><a href='{_e(method_url(locale))}'>"
             f"{_e(_method_title(locale))}{icon('arrow')}</a></p>"
         )
@@ -2672,27 +2471,147 @@ def _upload_form(
     )
 
 
-def _faq_html(copy: dict[str, Any], locale: str, *, retention_days: int) -> str:
+#: The landing's questions, by their place in ``_COPY[locale]['faq']`` (Portuguese has
+#: one more, on the report's language): what you get, which file, what happens to it,
+#: the evidence labels, what Rigor does not predict and that it never reaches a
+#: broker. The rest, and the answers on prices and payment, live on ``FAQ_PATH``.
+_LANDING_FAQ: dict[str, tuple[int, ...]] = {
+    "es": (2, 0, 7, 4, 5, 6),
+    "en": (2, 0, 7, 4, 5, 6),
+    "pt": (2, 0, 8, 5, 6, 7),
+}
+
+
+#: The operator's name and address under the questions, while "who is behind it"
+#: (``_founder``) is not shown; the settings let each language word the address.
+OPERATOR_LINE: dict[str, str] = {
+    "es": "Quién está detrás: {name}, {address}.",
+    "en": "Who is behind it: {name}, {address}.",
+    "pt": "Quem está por trás: {name}, {address}.",
+}
+#: The WhatsApp line under the questions (``cfg.contact_url``), on the same terms.
+ASK_LINE: dict[str, tuple[str, str]] = {
+    "es": ("¿Dudas antes de subir? Escríbenos por WhatsApp; responde una persona.", "Escribir"),
+    "en": ("Questions before you upload? Write to us on WhatsApp; a person answers.", "Write"),
+    "pt": ("Dúvidas antes de enviar? Escreva pelo WhatsApp; responde uma pessoa.", "Escrever"),
+}
+
+
+def _faq_html(
+    copy: dict[str, Any],
+    locale: str,
+    *,
+    retention_days: int,
+    operator: tuple[str, str] = ("", ""),
+    contact_url: str = "",
+) -> str:
+    from quant_trade.audit.faq import FAQ_PATH
+
     ui = _UI[locale]
+    name, address = operator
+    line = OPERATOR_LINE[locale].format(name=name, address=address)
+    who = f"<p class='muted faq-who'>{_e(line)}</p>" if name and address else ""
+    ask, ask_link = ASK_LINE[locale]
+    if contact_url:
+        who += (
+            f"<p class='muted faq-who'>{_e(ask)} "
+            f"<a href='{_e(contact_url)}' rel='noopener'>{_e(ask_link)}</a></p>"
+        )
     items = "".join(
         f"<details><summary>{_e(question)}</summary>"
         f"<p>{_e(answer.format(retention=retention_days))}</p></details>"
-        for question, answer in copy["faq"]
+        for question, answer in (copy["faq"][i] for i in _LANDING_FAQ[locale])
     )
     return (
         "<section class='section dark' id='faq'><div class='wrap wrap-mid'>"
         + _section_head(ui["faq_eyebrow"], f"<h2 class='h2'>{_e(copy['faq_title'])}</h2>")
-        + f"<div class='faq' data-reveal>{items}</div></div></section>"
+        + f"<div class='faq' data-reveal>{items}</div>"
+        # What Rigor does not do stays on the page whether or not "who is behind it" shows.
+        f"<p class='muted faq-not'>{_e(copy['not'])}</p>{who}"
+        f"<p class='method-link'><a href='{FAQ_PATH[locale]}'>{_e(ui['faq_more'])}"
+        f"{icon('arrow')}</a></p></div></section>"
+    )
+
+
+#: The founder's profile on X, linked from "who is behind it".
+FOUNDER_X_URL = "https://x.com/SergioVallvj"
+#: The founder's photo in ``static``. The founder adds it himself, and the photo is
+#: his approval of the block's text: until the file is there the block is not shown.
+FOUNDER_PHOTO = "fundador.jpg"
+FOUNDER_COPY: dict[str, dict[str, str]] = {
+    "es": {
+        "title": "Quién está detrás",
+        "text": (
+            "Soy {name} y hago Rigor desde México. Lo construí para responder una pregunta "
+            "antes de arriesgar dinero: cuánto de un buen backtest se distingue de la suerte. "
+            "Si tu archivo no se lee o una cifra no te cuadra, escríbeme y te respondo yo."
+        ),
+        "x": "En X",
+        "whatsapp": "Escribir por WhatsApp",
+    },
+    "en": {
+        "title": "Who is behind it",
+        "text": (
+            "I'm {name} and I build Rigor from Mexico. I built it to answer one question "
+            "before risking money: how much of a good backtest stands out from luck. If your "
+            "file does not read or a figure does not add up, write to me and I will answer "
+            "myself."
+        ),
+        "x": "On X",
+        "whatsapp": "Write on WhatsApp",
+    },
+    "pt": {
+        "title": "Quem está por trás",
+        "text": (
+            "Sou {name} e faço a Rigor no México. Eu a criei para responder uma pergunta antes "
+            "de arriscar dinheiro: quanto de um bom backtest se distingue da sorte. Se o seu "
+            "arquivo não for lido ou um número não fechar, escreva para mim e eu mesmo "
+            "respondo."
+        ),
+        "x": "No X",
+        "whatsapp": "Escrever pelo WhatsApp",
+    },
+}
+
+
+def _founder(locale: str, *, operator: tuple[str, str], contact_url: str) -> str:
+    """Who is behind Rigor, signed by the operator's name, once the founder's photo is in.
+
+    Without ``cfg.operator_name`` or without ``static/fundador.jpg`` it returns "":
+    no text, no link and no placeholder picture. What Rigor does not do
+    (``_COPY['not']``) is said under the questions, so it shows either way."""
+    name, address = operator
+    if not name or not static_ready(FOUNDER_PHOTO):
+        return ""
+    words = FOUNDER_COPY[locale]
+    links = (
+        (f"{_e(address)} · " if address else "")
+        + f"<a href='{FOUNDER_X_URL}' rel='noopener me'>{_e(words['x'])}</a>"
+        f" · <a href='{CONTACT_PATHS[locale]}'>{_e(CONTACT_COPY[locale]['eyebrow'])}</a>"
+        + (
+            f" · <a href='{_e(contact_url)}' rel='noopener'>{_e(words['whatsapp'])}</a>"
+            if contact_url
+            else ""
+        )
+    )
+    return (
+        "<section class='section light' id='quien'><div class='wrap'>"
+        "<div class='founder' data-reveal>"
+        f"<img class='founder-photo' src='/static/{FOUNDER_PHOTO}' width='88' height='88' "
+        f"alt='{_e(name)}'><div><h2>{_e(words['title'])}</h2>"
+        f"<p>{_e(words['text'].format(name=name))}</p><p class='founder-links'>{links}</p>"
+        "</div></div></div></section>"
     )
 
 
 def _final_cta(
     copy: dict[str, Any], locale: str, sample: str, *, joined: bool, err: str = ""
 ) -> str:
+    """The closing call. It keeps ``id='subir'`` so links shared as ``/#subir`` land here."""
     ui = _UI[locale]
     flash = (f"<div class='flash'>{_e(copy['joined'])}</div>" if joined else "") + err
     return (
-        "<section class='section dark' style='padding-top:0'><div class='wrap'>"
+        "<section class='section dark' id='subir' style='padding-top:0'><div class='wrap'>"
         "<div class='cta-band center' data-reveal style='max-width:900px'>"
         + _title_pair(ui["final_title"])
         + f"<p class='lead' style='margin-top:24px'>{_e(ui['final_lead'])}</p>"
@@ -2700,6 +2619,8 @@ def _final_cta(
         f"<a class='btn btn-primary btn-lg' href='{audit_path(locale)}'>{_e(ui['cta'])}"
         f"<span class='go'>{icon('arrow')}</span></a>"
         f"<a class='link-more' href='{_e(sample)}'>{_e(ui['cta_sample'])}{icon('arrow')}</a></div>"
+        f"<p class='final-tools'><a href='{_e(tools_url(locale))}'>"
+        f"{_e(ui['final_tools'])}</a></p>"
         f"<div class='news center' id='news'><p class='label'>{_e(copy['waitlist_title'])}</p>"
         f"{flash}<form class='inline-form' method='post' action='/waitlist'>"
         f"<input type='email' name='email' required maxlength='254' autocomplete='email' "
@@ -2736,10 +2657,17 @@ def landing(
 ) -> str:
     """The public landing; the upload form lives on its own page (``upload_page``).
 
-    ``extras_open`` and ``signed_in`` are accepted for old callers and not used here.
-    ``operator`` (name, address) is shown under "who is behind it" when both are set.
-    ``email_confirmation`` notes that the free first report waits for a confirmed
-    address; free mode has no such report, so the note is never shown there."""
+    It is short on purpose, for someone about to pay for a challenge or a robot: the
+    first screen, the sample's finding, who it is for, how it works, the prices, who
+    is behind it, six questions and the closing call. The institutional review and
+    the free tools stay one link away (the footer and the closing call).
+
+    ``extras_open``, ``signed_in`` and ``email_confirmation`` are accepted for old
+    callers and not used here: the first screen no longer carries the confirmation
+    note; the upload and account pages say when an address must be confirmed.
+    ``operator`` (name, address): the name signs "who is behind it" (``_founder``);
+    while that block is not shown, both stay in one line under the questions, and
+    so does the WhatsApp link (``contact_url``)."""
     locale = _locale(locale)
     copy = _COPY[locale]
     title = copy.get("meta_title", copy["title"])
@@ -2747,25 +2675,15 @@ def landing(
     sample = _sample_url(locale)
     err = f"<div class='error' role='alert'>{_e(error)}</div>" if error else ""
     count_html = completed_count_html(completed_audits, locale)
+    founder = _founder(locale, operator=operator, contact_url=contact_url)
+    # ``home`` tightens the sections' spacing on this page only.
     body = (
-        _hero(locale, sample, email_confirmation=email_confirmation and not free_mode)
+        "<div class='home'>"
+        + _hero(locale, sample, price_usd=price_usd, free_mode=free_mode)
         + ("<div class='wrap'>" + count_html + "</div>" if count_html else "")
-        + _specs(locale)
+        + _example_section(locale)
         + _audiences(locale)
-        + _tools_band(locale)
-        + "<div class='section light'><div class='wrap'>"
-        + institutional_block(locale, institutional.REVIEW_PATHS[locale])
-        + "</div></div>"
-        + _problems(locale)
-        + _dimensions(locale, copy)
         + _how_html(copy, locale)
-        + _trust(
-            locale,
-            retention_days=retention_days,
-            operator=operator,
-            contact_url=contact_url,
-            free_mode=free_mode,
-        )
         + _prices_html(
             copy,
             locale,
@@ -2777,31 +2695,19 @@ def landing(
             pack_price_usd=pack_price_usd,
             card_markets=card_markets,
         )
-        + _start_band(locale)
-        + _faq_html(copy, locale, retention_days=retention_days)
+        + founder
+        # The operator's and WhatsApp lines move into "who is behind it" when it shows.
+        + _faq_html(
+            copy,
+            locale,
+            retention_days=retention_days,
+            operator=("", "") if founder else operator,
+            contact_url="" if founder else contact_url,
+        )
         + _final_cta(copy, locale, sample, joined=joined, err=err)
+        + "</div>"
     )
     return _page(title, locale, body, meta_html=meta, alternates=LANDING_PATHS)
-
-
-def _start_band(locale: str) -> str:
-    """Where the form used to sit: what an audit gives and the button to its page.
-
-    Keeps ``id='subir'`` so links already shared as ``/#subir`` still land on a way in."""
-    ui = _UI[locale]
-    points = "".join(
-        f"<li>{icon('check')}<span>{_e(point)}</span></li>" for point in ui["upload_points"]
-    )
-    return (
-        "<section class='section light' id='subir'><div class='wrap upload'>"
-        "<div>"
-        + _section_head(ui["upload_eyebrow"], _title_pair(ui["upload_title"]), ui["upload_lead"])
-        + f"<div class='hero-cta' data-reveal><a class='btn btn-primary btn-lg' "
-        f"href='{audit_path(locale)}'>{_e(ui['cta'])}<span class='go'>{icon('arrow')}</span></a>"
-        "</div></div>"
-        + f"<div class='panel' data-reveal><ul class='checks'>{points}</ul></div>"
-        + "</div></section>"
-    )
 
 
 def upload_page(
