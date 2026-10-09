@@ -63,6 +63,7 @@ tests/test_audit_pdf_statements.py
 tests/test_audit_plan.py
 tests/test_audit_portuguese_report.py
 tests/test_audit_public.py
+tests/test_audit_public_fidelity.py
 tests/test_audit_purchase_mail.py
 tests/test_audit_reading_rules.py
 tests/test_audit_refunds.py

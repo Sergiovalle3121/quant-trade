@@ -16,7 +16,8 @@ from __future__ import annotations
 import html
 import math
 import re
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
+from datetime import date
 from typing import Any
 from urllib.parse import parse_qsl, quote, urlencode, urlsplit, urlunsplit
 
@@ -417,6 +418,10 @@ LABELS: dict[str, dict[str, str]] = {
         ),
         "generated": "Generada",
         "audit_id": "Identificador",
+        "data_period": "Datos",
+        "data_age": "{days} días entre el último dato y esta auditoría",
+        "data_age_one": "1 día entre el último dato y esta auditoría",
+        "data_age_account": "Lo que pasó después del último dato no está en este archivo.",
         "inputs": "Archivos auditados (sha256)",
         "verdict": "Veredicto",
         "dimensions": "Dimensiones",
@@ -1789,6 +1794,10 @@ LABELS: dict[str, dict[str, str]] = {
         ),
         "generated": "Generated",
         "audit_id": "Identifier",
+        "data_period": "Data",
+        "data_age": "{days} days between the last data point and this audit",
+        "data_age_one": "1 day between the last data point and this audit",
+        "data_age_account": "What happened after the last data point is not in this file.",
         "inputs": "Audited files (sha256)",
         "verdict": "Verdict",
         "dimensions": "Dimensions",
@@ -7454,6 +7463,26 @@ def report_kind(data: dict[str, Any]) -> str:
     return "account" if is_account_history(data) else "backtest"
 
 
+def data_age_days(data: Mapping[str, Any]) -> int | None:
+    """Whole days between the last data point and the audit date.
+
+    Read from ``inputs.last_timestamp`` and ``generated_at_utc`` (calendar
+    dates, UTC), so the private report and the public page give the same
+    figure. ``None`` when either is missing or unreadable, or when the last
+    data point is dated after the audit."""
+    last = (data.get("inputs") or {}).get("last_timestamp")
+    audited = data.get("generated_at_utc")
+    try:
+        days = (date.fromisoformat(str(audited)[:10]) - date.fromisoformat(str(last)[:10])).days
+    except ValueError:
+        return None
+    return days if days >= 0 else None
+
+
+def _data_age_text(days: int, labels: dict[str, str]) -> str:
+    return labels["data_age_one"] if days == 1 else labels["data_age"].format(days=days)
+
+
 def _title(data: dict[str, Any], labels: dict[str, str]) -> str:
     """The report's name: a fund's track record, an account history or a backtest."""
     key = {"fund": "title_fund", "account": "title_account"}.get(report_kind(data), "title")
@@ -8360,11 +8389,28 @@ def render_html(
         "</header>"
     )
     engine = data["engine"]
+    # Which dates the file covers and how old its last point was on the audit
+    # date: a history that stops months before the audit says nothing about
+    # those months.
+    first_day = str(data["inputs"].get("first_timestamp") or "")[:10]
+    last_day = str(data["inputs"].get("last_timestamp") or "")[:10]
+    age = data_age_days(data)
     meta = (
         f"<span>{_e(labels['audit_id'])} {_e(data['audit_id'])}</span>"
         f"<span>{_e(labels['generated'])} {_e(_short_time(data['generated_at_utc']))}</span>"
-        f"<span class='meta-x'>{_e(labels['engine'])} {_e(engine['package_version'])}</span>"
+        + (
+            f"<span>{_e(labels['data_period'])} {_e(first_day)} → {_e(last_day)}</span>"
+            if first_day and last_day
+            else ""
+        )
+        + (f"<span>{_e(_data_age_text(age, labels))}</span>" if age is not None else "")
+        + f"<span class='meta-x'>{_e(labels['engine'])} {_e(engine['package_version'])}</span>"
         f"<span class='meta-x'>{_e(labels['seed'])} {_e(engine['seed'])}</span>"
+    )
+    stale_account = (
+        f"<p class='muted data-age-note'>{_e(labels['data_age_account'])}</p>"
+        if age is not None and age > 30 and report_kind(data) == "account"
+        else ""
     )
     live_anchor = next(
         (f"r-d{i}" for i, (title, _) in enumerate(detail, 1) if title == labels["live"]), ""
@@ -8386,6 +8432,7 @@ def render_html(
         + class_ring(str(verdict["overall"]), size="lg")
         + f"<div><div class='verdict-k'>{_e(labels['verdict'])}</div>"
         + _verdict_html(str(verdict["summary"]))
+        + stale_account
         + ("" if locked else _hero_live(data, labels, live_anchor))
         + f"<p class='muted evidence-legend'>{_e(labels['evidence_legend'])}</p>"
         + "</div></div>"

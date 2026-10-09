@@ -163,12 +163,21 @@ with Inkscape; no rasterizer is installed or started by the command.
 
 Published verifications also expose `/v/{public_id}/card.svg`, using only
 class, audit date, public ID and fixed copy from the verification allow-list.
+The class sentence follows `report_kind` (`class_text(overall, locale,
+kind=...)`), so an account history or a fund reads its own C and D wording;
+the kind ("what was audited") and the data period's first and last dates go
+only in the SVG's `<desc>`.
 Their per-publication Open Graph/Twitter image URL is
-`/v/{public_id}/card.png`; it serves the existing class PNG for compatibility
-with image consumers, without a runtime rasterizer. It contains the class
-and fixed notice; the SVG additionally shows date and ID. The Portuguese
-PNG retains the existing English class-asset fallback; the SVG is Portuguese.
-Both image routes
+`/v/{public_id}/card.png`. For a backtest it serves the existing class PNG for
+compatibility with image consumers, without a runtime rasterizer. It contains
+the class and fixed notice; the SVG additionally shows date and ID. The
+Portuguese PNG retains the existing English class-asset fallback; the SVG is
+Portuguese. The static class PNGs call the upload a backtest, so for an
+account history or a fund's track record `card.png` renders the SVG above
+with `raster.card_png` (optional CairoSVG, the render kept in a bounded
+in-process cache) and, when no renderer is available, serves the site's
+generic card (`og_image_name("", locale)`), which has no class sentence. The
+cache headers are the same in every case. Both image routes
 use the page's publication gate. As required by `AGENTS.md`, a published
 verification survives retention purge; a missing retained view returns 410,
 and a withdrawn publication returns 404. This deliberately follows the
@@ -3280,16 +3289,48 @@ customers" without any third-party analytics.
 The owner of an audit (whoever holds its token) can publish it. The page at
 `/v/{public_id}` uses a random id unrelated to the audit id and shows only:
 the class and its fixed one-line explanation, the audit and publication
-dates, the six dimension statuses with their plain-language text, the input
-hashes and `dataset_digest`, the source format, the engine version, the
-declared trials and the trials used, the SHA-256 of the result, and a fixed
-notice. It never shows the files, the trades, the description or the token.
+dates, what was audited, the data period, the days between the last data
+point and the audit, the six dimension statuses with their plain-language
+text, the input hashes and `dataset_digest`, the source format, the engine
+version, the declared trials and the trials used, the SHA-256 of the result,
+and a fixed notice. It never shows the files, the trades, the description or
+the token, and never a return, Sharpe, drawdown or other result figure.
+
+The kind of upload (`report_kind`: backtest, account history or fund's track
+record) is read once and drives the class sentence (`class_text(..., kind=)`),
+the dimension cards (`meaning(..., account=, fund=)`, for example
+`costs.FAIL.account` and `out_of_sample.NOT_MEASURED.account`) and the share
+text, so an account's page never calls it a backtest. The details table (still
+the page's second and last `<table class='kv'>`) gains three rows:
+
+- "Qué se auditó" / "What was audited" / "O que foi auditado": Backtest,
+  "Historial de cuenta real o demo" / "Live or demo account history" /
+  "Histórico de conta real ou demo", or "Historial de un fondo" / "A fund's
+  track record" / "Histórico de um fundo".
+- "Periodo de los datos" / "Data period" / "Período dos dados": first and last
+  dates (`inputs.first_timestamp`, `inputs.last_timestamp`), the sampling
+  frequency (`inputs.frequency_label`, in the report's `FREQUENCY_TEXT`), the
+  number of observations and, when the upload has trades, the trade count
+  (`trade_stats.trade_count`), the counts with their evidence badge.
+- "Días entre el último dato y la auditoría" / "Days between the last data
+  point and the audit" / "Dias entre o último dado e a auditoria": calendar
+  days from the last data point to the audit date (`report.data_age_days`),
+  with the `MEASURED` badge.
+
+When the trials used carry `NOT_MEASURED` (never declared, computed at 1),
+that row shows "—", its badge and "sin declarar; se calcula con 1, el caso
+más favorable" instead of "1". A view kept before these rows existed has no
+dates or counts, and the page leaves those rows out.
+
 The retention purge does not take a published page down: for a published
 unpaid audit it keeps, in the `publication_views` table, only the fields the
 page reads (class, dimension statuses, input hashes, source format, engine
-name and version, declared and used trials, the audit date, and whether it is
-a fund track record, a single boolean) and the SHA-256 of the full result, so the page, its result hash and an embedded badge stay
-exactly as they were. The description, client text findings, series,
+name and version, declared and used trials, the audit date, whether it is a
+fund track record, a single boolean, the first and last timestamps, the
+number of observations with its evidence tag, the frequency label and
+`trade_stats.trade_count` with its evidence tag, a count and never the
+trades) and the SHA-256 of the full result, so the page, its result hash and
+an embedded badge stay exactly as they were. The description, client text findings, series,
 trades, statistics and files are deleted as for any other audit. The page
 goes away (404) when the owner unpublishes it (the private link still works
 for `unpublish` after the purge), when the operator runs
@@ -3309,6 +3350,16 @@ certificates in product listings, so the badge is for the seller's own site,
 Telegram, forums and videos. The guard refuses "verificado", "certificado",
 "aprobado", "pasarás", "certified", "approved" and "verified track record"
 unless directly negated, which is what lets the fixed wording through.
+
+The private report's hero also states the data period ("Datos" / "Data" /
+"Dados", first → last date) and the days between the last data point and the
+audit (`data_age`, in the singular for one day). An account history whose last
+point is more than 30 days before the audit adds under the verdict: "Lo que
+pasó después del último dato no está en este archivo." / "What happened after
+the last data point is not in this file." / "O que aconteceu depois do último
+dado não está neste arquivo." The data-quality `WEAK` sentence now points to
+the full report's warnings instead of the red flags and vendor questions,
+which `/v` does not show.
 
 ### File consistency page (`audit/forensics_web.py`, behind a switch)
 
@@ -3889,7 +3940,7 @@ Redesign pass 56 opens the PDF on a one-page summary (`_pdf_cover` in `report.py
 
 Redesign pass 58 styles "Mis estrategias". On the account page each strategy is a card with its latest class, name and version count; on a phone the count goes under the name and "Ver estrategia" spans the card. On a strategy's page the version table uses tabular figures, its "Quitar de la estrategia" buttons sit quietly at the right, and on a phone each version becomes a card with every figure under its column name (`data-label`). In "Qué cambió" each line ends in a chip coloured by its meaning only: green for "mejor", red for "peor", grey for "cambió", "igual" or "sin cambio claro". The wording and the rules behind each word are unchanged.
 
-Pass 56 also gives each shared link its own preview card (`tools/make_og_images.py`, `OG_KINDS` in `seo.py`, 1200x630, about 25 KB each, served from `/static/`). A published verification page (`/v/...`) shows the card for its class: the class ring, its fixed sentence and the fixed notice, nothing from the file. The sample shows a class C card marked as synthetic data, and each audience page shows its own title. The cards are static files in the package, so a preview makes no outside call and nothing about a client's report is ever drawn on one. Unknown kinds fall back to the site card.
+Pass 56 also gives each shared link its own preview card (`tools/make_og_images.py`, `OG_KINDS` in `seo.py`, 1200x630, about 25 KB each, served from `/static/`). A published verification page (`/v/...`) of a backtest shows the card for its class: the class ring, its fixed sentence and the fixed notice, nothing from the file. An account history or a fund's track record draws its own card instead, or the site card without a renderer (see `/v/{public_id}/card.png` above), because the class cards say "backtest". The sample shows a class C card marked as synthetic data, and each audience page shows its own title. The cards are static files in the package, so a preview makes no outside call and nothing about a client's report is ever drawn on one. Unknown kinds fall back to the site card.
 
 Pass 56 also turns the prop-firm simulator table (`table.timing.firms`) into one card per challenge on a phone, each figure labelled: its four columns were 436 px wide on a 390 px screen and made the report pan sideways.
 

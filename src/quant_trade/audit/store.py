@@ -6094,8 +6094,12 @@ def public_view(result_json: str) -> tuple[dict[str, Any], str]:
     """The allow-listed fields the public verification page reads, and the
     SHA-256 of the full result it came from.
 
-    Nothing else survives: no description, no client text findings, no
-    series, trades, statistics or files.
+    The page also says what was audited and over which dates, so the view
+    keeps the first and last timestamps, the number of observations (with
+    its evidence tag), the sampling frequency and the trade count (with its
+    evidence tag, ``trade_stats.trade_count`` only). Nothing else survives: no
+    description, no client text findings, no series, trades, other
+    statistics or files.
     """
     result = AuditResult.model_validate_json(result_json)
     data = result.model_dump(mode="json")
@@ -6126,7 +6130,16 @@ def public_view(result_json: str) -> tuple[dict[str, Any], str]:
         },
         "inputs": {
             key: inputs[key]
-            for key in ("digests", "dataset_digest", "source_format", "source")
+            for key in (
+                "digests",
+                "dataset_digest",
+                "source_format",
+                "source",
+                "first_timestamp",
+                "last_timestamp",
+                "observations",
+                "frequency_label",
+            )
             if key in inputs
         }
         | {"source_is_pdf": source_is_pdf},
@@ -6134,6 +6147,8 @@ def public_view(result_json: str) -> tuple[dict[str, Any], str]:
         "fund": {"track_record": bool((data.get("fund") or {}).get("track_record"))},
         "declared": {"trials": data.get("declared", {}).get("trials")},
         "multiplicity": {"trials_used": data.get("multiplicity", {}).get("trials_used")},
+        # A count, never the trades themselves.
+        "trade_stats": {"trade_count": (data.get("trade_stats") or {}).get("trade_count")},
     }
     digest = sha256_of_text(canonical_dumps(data))
     return view, digest

@@ -21,6 +21,7 @@ cacheable. ``/ejemplo`` and ``/sample`` serve a full report of synthetic data.
 import base64
 import contextlib
 import dataclasses
+import functools
 import hashlib
 import hmac
 import ipaddress
@@ -49,6 +50,7 @@ from quant_trade.audit import (
     mapping,
     owner_card,
     payments,
+    raster,
     reading,
     reading_png,
     track_seal_pages,
@@ -148,7 +150,7 @@ from quant_trade.audit.portuguese import MESSAGES_PT, link_locale
 from quant_trade.audit.pricing import PRICING_PATH, pricing_page
 from quant_trade.audit.prop_presets import DEFAULT_PRESET
 from quant_trade.audit.public_card import public_card_svg
-from quant_trade.audit.report import render, result_sha256
+from quant_trade.audit.report import render, report_kind, result_sha256
 from quant_trade.audit.retention import RetentionWorker
 from quant_trade.audit.return_series import is_return_series
 from quant_trade.audit.sample import sample_result
@@ -6041,15 +6043,33 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         )
         return Response(content=svg, media_type="image/svg+xml")
 
+    @functools.lru_cache(maxsize=64)
+    def _verification_png(svg: str) -> bytes | None:
+        """The raster of a verification card; the same publication and language
+        always give the same SVG, so a render is kept (bounded) instead of being
+        redone for every crawler."""
+        return raster.card_png(svg)
+
     @app.get("/v/{public_id}/card.png")
     def verification_card_png(public_id: str, lang: str | None = None) -> Response:
-        # Social crawlers need a raster image. The existing class card contains
-        # fixed copy only; the SVG above also carries the audit date and public id.
-        _, _, data, _ = _published(public_id)
+        # Social crawlers need a raster image. A backtest serves the static card
+        # of its class (fixed copy only). Those cards call the upload a
+        # backtest, so an account history or a fund's track record draws the
+        # SVG above (its own class sentence, date and public id) when the
+        # optional renderer is available, and otherwise serves the site's
+        # generic card, which carries no class sentence.
+        publication, _, data, _ = _published(public_id)
         overall = str(data["verdict"]["overall"])
         if overall not in ("A", "B", "C", "D"):
             raise _not_found()
-        return static(og_image_name(f"class-{overall}", _report_locale(lang)))
+        locale = _report_locale(lang)
+        if report_kind(data) in ("account", "fund"):
+            svg = verification_card_svg(data, public_id=publication.public_id, locale=locale)
+            png = _verification_png(svg)
+            if png is not None:
+                return Response(content=png, media_type="image/png")
+            return static(og_image_name("", locale))
+        return static(og_image_name(f"class-{overall}", locale))
 
     @app.get("/v/{public_id}", response_class=HTMLResponse)
     def verification(request: Request, public_id: str, lang: str | None = None) -> str:
