@@ -57,9 +57,24 @@ def test_static_route_serves_only_the_allow_list(tmp_path: Path) -> None:
 
 
 def test_script_never_sends_anything_anywhere() -> None:
+    """The script contacts no one: its only request is the upload form posting
+    to its own action on this origin (the in-place upload, PR 469), which the
+    CSP's ``connect-src 'self'`` also enforces. The HTML it inserts is the
+    server's own escaped answer to that post, nothing else."""
+    from quant_trade.audit.web import CONTENT_SECURITY_POLICY
+
     script = (STATIC_DIR / "app.js").read_text()
-    for word in ("fetch(", "XMLHttpRequest", "sendBeacon", "WebSocket", "eval(", "innerHTML"):
+    for word in ("XMLHttpRequest", "sendBeacon", "WebSocket", "eval(", "new Function"):
         assert word not in script, word
+    assert script.count("fetch(") == 1
+    assert "fetch(form.action, {" in script and 'credentials: "same-origin"' in script
+    assert "connect-src 'self'" in CONTENT_SECURITY_POLICY
+    assert "script-src 'self'" in CONTENT_SECURITY_POLICY
+    assert "'unsafe-inline'" not in CONTENT_SECURITY_POLICY.split("script-src", 1)[1].split(";")[0]
+    # HTML goes into the page only from that answer's two server-built fields.
+    assert script.count("innerHTML") == 1 and "fields.innerHTML = json.fields_html;" in script
+    assert script.count("insertAdjacentHTML") == 1
+    assert 'alertBox.insertAdjacentHTML("beforeend", guidance)' in script
 
 
 def test_pages_use_self_hosted_fonts_and_no_third_party() -> None:
