@@ -95,6 +95,7 @@ REF_TAGS: dict[str, str] = {
     "youtube": "YouTube",
     "x": "X (Twitter)",
     "share": "Verificación pública compartida",
+    "vendedor": "Mensaje al vendedor (informe de un comprador)",
     "ejemplos": "Ejemplos de cifras públicas",
     "lectura": "Lector de cifras compartido",
     "calculadora": "Calculadora de suerte compartida",

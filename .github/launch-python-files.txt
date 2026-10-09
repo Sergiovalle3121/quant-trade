@@ -29,6 +29,7 @@ src/quant_trade/audit/report.py
 src/quant_trade/audit/report_pt.py
 src/quant_trade/audit/sample.py
 src/quant_trade/audit/schema.py
+src/quant_trade/audit/seller_message.py
 src/quant_trade/audit/settings.py
 src/quant_trade/audit/sharing.py
 src/quant_trade/audit/store.py
@@ -76,6 +77,7 @@ tests/test_audit_reading_rules.py
 tests/test_audit_refunds.py
 tests/test_audit_report.py
 tests/test_audit_schema.py
+tests/test_audit_seller_message.py
 tests/test_audit_settings.py
 tests/test_audit_share_funnel.py
 tests/test_audit_sharing.py
