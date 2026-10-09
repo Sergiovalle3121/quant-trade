@@ -651,8 +651,8 @@ def change_summary(
     for issue in diagnostic.issues:
         text = REASONS[locale][issue.code]
         if issue.report is not None:
-            shown = numbers[issue.report - 1] if numbers else issue.report
-            text = f"{copy['report'].format(n=shown)}: {text}"
+            number = numbers[issue.report - 1] if numbers else issue.report
+            text = f"{copy['report'].format(n=number)}: {text}"
         if issue.metric is not None:
             closed = _mapping(a.get("inputs")).get("balance_only") is True
             label = (
