@@ -31,7 +31,7 @@ from quant_trade.audit.compare import (  # noqa: E402
 )
 from quant_trade.audit.guard import find_claims  # noqa: E402
 from quant_trade.audit.pages import PAGE_DESCRIPTIONS  # noqa: E402
-from quant_trade.audit.report import LABELS, _dimension_title  # noqa: E402
+from quant_trade.audit.report import LABELS, _dimension_title, evidence_label  # noqa: E402
 from quant_trade.audit.sample import sample_result  # noqa: E402
 from quant_trade.audit.settings import PACK_CREDITS, AuditSettings  # noqa: E402
 from quant_trade.audit.store import make_store  # noqa: E402
@@ -64,7 +64,12 @@ def _stored() -> dict[str, Any]:
 
 
 def _two_columns(a: dict[str, Any], b: dict[str, Any], href_a: str, href_b: str, locale: str):
-    """The two-report body exactly as it was built before three were possible."""
+    """The two-report body exactly as it was built before three were possible.
+
+    The figure cells come from ``_kpi_cells``, whose break-even row changed on
+    purpose with the three columns: one fixed name, the pips inside each cell
+    (see ``test_the_break_even_is_one_row_whatever_pips_each_report_shows``).
+    """
     copy, labels = COPY[locale], LABELS[locale]
     head = (
         "<div class='cmp-head'>"
@@ -165,6 +170,77 @@ def test_a_figure_is_different_unless_it_is_the_same_in_all_three(locale: str) -
     assert body.count("class='cmp-card'") == 3 and "<div class='cmp-head cmp3'>" in body
     assert body.count("<div class='cmp-scroll'><table class='cmp cmp3'>") == 2
     assert find_claims(body) == []
+
+
+def _costs(bps: float, pips: float | None, tag: str = "MEASURED") -> dict[str, Any]:
+    return {
+        "break_even_bps": {"evidence": "MEASURED", "value": bps},
+        "break_even_pips": (
+            {"evidence": tag, "value": pips}
+            if pips is not None
+            else {"evidence": "NOT_MEASURED", "value": None}
+        ),
+        "reference_bps": {"evidence": "DECLARED", "value": 1.0},
+    }
+
+
+def _breakeven_rows(body: str, locale: str) -> list[str]:
+    figures = body.rsplit("<table class='cmp", 1)[1]
+    return re.findall(rf"<tr><td>{re.escape(LABELS[locale]['kpi_breakeven'])} \(", figures)
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+def test_the_break_even_is_one_row_whatever_pips_each_report_shows(locale: str) -> None:
+    labels = LABELS[locale]
+    row = f"{labels['kpi_breakeven']} ({labels['bps_side']})"
+    measured = evidence_label("MEASURED", locale)
+    # Three robots on three pairs: the same 8.00 bp, a pip of another scale on each.
+    a, b, c = _stored(), _stored(), _stored()
+    for result, pips in ((a, 12.3), (b, 4.1), (c, None)):
+        result["costs"] = _costs(8.0, pips)
+    before = deepcopy((a, b, c))
+    body = comparison_body([a, b, c], hrefs=["/a", "/b", "/c"], locale=locale)
+    assert (a, b, c) == before
+    assert len(_breakeven_rows(body, locale)) == 1 and "pips)" not in body
+    cells = _figure_row(body, row)
+    assert len(cells) == 3
+    for cell, shown in zip(cells, ("8.00 · 12.3 pips", "8.00 · 4.1 pips", "8.00"), strict=True):
+        assert f"<span>{shown}</span>" in cell
+        assert f"class='badge MEASURED'>{measured}</span>" in cell
+        assert "NOT_MEASURED" not in cell
+    # The pips differ, so the row is marked; the same pips in all three are not.
+    assert all(cell.startswith("<td class=diff>") for cell in cells)
+    c["costs"] = _costs(8.0, 4.1)
+    a["costs"] = _costs(8.0, 4.1)
+    same = _figure_row(comparison_body([a, b, c], hrefs=["/a", "/b", "/c"], locale=locale), row)
+    assert not any("diff" in cell for cell in same)
+    # Two reports of one pair whose break-even moved share the row too.
+    a["costs"], b["costs"] = _costs(8.0, 12.3), _costs(3.5, 5.4)
+    two = comparison_body([a, b], hrefs=["/a", "/b"], locale=locale)
+    assert len(_breakeven_rows(two, locale)) == 1
+    left, right = _figure_row(two, row)
+    assert "<span>8.00 · 12.3 pips</span>" in left and "<span>3.50 · 5.4 pips</span>" in right
+    assert "NOT_MEASURED" not in left + right
+    assert find_claims(html.unescape(body)) == [] and find_claims(html.unescape(two)) == []
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+def test_a_break_even_already_negative_shares_the_row_with_the_others(locale: str) -> None:
+    labels = LABELS[locale]
+    row = f"{labels['kpi_breakeven']} ({labels['bps_side']})"
+    a, b, c = _stored(), _stored(), _stored()
+    a["costs"] = _costs(-2.0, None)
+    b["costs"] = _costs(8.0, 1.2, tag="DECLARED")  # a JPY pair: a pip of another scale
+    # The third report has no costs section: only it is not measured.
+    body = comparison_body([a, b, c], hrefs=["/a", "/b", "/c"], locale=locale)
+    assert len(_breakeven_rows(body, locale)) == 1
+    first, second, third = _figure_row(body, row)
+    negative = html.escape(f"0 · {labels['kpi_breakeven_negative']}")
+    assert f"<span>{negative}</span>" in first and "class='badge MEASURED'" in first
+    assert "<span>8.00 · 1.2 pips</span>" in second and "class='badge DECLARED'" in second
+    assert "<span>—</span>" in third and "class='badge NOT_MEASURED'" in third
+    assert "-2.00" not in body
+    assert find_claims(html.unescape(body)) == []
 
 
 @pytest.mark.parametrize("locale", LOCALES)

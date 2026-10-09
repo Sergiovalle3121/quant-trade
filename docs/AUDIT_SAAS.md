@@ -968,9 +968,18 @@ has a small form that fills in its own link (the second field only). Rules:
 - only paid reports (or any report in free mode) can be compared: if any of
   the two or three is locked the answer is the same 402 and no figure is
   shown;
-- with two reports the body is byte for byte the two-column one it was
-  (`tests/test_audit_compare_three.py` rebuilds the old layout and compares);
-  with three the cards, the dimension table and the figure table get a third
+- the break-even row has one fixed name in every report, "Costo extra que lo
+  lleva a cero (pb por lado)" (`compare._breakeven_row`), and each cell carries
+  that report's own detail (`compare._breakeven_cell`): "8.00 · 12.3 pips" (a
+  JPY pair's pip is another scale), "8.00" without pips, or "0 · ya pierde sin
+  costo extra" when the report already loses before any extra cost, with the
+  evidence of every number the cell shows. The report tile's name carries the
+  pips; used as the row's key it split the row in one per report and tagged
+  "No medido" figures that were measured;
+- with two reports the body is otherwise byte for byte the two-column one it
+  was (`tests/test_audit_compare_three.py` rebuilds the old layout and
+  compares; the break-even row above is the one deliberate change); with
+  three the cards, the dimension table and the figure table get a third
   column (`cmp3`; three cards in a row above 860 px, stacked below, and the
   tables scroll inside their box on a narrow phone), and the page title is
   "Tres informes, lado a lado";

@@ -389,8 +389,34 @@ def _combined_evidence(*blocks: Any) -> str:
     return "DECLARED" if "DECLARED" in tags else "MEASURED"
 
 
+def _breakeven_row(labels: dict[str, str]) -> str:
+    """The break-even's row: one fixed name, so every report lands on it."""
+    return f"{labels['kpi_breakeven']} ({labels['bps_side']})"
+
+
+def _breakeven_cell(costs: Mapping[str, Any], labels: dict[str, str]) -> tuple[str, str]:
+    """``(shown, evidence)`` of one report's break-even, its pips inside the cell.
+
+    The pips depend on the pair (a JPY pip is another scale), so they belong
+    to the report, not to the row's name: a name with the number in it split
+    the row in one per report and marked as not measured a figure that was.
+    """
+    bps, pips = costs["break_even_bps"], costs["break_even_pips"]
+    if bps["value"] <= 0:
+        # Negative already before any extra cost: the row's 0, and why.
+        return f"0 · {labels['kpi_breakeven_negative']}", _combined_evidence(bps)
+    if pips["value"] is None:
+        return f"{bps['value']:,.2f}", _combined_evidence(bps)
+    shown = f"{bps['value']:,.2f} · {pips['value']:,.1f} pips"
+    return shown, _combined_evidence(bps, pips)
+
+
 def _kpi_cells(data: dict[str, Any], labels: dict[str, str]) -> dict[str, tuple[str, str]]:
-    """Preserve the evidence of every numeric source used in a displayed figure."""
+    """Preserve the evidence of every numeric source used in a displayed figure.
+
+    Every row is keyed by a fixed name, never by a number one report shows,
+    so the same figure of two or three reports always shares one row.
+    """
     display = _display_data(data)
     perf, stats, costs = (display[name] for name in ("performance", "trade_stats", "costs"))
     closed = display["inputs"]["balance_only"]
@@ -409,24 +435,17 @@ def _kpi_cells(data: dict[str, Any], labels: dict[str, str]) -> dict[str, tuple[
         )
     }
     sources[labels["kpi_trades"]] = _combined_evidence(stats["trade_count"], stats["win_rate"])
-    bps, pips = costs["break_even_bps"], costs["break_even_pips"]
-    if bps["value"] is not None:
-        label = f"{labels['kpi_breakeven']} ({labels['kpi_breakeven_negative']})"
-        blocks = [bps]
-        if bps["value"] > 0:
-            label = f"{labels['kpi_breakeven']} ({labels['bps_side']})"
-            if pips["value"] is not None:
-                label = (
-                    f"{labels['kpi_breakeven']} ({labels['bps_side']}; {pips['value']:,.1f} pips)"
-                )
-                blocks.append(pips)
-        sources[label] = _combined_evidence(*blocks)
     for section, key in (("trades", "kpi_stress"), ("returns", "kpi_stress_curve")):
         rows = display["stress"][section]["rows"]
         sources[labels[key]] = _combined_evidence(rows[0]["result"]) if rows else "NOT_MEASURED"
+    breakeven = labels["kpi_breakeven"] + " ("
     cells = {}
     for label, shown, _ in _kpi_list(display, labels):
-        tag = sources.get(label, "NOT_MEASURED")
+        if label.startswith(breakeven):
+            # The tile's name carries the pips; the row keeps a fixed one.
+            label, (shown, tag) = _breakeven_row(labels), _breakeven_cell(costs, labels)
+        else:
+            tag = sources.get(label, "NOT_MEASURED")
         cells[label] = (shown if tag != "NOT_MEASURED" else "—", tag)
     for key in ("kpi_sharpe", "kpi_drawdown_closed" if closed else "kpi_drawdown"):
         cells.setdefault(labels[key], ("—", "NOT_MEASURED"))

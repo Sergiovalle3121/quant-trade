@@ -125,16 +125,17 @@ def test_break_even_evidence_includes_pips_only_when_that_number_is_displayed(
             "break_even_pips": {"evidence": "DECLARED", "value": 1.5},
             "reference_bps": {"evidence": "DECLARED", "value": 2.0},
         }
-    label = LABELS[locale]["kpi_breakeven"]
-    label += (
-        f" ({LABELS[locale]['bps_side']}; 1.5 pips)"
-        if bps > 0
-        else f" ({LABELS[locale]['kpi_breakeven_negative']})"
-    )
+    # One fixed row name; the pips (or why it is 0) go in each report's cell.
+    label = f"{LABELS[locale]['kpi_breakeven']} ({LABELS[locale]['bps_side']})"
+    shown = "5.00 · 1.5 pips" if bps > 0 else f"0 · {LABELS[locale]['kpi_breakeven_negative']}"
     original = deepcopy((a, b))
     body = comparison_body([a, b], hrefs=["/synthetic-a", "/synthetic-b"], locale=locale)
-    for cell in _figure_cells(body, label):
+    cells = _figure_cells(body, label)
+    assert len(cells) == 2
+    for cell in cells:
         _assert_badge(cell, expected, locale)
+        assert f"<span>{escape(shown)}</span>" in cell
+    assert "pips)" not in body and find_claims(unescape(body)) == []
     assert (a, b) == original
 
 
