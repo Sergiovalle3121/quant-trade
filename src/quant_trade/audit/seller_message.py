@@ -5,8 +5,9 @@ copy into the MQL5 or Telegram chat, with the key figures and the costs in
 pips". When the client declared "La compré o la voy a comprar / copiar"
 (``ownership.BUYER``), the questions section of the full report ends with a
 plain text built from the report's own data only (``report._seller_message``):
-a neutral greeting, the class and the dimensions that do not pass, two to four
-key figures with their evidence tag in words, the open questions numbered, the
+a neutral greeting, the class, the dimensions that do not pass and those not
+measured, two to four key figures with their evidence tag in words (summary
+tiles complete them when the files gave fewer), the open questions numbered, the
 public page's link when the report is published and "Informe hecho con Rigor
 (rigorscore.com)". The copy button is the site's ``data-copy`` button
 (``static/app.js``), so no new script is needed.
@@ -32,6 +33,11 @@ MAX_CHARS = 4000
 REF = "vendedor"
 #: The id of the text the copy button copies.
 TEXT_ID = "seller-message-text"
+#: Key figures in the message: at least this many measured or declared ones
+#: (summary tiles complete them) ...
+MIN_FIGURES = 2
+#: ... and at most this many lines, "not measured" ones included.
+MAX_FIGURES = 4
 
 
 def _say(es: str, en: str, pt: str) -> dict[str, str]:
@@ -65,6 +71,7 @@ COPY: dict[str, dict[str, str]] = {
         "class": "Clase del informe: {cls} (A es la más alta, D la más baja).",
         "dimensions": "Dimensiones que no superan: {items}.",
         "dimensions_none": "Dimensiones que no superan: ninguna.",
+        "unmeasured": "Dimensiones sin medir: {items}.",
         "figures": "Cifras clave:",
         "questions": "Preguntas:",
         "trimmed": "Quedan {n} preguntas más en el informe.",
@@ -73,6 +80,7 @@ COPY: dict[str, dict[str, str]] = {
         "public": "Informe público: {url}",
         "made": "Informe hecho con Rigor (rigorscore.com)",
         "not_measured": "no medido",
+        "dd_platform": "Drawdown con operaciones abiertas, según el informe de la plataforma",
     },
     "en": {
         "title": "Message for the seller",
@@ -96,6 +104,7 @@ COPY: dict[str, dict[str, str]] = {
         "class": "Report class: {cls} (A is the highest, D the lowest).",
         "dimensions": "Dimensions that do not pass: {items}.",
         "dimensions_none": "Dimensions that do not pass: none.",
+        "unmeasured": "Dimensions not measured: {items}.",
         "figures": "Key figures:",
         "questions": "Questions:",
         "trimmed": "{n} more questions are in the report.",
@@ -104,6 +113,7 @@ COPY: dict[str, dict[str, str]] = {
         "public": "Public report: {url}",
         "made": "Report made with Rigor (rigorscore.com)",
         "not_measured": "not measured",
+        "dd_platform": "Drawdown with open trades, per the platform's report",
     },
     "pt": {
         "title": "Mensagem para o vendedor",
@@ -129,6 +139,7 @@ COPY: dict[str, dict[str, str]] = {
         "class": "Classe do relatório: {cls} (A é a mais alta, D a mais baixa).",
         "dimensions": "Dimensões que não passam: {items}.",
         "dimensions_none": "Dimensões que não passam: nenhuma.",
+        "unmeasured": "Dimensões não medidas: {items}.",
         "figures": "Números-chave:",
         "questions": "Perguntas:",
         "trimmed": "Há mais {n} perguntas no relatório.",
@@ -137,6 +148,7 @@ COPY: dict[str, dict[str, str]] = {
         "public": "Relatório público: {url}",
         "made": "Relatório feito com o Rigor (rigorscore.com)",
         "not_measured": "não medido",
+        "dd_platform": "Drawdown com operações abertas, segundo o relatório da plataforma",
     },
 }
 
@@ -229,6 +241,8 @@ def chat_length(text: str) -> int:
 __all__ = [
     "COPY",
     "MAX_CHARS",
+    "MAX_FIGURES",
+    "MIN_FIGURES",
     "REF",
     "SELLER_ASK",
     "TEXT_ID",

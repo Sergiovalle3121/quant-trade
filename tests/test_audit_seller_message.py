@@ -2,7 +2,8 @@
 
 With "La compré o la voy a comprar / copiar" declared, the questions section
 ends with a plain text for the seller: the class, the dimensions that do not
-pass, two to four key figures with their evidence tag in words, the open
+pass and those not measured, two to four key figures with their evidence tag
+in words (at least two measured or declared ones), the open
 questions numbered and, when the report is published, its public page. It is
 built from the report alone, stays under Telegram's limit, uses the site's
 copy button, and no other voice, the locked preview or the PDF shows it.
@@ -26,9 +27,11 @@ from quant_trade.audit.analytics import _QUESTIONS
 from quant_trade.audit.engine import UNDECLARED_TRIALS, run_audit
 from quant_trade.audit.guard import find_claims
 from quant_trade.audit.live import MIN_LIVE_TRADES
+from quant_trade.audit.period_analysis import REASONS as PERIOD_REASONS
 from quant_trade.audit.report import render_html
 from quant_trade.audit.schema import AuditResult, DeclaredMetadata, build_inputs, declared
 from quant_trade.audit.theme import PRINT, STYLE
+from quant_trade.audit.verdict import DIMENSION_ORDER
 
 LOCALES = ("es", "en", "pt")
 NOW = datetime(2026, 1, 1, tzinfo=UTC)
@@ -42,6 +45,32 @@ MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", 
 
 def _text(page: str) -> str:
     return re.sub(r"\s+", " ", html.unescape(re.sub(r"<[^>]+>", " ", page)))
+
+
+def _lower(name: str) -> str:
+    return name[:1].lower() + name[1:]
+
+
+def _carrying(figures: list[str], locale: str) -> list[str]:
+    """The figure lines that carry a measured or declared figure (by their last
+    tag): a "not measured" line is not one of the two to four figures."""
+    tags = {report.evidence_label(tag, locale).lower() for tag in ("MEASURED", "DECLARED")}
+    return [
+        line
+        for line in figures
+        if (found := re.search(r"\(([^()]+)\)$", line)) and found.group(1) in tags
+    ]
+
+
+def _unmeasured_line(data: dict, locale: str) -> str | None:
+    statuses = {d["name"]: d["status"] for d in data["verdict"]["dimensions"]}
+    names = [
+        report._dimension_title(name, locale)
+        for name in DIMENSION_ORDER
+        if statuses.get(name) == "NOT_MEASURED"
+    ]
+    words = seller_message.words(locale)
+    return words["unmeasured"].format(items=", ".join(names)) if names else None
 
 
 def _with_role(result: AuditResult, role: str | None) -> AuditResult:
@@ -143,12 +172,19 @@ def test_the_message_carries_class_figures_with_tags_and_the_questions(locale: s
             assert f"{named}{status[dimension['status']].lower()})" in message
         else:
             assert named not in message
+    # The dimensions left unmeasured are named on their own line, or no such line.
+    unmeasured = _unmeasured_line(data, locale)
+    prefix = words["unmeasured"].split("{items}")[0]
+    if unmeasured:
+        assert unmeasured in lines
+    else:
+        assert not any(line.startswith(prefix) for line in lines)
     # Two to four figures, each with its evidence tag in words, as the report computes them.
     start = lines.index(words["figures"]) + 1
     figures = lines[start : lines.index("", start)]
-    assert 2 <= len(figures) <= 4
-    tags = {report.evidence_label(tag, locale).lower() for tag in ("MEASURED", "DECLARED")}
-    assert all(re.search(r"\(([^()]+)\)$", line).group(1) in tags for line in figures)
+    assert len(figures) <= seller_message.MAX_FIGURES
+    assert len(_carrying(figures, locale)) >= seller_message.MIN_FIGURES
+    assert _carrying(figures, locale) == figures
     costs = data["costs"]
     breakeven = costs["break_even_bps"]["value"]
     assert breakeven > 0 and costs["break_even_pips"]["evidence"] == "MEASURED"
@@ -158,11 +194,14 @@ def test_the_message_carries_class_figures_with_tags_and_the_questions(locale: s
     assert f"{costs['break_even_pips']['value']:,.1f} pips" in units
     live = data["live"]
     assert live["status"] == "MEASURED"
-    assert any(
-        line.startswith(f"- {labels['live']}: {labels['live_badge_' + live['outcome']]}; ")
-        and f": {live['net_below']['value']:.0%} ({measured})" in line
-        for line in figures
-    )
+    # Both shares of backtest histories the live section gives: either decides the badge.
+    below = report._seller_share(live["net_below"]["value"])
+    fall = report._seller_share(live["fall_above"]["value"])
+    assert (
+        f"- {labels['live']}: {labels['live_badge_' + live['outcome']]}; "
+        f"{_lower(labels['live_below'])}: {below}; "
+        f"{_lower(labels['live_fall_above'])}: {fall} ({measured})"
+    ) in figures
     trials = data["multiplicity"]["trials_used"]
     declared_word = report.evidence_label("DECLARED", locale).lower()
     assert f"- {labels['trials_used']}: {trials['value']} ({declared_word})" in figures
@@ -249,7 +288,8 @@ def test_an_unmeasured_figure_says_so_with_its_reason() -> None:
         assert not any(line.startswith(f"{labels['trials_used']}: 1") for line in figures)
         live_reason = report._localized_reason(LIVE_SHORT, locale)
         assert f"{labels['live']}: {unmeasured} ({live_reason})" in figures
-        assert 2 <= len(figures) <= 4
+        assert len(figures) <= seller_message.MAX_FIGURES
+        assert len(_carrying(figures, locale)) >= seller_message.MIN_FIGURES
 
 
 def test_a_message_too_long_for_telegram_drops_questions_and_says_so() -> None:
@@ -268,7 +308,7 @@ def test_a_message_too_long_for_telegram_drops_questions_and_says_so() -> None:
         assert seller_message.chat_length(text) < seller_message.MAX_CHARS
         assert words["trimmed"].format(n=total - shown) in text.split("\n")
         assert f"{shown}. " in text and f"{shown + 1}. " not in text
-        page = render_html(result, watermark=False, locale=locale)
+        page = render_html(result, watermark=False, locale=locale, public_id=PUBLIC_ID)
         note = words["trimmed_note"].format(shown=shown, total=total)
         assert html.escape(note) in _block(page)
         assert find_claims(text) == [] and find_claims(note) == []
@@ -301,7 +341,8 @@ def test_a_fund_message_goes_to_its_manager() -> None:
         # A fund has no trades to cost: no break-even line rather than an empty one.
         assert report.LABELS[locale]["kpi_breakeven"] not in message
         figures = report._seller_figures(data, locale, report.LABELS[locale])
-        assert 2 <= len(figures) <= 4
+        assert len(figures) <= seller_message.MAX_FIGURES
+        assert len(_carrying(figures, locale)) >= seller_message.MIN_FIGURES
         assert seller_message.chat_length(message) < seller_message.MAX_CHARS
         assert find_claims(message) == []
 
@@ -328,6 +369,203 @@ def test_every_text_exists_in_three_languages_and_passes_the_guard() -> None:
     for code, stored in _QUESTIONS.items():
         if buyer_words.search(stored["es"]):
             assert code in seller_message.SELLER_ASK, code
+
+
+@pytest.mark.parametrize(("outcome", "fall"), [("INCONSISTENT", 0.004), ("EDGE", 0.03)])
+def test_a_live_badge_decided_by_the_fall_carries_that_share(outcome: str, fall: float) -> None:
+    """``live._outcome`` judges the net result and the fall: with a net share
+    that looks normal, the line still gives the fall share that decided it."""
+    data = _buyer().model_dump(mode="json")
+    live = data["live"]
+    live["outcome"] = outcome
+    live["net_below"]["value"] = 0.41
+    live["fall_above"] = {"value": fall, "evidence": "MEASURED", "note": ""}
+    for locale in LOCALES:
+        labels = report.LABELS[locale]
+        measured = report.evidence_label("MEASURED", locale).lower()
+        shown = "<1%" if fall < 0.005 else f"{fall:.0%}"
+        line = (
+            f"{labels['live']}: {labels['live_badge_' + outcome]}; "
+            f"{_lower(labels['live_below'])}: 41%; "
+            f"{_lower(labels['live_fall_above'])}: {shown} ({measured})"
+        )
+        assert line in report._seller_figures(data, locale, labels)
+        assert find_claims(line) == []
+
+
+def test_a_tail_share_never_rounds_to_none_or_all() -> None:
+    assert report._seller_share(0.004) == "<1%"
+    assert report._seller_share(0.996) == ">99%"
+    assert report._seller_share(0.0) == "0%" and report._seller_share(1.0) == "100%"
+    assert report._seller_share(0.41) == "41%" and report._seller_share(0.006) == "1%"
+    data = _buyer().model_dump(mode="json")
+    data["live"]["outcome"] = "INCONSISTENT"
+    data["live"]["net_below"]["value"] = 0.004
+    data["live"]["fall_above"]["value"] = 0.996
+    for locale in LOCALES:
+        labels = report.LABELS[locale]
+        measured = report.evidence_label("MEASURED", locale).lower()
+        (line,) = [
+            line
+            for line in report._seller_figures(data, locale, labels)
+            if line.startswith(labels["live"])
+        ]
+        assert f"{_lower(labels['live_below'])}: <1%;" in line
+        assert line.endswith(f"{_lower(labels['live_fall_above'])}: >99% ({measured})")
+        assert ": 0%" not in line and "100%" not in line
+
+
+def test_the_platform_drawdown_goes_beside_the_closed_trade_one() -> None:
+    """MT5 prints the drawdown with open trades ("Equity Drawdown Maximal"):
+    when the summary shows it in red, deeper than the closed-trade curve, the
+    message gives both rather than the milder one, each with its tag."""
+    data = _buyer().model_dump(mode="json")
+    data["performance"]["platform_equity_drawdown"] = {
+        "value": -0.41,
+        "evidence": "DECLARED",
+        "note": "deepest drawdown the platform prints with open trades counted",
+    }
+    closed = bool(data["inputs"].get("balance_only"))
+    key = "kpi_drawdown_closed" if closed else "kpi_drawdown"
+    drawdown = data["performance"]["max_drawdown"]["value"]
+    for locale in LOCALES:
+        labels = report.LABELS[locale]
+        words = seller_message.words(locale)
+        tiles = {label: shown for label, shown, _ in report._kpi_list(data, labels)}
+        assert tiles[labels["kpi_dd_platform"]] == "-41.0%"
+        measured = report.evidence_label("MEASURED", locale).lower()
+        declared_word = report.evidence_label("DECLARED", locale).lower()
+        line = (
+            f"{labels[key]}: {report._pct(drawdown)} ({measured}); "
+            f"{_lower(words['dd_platform'])}: -41.0% ({declared_word})"
+        )
+        figures = report._seller_figures(data, locale, labels)
+        assert line in figures
+        assert len(figures) <= seller_message.MAX_FIGURES
+        assert find_claims(line) == []
+        # The buyer's tile says "your platform"; the seller reads "the platform's report".
+        assert labels["kpi_dd_platform"] not in "\n".join(figures)
+    # Not deeper than the closed-trade curve: no tile, and no second figure.
+    data["performance"]["platform_equity_drawdown"]["value"] = drawdown - 0.001
+    for locale in LOCALES:
+        words = seller_message.words(locale)
+        figures = report._seller_figures(data, locale, report.LABELS[locale])
+        assert _lower(words["dd_platform"]) not in "\n".join(figures)
+
+
+@lru_cache(maxsize=1)
+def _curve_buyer() -> AuditResult:
+    """The web's commonest upload: an equity curve, no trades, trials not declared."""
+    inputs = build_inputs(
+        csv_bytes(positive_drift(400)),
+        DeclaredMetadata(ownership="buyer", trials=1, trials_declared=False),
+    )
+    return run_audit(inputs, bootstrap_samples=60, audit_id="sellercurve", now=NOW)
+
+
+def test_an_equity_curve_alone_names_what_is_unmeasured_and_completes_the_figures() -> None:
+    """With only a curve, several dimensions are not measured: the message
+    names them, so the class does not read as nearly clean, and a tile the
+    report measured completes the figures the files could not give."""
+    result = _curve_buyer()
+    data = result.model_dump(mode="json")
+    statuses = {d["name"]: d["status"] for d in data["verdict"]["dimensions"]}
+    assert statuses["costs"] == "NOT_MEASURED" and statuses["multiplicity"] == "NOT_MEASURED"
+    for locale in LOCALES:
+        labels = report.LABELS[locale]
+        words = seller_message.words(locale)
+        message = _message(render_html(result, watermark=False, locale=locale))
+        lines = message.split("\n")
+        unmeasured = _unmeasured_line(data, locale)
+        assert unmeasured and unmeasured in lines
+        assert report._dimension_title("costs", locale) in unmeasured
+        assert (
+            lines.index(unmeasured)
+            == lines.index(words["class"].format(cls=data["verdict"]["overall"])) + 2
+        )
+        start = lines.index(words["figures"]) + 1
+        figures = [line[2:] for line in lines[start : lines.index("", start)]]
+        assert len(figures) <= seller_message.MAX_FIGURES
+        assert len(_carrying(figures, locale)) >= seller_message.MIN_FIGURES
+        tiles = {label: shown for label, shown, _ in report._kpi_list(data, labels)}
+        measured = report.evidence_label("MEASURED", locale).lower()
+        assert f"{labels['kpi_sharpe']}: {tiles[labels['kpi_sharpe']]} ({measured})" in figures
+        # The "not measured" lines stay with their reasons, but are not figures.
+        reason = report._localized_reason("no trades uploaded", locale)
+        assert f"{labels['kpi_breakeven']}: {words['not_measured']} ({reason})" in figures
+        assert find_claims(message) == []
+
+
+def test_only_unmeasured_dimensions_are_listed_not_those_that_do_not_apply() -> None:
+    data = _buyer().model_dump(mode="json")
+    dims = {d["name"]: d for d in data["verdict"]["dimensions"]}
+    for name in DIMENSION_ORDER:
+        dims[name]["status"] = "PASS"
+    dims["benchmark"]["status"] = "NOT_MEASURED"
+    dims["out_of_sample"]["status"] = "NOT_APPLICABLE"
+    for locale in LOCALES:
+        words = seller_message.words(locale)
+        lines = report._seller_message(data, locale, report.LABELS[locale])[0].split("\n")
+        title = report._dimension_title("benchmark", locale)
+        # "None fail" still says what was left unmeasured.
+        index = lines.index(words["dimensions_none"])
+        assert lines[index + 1] == words["unmeasured"].format(items=title)
+        assert report._dimension_title("out_of_sample", locale) not in lines[index + 1]
+        assert find_claims(lines[index + 1]) == []
+
+
+def test_too_few_figures_are_completed_and_a_not_measured_line_makes_room() -> None:
+    data = _buyer().model_dump(mode="json")
+    data["costs"]["break_even_bps"] = {
+        "value": None,
+        "evidence": "NOT_MEASURED",
+        "note": "no traded notional",
+    }
+    data["live"] = {"status": "NOT_MEASURED", "reason": LIVE_SHORT}
+    data["multiplicity"]["trials_used"] = {
+        "value": 1,
+        "evidence": "NOT_MEASURED",
+        "note": UNDECLARED_TRIALS,
+    }
+    for locale in LOCALES:
+        labels = report.LABELS[locale]
+        unmeasured = seller_message.words(locale)["not_measured"]
+        measured = report.evidence_label("MEASURED", locale).lower()
+        tiles = {label: shown for label, shown, _ in report._kpi_list(data, labels)}
+        figures = report._seller_figures(data, locale, labels)
+        assert len(figures) == seller_message.MAX_FIGURES
+        assert len(_carrying(figures, locale)) == seller_message.MIN_FIGURES
+        assert figures[-1] == f"{labels['kpi_sharpe']}: {tiles[labels['kpi_sharpe']]} ({measured})"
+        # The last "not measured" line (the trials) made room; the others stay, in order.
+        assert figures[0].startswith(f"{labels['kpi_breakeven']}: {unmeasured}")
+        assert figures[1].startswith(f"{labels['live']}: {unmeasured}")
+        assert not any(line.startswith(labels["trials_used"]) for line in figures)
+
+
+def test_period_returns_give_no_break_even_line() -> None:
+    """Gross and net period returns carry a cost difference, not a cost per
+    trade: their section stresses it, and the message has no break-even line
+    rather than a bare "not measured"."""
+    data = _buyer().model_dump(mode="json")
+    measured_costs = {
+        "kind": "period_returns",
+        "status": "MEASURED",
+        "rows": [],
+        "observations": {"value": 500, "evidence": "MEASURED", "note": ""},
+    }
+    missing_costs = {
+        "kind": "period_returns",
+        "status": "NOT_MEASURED",
+        "rows": [],
+        "reason": PERIOD_REASONS["missing_cost"]["en"],
+    }
+    for costs in (measured_costs, missing_costs):
+        data["costs"] = costs
+        for locale in LOCALES:
+            labels = report.LABELS[locale]
+            figures = report._seller_figures(data, locale, labels)
+            assert not any(line.startswith(labels["kpi_breakeven"]) for line in figures)
+            assert len(_carrying(figures, locale)) >= seller_message.MIN_FIGURES
 
 
 def test_the_pdf_leaves_the_message_out(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

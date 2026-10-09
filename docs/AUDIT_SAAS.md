@@ -377,17 +377,28 @@ the report (`report._seller_message`):
 - the class ("Clase del informe: C (A es la más alta, D la más baja).") and
   the dimensions that fail or are weak, by the report's names, with their
   status in words ("Costos (no supera), Número de configuraciones probadas
-  (débil)"), or "ninguna";
+  (débil)"), or "ninguna", then the dimensions not measured ("Dimensiones sin
+  medir: Costos, Fuera de muestra, Benchmark."; one that does not apply is not
+  listed). A class B from a curve alone is B because pieces are missing; without
+  that line it would read as "only one weak point";
 - two to four key figures, each with its evidence tag in words
   (`report._seller_figures`): the break-even cost as the summary tile gives
   it (basis points per side, then the pips of PR 479 and the money per lot
   when measured, or "ya pierde sin costo extra"; a backtest without trades
-  says "no medido" with the costs' reason; a fund has no such line), the
-  live account against its backtest when one was uploaded (its badge and the
-  share of backtest histories with a net result as low or lower, or "no
-  medido" with the reason), the trials used in the deflated Sharpe (an
-  undeclared count says "no medido" with the engine's note, not the 1 it was
-  computed with) and the maximum drawdown;
+  says "no medido" with the costs' reason; a fund and a table of gross and
+  net period returns, which have no cost per trade, have no such line), the
+  live account against its backtest when one was uploaded (its badge and both
+  shares of backtest histories its section gives, net result as low or lower
+  and fall as deep or deeper, since either decides the badge; a share short of
+  none or of all reads "<1%" or ">99%", never "0%" or "100%"; or "no medido"
+  with the reason), the trials used in the deflated Sharpe (an undeclared
+  count says "no medido" with the engine's note, not the 1 it was computed
+  with) and the maximum drawdown, with the platform's drawdown with open
+  trades beside it ("según el informe de la plataforma", declared) whenever
+  the summary shows that red tile. At least two lines carry a measured or
+  declared figure: when the files gave fewer, the summary's Sharpe, total
+  return or drawdown p95 complete them with their own tag, and past four
+  lines the last "no medido" one makes room;
 - the open questions (`ownership.open_questions`), numbered. The stored
   questions that speak to the buyer ("Pide el archivo de optimización", "¿Son
   los de su bróker?") are put to the seller in `seller_message.SELLER_ASK`
@@ -415,8 +426,10 @@ vendedor con esas preguntas, listo para copiar" right after the questions,
 for the buyer only. The block is `no-print`: the PDF (the page under the
 print stylesheet) leaves it out and keeps the questions.
 `tests/test_audit_seller_message.py` covers the three languages, the figures
-against the report's own helpers, the other voices, the public link, the lock
-box, the trimming, a fund and the PDF.
+against the report's own helpers (a badge decided by the fall, the tail
+shares, the platform's drawdown, a curve alone, period returns), the
+unmeasured dimensions, the other voices, the public link, the lock box, the
+trimming, a fund and the PDF.
 
 ### Dates and numbers in a hand-made file
 
