@@ -506,7 +506,7 @@ def test_the_report_shows_the_ladder_and_the_hero_line(tmp_path: Path, locale: s
     assert labels["ch_ladder_full_program"] in text
     assert labels["ch_ladder_in_sample"].format(date="2024-06-02") in text
     assert labels["ch_ladder_out_of_sample"].format(date="2024-06-03") in text
-    assert labels["ch_ladder_cost"].format(bps="1") in text
+    assert labels["ch_ladder_cost_declared"].format(bps="1") in text
     assert labels["ch_ladder_haircut"].split("{")[0] in text
     assert HERO[locale] in text and labels["hero_challenge_link"] in text
     assert OLD_UNFINISHED[locale] not in text

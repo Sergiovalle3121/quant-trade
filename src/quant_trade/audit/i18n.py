@@ -2132,6 +2132,72 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
         "cost per side at which the ledger nets to zero",
         "costo por lado con el que el resultado queda en cero",
     ),
+    (
+        "the whole history's break-even and reference costs per side, converted to pips at "
+        "each symbol's median entry price; not a break-even computed from that symbol's "
+        "trades alone",
+        "los costos de equilibrio y de referencia por lado de todo el historial, pasados a "
+        "pips con el precio de entrada mediano de cada símbolo; no es un equilibrio calculado "
+        "solo con las operaciones de ese símbolo",
+    ),
+    (
+        "no pip size is defined for metals; this symbol's cost stays in bps",
+        "no hay un tamaño de pip definido para los metales; el costo de este símbolo queda en pb",
+    ),
+    (
+        "other symbols traded ({symbols}) stay in bps: the audit defines no pip size for them",
+        "los otros símbolos operados ({symbols}) quedan en pb: la auditoría no define un "
+        "tamaño de pip para ellos",
+    ),
+    (
+        "cost per lot and side at which the ledger nets to zero: the net the file prints, "
+        "{net} {currency}, over {lots} lots traded counting entries and exits",
+        "costo por lote y lado con el que el resultado queda en cero: el neto que imprime el "
+        "archivo, {net} {currency}, dividido entre {lots} lotes negociados contando entradas "
+        "y salidas",
+    ),
+    (
+        "extra cost per lot and side, on top of the report's fees, at which the ledger nets "
+        "to zero: the net the file prints after those fees, {net} {currency}, over {lots} lots "
+        "traded counting entries and exits",
+        "costo extra por lote y lado, además de los costos del informe, con el que el "
+        "resultado queda en cero: el neto que imprime el archivo después de esos costos, "
+        "{net} {currency}, dividido entre {lots} lotes negociados contando entradas y salidas",
+    ),
+    (
+        "cost per lot and side at which the ledger nets to zero: the net the file prints, "
+        "{net} {currency}, over {lots} lots traded counting entries and exits; the lots of "
+        "the {count} currency pairs are added as the platform prints them",
+        "costo por lote y lado con el que el resultado queda en cero: el neto que imprime el "
+        "archivo, {net} {currency}, dividido entre {lots} lotes negociados contando entradas "
+        "y salidas; se suman los lotes de los {count} pares de divisas tal como los imprime "
+        "la plataforma",
+    ),
+    (
+        "extra cost per lot and side, on top of the report's fees, at which the ledger nets "
+        "to zero: the net the file prints after those fees, {net} {currency}, over {lots} lots "
+        "traded counting entries and exits; the lots of the {count} currency pairs are added "
+        "as the platform prints them",
+        "costo extra por lote y lado, además de los costos del informe, con el que el "
+        "resultado queda en cero: el neto que imprime el archivo después de esos costos, "
+        "{net} {currency}, dividido entre {lots} lotes negociados contando entradas y "
+        "salidas; se suman los lotes de los {count} pares de divisas tal como los imprime la "
+        "plataforma",
+    ),
+    (
+        "the money per lot is given only for MetaTrader 4 and 5 reports, whose volume column "
+        "is the platform's lots",
+        "el dinero por lote solo se da para los informes de MetaTrader 4 y 5, cuya columna "
+        "de volumen son los lotes de la plataforma",
+    ),
+    (
+        "the trades are on several symbols and not all are pairs of USD, EUR, GBP, JPY, CHF, "
+        "AUD, NZD or CAD: a lot of one instrument is not the same size as a lot of another (a "
+        "lot of gold is not a lot of EURUSD), so their lots are not added together",
+        "las operaciones son de varios símbolos y no todos son pares de USD, EUR, GBP, JPY, "
+        "CHF, AUD, NZD o CAD: un lote de un instrumento no tiene el mismo tamaño que un lote "
+        "de otro (un lote de oro no es un lote de EURUSD), así que sus lotes no se suman",
+    ),
     ("no traded notional", "no hay volumen operado"),
     ("undefined", "no definido"),
     (
