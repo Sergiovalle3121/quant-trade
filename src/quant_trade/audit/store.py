@@ -6131,6 +6131,7 @@ def public_view(result_json: str) -> tuple[dict[str, Any], str]:
         }
         | {"source_is_pdf": source_is_pdf},
         "engine": {key: data.get("engine", {}).get(key) for key in ("name", "package_version")},
+        "fund": {"track_record": bool((data.get("fund") or {}).get("track_record"))},
         "declared": {"trials": data.get("declared", {}).get("trials")},
         "multiplicity": {"trials_used": data.get("multiplicity", {}).get("trials_used")},
     }

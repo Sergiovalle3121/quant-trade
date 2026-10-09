@@ -85,13 +85,31 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
             REJECTION_COPY["en"][category], REJECTION_COPY["es"][category], strict=True
         )
     ),
-    (
-        "The {what} file is a picture, not a readable data table.",
-        "El archivo {what} es una imagen, no una tabla de datos legible.",
-    ),
-    (
-        "The {what} file has an incompatible format.",
-        "El archivo {what} tiene un formato incompatible.",
+    # These placeholders are the field labels of web.UPLOAD_NAMES, never client
+    # data; i18n cannot import web, so the pairs are repeated here and a test
+    # keeps them equal. Each rendered sentence is registered: a {what} rule
+    # would leave the English field name inside the Spanish sentence.
+    *(
+        (english.format(what=name_en), spanish.format(what=name_es))
+        for name_en, name_es in (
+            ("equity", "de la curva de equity"),
+            ("trades", "de operaciones"),
+            ("benchmark", "del benchmark"),
+            ("variants", "de variantes"),
+            ("report", "del informe"),
+            ("optimisation", "de optimización"),
+            ("live statement", "de la cuenta real"),
+        )
+        for english, spanish in (
+            (
+                "The {what} file is a picture, not a readable data table.",
+                "El archivo {what} es una imagen, no una tabla de datos legible.",
+            ),
+            (
+                "The {what} file has an incompatible format.",
+                "El archivo {what} tiene un formato incompatible.",
+            ),
+        )
     ),
     # Public figure reader notes (reading.COPY); keep the Spanish rules explicit.
     (

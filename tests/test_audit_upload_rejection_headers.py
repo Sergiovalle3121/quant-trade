@@ -78,8 +78,13 @@ def test_header_refusal_names_its_field_without_repeating_the_guidance(
 
 
 @pytest.mark.parametrize("message_key", ("file_is_picture", "file_not_a_report"))
-def test_header_message_templates_keep_their_spanish_rule(message_key: str) -> None:
-    assert spanish(message(message_key, "en", what="x")) == message(message_key, "es", what="x")
+@pytest.mark.parametrize("field", tuple(UPLOAD_NAMES))
+def test_header_messages_translate_the_actual_upload_field(message_key: str, field: str) -> None:
+    english = message(message_key, "en", what=UPLOAD_NAMES[field]["en"])
+    expected = message(message_key, "es", what=UPLOAD_NAMES[field]["es"])
+    assert spanish(english) == expected
+    for locale in ("es", "en", "pt"):
+        assert find_claims(message(message_key, locale, what=UPLOAD_NAMES[field][locale])) == []
 
 
 @pytest.mark.parametrize("locale", ("es", "en", "pt"))

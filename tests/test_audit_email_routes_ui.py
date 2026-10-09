@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import html
 import re
+from datetime import UTC, datetime
 from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
@@ -14,7 +15,7 @@ pytest.importorskip("sqlalchemy")
 
 from fastapi.testclient import TestClient  # noqa: E402
 
-from quant_trade.audit import account_pages, accounts, mail  # noqa: E402
+from quant_trade.audit import account_pages, accounts, inbox, mail  # noqa: E402
 from quant_trade.audit.guard import find_claims  # noqa: E402
 from quant_trade.audit.settings import AuditSettings  # noqa: E402
 from quant_trade.audit.store import Store, make_store  # noqa: E402
@@ -43,7 +44,7 @@ def _outbox_id(store: Store, account_id: str, kind: str) -> str:
     return str(row[0])
 
 
-def _client(tmp_path: Path) -> tuple[TestClient, Store]:
+def _client(tmp_path: Path, *, free_mode: bool = False) -> tuple[TestClient, Store]:
     settings = AuditSettings(
         database_url=f"sqlite:///{tmp_path}/email.db",
         base_url="https://rigor.example",
@@ -51,7 +52,7 @@ def _client(tmp_path: Path) -> tuple[TestClient, Store]:
         email_token_secret=SECRET,
         smtp_host="smtp.example",
         smtp_from="hello@rigor.example",
-        free_mode=False,
+        free_mode=free_mode,
     )
     store = make_store(settings.database_url)
     client = TestClient(create_app(settings, store), base_url="https://rigor.example")
@@ -180,15 +181,19 @@ def test_confirmation_requires_a_post_and_recovery_keeps_language(
         ),
     ],
 )
-@pytest.mark.parametrize("welcome_used", [False, True])
+@pytest.mark.parametrize("welcome_state", ["available", "used", "off", "free_mode", "inbox_used"])
 def test_confirmation_without_a_session_keeps_the_notice_on_signin(
     tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
     locale: str,
     welcome_notice: str,
     used_notice: str,
-    welcome_used: bool,
+    welcome_state: str,
 ) -> None:
-    client, store = _client(tmp_path)
+    monkeypatch.setattr(accounts, "WELCOME_FULL_REPORT", welcome_state != "off")
+    client, store = _client(tmp_path, free_mode=welcome_state == "free_mode")
+    welcome_used = welcome_state == "used"
+    welcome_available = welcome_state == "available"
     paths = account_pages.PATHS[locale]
     signup = client.get(paths["signup"])
     email = f"separate-browser-{locale}@example.com"
@@ -208,6 +213,16 @@ def test_confirmation_without_a_session_keeps_the_notice_on_signin(
                 )
             )
     assert store.welcome_used(account.id) is welcome_used
+    if welcome_state == "inbox_used":
+        assert (
+            store.claim_free(
+                "synthetic-other-account",
+                keys=[inbox.welcome_key(email)],
+                slots={},
+                at=datetime.now(UTC),
+            )
+            == ""
+        )
     token = mail.token_for(_outbox_id(store, account.id, "verify"), SECRET)
     confirm_path = mail.PATHS[locale]["verify"]
 
@@ -226,14 +241,14 @@ def test_confirmation_without_a_session_keeps_the_notice_on_signin(
     signin_url = urlsplit(account_redirect.headers["location"])
     assert signin_url.path == paths["signin"]
     assert parse_qs(signin_url.query) == {
-        "done": ["email_verified" if welcome_used else "email_verified_welcome"],
+        "done": ["email_verified_welcome" if welcome_available else "email_verified"],
         "next": [paths["account"]],
     }
     signin = browser.get(account_redirect.headers["location"])
     assert signin.status_code == 200
-    notice = used_notice if welcome_used else welcome_notice
+    notice = welcome_notice if welcome_available else used_notice
     assert f"<div class='flash' role='status'>{notice}</div>" in signin.text
-    assert (welcome_notice in signin.text) is not welcome_used
+    assert (welcome_notice in signin.text) is welcome_available
     assert account_pages.COPY[locale]["email_verified"] not in signin.text
     assert find_claims(html.unescape(signin.text)) == []
     assert accounts.SESSION_COOKIE not in browser.cookies
@@ -255,6 +270,37 @@ def test_confirmation_without_a_session_keeps_the_notice_on_signin(
     assert account_page.status_code == 200
     assert notice not in account_page.text
     assert "<div class='flash'" not in account_page.text
+    assert ("class='acct-kpi acct-gift is-on'" in account_page.text) is welcome_available
+    assert store.welcome_used(account.id) is welcome_used
+    assert store.free_claim_taken(inbox.welcome_key(email)) is (welcome_state == "inbox_used")
+
+
+@pytest.mark.parametrize("locale", account_pages.LANGUAGES)
+def test_welcome_confirmation_notice_is_normalized_for_an_active_session(
+    tmp_path: Path, locale: str
+) -> None:
+    client, store = _client(tmp_path)
+    paths = account_pages.PATHS[locale]
+    signup = client.get(paths["signup"])
+    email = f"active-confirmation-{locale}@example.com"
+    created = client.post(
+        paths["signup"],
+        data={"email": email, "password": PASSWORD, "csrf": _csrf(signup.text)},
+        follow_redirects=False,
+    )
+    assert created.status_code == 303
+    account = store.find_account(email)
+    assert account is not None
+    confirmed = client.get(paths["account"], params={"done": "email_verified_welcome"})
+    assert confirmed.status_code == 200
+    assert (
+        f"<div class='flash' role='status'>{account_pages.COPY[locale]['email_verified']}</div>"
+        in confirmed.text
+    )
+    assert account_pages.COPY[locale]["email_verified_welcome_signin"] not in confirmed.text
+    assert not store.email_verified(account.id)
+    assert not store.welcome_used(account.id)
+    assert find_claims(html.unescape(confirmed.text)) == []
 
 
 @pytest.mark.parametrize("locale", account_pages.LANGUAGES)

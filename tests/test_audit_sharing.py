@@ -5,6 +5,7 @@ from __future__ import annotations
 import html
 import json
 import re
+from datetime import UTC, datetime
 from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
@@ -163,6 +164,7 @@ def test_public_page_and_report_follow_publication_lifecycle(
         assert f"/v/{public_id}?ref=share" in block
         assert "https://wa.me/?" in block
         assert "https://t.me/share/url?" in block
+        assert block.count("target='_blank' rel='noopener noreferrer'") == 3
         assert html.escape(SHARE_PHRASES[locale][kind]) in block
         assert find_claims(html.unescape(response.text)) == []
         assert find_claims(html.unescape(block)) == []
@@ -173,6 +175,32 @@ def test_public_page_and_report_follow_publication_lifecycle(
     assert "data-public-share" not in client.get(private_url).text
     # A previously published audit becomes private again, with its publish action.
     assert "/publish?" in client.get(private_url).text
+
+
+@pytest.mark.parametrize("locale", ["es", "en", "pt"])
+def test_published_fund_keeps_its_share_text_after_purge(tmp_path: Path, locale: str) -> None:
+    client, store, audit_id, token, public_id = _published_history(tmp_path, "fund")
+    public_url = f"/v/{public_id}?lang={locale}"
+    before = client.get(public_url)
+    assert before.status_code == 200
+    before_block = re.search(r"<section[^>]+data-public-share>.*?</section>", before.text).group()
+    assert html.escape(SHARE_PHRASES[locale]["fund"]) in before_block
+
+    assert store.purge_expired(datetime(2100, 1, 1, tzinfo=UTC), retention_days=1) == 1
+    record = store.get_audit(audit_id)
+    assert record is not None and record.result_json is None
+    retained = store.publication_view(audit_id)
+    assert retained is not None
+    assert retained[0]["fund"] == {"track_record": True}
+    assert report_kind(retained[0]) == "fund"
+
+    response = client.get(public_url)
+    assert response.status_code == 200
+    block = re.search(r"<section[^>]+data-public-share>.*?</section>", response.text).group()
+    assert block == before_block
+    assert find_claims(html.unescape(response.text)) == []
+    for secret in (audit_id, token, PRIVATE, "fund.csv", "token="):
+        assert secret not in response.text
 
 
 @pytest.mark.parametrize("locale", ["es", "en", "pt"])
@@ -207,8 +235,9 @@ def test_report_and_public_page_keep_the_kind_with_the_retained_public_view(
             update={"inputs": {**result.inputs, "source_format": MT5_HISTORY_HTML}}
         )
     data = result.model_dump(mode="json")
-    # This is the allow-listed view retained by purge_expired; no new fields are needed.
+    # This is the allow-listed view retained by purge_expired.
     retained, digest = public_view(result.model_dump_json())
+    assert retained["fund"] == {"track_record": False}
     assert is_account_history(data) == is_account_history(retained) == (kind == "account")
     assert retained["inputs"]["source_format"] == data["inputs"]["source_format"]
     expected = share_text(

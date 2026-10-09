@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 import logging
-from html import escape
+from html import escape, unescape
 from pathlib import Path
 from typing import Any
 
 import pytest
-from audit_fixtures import csv_bytes, positive_drift
+from audit_fixtures import csv_bytes, positive_drift, synthetic_mt5_report, trades_frame
 from fastapi.testclient import TestClient
 from starlette.datastructures import UploadFile
 
@@ -35,9 +35,9 @@ def _app(tmp_path: Path, **kwargs: Any) -> Any:
 
 @pytest.mark.parametrize("locale", ["es", "en", "pt"])
 @pytest.mark.parametrize(
-    ("category", "field", "content", "detected", "status", "detector"),
+    ("category", "field", "content", "detected", "status", "detector", "file_inspected"),
     [
-        ("format_unknown", "report", b"\x7fELF" + b"x" * 9000, "unknown", 400, "header"),
+        ("format_unknown", "report", b"\x7fELF" + b"x" * 9000, "unknown", 400, "header", True),
         (
             "format_unknown",
             "report",
@@ -45,10 +45,19 @@ def _app(tmp_path: Path, **kwargs: Any) -> Any:
             "html",
             400,
             "importers",
+            True,
         ),
-        ("image", "report", b"\x89PNG\r\n\x1a\n" + b"x" * 9000, "image", 400, "header"),
-        ("pdf_no_trades", "report", b"%PDF-1.4\n%%EOF", "pdf", 400, "importers"),
-        ("too_few_rows", "equity", b"timestamp,equity\n2024-01-01,100\n", "csv", 400, "schema"),
+        ("image", "report", b"\x89PNG\r\n\x1a\n" + b"x" * 9000, "image", 400, "header", True),
+        ("pdf_no_trades", "report", b"%PDF-1.4\n%%EOF", "pdf", 400, "importers", True),
+        (
+            "too_few_rows",
+            "equity",
+            b"timestamp,equity\n2024-01-01,100\n",
+            "csv",
+            400,
+            "schema",
+            True,
+        ),
         (
             "dates_unreadable",
             "equity",
@@ -56,6 +65,7 @@ def _app(tmp_path: Path, **kwargs: Any) -> Any:
             "csv",
             400,
             "schema",
+            True,
         ),
         (
             "columns_missing",
@@ -64,6 +74,16 @@ def _app(tmp_path: Path, **kwargs: Any) -> Any:
             "csv",
             422,
             "mapping",
+            True,
+        ),
+        (
+            "files_mismatch",
+            "report",
+            synthetic_mt5_report(days=3),
+            "unknown",
+            400,
+            "importers",
+            False,
         ),
         (
             "invalid_values",
@@ -72,8 +92,9 @@ def _app(tmp_path: Path, **kwargs: Any) -> Any:
             "csv",
             400,
             "schema",
+            True,
         ),
-        ("empty_file", "report", b"", "unknown", 400, "form"),
+        ("empty_file", "report", b"", "unknown", 400, "form", False),
     ],
 )
 def test_synthetic_refusal_explains_cause_and_records_only_labels(
@@ -87,6 +108,7 @@ def test_synthetic_refusal_explains_cause_and_records_only_labels(
     detected: str,
     status: int,
     detector: str,
+    file_inspected: bool,
 ) -> None:
     # No external PDF process or network is needed to represent a table-less PDF.
     monkeypatch.setattr(pdf_tables, "_extract", lambda data: {})
@@ -104,10 +126,14 @@ def test_synthetic_refusal_explains_cause_and_records_only_labels(
         return result
 
     monkeypatch.setattr(web, "_client_ip", capture_client_ip)
+    files = {field: ("PRIVATE-file-name.csv", content)}
+    if category == "files_mismatch":
+        files["report"] = ("PRIVATE-report.html", content)
+        files["trades"] = ("PRIVATE-trades.csv", csv_bytes(trades_frame(3)))
     with TestClient(app) as client:
         answer = client.post(
             "/audits",
-            files={field: ("PRIVATE-file-name.csv", content)},
+            files=files,
             headers={"X-Forwarded-For": ip},
             data={
                 "consent": "on",
@@ -121,9 +147,16 @@ def test_synthetic_refusal_explains_cause_and_records_only_labels(
         assert answer.status_code == status, answer.text[:500]
         assert ip in observed_ips  # The trusted header really entered the upload pipeline.
         assert (
-            rejection_guidance(category, detected, locale, file_inspected=category != "empty_file")
+            rejection_guidance(category, detected, locale, file_inspected=file_inspected)
             in answer.text
         )
+        if category == "files_mismatch":
+            # The MT5 report was identified; only the pairing failed, so no
+            # "not recognised" format line is printed for it.
+            format_label = {"es": "Formato detectado", "en": "Detected format"}
+            assert format_label.get(locale, "Formato detectado") not in answer.text
+            alert = {"es": "no ambos", "en": "not both", "pt": "não os dois"}[locale]
+            assert alert in unescape(answer.text)
         assert find_claims(answer.text) == []
         assert "name='trials'" in answer.text and "value='7'" in answer.text
         assert escape(private, quote=True) in answer.text
@@ -159,10 +192,19 @@ def test_request_refusals_have_guidance(
     detector: str,
     file_inspected: bool,
 ) -> None:
-    app = _app(tmp_path, max_upload_bytes=100, max_uploads_per_hour_per_ip=1)
+    app = _app(tmp_path, max_upload_bytes=100, max_uploads_per_hour_per_ip=1, trusted_proxy_hops=1)
     caplog.set_level(logging.DEBUG)
     email = "private-refusal@example.invalid"
     ip = "192.0.2.232"
+    observed_ips: list[str] = []
+    original_client_ip = web._client_ip
+
+    def capture_client_ip(request: Any, trusted_proxy_hops: int) -> str:
+        result = original_client_ip(request, trusted_proxy_hops)
+        observed_ips.append(result)
+        return result
+
+    monkeypatch.setattr(web, "_client_ip", capture_client_ip)
     content = CURVE
     data = {
         "consent": "on",
@@ -196,6 +238,7 @@ def test_request_refusals_have_guidance(
             headers={"X-Forwarded-For": ip},
         )
         assert answer.status_code == status, answer.text[:500]
+        assert ip in observed_ips
         assert (
             rejection_guidance(
                 category,

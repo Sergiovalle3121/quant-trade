@@ -240,9 +240,11 @@ def test_a_purged_published_audit_keeps_only_its_public_page(tmp_path: Path) -> 
         "verdict",
         "inputs",
         "engine",
+        "fund",
         "declared",
         "multiplicity",
     }
+    assert view["fund"] == {"track_record": False}
     assert set(view["declared"]) == {"trials"}
 
     # The owner can still withdraw it with the private link.

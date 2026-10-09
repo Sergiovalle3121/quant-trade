@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from pathlib import Path
 
 import pytest
@@ -13,7 +14,6 @@ pytest.importorskip("sqlalchemy")
 from fastapi.testclient import TestClient  # noqa: E402
 
 from quant_trade.audit.guard import find_claims  # noqa: E402
-from quant_trade.audit.mapping import missing_fields  # noqa: E402
 from quant_trade.audit.pages import guides_index_url, upload_page  # noqa: E402
 from quant_trade.audit.settings import AuditSettings  # noqa: E402
 from quant_trade.audit.store import make_store  # noqa: E402
@@ -135,7 +135,17 @@ def test_an_absent_mapping_choice_is_counted_without_logging_its_name(
         f"guessed=1 chosen=1 locale={locale}"
     ) in caplog.text
     if role == "date":
-        assert missing_fields(chosen, locale) in answer.text
+        expected = {
+            "es": "aún falta: Resultado de la operación.",
+            "en": "still missing: Trade result.",
+            "pt": "ainda falta: Resultado da operação.",
+        }[locale]
+        outside_form = re.sub(r"<form\b.*?</form>", "", answer.text, flags=re.DOTALL)
+        assert expected in outside_form
+        # The incomplete-map explanation names the missing role, never the
+        # customer's absent date column. A reader's unknown-column refusal
+        # (the profit case above) intentionally identifies the invalid choice.
+        assert chosen[role] not in outside_form
     assert "PRIVATE" not in caplog.text
     assert find_claims(answer.text) == []
 
