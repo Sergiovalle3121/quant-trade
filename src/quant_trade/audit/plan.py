@@ -698,6 +698,46 @@ def _multiplicity_step(data: dict[str, Any], status: str, locale: str) -> tuple[
                 "abaixo da mediana fora da amostra.",
             )
         )
+    if half is not None and half <= 1:
+        # Below 0.5 at a single trial: fewer or counted trials cannot lift the
+        # class, so the actions are about the signal and the history.
+        if _fund_record(data):
+            return " ".join(parts), _say(
+                locale,
+                [
+                    "Aquí no decide cuántos fondos lleva el gestor: ya con 1 queda por debajo "
+                    "de 0.5. Lo que cuenta es más historial del mismo fondo.",
+                ],
+                [
+                    "How many funds the manager runs does not decide here: even at 1 it is "
+                    "below 0.5. What counts is more history of the same fund.",
+                ],
+                [
+                    "Aqui não decide quantos fundos o gestor administra: já com 1 fica abaixo "
+                    "de 0.5. O que conta é mais histórico do mesmo fundo.",
+                ],
+            )
+        return " ".join(parts), _say(
+            locale,
+            [
+                "Para esta dimensión cuenta más historial de la misma configuración, sin cambiar "
+                "parámetros: el número de intentos no decide aquí.",
+                "Antes de optimizar más, revisa si la idea tiene una ventaja: buscar entre más "
+                "configuraciones sobre estos mismos datos no la crea.",
+            ],
+            [
+                "What counts for this dimension is more history from the same configuration, "
+                "with unchanged settings: the number of trials does not decide here.",
+                "Before optimising further, check whether the idea has an edge: searching more "
+                "configurations on this same data does not create one.",
+            ],
+            [
+                "Para esta dimensão conta mais histórico da mesma configuração, sem mudar "
+                "parâmetros: o número de tentativas não decide aqui.",
+                "Antes de otimizar mais, verifique se a ideia tem uma vantagem: buscar entre mais "
+                "configurações nestes mesmos dados não a cria.",
+            ],
+        )
     counted = (mult.get("trials_used") or {}).get("evidence") == "MEASURED"
     if _fund_record(data):
         # A fund has no optimisation to export: its trials are the other funds

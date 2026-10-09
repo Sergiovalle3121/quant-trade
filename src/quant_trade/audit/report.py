@@ -23,7 +23,14 @@ from urllib.parse import parse_qsl, quote, urlencode, urlsplit, urlunsplit
 
 from quant_trade.audit import charts, report_pt
 from quant_trade.audit.account import is_account_history
-from quant_trade.audit.crises import MARKET, MARKET_AS_OF, WINDOW_MARKET, traded_markets
+from quant_trade.audit.crises import (
+    MARKET,
+    MARKET_AS_OF,
+    MIN_WINDOWS,
+    WINDOW_MARKET,
+    WORSE_SHARE,
+    traded_markets,
+)
 from quant_trade.audit.decay import is_weaker
 from quant_trade.audit.decay import signed_amount as _signed_amount
 from quant_trade.audit.engine import _NO_PRINTED_BALANCE_REASON as NO_PRINTED_BALANCE_REASON
@@ -1309,9 +1316,21 @@ LABELS: dict[str, dict[str, str]] = {
         ),
         "crises_no_trades": "sin operaciones cerradas en la ventana",
         "crises_not_applicable": (
-            "No aplica a este historial: estas crisis son caídas de acciones de EE. UU. y de "
-            "bitcoin, y ninguno de los símbolos operados ({symbols}) es de esos mercados."
+            "No aplica a este historial: las crisis que cubre la curva son {falls}, y ninguno "
+            "de los símbolos operados ({symbols}) es de {that}."
         ),
+        "crises_not_covered": (
+            "No aplica a este historial: las crisis que cubre la curva son {falls}; los "
+            "símbolos operados ({symbols}) incluyen {traded}, pero la curva no cubre ninguna "
+            "de las crisis de ese mercado."
+        ),
+        "crises_falls_us_equity": "caídas de acciones de EE. UU.",
+        "crises_falls_crypto": "caídas de bitcoin",
+        "crises_falls_both": "caídas de acciones de EE. UU. y de bitcoin",
+        "crises_traded_us_equity": "acciones de EE. UU.",
+        "crises_traded_crypto": "bitcoin",
+        "crises_that_market": "ese mercado",
+        "crises_those_markets": "esos mercados",
         "crises_worse": (
             "En {worse} de {n} crisis cayó más que su índice. Pregunta al vendedor qué la "
             "protege cuando el mercado cae."
@@ -1664,6 +1683,8 @@ LABELS: dict[str, dict[str, str]] = {
         "unit_monthly": "meses",
         "unit_hourly": "horas",
         "unit_periods": "periodos de la curva",
+        "unit_periods_days": "periodos de la curva (de media, {n} días de calendario cada uno)",
+        "unit_periods_hours": "periodos de la curva (de media, {n} horas de calendario cada uno)",
         "risk_under_median": "mediana",
         "risk_under_p95": "en 1 de cada 20",
         "challenge": "Simulador de reto de prop firm",
@@ -2733,9 +2754,21 @@ LABELS: dict[str, dict[str, str]] = {
         ),
         "crises_no_trades": "no trades closed in the window",
         "crises_not_applicable": (
-            "Does not apply to this history: these crises are falls in US equities and in "
-            "bitcoin, and none of the symbols traded ({symbols}) belongs to those markets."
+            "Does not apply to this history: the crises the curve covers are {falls}, and none "
+            "of the symbols traded ({symbols}) belongs to {that}."
         ),
+        "crises_not_covered": (
+            "Does not apply to this history: the crises the curve covers are {falls}; the "
+            "symbols traded ({symbols}) include {traded}, but the curve covers none of that "
+            "market's crises."
+        ),
+        "crises_falls_us_equity": "falls in US equities",
+        "crises_falls_crypto": "falls in bitcoin",
+        "crises_falls_both": "falls in US equities and in bitcoin",
+        "crises_traded_us_equity": "US equities",
+        "crises_traded_crypto": "bitcoin",
+        "crises_that_market": "that market",
+        "crises_those_markets": "those markets",
         "crises_worse": (
             "In {worse} of {n} crises it fell more than its benchmark. Ask the seller what "
             "protects it when markets fall."
@@ -3082,6 +3115,8 @@ LABELS: dict[str, dict[str, str]] = {
         "unit_monthly": "months",
         "unit_hourly": "hours",
         "unit_periods": "curve periods",
+        "unit_periods_days": "curve periods (on average {n} calendar days each)",
+        "unit_periods_hours": "curve periods (on average {n} calendar hours each)",
         "risk_under_median": "median",
         "risk_under_p95": "in 1 of every 20",
         "challenge": "Prop-firm challenge simulator",
@@ -4377,7 +4412,13 @@ def _kpi_list(data: dict[str, Any], labels: dict[str, str]) -> list[tuple[str, s
     if count is not None and rate is not None:
         out.append((labels["kpi_trades"], f"{count:,.0f} · {rate:.0%}", ""))
     breakeven = _ev_value(costs.get("break_even_bps"))
-    reference = _ev_value(costs.get("reference_bps")) or 0.0
+    # An assumed reference is tagged NOT_MEASURED but is still the one the costs used.
+    reference_value = (costs.get("reference_bps") or {}).get("value")
+    reference = (
+        float(reference_value)
+        if isinstance(reference_value, int | float) and not isinstance(reference_value, bool)
+        else 0.0
+    )
     if breakeven is not None and breakeven <= 0:
         # Negative already before any extra cost: "-0.56 bp" would read as a cost.
         label = f"{labels['kpi_breakeven']} ({labels['kpi_breakeven_negative']})"
@@ -4927,10 +4968,35 @@ def _hidden_loss_note(data: dict[str, Any], labels: dict[str, str]) -> str:
     )
 
 
-def _period_unit(frequency: str, labels: dict[str, str]) -> str:
+#: Periods per year at which one period of the curve has a calendar name: a
+#: name is used only when the curve's density is close to it, since the time
+#: under water is counted in the curve's own points (a curve with one row per
+#: trade can have the density of hours without being hourly).
+PERIOD_UNITS: tuple[tuple[float, float, str], ...] = (
+    (11.0, 13.0, "unit_monthly"),
+    (48.0, 56.0, "unit_weekly"),
+    (235.0, 270.0, "unit_daily_trading"),
+    (345.0, 385.0, "unit_daily_calendar"),
+    (5600.0, 9000.0, "unit_hourly"),
+)
+DAYS_PER_YEAR = 365.25
+
+
+def _period_unit(periods_per_year: float | None, labels: dict[str, str]) -> str:
     """What one period of the uploaded curve is (trading days, weeks...), as a
-    reader counts it; the curve's own periods when the spacing has no name."""
-    return labels.get(f"unit_{frequency}", labels["unit_periods"])
+    reader counts it, when the curve's density matches that name. Otherwise
+    the curve's own periods, with their average calendar length worked out
+    from the same density (365.25 / periods per year)."""
+    if periods_per_year is None or not math.isfinite(periods_per_year) or periods_per_year <= 0:
+        return labels["unit_periods"]
+    for low, high, key in PERIOD_UNITS:
+        if low <= periods_per_year <= high:
+            return labels[key]
+    days = DAYS_PER_YEAR / periods_per_year
+    if days >= 1:
+        return labels["unit_periods_days"].format(n=f"{days:,.0f}" if days >= 10 else f"{days:.1f}")
+    hours = days * 24
+    return labels["unit_periods_hours"].format(n=f"{hours:.0f}" if hours >= 10 else f"{hours:.1f}")
 
 
 def _whole_cell(item: dict[str, Any]) -> str:
@@ -4950,7 +5016,7 @@ def _risk_html(
     labels: dict[str, str],
     hidden_note: str = "",
     *,
-    frequency: str = "",
+    periods_per_year: float | None = None,
 ) -> str:
     if not risk:
         return f"<p class='muted'>{_e(labels['none'])}</p>"
@@ -4980,8 +5046,9 @@ def _risk_html(
             + "</table>"
         )
         under = risk["longest_underwater_periods"]
+        unit = _period_unit(periods_per_year, labels)
         html_text += (
-            f"<p>{_e(labels['risk_underwater'].format(unit=_period_unit(frequency, labels)))}: "
+            f"<p>{_e(labels['risk_underwater'].format(unit=unit))}: "
             f"{_e(labels['risk_under_median'])} {_whole_cell(under['p50'])}, "
             f"{_e(labels['risk_under_p95'])} {_whole_cell(under['p95'])}</p>"
         )
@@ -7634,6 +7701,71 @@ def _traded_symbols(data: dict[str, Any]) -> list[str]:
     return list(seen.values())
 
 
+def _crises_rows(
+    stress: dict[str, Any] | None, symbols: list[str] | None
+) -> tuple[list[dict[str, Any]], set[str] | None]:
+    """The covered windows the section shows, and the markets traded (``None``
+    when a symbol is uncertain or the file names none: every window is shown).
+
+    With every market known, a window is shown when its fall is in a market
+    traded. When none is, the windows compared with the client's own index
+    stay: that comparison is with the client's yardstick, whatever the market."""
+    rows = list((stress or {}).get("windows") or [])
+    markets = traded_markets(symbols) if symbols else None
+    if markets is None:
+        return rows, None
+    kept = [row for row in rows if WINDOW_MARKET.get(row["key"]) in markets]
+    return kept or [row for row in rows if "benchmark" in row], markets
+
+
+def _crises_apply(data: dict[str, Any]) -> bool:
+    """False when the crises section shows no window because none of the
+    covered falls is in a market the history trades."""
+    stress = data.get("crises")
+    if not _crises_shown(stress) or not (stress or {}).get("windows"):
+        return True
+    return bool(_crises_rows(stress, _traded_symbols(data))[0])
+
+
+def _crises_worse(stress: dict[str, Any], rows: list[dict[str, Any]]) -> tuple[int, int] | None:
+    """How many of the shown windows fell more than the index, and out of how
+    many compared, when that is a finding. With every covered window shown it
+    is the stored finding; with fewer it is the same rule (``crises.WORSE_SHARE``
+    of at least ``crises.MIN_WINDOWS``) on the windows shown, for display only."""
+    if len(rows) == len(stress.get("windows") or []):
+        if "fell_more_in_crises" not in (stress.get("findings") or []):
+            return None
+        return int(stress["worse_than_benchmark"]["value"]), int(stress["compared"]["value"])
+    compared = [row for row in rows if "benchmark" in row]
+    worse = sum(
+        1 for row in compared if float(row["fund"]["value"]) < float(row["benchmark"]["value"])
+    )
+    if len(compared) >= MIN_WINDOWS and worse >= WORSE_SHARE * len(compared):
+        return worse, len(compared)
+    return None
+
+
+def _crises_not_applicable(
+    stress: dict[str, Any], markets: set[str], symbols: list[str], labels: dict[str, str]
+) -> str:
+    """Why no covered window is shown: the markets of the falls the curve
+    covers, and, when a market traded has falls in the list, that the curve
+    covers none of them."""
+    covered = sorted(
+        {WINDOW_MARKET.get(row["key"], "") for row in stress.get("windows") or []} - {""}
+    )
+    falls = labels["crises_falls_" + (covered[0] if len(covered) == 1 else "both")]
+    shown = ", ".join(symbols[:CRISES_SYMBOLS_SHOWN]) + (
+        "…" if len(symbols) > CRISES_SYMBOLS_SHOWN else ""
+    )
+    missing = sorted(markets & set(WINDOW_MARKET.values()))
+    if missing:
+        traded = ", ".join(labels["crises_traded_" + market] for market in missing)
+        return labels["crises_not_covered"].format(symbols=shown, traded=traded, falls=falls)
+    that = labels["crises_that_market" if len(covered) == 1 else "crises_those_markets"]
+    return labels["crises_not_applicable"].format(symbols=shown, falls=falls, that=that)
+
+
 def _crises_html(
     stress: dict[str, Any] | None,
     labels: dict[str, str],
@@ -7644,23 +7776,21 @@ def _crises_html(
     """A fund or any dated curve through the dated market falls it covers.
 
     When the market of every traded symbol is known (``crises.traded_markets``),
-    only the falls of those markets are shown; a history trading none of them
-    says so in one line instead of a table of unrelated markets. Otherwise
-    every covered fall is shown, as before."""
+    only the falls of those markets are shown (``_crises_rows``); a history
+    trading none of them says so in one line instead of a table of unrelated
+    markets, unless the windows carry the client's own index. Otherwise every
+    covered fall is shown, as before."""
     if not stress or not _crises_shown(stress):
         return ""
     out = ""
     subject = labels["fund_stress_fund" if fund else "crises_subject"]
-    rows = stress.get("windows") or []
-    covered = len(rows)
-    markets = traded_markets(symbols) if symbols else None
-    if markets is not None:
-        rows = [row for row in rows if WINDOW_MARKET.get(row["key"]) in markets]
+    covered = len(stress.get("windows") or [])
+    rows, markets = _crises_rows(stress, symbols)
     with_index = any("benchmark" in row for row in rows)
-    # The finding counts every covered window: it is shown with all of them only.
-    if len(rows) == covered and "fell_more_in_crises" in (stress.get("findings") or []):
+    worse = _crises_worse(stress, rows)
+    if worse is not None:
         text = labels["fund_stress_worse" if fund else "crises_worse"].format(
-            worse=int(stress["worse_than_benchmark"]["value"]), n=int(stress["compared"]["value"])
+            worse=worse[0], n=worse[1]
         )
         out += (
             f"<div class='live-verdict lv-WEAK beh'><span class='badge WEAK'>"
@@ -7703,11 +7833,8 @@ def _crises_html(
             f"<tbody>{body}</tbody></table>"
         )
         out += _market_note([row["key"] for row in rows], labels)
-    elif covered:
-        shown = ", ".join((symbols or [])[:CRISES_SYMBOLS_SHOWN]) + (
-            "…" if len(symbols or []) > CRISES_SYMBOLS_SHOWN else ""
-        )
-        text = labels["crises_not_applicable"].format(symbols=shown)
+    elif covered and markets is not None:
+        text = _crises_not_applicable(stress, markets, symbols or [], labels)
         out += f"<p class='muted'>{_e(text)}</p>"
     else:
         out += f"<p class='muted'>{_e(labels['fund_stress_none'])}</p>"
@@ -8862,7 +8989,7 @@ def render_html(
                 locale,
                 labels,
                 hidden,
-                frequency=str((data.get("inputs") or {}).get("frequency_label") or ""),
+                periods_per_year=_ev_value((data.get("inputs") or {}).get("periods_per_year")),
             ),
         ),
         *(
@@ -8980,7 +9107,13 @@ def render_html(
             + "".join(
                 f"<li>{_e(gain)}</li>"
                 for gain in _locked_gains(
-                    [title for title, body in detail if not _only_unmeasured(body)],
+                    [
+                        title
+                        for title, body in detail
+                        if not _only_unmeasured(body)
+                        # Falls of markets the history does not trade are not on offer.
+                        and (title != labels["crises"] or _crises_apply(data))
+                    ],
                     labels,
                     locale,
                 )

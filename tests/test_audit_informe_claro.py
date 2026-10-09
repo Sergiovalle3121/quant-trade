@@ -31,12 +31,19 @@ from quant_trade.audit.engine import DEFAULT_NOT_DECLARED, run_audit  # noqa: E4
 from quant_trade.audit.guard import find_claims  # noqa: E402
 from quant_trade.audit.institutional import COPY as REVIEW_COPY  # noqa: E402
 from quant_trade.audit.institutional import REVIEW_PATHS  # noqa: E402
-from quant_trade.audit.plan import _significance_step, improvement_plan  # noqa: E402
+from quant_trade.audit.pages import _UI, upload_page  # noqa: E402
+from quant_trade.audit.plan import (  # noqa: E402
+    _multiplicity_step,
+    _significance_step,
+    improvement_plan,
+)
 from quant_trade.audit.report import (  # noqa: E402
     INTEGRITY_TEXT,
     KEY_LABELS,
     LABELS,
+    LOCKED_GAINS,
     _crises_html,
+    _kpi_list,
     _period_unit,
     _traded_symbols,
     evidence_label,
@@ -192,7 +199,17 @@ def test_crises_of_other_markets_do_not_apply_to_a_currency_ea(
     assert _traded_symbols(sample_data) == ["AUDUSD", "EURUSD"]
     page = _page(sample_data, locale)
     section = _section(page, LABELS[locale]["crises"])
-    line = LABELS[locale]["crises_not_applicable"].format(symbols="AUDUSD, EURUSD")
+    line = {
+        "es": "No aplica a este historial: las crisis que cubre la curva son caídas de acciones "
+        "de EE. UU. y de bitcoin, y ninguno de los símbolos operados (AUDUSD, EURUSD) es de "
+        "esos mercados.",
+        "en": "Does not apply to this history: the crises the curve covers are falls in US "
+        "equities and in bitcoin, and none of the symbols traded (AUDUSD, EURUSD) belongs to "
+        "those markets.",
+        "pt": "Não se aplica a este histórico: as crises que a curva cobre são quedas de ações "
+        "dos EUA e do bitcoin, e nenhum dos símbolos operados (AUDUSD, EURUSD) é desses "
+        "mercados.",
+    }[locale]
     assert line in section
     for market in ("S&P 500", "Nasdaq", "Bitcoin"):
         assert market not in section
@@ -250,6 +267,151 @@ def test_crises_keep_only_the_falls_of_the_markets_traded(sample_data: dict[str,
     assert all(market in _text(unknown) for market in ("S&P 500", "Nasdaq", "Bitcoin"))
     # The data and the calculation of the crises are untouched.
     assert [row["key"] for row in stress["windows"]] == ["covid", "rates_2022", "crypto_2022"]
+
+
+def _only(stress: dict[str, Any], *keys: str) -> dict[str, Any]:
+    """The same crises with only the windows ``keys`` covered."""
+    stress = copy.deepcopy(stress)
+    stress["windows"] = [row for row in stress["windows"] if row["key"] in keys]
+    return stress
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+def test_a_bitcoin_curve_that_misses_2022_is_told_so(
+    sample_data: dict[str, Any], locale: str
+) -> None:
+    """A bitcoin backtest whose curve covers covid but not the 2022 crypto fall."""
+    text = _text(
+        _crises_html(_only(sample_data["crises"], "covid"), LABELS[locale], symbols=["BTCUSD"])
+    )
+    line = {
+        "es": "No aplica a este historial: las crisis que cubre la curva son caídas de acciones "
+        "de EE. UU.; los símbolos operados (BTCUSD) incluyen bitcoin, pero la curva no cubre "
+        "ninguna de las crisis de ese mercado.",
+        "en": "Does not apply to this history: the crises the curve covers are falls in US "
+        "equities; the symbols traded (BTCUSD) include bitcoin, but the curve covers none of "
+        "that market's crises.",
+        "pt": "Não se aplica a este histórico: as crises que a curva cobre são quedas de ações "
+        "dos EUA; os símbolos operados (BTCUSD) incluem bitcoin, mas a curva não cobre nenhuma "
+        "das crises desse mercado.",
+    }[locale]
+    assert line in text
+    for wrong in ("es de esos mercados", "belongs to those markets", "é desses mercados"):
+        assert wrong not in text
+    assert find_claims(line) == []
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+def test_a_currency_curve_with_equity_falls_only_does_not_name_bitcoin(
+    sample_data: dict[str, Any], locale: str
+) -> None:
+    stress = _only(sample_data["crises"], "covid", "rates_2022")
+    text = _text(_crises_html(stress, LABELS[locale], symbols=["EURUSD"]))
+    line = {
+        "es": "No aplica a este historial: las crisis que cubre la curva son caídas de acciones "
+        "de EE. UU., y ninguno de los símbolos operados (EURUSD) es de ese mercado.",
+        "en": "Does not apply to this history: the crises the curve covers are falls in US "
+        "equities, and none of the symbols traded (EURUSD) belongs to that market.",
+        "pt": "Não se aplica a este histórico: as crises que a curva cobre são quedas de ações "
+        "dos EUA, e nenhum dos símbolos operados (EURUSD) é desse mercado.",
+    }[locale]
+    assert line in text
+    assert "bitcoin" not in text.lower()
+    assert find_claims(line) == []
+
+
+def _with_index(data: dict[str, Any], symbols: tuple[str, str]) -> dict[str, Any]:
+    """The sample traded on ``symbols``, with a client benchmark that fell less
+    than the curve in each of its three covered crises."""
+    data = copy.deepcopy(data)
+    for row, name in zip(data["instruments"]["rows"], symbols, strict=True):
+        row["key"] = name
+    data["instruments"]["best"]["key"] = symbols[0]
+    data["inputs"]["report_metadata"]["symbol"] = ",".join(symbols)
+    data["costs"].pop("pip_symbol", None)
+    stress = data["crises"]
+    for row, (fund, index) in zip(
+        stress["windows"], ((-0.278, -0.098), (-0.307, -0.086), (-0.35, -0.10)), strict=True
+    ):
+        row["fund"]["value"] = fund
+        row["benchmark"] = {"value": index, "evidence": "MEASURED", "note": ""}
+    stress["findings"] = ["fell_more_in_crises"]
+    stress["worse_than_benchmark"] = {"value": 3, "evidence": "MEASURED", "note": ""}
+    stress["compared"] = {"value": 3, "evidence": "MEASURED", "note": ""}
+    return data
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+def test_falling_more_than_the_index_survives_the_market_filter(
+    sample_data: dict[str, Any], locale: str
+) -> None:
+    """US500 over 2021-11..2022-12: the bitcoin window goes, the warning stays,
+    counted on the two equity windows still shown."""
+    data = _with_index(sample_data, ("US500", "NAS100"))
+    assert _traded_symbols(data) == ["US500", "NAS100"]
+    section = _section(_page(data, locale), LABELS[locale]["crises"])
+    labels = LABELS[locale]
+    assert labels["crises_worse"].format(worse=2, n=2) in section
+    assert labels["fund_stress_covid"] in section and labels["fund_stress_rates_2022"] in section
+    assert labels["fund_stress_crypto_2022"] not in section
+    assert find_claims(section) == []
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+def test_the_clients_own_index_keeps_the_crises_of_other_markets(
+    sample_data: dict[str, Any], locale: str
+) -> None:
+    """A currency EA compared with the client's own index: the comparison and
+    its warning stay, it is not reduced to "does not apply"."""
+    data = _with_index(sample_data, ("AUDUSD", "EURUSD"))
+    section = _section(_page(data, locale), LABELS[locale]["crises"])
+    labels = LABELS[locale]
+    assert labels["crises_worse"].format(worse=3, n=3) in section
+    assert labels["fund_stress_index"] in section
+    for key in ("covid", "rates_2022", "crypto_2022"):
+        assert labels[f"fund_stress_{key}"] in section
+    for wrong in ("No aplica", "Does not apply", "Não se aplica"):
+        assert wrong not in section
+
+
+def test_a_warning_the_shown_windows_do_not_support_is_not_shown(
+    sample_data: dict[str, Any],
+) -> None:
+    """Only one equity window compared: fewer than the two the rule needs."""
+    data = _with_index(sample_data, ("US500", "NAS100"))
+    stress = data["crises"]
+    del stress["windows"][1]["benchmark"]
+    text = _text(_crises_html(stress, LABELS["en"], symbols=["US500"]))
+    assert LABELS["en"]["crises_worse"].format(worse=1, n=1) not in text
+    assert "To ask" not in text
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+def test_the_locked_view_does_not_sell_crises_that_do_not_apply(
+    sample_data: dict[str, Any], locale: str
+) -> None:
+    gain = LOCKED_GAINS[locale]["crises"]
+    result = AuditResult.model_validate(sample_data)
+    locked = _text(render_html(result, watermark=True, free_mode=False, locale=locale))
+    assert LABELS[locale]["locked_intro"] in locked
+    assert gain not in locked
+    for promise in ("2008, el covid", "2008, covid", "2008, na covid"):
+        assert promise not in locked
+    # Where the crises apply, the lockbox still lists them.
+    equities = AuditResult.model_validate(_with_index(sample_data, ("US500", "NAS100")))
+    assert gain in _text(render_html(equities, watermark=True, free_mode=False, locale=locale))
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+def test_the_landing_card_says_crises_of_other_markets_are_left_out(locale: str) -> None:
+    text = next(text for icon, _, text in _UI[locale]["diffs"] if icon == "chart")
+    expected = {
+        "es": "se mide por separado, salvo las de mercados que no operas",
+        "en": "is measured on its own, except those of markets you do not trade",
+        "pt": "é medida à parte, exceto as de mercados que você não opera",
+    }[locale]
+    assert expected in text
+    assert find_claims(expected) == []
 
 
 # 4 · a share of more than 100 % -------------------------------------------------
@@ -354,9 +516,47 @@ def test_time_under_water_has_a_unit_and_whole_numbers(
     assert found.group(1) == "72" and found.group(2) == "186"
     assert "186.05" not in text
     assert find_claims(label) == []
-    # Each spacing of the curve names its own period; an unnamed one says so.
-    assert _period_unit("monthly", LABELS[locale]) == LABELS[locale]["unit_monthly"]
-    assert _period_unit("intraday", LABELS[locale]) == LABELS[locale]["unit_periods"]
+    # A density close to a calendar spacing names it; any other says the curve's periods.
+    labels = LABELS[locale]
+    for ppy, key in (
+        (12.0, "unit_monthly"),
+        (52.18, "unit_weekly"),
+        (252.0, "unit_daily_trading"),
+        (261.0, "unit_daily_trading"),
+        (365.25, "unit_daily_calendar"),
+        (6262.0, "unit_hourly"),
+        (8766.0, "unit_hourly"),
+        (None, "unit_periods"),
+    ):
+        assert _period_unit(ppy, labels) == labels[key], ppy
+    assert _period_unit(26.0, labels) == labels["unit_periods_days"].format(n="14")
+    assert _period_unit(100.0, labels) == labels["unit_periods_days"].format(n="3.7")
+    assert _period_unit(1560.0, labels) == labels["unit_periods_hours"].format(n="5.6")
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+def test_an_irregular_curve_is_not_counted_in_hours(
+    sample_data: dict[str, Any], locale: str
+) -> None:
+    """One row per trade, about 500 a year: the density of "hourly", not hours."""
+    data = copy.deepcopy(sample_data)
+    data["inputs"]["periods_per_year"]["value"] = 500.0
+    data["inputs"]["frequency_label"] = "hourly"
+    text = _text(_page(data, locale))
+    labels = LABELS[locale]
+    unit = {
+        "es": "periodos de la curva (de media, 18 horas de calendario cada uno)",
+        "en": "curve periods (on average 18 calendar hours each)",
+        "pt": "períodos da curva (em média, 18 horas corridas cada um)",
+    }[locale]
+    assert labels["risk_underwater"].format(unit=unit) in text
+    assert labels["risk_underwater"].format(unit=labels["unit_hourly"]) not in text
+    assert find_claims(unit) == []
+    # A daily return series of 365 days a year counts calendar days.
+    data["inputs"]["periods_per_year"]["value"] = 365.0
+    data["inputs"]["frequency_label"] = "daily_trading"
+    text = _text(_page(data, locale))
+    assert labels["risk_underwater"].format(unit=labels["unit_daily_calendar"]) in text
 
 
 # 6 · already below 0.5 at a single trial ----------------------------------------
@@ -372,6 +572,44 @@ def test_below_half_at_one_trial_blames_the_signal_not_the_search(
         assert wrong not in text
     step = next(s for s in improvement_plan(account_data, locale) if s.dimension == "multiplicity")
     assert ONE_TRIAL[locale] in step.finding
+    # The actions follow: nothing about fewer or counted trials, which cannot lift the class.
+    for wrong in ("reducen el número de intentos", "mean fewer trials", "reduzem o número"):
+        assert wrong not in text
+    for wrong in ("intentos pasa a ser medido", "count becomes measured", "passa a ser medido"):
+        assert all(wrong not in action for action in step.actions)
+    assert all("XML" not in action for action in step.actions)
+    signal = {
+        "es": "revisa si la idea tiene una ventaja",
+        "en": "check whether the idea has an edge",
+        "pt": "verifique se a ideia tem uma vantagem",
+    }[locale]
+    assert any(signal in action for action in step.actions)
+    assert signal in text
+    assert all(find_claims(action) == [] for action in step.actions)
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+def test_a_fund_below_half_at_one_trial_is_not_asked_for_its_count(locale: str) -> None:
+    data = {
+        "fund": {"track_record": True},
+        "multiplicity": {
+            "status": "MEASURED",
+            "trials_used": {"value": 1, "evidence": "MEASURED"},
+            "dsr_at_trials_used": {"value": 0.3, "evidence": "MEASURED"},
+            "trials_to_half": {"value": 1, "evidence": "MEASURED"},
+        },
+    }
+    finding, actions = _multiplicity_step(data, "FAIL", locale)
+    assert "0.5" in finding
+    text = " ".join(actions)
+    for wrong in ("decláralo", "declare it", "declare isso"):
+        assert wrong not in text
+    assert {
+        "es": "más historial del mismo fondo",
+        "en": "more history of the same fund",
+        "pt": "mais histórico do mesmo fundo",
+    }[locale] in text
+    assert find_claims(text) == []
 
 
 # 7 · two identical DSR rows ------------------------------------------------------
@@ -507,6 +745,90 @@ def test_the_cost_note_keeps_its_old_words_when_zero_was_declared() -> None:
     assert "no cost was declared" in reference_note(True, True, cost_declared=False)
 
 
+@pytest.mark.parametrize("locale", LOCALES)
+def test_an_assumed_reference_cost_is_never_declared(
+    uploads: tuple[TestClient, str, str], locale: str
+) -> None:
+    """The cost left blank: Rigor assumed 0.5 bps of slippage, so the cost
+    table, the challenge ladder and the public JSON never say Declared."""
+    client, blank, _ = uploads
+    result = _json(client, blank)
+    reference = result["costs"]["reference_bps"]
+    assert reference["value"] == 0.5 and reference["evidence"] == "NOT_MEASURED"
+    assert reference["note"].startswith("assumed slippage: no cost was declared")
+    costs = next(d for d in result["verdict"]["dimensions"] if d["name"] == "costs")
+    assert costs["inputs"]["reference_bps_per_side"] == {
+        "value": 0.5,
+        "evidence": "NOT_MEASURED",
+        "note": reference["note"],
+    }
+    text = _text(client.get(f"{blank}&lang={locale}").text)
+    not_measured = evidence_label("NOT_MEASURED", locale)
+    declared = evidence_label("DECLARED", locale)
+    row = KEY_LABELS[locale]["reference_bps"]
+    ladder = LABELS[locale]["ch_ladder_cost"].format(bps="0.5")
+    assert f"{row} 0.5000 {not_measured}" in text
+    assert f"{ladder} {not_measured}" in text
+    for name in (row, ladder):
+        assert not re.search(re.escape(name) + r" \S+ " + re.escape(declared), text)
+        assert f"{name} {declared}" not in text
+    for wrong in ("client declared zero cost", "el cliente declaró costo cero", "declarou custo"):
+        assert wrong not in text
+
+
+def test_a_zero_cost_declared_keeps_its_note_but_not_the_label(
+    account_data: dict[str, Any],
+) -> None:
+    """0 written by the client: the 0.5 the costs use is still Rigor's assumption."""
+    reference = account_data["costs"]["reference_bps"]
+    assert reference["evidence"] == "NOT_MEASURED"
+    assert "the client declared zero cost" in reference["note"]
+    # The figure the costs and the tiles use does not change with the label.
+    as_declared = copy.deepcopy(account_data)
+    as_declared["costs"]["reference_bps"]["evidence"] = "DECLARED"
+    for locale in LOCALES:
+        assert _kpi_list(account_data, LABELS[locale]) == _kpi_list(as_declared, LABELS[locale])
+
+
+def test_a_cost_the_client_wrote_stays_declared(uploads: tuple[TestClient, str, str]) -> None:
+    client, _, answered = uploads
+    result = _json(client, answered)
+    assert result["costs"]["reference_bps"]["evidence"] == "DECLARED"
+    assert result["costs"]["reference_bps"]["value"] == 2.0
+    costs = next(d for d in result["verdict"]["dimensions"] if d["name"] == "costs")
+    assert costs["inputs"]["reference_bps_per_side"]["evidence"] == "DECLARED"
+
+
+def _benchmark_select(page: str) -> str:
+    found = re.search(r"<select name='benchmark_applicable'[^>]*>(.*?)</select>", page, re.S)
+    assert found is not None
+    return found.group(1)
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+def test_the_benchmark_question_starts_unanswered(locale: str) -> None:
+    select = _benchmark_select(upload_page(locale=locale))
+    first, rest = select.split("</option>", 1)
+    assert first.startswith("<option value='' selected>")
+    assert " selected" not in rest
+    label = {
+        "es": "Sin respuesta (cuenta como sí)",
+        "en": "No answer (counts as yes)",
+        "pt": "Sem resposta (conta como sim)",
+    }[locale]
+    assert html.unescape(first).endswith(label)
+    assert find_claims(label) == []
+    # An answer carried back after a refusal stays selected.
+    chosen = _benchmark_select(upload_page(locale=locale, carried={"benchmark_applicable": "yes"}))
+    assert "<option value='yes' selected>" in chosen and "value='' selected" not in chosen
+
+
+def test_an_explicit_yes_is_declared(uploads: tuple[TestClient, str, str]) -> None:
+    client, _, _ = uploads
+    declared = _json(client, _upload(client, benchmark_applicable="yes"))["declared"]
+    assert declared["benchmark_applicable"] == {"value": True, "evidence": "DECLARED", "note": ""}
+
+
 # 9 · forensics that no calibrated check could read -------------------------------
 
 
@@ -591,6 +913,16 @@ def test_the_institutional_page_names_the_label_correctly(
 def test_every_new_text_passes_the_guard() -> None:
     keys = (
         "crises_not_applicable",
+        "crises_not_covered",
+        "crises_falls_us_equity",
+        "crises_falls_crypto",
+        "crises_falls_both",
+        "crises_traded_us_equity",
+        "crises_traded_crypto",
+        "crises_that_market",
+        "crises_those_markets",
+        "unit_periods_days",
+        "unit_periods_hours",
         "timing_best_day_over",
         "timing_best_day_over_plain",
         "timing_best_block_over",

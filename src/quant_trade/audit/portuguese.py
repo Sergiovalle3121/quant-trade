@@ -113,6 +113,7 @@ COPY_PT: dict[str, Any] = {
         "São rentabilidades de um fundo, já líquidas das suas taxas (só histórico mensal)"
     ),
     "benchmark_applicable": "Um benchmark se aplica?",
+    "unanswered": "Sem resposta (conta como sim)",
     "yes": "Sim",
     "no": "Não",
     "locale": "Idioma do relatório",
@@ -506,8 +507,8 @@ UI_PT: dict[str, Any] = {
             "chart",
             "Mercado tranquilo e agitado",
             "Cada rentabilidade é atribuída segundo o VIX do dia anterior, e cada crise de data "
-            "pública que o seu histórico cobre é medida à parte: você vê se o resultado depende "
-            "de um só tipo de mercado.",
+            "pública que o seu histórico cobre é medida à parte, exceto as de mercados que você "
+            "não opera: você vê se o resultado depende de um só tipo de mercado.",
         ),
         (
             "globe",

@@ -616,9 +616,21 @@ REPORT: dict[str, Any] = {
         "crises_subject": "Estratégia",
         "crises_no_trades": "nenhuma operação fechada na janela",
         "crises_not_applicable": (
-            "Não se aplica a este histórico: estas crises são quedas de ações dos EUA e do "
-            "bitcoin, e nenhum dos símbolos operados ({symbols}) é desses mercados."
+            "Não se aplica a este histórico: as crises que a curva cobre são {falls}, e nenhum "
+            "dos símbolos operados ({symbols}) é {that}."
         ),
+        "crises_not_covered": (
+            "Não se aplica a este histórico: as crises que a curva cobre são {falls}; os "
+            "símbolos operados ({symbols}) incluem {traded}, mas a curva não cobre nenhuma das "
+            "crises desse mercado."
+        ),
+        "crises_falls_us_equity": "quedas de ações dos EUA",
+        "crises_falls_crypto": "quedas do bitcoin",
+        "crises_falls_both": "quedas de ações dos EUA e do bitcoin",
+        "crises_traded_us_equity": "ações dos EUA",
+        "crises_traded_crypto": "bitcoin",
+        "crises_that_market": "desse mercado",
+        "crises_those_markets": "desses mercados",
         "crises_worse": (
             "Em {worse} de {n} crises caiu mais que seu índice. Pergunte ao vendedor o que a "
             "protege quando o mercado cai."
@@ -974,6 +986,8 @@ REPORT: dict[str, Any] = {
         "unit_monthly": "meses",
         "unit_hourly": "horas",
         "unit_periods": "períodos da curva",
+        "unit_periods_days": "períodos da curva (em média, {n} dias corridos cada um)",
+        "unit_periods_hours": "períodos da curva (em média, {n} horas corridas cada um)",
         "risk_under_median": "mediana",
         "risk_under_p95": "em 1 de cada 20",
         "challenge": "Simulador de desafio de mesa proprietária (prop firm)",

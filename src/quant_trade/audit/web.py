@@ -4897,7 +4897,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         cost_bps: Annotated[str, Form(max_length=20)] = "",
         oos_start: Annotated[str, Form()] = "",
         description: Annotated[str, Form()] = "",
-        benchmark_applicable: Annotated[str, Form()] = "yes",
+        benchmark_applicable: Annotated[str, Form()] = "",
         locale: Annotated[str, Form()] = "es",
         consent: Annotated[str, Form()] = "",
         challenge: Annotated[str, Form()] = "",
@@ -5235,8 +5235,10 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 oos_start=oos_start.strip() or None,
                 description=description,
                 benchmark_applicable=benchmark_applicable.lower() not in ("no", "false", "0"),
-                # The form preselects "yes": only a "no" is an answer the client gave.
-                benchmark_declared=benchmark_applicable.strip().lower() in ("no", "false", "0"),
+                # The form preselects "no answer", which counts as "yes": only an
+                # explicit "yes" or "no" is an answer the client gave.
+                benchmark_declared=benchmark_applicable.strip().lower()
+                in ("yes", "true", "1", "no", "false", "0"),
                 locale=report_loc,
                 initial_balance=_positive_or_none(initial_balance),
                 challenge=challenge.strip() or None,

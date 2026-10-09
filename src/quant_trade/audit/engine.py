@@ -476,6 +476,15 @@ def _by_default(value: Any) -> dict[str, Any]:
     return {"value": value, "evidence": NOT_MEASURED, "note": DEFAULT_NOT_DECLARED}
 
 
+def _reference(value: float, note: str, *, assumed: bool) -> dict[str, Any]:
+    """The reference cost: DECLARED when it is the client's figure. One the
+    audit assumed (the client's cost was zero or blank) keeps its value and
+    its note but is tagged NOT_MEASURED, never DECLARED."""
+    if assumed:
+        return {"value": float(value), "evidence": NOT_MEASURED, "note": note}
+    return declared(value, note)
+
+
 def trial_count(inputs: AuditInputs) -> tuple[int, str, str]:
     """The trial count the deflated Sharpe uses, its evidence and its source.
 
@@ -1044,7 +1053,7 @@ def _costs(
     gross = cost_lib.gross_pnls(inputs.trades.trades, inputs.trades.sides)
     section = {
         "status": "MEASURED",
-        "reference_bps": declared(
+        "reference_bps": _reference(
             ref,
             cost_lib.reference_note(
                 assumed,
@@ -1052,6 +1061,7 @@ def _costs(
                 real_fills,
                 cost_declared=inputs.declared.cost_declared,
             ),
+            assumed=assumed,
         ),
         "reported_costs_in_rows": fees_reported,
         "rows": [
@@ -1088,7 +1098,7 @@ def _costs(
         pip = 0.01 if pair.endswith("JPY") else 0.0001
         where = f"per side on {pair} at {price:.5g}, the median entry price"
         section["break_even_pips"] = measured(be / 10_000 * price / pip, where)
-        section["reference_pips"] = declared(ref / 10_000 * price / pip, where)
+        section["reference_pips"] = _reference(ref / 10_000 * price / pip, where, assumed=assumed)
         section["pip_symbol"] = pair
     if inputs.reported_fees:
         section["reported_fees"] = {
@@ -2264,6 +2274,7 @@ def run_audit(
             reference_is_assumption=assumed,
             fees_reported=inputs.trades is not None and inputs.trades.reports_fees,
             real_fills=_real_fills(inputs),
+            cost_declared=inputs.declared.cost_declared,
             thresholds=thresholds,
         ),
         verdict.assess_out_of_sample(

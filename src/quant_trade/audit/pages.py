@@ -301,6 +301,7 @@ _COPY: dict[str, dict[str, Any]] = {
             "Son rentabilidades de un fondo, ya netas de sus comisiones (solo historial mensual)"
         ),
         "benchmark_applicable": "¿Aplica un benchmark?",
+        "unanswered": "Sin respuesta (cuenta como sí)",
         "yes": "Sí",
         "no": "No",
         "locale": "Idioma del informe",
@@ -623,6 +624,7 @@ _COPY: dict[str, dict[str, Any]] = {
             "These are a fund's returns, already net of its fees (monthly track record only)"
         ),
         "benchmark_applicable": "Does a benchmark apply?",
+        "unanswered": "No answer (counts as yes)",
         "yes": "Yes",
         "no": "No",
         "locale": "Report language",
@@ -1011,8 +1013,8 @@ _UI: dict[str, dict[str, Any]] = {
                 "chart",
                 "Mercado tranquilo y agitado",
                 "Cada rentabilidad se asigna según el VIX del día anterior, y cada crisis de "
-                "fecha pública que cubre tu historial se mide por separado: ves si el resultado "
-                "depende de un solo tipo de mercado.",
+                "fecha pública que cubre tu historial se mide por separado, salvo las de "
+                "mercados que no operas: ves si el resultado depende de un solo tipo de mercado.",
             ),
             (
                 "globe",
@@ -1251,8 +1253,8 @@ _UI: dict[str, dict[str, Any]] = {
                 "chart",
                 "Calm and agitated markets",
                 "Each return is placed by the previous day's VIX, and every publicly dated "
-                "crisis your history covers is measured on its own: you see whether the result "
-                "depends on one kind of market.",
+                "crisis your history covers is measured on its own, except those of markets you "
+                "do not trade: you see whether the result depends on one kind of market.",
             ),
             (
                 "globe",
@@ -2382,11 +2384,13 @@ def _upload_form(
         + _field(
             copy["benchmark_applicable"],
             "<select name='benchmark_applicable'>"
+            # Left unanswered it counts as "yes", shown as a default and not
+            # as the client's declaration; "yes" and "no" are answers.
             + "".join(
-                f"<option value='{option}'"
-                + (" selected" if values.get("benchmark_applicable", "yes") == option else "")
+                f"<option value='{value_}'"
+                + (" selected" if values.get("benchmark_applicable", "") == value_ else "")
                 + f">{_e(copy[option])}</option>"
-                for option in ("yes", "no")
+                for value_, option in (("", "unanswered"), ("yes", "yes"), ("no", "no"))
             )
             + "</select>",
         )
