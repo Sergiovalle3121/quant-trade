@@ -111,6 +111,8 @@ EXPECTED_STEPS: dict[str, tuple[dict[str, str], ...]] = {
     "auditoria-independiente-backtest": ({"kind": "audit"}, {"kind": "sample"}),
     "que-hacer-despues-del-backtest": ({"kind": "audit"}, {"kind": "sample"}),
     "auditar-cartera-modelo-senales": ({"kind": "audit"}, {"kind": "sample"}),
+    "monte-carlo-backtest": ({"kind": "audit"}, {"kind": "sample"}),
+    "rachas-perdedoras": ({"kind": "winrate", "example": "win-rate"},),
 }
 PRICING_KEYS = (
     "start_title",

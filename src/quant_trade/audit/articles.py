@@ -792,6 +792,10 @@ ARTICLE_NEXT_STEPS: dict[str, tuple[dict[str, str], ...]] = {
     "auditoria-independiente-backtest": ({"kind": "audit"}, {"kind": "sample"}),
     "que-hacer-despues-del-backtest": ({"kind": "audit"}, {"kind": "sample"}),
     "auditar-cartera-modelo-senales": ({"kind": "audit"}, {"kind": "sample"}),
+    # What the report measures with the trades, and a sample of it.
+    "monte-carlo-backtest": ({"kind": "audit"}, {"kind": "sample"}),
+    # Streaks follow from the win rate: its free calculator comes first.
+    "rachas-perdedoras": ({"kind": "winrate", "example": "win-rate"},),
 }
 #: An article missing from the table keeps the old closing call.
 DEFAULT_NEXT_STEP: tuple[dict[str, str], ...] = ({"kind": "calculator"}, {"kind": "audit"})

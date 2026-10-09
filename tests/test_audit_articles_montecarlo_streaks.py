@@ -448,7 +448,7 @@ EXPECTED_LINKS = {
         article_url("cuantos-intentos-reto-prop-firm", locale),
         WINRATE_PATH[locale],
         audit_path(locale),
-        calculator_url(locale),
+        # Its next step is the win-rate calculator, not the luck calculator.
         article_url(MONTE_CARLO, locale),
     },
 }
