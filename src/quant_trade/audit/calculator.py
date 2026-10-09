@@ -96,6 +96,24 @@ def parse_input(
     return CalculatorInput(sharpe=sr, years=yrs, trials=n, periods_per_year=frequency)
 
 
+def read_input(
+    sharpe: str | None,
+    years: str | None,
+    trials: str | None,
+    periods_per_year: str | None = None,
+) -> CalculatorInput | str | None:
+    """``parse_input`` for values anyone can type into the address bar.
+
+    A trial count past float's range (``inf``, ``1e999``, hundreds of digits)
+    overflows ``int``: it is a bad number like any other, so the page shows
+    ``error_number`` and ``card.png`` answers 404 instead of a 500.
+    """
+    try:
+        return parse_input(sharpe, years, trials, periods_per_year)
+    except OverflowError:
+        return "error_number"
+
+
 def share_values(value: CalculatorInput) -> dict[str, str]:
     """The validated inputs as query strings that parse back to the same numbers.
 
@@ -488,6 +506,7 @@ __all__ = [
     "calculator_url",
     "compute",
     "parse_input",
+    "read_input",
     "share_url",
     "share_values",
 ]

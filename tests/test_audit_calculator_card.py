@@ -25,6 +25,7 @@ from quant_trade.audit.calculator import (  # noqa: E402
     CalculatorInput,
     compute,
     parse_input,
+    read_input,
     share_url,
     share_values,
 )
@@ -38,6 +39,8 @@ BASE = "https://audit.example"
 LOCALES = ("es", "en", "pt")
 PAGES = tuple((CALCULATOR_PATH[locale], locale) for locale in LOCALES)
 FORM = {"sharpe": "1.8", "years": "3", "trials": "100"}
+#: Trial counts past float's range: ``int()`` overflows on them.
+OVERFLOW = ("inf", "-inf", "1e999", "9" * 400)
 CARD = {"sharpe": "1.8", "years": "3.0", "trials": "100", "periods_per_year": "252"}
 MOCK_PNG = b"mocked PNG"
 NS = {"s": "http://www.w3.org/2000/svg"}
@@ -284,6 +287,7 @@ def test_png_route_rejects_bad_input(client: TestClient, locale: str) -> None:
         {**CARD, "sharpe": "nan"},
         {**CARD, "sharpe": "<script>alert(1)</script>"},
         {**CARD, "years": ""},
+        *({**CARD, "trials": trials} for trials in OVERFLOW),
         unmeasured,
     )
     for params in invalid:
@@ -400,6 +404,7 @@ def test_empty_and_invalid_forms_have_no_share_or_dynamic_image(
         {"sharpe": "abc", "years": "3", "trials": "10"},
         {"sharpe": "1", "years": "0.1", "trials": "10", "periods_per_year": "12"},
         {**FORM, "periods_per_year": "7"},
+        *({**FORM, "trials": trials} for trials in OVERFLOW),
     ):
         page = client.get(path, params=params)
         assert page.status_code == 200
@@ -408,6 +413,29 @@ def test_empty_and_invalid_forms_have_no_share_or_dynamic_image(
         assert "/card.png" not in page.text
         assert _meta(page.text, "og:image") == f"{BASE}/static/og-{locale}.png"
     assert renders == []
+
+
+def test_overflowing_trials_are_a_bad_number() -> None:
+    # parse_input stays as it is; read_input turns int()'s OverflowError into
+    # the same error a non-number gets, and passes everything else through.
+    for trials in OVERFLOW:
+        with pytest.raises(OverflowError):
+            parse_input("1.8", "3", trials)
+        assert read_input("1.8", "3", trials) == "error_number"
+    for values in ((None, None, None), ("1,8", "3", "1,000", "52"), ("abc", "3", "10")):
+        assert read_input(*values) == parse_input(*values)
+
+
+@pytest.mark.parametrize(("path", "locale"), PAGES)
+def test_overflowing_trials_show_the_number_error(
+    client: TestClient, path: str, locale: str
+) -> None:
+    for trials in OVERFLOW:
+        page = client.get(path, params={**FORM, "trials": trials})
+        assert page.status_code == 200
+        assert COPY[locale]["error_number"] in _visible(page.text)
+        card = client.get(path + "/card.png", params={**CARD, "trials": trials})
+        assert card.status_code == 404 and card.content == b""
 
 
 def test_png_generation_uses_no_network_database_or_files(

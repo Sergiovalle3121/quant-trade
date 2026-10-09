@@ -54,7 +54,7 @@ from quant_trade.audit.calculator import (
     calculator_copy,
     calculator_url,
     compute,
-    parse_input,
+    read_input,
     share_url,
 )
 from quant_trade.audit.calculator import COPY as CALCULATOR_COPY
@@ -3913,7 +3913,7 @@ def calculator_page(
         + frequency_field
         + f"</div><button class='btn btn-dark' type='submit'>{_e(words['submit'])}</button></form>"
     )
-    parsed = parse_input(sharpe, years, trials, periods_per_year)
+    parsed = read_input(sharpe, years, trials, periods_per_year)
     result = _calculator_result(words, locale, parsed)
     # Sharing only for a measured result: an empty form or an error has nothing to show.
     share = ""

@@ -72,7 +72,7 @@ from quant_trade.audit.calculator import (
     CalculatorInput,
     calculator_url,
     compute,
-    parse_input,
+    read_input,
     share_values,
 )
 from quant_trade.audit.calculator_card import calculator_card_svg
@@ -6302,7 +6302,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         # or when the renderer fails, the page keeps the static image: the
         # calculator itself is never refused.
         image_path = ""
-        parsed = parse_input(sharpe, years, trials, periods_per_year)
+        parsed = read_input(sharpe, years, trials, periods_per_year)
         if isinstance(parsed, CalculatorInput) and compute(parsed)["status"] == "MEASURED":
             ip = _client_ip(request, cfg.trusted_proxy_hops)
             within = calculator_attempts.hit(ip, datetime.now(UTC)) < CARD_REQUESTS_PER_HOUR
@@ -6337,7 +6337,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 status_code=429,
                 headers={"Retry-After": "3600"},
             )
-        parsed = parse_input(
+        parsed = read_input(
             query.get("sharpe"),
             query.get("years"),
             query.get("trials"),
