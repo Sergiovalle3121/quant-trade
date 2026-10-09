@@ -3365,9 +3365,11 @@ PAGE_DESCRIPTIONS: dict[str, dict[str, str]] = {
         ),
     },
     "compare": {
-        "es": "Compara dos de tus informes de Rigor, lado a lado, para ver qué cambió.",
-        "en": "Compare two of your Rigor reports, side by side, to see what changed.",
-        "pt": "Compare dois dos seus relatórios do Rigor, lado a lado, para ver o que mudou.",
+        "es": "Compara dos o tres de tus informes de Rigor, lado a lado, para ver qué cambió.",
+        "en": "Compare two or three of your Rigor reports, side by side, to see what changed.",
+        "pt": (
+            "Compare dois ou três dos seus relatórios do Rigor, lado a lado, para ver o que mudou."
+        ),
     },
     "signup": {
         "es": "Crea tu cuenta de Rigor para subir tus archivos y guardar tus informes.",
@@ -3622,24 +3624,27 @@ def compare_page(
     locale: str = "es",
     lead: str = "",
     alternates: dict[str, str] | None = None,
+    title: str = "",
 ) -> str:
-    """The private page that compares two reports (``audit/compare.py`` builds ``content``)."""
+    """The private page that compares two or three reports (``audit/compare.py``
+    builds ``content``); ``title`` names three reports or the form."""
     from quant_trade.audit.compare import COMPARE_CSS, COMPARE_PATH, COPY
 
     locale = _locale(locale)
     copy = COPY[locale]
+    title = title or copy["title"]
     body = (
-        _page_hero(copy["eyebrow"], copy["title"], lead or copy["lead"])
+        _page_hero(copy["eyebrow"], title, lead or copy["lead"])
         + f"<div class='paper page-main'><div class='wrap'><style>{COMPARE_CSS}</style>"
         + content
         + "</div></div>"
     )
     # A comparison reached from Mi cuenta passes its own addresses.
     return _page(
-        copy["title"],
+        title,
         locale,
         body,
-        meta_html=private_meta(copy["title"], locale, PAGE_DESCRIPTIONS["compare"][locale]),
+        meta_html=private_meta(title, locale, PAGE_DESCRIPTIONS["compare"][locale]),
         alternates=alternates or dict(COMPARE_PATH),
         solid_nav=True,
     )
