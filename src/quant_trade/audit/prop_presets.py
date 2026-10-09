@@ -136,6 +136,14 @@ _TOPSTEP_NOTES = (
 )
 
 
+#: Topstep's Trading Combine sizes: the account and its maximum loss, in US dollars.
+_TOPSTEP_ACCOUNTS: tuple[tuple[str, int, int], ...] = (
+    ("50K", 50_000, 2_000),
+    ("100K", 100_000, 3_000),
+    ("150K", 150_000, 4_500),
+)
+
+
 def _topstep(size: str, maximum_loss: float) -> ChallengeRules:
     return ChallengeRules(
         key=f"topstep-{size.lower()}-combine",
@@ -386,12 +394,17 @@ _PRESET_LIST: tuple[ChallengeRules, ...] = (
         source_url=THE5ERS_BOOTCAMP_URL,
         as_of=AS_OF,
     ),
-    _topstep("50K", 2_000 / 50_000),
-    _topstep("100K", 3_000 / 100_000),
-    _topstep("150K", 4_500 / 150_000),
+    *(_topstep(size, loss / account) for size, account, loss in _TOPSTEP_ACCOUNTS),
 )
 
 PRESETS: dict[str, ChallengeRules] = {rules.key: rules for rules in _PRESET_LIST}
+
+#: The account size, in US dollars, of the presets whose program names one (the
+#: firm states its limits in dollars at that size). Every other preset's rules
+#: are shares of whatever balance the account starts with.
+ACCOUNT_SIZES: dict[str, float] = {
+    f"topstep-{size.lower()}-combine": float(account) for size, account, _ in _TOPSTEP_ACCOUNTS
+}
 
 
 def get_preset(key: str) -> ChallengeRules:
@@ -424,6 +437,7 @@ def preset_label(firm: str, program: str, phase: str, locale: str = "es") -> str
 
 __all__ = [
     "preset_label",
+    "ACCOUNT_SIZES",
     "DAILY_LOSS_BASES",
     "DEFAULT_PRESET",
     "AS_OF",

@@ -121,6 +121,21 @@ REPORT_FORMATS: tuple[str, ...] = (
     UNIVERSAL_FILLS_CSV,
 )
 
+#: Formats whose volume column is the platform's lots (MetaTrader 4 and 5) and
+#: whose rows print each trade's result in the account's money: the costs can
+#: be given per lot only for these. Other formats' volume may be units,
+#: contracts or shares, and no contract size is assumed for them.
+LOT_FORMATS: frozenset[str] = frozenset(
+    {
+        MT5_TESTER_HTML,
+        MT5_TESTER_XLSX,
+        MT5_HISTORY_HTML,
+        MT5_HISTORY_XLSX,
+        MT4_TESTER_HTML,
+        MT4_STATEMENT_HTML,
+    }
+)
+
 #: Used when the file does not state a starting balance and none is supplied.
 DEFAULT_INITIAL_BALANCE = 10_000.0
 
@@ -200,6 +215,9 @@ class ImportedReport:
     #: Deposits (positive) and withdrawals (negative) the file lists, in time
     #: order, including those before the first trade and after the last.
     cash_flows: list[tuple[datetime, float]] = field(default_factory=list)
+    #: The volume of each trade in ``trades`` in the platform's lots, as the
+    #: file prints it; ``None`` unless the format is one of ``LOT_FORMATS``.
+    lots: list[float] | None = None
 
 
 def is_return_series(data: bytes) -> bool:
@@ -3806,6 +3824,7 @@ def _assemble(draft: _Draft, fallback_initial: float | None) -> ImportedReport:
     client_pnl: list[float | None] = []
     trade_fees: list[float] = []
     trade_symbols: list[str] = []
+    trade_lots: list[float] = []
     invalid = draft.invalid_rows
     unknown = [trip for trip in trips if trip.symbol not in known]
     drifting = _drifting_symbols(unknown, sizes) if draft.itemised else set()
@@ -3850,6 +3869,7 @@ def _assemble(draft: _Draft, fallback_initial: float | None) -> ImportedReport:
         client_pnl.append(trip.gross)
         trade_fees.append(-(trip.commission + trip.swap + trip.fee))
         trade_symbols.append(trip.symbol)
+        trade_lots.append(trip.volume)
     if not trades and backwards == len(trips):
         raise ReportFormatError(
             "exits_before_entries",
@@ -3915,6 +3935,7 @@ def _assemble(draft: _Draft, fallback_initial: float | None) -> ImportedReport:
         cash_flows=sorted(
             (item.time, item.amount) for item in draft.cash or [] if item.is_flow and item.amount
         ),
+        lots=trade_lots if draft.source_format in LOT_FORMATS else None,
     )
 
 
@@ -5367,6 +5388,7 @@ __all__ = [
     "MQL5_SIGNAL_CSV",
     "MYFXBOOK_CSV",
     "FXBLUE_CSV",
+    "LOT_FORMATS",
     "ROBINHOOD_CSV",
     "NINJATRADER_CSV",
     "NINJATRADER_EXECUTIONS_CSV",

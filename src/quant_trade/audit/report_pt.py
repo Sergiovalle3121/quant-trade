@@ -1068,6 +1068,7 @@ REPORT: dict[str, Any] = {
         "ch_ladder_in_sample": "Só dentro da amostra (até {date})",
         "ch_ladder_out_of_sample": "Só fora da amostra (a partir de {date})",
         "ch_ladder_cost": "Com o custo de referência ({bps} pb por lado)",
+        "ch_ladder_cost_declared": "Com o custo declarado ({bps} pb por lado)",
         "ch_ladder_haircut": (
             "Com a sorte de {trials} tentativas descontada (Sharpe {before} → {after}, Harvey "
             "e Liu)"
@@ -1076,6 +1077,46 @@ REPORT: dict[str, Any] = {
         "ch_ladder_low_out_of_sample": "só fora da amostra",
         "ch_ladder_low_reference_cost": "com o custo de referência",
         "ch_ladder_low_luck_haircut": "com a sorte descontada",
+        "ch_size_title": "Em que tamanho? O desafio a 0.5x, 1x, 1.5x e 2x",
+        "ch_size_intro": (
+            "O mesmo programa da escada ({program}), com outro tamanho. Em cada linha, atingir "
+            "a meta, romper uma perda e não atingir a meta dentro do limite repartem todas as "
+            "simulações, contando todas as fases. A tabela mostra o que muda com o tamanho; não "
+            "aconselha nenhum."
+        ),
+        "ch_size_cap": (
+            "«Atinge a meta» conta só o que chega dentro desse limite, que a simulação põe e as "
+            "regras não. Com menos tamanho a meta demora mais: as simulações que passam a «não "
+            "atinge» ficaram sem dias; não romperam uma perda, que tem suas próprias colunas."
+        ),
+        "ch_size_one": (
+            "1x é o tamanho do histórico que você enviou: cada dia simulado ganha ou perde a "
+            "mesma porcentagem do saldo que um dia do arquivo. 0.5x é a metade desse tamanho e "
+            "2x, o dobro."
+        ),
+        "ch_size_balance": (
+            "As porcentagens de 1x são medidas sobre o saldo inicial do arquivo ({balance})."
+        ),
+        "ch_size_balance_assumed": (
+            "As porcentagens de 1x são medidas sobre um saldo inicial de {balance} que foi suposto "
+            "porque o arquivo não o indica: 1x escala com ele, e sobre um saldo maior as mesmas "
+            "operações seriam menos de 1x."
+        ),
+        "ch_size_lot": "Lote ou risco por operação a 1x",
+        "ch_size_account": (
+            "Conta que o programa nomeia: {size} USD. Os seus limites em dólares são simulados "
+            "como porcentagens dessa conta."
+        ),
+        "ch_size_no_account": (
+            "As regras simuladas não fixam um tamanho de conta: são porcentagens (do saldo "
+            "inicial ou do dia), então a tabela não depende do tamanho da conta."
+        ),
+        "ch_size_size": "Tamanho",
+        "ch_size_unfinished_phase": (
+            "Não atinge a meta em {days} dias úteis por fase (limite da simulação; as regras não "
+            "têm prazo)"
+        ),
+        "ch_size_assumption": "Método e premissa: {note}.",
         "assumptions": "Premissas",
         "source": "Fonte",
         "as_of": "lida em",
@@ -1116,6 +1157,12 @@ REPORT: dict[str, Any] = {
         "kpi_trades": "Operações · % de acerto",
         "kpi_breakeven": "Custo extra que o leva a zero",
         "kpi_breakeven_negative": "já perde sem custo extra",
+        "kpi_pips_on": "{pips} pips em {symbol}",
+        "kpi_per_lot": "{value} {currency} por lote e lado",
+        "kpi_per_lot_units": "{value} por lote e lado, em unidades do arquivo",
+        "cost_pips_title": "Em pips, por símbolo",
+        "cost_symbol": "Símbolo",
+        "cost_median_entry": "Preço de entrada mediano",
         "kpi_stress": "Sem as 5 melhores operações",
         "kpi_stress_curve": "Sem os 5 melhores períodos",
         "kpi_hint_return": "quanto a conta mudou em todo o histórico",
@@ -1655,6 +1702,10 @@ REPORT: dict[str, Any] = {
         "challenge": (
             "Com que frequência tocaria os limites de um desafio de mesa proprietária (prop firm)"
         ),
+        "ch_size_title": (
+            "Em que tamanho? O desafio a 0.5x, 1x, 1.5x e 2x o tamanho do histórico, com a "
+            "probabilidade de atingir a meta e de romper cada perda"
+        ),
         "questions": "O que perguntar ao vendedor ou ao gestor",
         "performance": "Rentabilidade anual, volatilidade e drawdown máximo medidos",
         "significance": "Se o resultado se distingue da sorte",
@@ -1790,6 +1841,7 @@ REPORT: dict[str, Any] = {
         "break_even_bps": "Custo de equilíbrio (pb por lado)",
         "break_even_pips": "Custo de equilíbrio (pips por lado)",
         "reference_pips": "Custo de referência (pips por lado)",
+        "break_even_per_lot": "Custo de equilíbrio (por lote e lado)",
         "platform_equity_drawdown": "Drawdown com operações abertas (sua plataforma)",
         "commission": "Comissão",
         "swap": "Swap",
@@ -3997,6 +4049,62 @@ RULES: tuple[tuple[str, str], ...] = (
         ),
     ),
     (
+        (
+            "the ladder's full-history row with every daily return multiplied by the size; it "
+            "assumes that changing the size scales every daily return in the same proportion, "
+            "as linear leverage does when the costs grow in proportion to the size (the same "
+            "cost per lot) and the execution does not worsen with more volume"
+        ),
+        (
+            "a linha do histórico completo da escada com cada retorno diário multiplicado pelo "
+            "tamanho; supõe que mudar o tamanho escala cada retorno diário na mesma proporção, "
+            "como faz a alavancagem linear quando os custos crescem na proporção do tamanho (o "
+            "mesmo custo por lote) e a execução não piora com mais volume"
+        ),
+    ),
+    (
+        "the audit keeps neither the lot nor the stop loss of each trade, so the lot or risk "
+        "per trade at 1x is not known",
+        "a auditoria não guarda o lote nem o stop loss de cada operação, então o lote ou o "
+        "risco por operação a 1x não é conhecido",
+    ),
+    (
+        "account size in US dollars that the program names; its limits are shares of it",
+        "tamanho de conta em dólares americanos que o programa nomeia; seus limites são "
+        "porcentagens dela",
+    ),
+    (
+        "the simulated rules fix no account size: they are shares (of the starting balance or "
+        "of the day's), so the table does not depend on the account size",
+        "as regras simuladas não fixam um tamanho de conta: são porcentagens (do saldo inicial "
+        "ou do dia), então a tabela não depende do tamanho da conta",
+    ),
+    (
+        "starting balance of the history; the daily shares at 1x are measured on it",
+        "saldo inicial do histórico; as porcentagens diárias a 1x são medidas sobre ele",
+    ),
+    (
+        "first value of the file's balance curve; the daily shares at 1x are measured on it",
+        "primeiro valor da curva de saldo do arquivo; as porcentagens diárias a 1x são medidas "
+        "sobre ele",
+    ),
+    (
+        "assumed because the file does not state a starting balance; the daily shares at 1x "
+        "are measured on it, so 1x scales with it",
+        "suposto porque o arquivo não indica um saldo inicial; as porcentagens diárias a 1x "
+        "são medidas sobre ele, então 1x escala com ele",
+    ),
+    (
+        (
+            "share of the resampled paths that end the program this way: each phase is a fresh "
+            "start reached only by passing the phases before it"
+        ),
+        (
+            "proporção dos percursos reamostrados que terminam o programa assim: cada fase é um "
+            "recomeço ao qual só se chega passando pelas anteriores"
+        ),
+    ),
+    (
         "the curve covers none of the dated market falls in full",
         "a curva não cobre por completo nenhuma das quedas de mercado com data",
     ),
@@ -4596,6 +4704,71 @@ RULES: tuple[tuple[str, str], ...] = (
     (
         "cost per side at which the ledger nets to zero",
         "custo por lado com o qual o resultado fica em zero",
+    ),
+    (
+        "the whole history's break-even and reference costs per side, converted to pips at "
+        "each symbol's median entry price; not a break-even computed from that symbol's "
+        "trades alone",
+        "os custos de equilíbrio e de referência por lado de todo o histórico, convertidos "
+        "em pips com o preço de entrada mediano de cada símbolo; não é um equilíbrio "
+        "calculado só com as operações desse símbolo",
+    ),
+    (
+        "no pip size is defined for metals; this symbol's cost stays in bps",
+        "não há um tamanho de pip definido para os metais; o custo deste símbolo fica em pb",
+    ),
+    (
+        "other symbols traded ({symbols}) stay in bps: the audit defines no pip size for them",
+        "os outros símbolos operados ({symbols}) ficam em pb: a auditoria não define um "
+        "tamanho de pip para eles",
+    ),
+    (
+        "cost per lot and side at which the ledger nets to zero: the net the file prints, "
+        "{net} {currency}, over {lots} lots traded counting entries and exits",
+        "custo por lote e lado com o qual o resultado fica em zero: o líquido que o arquivo "
+        "imprime, {net} {currency}, dividido por {lots} lotes negociados contando entradas e "
+        "saídas",
+    ),
+    (
+        "extra cost per lot and side, on top of the report's fees, at which the ledger nets "
+        "to zero: the net the file prints after those fees, {net} {currency}, over {lots} lots "
+        "traded counting entries and exits",
+        "custo extra por lote e lado, além dos custos do relatório, com o qual o resultado "
+        "fica em zero: o líquido que o arquivo imprime depois desses custos, {net} "
+        "{currency}, dividido por {lots} lotes negociados contando entradas e saídas",
+    ),
+    (
+        "cost per lot and side at which the ledger nets to zero: the net the file prints, "
+        "{net} {currency}, over {lots} lots traded counting entries and exits; the lots of "
+        "the {count} currency pairs are added as the platform prints them",
+        "custo por lote e lado com o qual o resultado fica em zero: o líquido que o arquivo "
+        "imprime, {net} {currency}, dividido por {lots} lotes negociados contando entradas e "
+        "saídas; os lotes dos {count} pares de moedas são somados como a plataforma os imprime",
+    ),
+    (
+        "extra cost per lot and side, on top of the report's fees, at which the ledger nets "
+        "to zero: the net the file prints after those fees, {net} {currency}, over {lots} lots "
+        "traded counting entries and exits; the lots of the {count} currency pairs are added "
+        "as the platform prints them",
+        "custo extra por lote e lado, além dos custos do relatório, com o qual o resultado "
+        "fica em zero: o líquido que o arquivo imprime depois desses custos, {net} "
+        "{currency}, dividido por {lots} lotes negociados contando entradas e saídas; os "
+        "lotes dos {count} pares de moedas são somados como a plataforma os imprime",
+    ),
+    (
+        "the money per lot is given only for MetaTrader 4 and 5 reports, whose volume column "
+        "is the platform's lots",
+        "o dinheiro por lote só é dado para os relatórios do MetaTrader 4 e 5, cuja coluna "
+        "de volume são os lotes da plataforma",
+    ),
+    (
+        "the trades are on several symbols and not all are pairs of USD, EUR, GBP, JPY, CHF, "
+        "AUD, NZD or CAD: a lot of one instrument is not the same size as a lot of another (a "
+        "lot of gold is not a lot of EURUSD), so their lots are not added together",
+        "as operações são de vários símbolos e nem todos são pares de USD, EUR, GBP, JPY, "
+        "CHF, AUD, NZD ou CAD: um lote de um instrumento não tem o mesmo tamanho que um lote "
+        "de outro (um lote de ouro não é um lote de EURUSD), então os seus lotes não são "
+        "somados",
     ),
     (
         "no traded notional",

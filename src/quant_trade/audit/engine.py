@@ -56,8 +56,8 @@ from quant_trade.audit import stress as stress_lib
 from quant_trade.audit import testdata as testdata_lib
 from quant_trade.audit import timing as timing_lib
 from quant_trade.audit.guard import find_claims, scan_client_text
-from quant_trade.audit.importers import MT4_STATEMENT_HTML, lead_number
-from quant_trade.audit.prop_presets import DEFAULT_PRESET, get_preset
+from quant_trade.audit.importers import LOT_FORMATS, MT4_STATEMENT_HTML, lead_number
+from quant_trade.audit.prop_presets import ACCOUNT_SIZES, DEFAULT_PRESET, get_preset
 from quant_trade.audit.return_series import frame_returns, return_performance
 from quant_trade.audit.schema import (
     DECLARED,
@@ -136,6 +136,42 @@ LADDER_NOT_MONEY = "the curve and the trades do not reconcile in money"
 LADDER_NOT_SHOWN = "the curve was not shown to be money"
 LADDER_NOT_SHOWN_WHY = "the curve was not shown to be money: {why}"
 LADDER_RUIN = "with the reference cost the balance reaches zero inside the history"
+#: A returns upload says nothing in money: the reconciliation and the size table
+#: give this same reason.
+RETURNS_NOT_MONEY = "uploaded returns are not money"
+#: The size table: the ladder's full-history row again with every daily return
+#: multiplied by each size. 1x is the history as uploaded.
+SIZING_MULTIPLIERS: tuple[float, ...] = (0.5, 1.0, 1.5, 2.0)
+SIZING_NOTE = (
+    "the ladder's full-history row with every daily return multiplied by the size; it assumes "
+    "that changing the size scales every daily return in the same proportion, as linear "
+    "leverage does when the costs grow in proportion to the size (the same cost per lot) and "
+    "the execution does not worsen with more volume"
+)
+SIZING_NO_SIZE = (
+    "the audit keeps neither the lot nor the stop loss of each trade, so the lot or risk per "
+    "trade at 1x is not known"
+)
+SIZING_ACCOUNT_NOTE = (
+    "account size in US dollars that the program names; its limits are shares of it"
+)
+SIZING_NO_ACCOUNT = (
+    "the simulated rules fix no account size: they are shares (of the starting balance or of "
+    "the day's), so the table does not depend on the account size"
+)
+#: The balance the daily shares at 1x are measured on, as the capital section
+#: names it: the imported report's, the first value of an uploaded curve, or
+#: the one the reader assumed because the file states none.
+SIZING_BALANCE_NOTE = "starting balance of the history; the daily shares at 1x are measured on it"
+SIZING_BALANCE_CURVE = (
+    "first value of the file's balance curve; the daily shares at 1x are measured on it"
+)
+SIZING_BALANCE_ASSUMED = (
+    "assumed because the file does not state a starting balance; the daily shares at 1x are "
+    "measured on it, so 1x scales with it"
+)
+#: The importers' warning (also the column mapping's) when they assume a balance.
+_ASSUMED_BALANCE_WARNING = "the file does not state a starting balance"
 SERIES_MAX_POINTS = 400
 WITHHELD_TEXT = "[withheld: promotional wording]"
 NO_LOCAL_CASH = (
@@ -204,9 +240,10 @@ FX_CURRENCIES = frozenset({"USD", "EUR", "GBP", "JPY", "CHF", "AUD", "NZD", "CAD
 
 
 def fx_pair(symbols: list[str] | None, metadata: dict[str, str]) -> str | None:
-    """The one currency pair every trade is on (``GBPUSD`` for ``GBPUSD.m``), else ``None``."""
+    """The one currency pair every trade is on (``GBPUSD`` for ``GBPUSD.m`` or
+    ``FX:GBPUSD``), else ``None``."""
     names = [name for name in (symbols or []) if name] or [metadata.get("symbol", "")]
-    cleaned = {"".join(ch for ch in name.upper() if ch.isalnum())[:6] for name in names}
+    cleaned = {_symbol_code(name) for name in names}
     if len(cleaned) != 1:
         return None
     pair = cleaned.pop()
@@ -1031,6 +1068,167 @@ def _real_fills(inputs: AuditInputs) -> bool:
     return inputs.source_format in account_lib.ACCOUNT_FORMATS
 
 
+def _pip_size(pair: str) -> float:
+    """A pip of a currency pair ``fx_pair`` recognises: 0.01 on yen pairs, else 0.0001."""
+    return 0.01 if pair.endswith("JPY") else 0.0001
+
+
+#: What the per-symbol pips are: the whole ledger's break-even, converted.
+PIPS_BY_SYMBOL_NOTE = (
+    "the whole history's break-even and reference costs per side, converted to pips at "
+    "each symbol's median entry price; not a break-even computed from that symbol's "
+    "trades alone"
+)
+#: A metal is recognised (``crises.symbol_market``) but the audit has no pip size for it.
+PIPS_NO_METAL_SIZE = "no pip size is defined for metals; this symbol's cost stays in bps"
+#: The symbols traded that are neither a pair ``fx_pair`` knows nor a metal.
+PIPS_OTHERS_NOTE = (
+    "other symbols traded ({symbols}) stay in bps: the audit defines no pip size for them"
+)
+#: Symbols named in that line; the rest read as "…".
+PIPS_OTHERS_SHOWN = 5
+#: The extra cost per lot and side at which the ledger nets to zero, by hand:
+#: the net money the file prints for the closed trades over every lot bought or sold.
+PER_LOT_NOTE = (
+    "cost per lot and side at which the ledger nets to zero: the net the file prints, "
+    "{net} {currency}, over {lots} lots traded counting entries and exits"
+)
+PER_LOT_NOTE_FEES = (
+    "extra cost per lot and side, on top of the report's fees, at which the ledger nets "
+    "to zero: the net the file prints after those fees, {net} {currency}, over {lots} lots "
+    "traded counting entries and exits"
+)
+#: Added to either note when the lots of several currency pairs are summed.
+PER_LOT_PAIRS = "; the lots of the {count} currency pairs are added as the platform prints them"
+PER_LOT_NOTE_PAIRS = PER_LOT_NOTE + PER_LOT_PAIRS
+PER_LOT_NOTE_FEES_PAIRS = PER_LOT_NOTE_FEES + PER_LOT_PAIRS
+#: Every format outside ``importers.LOT_FORMATS``: its volume may be lots,
+#: units, contracts or shares, and no contract size is assumed.
+PER_LOT_ONLY_METATRADER = (
+    "the money per lot is given only for MetaTrader 4 and 5 reports, whose volume column "
+    "is the platform's lots"
+)
+#: Lots of a metal, an index or a coin are not the size of a currency pair's.
+PER_LOT_MIXED = (
+    "the trades are on several symbols and not all are pairs of USD, EUR, GBP, JPY, CHF, "
+    "AUD, NZD or CAD: a lot of one instrument is not the same size as a lot of another (a "
+    "lot of gold is not a lot of EURUSD), so their lots are not added together"
+)
+#: An exchange or data-vendor prefix (``OANDA:``, ``FX_IDC:``) before the symbol.
+_EXCHANGE_PREFIX = re.compile(r"^\s*[A-Za-z0-9_.\-]+:")
+
+
+def _symbol_name(name: str) -> str:
+    """A symbol name without its exchange prefix (``XAUUSD`` for ``OANDA:XAUUSD``)."""
+    return _EXCHANGE_PREFIX.sub("", str(name)).strip()
+
+
+def _symbol_code(name: str) -> str:
+    """The six letters ``fx_pair`` reads in a symbol name (``XAUUSD`` for
+    ``XAUUSD.r`` or ``OANDA:XAUUSD``)."""
+    return "".join(ch for ch in _symbol_name(name).upper() if ch.isalnum())[:6]
+
+
+def _pips_by_symbol(
+    inputs: AuditInputs, be: float | None, ref: float, assumed: bool
+) -> dict[str, Any] | None:
+    """The break-even and reference costs per side in pips of each currency pair
+    the ledger trades, at that pair's median entry price; metals are listed in
+    basis points with the reason, and the other symbols are named in one line.
+    ``None`` when the trades are on one pair (the section's ``break_even_pips``
+    say it) or on no pair at all (a history of gold alone has no pips)."""
+    assert inputs.trades is not None
+    trades = inputs.trades.trades
+    symbols = inputs.trade_symbols
+    if be is None or not symbols or len(symbols) != len(trades):
+        return None
+    if fx_pair(symbols, inputs.report_metadata or {}) is not None:
+        return None
+    prices: dict[str, list[float]] = {}
+    metals: set[str] = set()
+    others: dict[str, int] = {}
+    for name, trade in zip(symbols, trades, strict=True):
+        code = fx_pair([name], {}) if name else None
+        if code is None and name and crises_lib.symbol_market(name) == "metal":
+            code = _symbol_code(name)
+            metals.add(code)
+        if code is None and _symbol_name(name):
+            shown = _symbol_name(name).upper()[:20]
+            others[shown] = others.get(shown, 0) + 1
+        if code is not None and trade.entry_price > 0:
+            prices.setdefault(code, []).append(float(trade.entry_price))
+    if not set(prices) - metals:
+        return None
+    rows: list[dict[str, Any]] = []
+    for code, entries in sorted(prices.items(), key=lambda item: (-len(item[1]), item[0])):
+        price = float(np.median(entries))
+        row: dict[str, Any] = {
+            "symbol": code,
+            "trades": len(entries),
+            "median_entry_price": measured(price),
+        }
+        if code in metals:
+            row["break_even_pips"] = not_measured(PIPS_NO_METAL_SIZE)
+            row["reference_pips"] = not_measured(PIPS_NO_METAL_SIZE)
+        else:
+            pip = _pip_size(code)
+            where = f"per side on {code} at {price:.5g}, the median entry price"
+            row["pip_size"] = pip
+            row["break_even_pips"] = measured(be / 10_000 * price / pip, where)
+            row["reference_pips"] = _reference(ref / 10_000 * price / pip, where, assumed=assumed)
+        rows.append(row)
+    block: dict[str, Any] = {"note": PIPS_BY_SYMBOL_NOTE, "rows": rows}
+    # A name the guard refuses is the client's text, not a symbol to repeat.
+    named = [
+        name
+        for name, _ in sorted(others.items(), key=lambda item: (-item[1], item[0]))
+        if not find_claims(name)
+    ]
+    if named:
+        listed = ", ".join(named[:PIPS_OTHERS_SHOWN])
+        if len(named) > PIPS_OTHERS_SHOWN:
+            listed += ", …"
+        block["others"] = {"symbols": named, "note": PIPS_OTHERS_NOTE.format(symbols=listed)}
+    return block
+
+
+def _break_even_per_lot(inputs: AuditInputs, charged: list[float] | None) -> dict[str, Any]:
+    """The extra cost per lot and side at which the closed trades net to zero:
+    the net money the file prints for them (each row's profit, after the fees
+    the report itemises: the same net as the stress tile's) over every lot
+    bought and sold, so it can be checked by hand against the file.
+
+    Only a format that prints the volume in lots and each trade's result in
+    money (``importers.LOT_FORMATS``) gives it; no contract size is assumed.
+    The lots of several symbols are added only when every one is a currency
+    pair ``fx_pair`` knows: a lot of gold or of an index is another size."""
+    assert inputs.trades is not None
+    trades = inputs.trades.trades
+    lots = inputs.trade_lots
+    if inputs.source_format not in LOT_FORMATS or not lots or len(lots) != len(trades):
+        return not_measured(PER_LOT_ONLY_METATRADER)
+    names = [name for name in inputs.trade_symbols or [] if name]
+    pairs = {_symbol_code(name) for name in names}
+    if len(pairs) > 1 and any(fx_pair([name], {}) is None for name in names):
+        return not_measured(PER_LOT_MIXED)
+    net = float(sum(trade.pnl for trade in trades)) - float(sum(charged or []))
+    traded = 2.0 * float(sum(lots))
+    if not math.isfinite(traded) or traded <= 0 or not math.isfinite(net):
+        return not_measured(PER_LOT_ONLY_METATRADER)
+    several = len(pairs) > 1
+    if charged:
+        template = PER_LOT_NOTE_FEES_PAIRS if several else PER_LOT_NOTE_FEES
+    else:
+        template = PER_LOT_NOTE_PAIRS if several else PER_LOT_NOTE
+    note = template.format(
+        net=f"{net:,.2f}",
+        currency=inputs.account_currency or "in file units",
+        lots=f"{traded:,.2f}",
+        count=len(pairs),
+    )
+    return measured(net / traded, note)
+
+
 def _costs(
     inputs: AuditInputs,
 ) -> tuple[dict[str, Any], list[cost_lib.RecostRow] | None, float | None, bool, list[float] | None]:
@@ -1095,11 +1293,18 @@ def _costs(
     prices = [t.entry_price for t in inputs.trades.trades if t.entry_price > 0]
     if pair is not None and be is not None and prices:
         price = float(np.median(prices))
-        pip = 0.01 if pair.endswith("JPY") else 0.0001
+        pip = _pip_size(pair)
         where = f"per side on {pair} at {price:.5g}, the median entry price"
         section["break_even_pips"] = measured(be / 10_000 * price / pip, where)
         section["reference_pips"] = _reference(ref / 10_000 * price / pip, where, assumed=assumed)
         section["pip_symbol"] = pair
+    by_symbol = _pips_by_symbol(inputs, be, ref, assumed)
+    if by_symbol is not None:
+        section["pips_by_symbol"] = by_symbol
+    per_lot = _break_even_per_lot(inputs, charged)
+    section["break_even_per_lot"] = per_lot
+    if per_lot["evidence"] == MEASURED:
+        section["per_lot_currency"] = inputs.account_currency
     if inputs.reported_fees:
         section["reported_fees"] = {
             name: measured(value, "signed total the report itemises; negative is a cost")
@@ -1154,7 +1359,7 @@ def _reconciliation(inputs: AuditInputs) -> tuple[dict[str, Any], list[redflags.
     if inputs.trades is None or not inputs.trades.trades:
         return {"status": "NOT_MEASURED", "reason": "no closed-trade ledger supplied"}, []
     if inputs.equity.source != "equity":
-        return {"status": "NOT_MEASURED", "reason": "uploaded returns are not money"}, []
+        return {"status": "NOT_MEASURED", "reason": RETURNS_NOT_MONEY}, []
 
     trades = inputs.trades.trades
     frame = inputs.equity.frame
@@ -1592,6 +1797,7 @@ def _challenge(
             "selected_by": selected_by,
             "rules": rules.to_dict(),
             "assumptions": analytics.CHALLENGE_ASSUMPTIONS,
+            "sizing": {"status": "NOT_MEASURED", "reason": reason},
         }
     daily = analytics.daily_returns_from_equity(inputs.equity.frame)
     result = analytics.simulate_challenge(daily, rules, samples=samples, seed=seed)
@@ -1599,6 +1805,7 @@ def _challenge(
     out: dict[str, Any] = {"status": status, "preset": key, "selected_by": selected_by, **result}
     if status == "NOT_MEASURED":
         out["reason"] = result["probability"]["pass"]["note"]
+        out["sizing"] = {"status": "NOT_MEASURED", "reason": out["reason"]}
     else:
         out["firm_fit"] = firmfit_lib.firm_fit(
             daily, samples=min(samples, firmfit_lib.SAMPLES), seed=seed, known={key: result}
@@ -1615,6 +1822,9 @@ def _challenge(
             money_curve=money_curve,
             luck=luck,
             reconciliation=reconciliation,
+        )
+        out["sizing"] = _challenge_sizing(
+            inputs, daily, key, result, out["scenarios"], samples=samples, seed=seed
         )
     return out
 
@@ -1791,6 +2001,91 @@ def _challenge_scenarios(
         "note": LADDER_NOTE,
         "rows": rows,
     }
+
+
+def _challenge_sizing(
+    inputs: AuditInputs,
+    daily: pd.Series,
+    key: str,
+    result: dict[str, Any],
+    scenarios: dict[str, Any],
+    *,
+    samples: int,
+    seed: int,
+) -> dict[str, Any]:
+    """The chosen program at 0.5x, 1x, 1.5x and 2x the history's size.
+
+    Each row is the ladder's full-history row (``firmfit.program_pass``: same
+    simulator, seed, paths per phase and rules) on the daily returns
+    multiplied by the size, plus how the program ends when it is not passed.
+    The 1x row is the full-history row itself. Not measured, with the same
+    reason, when the ladder's full row is not, or when the upload is returns
+    rather than money. Informational; nothing here feeds the verdict."""
+    rows: list[dict[str, Any]] = scenarios.get("rows") or []
+    full = next((row for row in rows if row.get("key") == "full"), {})
+    figure = full.get("pass") or {}
+    if figure.get("evidence") != MEASURED:
+        return {"status": "NOT_MEASURED", "reason": str(figure.get("note") or "not measured")}
+    if inputs.equity.source != "equity":
+        return {"status": "NOT_MEASURED", "reason": RETURNS_NOT_MONEY}
+    sized: list[dict[str, Any]] = []
+    for size in SIZING_MULTIPLIERS:
+        # 1x is the history untouched and the chosen phase already simulated.
+        series = daily if size == 1.0 else daily * size
+        known = {key: result} if size == 1.0 else None
+        program = firmfit_lib.program_outcomes(series, key, samples=samples, seed=seed, known=known)
+        if program["status"] != "MEASURED":
+            return {"status": "NOT_MEASURED", "reason": program["reason"]}
+        row: dict[str, Any] = {
+            "key": f"{size:g}x",
+            "multiplier": size,
+            "days": int(len(daily)),
+            "pass": program["pass"],
+            "main_risk": program["main_risk"],
+        }
+        if "pass_within_best_day" in program:
+            row["pass_within_best_day"] = program["pass_within_best_day"]
+        for fail in ("fail_daily_loss", "fail_total_loss", "unfinished"):
+            row[fail] = program[fail]
+        sized.append(row)
+    account = ACCOUNT_SIZES.get(key)
+    return {
+        "status": "MEASURED",
+        "program": scenarios.get("program"),
+        "note": SIZING_NOTE,
+        "starting_balance": _sizing_balance(inputs),
+        "size_per_trade": not_measured(SIZING_NO_SIZE),
+        "account_size": (
+            declared(account, SIZING_ACCOUNT_NOTE)
+            if account is not None
+            else not_measured(SIZING_NO_ACCOUNT)
+        ),
+        "rows": sized,
+    }
+
+
+def _sizing_balance(inputs: AuditInputs) -> dict[str, Any]:
+    """The balance the size table's daily shares at 1x are measured on.
+
+    A report's curve rebuilt from its trades starts at the report's balance
+    (DECLARED). A curve the client uploaded, or one built from the columns
+    the client chose, carries its own shares: its first value (MEASURED).
+    When the reader assumed the balance because the file states none, the
+    value is kept but tagged NOT_MEASURED: 1x then scales with that guess."""
+    rebuilt = inputs.balance_only and inputs.initial_balance is not None
+    first = float(inputs.equity.frame["equity"].iloc[0])
+    value = float(inputs.initial_balance or first) if rebuilt else first
+    # A curve uploaded beside the report brings its own balance: the report's
+    # assumed one does not reach the shares then.
+    assumed = (rebuilt or inputs.initial_balance is None) and any(
+        warning.startswith("report: ") and _ASSUMED_BALANCE_WARNING in warning
+        for warning in inputs.warnings
+    )
+    if assumed:
+        return {"value": value, "evidence": NOT_MEASURED, "note": SIZING_BALANCE_ASSUMED}
+    return (
+        declared(value, SIZING_BALANCE_NOTE) if rebuilt else measured(value, SIZING_BALANCE_CURVE)
+    )
 
 
 def _round(value: float) -> float:

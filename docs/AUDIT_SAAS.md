@@ -1123,8 +1123,59 @@ Three details a buyer reading a real MetaTrader report asked about:
   GBP, JPY, CHF, AUD, NZD or CAD (a broker suffix is ignored), the break-even
   and reference costs are also given in pips per side at the median entry
   price (`costs.break_even_pips`, `costs.reference_pips`, `costs.pip_symbol`;
-  a pip is 0.01 on yen pairs, else 0.0001). Metals, indices and mixed
-  symbols stay in basis points only.
+  a pip is 0.01 on yen pairs, else 0.0001). Indices and other symbols stay in
+  basis points only.
+- Costs in pips by symbol: when the trades are on more than one symbol and
+  at least one is such a pair, `costs.pips_by_symbol` lists each pair and
+  each metal (`crises.symbol_market`: XAU, XAG, XPT or XPD against one of
+  those currencies), most traded first: `{"note", "rows": [{"symbol",
+  "trades", "median_entry_price", "pip_size", "break_even_pips",
+  "reference_pips"}], "others"}`. An exchange prefix is dropped first
+  (`OANDA:XAUUSD` is XAUUSD, `FX:EURUSD` is EURUSD, also for one pair).
+  Each pair's figures are the same formula as for one pair
+  (`bps / 10,000 × median entry price / pip`) with that pair's own median
+  entry price: the break-even is the whole history's (`break_even_bps`),
+  converted, not a break-even of that pair's trades alone, and the note says
+  so. The repository defines no pip size for metals, so a metal's row has no
+  `pip_size` and its two figures are NOT_MEASURED ("no pip size is defined for
+  metals; this symbol's cost stays in bps"). Every other symbol traded
+  (USDMXN, US30, BTCUSD...) is named in `others` (`{"symbols", "note"}`,
+  most traded first), and the report prints that note under the table:
+  "other symbols traded (USDMXN, US30) stay in bps: the audit defines no pip
+  size for them". The key is absent with one pair (the three keys above say
+  it) and when no pair is traded: a history of gold alone, or of gold and
+  silver, has no figure in pips to show.
+- Costs per lot: `costs.break_even_per_lot` is the extra cost per lot and
+  side at which the ledger nets to zero, MEASURED only for the formats whose
+  volume is the platform's lots and whose rows print each trade's result in
+  money (`importers.LOT_FORMATS`: MT5 tester and history, HTML or XLSX; MT4
+  tester and statement). It is the net the file prints for the closed trades
+  (each row's profit after the commission and swap the report itemises, the
+  same net as the stress tile's "with all") divided by twice the lots traded
+  (each trade buys and sells its volume); the note gives both figures so it
+  can be checked by hand against the file, and `costs.per_lot_currency` is the
+  account currency (null when the file does not state it: the note then says
+  "in file units"). Any other format is NOT_MEASURED ("the money per lot is
+  given only for MetaTrader 4 and 5 reports, whose volume column is the
+  platform's lots"): Myfxbook, FX Blue and MQL5 files print a volume too, but
+  no contract size is assumed for them. The lots of several symbols are added
+  only when every one is a pair of two of the currencies above (a broker
+  usually quotes its commission per lot of any of them), and the note then adds "the
+  lots of the 2 currency pairs are added as the platform prints them"; with a
+  metal, an index, a coin or any other symbol among several it is
+  NOT_MEASURED ("... a lot of gold is not a lot of EURUSD, so their lots are
+  not added together").
+- In the report, the executive summary's break-even tile reads "(bps per side;
+  1.7 pips)" with one pair, "(bps per side; ≈ 4.3 pips on EURUSD / 5.0 pips on
+  GBPUSD)" with several (the three most traded), and adds "52.54 USD per lot
+  and side" when the per-lot figure is measured; the basis points stay the
+  figure. The costs section adds a table "In pips, by symbol" under the
+  re-costed ledger. The improvement plan's costs step quotes those figures
+  when the break-even is above zero and then drops the generic "on EURUSD at
+  1.10, 1 bp per side is about 1.1 pips": it names the table's symbols, metals
+  included, when they are every symbol traded and no more than three, and
+  says "on each symbol you trade" otherwise. With a break-even at or below
+  zero it quotes no figure of its own and keeps the generic line.
 
 ### The variance policy behind the deflated Sharpe
 
@@ -1233,7 +1284,11 @@ and report wire them in during the integration step):
   out-of-sample start, NOT_MEASURED with the holdout's own
   reason when it was not measured (no date declared, a date outside the
   series, a side too short); `reference_cost`, the curve with the cost
-  section's reference cost per side (`costs.round_trip_cost`) taken off the
+  section's reference cost per side (`costs.reference_bps`: the client's
+  declared cost when one above zero was declared, and the row's name then
+  reads "With the declared cost (N bps per side)" with a DECLARED badge;
+  otherwise the assumed reference, named "With the reference cost"),
+  charged with `costs.round_trip_cost` and taken off the
   balance from each trade's exit on, NOT_MEASURED without trades, when the
   curve is not money (deposits or withdrawals inside the history make it an
   index; otherwise the curve and the trades must reconcile, or the balance
@@ -1264,6 +1319,66 @@ and report wire them in during the integration step):
   `/v`, the badge or the card. Every preset has `time_limit_days=None`, so
   "unfinished" reads as not reaching the target within the simulator's
   250 business days, the cap, never as a deadline the rules set.
+- `challenge.sizing`, the size table ("¿A qué tamaño? El reto a 0.5x, 1x,
+  1.5x y 2x", under the ladder): the ladder's `full` row again with every
+  daily return of the history multiplied by 0.5, 1, 1.5 and 2
+  (`SIZING_MULTIPLIERS`), through `firmfit.program_outcomes`, which is
+  `program_pass` (same simulator, seed, paths per phase and rules, all the
+  program's phases) plus how the program ends when it is not passed. JSON:
+  `{"status", "program", "note", "starting_balance", "size_per_trade",
+  "account_size", "rows"}`;
+  each row is `{"key": "0.5x" | "1x" | "1.5x" | "2x", "multiplier", "days",
+  "pass", "main_risk", "pass_within_best_day" (when the program has a
+  best-day rule), "fail_daily_loss", "fail_total_loss", "unfinished"}`, all
+  MEASURED. `pass` is the chance of passing every phase (the product, as in
+  the firm table); the three failures count a phase's outcome weighted by
+  the chance of reaching that phase (fresh starts, The5ers Bootcamp three
+  times), so the four figures of a row sum to one. The 1x row is the ladder's
+  `full` row itself (same `days`, `pass`, `main_risk` and
+  `pass_within_best_day`). The `note` says the assumption: changing the size
+  scales every daily return in the same proportion, as linear leverage does
+  when the costs grow in proportion to the size (the same cost per lot) and
+  the execution does not worsen with more volume. `starting_balance` is the
+  balance the daily shares at 1x are measured on, as the capital section
+  names it: DECLARED for a report's curve rebuilt from its trades (the
+  report's balance, or the one declared on the form), MEASURED for a curve
+  the client uploaded or built from chosen columns (its first value), and
+  NOT_MEASURED with the value kept when the reader assumed 10,000 because the
+  file states none (the importer's or the column mapping's "does not state a
+  starting balance" warning on a curve built from it); the report then says
+  the balance was assumed and that 1x scales with it. `size_per_trade`
+  is NOT_MEASURED: the importers fold each trade's lots into units of the
+  instrument and read no stop loss, so the report does not know the lot or
+  the risk per trade behind 1x and never gives one; 1x is "the size of the
+  history you uploaded" (each simulated day gains or loses the same share of
+  the balance as a day of the file). `account_size` is DECLARED only when
+  the preset's program names one (`prop_presets.ACCOUNT_SIZES`: Topstep
+  50K/100K/150K, whose dollar limits are shares of that account); otherwise
+  NOT_MEASURED, and the report says the simulated rules fix no account size
+  (they are shares of the starting balance or of the day's), so the table
+  does not depend on the account size. The whole block is
+  NOT_MEASURED, with the same reason, when the challenge or the ladder's
+  `full` row is not measured, and with "uploaded returns are not money"
+  (`RETURNS_NOT_MONEY`, the reconciliation's own reason) for a returns
+  upload. The report shows one row per size with the chance of reaching the
+  target in every phase, within the best-day rule when the program has one,
+  of breaking the daily limit ("no rule" for programs without one), of
+  breaking the total limit and of not reaching the target within the
+  simulator's cap (the ladder's `unfinished_cap` words; "per phase" for a
+  program of several phases, since each phase has 250 business days of its
+  own), in the ladder's formats (`_firm_pct`). Without a deadline in the
+  rules the intro adds that "reaches the target" counts only what gets there
+  within that cap, so a smaller size moving simulations to "does not reach"
+  is read as days running out, not as broken limits. It repeats the
+  open-loss warning ("cifras optimistas") under the same condition as the
+  ladder (`_challenge_optimistic`). It shows what changes with the size and
+  advises none. In the locked preview its title is listed after the
+  challenge simulator. Time measured with `time.perf_counter` at the
+  production 5,000 paths: about 0.17 s extra on the sample report (generic
+  preset) and 0.30 s with FTMO 2-Step (two phases), under 1 s, so every
+  size keeps the ladder's paths. Informational: no class, dimension,
+  challenge figure, ladder row or firm-table change, and nothing reaches
+  `/v`, the badge or the card.
 - `vendor_questions`: neutral questions for the seller of a robot, driven by
   the red flags and the missing inputs, in Spanish and English. It never
   says whether to buy.
