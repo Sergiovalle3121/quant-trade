@@ -54,6 +54,9 @@ class Audience:
     #: "signal" (``/ejemplo-senal``). A signal copier's main button opens the
     #: signal sample, and starting comes after it.
     sample: str = "backtest"
+    #: Whoever publishes a history for clients sees, under the first buttons, the
+    #: public page, badge and card of both samples (``sample_publication``).
+    public_example: bool = False
 
     def slug_for(self, locale: str) -> str:
         if locale == "pt":
@@ -1825,6 +1828,7 @@ AUDIENCE_PAGES: tuple[Audience, ...] = (
         slug_pt="gestoras-e-sinais",
         icon="chart",
         contact_cta=True,
+        public_example=True,
         text={
             "es": AudienceText(
                 title=(

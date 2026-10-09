@@ -117,6 +117,7 @@ from quant_trade.audit.report import (
     report_kind,
     source_name,
 )
+from quant_trade.audit.sample_publication import public_pages_line
 from quant_trade.audit.seo import (
     BRAND,
     OG_IMAGE_SIZE,
@@ -3035,6 +3036,7 @@ def verification_page(
     result_sha256: str,
     base_url: str,
     locale: str = "es",
+    notice_html: str = "",
 ) -> str:
     """The public page of a published audit.
 
@@ -3047,6 +3049,10 @@ def verification_page(
     observations, files and token are never read here, so they cannot leak. A
     view kept before the period was shown has no dates, and those rows are
     left out.
+
+    ``notice_html`` goes on top, above the title: only a public sample's page
+    (``sample_publication.sample_notice_html``) has one; a publication's page
+    never does, and without it nothing else on the page changes.
     """
     locale = _locale(locale)
     copy = _COPY[locale]
@@ -3140,8 +3146,12 @@ def verification_page(
         base_url=base_url,
     )
     hero = (
-        "<section class='page-hero'>" + aurora() + grid_bg() + "<div class='wrap'>"
-        f"<div class='eyebrow rise'><span class='dot'></span>{_e(ui['v_eyebrow'])}</div>"
+        "<section class='page-hero'>"
+        + aurora()
+        + grid_bg()
+        + "<div class='wrap'>"
+        + notice_html
+        + f"<div class='eyebrow rise'><span class='dot'></span>{_e(ui['v_eyebrow'])}</div>"
         f"<h1 class='rise' style='--i:1'>{_e(copy['v_title'])}</h1>"
         "<div class='v-hero rise' style='--i:2'>"
         + class_ring(overall, size="xl")
@@ -4893,6 +4903,9 @@ def audience_page(
             f"<a class='link-more' href='{_e(start)}'>{_e(start_label)}{icon('arrow')}</a>"
             "</div>"
         )
+    if audience.public_example:
+        # What the provider's clients would see, before uploading anything.
+        lead += public_pages_line(locale, css="aud-example")
     alternates = {lang: audience_url(audience.slug, lang) for lang in ("es", "en", "pt")}
     crumbs = f"<a href='{_e(_home(locale))}'>{_e(words['home'])}</a>" + _language_crumbs(
         alternates, locale

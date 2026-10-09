@@ -162,6 +162,12 @@ from quant_trade.audit.report import render, report_kind, result_sha256
 from quant_trade.audit.retention import RetentionWorker
 from quant_trade.audit.return_series import is_return_series
 from quant_trade.audit.sample import sample_result, signal_sample_result
+from quant_trade.audit.sample_publication import (
+    SAMPLE_KIND_BY_PUBLIC_ID,
+    SAMPLE_PUBLICATION_LOCALE,
+    sample_notice_html,
+    sample_publication,
+)
 from quant_trade.audit.schema import (
     MAX_UPLOAD_BYTES,
     AuditResult,
@@ -6284,8 +6290,12 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         """Publication, record, the page's data and the result's SHA-256.
 
         A purged audit is served from the view the purge kept; without one
-        the page is gone (410).
+        the page is gone (410). A public sample's reserved id
+        (``sample_publication``) is answered from the sample itself, before any
+        lookup: no real id can be one (``Store.publish`` draws 12 characters).
         """
+        if public_id in SAMPLE_KIND_BY_PUBLIC_ID:
+            return _sample_publication(public_id)
         publication = db.get_publication(public_id)
         if publication is None:
             raise _not_found()
@@ -6350,13 +6360,16 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     @app.get("/v/{public_id}", response_class=HTMLResponse)
     def verification(request: Request, public_id: str, lang: str | None = None) -> str:
         publication, _, data, digest = _published(public_id)
+        locale = _report_locale(lang)
         return verification_page(
             data,
             public_id=publication.public_id,
             published_at=publication.created_at,
             result_sha256=digest,
             base_url=_site_url(request),
-            locale=_report_locale(lang),
+            locale=locale,
+            # Empty for a publication: only a public sample's page has a notice.
+            notice_html=sample_notice_html(public_id, locale),
         )
 
     sample_cache: dict[tuple[str, str, str, tuple[str, ...]], str] = {}
@@ -6385,6 +6398,28 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         the network; none (the offline sample) until the first download lands."""
         ready = market_data.ready() if market_data is not None else ()
         return (market_data.closes if market_data is not None and ready else None), ready
+
+    sample_views: dict[tuple[str, tuple[str, ...]], tuple[Any, dict[str, Any], str]] = {}
+    # Its own lock: building a sample's view never holds up the sample pages.
+    sample_view_lock = threading.Lock()
+
+    def _sample_publication(public_id: str) -> tuple[Any, Any, dict[str, Any], str]:
+        """``_published`` for a public sample's reserved id: the view a purge keeps
+        of the sample's Spanish report, with the public series in memory as its
+        page has them. Built once per sample and set of series, and kept; nothing
+        is read from or written to the database."""
+        kind = SAMPLE_KIND_BY_PUBLIC_ID[public_id]
+        with sample_view_lock:
+            market, ready = _sample_market()
+            for stale in [k for k in sample_views if k[1] != ready]:
+                del sample_views[stale]
+            key = (kind, ready)
+            if key not in sample_views:
+                result = samples[kind].result(SAMPLE_PUBLICATION_LOCALE, market=market)
+                sample_views[key] = sample_publication(public_id, result)
+            publication, view, digest = sample_views[key]
+        # The publication and the record in one: its id, date and class.
+        return publication, publication, view, digest
 
     def _sample_html(locale: str, base_url: str, kind: str = "backtest") -> str:
         """Built once per sample, locale, address and set of public series in

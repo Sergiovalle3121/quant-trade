@@ -2104,6 +2104,23 @@ button, the Myfxbook, MQL5 and FX Blue guides link it under "What you get",
 the first sample links it from its band, and the sitemap lists it with its
 own date (`seo.SIGNAL_SAMPLE_PUBLISHED`).
 
+Each sample also has the public page a publication of its report would get
+(`audit/sample_publication.py`): `/v/ejemplo` (the backtest) and
+`/v/ejemplo-senal` (the signal), with their `badge.svg`, `card.svg` and
+`card.png`. They go through the `/v/{public_id}` routes, functions and caching
+(`pages.verification_page`, badge, cards; `?lang=` and `noindex` as any `/v`),
+from the view a retention purge keeps (`store.public_view`) of the sample's
+Spanish report, built in memory once per set of public series, with the
+synthetic-data notice and a link to the full sample on top. Nothing is read
+from or written to the database. The two ids cannot be real ones: a real id is
+`secrets.token_urlsafe(9)`, always 12 characters, and `/v` answers the reserved
+ids before any lookup. The report's publish block links the one of its kind
+(an account history the signal's), the FAQ's publishing answer and the page for
+funds and signal providers link both, and each sample links its own from its
+band. `/comprobar` answers a sample's PDF as before.
+`tests/test_audit_sample_publication.py` compares each page, badge and card
+with those of a real publication of the same report, before and after a purge.
+
 Sharpe after the cash rate (`audit/cashrate.py`). With public data on, the
 report adds one line under the key figures: the Sharpe ratio of the returns
 after subtracting what the 3-month US Treasury bill paid over the same days
@@ -2664,6 +2681,7 @@ Routes:
 | `POST /audits/{id}/publish?token=…` | Create (or return) the public verification page. Paid audits, or any audit in free mode; 402 otherwise. |
 | `POST /audits/{id}/unpublish?token=…` | Remove the public page. |
 | `GET /v/{public_id}` | Public verification page. `GET /v/{public_id}/badge.svg` its badge. Survives the retention purge (only the shown fields are kept); 404 once unpublished. |
+| `GET /v/ejemplo`, `GET /v/ejemplo-senal` | The public page each sample's report would get, with the synthetic-data notice on top, and the same `badge.svg`, `card.svg` and `card.png`; built in memory, never stored. |
 | `GET /ejemplo`, `GET /sample` | A full report of synthetic data, Spanish and English. |
 | `GET /ejemplo-senal`, `/en/sample-signal`, `/pt/exemplo-sinal` | The signal sample: a full report of a made-up Myfxbook account, for a copier; each with its `.pdf`. |
 | `GET /terminos`, `GET /terms` | Terms of service (`audit/legal.py`), Spanish and English; either answers `?lang=`. |

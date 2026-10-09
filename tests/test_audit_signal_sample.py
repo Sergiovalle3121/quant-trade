@@ -57,6 +57,7 @@ from quant_trade.audit.report import (  # noqa: E402
     SAMPLE_CTA_CSS,
     render,
     sample_cta_band,
+    sample_public_line,
 )
 from quant_trade.audit.sample import (  # noqa: E402
     SIGNAL_DEPOSIT,
@@ -70,6 +71,7 @@ from quant_trade.audit.sample import (  # noqa: E402
     signal_sample_result,
     synthetic_signal_statement,
 )
+from quant_trade.audit.sample_publication import sample_public_path  # noqa: E402
 from quant_trade.audit.seo import (  # noqa: E402
     CHECK_PATH,
     PUBLIC_PAGES,
@@ -305,6 +307,8 @@ def test_each_page_answers_with_the_notice_the_role_and_no_claims(
         guide_url("myfxbook", locale),
         guide_url("mql5-signal", locale),
         guide_url("fxblue", locale),
+        # The public page this report would get (sample_publication).
+        sample_public_path("ejemplo-senal", locale),
     ]
     links = _between(page, "<nav class='report-languages'", "</nav>")
     assert _hrefs(links) == [SIGNAL_SAMPLE_PATHS[lang] for lang in LOCALES if lang != locale]
@@ -433,7 +437,9 @@ def test_the_first_sample_only_gains_the_link_to_the_signal_sample(
             f"<p class='sample-cta-files'>{html.escape(words['files'])} "
             f"<a href='{guide_url('mt5', locale)}'>{html.escape(words['mt5'])}</a> "
             f"{html.escape(words['joint'])} <a href='{guide_url('mt5-optimization', locale)}'>"
-            f"{html.escape(words['optimization'])}</a>.</p></div>"
+            f"{html.escape(words['optimization'])}</a>.</p>"
+            # The line to its own public page (sample_publication), before this one.
+            f"{sample_public_line(locale)}</div>"
         )
         assert band.replace(link, "", 1) == before
     # The first sample renders as before: its kind is the default one.

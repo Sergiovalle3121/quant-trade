@@ -55,6 +55,13 @@ from quant_trade.audit.method import method_url
 from quant_trade.audit.plan import improvement_plan
 from quant_trade.audit.prop_presets import preset_label
 from quant_trade.audit.redflags import flag_title
+from quant_trade.audit.sample_publication import (
+    PUBLIC_PAGE_LINK,
+    SAMPLE_BAND_LINK,
+    SAMPLE_PUBLIC_IDS,
+    sample_public_id,
+    sample_public_path,
+)
 from quant_trade.audit.schema import AuditResult, Dimension
 from quant_trade.audit.seo import (
     BRAND,
@@ -9042,7 +9049,9 @@ def sample_cta_band(locale: str, offer: str = "welcome", kind: str = "backtest")
 
     The backtest sample (``kind="backtest"``) names the MT5 files and sends whoever
     is about to copy a signal to the other sample; the signal sample names the
-    account exports it reads."""
+    account exports it reads. Both link to their own public page
+    (``sample_publication``): the page, badge and card a publication of this
+    report would get."""
     from quant_trade.audit.pages import AUDIT_PATHS
 
     lang = locale if locale in SAMPLE_CTA_COPY else "es"
@@ -9074,7 +9083,17 @@ def sample_cta_band(locale: str, offer: str = "welcome", kind: str = "backtest")
         f"<p><b>{_e(words['lead_' + offer])}</b></p>"
         f"<a class='btn btn-primary btn-sm' href='{_e(AUDIT_PATHS[lang])}'>"
         f"{_e(words['button_' + offer])}</a>"
-        f"<p class='sample-cta-files'>{files}</p>{other}</div>"
+        f"<p class='sample-cta-files'>{files}</p>{sample_public_line(lang, kind)}{other}</div>"
+    )
+
+
+def sample_public_line(locale: str, kind: str = "backtest") -> str:
+    """The sample band's line to the public page of that sample (``sample_cta_band``)."""
+    lang = locale if locale in SAMPLE_BAND_LINK else "es"
+    public_id = SAMPLE_PUBLIC_IDS["signal" if kind == "signal" else "backtest"]
+    return (
+        f"<p class='sample-cta-files'><a href='{_e(sample_public_path(public_id, lang))}'>"
+        f"{_e(SAMPLE_BAND_LINK[lang])}</a>.</p>"
     )
 
 
@@ -9329,9 +9348,14 @@ def render_html(
             kind=report_kind(data),
         )
     elif publish_url and not locked:
+        # Before publishing, the owner can see the page a sample of the same kind
+        # gets (``sample_publication``): an account history, the signal's.
+        example = sample_public_path(sample_public_id(report_kind(data)), locale)
+        example_words = PUBLIC_PAGE_LINK.get(locale, PUBLIC_PAGE_LINK["es"])
         publish_html = (
             f"<form class='publish' method='post' action='{_e(publish_url)}'>"
             f"<p class='muted'>{_e(labels['publish_help'])}</p>"
+            f"<p class='muted publish-example'><a href='{_e(example)}'>{_e(example_words)}</a></p>"
             f"<button class='btn btn-dark' type='submit'>{_e(labels['publish'])}</button></form>"
         )
 
