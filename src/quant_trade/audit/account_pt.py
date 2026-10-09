@@ -119,7 +119,8 @@ COPY_PT: dict[str, str] = {
     "next_title": "Como continua",
     "next_account": "Crie a conta com o seu e-mail e uma senha.",
     "next_confirm_welcome": (
-        "Abra o link que enviamos por e-mail: o relatório completo grátis espera essa etapa."
+        "Abra o link que enviamos por e-mail. Você pode enviar o arquivo antes; o relatório "
+        "completo grátis espera essa etapa."
     ),
     "next_confirm": "Abra o link que enviamos por e-mail para confirmar a conta.",
     "next_upload": ("Envie o arquivo que a sua plataforma já exporta, sem convertê-lo: {formats}."),

@@ -161,8 +161,8 @@ COPY: dict[str, dict[str, str]] = {
         "next_title": "Así sigue",
         "next_account": "Crea la cuenta con tu correo y una contraseña.",
         "next_confirm_welcome": (
-            "Abre el enlace que te enviamos por correo: el informe completo gratis espera a ese "
-            "paso."
+            "Abre el enlace que te enviamos por correo. Puedes subir tu archivo antes; el "
+            "informe completo gratis espera a ese paso."
         ),
         "next_confirm": "Abre el enlace que te enviamos por correo para confirmar la cuenta.",
         "next_upload": "Sube el archivo que ya exporta tu plataforma, sin convertirlo: {formats}.",
@@ -921,7 +921,8 @@ COPY: dict[str, dict[str, str]] = {
         "next_title": "What happens next",
         "next_account": "Create the account with your e-mail and a password.",
         "next_confirm_welcome": (
-            "Open the link we e-mail you: the free full report waits for that step."
+            "Open the link we e-mail you. You can upload your file before that; the free full "
+            "report waits for that step."
         ),
         "next_confirm": "Open the link we e-mail you to confirm the account.",
         "next_upload": (
