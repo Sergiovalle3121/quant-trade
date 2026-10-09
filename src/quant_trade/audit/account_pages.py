@@ -161,8 +161,8 @@ COPY: dict[str, dict[str, str]] = {
         "next_upload": "Sube el archivo que ya exporta tu plataforma, sin convertirlo: {formats}.",
         "next_guides": "Cómo exportarlo, plataforma por plataforma",
         "next_report": (
-            "Recibes la clase, de {first} a {last}, las {count} comprobaciones con su etiqueta "
-            "MEASURED, DECLARED o NOT_MEASURED y el PDF."
+            "Recibes la clase, de {first} a {last}, las {count} comprobaciones, cada una como "
+            "{statuses}, y el PDF."
         ),
         "next_free_welcome": "El primero es gratis.",
         "next_free_all": "Ahora todos los informes completos son gratis.",
@@ -901,8 +901,8 @@ COPY: dict[str, dict[str, str]] = {
         ),
         "next_guides": "How to export it, platform by platform",
         "next_report": (
-            "You get the class, from {first} to {last}, the {count} checks with their "
-            "MEASURED, DECLARED or NOT_MEASURED label, and the PDF."
+            "You get the class, from {first} to {last}, the {count} checks, each one as "
+            "{statuses}, and the PDF."
         ),
         "next_free_welcome": "The first one is free.",
         "next_free_all": "All full reports are currently free.",
@@ -1827,13 +1827,28 @@ def _benefits(copy: dict[str, str]) -> str:
 _COUNT_WORDS: dict[str, dict[int, str]] = {"es": {6: "seis"}, "en": {6: "six"}, "pt": {6: "seis"}}
 #: How the last item of a list joins the others.
 _AND: dict[str, str] = {"es": "y", "en": "and", "pt": "e"}
+#: The same for a choice: ``a, b o c``.
+_OR: dict[str, str] = {"es": "o", "en": "or", "pt": "ou"}
 
 
-def _listed(items: Sequence[str], locale: str) -> str:
-    """``a, b y c`` in the page's language."""
+def _listed(items: Sequence[str], locale: str, *, choice: bool = False) -> str:
+    """``a, b y c`` (or ``a, b o c`` with ``choice``) in the page's language."""
     if len(items) < 2:
         return "".join(items)
-    return f"{', '.join(items[:-1])} {_AND[locale]} {items[-1]}"
+    word = (_OR if choice else _AND)[locale]
+    return f"{', '.join(items[:-1])} {word} {items[-1]}"
+
+
+def _status_labels(locale: str) -> list[str]:
+    """Every status a dimension can come out with, as the report's badges name it."""
+    from typing import get_args
+
+    from quant_trade.audit.portuguese import STATUS_TEXT_PT
+    from quant_trade.audit.report import STATUS_TEXT
+    from quant_trade.audit.verdict import Status
+
+    text = STATUS_TEXT_PT if locale == "pt" else STATUS_TEXT[locale]
+    return [text[status] for status in get_args(Status)]
 
 
 def is_upload_next(next_path: str) -> bool:
@@ -1851,7 +1866,8 @@ def _next_steps(copy: dict[str, str], locale: str, *, email_verification: bool, 
     Every step comes from the configuration: the e-mail step only when a confirmed
     address is required, the free report as the service offers it (``welcome``:
     the first full report with an account; ``free``: every full report). The
-    formats are the upload form's own list and the counts are the engine's.
+    formats are the upload form's own list; the counts and the statuses each
+    check comes out with are the engine's.
     """
     from quant_trade.audit.guides import guides_index_url
     from quant_trade.audit.pages import PLATFORMS, SAMPLE_PAGE_PATHS
@@ -1863,6 +1879,7 @@ def _next_steps(copy: dict[str, str], locale: str, *, email_verification: bool, 
         first=CLASS_ORDER[0],
         last=CLASS_ORDER[-1],
         count=_COUNT_WORDS[locale].get(count, str(count)),
+        statuses=_listed(_status_labels(locale), locale, choice=True),
     )
     report += " " + copy["next_free_welcome" if offer == "welcome" else "next_free_all"]
     steps = [_e(copy["next_account"])]

@@ -15,7 +15,7 @@ from dataclasses import replace
 from datetime import UTC, datetime
 from functools import cache
 from pathlib import Path
-from typing import Any
+from typing import Any, get_args
 from urllib.parse import parse_qs, urlsplit
 
 import pytest
@@ -51,10 +51,12 @@ from quant_trade.audit.pages import (  # noqa: E402
     _articles_cta,
     upload_page,
 )
+from quant_trade.audit.portuguese import STATUS_TEXT_PT  # noqa: E402
 from quant_trade.audit.pricing import PRICING_COPY, PRICING_PATH, start_cta  # noqa: E402
 from quant_trade.audit.report import (  # noqa: E402
     LABELS,
     SAMPLE_CTA_COPY,
+    STATUS_TEXT,
     evidence_label,
     render,
     sample_check_block,
@@ -66,7 +68,7 @@ from quant_trade.audit.seo import CHECK_PATH  # noqa: E402
 from quant_trade.audit.settings import AuditSettings  # noqa: E402
 from quant_trade.audit.store import make_store  # noqa: E402
 from quant_trade.audit.strategies import CLASS_ORDER  # noqa: E402
-from quant_trade.audit.verdict import DIMENSION_ORDER  # noqa: E402
+from quant_trade.audit.verdict import DIMENSION_ORDER, Status  # noqa: E402
 from quant_trade.audit.winrate import WINRATE_PATH  # noqa: E402
 
 LOCALES = ("es", "en", "pt")
@@ -456,8 +458,12 @@ def test_sign_up_on_the_way_to_the_form_says_what_happens_next(tmp_path: Path, l
     count = {"es": "seis", "en": "six", "pt": "seis"}[locale] if len(DIMENSION_ORDER) == 6 else ""
     assert f" {count or len(DIMENSION_ORDER)} " in steps[2]
     assert f"{CLASS_ORDER[0]} " in steps[2] and f" {CLASS_ORDER[-1]}," in steps[2]
-    for tag in ("MEASURED", "DECLARED", "NOT_MEASURED"):
-        assert evidence_label(tag, locale) in steps[2]
+    # Each check comes out with a status, as the report's badges name it; the
+    # evidence labels belong to each figure, never to a check.
+    statuses = STATUS_TEXT_PT if locale == "pt" else STATUS_TEXT[locale]
+    for status in get_args(Status):
+        assert statuses[status] in steps[2]
+    assert evidence_label("DECLARED", locale) not in steps[2]
     assert "PDF" in steps[2] and steps[2].endswith(copy["next_free_welcome"])
     assert DURATION.search(_visible(side)) is None
     links = _hrefs(side)

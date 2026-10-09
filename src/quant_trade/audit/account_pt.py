@@ -118,8 +118,8 @@ COPY_PT: dict[str, str] = {
     "next_upload": ("Envie o arquivo que a sua plataforma já exporta, sem convertê-lo: {formats}."),
     "next_guides": "Como exportá-lo, plataforma por plataforma",
     "next_report": (
-        "Você recebe a classe, de {first} a {last}, os {count} pontos com o seu rótulo "
-        "MEASURED, DECLARED ou NOT_MEASURED, e o PDF."
+        "Você recebe a classe, de {first} a {last}, os {count} pontos, cada um como "
+        "{statuses}, e o PDF."
     ),
     "next_free_welcome": "O primeiro é grátis.",
     "next_free_all": "Agora todos os relatórios completos são grátis.",
