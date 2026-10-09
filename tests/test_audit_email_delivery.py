@@ -183,7 +183,7 @@ def test_signup_outbox_survives_restart_and_checkout_waits_for_post(tmp_path: Pa
     _signup(client, "buyer@example.com")
     account = store.find_account("buyer@example.com")
     assert account is not None and not store.email_verified(account.id)
-    first_id, _ = _upload(client, 301)
+    first_id, first_token = _upload(client, 301)
     # The free first report waits for a confirmed address: one per person.
     assert not store.get_audit(first_id).paid
     second_id, token = _upload(client, 302)
@@ -204,6 +204,10 @@ def test_signup_outbox_survives_restart_and_checkout_waits_for_post(tmp_path: Pa
     assert not restarted.email_verified(account.id)  # GET may be prefetched
     _confirm(fresh, link)
     assert restarted.email_verified(account.id)
+    # Confirming opens the most recent upload as the free first report; the
+    # earlier one stays a preview, which can now be bought.
+    assert restarted.get_audit(second_id).paid
+    assert not restarted.get_audit(first_id).paid
 
     observed = []
     app.state.checkout_factory = lambda *_args, **kwargs: (
@@ -211,7 +215,7 @@ def test_signup_outbox_survives_restart_and_checkout_waits_for_post(tmp_path: Pa
         "https://checkout.stripe.test/email",
     )[1]
     allowed = client.post(
-        f"/audits/{second_id}/checkout?token={token}",
+        f"/audits/{first_id}/checkout?token={first_token}",
         data={"billing_country": "MX", "final_sale": "yes"},
         follow_redirects=False,
     )
@@ -225,9 +229,11 @@ def test_verified_owner_must_be_the_signed_in_checkout_buyer(tmp_path: Path) -> 
     app = create_app(cfg, store)
     owner = TestClient(app, base_url=cfg.base_url)
     _signup(owner, "owner@example.com")
-    _upload(owner, 701)  # the first full report is free
-    audit_id, token = _upload(owner, 702)
+    audit_id, token = _upload(owner, 701)
+    # Confirming opens the most recent upload as the free first report.
+    free_id, _ = _upload(owner, 702)
     _confirm(owner, _mail_link(store, cfg, "owner@example.com"))
+    assert store.get_audit(free_id).paid and not store.get_audit(audit_id).paid
 
     path = f"/audits/{audit_id}/checkout?token={token}"
     anonymous = TestClient(app, base_url=cfg.base_url)
@@ -330,8 +336,8 @@ def test_referral_waits_until_both_addresses_are_confirmed(tmp_path: Path) -> No
     first_id, _ = _upload(friend, 410)
     assert not store.get_audit(first_id).paid  # unconfirmed: a preview
     _confirm(friend, friend_link)
-    welcome_id, _ = _upload(friend, 411)
-    assert store.get_audit(welcome_id).paid
+    # Confirming opens that same upload as the free first report.
+    assert store.get_audit(first_id).paid
     assert store.account_credits(account.id, datetime.now(UTC)) == 0
     _confirm(inviter, inviter_link)
     assert store.account_credits(account.id, datetime.now(UTC)) == 1

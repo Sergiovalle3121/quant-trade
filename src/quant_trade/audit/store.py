@@ -127,6 +127,19 @@ class AuditRecord:
 
 
 @dataclass(frozen=True)
+class WelcomePending:
+    """A preview uploaded before the account confirmed its e-mail: the free
+    full report it may still become, with the marks it was uploaded with."""
+
+    audit_id: str
+    account_id: str
+    device_sha256: str
+    file_sha256: str
+    client_ip: str
+    created_at: str
+
+
+@dataclass(frozen=True)
 class RefusedPayment:
     """A live card payment Stripe charged that unlocked nothing: ids only."""
 
@@ -814,6 +827,21 @@ class Store(OpsStoreMixin):
             sa.Column("file_sha256", sa.String(64), nullable=False, default="", index=True),
             sa.Column("client_ip", sa.String(64), nullable=False, default="", index=True),
             sa.Column("created_at", sa.String(40), nullable=False, index=True),
+        )
+        # Additive mapping: older databases need no ALTER TABLE. A preview
+        # uploaded before the e-mail was confirmed, which confirming it may
+        # turn into the free full report; the browser mark, file fingerprint
+        # and address are the upload's own, so the same limits are applied
+        # again. Rows go with the report, the account and the retention purge.
+        self.welcome_pending = sa.Table(
+            "welcome_pending",
+            self.metadata,
+            sa.Column("audit_id", sa.String(32), primary_key=True),
+            sa.Column("account_id", sa.String(32), nullable=False, default="", index=True),
+            sa.Column("device_sha256", sa.String(64), nullable=False, default=""),
+            sa.Column("file_sha256", sa.String(64), nullable=False, default=""),
+            sa.Column("client_ip", sa.String(64), nullable=False, default=""),
+            sa.Column("created_at", sa.String(40), nullable=False),
         )
         #: A card an account verified with Stripe at no charge (Checkout in
         #: setup mode) so its free full report passes the browser and network
@@ -2943,6 +2971,9 @@ class Store(OpsStoreMixin):
             conn.execute(
                 self.strategy_reports.delete().where(self.strategy_reports.c.audit_id == audit_id)
             )
+            conn.execute(
+                self.welcome_pending.delete().where(self.welcome_pending.c.audit_id == audit_id)
+            )
             store_hooks.on_delete_audit(self, conn, audit_id)
             deleted = conn.execute(self.audits.delete().where(self.audits.c.id == audit_id))
         return bool(deleted.rowcount)
@@ -3832,6 +3863,7 @@ class Store(OpsStoreMixin):
                 self.account_events,
                 self.failed_signins,
                 self.account_seen,
+                self.welcome_pending,
             ):
                 conn.execute(table.delete().where(table.c.account_id == account_id))
             conn.execute(
@@ -5324,6 +5356,74 @@ class Store(OpsStoreMixin):
                 )
             )
 
+    def delete_free_preview(self, audit_id: str) -> None:
+        """Give the month's free preview back: ``audit_id`` became a full report."""
+        with self.engine.begin() as conn:
+            conn.execute(
+                self.free_previews.delete().where(self.free_previews.c.audit_id == audit_id)
+            )
+
+    # -- the free full report waiting for a confirmed e-mail ----------------
+    def record_welcome_pending(
+        self,
+        audit_id: str,
+        account_id: str,
+        *,
+        device_sha256: str,
+        file_sha256: str,
+        client_ip: str,
+        at: datetime,
+    ) -> None:
+        """Note a preview that confirming the e-mail may open in full."""
+        sa = self._sa
+        try:
+            with self.engine.begin() as conn:
+                conn.execute(
+                    self.welcome_pending.insert().values(
+                        audit_id=audit_id,
+                        account_id=account_id,
+                        device_sha256=device_sha256[:64],
+                        file_sha256=file_sha256[:64],
+                        client_ip=client_ip[:64],
+                        created_at=_iso(at),
+                    )
+                )
+        except sa.exc.IntegrityError:  # pragma: no cover - one row per report
+            return
+
+    def welcome_pending_for(self, account_id: str, *, since: datetime) -> list[WelcomePending]:
+        """The account's pending previews since ``since``, the most recent first."""
+        sa = self._sa
+        table = self.welcome_pending
+        with self.engine.connect() as conn:
+            rows = (
+                conn.execute(
+                    sa.select(table)
+                    .where(table.c.account_id == account_id)
+                    .where(table.c.created_at >= _iso(since))
+                    .order_by(table.c.created_at.desc(), table.c.audit_id)
+                )
+                .mappings()
+                .all()
+            )
+        return [
+            WelcomePending(
+                audit_id=str(row["audit_id"]),
+                account_id=str(row["account_id"]),
+                device_sha256=str(row["device_sha256"] or ""),
+                file_sha256=str(row["file_sha256"] or ""),
+                client_ip=str(row["client_ip"] or ""),
+                created_at=str(row["created_at"]),
+            )
+            for row in rows
+        ]
+
+    def clear_welcome_pending(self, account_id: str) -> None:
+        """Forget every pending preview of the account."""
+        table = self.welcome_pending
+        with self.engine.begin() as conn:
+            conn.execute(table.delete().where(table.c.account_id == account_id))
+
     def free_previews_since(
         self, since: datetime, *, account_id: str = "", client_ip: str = ""
     ) -> int:
@@ -5490,6 +5590,18 @@ class Store(OpsStoreMixin):
                 .mappings()
                 .first()
             )
+            pending = self.welcome_pending
+            waiting = conn.execute(
+                sa.select(
+                    pending.c.audit_id,
+                    pending.c.created_at,
+                    pending.c.client_ip,
+                    pending.c.device_sha256,
+                    pending.c.file_sha256,
+                )
+                .where(pending.c.account_id == account_id)
+                .order_by(pending.c.created_at)
+            ).all()
             card = conn.execute(
                 sa.select(self.card_checks.c.created_at, self.card_checks.c.card_sha256).where(
                     self.card_checks.c.account_id == account_id
@@ -5606,6 +5718,16 @@ class Store(OpsStoreMixin):
                 if welcome is not None
                 else None
             ),
+            "free_first_report_pending": [
+                {
+                    "audit_id": row[0],
+                    "created_at": row[1],
+                    "upload_ip": row[2],
+                    "browser_mark_sha256": row[3],
+                    "file_fingerprint_sha256": row[4],
+                }
+                for row in waiting
+            ],
             "card_check": (
                 {"created_at": card[0], "card_fingerprint_sha256": card[1]}
                 if card is not None
@@ -6041,6 +6163,11 @@ class Store(OpsStoreMixin):
                     & (self.free_previews.c.client_ip != "")
                 )
                 .values(client_ip="")
+            )
+            # A pending free report is only honoured for days: past the
+            # window nothing of it is kept, its address included.
+            conn.execute(
+                self.welcome_pending.delete().where(self.welcome_pending.c.created_at < cutoff)
             )
             if count == 0:
                 return count

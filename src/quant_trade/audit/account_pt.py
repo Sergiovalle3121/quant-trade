@@ -10,7 +10,11 @@ profit-claim guard.
 
 from __future__ import annotations
 
-from quant_trade.audit.accounts import FREE_PREVIEWS_PER_MONTH, MIN_PASSWORD_CHARS
+from quant_trade.audit.accounts import (
+    FREE_PREVIEWS_PER_MONTH,
+    MIN_PASSWORD_CHARS,
+    WELCOME_PENDING_DAYS,
+)
 from quant_trade.audit.seo import BRAND
 
 PATHS_PT: dict[str, str] = {
@@ -104,15 +108,19 @@ COPY_PT: dict[str, str] = {
     "signed_out": "Você saiu da conta.",
     "welcome": "Conta criada. Envie um arquivo agora: o relatório fica salvo aqui.",
     "welcome_confirm": (
-        "Conta criada. Enviamos um link de confirmação para o seu e-mail: abra-o para "
-        "liberar seu primeiro relatório completo gratuito e as compras. Se não encontrar, "
-        "confira a pasta de spam."
+        "Conta criada. Você já pode enviar seu arquivo. Ao abrir o link que enviamos por e-mail "
+        "(se não encontrar, confira a pasta de spam), abre completo e grátis o mais recente dos "
+        f"seus envios dos {WELCOME_PENDING_DAYS} dias anteriores que ainda possa receber o "
+        "relatório grátis: aquele cujo arquivo e navegador não o tiveram em outra conta e cuja "
+        "rede não esgotou os do mês. Se nenhum puder, recebe-o o primeiro que você fizer depois e "
+        "que cumpra o mesmo."
     ),
     "welcome_confirm_guides": "Enquanto o e-mail chega, exporte o seu arquivo",
     "next_title": "Como continua",
     "next_account": "Crie a conta com o seu e-mail e uma senha.",
     "next_confirm_welcome": (
-        "Abra o link que enviamos por e-mail: o relatório completo grátis espera essa etapa."
+        "Abra o link que enviamos por e-mail. Você pode enviar o arquivo antes; o relatório "
+        "completo grátis espera essa etapa."
     ),
     "next_confirm": "Abra o link que enviamos por e-mail para confirmar a conta.",
     "next_upload": ("Envie o arquivo que a sua plataforma já exporta, sem convertê-lo: {formats}."),
@@ -191,8 +199,20 @@ COPY_PT: dict[str, str] = {
         "é uma prévia. O primeiro relatório gratuito é um por pessoa."
     ),
     "welcome_refused_unverified": (
-        "Confirme seu e-mail pelo link que enviamos e seu próximo arquivo receberá o primeiro "
-        "relatório completo gratuito. Até lá, isto é uma prévia."
+        f"Confirme seu e-mail com o link que enviamos em até {WELCOME_PENDING_DAYS} dias depois "
+        "deste envio e este mesmo relatório abre completo e grátis, sem enviá-lo de novo, se até "
+        "lá ele continuar sendo o mais recente dos seus envios que pode receber o relatório "
+        "grátis. Hoje é o caso: o arquivo e o navegador dele não o tiveram em outra conta e a "
+        "rede dele não esgotou os do mês. Enquanto isso, esta é uma prévia."
+    ),
+    "welcome_pending_other": (
+        "Esta é uma prévia. Ao confirmar seu e-mail com o link que enviamos, abre completo e "
+        f"grátis o mais recente dos seus envios dos {WELCOME_PENDING_DAYS} dias anteriores que "
+        "ainda possa receber o relatório grátis: aquele cujo arquivo e navegador não o tiveram em "
+        "outra conta e cuja rede não esgotou os do mês. Hoje não é este."
+    ),
+    "welcome_pending_confirmed": (
+        "Seu e-mail já está confirmado; este envio continua sendo uma prévia."
     ),
     "welcome_refused_unverified_nomail": (
         "A confirmação de e-mail não está disponível no momento, então isto é uma "
@@ -399,6 +419,10 @@ COPY_PT: dict[str, str] = {
     "email_pending": ("A troca está pendente. Abra o link enviado ao novo e-mail para concluí-la."),
     "email_verified": "E-mail confirmado. Você já pode usar compras e recompensas disponíveis.",
     "email_verified_signin": "E-mail confirmado. Entre.",
+    "email_verified_report": (
+        "E-mail confirmado. Seu relatório já está completo, com o PDF: ele está na sua lista de "
+        "relatórios."
+    ),
     "email_verified_welcome_signin": (
         "E-mail confirmado. Entre para usar seu primeiro relatório completo grátis."
     ),

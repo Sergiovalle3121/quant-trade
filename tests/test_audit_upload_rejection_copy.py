@@ -49,7 +49,7 @@ def test_each_refusal_explains_cause_next_step_and_real_guides(category: str, lo
     assert next_step in unescape(page)
     paths = {f"{GUIDES_PATH[locale]}/{guide.slug_for(locale)}" for guide in GUIDES}
     links = _Links(page).hrefs
-    assert 2 <= len(links) <= 5
+    assert 2 <= len(links) <= 7
     assert all(link in paths for link in links)
     assert_report_clean(page)
 

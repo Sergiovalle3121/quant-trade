@@ -90,6 +90,47 @@ def _program(results: list[tuple[str, dict[str, Any]]]) -> dict[str, Any]:
     return row
 
 
+def program_keys(key: str) -> list[str]:
+    """The presets of ``key``'s program (same firm and program), in ``PRESETS`` order.
+
+    The generic reference has no siblings, so it returns only itself."""
+    rules = PRESETS[key]
+    return [
+        k
+        for k, other in PRESETS.items()
+        if (other.firm, other.program) == (rules.firm, rules.program)
+    ]
+
+
+def program_pass(
+    daily_returns: pd.Series | np.ndarray | Sequence[float],
+    key: str,
+    *,
+    samples: int,
+    seed: int,
+    known: dict[str, dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    """Every phase of ``key``'s program on one history, as one row of :func:`firm_fit`.
+
+    ``key`` is simulated with ``samples`` paths and its sibling phases with
+    ``min(samples, SAMPLES)``, as :func:`firm_fit` does next to a chosen firm,
+    so with ``known={key: result}`` the row is the same as that program's row
+    in the firm table."""
+    results: list[tuple[str, dict[str, Any]]] = []
+    for phase in program_keys(key):
+        result = (known or {}).get(phase) or simulate_challenge(
+            daily_returns,
+            PRESETS[phase],
+            samples=samples if phase == key else min(samples, SAMPLES),
+            seed=seed,
+        )
+        if not result.get("method"):
+            reason = result["probability"]["pass"].get("note", "not measured")
+            return {"status": "NOT_MEASURED", "reason": reason}
+        results.append((phase, result))
+    return {"status": "MEASURED", **_program(results)}
+
+
 def firm_fit(
     daily_returns: pd.Series | np.ndarray | Sequence[float],
     *,
@@ -132,4 +173,4 @@ def firm_fit(
     return out
 
 
-__all__ = ["REPEATS", "SAMPLES", "firm_fit"]
+__all__ = ["REPEATS", "SAMPLES", "firm_fit", "program_keys", "program_pass"]

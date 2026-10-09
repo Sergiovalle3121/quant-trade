@@ -89,6 +89,9 @@ WELCOME_REPORTS_PER_IPV4_PER_MONTH = 10
 #: While e-mail confirmation is off nothing else tells made-up accounts on
 #: one connection apart, so the IPv4 cap stays at the IPv6 one.
 WELCOME_REPORTS_PER_IPV4_UNVERIFIED = 3
+#: Days a preview uploaded before the e-mail was confirmed can still become the
+#: free full report when the address is confirmed (the most recent one only).
+WELCOME_PENDING_DAYS = 7
 #: "Invita a un colega": an account whose invite link brings a new account
 #: gets this many full-report credits once the new account's free first
 #: report exists (so the free tier's browser, file and address limits

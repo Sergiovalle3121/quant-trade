@@ -1209,6 +1209,38 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
         "es el producto de la de cada fase",
     ),
     (
+        "scenarios of the same history under the same simulator, seed and rules; "
+        "they are not predictions",
+        "escenarios del mismo historial con el mismo simulador, semilla y reglas; no son "
+        "predicciones",
+    ),
+    (
+        "fewer than 2 trials: there is no search to discount",
+        "menos de 2 intentos: no hay búsqueda que descontar",
+    ),
+    (
+        "trial count not declared: the haircut needs to know how many configurations were tried",
+        "no se declaró el número de intentos: el descuento necesita saber cuántas "
+        "configuraciones se probaron",
+    ),
+    (
+        "deposits or withdrawals inside the history: the curve is an index, not money",
+        "depósitos o retiros dentro del historial: la curva es un índice, no dinero",
+    ),
+    (
+        "the curve and the trades do not reconcile in money",
+        "la curva y las operaciones no cuadran en dinero",
+    ),
+    ("the curve was not shown to be money", "no se pudo comprobar que la curva sea dinero"),
+    (
+        "the curve was not shown to be money: {why}",
+        "no se pudo comprobar que la curva sea dinero: {why}",
+    ),
+    (
+        "with the reference cost the balance reaches zero inside the history",
+        "con el costo de referencia el balance llega a cero dentro del historial",
+    ),
+    (
         "share of the resampled passes whose best day breaks the firm's best-day rule, "
         "checked at the pass on daily closes",
         "proporción de los pases remuestreados cuyo mejor día rompe la regla del mejor día "
@@ -2394,6 +2426,11 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
         "explicar la diferencia",
     ),
     (
+        "the file prints no running balance of its own to compare with",
+        "el archivo no imprime un saldo propio con el que comparar, así que no hay nada "
+        "independiente que conciliar",
+    ),
+    (
         "a calibrated heuristic found balance-chain inconsistencies; this alone "
         "does not establish alteration",
         "una heurística calibrada encontró inconsistencias en la cadena de "
@@ -2696,6 +2733,9 @@ def _translate_values(values: dict[str, str], locale: str = "es") -> dict[str, s
     if "source" in out:
         source = out["source"]
         out["source"] = trials.get(source, initial.get(source, source))
+    if "why" in out:
+        # A reason the engine wrote elsewhere, quoted whole.
+        out["why"] = _render(out["why"], locale) or out["why"]
     return out
 
 

@@ -37,8 +37,10 @@ src/quant_trade/audit/web.py
 tests/audit_fixtures.py
 tests/forgery_lab.py
 tests/test_audit_access_codes.py
+tests/test_audit_account_upload_honesty.py
 tests/test_audit_articles.py
 tests/test_audit_card_payments.py
+tests/test_audit_challenge_ladder.py
 tests/test_audit_checkout_language.py
 tests/test_audit_completed_count.py
 tests/test_audit_email_delivery.py
@@ -72,8 +74,10 @@ tests/test_audit_schema.py
 tests/test_audit_settings.py
 tests/test_audit_share_funnel.py
 tests/test_audit_sharing.py
+tests/test_audit_upload_inplace.py
 tests/test_audit_user_accounts.py
 tests/test_audit_web_languages.py
+tests/test_audit_welcome_pending.py
 tests/test_forensics_balance.py
 tests/test_forensics_review.py
 tests/test_forensics_totals.py
