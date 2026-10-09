@@ -182,10 +182,12 @@ def test_pdf_buttons_say_the_pdf_is_being_prepared(tmp_path: Path) -> None:
         ("es", "Generando tu PDF… (unos segundos)", "El PDF tarda unos segundos en generarse."),
         ("en", "Preparing your PDF… (a few seconds)", "The PDF takes a few seconds to prepare."),
     ):
-        pages = (client.get(f"{location}&lang={lang}").text,)
-        pages += (client.get("/ejemplo" if lang == "es" else "/sample").text,)
-        for page in pages:
-            assert page.count(f"download data-busy='{busy}'") == 2
+        # A client's report has two PDF buttons; the public sample adds a third in
+        # its "check it yourself" block (report.sample_check_block).
+        pages = ((client.get(f"{location}&lang={lang}").text, 2),)
+        pages += ((client.get("/ejemplo" if lang == "es" else "/sample").text, 3),)
+        for page, buttons in pages:
+            assert page.count(f"download data-busy='{busy}'") == buttons
             assert f"<noscript> <span class='muted'>{wait}</span></noscript>" in page
             assert find_claims(page) == []
     script = (STATIC_DIR / "app.js").read_text()
