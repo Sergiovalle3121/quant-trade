@@ -216,6 +216,47 @@ free tools page and is linked from the win-rate and challenge calculators and
 from the related links of the article "rachas-perdedoras". The page carries a
 three-question FAQ (visible and as `FAQPage`), a `WebApplication` with price 0
 and no sizing advice. Tests: `tests/test_audit_ruin_calculator.py`.
+The public table of prop-firm rules (`audit/rules_table.py`, rendered by
+`challenge_pages.rules_table_page`) lives at `/reglas-prop-firm`,
+`/en/prop-firm-rules` and `/pt/regras-prop-firm`, in the sitemap with the date
+`rules_table.rules_table_lastmod()`: the later of `RULES_TABLE_PUBLISHED` and
+the most recent preset `as_of`, the same date the `Dataset` names as
+`dateModified`. One row per published preset (every
+program, phase by phase, in `PRESETS` order; the generic reference is not one):
+firm, program and phase, target, daily loss with its basis, total loss with its
+type (static, trailing the highest daily close, or trailing and locking at the
+initial balance), minimum days, time limit, best-day rule, the markets when a
+page states them (`markets`, linked to `markets_source`, with `markets_as_of`
+shown when it differs from the row's `as_of`), the source page and its `as_of`.
+Every cell is read from the preset with the calculator's own words; no figure
+is typed into a text, and the counts the texts name (firms, programs, how many
+use each basis or type) are counted from the presets. The lead says the rows
+are the rules as the calculator uses them and that a program's notes (which
+variant was simulated, whether an approximation is stricter or optimistic) are
+on its calculator page. The types of maximum loss are named once
+(`rules_table.loss_names`, the calculator's cell text without the figure) for
+the cells, the filter chips and the questions. The filters are links with a
+query, no JavaScript: `?firma=<FIRMS key>`, `?perdida=<TOTAL_LOSS_TYPES value>`
+and `?mercado=fx|futures`, combined, each chip keeping the other two; a chip
+whose combination would show no row is rendered as plain text, not a link; a
+value that names nothing is ignored (the whole table, a 200, never a 400), a
+market filter says that programs whose pages state no markets are not shown,
+and the canonical and hreflang links never carry the query. The route keeps
+each rendered combination (language, filters, address, offer) in a bounded
+`lru_cache` after the claim guard, which is most of the page's cost. Below the
+table, one block per firm with two sentences of fact from its presets (its
+programs, how many of its pages they were read from and when, then its first
+program's first note, named by that program) and the links to its calculator
+page and to its rows, then the
+fixed "not affiliated; rules change, check the official page" line, a "what
+this table does not see" list (intraday trailing, news, payout rules, account
+sizes, fees) that recommends buying nothing, and four questions of fact (what
+trailing EOD is, what the best-day rule is, which basis the daily loss uses,
+why some programs are left out) that are also the page's `FAQPage` JSON-LD; a
+`Dataset` block carries `dateModified` = the most recent `as_of`. The page is
+linked from the tools page (under the challenge calculator), from the
+calculator and every firm page, and from the prop-firm case page; it uses the
+site's share card. Tests: `tests/test_audit_prop_rules_table.py`.
 
 Five firms were added on 2026-10-10 (`prop_presets.NEW_FIRMS_AS_OF`), each
 from its official site and only with the programs whose rules fit the
@@ -3080,6 +3121,7 @@ Routes:
 | `GET /calculadora-reto`, `/en/challenge-calculator`, `/pt/calculadora-desafio` | The free prop-firm challenge calculator, and its firm pages under each (`/ftmo`, `/fundednext`, `/the5ers`, `/topstep`, `/fundingpips`, `/alpha-capital-group`, `/e8-markets`, `/fxify`, `/maven-trading`, `/take-profit-trader`, `/myfundedfutures`, `/tradeify`, `/bulenox`, `/earn2trade`, `/alpha-futures`, `/lucid-trading`). |
 | `GET /herramientas` | The free tools page (`/en/tools`, `/pt/ferramentas`; `/tools` and `/pt/tools` redirect there): luck calculator, win-rate calculator, challenge calculator, risk-of-ruin calculator, figure reader and report check. |
 | `GET /calculadora-ruina`, `/en/risk-of-ruin-calculator`, `/pt/calculadora-risco-de-ruina` | The free risk-of-ruin and expectancy calculator (`audit/ruin_calc.py`, `audit/ruin_pages.py`): declared figures, fixed-size paths, the engine's streak function and the win rate's Wilson interval. |
+| `GET /reglas-prop-firm`, `/en/prop-firm-rules`, `/pt/regras-prop-firm` | The public table of every published prop-firm preset with source and date (`audit/rules_table.py`); `?firma=`, `?perdida=` and `?mercado=` filter it by links, an unknown value shows the whole table. |
 | `GET /en/calculator`, `/reading`, `/en/methodology`, `/en/articles`, `/en/guides`, `/en/sample`, `/en/check`, `/faq`, `/examples` | 301 to the page people meant (`/calculator`, `/en/reading`, `/methodology`, `/articles`, `/guides`, `/sample`, `/check`, `/en/faq`, `/en/examples`). The first two keep the query string. |
 | `POST /webhooks/stripe`, `POST /waitlist`, `GET /health` | Payment confirmation, waiting list, health check. |
 
