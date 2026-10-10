@@ -24,6 +24,7 @@ from urllib.parse import parse_qsl, quote, urlencode, urlsplit, urlunsplit
 from quant_trade.audit import charts, ownership, paid_offer, psr_names, report_pt, seller_message
 from quant_trade.audit.account import FLOATING_NOTE as ACCOUNT_FLOATING_NOTE
 from quant_trade.audit.account import is_account_history
+from quant_trade.audit.analytics import question_now
 from quant_trade.audit.crises import (
     MARKET,
     MARKET_AS_OF,
@@ -820,6 +821,11 @@ LABELS: dict[str, dict[str, str]] = {
             "La tabla muestra cuánto historial haría falta según cuántas fueran: pregúntaselo "
             "al vendedor."
         ),
+        "luck_uncounted_account": (
+            "El historial no dice cuántas cuentas o señales hay detrás de esta ni cuántas se "
+            "cerraron o reiniciaron. La tabla muestra cuánto historial haría falta según "
+            "cuántas fueran: pregúntaselo al proveedor."
+        ),
         "luck_span_line": "Sharpe del archivo: {sharpe}. Historial: {span}.",
         "luck_table_trials": "Configuraciones probadas",
         "luck_table_luck": "Sharpe que daría la suerte",
@@ -1070,6 +1076,7 @@ LABELS: dict[str, dict[str, str]] = {
             "cambia la probabilidad de que el Sharpe real sea mayor que cero."
         ),
         "dependence_info": "La clase usa la segunda cifra, el PSR ajustado por dependencia.",
+        "dependence_info_plain": "Es informativo: la clase usa la cuenta simple.",
         "lo_not_lower": (
             "Sharpe corregido por autocorrelación (Lo, 2002): no queda apreciablemente por "
             "debajo de {plain}, así que el orden de los retornos no infla el Sharpe simple de "
@@ -1546,6 +1553,8 @@ LABELS: dict[str, dict[str, str]] = {
         "live_fall": "Peor caída",
         "live_avg_win": "Ganancia media (neta de costos)",
         "live_avg_loss": "Pérdida media (neta de costos)",
+        "live_avg_win_plain": "Ganancia media",
+        "live_avg_loss_plain": "Pérdida media",
         "live_below": "Historias del backtest con un resultado neto igual o peor",
         "live_fall_above": "Historias del backtest con una caída igual o más profunda",
         "live_rescaled": (
@@ -1745,6 +1754,17 @@ LABELS: dict[str, dict[str, str]] = {
             "Las pérdidas abiertas que el balance oculta ya cuentan contra los límites de pérdida "
             "diaria y total de cualquier reto, y las cifras de abajo no las ven: el balance solo "
             "cuenta operaciones cerradas."
+        ),
+        "ch_unseen_hidden": (
+            "Las banderas rojas encontraron pérdidas abiertas durante el historial que el "
+            "balance oculta (Drawdown flotante oculto): en un reto habrían contado contra los "
+            "límites de pérdida diaria y total, y las cifras de abajo no las ven: el balance "
+            "solo cuenta operaciones cerradas."
+        ),
+        "ch_unseen_hidden_also": (
+            "Además, las banderas rojas encontraron pérdidas abiertas durante el historial que "
+            "el balance oculta (Drawdown flotante oculto): en un reto también habrían contado "
+            "contra esos límites."
         ),
         "ch_unseen_summary": "Cifras que no ven la pérdida abierta (optimistas)",
         "ch_unseen_sizes": (
@@ -2453,6 +2473,11 @@ LABELS: dict[str, dict[str, str]] = {
             "picked. The table shows how much history each search size would need: ask the "
             "vendor."
         ),
+        "luck_uncounted_account": (
+            "The history does not say how many accounts or signals stand behind this one, or "
+            "how many were closed or reset. The table shows how much history each count would "
+            "need: ask the provider."
+        ),
         "luck_span_line": "The file's Sharpe: {sharpe}. History: {span}.",
         "luck_table_trials": "Configurations tried",
         "luck_table_luck": "Sharpe luck would show",
@@ -2692,6 +2717,7 @@ LABELS: dict[str, dict[str, str]] = {
             "does not change the probability that the true Sharpe is above zero."
         ),
         "dependence_info": "The class uses the second figure, the PSR adjusted for dependence.",
+        "dependence_info_plain": "It is informational: the class uses the plain count.",
         "lo_not_lower": (
             "Sharpe corrected for autocorrelation (Lo, 2002): it is not appreciably below "
             "{plain}, so the order of the returns does not inflate the plain Sharpe appreciably. "
@@ -3159,6 +3185,8 @@ LABELS: dict[str, dict[str, str]] = {
         "live_fall": "Deepest fall",
         "live_avg_win": "Average win (net of fees)",
         "live_avg_loss": "Average loss (net of fees)",
+        "live_avg_win_plain": "Average win",
+        "live_avg_loss_plain": "Average loss",
         "live_below": "Backtest histories with a net result as low or lower",
         "live_fall_above": "Backtest histories with a fall as deep or deeper",
         "live_rescaled": (
@@ -3355,6 +3383,17 @@ LABELS: dict[str, dict[str, str]] = {
             "The open losses the balance hides already count against the daily and total loss "
             "limits of any challenge, and the figures below do not see them: the balance counts "
             "closed trades only."
+        ),
+        "ch_unseen_hidden": (
+            "The red flags found open losses during the history that the balance hides (Hidden "
+            "floating drawdown): in a challenge they would have counted against the daily and "
+            "total loss limits, and the figures below do not see them: the balance counts "
+            "closed trades only."
+        ),
+        "ch_unseen_hidden_also": (
+            "The red flags also found open losses during the history that the balance hides "
+            "(Hidden floating drawdown): in a challenge they would also have counted against "
+            "those limits."
         ),
         "ch_unseen_summary": "Figures that do not see the open loss (optimistic)",
         "ch_unseen_sizes": (
@@ -5349,18 +5388,24 @@ def _lo_html(significance: dict[str, Any], plain: float | None, labels: dict[str
     return f"<p>{_e(out)} {_badge('MEASURED')}</p>"
 
 
-def _significance_rows(significance: dict[str, Any]) -> dict[str, Any]:
+def _significance_rows(significance: dict[str, Any], data: dict[str, Any]) -> dict[str, Any]:
     """The significance table's rows: the stored ones, with the PSR adjusted for
-    dependence beside the plain count when it is measured, since that is the
-    figure the class uses (``psr_names``). Display only: nothing is stored."""
+    dependence beside the plain count when it is measured. Its note says it is
+    the figure the class uses only when the stored statistical dimension used
+    it (``psr_names.class_psr``): a result stored before policy
+    2026-09-27-dependence-1 classified with the plain count. Display only:
+    nothing is stored."""
     adjusted = (significance.get("dependence") or {}).get("psr") or {}
     if adjusted.get("evidence") != "MEASURED" or "psr" not in significance:
         return significance
+    row = dict(adjusted)
+    if psr_names.class_psr(data)[2] == psr_names.ADJUSTED:
+        row["note"] = psr_names.CLASS_NOTE
     shown: dict[str, Any] = {}
     for key, value in significance.items():
         shown[key] = value
         if key == "psr":
-            shown["psr_dependence"] = {**adjusted, "note": psr_names.CLASS_NOTE}
+            shown["psr_dependence"] = row
     return shown
 
 
@@ -5372,10 +5417,16 @@ def _class_psr_reason(reason: str, data: dict[str, Any], locale: str) -> str:
     )
 
 
-def _dependence_html(significance: dict[str, Any], labels: dict[str, str]) -> str:
+def _dependence_html(
+    significance: dict[str, Any], labels: dict[str, str], data: dict[str, Any]
+) -> str:
     """The probability of a true Sharpe above zero with dependent returns, beside
-    the plain one; it never reads higher, and when it is measured it is the one
-    the class uses (the engine takes the lower of the two)."""
+    the plain one; it never reads higher. The sentence says which of the two
+    the class uses as the stored statistical dimension used it
+    (``psr_names.class_psr``): the adjusted one since policy
+    2026-09-27-dependence-1, the plain count in a result stored before it.
+    It says the dependence changes nothing only when the two read the same in
+    the significance table, so it never contradicts the row above it."""
     block = significance.get("dependence") or {}
     ratio = _ev_value(block.get("ratio"))
     psr = _ev_value(block.get("psr"))
@@ -5392,14 +5443,16 @@ def _dependence_html(significance: dict[str, Any], labels: dict[str, str]) -> st
         or count is None
     ):
         return ""
-    # A widening under a tenth moves the probability by less than the table's
-    # rounding says anything about.
-    if ratio < 1.1:
+    # A widening under a tenth that leaves both figures the same in the table
+    # says nothing; one that moves either, however little, is said with both.
+    if ratio < 1.1 and _table_pct(plain) == _table_pct(psr):
         out = labels["dependence_none"]
     else:
         n = f"{int(count):,}"
         out = labels["dependence_line"].format(
-            ratio=f"{ratio:.1f}", plain=_table_pct(plain), psr=_table_pct(psr)
+            ratio=f"{ratio:.2f}" if ratio < 1.1 else f"{ratio:.1f}",
+            plain=_table_pct(plain),
+            psr=_table_pct(psr),
         )
         # A count far beyond the history reads as noise; beyond ten times it
         # only says the history would have to be far longer.
@@ -5415,7 +5468,8 @@ def _dependence_html(significance: dict[str, Any], labels: dict[str, str]) -> st
             )
         if plain >= 0.95 > psr:
             out += " " + labels["dependence_pass_rests"]
-        out += " " + labels["dependence_info"]
+        adjusted = psr_names.class_psr(data)[2] == psr_names.ADJUSTED
+        out += " " + labels["dependence_info" if adjusted else "dependence_info_plain"]
     return f"<p>{_e(out)} {_badge('MEASURED')}</p>"
 
 
@@ -5719,44 +5773,71 @@ def _challenge_optimistic(
 UNSEEN_OPEN_LOSS_FLAGS = ("FLOATING_LOSS_AT_END", "HIDDEN_FLOATING_DRAWDOWN")
 
 
-def unseen_open_loss(data: dict[str, Any]) -> tuple[bool, float | None]:
-    """Whether the challenge figures cannot see an open loss the file shows,
-    and that loss as a share of the balance when the file declares it.
+def _own_account(data: dict[str, Any]) -> dict[str, Any]:
+    """The account review of the file the report is about. An account history
+    uploaded as the real account beside a backtest gets its own review
+    (``source`` "live"): its figures describe that other file, never the
+    backtest's reconciliation or challenge."""
+    account = data.get("account") or {}
+    return {} if account.get("source") == "live" else account
 
-    True when the red flags found hidden open losses (a curve of closed trades
-    only), or an open loss at the end on a balance-only curve; the share is the
-    account's declared floating share, else the flag's own figure."""
-    flags = {
+
+def _unseen_flags(data: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    return {
         str(flag.get("code")): flag
         for flag in data.get("red_flags") or []
         if flag.get("code") in UNSEEN_OPEN_LOSS_FLAGS
     }
+
+
+def unseen_open_loss(data: dict[str, Any]) -> tuple[bool, float | None]:
+    """Whether the challenge figures cannot see an open loss the file shows,
+    and that loss as a share of the balance when it reads as a figure.
+
+    True when the red flags found hidden open losses (a curve of closed trades
+    only), or an open loss at the end on a balance-only curve. The share is the
+    file's own account review's floating share (never that of an account
+    uploaded beside a backtest), else the flag's own figure; it is given with
+    the open-loss-at-end flag, or when it shows as at least 1 % of the balance,
+    so the callout never reads "0%"."""
+    flags = _unseen_flags(data)
     balance_only = bool((data.get("inputs") or {}).get("balance_only"))
     if "HIDDEN_FLOATING_DRAWDOWN" not in flags and not (
         "FLOATING_LOSS_AT_END" in flags and balance_only
     ):
         return False, None
-    share = _ev_value((data.get("account") or {}).get("floating_share"))
+    share = _ev_value(_own_account(data).get("floating_share"))
     if share is None and "FLOATING_LOSS_AT_END" in flags:
         value = flags["FLOATING_LOSS_AT_END"].get("value")
         share = float(value) if isinstance(value, int | float) else None
     if share is not None and (not math.isfinite(share) or share >= 0):
         share = None
+    if share is not None and "FLOATING_LOSS_AT_END" not in flags and _loss_share(share) == "0%":
+        share = None
     return True, share
+
+
+def _loss_share(share: float) -> str:
+    """An open loss as the challenge callout prints it."""
+    return f"{abs(share):.0%}"
 
 
 def unseen_open_loss_warning(data: dict[str, Any], labels: dict[str, str]) -> str:
     """The callout that opens the challenge section when its figures cannot see
     the open loss: that loss already counts against any challenge's daily and
-    total limits. Empty when the curve sees it or nothing is open."""
+    total limits. It names the open loss at the end when it reads as a figure,
+    and the hidden floating drawdown during the history when the red flags
+    found it. Empty when the curve sees it or nothing is open."""
     unseen, share = unseen_open_loss(data)
     if not unseen:
         return ""
-    text = (
-        labels["ch_unseen_open"].format(share=f"{abs(share):.0%}")
-        if share is not None
-        else labels["ch_unseen_open_any"]
-    )
+    hidden = "HIDDEN_FLOATING_DRAWDOWN" in _unseen_flags(data)
+    if share is not None:
+        text = labels["ch_unseen_open"].format(share=_loss_share(share))
+        if hidden:
+            text += " " + labels["ch_unseen_hidden_also"]
+    else:
+        text = labels["ch_unseen_hidden" if hidden else "ch_unseen_open_any"]
     return (
         f"<p class='live-verdict lv-FAIL unseen-open-note'><span class='badge FAIL'>"
         f"{_e(labels['open_loss_badge'])}</span> {_e(text)}</p>"
@@ -6516,6 +6597,8 @@ def _firm_fit_html(
 
 
 def _question_text(question: dict[str, str], locale: str) -> str:
+    # A question reworded since the result was stored reads as the plan does now.
+    question = {**question, **(question_now(str(question.get("code", ""))) or {})}
     if locale == "pt":
         # A result stores its questions in Spanish and English only.
         return localize(question.get("en", ""), locale)
@@ -6982,8 +7065,12 @@ def _recon_text(value: str, locale: str, table: dict[str, tuple[str, str, str]])
 def declared_open_value(data: dict[str, Any]) -> dict[str, Any] | None:
     """The open positions' floating result the file declares, as the account
     review reads it (DECLARED, with its note), or straight from the platform's
-    summary when there is no account review. None when the file declares none."""
-    item = (data.get("account") or {}).get("floating_pnl") or {}
+    summary when there is no account review. None when the file declares none.
+
+    Only the file the reconciliation is about: the review of an account history
+    uploaded as the real account beside a backtest (``_own_account``) speaks of
+    that other file, so a backtest's reconciliation never shows its figure."""
+    item = _own_account(data).get("floating_pnl") or {}
     value = item.get("value")
     if item.get("evidence") == "DECLARED" and isinstance(value, int | float):
         return dict(item) if math.isfinite(float(value)) else None
@@ -7422,12 +7509,33 @@ def _block_name(key: int) -> str:
 LIVE_TONE = {"CONSISTENT": "PASS", "EDGE": "WEAK", "INCONSISTENT": "FAIL", "ABOVE": "WEAK"}
 
 
-def _live_html(live: dict[str, Any] | None, locale: str, labels: dict[str, str]) -> str:
-    """The live statement placed among resampled backtest histories."""
+def live_net_of_fees(live: dict[str, Any], trade_stats: dict[str, Any] | None = None) -> bool:
+    """Whether both sides of the live comparison itemise each trade's fees, so
+    its averages are net of them (``live._net`` subtracts only those). A result
+    stored before ``fees_itemised`` reads the backtest's from its trade table
+    (``win_rate_gross`` is there only then) and the live file's as unknown."""
+    itemised = live.get("fees_itemised") or {}
+    backtest = itemised.get("backtest")
+    if backtest is None:
+        backtest = "win_rate_gross" in (trade_stats or {})
+    return bool(backtest) and bool(itemised.get("live"))
+
+
+def _live_html(
+    live: dict[str, Any] | None,
+    locale: str,
+    labels: dict[str, str],
+    trade_stats: dict[str, Any] | None = None,
+) -> str:
+    """The live statement placed among resampled backtest histories. Its
+    averages say "net of fees" only when both files itemise them per trade
+    (``live_net_of_fees``); otherwise they are the files' own results, named
+    as the trade table names them."""
     if not live:
         return ""
     if live.get("status") != "MEASURED":
         return _status_line(live, labels)
+    plain = "" if live_net_of_fees(live, trade_stats) else "_plain"
     outcome = live["outcome"]
     bt, lv, expected = live["backtest"], live["live"], live["expected"]
 
@@ -7471,8 +7579,18 @@ def _live_html(live: dict[str, Any] | None, locale: str, labels: dict[str, str])
             cell(lv, "max_fall", money),
             band("max_fall", money),
         ),
-        (labels["live_avg_win"], cell(bt, "avg_win", money), cell(lv, "avg_win", money), ""),
-        (labels["live_avg_loss"], cell(bt, "avg_loss", money), cell(lv, "avg_loss", money), ""),
+        (
+            labels[f"live_avg_win{plain}"],
+            cell(bt, "avg_win", money),
+            cell(lv, "avg_win", money),
+            "",
+        ),
+        (
+            labels[f"live_avg_loss{plain}"],
+            cell(bt, "avg_loss", money),
+            cell(lv, "avg_loss", money),
+            "",
+        ),
     ]
     live_head = "live_col_live_rescaled" if live.get("rescaled") else "live_col_live"
     table = (
@@ -8246,9 +8364,14 @@ def _luck_html(
     labels: dict[str, str],
     multiplicity: dict[str, Any] | None = None,
     dsr_pass: float = DEFAULT_THRESHOLDS.dsr_pass,
+    *,
+    account: bool = False,
 ) -> str:
     """The file's Sharpe next to the luck of the configurations counted, and
     what a search of 10, 100 or 1,000 would need.
+
+    ``account``: an account or signal history, whose uncounted trials are the
+    accounts or signals behind it (no optimisation file to ask for).
 
     Beating the luck is a DSR of at least 0.5; the multiplicity dimension
     passes only at 0.95, so a Sharpe between the two says it beats the luck
@@ -8326,7 +8449,7 @@ def _luck_html(
         out += f"<div class='facts'>{facts}</div>"
     else:
         out += (
-            f"<p>{_e(labels['luck_uncounted'])}</p>"
+            f"<p>{_e(labels['luck_uncounted_account' if account else 'luck_uncounted'])}</p>"
             f"<p>{_e(labels['luck_span_line'].format(sharpe=sharpe, span=span))} "
             f"{_badge(luck['sharpe']['evidence'])}</p>"
         )
@@ -10425,7 +10548,12 @@ def render_html(
     detail: list[tuple[str, str]] = [
         (labels["plan"], _plan_html(data, locale, labels, locked=False)),
         *(
-            [(labels["live"], _live_html(data.get("live"), locale, labels))]
+            [
+                (
+                    labels["live"],
+                    _live_html(data.get("live"), locale, labels, data.get("trade_stats")),
+                )
+            ]
             if data.get("live")
             else []
         ),
@@ -10564,6 +10692,7 @@ def render_html(
                                 "dsr_pass", DEFAULT_THRESHOLDS.dsr_pass
                             )
                         ),
+                        account=is_account_history(data) and not _fund_record(data),
                     ),
                 )
             ]
@@ -10634,13 +10763,13 @@ def render_html(
         (
             labels["significance"],
             _status_line(data["significance"], labels)
-            + _evidence_rows(_significance_rows(data["significance"]), labels, skip=set())
+            + _evidence_rows(_significance_rows(data["significance"], data), labels, skip=set())
             + _lo_html(
                 data["significance"],
                 _ev_value((data.get("performance") or {}).get("sharpe")),
                 labels,
             )
-            + _dependence_html(data["significance"], labels),
+            + _dependence_html(data["significance"], labels, data),
         ),
         (labels["multiplicity"], multiplicity_html),
         (labels["bootstrap"], boot_html),

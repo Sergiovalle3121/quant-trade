@@ -544,23 +544,26 @@ def _significance_step(data: dict[str, Any], status: str, locale: str) -> tuple[
         return finding, _voiced(fund_actions, ("fund_history",), locale, ownership.role_of(data))
     if is_account_history(data):
         # An account is already the real or demo history: more of it is the
-        # same account, kept running with the same settings.
+        # same account, kept running with the same settings. It has no
+        # optimiser of its own: its new months are data nobody chose its
+        # settings on.
         return finding, _say(
             locale,
             [
                 "Sube un periodo más largo de la misma cuenta, sin cambiar la configuración.",
                 "Mejor aún, vuelve a auditarla cuando sume más meses con la misma "
-                "configuración: cada mes nuevo cuenta como datos que el optimizador nunca vio.",
+                "configuración: cada mes nuevo cuenta como datos que no se usaron para elegirla.",
             ],
             [
                 "Upload a longer period of the same account, with unchanged settings.",
                 "Better still, audit it again once it adds more months with the same "
-                "settings: each new month counts as data the optimiser never saw.",
+                "settings: each new month counts as data that was not used to choose them.",
             ],
             [
                 "Envie um período mais longo da mesma conta, sem mudar a configuração.",
                 "Melhor ainda, audite-a de novo quando somar mais meses com a mesma "
-                "configuração: cada mês novo conta como dados que o otimizador nunca viu.",
+                "configuração: cada mês novo conta como dados que não foram usados para "
+                "escolhê-la.",
             ],
         )
     actions = _say(
@@ -1359,24 +1362,32 @@ def _benchmark_step(data: dict[str, Any], status: str, locale: str) -> tuple[str
             "No reference was uploaded to compare against.",
             "Não foi enviada uma referência para comparar.",
         )
+        # An account or signal is not a robot: its example is a forex signal.
+        account = is_account_history(data)
+        example = _say(
+            locale,
+            "una cuenta o señal de forex" if account else "un EA de forex",
+            "a forex account or signal" if account else "a forex EA",
+            "uma conta ou sinal de forex" if account else "um EA de forex",
+        )
         actions = _say(
             locale,
             [
                 "Sube la curva de una alternativa pasiva: comprar y mantener el mismo activo o "
                 "un índice, con las mismas fechas.",
-                "Si no existe una alternativa pasiva comparable (por ejemplo, un EA de forex), "
+                f"Si no existe una alternativa pasiva comparable (por ejemplo, {example}), "
                 "declara que no aplica: la clase A lo admite.",
             ],
             [
                 "Upload the curve of a passive alternative: buy-and-hold of the same asset or "
                 "an index, over the same dates.",
-                "If no comparable passive alternative exists (a forex EA, say), declare it "
+                f"If no comparable passive alternative exists ({example}, say), declare it "
                 "not applicable: class A allows that.",
             ],
             [
                 "Envie a curva de uma alternativa passiva: comprar e manter o mesmo ativo ou "
                 "um índice, com as mesmas datas.",
-                "Se não existe uma alternativa passiva comparável (por exemplo, um EA de forex), "
+                f"Se não existe uma alternativa passiva comparável (por exemplo, {example}), "
                 "declare que não se aplica: a classe A admite isso.",
             ],
         )

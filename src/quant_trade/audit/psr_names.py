@@ -3,9 +3,11 @@
 The engine stores two probabilities that the true Sharpe is above zero: the
 plain count, which takes the returns as independent (``significance.psr``),
 and the one adjusted for the returns' dependence on each other
-(``significance.dependence.psr``). The statistical dimension uses the lower of
-the two (``engine.run_audit``), which is the adjusted one whenever it is
-measured: widening the variance never raises the probability. This module
+(``significance.dependence.psr``). Since policy 2026-09-27-dependence-1 the
+statistical dimension uses the lower of the two (``engine.run_audit``), which
+is the adjusted one whenever it is measured: widening the variance never
+raises the probability. A result stored the day before that policy kept the
+adjusted figure as information and classified with the plain count. This module
 computes nothing; it reads which figure the stored result used and gives it
 one name in Spanish, English and Portuguese, so the plan, the significance
 table and the technical detail never show two figures under the same name.
@@ -34,8 +36,9 @@ NAMES: dict[str, dict[str, str]] = {
     },
 }
 
-#: The note of the adjusted figure's row in the significance table (an engine-style
-#: English note: ``i18n`` and ``report_pt`` give its Spanish and Portuguese).
+#: The note of the adjusted figure's row in the significance table when the class
+#: used it (``class_psr`` says ADJUSTED); an engine-style English note: ``i18n``
+#: and ``report_pt`` give its Spanish and Portuguese.
 CLASS_NOTE = "the figure the class uses: the lower of the two, since it never reads higher"
 
 

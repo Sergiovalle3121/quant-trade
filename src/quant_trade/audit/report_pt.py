@@ -379,6 +379,11 @@ REPORT: dict[str, Any] = {
             "A tabela mostra quanto histórico seria necessário conforme quantas fossem: pergunte "
             "ao vendedor."
         ),
+        "luck_uncounted_account": (
+            "O histórico não diz quantas contas ou sinais há por trás desta nem quantas foram "
+            "encerradas ou reiniciadas. A tabela mostra quanto histórico seria necessário "
+            "conforme quantas fossem: pergunte ao fornecedor."
+        ),
         "luck_span_line": "Sharpe do arquivo: {sharpe}. Histórico: {span}.",
         "luck_table_trials": "Configurações testadas",
         "luck_table_luck": "Sharpe que a sorte daria",
@@ -811,6 +816,8 @@ REPORT: dict[str, Any] = {
         "live_fall": "Pior queda",
         "live_avg_win": "Ganho médio (líquido de custos)",
         "live_avg_loss": "Perda média (líquida de custos)",
+        "live_avg_win_plain": "Ganho médio",
+        "live_avg_loss_plain": "Perda média",
         "live_below": "Histórias do backtest com resultado líquido igual ou pior",
         "live_fall_above": "Histórias do backtest com queda igual ou mais profunda",
         "live_rescaled": (
@@ -1009,6 +1016,17 @@ REPORT: dict[str, Any] = {
             "As perdas abertas que o saldo esconde já contam contra os limites de perda diária e "
             "total de qualquer desafio, e os números abaixo não as veem: o saldo conta só "
             "operações fechadas."
+        ),
+        "ch_unseen_hidden": (
+            "As bandeiras vermelhas encontraram perdas abertas durante o histórico que o saldo "
+            "esconde (Drawdown flutuante oculto): em um desafio elas teriam contado contra os "
+            "limites de perda diária e total, e os números abaixo não as veem: o saldo conta só "
+            "operações fechadas."
+        ),
+        "ch_unseen_hidden_also": (
+            "Além disso, as bandeiras vermelhas encontraram perdas abertas durante o histórico "
+            "que o saldo esconde (Drawdown flutuante oculto): em um desafio elas também teriam "
+            "contado contra esses limites."
         ),
         "ch_unseen_summary": "Números que não veem a perda aberta (otimistas)",
         "ch_unseen_sizes": (
@@ -1418,6 +1436,7 @@ REPORT: dict[str, Any] = {
             "não muda a probabilidade de que o Sharpe real seja maior que zero."
         ),
         "dependence_info": "A classe usa o segundo número, o PSR ajustado por dependência.",
+        "dependence_info_plain": "É informativo: a classe usa a conta simples.",
         "lo_not_lower": (
             "Sharpe corrigido pela autocorrelação (Lo, 2002): não fica apreciavelmente abaixo de "
             "{plain}, então a ordem dos retornos não infla o Sharpe simples de forma apreciável. "
@@ -2213,6 +2232,19 @@ VERDICT: dict[str, Any] = {
             "com 1, o caso mais favorável, o resultado não supera o que uma tentativa sem "
             "habilidade produziria."
         ),
+        "multiplicity.NOT_MEASURED.undeclared.account": (
+            "Não foi declarado quantas contas ou sinais há por trás desta; o cálculo usa 1, o "
+            "caso mais favorável, e a multiplicidade continua sem medição."
+        ),
+        "multiplicity.WEAK.undeclared.account": (
+            "Não foi declarado quantas contas ou sinais há por trás desta e, mesmo com 1, o caso "
+            "mais favorável, o Sharpe ajustado por essas tentativas não chega ao limiar."
+        ),
+        "multiplicity.FAIL.undeclared.account": (
+            "Não foi declarado quantas contas ou sinais há por trás desta e, mesmo com 1, o caso "
+            "mais favorável, o resultado não supera o que uma tentativa sem habilidade "
+            "produziria."
+        ),
         "costs.PASS": (
             "Com 3 vezes o custo de referência, o resultado das operações continua positivo."
         ),
@@ -2300,6 +2332,18 @@ VERDICT: dict[str, Any] = {
             "Mesmo contando um único fundo, o caso mais favorável, o resultado não supera o que "
             "uma tentativa sem vantagem real daria. Não foi declarado quantos fundos ou "
             "estratégias o gestor administra: com mais de um, a conclusão seria ainda mais fraca."
+        ),
+        "multiplicity.NOT_MEASURED.undeclared.account": (
+            "Não foi declarado quantas contas ou sinais há por trás desta nem quantas foram "
+            "encerradas ou reiniciadas, então a classe não pode passar de B. Pergunte ao "
+            "fornecedor quantas são e declare esse número (mesmo que seja 1): o Rigor pode "
+            "descontá-lo."
+        ),
+        "multiplicity.FAIL.undeclared.account": (
+            "Mesmo contando uma única conta, o caso mais favorável, o resultado não supera o que "
+            "uma tentativa sem vantagem real daria. Não foi declarado quantas contas ou sinais "
+            "há por trás nem quantas foram encerradas ou reiniciadas: com mais de uma, a "
+            "conclusão seria ainda mais fraca."
         ),
         "costs.PASS": (
             "As operações se sustentam mesmo que os custos tripliquem. Os custos reais dependem "
@@ -6080,6 +6124,16 @@ RULES: tuple[tuple[str, str], ...] = (
         (
             "Peça o backtest do mesmo robô com a mesma configuração: enviado junto com esta "
             "conta, o relatório compara os dois operação por operação."
+        ),
+    ),
+    (
+        (
+            "Ask for the backtest of the same strategy, if it has one, with the same settings: "
+            "uploaded together with this account, the report compares the two trade by trade."
+        ),
+        (
+            "Peça o backtest da mesma estratégia, se ela tiver um, com a mesma configuração: "
+            "enviado junto com esta conta, o relatório compara os dois operação por operação."
         ),
     ),
     (

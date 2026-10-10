@@ -617,6 +617,19 @@ _TEXT: dict[str, dict[str, str]] = {
             "el caso más favorable, el resultado no supera lo que produciría un intento sin "
             "habilidad."
         ),
+        # An account or signal: its trials are the accounts or signals behind it.
+        f"{MULTIPLICITY}.NOT_MEASURED.undeclared.account": (
+            "No se declaró cuántas cuentas o señales hay detrás de esta; el cálculo usa 1, el "
+            "caso más favorable, y la multiplicidad queda sin medir."
+        ),
+        f"{MULTIPLICITY}.WEAK.undeclared.account": (
+            "No se declaró cuántas cuentas o señales hay detrás de esta, e incluso con 1, el caso "
+            "más favorable, el Sharpe ajustado por esos intentos no llega al umbral."
+        ),
+        f"{MULTIPLICITY}.FAIL.undeclared.account": (
+            "No se declaró cuántas cuentas o señales hay detrás de esta, e incluso con 1, el caso "
+            "más favorable, el resultado no supera lo que produciría un intento sin habilidad."
+        ),
         f"{COSTS}.PASS": (
             "Con 3 veces el costo de referencia, el resultado de las operaciones sigue positivo."
         ),
@@ -732,6 +745,19 @@ _TEXT: dict[str, dict[str, str]] = {
             "with 1, the most favourable case, the result does not exceed what an unskilled "
             "trial would produce."
         ),
+        f"{MULTIPLICITY}.NOT_MEASURED.undeclared.account": (
+            "How many accounts or signals stand behind this one was not declared; the "
+            "calculation uses 1, the most favourable case, and multiplicity remains unmeasured."
+        ),
+        f"{MULTIPLICITY}.WEAK.undeclared.account": (
+            "How many accounts or signals stand behind this one was not declared, and even with "
+            "1, the most favourable case, the Sharpe adjusted for those trials misses the bar."
+        ),
+        f"{MULTIPLICITY}.FAIL.undeclared.account": (
+            "How many accounts or signals stand behind this one was not declared, and even with "
+            "1, the most favourable case, the result does not exceed what an unskilled trial "
+            "would produce."
+        ),
         f"{COSTS}.PASS": "At 3 times the reference cost, the trades still end positive.",
         f"{COSTS}.WEAK": (
             "The trades stay positive at the reference cost, but not at 3 times that cost."
@@ -820,6 +846,17 @@ MEANING: dict[str, dict[str, str]] = {
             "Incluso contando un solo fondo, el caso más favorable, el resultado no supera lo "
             "que daría un intento sin ventaja real. No se declaró cuántos fondos o estrategias "
             "lleva el gestor: con más de uno, la conclusión sería aún más débil."
+        ),
+        f"{MULTIPLICITY}.NOT_MEASURED.undeclared.account": (
+            "No se declaró cuántas cuentas o señales hay detrás de esta ni cuántas se cerraron o "
+            "reiniciaron, así que la clase no puede pasar de B. Pregunta al proveedor cuántas "
+            "son y decláralo (aunque sea 1): Rigor puede descontarlo."
+        ),
+        f"{MULTIPLICITY}.FAIL.undeclared.account": (
+            "Incluso contando una sola cuenta, el caso más favorable, el resultado no supera lo "
+            "que daría un intento sin ventaja real. No se declaró cuántas cuentas o señales hay "
+            "detrás ni cuántas se cerraron o reiniciaron: con más de una, la conclusión sería "
+            "aún más débil."
         ),
         f"{COSTS}.PASS": (
             "Las operaciones aguantan aunque los costos se tripliquen. "
@@ -958,6 +995,17 @@ MEANING: dict[str, dict[str, str]] = {
             "manager runs was not declared: with more than one, the conclusion would be weaker "
             "still."
         ),
+        f"{MULTIPLICITY}.NOT_MEASURED.undeclared.account": (
+            "How many accounts or signals stand behind this one, or were closed or reset, was "
+            "not declared, so the class cannot go above B. Ask the provider how many there are "
+            "and declare it (even if it is 1): Rigor can discount it."
+        ),
+        f"{MULTIPLICITY}.FAIL.undeclared.account": (
+            "Even counting a single account, the most favourable case, the result does not "
+            "exceed what a trial with no real edge would give. How many accounts or signals "
+            "stand behind it, or were closed or reset, was not declared: with more than one, "
+            "the conclusion would be weaker still."
+        ),
         f"{COSTS}.PASS": (
             "The trades hold up even if costs triple. "
             "Real costs depend on your broker and on execution."
@@ -1080,6 +1128,8 @@ def meaning(
     texts = MEANING.get(locale, MEANING["es"])
     if undeclared and fund and f"{name}.{status}.undeclared.fund" in texts:
         return texts[f"{name}.{status}.undeclared.fund"]
+    if undeclared and account and f"{name}.{status}.undeclared.account" in texts:
+        return texts[f"{name}.{status}.undeclared.account"]
     if undeclared and f"{name}.{status}.undeclared" in texts:
         return texts[f"{name}.{status}.undeclared"]
     if fund and f"{name}.{status}.fund" in texts:
@@ -1121,6 +1171,9 @@ def summary(
             key = undeclared if undeclared in text else key
             if fund and f"{undeclared}.fund" in text:
                 key = f"{undeclared}.fund"
+            elif account and f"{undeclared}.account" in text:
+                # An account or signal's trials are the accounts or signals behind it.
+                key = f"{undeclared}.account"
         template = text.get(key, f"{name}: {dimension.status}.")
         reasons = dimension.reasons_in(locale)
         lines.append(

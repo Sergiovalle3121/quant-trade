@@ -45,13 +45,12 @@ def test_hidden_open_losses_are_called_out(locale: str) -> None:
     page = _visible(render_html(_result(red_flags=flags), watermark=False, locale=locale))
     text = LABELS[locale]["hidden_loss"]
     assert page.count(text) == 2  # resampled risk and capital
-    # The prop simulator opens with its own warning: those open losses already count
-    # against its limits, and its figures sit folded under it.
-    unseen = (
-        LABELS[locale]["ch_unseen_open_any"],
-        LABELS[locale]["ch_unseen_open"].split("{share}")[0],
-    )
-    assert any(lead in page for lead in unseen)
+    # The prop simulator opens with its own warning: those open losses would have
+    # counted against its limits, and its figures sit folded under it. The tester
+    # report declares no floating result of its own, and the real account's (its
+    # own section) is not the backtest's: the warning names the hidden drawdown.
+    assert LABELS[locale]["ch_unseen_hidden"] in page
+    assert LABELS[locale]["ch_unseen_open"].split("{share}")[0] not in page
     assert LABELS[locale]["ch_unseen_summary"] in page
     assert LABELS[locale]["kpi_drawdown_closed"] in page
     assert find_claims(text) == []

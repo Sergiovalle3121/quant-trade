@@ -166,9 +166,12 @@ SELLER_ASK: dict[str, dict[str, str]] = {
         "encerradas ou reiniciadas?",
     ),
     "backtest_match": _say(
-        "¿Puedes enviar el backtest del mismo robot con la misma configuración que esta cuenta?",
-        "Can you send the backtest of the same robot with the same settings as this account?",
-        "Você pode enviar o backtest do mesmo robô com a mesma configuração desta conta?",
+        "¿La estrategia de esta cuenta tiene un backtest? Si lo tiene, ¿puedes enviarlo con la "
+        "misma configuración que esta cuenta?",
+        "Does this account's strategy have a backtest? If it does, can you send it with the "
+        "same settings as this account?",
+        "A estratégia desta conta tem um backtest? Se tiver, você pode enviá-lo com a mesma "
+        "configuração desta conta?",
     ),
     "trials": _say(
         "¿Cuántas combinaciones de parámetros se probaron antes de elegir esta? ¿Puedes enviar "

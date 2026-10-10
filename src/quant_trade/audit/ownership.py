@@ -667,6 +667,45 @@ LABELS: dict[str, dict[str, dict[str, str]]] = {
             "número pode ser declarado no envio ou medido com o XML da otimização.",
         ),
     },
+    # An account or signal: its trials are the accounts or signals behind it,
+    # with no optimisation file to upload.
+    "luck_uncounted_account": {
+        OWN: _say(
+            "El historial no dice cuántas cuentas o señales hay detrás de esta ni cuántas se "
+            "cerraron o reiniciaron. La tabla muestra cuánto historial haría falta según "
+            "cuántas fueran: declara cuántas llevas o has cerrado o reiniciado.",
+            "The history does not say how many accounts or signals stand behind this one, or "
+            "how many were closed or reset. The table shows how much history each count would "
+            "need: declare how many you run or have closed or reset.",
+            "O histórico não diz quantas contas ou sinais há por trás desta nem quantas foram "
+            "encerradas ou reiniciadas. A tabela mostra quanto histórico seria necessário "
+            "conforme quantas fossem: declare quantas você opera ou já encerrou ou reiniciou.",
+        ),
+        PROVIDER: _say(
+            "El historial no dice cuántas cuentas o señales hay detrás de esta ni cuántas se "
+            "cerraron o reiniciaron. La tabla muestra cuánto historial haría falta según "
+            "cuántas fueran: te lo van a preguntar, así que declara cuántas llevas o has cerrado "
+            "o reiniciado.",
+            "The history does not say how many accounts or signals stand behind this one, or "
+            "how many were closed or reset. The table shows how much history each count would "
+            "need: you will be asked, so declare how many you run or have closed or reset.",
+            "O histórico não diz quantas contas ou sinais há por trás desta nem quantas foram "
+            "encerradas ou reiniciadas. A tabela mostra quanto histórico seria necessário "
+            "conforme quantas fossem: vão perguntar isso a você, então declare quantas opera ou "
+            "já encerrou ou reiniciou.",
+        ),
+        NEUTRAL: _say(
+            "El historial no dice cuántas cuentas o señales hay detrás de esta ni cuántas se "
+            "cerraron o reiniciaron. La tabla muestra cuánto historial haría falta según "
+            "cuántas fueran: el número se puede declarar al subir el historial.",
+            "The history does not say how many accounts or signals stand behind this one, or "
+            "how many were closed or reset. The table shows how much history each count would "
+            "need: the number can be declared when the history is uploaded.",
+            "O histórico não diz quantas contas ou sinais há por trás desta nem quantas foram "
+            "encerradas ou reiniciadas. A tabela mostra quanto histórico seria necessário "
+            "conforme quantas fossem: o número pode ser declarado ao enviar o histórico.",
+        ),
+    },
     "crises_worse": {
         OWN: _say(
             "En {worse} de {n} crisis cayó más que su índice. Revisa qué la protege cuando el "
@@ -1108,6 +1147,85 @@ MEANING: dict[str, dict[str, dict[str, str]]] = {
             "descartar a sorte. Não foi declarado quantas contas ou sinais há por trás nem "
             "quantas foram encerradas ou reiniciadas: com mais de uma, a conclusão seria mais "
             "fraca.",
+        ),
+    },
+    "multiplicity.FAIL.undeclared.account": {
+        OWN: _say(
+            "Incluso contando una sola cuenta, el caso más favorable, el resultado no supera lo "
+            "que daría un intento sin ventaja real. No declaraste cuántas cuentas o señales "
+            "llevas o has cerrado o reiniciado: con más de una, la conclusión sería aún más "
+            "débil.",
+            "Even counting a single account, the most favourable case, the result does not "
+            "exceed what a trial with no real edge would give. You did not declare how many "
+            "accounts or signals you run or have closed or reset: with more than one, the "
+            "conclusion would be weaker still.",
+            "Mesmo contando uma única conta, o caso mais favorável, o resultado não supera o que "
+            "uma tentativa sem vantagem real daria. Você não declarou quantas contas ou sinais "
+            "opera ou já encerrou ou reiniciou: com mais de uma, a conclusão seria ainda mais "
+            "fraca.",
+        ),
+        PROVIDER: _say(
+            "Incluso contando una sola cuenta, el caso más favorable, el resultado no supera lo "
+            "que daría un intento sin ventaja real. Te van a preguntar cuántas cuentas o señales "
+            "llevas o has cerrado o reiniciado: con más de una, la conclusión sería aún más "
+            "débil.",
+            "Even counting a single account, the most favourable case, the result does not "
+            "exceed what a trial with no real edge would give. You will be asked how many "
+            "accounts or signals you run or have closed or reset: with more than one, the "
+            "conclusion would be weaker still.",
+            "Mesmo contando uma única conta, o caso mais favorável, o resultado não supera o que "
+            "uma tentativa sem vantagem real daria. Vão perguntar a você quantas contas ou "
+            "sinais opera ou já encerrou ou reiniciou: com mais de uma, a conclusão seria ainda "
+            "mais fraca.",
+        ),
+        NEUTRAL: _say(
+            "Incluso contando una sola cuenta, el caso más favorable, el resultado no supera lo "
+            "que daría un intento sin ventaja real. No se declaró cuántas cuentas o señales hay "
+            "detrás ni cuántas se cerraron o reiniciaron: con más de una, la conclusión sería "
+            "aún más débil.",
+            "Even counting a single account, the most favourable case, the result does not "
+            "exceed what a trial with no real edge would give. How many accounts or signals "
+            "stand behind it, or were closed or reset, was not declared: with more than one, "
+            "the conclusion would be weaker still.",
+            "Mesmo contando uma única conta, o caso mais favorável, o resultado não supera o que "
+            "uma tentativa sem vantagem real daria. Não foi declarado quantas contas ou sinais "
+            "há por trás nem quantas foram encerradas ou reiniciadas: com mais de uma, a "
+            "conclusão seria ainda mais fraca.",
+        ),
+    },
+    "multiplicity.NOT_MEASURED.undeclared.account": {
+        OWN: _say(
+            "No declaraste cuántas cuentas o señales llevas o has cerrado o reiniciado, así que "
+            "la clase no puede pasar de B. Al declararlo (aunque sea 1), Rigor puede "
+            "descontarlo.",
+            "You did not declare how many accounts or signals you run or have closed or reset, "
+            "so the class cannot go above B. Once you declare it (even if it is 1), Rigor can "
+            "discount it.",
+            "Você não declarou quantas contas ou sinais opera ou já encerrou ou reiniciou, então "
+            "a classe não pode passar de B. Ao declarar esse número (mesmo que seja 1), o Rigor "
+            "pode descontá-lo.",
+        ),
+        PROVIDER: _say(
+            "No se declaró cuántas cuentas o señales llevas o has cerrado o reiniciado, así que "
+            "la clase no puede pasar de B. Te lo van a preguntar: al declararlo (aunque sea 1), "
+            "Rigor puede descontarlo.",
+            "How many accounts or signals you run or have closed or reset was not declared, so "
+            "the class cannot go above B. You will be asked: once you declare it (even if it is "
+            "1), Rigor can discount it.",
+            "Não foi declarado quantas contas ou sinais você opera ou já encerrou ou reiniciou, "
+            "então a classe não pode passar de B. Vão perguntar isso a você: ao declarar esse "
+            "número (mesmo que seja 1), o Rigor pode descontá-lo.",
+        ),
+        NEUTRAL: _say(
+            "No se declaró cuántas cuentas o señales hay detrás de esta ni cuántas se cerraron o "
+            "reiniciaron, así que la clase no puede pasar de B. Al declararlo (aunque sea 1), "
+            "Rigor puede descontarlo.",
+            "How many accounts or signals stand behind this one, or were closed or reset, was "
+            "not declared, so the class cannot go above B. Once it is declared (even if it is "
+            "1), Rigor can discount it.",
+            "Não foi declarado quantas contas ou sinais há por trás desta nem quantas foram "
+            "encerradas ou reiniciadas, então a classe não pode passar de B. Ao declarar esse "
+            "número (mesmo que seja 1), o Rigor pode descontá-lo.",
         ),
     },
 }
@@ -1770,21 +1888,25 @@ QUESTIONS: dict[str, dict[str, tuple[str | None, str]]] = {
             "reiniciadas",
         ),
     },
+    # Asked of an account or signal only: a signal may have no backtest at all.
     "backtest_match": {
         "es": (
-            "¿Se parece esta cuenta al backtest del mismo robot con la misma configuración?",
-            "el informe HTML del probador con la misma configuración, subido junto a esta "
-            "cuenta: el informe compara los dos operación por operación",
+            "¿Se parece esta cuenta al backtest de la misma estrategia, si lo tiene, con la "
+            "misma configuración?",
+            "el backtest de la misma estrategia con la misma configuración, si lo tiene, subido "
+            "junto a esta cuenta: el informe compara los dos operación por operación",
         ),
         "en": (
-            "Does this account look like the backtest of the same robot with the same settings?",
-            "the tester's HTML report with the same settings, uploaded together with this "
-            "account: the report compares the two trade by trade",
+            "Does this account look like the backtest of the same strategy, if it has one, "
+            "with the same settings?",
+            "the backtest of the same strategy with the same settings, if it has one, uploaded "
+            "together with this account: the report compares the two trade by trade",
         ),
         "pt": (
-            "Esta conta se parece com o backtest do mesmo robô com a mesma configuração?",
-            "o relatório HTML do testador com a mesma configuração, enviado junto com esta "
-            "conta: o relatório compara os dois operação por operação",
+            "Esta conta se parece com o backtest da mesma estratégia, se ela tiver um, com a "
+            "mesma configuração?",
+            "o backtest da mesma estratégia com a mesma configuração, se ela tiver um, enviado "
+            "junto com esta conta: o relatório compara os dois operação por operação",
         ),
     },
     "live_record": {

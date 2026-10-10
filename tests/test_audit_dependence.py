@@ -136,28 +136,38 @@ def test_the_line_reads_the_block(locale: str) -> None:
             "min_track_record_length": measured(981.1),
         },
     }
-    shown = html.unescape(report._dependence_html(significance, labels))
+    # Stored without the dimension's input, the class's figure is the lower one.
+    data = {"significance": significance}
+    shown = html.unescape(report._dependence_html(significance, labels, data))
     assert "2.3" in shown and "97.00%" in shown and "88.00%" in shown
     assert "982" in shown and "421" in shown and "500" in shown
     assert labels["dependence_track_long"].split("{")[0] not in shown
     assert labels["dependence_pass_rests"] in shown and labels["dependence_info"] in shown
     # A count beyond ten times the history is not printed: it only reads as noise.
     significance["dependence"]["min_track_record_length"] = measured(5001.0)
-    shown = html.unescape(report._dependence_html(significance, labels))
+    shown = html.unescape(report._dependence_html(significance, labels, data))
     assert labels["dependence_track_long"].format(n="500") in shown and "5,001" not in shown
     # A count already within the history says the history reaches it.
     significance["dependence"]["min_track_record_length"] = measured(310.4)
-    shown = html.unescape(report._dependence_html(significance, labels))
+    shown = html.unescape(report._dependence_html(significance, labels, data))
     assert labels["dependence_track_reached"].format(n="500", track="311") in shown
     significance["dependence"]["min_track_record_length"] = measured(981.1)
     # A probability that stays above 95 % has nothing resting on independence.
     significance["dependence"]["psr"] = measured(0.96)
-    shown = html.unescape(report._dependence_html(significance, labels))
+    shown = html.unescape(report._dependence_html(significance, labels, data))
     assert labels["dependence_pass_rests"] not in shown
     significance["dependence"]["ratio"] = measured(1.04)
-    shown = html.unescape(report._dependence_html(significance, labels))
-    assert labels["dependence_none"] in shown and "96.00%" not in shown
-    assert report._dependence_html({"psr": measured(0.97)}, labels) == ""
+    # Under a tenth of widening that still moves the table's figure (97.00 % to
+    # 96.00 %), the sentence gives both and says which one the class uses.
+    shown = html.unescape(report._dependence_html(significance, labels, data))
+    assert labels["dependence_none"] not in shown
+    assert "1.04" in shown and "97.00%" in shown and "96.00%" in shown
+    assert labels["dependence_info"] in shown
+    # Only when the two read the same in the table does it say nothing changes.
+    significance["dependence"]["psr"] = measured(0.97 - 1e-6)
+    shown = html.unescape(report._dependence_html(significance, labels, data))
+    assert labels["dependence_none"] in shown and labels["dependence_info"] not in shown
+    assert report._dependence_html({"psr": measured(0.97)}, labels, {}) == ""
 
 
 @pytest.mark.parametrize("locale", LOCALES)

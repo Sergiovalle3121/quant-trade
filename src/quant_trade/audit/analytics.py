@@ -963,11 +963,14 @@ _QUESTIONS: dict[str, dict[str, str]] = {
         "en": "Is this the only account running this strategy? Ask for the accounts that "
         "were closed or restarted too: showing only the one that went well is common.",
     },
+    # A signal may have no backtest at all: the one asked for is the strategy's.
     "backtest_match": {
-        "es": "Pide el backtest del mismo robot con la misma configuración: subido junto a "
-        "esta cuenta, el informe compara los dos operación por operación.",
-        "en": "Ask for the backtest of the same robot with the same settings: uploaded "
-        "together with this account, the report compares the two trade by trade.",
+        "es": "Pide el backtest de la misma estrategia, si lo tiene, con la misma "
+        "configuración: subido junto a esta cuenta, el informe compara los dos operación por "
+        "operación.",
+        "en": "Ask for the backtest of the same strategy, if it has one, with the same "
+        "settings: uploaded together with this account, the report compares the two trade by "
+        "trade.",
     },
     "live_record": {
         "es": "¿Hay una cuenta real o demo con al menos {months} meses de historial auditable "
@@ -1130,6 +1133,20 @@ _FINDING_QUESTIONS: dict[str, str] = {
 }
 
 _QUESTION_ORDER: tuple[str, ...] = tuple(k for k in _QUESTIONS if k != "live_record_long")
+#: Stored questions whose current wording the report shows over the one a
+#: result stored before it changed (``question_now``).
+REWORDED_QUESTIONS: frozenset[str] = frozenset({"backtest_match"})
+
+
+def question_now(code: str) -> dict[str, str] | None:
+    """The current Spanish and English of a stored question that was reworded
+    (``REWORDED_QUESTIONS``), so a result stored earlier reads as the plan does;
+    None for every other question, which keeps its stored text."""
+    if code not in REWORDED_QUESTIONS:
+        return None
+    return dict(_QUESTIONS[code])
+
+
 #: Questions about how a backtest was made; they do not apply to an account.
 _BACKTEST_ONLY: frozenset[str] = frozenset({"modelling", "trials", "out_of_sample", "costs"})
 
@@ -1220,9 +1237,11 @@ __all__ = [
     "DRAWDOWN_THRESHOLDS",
     "FAN_QUANTILES",
     "MAX_FAN_POINTS",
+    "REWORDED_QUESTIONS",
     "RISK_ASSUMPTIONS",
     "daily_returns_from_equity",
     "drawdown_risk",
+    "question_now",
     "simulate_challenge",
     "trade_statistics",
     "vendor_questions",

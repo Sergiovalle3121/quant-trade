@@ -5735,20 +5735,32 @@ so every figure it shows twice now reads the same both times. Display only:
 no figure, threshold, class, tag, simulator result, price or credit changed
 (`tests/test_audit_informe_cuenta_coherente.py`, es/en/pt).
 
-- **One name per PSR** (`psr_names`). The statistical dimension has always
-  used the lower of the plain PSR and the dependence-adjusted one; the report
-  said "the class uses the plain count" and the plan quoted the plain figure.
-  `class_psr(data)` reads which figure the stored dimension used and its
-  track record; the plan, the technical detail ("PSR adjusted for dependence
-  0.677 < 0.8") and the significance table ("PSR (plain count)", plus a row
-  for the adjusted figure, "the figure the class uses") give each its name.
-  The plain track record rows say "(plain count)".
+- **One name per PSR** (`psr_names`). Since policy 2026-09-27-dependence-1
+  the statistical dimension uses the lower of the plain PSR and the
+  dependence-adjusted one; the report still said "the class uses the plain
+  count" and the plan quoted the plain figure. Results stored between the
+  dependence figure's arrival (26 September, informational) and that policy
+  (27 September) stored the adjusted figure but classified with the plain
+  count. `class_psr(data)` reads which figure each stored dimension used and
+  its track record; the plan, the technical detail ("PSR adjusted for
+  dependence 0.677 < 0.8") and the significance table ("PSR (plain count)",
+  plus a row for the adjusted figure) give each its name. The adjusted row's
+  note ("the figure the class uses") and the dependence sentence ("the class
+  uses the second figure") follow `class_psr`: a result that classified with
+  the plain count keeps "it is informational: the class uses the plain
+  count". The sentence says the dependence changes nothing only when both
+  figures read the same in the table. The plain track record rows say
+  "(plain count)".
 - **Declared floating result in the reconciliation.** When the engine values
   no open position and the file declares a floating result
   (`report.declared_open_value`: the account review's DECLARED figure, else
   the platform summary), the "Open-position value" row shows it as Declared,
   with its note and why it stays out of the expected balance (closed trades
   only); the coverage line says the same. The expected balance is unchanged.
+  Only the reconciled file's own review counts: an account history uploaded
+  as the real account beside a backtest (`account.source == "live"`) has its
+  own section, and its floating result never reaches the backtest's
+  reconciliation or challenge (`report._own_account`).
 - **Under a year is not 12 months.** The luck section gives the history in
   months with one decimal, or "almost 12 months", never rounded up to 12.
 - **Annual figures below -100 %.** The mean-shift section shows any yearly
@@ -5767,8 +5779,11 @@ no figure, threshold, class, tag, simulator result, price or credit changed
 - **Challenge with an unseen open loss** (`report.unseen_open_loss`). With
   HIDDEN_FLOATING_DRAWDOWN, or FLOATING_LOSS_AT_END on a balance-only curve,
   the challenge section opens with a red callout: the open loss (its declared
-  share of the balance when known) already counts against the daily and
-  total limits of any challenge, and the figures below do not see it. The
+  share of the balance, given with FLOATING_LOSS_AT_END or when it shows as at
+  least 1 %, never "0%") already counts against the daily and total limits of
+  any challenge, and the figures below do not see it. With
+  HIDDEN_FLOATING_DRAWDOWN the callout also names the open losses the balance
+  hid during the history (the flag's title), alone when no share is given. The
   outcome table, the ladder, the size table and the firms' table sit in
   `<details class='unseen-open'>` under that callout (the size and firms
   subsections each repeat a short line first). The simulator is unchanged;
@@ -5778,5 +5793,19 @@ no figure, threshold, class, tag, simulator result, price or credit changed
   trade, while the curve data run from the curve's first point (a deposit
   or the opening balance) to its last.
 - **Net or gross.** The backtest-against-live table names its averages "net
-  of fees"; the trade table names its own "gross, before fees" when the file
+  of fees" only when both files itemise fees per trade (`live.fees_itemised`,
+  stored with the comparison; a result stored before it reads the backtest's
+  from `win_rate_gross` and the live file's as unknown), else plain "Average
+  win"; the trade table names its own "gross, before fees" when the file
   itemises fees per trade.
+- **Account wording, second pass.** The multiplicity meaning and the summary
+  of an account or signal with no trial count declared count accounts or
+  signals, not configurations (`verdict` `multiplicity.FAIL.undeclared.account`,
+  `NOT_MEASURED.undeclared.account`, and the summary's `.undeclared.account`
+  templates; `ownership.MEANING` in every voice); the luck section asks how
+  many accounts or signals stand behind it (`luck_uncounted_account`, no
+  optimisation XML); the plan's new months are "data that was not used to
+  choose them", not "data the optimiser never saw"; the backtest question is
+  "of the same strategy, if it has one" in every voice, the seller message
+  included, and a result stored with the old wording shows the new one
+  (`analytics.question_now`).
