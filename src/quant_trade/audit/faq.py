@@ -6,6 +6,7 @@ payments nor performs retention, publication, account or contact operations.
 
 from __future__ import annotations
 
+from quant_trade.audit import paid_offer
 from quant_trade.audit.settings import AuditSettings
 
 FAQ_PATH: dict[str, str] = {"es": "/preguntas", "en": "/en/faq", "pt": "/pt/perguntas"}
@@ -368,7 +369,11 @@ def faq_items(settings: AuditSettings, locale: str = "es") -> tuple[tuple[str, s
     """The same localized answers feed the visible page and FAQPage JSON-LD.
 
     ``_QUESTIONS`` first, then the landing's questions it does not show
-    (``landing_only_questions``), and the contact question last."""
+    (``landing_only_questions``), and the contact question last. Under the paid
+    offer (``AUDIT_WELCOME_FULL_REPORT=false``) the first question is the full
+    report's price, «¿Y si el informe no me sirve?» follows it with the terms'
+    7-day refund, and no answer names a free first report
+    (``paid_offer.rewrite_text``)."""
     # Lazy imports keep FAQ_PATH usable by seo without a pages/seo cycle.
     from quant_trade.audit.pages import CONTACT_COPY, card_markets_line
     from quant_trade.audit.report import localize_tags
@@ -386,8 +391,9 @@ def faq_items(settings: AuditSettings, locale: str = "es") -> tuple[tuple[str, s
             "en": "DECLARED · An additional full report costs USD {amount:.2f}.",
             "pt": "DECLARED · Um relatório completo adicional custa USD {amount:.2f}.",
         }[locale].format(amount=settings.price_usd)
+    offer = paid_offer.offer_of(settings)
     email = ""
-    if settings.email_verification_required and not settings.free_mode:
+    if settings.email_verification_required and offer.kind == "welcome":
         email = {
             "es": " Para el primer informe gratis debes confirmar el correo de tu cuenta.",
             "en": " For the first free report, you must confirm your account e-mail.",
@@ -426,10 +432,17 @@ def faq_items(settings: AuditSettings, locale: str = "es") -> tuple[tuple[str, s
     }
     pairs = [item[locale] for item in _QUESTIONS]
     pairs[-1:-1] = landing_only_questions(locale)
+    if offer.paid:
+        support = settings.operator_contact if "@" in settings.operator_contact else ""
+        pairs[0] = paid_offer.price_question(locale, offer)
+        pairs.insert(1, paid_offer.refund_question(locale, support))
     # _page localizes evidence tags in text nodes. Apply that same transformation
     # here so the structured questions and answers are exactly the wording a reader sees.
     return tuple(
-        (localize_tags(question, locale), localize_tags(answer.format(**values), locale))
+        (
+            localize_tags(question, locale),
+            localize_tags(paid_offer.rewrite_text(answer.format(**values), locale, offer), locale),
+        )
         for question, answer in pairs
     )
 
@@ -455,9 +468,10 @@ def faq_page(settings: AuditSettings, *, locale: str = "es", base_url: str | Non
     words = FAQ_COPY[locale]
     title = f"{words['title']} · {BRAND}"
     pairs = faq_items(settings, locale)
+    offer = paid_offer.offer_of(settings)
     meta = _public_meta(
         title,
-        words["summary"],
+        paid_offer.rewrite_text(words["summary"], locale, offer),
         locale,
         FAQ_PATH[locale],
         settings.base_url if base_url is None else base_url,
@@ -488,4 +502,6 @@ def faq_page(settings: AuditSettings, *, locale: str = "es", base_url: str | Non
         + _articles_cta(locale)
         + "</div></div>"
     )
-    return _page(title, locale, body, meta_html=meta, alternates=FAQ_PATH, solid_nav=True)
+    page = _page(title, locale, body, meta_html=meta, alternates=FAQ_PATH, solid_nav=True)
+    # The closing call's "my free first report" button, under the paid offer.
+    return paid_offer.rewrite_html(page, locale, offer)

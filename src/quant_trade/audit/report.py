@@ -21,7 +21,7 @@ from datetime import date
 from typing import Any
 from urllib.parse import parse_qsl, quote, urlencode, urlsplit, urlunsplit
 
-from quant_trade.audit import charts, ownership, report_pt, seller_message
+from quant_trade.audit import charts, ownership, paid_offer, report_pt, seller_message
 from quant_trade.audit.account import is_account_history
 from quant_trade.audit.crises import (
     MARKET,
@@ -541,11 +541,12 @@ LABELS: dict[str, dict[str, str]] = {
         "pay_pack": "Comprar el paquete de 3 (USD {price:.0f})",
         "pay_secure": (
             "Pago seguro con Stripe. Ves el informe completo en cuanto se confirma el pago; "
-            "nosotros no vemos ni guardamos los datos de tu tarjeta. Todas las ventas son "
-            "finales."
+            "nosotros no vemos ni guardamos los datos de tu tarjeta. Si no te sirve, puedes "
+            "pedir la devolución en 7 días según los términos."
         ),
         "final_sale": (
-            "Entiendo que el informe se entrega al momento y que la compra no es reembolsable."
+            "Entiendo que el informe se abre al momento y que puedo pedir la devolución en 7 "
+            "días según los términos."
         ),
         "pay_links_note": (
             "El pago se abre en otra pestaña. Cuando termines, vuelve aquí: el informe se "
@@ -2060,10 +2061,12 @@ LABELS: dict[str, dict[str, str]] = {
         "pay_pack": "Buy the pack of 3 (USD {price:.0f})",
         "pay_secure": (
             "Secure payment with Stripe. You see the full report as soon as the payment is "
-            "confirmed; we never see or store your card details. All sales are final."
+            "confirmed; we never see or store your card details. If it is no use to you, you "
+            "can ask for a refund within 7 days under the terms."
         ),
         "final_sale": (
-            "I understand that the report is delivered at once and the purchase is not refundable."
+            "I understand that the report opens at once and that I can ask for a refund within "
+            "7 days under the terms."
         ),
         "pay_links_note": (
             "The payment opens in another tab. When you finish, come back here: the report "
@@ -9043,7 +9046,9 @@ def sample_signup_href(locale: str) -> str:
 SAMPLE_KINDS: tuple[str, ...] = ("backtest", "signal")
 
 
-def sample_cta_band(locale: str, offer: str = "welcome", kind: str = "backtest") -> str:
+def sample_cta_band(
+    locale: str, offer: str | paid_offer.Offer = "welcome", kind: str = "backtest"
+) -> str:
     """Under the sample's synthetic-data notice: the free first report and which file
     gives a report like this. Hidden when printed; only the public samples show it.
 
@@ -9051,12 +9056,20 @@ def sample_cta_band(locale: str, offer: str = "welcome", kind: str = "backtest")
     is about to copy a signal to the other sample; the signal sample names the
     account exports it reads. Both link to their own public page
     (``sample_publication``): the page, badge and card a publication of this
-    report would get."""
+    report would get. Under the paid offer with its price (``paid_offer.Offer``)
+    the lead goes on with the free preview, the price and the 7-day refund."""
     from quant_trade.audit.pages import AUDIT_PATHS
 
     lang = locale if locale in SAMPLE_CTA_COPY else "es"
     words = SAMPLE_CTA_COPY[lang]
-    offer = offer if offer in ("welcome", "free", "paid") else "paid"
+    # Any other word is the paid offer without its price, as before.
+    terms = (
+        offer
+        if isinstance(offer, paid_offer.Offer)
+        else paid_offer.Offer(kind=offer if offer in paid_offer.OFFER_KINDS else "paid")
+    )
+    offer = terms.kind
+    paid = f" {_e(paid_offer.paid_text(lang, terms))}" if terms.paid and terms.price_usd > 0 else ""
     if kind == "signal":
         links = {
             key: f"<a href='{_e(guide_url(slug, lang))}'>{_e(words[key])}</a>"
@@ -9080,7 +9093,7 @@ def sample_cta_band(locale: str, offer: str = "welcome", kind: str = "backtest")
         )
     return (
         f"<div class='sample-cta no-print'><style>{SAMPLE_CTA_CSS}</style>"
-        f"<p><b>{_e(words['lead_' + offer])}</b></p>"
+        f"<p><b>{_e(words['lead_' + offer])}</b>{paid}</p>"
         f"<a class='btn btn-primary btn-sm' href='{_e(AUDIT_PATHS[lang])}'>"
         f"{_e(words['button_' + offer])}</a>"
         f"<p class='sample-cta-files'>{files}</p>{sample_public_line(lang, kind)}{other}</div>"
@@ -9142,7 +9155,7 @@ def render_html(
     account_box: str = "",
     tools_link: bool = False,
     sample_cta: bool = False,
-    sample_offer: str = "welcome",
+    sample_offer: str | paid_offer.Offer = "welcome",
     sample_kind: str = "backtest",
 ) -> str:
     """The audit as one HTML document.
@@ -10385,7 +10398,7 @@ def render(
     account_box: str = "",
     tools_link: bool = False,
     sample_cta: bool = False,
-    sample_offer: str = "welcome",
+    sample_offer: str | paid_offer.Offer = "welcome",
     sample_kind: str = "backtest",
 ) -> tuple[str, str]:
     """``(html, json)`` for a result, both guarded. Raises ``AuditReportError``."""

@@ -70,14 +70,14 @@ def test_locked_report_offers_the_pack(tmp_path: Path) -> None:
     assert "paquete de 3 informes: USD 69" in report
 
 
-def test_terms_state_the_pack_and_final_sales(tmp_path: Path) -> None:
+def test_terms_state_the_pack_and_the_refund(tmp_path: Path) -> None:
     client = _client(tmp_path, **SELLING)
     es = client.get("/terminos").text
     assert "códigos de 3 créditos por USD 69.00" in es
     assert "lee mal tu archivo" in es
-    assert "Todas las ventas son finales" in es
+    assert "Devolución en 7 días" in es and "la parte de los créditos sin usar" in es
     en = client.get("/terms").text
     assert "codes with 3 credits for USD 69.00" in en
     assert "misreads your file" in en
-    assert "All sales are final" in en
+    assert "7-day refund" in en and "the part of the unused credits" in en
     assert find_claims(es) == [] and find_claims(en) == []

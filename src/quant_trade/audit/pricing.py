@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from quant_trade.audit import paid_offer
 from quant_trade.audit.settings import PACK_CREDITS, AuditSettings
 
 PRICING_PATH: dict[str, str] = {"es": "/precios", "en": "/en/pricing", "pt": "/pt/precos"}
@@ -259,26 +260,34 @@ def start_cta(settings: AuditSettings, locale: str) -> str:
 
     Free mode: every full report is free and the form needs no account. Otherwise,
     with the welcome report on, the first full report is free with an account (and
-    a confirmed e-mail when that is required). Without either, the articles' call.
+    a confirmed e-mail when that is required). Without it (the paid offer), the
+    free preview first, then the price of the full report and its 7-day refund
+    (``paid_offer.paid_text``).
     """
     # Lazy imports, as in ``pricing_page``: pages imports this module.
-    from quant_trade.audit.accounts import WELCOME_FULL_REPORT
     from quant_trade.audit.calculator import calculator_url
     from quant_trade.audit.guides import guides_index_url
-    from quant_trade.audit.pages import SAMPLE_PAGE_PATHS, _articles_cta, _e, audit_path
+    from quant_trade.audit.pages import SAMPLE_PAGE_PATHS, _e, audit_path
     from quant_trade.audit.theme import icon
 
     locale = locale if locale in PRICING_COPY else "es"
     words = PRICING_COPY[locale]
+    title = words["start_title"]
     if settings.free_mode:
         offer, button = "free", words["start_button_free"]
-    elif WELCOME_FULL_REPORT:
+    elif settings.welcome_full_report:
         offer, button = "welcome", words["start_button"]
     else:
-        return _articles_cta(locale)
-    text = offer_text(offer, locale, email_verification=settings.email_verification_required)
+        offer = "paid"
+        paid = paid_offer.words(locale)
+        title, button = paid["start_title"], paid["upload"]
+    text = (
+        paid_offer.paid_text(locale, paid_offer.offer_of(settings))
+        if offer == "paid"
+        else offer_text(offer, locale, email_verification=settings.email_verification_required)
+    )
     return (
-        f"<section class='article-cta'><h2>{_e(words['start_title'])}</h2><p>{_e(text)}</p>"
+        f"<section class='article-cta'><h2>{_e(title)}</h2><p>{_e(text)}</p>"
         "<div class='back-row'>"
         f"<a class='btn btn-dark' href='{_e(audit_path(locale))}'>{_e(button)}"
         f"<span class='go'>{icon('arrow')}</span></a>"
@@ -295,7 +304,11 @@ def start_cta(settings: AuditSettings, locale: str) -> str:
 def pricing_page(
     settings: AuditSettings, *, locale: str = "es", base_url: str | None = None
 ) -> str:
-    """An indexable description of existing reports, without a checkout action."""
+    """An indexable description of existing reports, without a checkout action.
+
+    Under the paid offer (``AUDIT_WELCOME_FULL_REPORT=false``) the first card is
+    the free preview instead of a free first report, and the full report's and
+    the pack's cards carry the terms' 7-day refund next to their button."""
     # Lazy imports let seo/pages use PRICING_PATH without an import cycle.
     from quant_trade.audit.compare import MAX_COMPARED
     from quant_trade.audit.institutional import REVIEW_PATHS
@@ -324,18 +337,23 @@ def pricing_page(
     base = (settings.base_url if base_url is None else base_url).rstrip("/")
     url = base + PRICING_PATH[locale]
     title = f"{words['title']} · {BRAND}"
-    meta = _public_meta(title, words["summary"], locale, PRICING_PATH[locale], base)
+    offer = paid_offer.offer_of(settings)
+    paid = paid_offer.words(locale) if offer.paid else {}
+    summary = paid["summary"] if offer.paid else words["summary"]
+    meta = _public_meta(title, summary, locale, PRICING_PATH[locale], base)
+    paid_intro = paid_offer.paid_text(locale, offer) if offer.paid else ""
     product: dict[str, Any] = {
         "@context": "https://schema.org",
         "@type": "Product",
         "name": f"{BRAND} · {words['full']}",
-        "description": words["free"] if settings.free_mode else words["intro"],
+        "description": words["free"] if settings.free_mode else paid_intro or words["intro"],
         "url": url,
     }
     prices = ""
     if not settings.free_mode:
         offers = [(words["full"], settings.price_usd)]
-        prices = f"<p>{_e(words['single'].format(price=usd(settings.price_usd)))}</p>"
+        single = paid["single"] if offer.paid else words["single"]
+        prices = f"<p>{_e(single.format(price=usd(settings.price_usd)))}</p>"
         if settings.pack_price_usd:
             offers.append((words["pack_name"].format(n=PACK_CREDITS), settings.pack_price_usd))
             pack = words["pack"].format(n=PACK_CREDITS, price=usd(settings.pack_price_usd))
@@ -357,11 +375,54 @@ def pricing_page(
     contact = f"<a href='{CONTACT_PATHS[locale]}'>{_e(words['contact'])}</a>"
     support = _e(words["support_note"] if email_available else words["no_email"])
     start = audit_path(locale)
+    # Each card: name, amount, the small line under it, its text, the button's
+    # label ("" for the page's) and a line next to the button (the refund).
+    cards: list[tuple[str, str, str, str, str, str]]
     if settings.free_mode:
-        cards = [(words["all_reports"], ui["plan_free_amount"], "", words["free"], "")]
+        cards = [(words["all_reports"], ui["plan_free_amount"], "", words["free"], "", "")]
         button = words["start_button_free"]
         intro = words["free"]
         note = f"<p>{_e(landing['price_free_mode'])}</p>"
+    elif offer.paid:
+        from quant_trade.audit.accounts import FREE_PREVIEWS_PER_MONTH
+
+        preview = paid_offer.preview_text(locale, offer)
+        monthly = paid["account_previews"].format(n=FREE_PREVIEWS_PER_MONTH)
+        cards = [
+            (
+                paid["preview_title"],
+                ui["plan_free_amount"],
+                paid["preview_note"],
+                f"{preview} {monthly}",
+                paid["upload"],
+                "",
+            ),
+            (
+                words["full"],
+                usd(settings.price_usd),
+                paid["per_report"],
+                paid_offer.full_text(locale, offer),
+                "",
+                paid_offer.refund_text(locale),
+            ),
+        ]
+        if settings.pack_price_usd:
+            each = usd(settings.pack_price_usd / PACK_CREDITS)
+            cards.append(
+                (
+                    words["pack_title"].format(n=PACK_CREDITS),
+                    usd(settings.pack_price_usd),
+                    words["pack_each"].format(each=each),
+                    words[
+                        "pack_text" if PACK_CREDITS <= MAX_COMPARED else "pack_text_plain"
+                    ].format(n=PACK_CREDITS),
+                    "",
+                    paid_offer.pack_refund_text(locale),
+                )
+            )
+        button = words["card_button"]
+        intro = paid_intro
+        note = ""
     else:
         first = words["first_text"]
         if settings.email_verification_required:
@@ -373,12 +434,14 @@ def pricing_page(
                 words["first_quantity"],
                 first,
                 ui["cta_full"],
+                "",
             ),
             (
                 words["full"],
                 usd(settings.price_usd),
                 words["single_note"],
                 landing["price_full"],
+                "",
                 "",
             ),
         ]
@@ -394,6 +457,7 @@ def pricing_page(
                         "pack_text" if PACK_CREDITS <= MAX_COMPARED else "pack_text_plain"
                     ].format(n=PACK_CREDITS),
                     "",
+                    "",
                 )
             )
         button = words["card_button"]
@@ -406,8 +470,9 @@ def pricing_page(
         f"<h2>{_e(name)}</h2><p class='plan-price'>{_e(amount)}</p>"
         + (f"<p class='plan-note'>{_e(small)}</p>" if small else "")
         + f"<p>{_e(text)}</p>"
-        f"<a class='btn btn-dark' href='{_e(start)}'>{_e(label or button)}</a></div>"
-        for name, amount, small, text, label in cards
+        + (f"<p class='plan-note plan-refund'>{_e(refund)}</p>" if refund else "")
+        + f"<a class='btn btn-dark' href='{_e(start)}'>{_e(label or button)}</a></div>"
+        for name, amount, small, text, label, refund in cards
     )
     included = [_e(DIMENSION_TITLES[locale][name]) for name in DIMENSION_ORDER] + [
         f"<b>{_e(words['evidence'])}</b> {_e(words['evidence_text'])}",

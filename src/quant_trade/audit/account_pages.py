@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from typing import Any
 from urllib.parse import quote
 
+from quant_trade.audit import paid_offer
 from quant_trade.audit.account_pt import COPY_PT, PATHS_PT
 from quant_trade.audit.accounts import (
     FREE_PREVIEWS_PER_MONTH,
@@ -156,6 +157,10 @@ COPY: dict[str, dict[str, str]] = {
             "recibir el informe gratis: cuyo archivo y navegador no lo hayan tenido en otra "
             "cuenta y cuya red no haya agotado los del mes. Si ninguna puede, lo recibe la "
             "primera que hagas después que cumpla lo mismo."
+        ),
+        "welcome_confirm_paid": (
+            "Cuenta creada. Te enviamos un enlace para confirmar tu correo (si no lo ves, "
+            "revisa la carpeta de spam). Ya puedes subir tu archivo."
         ),
         "welcome_confirm_guides": "Mientras llega el correo, exporta tu archivo",
         "next_title": "Así sigue",
@@ -383,9 +388,13 @@ COPY: dict[str, dict[str, str]] = {
         "buy_country": "País de facturación",
         "buy_country_prompt": "Elige tu país",
         "buy_final_sale": (
-            "Entiendo que el crédito se entrega al momento y que la compra no es reembolsable."
+            "Entiendo que el crédito se entrega al momento y que puedo pedir la devolución en "
+            "7 días según los términos."
         ),
-        "buy_final_sale_note": "El crédito se entrega al momento y la compra no es reembolsable.",
+        "buy_final_sale_note": (
+            "El crédito se entrega al momento y puedes pedir la devolución en 7 días según los "
+            "términos."
+        ),
         "buy_alt": "¿Prefieres pagar por WhatsApp?",
         "card_paid": (
             "Pago recibido. Tus créditos aparecen aquí en cuanto Stripe lo confirma; si aún "
@@ -393,7 +402,7 @@ COPY: dict[str, dict[str, str]] = {
         ),
         "buy_off": "El pago con tarjeta no está disponible en este momento.",
         "buy_market": "Elige tu país de facturación para pagar.",
-        "buy_final_sale_needed": "Marca la casilla de compra no reembolsable para pagar.",
+        "buy_final_sale_needed": "Marca la casilla de los términos de compra para pagar.",
         "buy_email": "Confirma tu correo para comprar créditos.",
         "buy_review": "Hay un cobro pendiente de revisión. No vuelvas a pagar; pide ayuda.",
         "security_title": "Contraseña y datos",
@@ -937,6 +946,10 @@ COPY: dict[str, dict[str, str]] = {
             "whose network has not used up this month's. If none can, the first one you make "
             "afterwards that meets the same gets it."
         ),
+        "welcome_confirm_paid": (
+            "Account created. We sent you a link to confirm your e-mail (if you do not see it, "
+            "check the spam folder). You can upload your file now."
+        ),
         "welcome_confirm_guides": "While the e-mail arrives, export your file",
         "next_title": "What happens next",
         "next_account": "Create the account with your e-mail and a password.",
@@ -1160,10 +1173,12 @@ COPY: dict[str, dict[str, str]] = {
         "buy_country": "Billing country",
         "buy_country_prompt": "Choose your country",
         "buy_final_sale": (
-            "I understand that the credit is delivered at once and the purchase is not refundable."
+            "I understand that the credit is delivered at once and that I can ask for a refund "
+            "within 7 days under the terms."
         ),
         "buy_final_sale_note": (
-            "The credit is delivered at once and the purchase is not refundable."
+            "The credit is delivered at once, and you can ask for a refund within 7 days under "
+            "the terms."
         ),
         "buy_alt": "Prefer to pay on WhatsApp?",
         "card_paid": (
@@ -1172,7 +1187,7 @@ COPY: dict[str, dict[str, str]] = {
         ),
         "buy_off": "Card payment is not available right now.",
         "buy_market": "Choose your billing country to pay.",
-        "buy_final_sale_needed": "Tick the non-refundable purchase box to pay.",
+        "buy_final_sale_needed": "Tick the purchase terms box to pay.",
         "buy_email": "Confirm your e-mail to buy credits.",
         "buy_review": "A charge is under review. Do not pay again; ask for help.",
         "security_title": "Password and data",
@@ -1893,7 +1908,9 @@ def _alert(copy: dict[str, str], error: str = "", flash: str = "", *, locale: st
     out = ""
     if flash and flash in copy:
         extra = (
-            f" {welcome_confirm_guides(locale)}" if flash == "welcome_confirm" and locale else ""
+            f" {welcome_confirm_guides(locale)}"
+            if flash in ("welcome_confirm", "welcome_confirm_paid") and locale
+            else ""
         )
         out += f"<div class='flash' role='status'>{_e(copy[flash])}{extra}</div>"
     if error and error in copy:
@@ -1966,19 +1983,31 @@ def report_contents(locale: str, offer: str = "") -> str:
     return f"{text} {copy[free]}" if free else text
 
 
-def _next_steps(copy: dict[str, str], locale: str, *, email_verification: bool, offer: str) -> str:
+def _next_steps(
+    copy: dict[str, str],
+    locale: str,
+    *,
+    email_verification: bool,
+    offer: str,
+    paid: paid_offer.Offer | None = None,
+) -> str:
     """ "What happens next" beside the sign-up form when ``next`` is the upload page.
 
     Every step comes from the configuration: the e-mail step only when a confirmed
     address is required, the free report as the service offers it (``welcome``:
-    the first full report with an account; ``free``: every full report). The
+    the first full report with an account; ``free``: every full report; ``paid``,
+    with its price: the free preview, the price and the 7-day refund). The
     formats are the upload form's own list; the counts and the statuses each
     check comes out with are the engine's.
     """
     from quant_trade.audit.guides import guides_index_url
     from quant_trade.audit.pages import PLATFORMS, SAMPLE_PAGE_PATHS
 
-    report = report_contents(locale, "welcome" if offer == "welcome" else "free")
+    report = (
+        paid_offer.next_report_text(locale, paid)
+        if offer == "paid" and paid is not None
+        else report_contents(locale, "welcome" if offer == "welcome" else "free")
+    )
     steps = [_e(copy["next_account"])]
     if email_verification:
         steps.append(_e(copy["next_confirm_welcome" if offer == "welcome" else "next_confirm"]))
@@ -2079,7 +2108,7 @@ def signup_page(
     typo_of: str = "",
     typo_kept: bool = False,
     email_verification: bool = False,
-    offer: str = "welcome",
+    offer: str | paid_offer.Offer = "welcome",
 ) -> str:
     """The sign-up form; ``typo_of`` asks whether that address was meant as ``email``.
 
@@ -2087,9 +2116,20 @@ def signup_page(
     With ``next`` on the upload page the side panel says what happens next, from
     ``email_verification`` and ``offer`` (``welcome``, ``free`` or ``paid``; with
     ``paid`` and any other ``next`` it lists the account's benefits as before).
+    The paid offer with its price (``paid_offer.Offer``) also says, in the lead
+    and in "What happens next", the free preview, the price and the 7-day refund
+    instead of a free first report.
     """
     locale = _locale(locale)
     copy = COPY[locale]
+    terms = paid_offer.as_offer(offer)
+    offer = terms.kind
+    priced = terms.paid and terms.price_usd > 0
+    lead = (
+        paid_offer.signup_lead(locale, terms, FREE_PREVIEWS_PER_MONTH)
+        if priced
+        else copy["signup_lead"]
+    )
     from quant_trade.audit.legal import legal_url
 
     typo = ""
@@ -2136,8 +2176,14 @@ def signup_page(
         f"<a href='{_e(signin)}'>{_e(copy['signin_link'])}</a></p>"
     )
     side = (
-        _next_steps(copy, locale, email_verification=email_verification, offer=offer)
-        if offer in ("welcome", "free") and is_upload_next(next_path)
+        _next_steps(
+            copy,
+            locale,
+            email_verification=email_verification,
+            offer=offer,
+            paid=terms if priced else None,
+        )
+        if (offer in ("welcome", "free") or priced) and is_upload_next(next_path)
         else _benefits(copy)
     )
     body = (
@@ -2147,7 +2193,7 @@ def signup_page(
     return _shell(
         locale,
         copy["signup_title"],
-        copy["signup_lead"],
+        lead,
         body,
         switch=_switch("signup", locale, next_path),
         describe="signup",
@@ -2338,11 +2384,20 @@ def compare_mine_note(locale: str) -> str:
     )
 
 
-def gate_page(*, locale: str, reason: str, limit: int, extras: bool = False) -> str:
+def gate_page(
+    *,
+    locale: str,
+    reason: str,
+    limit: int,
+    extras: bool = False,
+    offer: paid_offer.Offer | None = None,
+) -> str:
     """Why an upload did not run: no account, a bad code, or the month's free previews used.
 
     ``reason`` is ``signin``, ``code``, ``quota`` or ``network``; ``extras`` brings the
-    visitor back to the upload page with its extra boxes open.
+    visitor back to the upload page with its extra boxes open. Under the paid
+    ``offer`` the "create your account" page names the account's free previews,
+    the price and the 7-day refund instead of a free first report.
     """
     locale = _locale(locale)
     copy = COPY[locale]
@@ -2368,10 +2423,14 @@ def gate_page(*, locale: str, reason: str, limit: int, extras: bool = False) -> 
         "<div class='wrap-narrow'><div class='acct-card acct-gate'>"
         f"<div class='inline-form'>{buttons}</div></div></div>"
     )
+    title = copy[f"gate_{reason}_title"].format(limit=limit)
+    lead = copy[f"gate_{reason}_lead"].format(limit=limit)
+    if reason == "signin" and offer is not None and offer.paid:
+        title, lead = paid_offer.gate_text(locale, offer, limit)
     return _shell(
         locale,
-        copy[f"gate_{reason}_title"].format(limit=limit),
-        copy[f"gate_{reason}_lead"].format(limit=limit),
+        title,
+        lead,
         body,
         switch={lang: path("signup", lang) for lang in LANGUAGES},
     )
@@ -3348,6 +3407,7 @@ def report_box(
     locked: bool = False,
     card_offer: bool = False,
     anon_preview: bool = False,
+    offer: paid_offer.Offer | None = None,
 ) -> str:
     """The account line on a report page.
 
@@ -3358,7 +3418,9 @@ def report_box(
     A signed-out visitor goes to sign-up or sign-in through a form, so the
     report's key is never written inside a ``next`` address. ``anon_preview``
     (a preview uploaded without an account that the account would open in
-    full) says so, with "open my full report" as the main button.
+    full) says so, with "open my full report" as the main button. Under the paid
+    ``offer`` that preview's box says the account opens it in full for the price,
+    with the 7-day refund (``paid_offer.anon_box_text``), never for free.
     """
     locale = _locale(locale)
     copy = COPY[locale]
@@ -3370,11 +3432,15 @@ def report_box(
             if anon_preview
             else ("anon_box", "anon_signup", "anon_signin", "btn-dark")
         )
+        box_text, signup_text = copy[box], copy[signup]
+        if anon_preview and offer is not None and offer.paid:
+            box_text = paid_offer.anon_box_text(locale, offer)
+            signup_text = paid_offer.words(locale)["anon_signup"]
         parts.append(
-            f"<span>{_e(copy[box])}</span>"
+            f"<span>{_e(box_text)}</span>"
             f"<form method='post' action='{_e(base)}/account{_e(query)}'>"
             f"<button class='btn {main} btn-sm' type='submit' name='go' value='signup'>"
-            f"{_e(copy[signup])}</button> "
+            f"{_e(signup_text)}</button> "
             "<button class='btn btn-ghost btn-sm' type='submit' name='go' value='signin'>"
             f"{_e(copy[signin])}</button></form>"
         )

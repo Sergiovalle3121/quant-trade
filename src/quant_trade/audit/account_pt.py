@@ -115,6 +115,10 @@ COPY_PT: dict[str, str] = {
         "rede não esgotou os do mês. Se nenhum puder, recebe-o o primeiro que você fizer depois e "
         "que cumpra o mesmo."
     ),
+    "welcome_confirm_paid": (
+        "Conta criada. Enviamos um link para confirmar o seu e-mail (se não o vir, confira a "
+        "pasta de spam). Você já pode enviar o seu arquivo."
+    ),
     "welcome_confirm_guides": "Enquanto o e-mail chega, exporte o seu arquivo",
     "next_title": "Como continua",
     "next_account": "Crie a conta com o seu e-mail e uma senha.",
@@ -337,9 +341,12 @@ COPY_PT: dict[str, str] = {
     "buy_country": "País de cobrança",
     "buy_country_prompt": "Escolha seu país",
     "buy_final_sale": (
-        "Entendo que o crédito é entregue na hora e que a compra não é reembolsável."
+        "Entendo que o crédito é entregue na hora e que posso pedir a devolução em 7 dias "
+        "conforme os termos."
     ),
-    "buy_final_sale_note": "O crédito é entregue na hora e a compra não é reembolsável.",
+    "buy_final_sale_note": (
+        "O crédito é entregue na hora e você pode pedir a devolução em 7 dias conforme os termos."
+    ),
     "buy_alt": "Prefere pagar pelo WhatsApp?",
     "card_paid": (
         "Pagamento recebido. Seus créditos aparecem aqui assim que a Stripe confirma; se "
@@ -347,7 +354,7 @@ COPY_PT: dict[str, str] = {
     ),
     "buy_off": "O pagamento com cartão não está disponível agora.",
     "buy_market": "Escolha seu país de cobrança para pagar.",
-    "buy_final_sale_needed": "Marque a caixa de compra não reembolsável para pagar.",
+    "buy_final_sale_needed": "Marque a caixa dos termos de compra para pagar.",
     "buy_email": "Confirme seu e-mail para comprar créditos.",
     "buy_review": "Há uma cobrança em análise. Não pague novamente; peça ajuda.",
     "security_title": "Senha e dados",

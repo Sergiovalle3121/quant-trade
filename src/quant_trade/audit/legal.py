@@ -21,16 +21,19 @@ import html
 from dataclasses import dataclass
 
 from quant_trade.audit.accounts import (
+    ANON_PREVIEWS_PER_IPV4_PER_DAY,
+    ANON_PREVIEWS_PER_NETWORK_PER_DAY,
     DEVICE_COOKIE,
     FREE_PREVIEWS_PER_MONTH,
     REFERRAL_CREDITS,
     REFERRAL_MONTHLY_CAP,
 )
 from quant_trade.audit.funnel import REF_COOKIE, REF_DAYS, SEEN_COOKIE
+from quant_trade.audit.paid_offer import REFUND_DAYS
 from quant_trade.audit.settings import PACK_CREDITS
 
 #: Date of the current wording. Change it whenever a text below changes.
-LEGAL_UPDATED = "2026-09-28"
+LEGAL_UPDATED = "2026-10-09"
 
 STRIPE_PRIVACY_URL = "https://stripe.com/privacy"
 RESEND_PRIVACY_URL = "https://resend.com/legal/privacy-policy"
@@ -90,6 +93,12 @@ class LegalContext:
     email_verification_required: bool = False
     retention_days: int = 30
     max_uploads_per_hour_per_ip: int = 10
+    #: A new account's first upload is a free full report
+    #: (``AUDIT_WELCOME_FULL_REPORT``); off, every full report is paid.
+    welcome_full_report: bool = True
+    #: A visitor without an account may see a file's class and red flags
+    #: (``AUDIT_ANON_PREVIEW``).
+    anon_preview: bool = False
 
     @property
     def configured(self) -> bool:
@@ -225,6 +234,111 @@ def _account_email_status(ctx: LegalContext, locale: str) -> str:
     }[locale]
 
 
+def _refund(ctx: LegalContext, locale: str) -> str:
+    """The refund policy: a paid report within ``REFUND_DAYS`` days of the payment,
+    a pack's unused credits, and always a duplicate charge or one that delivered
+    no report. The operator refunds a card payment from Stripe; nothing locks
+    the report again (``refund.created`` is recorded, ``record_stripe_refund``)."""
+    contact = _value(ctx.operator_contact, locale)
+    days = REFUND_DAYS
+    pack = bool(ctx.pack_price_usd)
+    if locale == "en":
+        parts = [
+            f"{days}-day refund: if a paid report is no use to you, write to {contact} within "
+            f"{days} days of the payment, with the report's or the purchase's identifier, and "
+            "we refund the full amount."
+        ]
+        if pack:
+            parts.append(
+                f"For a pack, if you used none of its credits within those {days} days, we "
+                "refund the whole pack; if you used some, we refund the part of the unused "
+                "credits"
+                + (
+                    " (a pack bought by card from a report has already used one credit: that "
+                    "report's)."
+                    if ctx.card_payments
+                    else "."
+                )
+            )
+        parts.append(
+            "We also always refund a duplicate charge or a charge that delivered no report; if "
+            "the report was not produced because of a fault in the service, you can also ask "
+            "for a new code."
+        )
+        if ctx.card_payments:
+            parts.append(
+                "We make the refund of a card payment ourselves, from Stripe, and it reaches the "
+                "same payment method within your bank's times."
+            )
+        if ctx.access_codes:
+            parts.append(
+                "A code paid outside the site is refunded through the method you paid with."
+            )
+        parts.append("This does not limit your rights under applicable law.")
+        return " ".join(parts)
+    if locale == "pt":
+        parts = [
+            f"Devolução em {days} dias: se um relatório pago não servir para você, escreva para "
+            f"{contact} nos {days} dias seguintes ao pagamento, com o identificador do relatório "
+            "ou da compra, e devolvemos o valor total."
+        ]
+        if pack:
+            parts.append(
+                f"No pacote, se nesses {days} dias você não usou nenhum crédito, devolvemos o "
+                "pacote inteiro; se usou algum, devolvemos a parte dos créditos não usados"
+                + (
+                    " (um pacote comprado com cartão a partir de um relatório já usou um "
+                    "crédito: o desse relatório)."
+                    if ctx.card_payments
+                    else "."
+                )
+            )
+        parts.append(
+            "Além disso, sempre devolvemos uma cobrança duplicada ou uma cobrança que não "
+            "entregou nenhum relatório; se o relatório não foi gerado por uma falha do serviço, "
+            "você também pode pedir um novo código."
+        )
+        if ctx.card_payments:
+            parts.append(
+                "Nós mesmos fazemos a devolução de um pagamento com cartão, pelo Stripe, e ela "
+                "chega ao mesmo meio de pagamento nos prazos do seu banco."
+            )
+        if ctx.access_codes:
+            parts.append("Um código pago fora do site é devolvido pelo mesmo meio do pagamento.")
+        parts.append("Isso não limita os direitos previstos na lei aplicável.")
+        return " ".join(parts)
+    parts = [
+        f"Devolución en {days} días: si un informe pagado no te sirve, escribe a {contact} "
+        f"dentro de los {days} días siguientes al pago, con el identificador del informe o de "
+        "la compra, y te devolvemos el importe completo."
+    ]
+    if pack:
+        parts.append(
+            f"En un paquete, si en esos {days} días no usaste ningún crédito, te devolvemos el "
+            "paquete completo; si usaste alguno, te devolvemos la parte de los créditos sin usar"
+            + (
+                " (un paquete comprado con tarjeta desde un informe ya usó un crédito: el de ese "
+                "informe)."
+                if ctx.card_payments
+                else "."
+            )
+        )
+    parts.append(
+        "Además, siempre devolvemos un cobro duplicado o un cobro que no entregó ningún "
+        "informe; si el informe no se generó por un fallo del servicio, también puedes pedir "
+        "un código nuevo."
+    )
+    if ctx.card_payments:
+        parts.append(
+            "La devolución de un pago con tarjeta la hacemos nosotros desde Stripe y llega al "
+            "mismo medio de pago, en los plazos de tu banco."
+        )
+    if ctx.access_codes:
+        parts.append("Un código pagado fuera de la web se devuelve por el mismo medio de pago.")
+    parts.append("Esto no limita los derechos que te conceda la ley aplicable.")
+    return " ".join(parts)
+
+
 def _price_es(ctx: LegalContext) -> tuple[str, ...]:
     if ctx.free_mode:
         return (
@@ -236,7 +350,7 @@ def _price_es(ctx: LegalContext) -> tuple[str, ...]:
         "La vista previa es gratuita. El informe completo cuesta "
         f"USD {ctx.price_usd:.2f} por auditoría."
     ]
-    if ctx.email_verification_required:
+    if ctx.email_verification_required and ctx.welcome_full_report:
         lines.append(
             "Tu primer informe completo gratis llega cuando confirmas el correo de tu cuenta."
         )
@@ -272,13 +386,7 @@ def _price_es(ctx: LegalContext) -> tuple[str, ...]:
             "coinciden con lo que muestra tu plataforma), escríbenos con el identificador del "
             "informe: lo corregimos o, si no se puede, te damos un crédito nuevo."
         )
-    lines.append(
-        "Todas las ventas son finales: el informe se entrega al momento, así que no "
-        "devolvemos el dinero de un informe ya desbloqueado. Solo devolvemos un cobro "
-        "duplicado o un cobro que no entregó ningún informe; si el informe no se generó por "
-        "un fallo del servicio, también puedes pedir un código nuevo. Esto no limita los "
-        "derechos que te conceda la ley aplicable."
-    )
+    lines.append(_refund(ctx, "es"))
     return tuple(lines)
 
 
@@ -290,7 +398,7 @@ def _price_en(ctx: LegalContext) -> tuple[str, ...]:
             "affected.",
         )
     lines = [f"The preview is free. The full report costs USD {ctx.price_usd:.2f} per audit."]
-    if ctx.email_verification_required:
+    if ctx.email_verification_required and ctx.welcome_full_report:
         lines.append("Your first free full report comes once you confirm your account e-mail.")
     if ctx.card_payments and ctx.email_verification_required:
         lines.append("To pay by card, confirm your account e-mail.")
@@ -324,12 +432,7 @@ def _price_en(ctx: LegalContext) -> tuple[str, ...]:
             "what your platform shows), write to us with the report's identifier: we fix it "
             "or, if that is not possible, give you a new credit."
         )
-    lines.append(
-        "All sales are final: the report is delivered at once, so we do not refund a report "
-        "that has been unlocked. We only refund a duplicate charge or a charge that delivered "
-        "no report; if the report was not produced because of a fault in the service, you "
-        "can also ask for a new code. This does not limit your rights under applicable law."
-    )
+    lines.append(_refund(ctx, "en"))
     return tuple(lines)
 
 
@@ -343,7 +446,7 @@ def _price_pt(ctx: LegalContext) -> tuple[str, ...]:
     lines = [
         f"A prévia é gratuita. O relatório completo custa USD {ctx.price_usd:.2f} por auditoria."
     ]
-    if ctx.email_verification_required:
+    if ctx.email_verification_required and ctx.welcome_full_report:
         lines.append(
             "Seu primeiro relatório completo gratuito chega quando você confirma o e-mail da conta."
         )
@@ -379,14 +482,115 @@ def _price_pt(ctx: LegalContext) -> tuple[str, ...]:
             "datas que não correspondem à plataforma), entre em contato com o identificador "
             "do relatório: nós o corrigimos ou, se não for possível, damos um novo crédito."
         )
-    lines.append(
-        "Todas as vendas são finais: o relatório é entregue na hora, então não devolvemos o "
-        "valor de um relatório já liberado. Só devolvemos uma cobrança duplicada ou uma "
-        "cobrança que não entregou nenhum relatório; se o relatório não foi gerado por uma "
-        "falha do serviço, você também pode pedir um novo código. Isso não limita os "
-        "direitos previstos na lei aplicável."
-    )
+    lines.append(_refund(ctx, "pt"))
     return tuple(lines)
+
+
+def _account_terms(ctx: LegalContext, locale: str) -> str:
+    """The free tier as the code applies it: the free first full report (while
+    ``welcome_full_report``), the account's monthly previews and, with
+    ``anon_preview``, the previews without an account of each network."""
+    n = FREE_PREVIEWS_PER_MONTH
+    per_net, per_ipv4 = ANON_PREVIEWS_PER_NETWORK_PER_DAY, ANON_PREVIEWS_PER_IPV4_PER_DAY
+    if locale == "en":
+        if ctx.free_mode:
+            return "The account is optional while the service is in free mode."
+        lead = (
+            "The first file of a new account gets a free full report: once per account, "
+            "browser and file, and only a few times a month from the same network address. "
+            if ctx.welcome_full_report
+            else "Every full report is paid, the first one too. "
+        )
+        if not ctx.anon_preview:
+            first = "After it, the free preview" if ctx.welcome_full_report else "The free preview"
+            previews = (
+                first + f" needs an account: {n} a calendar month per account, also counted per "
+                "network address. Past that, each file is a paid report. "
+            )
+        else:
+            previews = (
+                f"With an account you get {n} free previews a calendar month, also counted per "
+                "network address; past that, each file is a paid report. Without an account, "
+                f"each network can see the class and red flags of {per_net} files a day "
+                f"({per_ipv4} from an IPv4 address, which is often shared); the full report "
+                "needs an account. "
+                + (
+                    "If you create it from the browser that uploaded the file, that report can "
+                    "open as your free report, under the same limits; otherwise it takes one of "
+                    "the month's previews while any are left. "
+                    if ctx.welcome_full_report
+                    else "If you move one of those previews to your account, it takes one of the "
+                    "month's previews while any are left. "
+                )
+            )
+        return lead + previews + "Each report's private link works without an account."
+    if locale == "pt":
+        if ctx.free_mode:
+            return "A conta é opcional enquanto o serviço estiver no modo gratuito."
+        lead = (
+            "O primeiro arquivo de uma conta nova dá direito a um relatório completo "
+            "gratuito, uma vez por conta, navegador e arquivo, sujeito também aos limites "
+            "mensais por endereço de rede. Uma rede compartilhada, por si só, não impede "
+            "o acesso. "
+            if ctx.welcome_full_report
+            else "Todo relatório completo é pago, também o primeiro. "
+        )
+        if not ctx.anon_preview:
+            first = "Depois disso, a prévia" if ctx.welcome_full_report else "A prévia"
+            previews = (
+                first
+                + f" gratuita exige uma conta: {n} por mês civil por conta, também sujeitas aos "
+                "limites por rede. Após esses limites, cada arquivo exige pagamento. "
+            )
+        else:
+            previews = (
+                f"Com uma conta, você tem {n} prévias gratuitas por mês civil, também sujeitas "
+                "aos limites por rede; após esses limites, cada arquivo exige pagamento. Sem "
+                f"conta, cada rede pode ver a classe e os alertas de {per_net} arquivos por dia "
+                f"({per_ipv4} a partir de um endereço IPv4, que costuma ser compartilhado); o "
+                "relatório completo exige uma conta. "
+                + (
+                    "Se você criá-la no navegador que enviou o arquivo, esse relatório pode abrir "
+                    "como o seu relatório gratuito, com os mesmos limites; se não, ocupa uma das "
+                    "prévias do mês enquanto houver. "
+                    if ctx.welcome_full_report
+                    else "Se você passar uma dessas prévias para a sua conta, ela ocupa uma das "
+                    "prévias do mês enquanto houver. "
+                )
+            )
+        return lead + previews + "O link privado de cada relatório funciona sem conta."
+    if ctx.free_mode:
+        return "La cuenta es opcional mientras el servicio está en modo gratuito."
+    lead = (
+        "El primer archivo de una cuenta nueva es un informe completo gratis, una vez "
+        "por cuenta, navegador y archivo, y unos pocos por dirección de red al mes. "
+        if ctx.welcome_full_report
+        else "Cada informe completo es de pago, también el primero. "
+    )
+    if not ctx.anon_preview:
+        first = "Después, la vista previa" if ctx.welcome_full_report else "La vista previa"
+        previews = (
+            first
+            + f" gratis necesita una cuenta: {n} por mes calendario y por cuenta, contadas también "
+            "por dirección de red. Pasado ese número, cada archivo es un informe de pago. "
+        )
+    else:
+        previews = (
+            f"Con una cuenta tienes {n} vistas previas gratis por mes calendario, contadas "
+            "también por dirección de red; pasado ese número, cada archivo es un informe de "
+            f"pago. Sin cuenta, cada red puede ver la clase y las banderas rojas de {per_net} "
+            f"archivos al día ({per_ipv4} desde una dirección IPv4, que suele ser compartida); "
+            "el informe completo necesita una cuenta. "
+            + (
+                "Si la creas desde el navegador con el que subiste el archivo, ese informe puede "
+                "abrirse como tu informe gratis, con los mismos límites; si no, ocupa una de las "
+                "vistas previas del mes mientras queden. "
+                if ctx.welcome_full_report
+                else "Si pasas una de esas vistas previas a tu cuenta, ocupa una de las vistas "
+                "previas del mes mientras queden. "
+            )
+        )
+    return lead + previews + "El enlace privado de cada informe funciona sin cuenta."
 
 
 def terms_text(ctx: LegalContext, locale: str = "es") -> LegalText:
@@ -436,17 +640,7 @@ def terms_text(ctx: LegalContext, locale: str = "es") -> LegalText:
             (
                 "Your account",
                 (
-                    (
-                        "The first file of a new account gets a free full report: once per "
-                        "account, browser and file, and only a few times a month from the "
-                        "same network address. "
-                        f"After it, the free preview needs an account: {FREE_PREVIEWS_PER_MONTH} "
-                        "a calendar month per account, also counted per network address. Past "
-                        "that, each file is a paid report. "
-                        + "Each report's private link works without an account."
-                        if not ctx.free_mode
-                        else "The account is optional while the service is in free mode."
-                    ),
+                    _account_terms(ctx, "en"),
                     "The account shows your reports, credits and purchases in one place.",
                     "You are responsible for your password. " + _account_recovery(ctx, "en"),
                     *(
@@ -554,17 +748,7 @@ def terms_text(ctx: LegalContext, locale: str = "es") -> LegalText:
         (
             "Tu cuenta",
             (
-                (
-                    "El primer archivo de una cuenta nueva es un informe completo gratis, una vez "
-                    "por cuenta, navegador y archivo, y unos pocos por dirección de red al mes. "
-                    "Después, la vista previa gratis necesita una cuenta: "
-                    f"{FREE_PREVIEWS_PER_MONTH} por mes calendario y por cuenta, "
-                    "contadas también por dirección de red. "
-                    "Pasado ese número, cada archivo es un informe de pago. "
-                    + "El enlace privado de cada informe funciona sin cuenta."
-                    if not ctx.free_mode
-                    else "La cuenta es opcional mientras el servicio está en modo gratuito."
-                ),
+                _account_terms(ctx, "es"),
                 "La cuenta sirve para ver en un solo lugar tus informes, tus créditos y tus "
                 "compras.",
                 "Eres responsable de tu contraseña. " + _account_recovery(ctx, "es"),
@@ -644,19 +828,10 @@ def _terms_pt(
     jurisdiction: str,
     warning: str | None,
 ) -> LegalText:
-    account = (
-        (
-            "O primeiro arquivo de uma conta nova dá direito a um relatório completo "
-            "gratuito, uma vez por conta, navegador e arquivo, sujeito também aos limites "
-            "mensais por endereço de rede. Uma rede compartilhada, por si só, não impede "
-            "o acesso. Depois disso, a prévia gratuita exige uma conta: "
-            f"{FREE_PREVIEWS_PER_MONTH} por mês civil por conta, também sujeitas aos limites "
-            "por rede. Após esses limites, cada arquivo exige pagamento. "
-            + "O link privado de cada relatório funciona sem conta."
-        )
-        if not ctx.free_mode
-        else "A conta é opcional enquanto o serviço estiver no modo gratuito."
-    )
+    account = _account_terms(ctx, "pt")
+    # Invites pay a credit once the invitee's free first report exists: without
+    # that report (the paid offer) there is no invite to describe.
+    invites = ctx.free_mode or ctx.welcome_full_report
     sections: tuple[tuple[str, tuple[str, ...]], ...] = (
         ("Prestador", (f'{name}, {address}. Contato: {contact}{_tel(ctx, "pt")} ("nós").',)),
         (
@@ -692,19 +867,23 @@ def _terms_pt(
             ),
         ),
         (
-            "Sua conta e indicações",
+            "Sua conta e indicações" if invites else "Sua conta",
             (
                 account,
                 "A conta reúne seus relatórios, créditos e compras. Você é responsável pela "
                 "senha. " + _account_recovery(ctx, "pt"),
-                (
-                    "Ao indicar um colega, você recebe "
-                    f"{REFERRAL_CREDITS} crédito quando a pessoa indicada concluir seu "
-                    "primeiro relatório completo gratuito, até "
-                    f"{REFERRAL_MONTHLY_CAP} créditos por mês civil. Indicações feitas pelo "
-                    "mesmo navegador não contam como novas pessoas. Compartilhar uma rede "
-                    "não invalida uma indicação por si só. Para receber o crédito, o seu "
-                    "e-mail e o da pessoa indicada precisam estar confirmados."
+                *(
+                    (
+                        "Ao indicar um colega, você recebe "
+                        f"{REFERRAL_CREDITS} crédito quando a pessoa indicada concluir seu "
+                        "primeiro relatório completo gratuito, até "
+                        f"{REFERRAL_MONTHLY_CAP} créditos por mês civil. Indicações feitas pelo "
+                        "mesmo navegador não contam como novas pessoas. Compartilhar uma rede "
+                        "não invalida uma indicação por si só. Para receber o crédito, o seu "
+                        "e-mail e o da pessoa indicada precisam estar confirmados.",
+                    )
+                    if invites
+                    else ()
                 ),
                 *(
                     (
@@ -890,6 +1069,60 @@ def _email_keeps_text(locale: str) -> tuple[str, ...]:
     }[locale]
 
 
+def _anon_keeps(ctx: LegalContext, locale: str, days: int) -> tuple[str, ...]:
+    """What an upload without an account keeps (``AUDIT_ANON_PREVIEW``): the
+    ``anon_previews`` row, the ``welcome_pending`` row and the day's network
+    claims, all gone with the report or at the retention purge. Under the paid
+    offer no file fingerprint is kept: there is no free report to check it for."""
+    if not ctx.anon_preview or ctx.free_mode:
+        return ()
+    welcome = ctx.welcome_full_report
+    if locale == "en":
+        marks = (
+            ", the file's SHA-256 and the network address, to open it as the free report if you "
+            "create the account"
+            if welcome
+            else " and the network address, so that only that browser can move it to an "
+            "account, where it takes one of the month's previews"
+        )
+        return (
+            "If you upload a file without an account: the language, the link tag you came "
+            f"with ({REF_COOKIE} cookie), the date and, if you later move it to an account, "
+            f"when; also your browser's identifier (as a hash only){marks}; and a hash of "
+            "the network per day, to count its previews without an account. All of it is "
+            f"deleted with the report or after {days} days.",
+        )
+    if locale == "pt":
+        marks = (
+            ", o SHA-256 do arquivo e o endereço de rede, para abri-lo como relatório grátis se "
+            "você criar a conta"
+            if welcome
+            else " e o endereço de rede, para que só esse navegador possa passá-lo para uma "
+            "conta, onde ocupa uma das prévias do mês"
+        )
+        return (
+            "Se você enviar um arquivo sem conta: o idioma, a etiqueta do link com que você "
+            f"chegou (cookie {REF_COOKIE}), a data e, se depois você o passar para uma conta, "
+            f"quando; além disso, o identificador do seu navegador (só como hash){marks}; e "
+            "um hash da rede por dia, para contar as prévias sem conta. Tudo é apagado com o "
+            f"relatório ou após {days} dias.",
+        )
+    marks = (
+        ", el SHA-256 del archivo y la dirección de red, para abrirlo como informe gratis si "
+        "creas la cuenta"
+        if welcome
+        else " y la dirección de red, para que solo ese navegador pueda pasarlo a una cuenta, "
+        "donde ocupa una de las vistas previas del mes"
+    )
+    return (
+        "Si subes un archivo sin cuenta: el idioma, la etiqueta del enlace con la que "
+        f"llegaste (cookie {REF_COOKIE}), la fecha y, si luego lo pasas a una cuenta, cuándo; "
+        f"además, el identificador de tu navegador (solo como hash){marks}; y un hash de la "
+        "red por día, para contar las vistas previas sin cuenta. Todo se borra con el informe "
+        f"o a los {days} días.",
+    )
+
+
 def privacy_text(ctx: LegalContext, locale: str = "es") -> LegalText:
     locale = _locale(locale)
     name = _value(ctx.operator_name, locale)
@@ -928,6 +1161,7 @@ def privacy_text(ctx: LegalContext, locale: str = "es") -> LegalText:
                     "To count free previews: which account used each one, when, and the "
                     "network address it came from. The address is cleared with the rest "
                     f"after {days} days.",
+                    *_anon_keeps(ctx, "en", days),
                     "For the free first full report: a random identifier of your browser "
                     f"(a cookie named {DEVICE_COOKIE}, stored by us only as a hash), the "
                     "SHA-256 of the file, a SHA-256 of your e-mail in its basic form (lower "
@@ -1107,6 +1341,7 @@ def privacy_text(ctx: LegalContext, locale: str = "es") -> LegalText:
                 "Para contar las vistas previas gratis: qué cuenta usó cada una, cuándo y "
                 f"desde qué dirección de red. La dirección se borra con lo demás a los {days} "
                 "días.",
+                *_anon_keeps(ctx, "es", days),
                 "Para el primer informe completo gratis: un identificador al azar de tu "
                 f"navegador (una cookie llamada {DEVICE_COOKIE}, que guardamos solo como hash), "
                 "el SHA-256 del archivo, un SHA-256 de tu correo en su forma básica (en "
@@ -1297,6 +1532,7 @@ def _privacy_pt(
                 *_email_keeps(ctx, "pt"),
                 "Para contar as prévias gratuitas: qual conta usou cada uma, quando e de qual "
                 f"endereço de rede. O endereço é eliminado com os demais dados após {days} dias.",
+                *_anon_keeps(ctx, "pt", days),
                 "Para o primeiro relatório completo gratuito: um identificador aleatório do "
                 f"navegador (cookie {DEVICE_COOKIE}, guardado por nós apenas como hash), "
                 "o SHA-256 do arquivo, um SHA-256 do seu e-mail na forma básica (em "

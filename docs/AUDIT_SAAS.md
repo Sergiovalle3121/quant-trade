@@ -2714,7 +2714,7 @@ Routes:
 | Route | What it does |
 |---|---|
 | `GET /` | Landing (how it works, prices, FAQ, link to the sample); `?lang=en`. `GET /en` is the English landing, a short address to share. Its closing call keeps `id='subir'`, and every start button links to the upload page; old `?extras=1` links redirect there. |
-| `GET /auditar` | The upload form on its own page (`/en/audit`, `/pt/auditar`; `?extras=1` opens the extra files). Outside free mode a visitor without an account gets a 303 to sign-up with `next` back here (`/registro?next=/auditar`, `/signup?next=/en/audit`, `/pt/cadastro?next=/pt/auditar`), so nobody fills the form and loses it. A visitor who came with `?extras=1` keeps it (`next=/auditar%3Fextras%3D1`) and lands on the form with the extra files open after signing up or in; the language switch of the form and the "account first" answer to an upload that used an extra box keep it too. With `AUDIT_ANON_PREVIEW=true` there is no redirect: the form is served, and its note says that without an account the file's A to D class and red flags are shown, and that with an e-mail the first full report is free (`pages._COPY[...]["anon_preview_note"]`); see "Preview without an account" below. |
+| `GET /auditar` | The upload form on its own page (`/en/audit`, `/pt/auditar`; `?extras=1` opens the extra files). Outside free mode a visitor without an account gets a 303 to sign-up with `next` back here (`/registro?next=/auditar`, `/signup?next=/en/audit`, `/pt/cadastro?next=/pt/auditar`), so nobody fills the form and loses it. A visitor who came with `?extras=1` keeps it (`next=/auditar%3Fextras%3D1`) and lands on the form with the extra files open after signing up or in; the language switch of the form and the "account first" answer to an upload that used an extra box keep it too. With `AUDIT_ANON_PREVIEW=true` there is no redirect: the form is served, and its note says that without an account the file's A to D class and red flags are shown, and that with an e-mail the first full report is free (`pages._COPY[...]["anon_preview_note"]`); under the paid offer (`AUDIT_WELCOME_FULL_REPORT=false`) the notes say instead the free preview, the price and the 7-day refund (`paid_offer.paid_text`); see "Preview without an account" and "Paid offer" below. |
 | `GET /precios` | 301 to the landing's prices (`/#pricing`); `/pricing` and `/en/pricing` go to `/en#pricing`, `/pt/precos` to `/pt#pricing`. |
 | `GET /contacto` | Contact page (`/en/contact`, `/pt/contato`; `/soporte`, `/contact`, `/support`, `/en/support`, `/pt/suporte` redirect there), linked from every footer. It shows only what the operator set: `AUDIT_OPERATOR_CONTACT` as a mail link and `AUDIT_CONTACT_URL` as the chat link; with neither it says no channel is published yet. It also says never to send a password, recovery key or card details. |
 | `POST /audits` | Upload. An optional `access_code` field redeems a code (paid mode with codes on). With `AUDIT_ANON_PREVIEW=true`, an upload without an account and without a working code is stored as a locked preview and answers 303 to `/audits/{id}?token=…&acct=anon_preview` (201 with that `location` for JSON). |
@@ -2773,7 +2773,8 @@ with an empty value):
 | `AUDIT_ACCESS_CODES` | `false` | Offer manual access-code sales and typed-code redemption. With `AUDIT_FREE_MODE=false` it turns on paid mode without Stripe. Credits already on an account remain spendable when this is `false`. |
 | `AUDIT_REFERRAL_REWARDS` | `true` | Set `false` to stop new invite rewards and hide the reward promise during an incident. Previously granted credits remain usable. |
 | `AUDIT_REFERRAL_GLOBAL_MONTHLY_CAP` | `100` | Maximum rewarded invites across the whole service per UTC month, reserved transactionally in `referral_global_slots`. At one credit per invite this caps the new monthly credit obligation. `0` stops new rewards. |
-| `AUDIT_ANON_PREVIEW` | `false` | Paid mode only. `true` lets a visitor without an account upload and see the file's class and red flags (a locked preview, `accounts.ANON_PREVIEWS_PER_NETWORK_PER_DAY = 2` per IPv6 /64 and `ANON_PREVIEWS_PER_IPV4_PER_DAY = 6` per IPv4 address a UTC day); signing up or in from that report puts it on the account and opens it as the free first full report under the usual limits. `false` keeps "account first": every page and route answers exactly as before. It changes the free tier's rule, so only the owner turns it on. |
+| `AUDIT_ANON_PREVIEW` | `false` | Paid mode only. `true` lets a visitor without an account upload and see the file's class and red flags (a locked preview, `accounts.ANON_PREVIEWS_PER_NETWORK_PER_DAY = 2` per IPv6 /64 and `ANON_PREVIEWS_PER_IPV4_PER_DAY = 6` per IPv4 address a UTC day); signing up or in from that report puts it on the account and opens it as the free first full report under the usual limits (with `AUDIT_WELCOME_FULL_REPORT=false` it stays locked on the account, with the usual purchase). `false` keeps "account first": every page and route answers exactly as before. It changes the free tier's rule, so only the owner turns it on. |
+| `AUDIT_WELCOME_FULL_REPORT` | `true` | Paid mode only (`AuditSettings.welcome_full_report`, default `accounts.WELCOME_FULL_REPORT`). `true`: a new account's first upload is a free full report under the usual limits. `false` (the paid offer, `audit/paid_offer.py`): every full report is paid from the first one; no path grants one free (upload, confirmed e-mail, card check, invite), access codes and credits work as always, and the pages say the free preview, the price from the settings and the terms' 7-day refund. Planned for production with `AUDIT_ANON_PREVIEW=true`. |
 | `AUDIT_EMAIL_VERIFICATION_REQUIRED` | `false` | Migration default. When `true`, both addresses must be confirmed before an invite reward and a buyer's address before a new Checkout. Sign-up still works; the free first full report waits until the address is confirmed (earlier uploads are previews with reason `unverified`). **Public paid launch requires `true` and e-mail delivery (Resend's API or SMTP, see the next two rows) verified end to end.** |
 | `AUDIT_EMAIL_TOKEN_SECRET`, `AUDIT_SMTP_HOST`, `AUDIT_SMTP_PORT`, `AUDIT_SMTP_USERNAME`, `AUDIT_SMTP_PASSWORD`, `AUDIT_SMTP_FROM`, `AUDIT_SMTP_SECURITY` | empty / `587` / `starttls` | Stable secret of at least 32 characters shared by replicas and encrypted SMTP transport. SMTP is one of two transports: when `AUDIT_RESEND_API_KEY` is set (next row but one) the mail goes through Resend's HTTPS API and the `AUDIT_SMTP_HOST`, port, user, password and security variables are not used; the sender is `AUDIT_EMAIL_FROM`, or `AUDIT_SMTP_FROM` when that is empty. `/ready` fails when verification is required but delivery is not configured. Test real delivery, retries and legacy account confirmation before launch. No usable token or link is stored in the outbox. |
 | `AUDIT_SKIP_EMAIL_DNS` | `false` | `true` stops the sign-up DNS check that refuses domains taking no mail (for a staging copy without DNS). |
@@ -3238,52 +3239,82 @@ an account never changes what a report says.
   - `/panel` adds "Vistas previas sin cuenta" by tag: how many previews were
     uploaded without an account and how many went on an account afterwards
     (`funnel.STAGES` `anon_previews` and `anon_linked`).
-  - **Open before turning it on** (`legal.py` is not changed on this branch;
-    the owner decides and the terms and privacy pages change first, in
-    es/en/pt with the same meaning):
-    - Terms: they say that after the free report "la vista previa gratis
-      necesita una cuenta: 3 por mes calendario y por cuenta, contadas también
-      por dirección de red". With the switch on, a network also gets the
-      previews without an account of the day, apart from the account's 3.
-      Proposed (es): «Sin cuenta, cada red puede ver la clase y las banderas
-      rojas de unos pocos archivos al día (2 por red IPv6 /64 y 6 por
-      dirección IPv4); esas vistas previas no cuentan entre las 3 de tu
-      cuenta.» (en): "Without an account, each network can see the class and
-      red flags of a few files a day (2 per IPv6 /64 network and 6 per IPv4
-      address); those previews do not count among your account's 3." (pt):
-      «Sem conta, cada rede pode ver a classe e os alertas de alguns arquivos
-      por dia (2 por rede IPv6 /64 e 6 por endereço IPv4); essas prévias não
-      contam entre as 3 da sua conta.»
-    - Privacy: it does not say that an upload without an account keeps, per
-      report, the link tag the visitor came with (`anon_previews.ref`, from
-      the `rigor_ref` cookie) next to a report that keeps `client_ip` until
-      the purge, nor that the `welcome_pending` row of a visitor who never
-      makes an account keeps the browser mark (hash), the file's SHA-256 and
-      the network address. Proposed (es): «Si subes un archivo sin cuenta: el
-      idioma, la etiqueta del enlace con la que llegaste (cookie rigor_ref),
-      la fecha y, si luego lo pasas a una cuenta, cuándo; además, el
-      identificador de tu navegador (solo como hash), el SHA-256 del archivo y
-      la dirección de red, para abrirlo como informe gratis si creas la
-      cuenta. Todo se borra con el informe o a los {days} días.» (en): "If you
-      upload a file without an account: the language, the link tag you came
-      with (rigor_ref cookie), the date and, if you later move it to an
-      account, when; also your browser's identifier (as a hash only), the
-      file's SHA-256 and the network address, to open it as the free report
-      if you create the account. All of it is deleted with the report or
-      after {days} days." (pt): «Se você enviar um arquivo sem conta: o
-      idioma, a etiqueta do link com que você chegou (cookie rigor_ref), a
-      data e, se depois você o passar para uma conta, quando; além disso, o
-      identificador do seu navegador (só como hash), o SHA-256 do arquivo e o
-      endereço de rede, para abri-lo como relatório grátis se você criar a
-      conta. Tudo é apagado com o relatório ou após {days} dias.» The other
-      way is to keep no tag per report and count only a daily total.
-    - The box's promise (`anon_preview_box`, fixed by the brief) cannot know
-      whether the inbox already had its free report: the address is only
-      known on signing up, and the notice afterwards (`welcome_refused_email`)
-      says why it stayed a preview. Kept as is; if the owner wants it
-      softened, the same condition goes in the three languages, e.g. «…se
-      abre completo, gratis, con PDF, si tu correo no lo recibió ya».
-- **Free first full report** (`accounts.WELCOME_FULL_REPORT = True`,
+  - **The terms and privacy pages** (2026-10-09, `LEGAL_UPDATED`; they were
+    left open by the branch that added the switch). With the switch on,
+    "Tu cuenta" (`legal._account_terms`) says that with an account there are
+    3 free previews a calendar month, also counted per network; that without
+    an account each network can see the class and red flags of
+    `ANON_PREVIEWS_PER_NETWORK_PER_DAY` (2) files a day
+    (`ANON_PREVIEWS_PER_IPV4_PER_DAY`, 6, from an IPv4 address, often shared);
+    that the full report needs an account; and what moving one of those
+    previews to an account does: with the free first report on, it can open
+    as that report under the same limits, otherwise it takes one of the
+    month's previews while any are left (the code counts it with
+    `_claim_month_preview`, so the earlier proposal "those previews do not
+    count among your account's 3" was not what the code does). The privacy
+    policy (`legal._anon_keeps`) lists what such an upload keeps: the
+    language, the link tag (`rigor_ref`), the date and when it moved to an
+    account; the browser's identifier (hash only) and the network address
+    and, only with the free first report on, the file's SHA-256 (under the
+    paid offer `welcome_pending.file_sha256` is stored empty: nothing would
+    ever check it); and a hash of the network per day for the daily count.
+    All of it goes with the report or at the retention purge.
+    - The welcome box's promise (`anon_preview_box`) cannot know whether the
+      inbox already had its free report: the address is only known on
+      signing up, and the notice afterwards (`welcome_refused_email`) says
+      why it stayed a preview. Under the paid offer the box never promises a
+      free report (see "Paid offer" below).
+- **Paid offer** (`AUDIT_WELCOME_FULL_REPORT=false`,
+  `AuditSettings.welcome_full_report`; `audit/paid_offer.py`). Decided by the
+  owner on 2026-10-09 and planned for production together with
+  `AUDIT_ANON_PREVIEW=true` (the session that runs Railway sets both). The
+  free tier's rule becomes "see the class first, pay for the full report":
+  - Without an account (switch on), each network sees the class and red
+    flags of 2 files a day (6 per IPv4 address); with a free account, 3
+    previews a month as before. Every full report costs the price from the
+    settings (`price_usd_cents`, the pack `pack_price_usd_cents`), from the
+    first one, and the terms refund it on request within
+    `paid_offer.REFUND_DAYS` (7) days of the payment (see "Terms and privacy").
+  - No path grants a free full report: `_first_look` answers `off` (the
+    upload is a preview, with no `acct=preview_*` notice), `_grantable_pending`
+    finds nothing on confirming the e-mail, `_referrals_on` is off (no invite
+    link, no reward), `_card_offer` is off (`off` is not a card refusal), and
+    `_anon_to_account` puts a preview made without an account on the account
+    as one of the month's previews (saved, past the cap), locked, with the
+    usual purchase, never attaching its pending row. Access codes and credits
+    open reports as always.
+  - Every page says it with the same words (`paid_offer.COPY`, es/en/pt): free,
+    without an account, the class and the red flags; the full report, with
+    every figure and the PDF, costs USD 29; if it is no use, the money back
+    when asked within 7 days of paying. The pages built around the offer take
+    it as a parameter (`Offer`, from `paid_offer.offer_of(settings)`):
+    `/precios` (a "Vista previa" card, the full report's and the pack's cards
+    with their refund line next to the button, the closing call and the
+    JSON-LD), the landing (the hero's line, "Cómo funciona", the price cards
+    and the question «¿Y si el informe no me sirve?»), `/preguntas` (the
+    price question and the refund question after it), `/auditar` (the notes),
+    sign-up (the lead and "Así sigue"), the sample's band, the guides' "Lo
+    que recibes" and the report's box. The box of a preview its own browser
+    made without an account says «Crea tu cuenta y ábrelo completo por USD
+    29» with the refund (`paid_offer.anon_box_text`); another browser with
+    the link gets the usual box. The notice after signing up with a
+    confirmation pending is `welcome_confirm_paid` (only the link, nothing
+    opens). The other public pages (articles and their closing calls, the
+    audience pages, the examples, the tools, the calculators and the figure
+    reader) keep their copy and are served through `web._offered`, which
+    swaps each sentence that promised the free first report
+    (`paid_offer.PROMISES`, regular expressions over the text, the
+    descriptions and the JSON-LD) for the paid one. With the free first
+    report on, nothing is rewritten: a test renders every sitemap page with
+    it on and checks that each pattern still finds its sentence, and another
+    renders every page, sign-up, the form and both kinds of report with the
+    paid offer and finds no promise of a free full report
+    (`tests/test_audit_oferta_pago.py`).
+  - The privacy policy keeps listing what the free first report kept (its
+    hashes stay for the accounts that had it), worded as a data description,
+    not an offer.
+- **Free first full report** (`AUDIT_WELCOME_FULL_REPORT=true`, the default
+  `accounts.WELCOME_FULL_REPORT = True`;
   `WELCOME_REPORTS_PER_IP_PER_MONTH = 3` per IPv6 /64,
   `WELCOME_REPORTS_PER_IPV4_PER_MONTH = 10` per IPv4 address; not in free
   mode). Why IPv4 gets more (`accounts.network_cap`): mobile carriers in
@@ -3573,9 +3604,9 @@ an account never changes what a report says.
   one day are told apart (the strategies form shows the same id); on a phone
   the line wraps under the date. The "¿Necesitas créditos?" box shows the
   single and pack prices from the settings and a WhatsApp link with the
-  request typed, and says that the credit is delivered at once and the
-  purchase is not refundable (`buy_final_sale_note`), as the card form's box
-  does.
+  request typed, and says that the credit is delivered at once and that a
+  refund can be asked within 7 days under the terms (`buy_final_sale_note`),
+  as the card form's box does.
 - **Comparing**: with two or more full reports, "Mis informes" lets the
   customer tick two or three and open `/cuenta/comparar` (`/account/comparar`),
   the same side-by-side view as `/comparar` without pasting private links. It
@@ -4081,24 +4112,37 @@ the new page up with no further change.
 
 ### Terms and privacy
 
-No refunds (sergio's decision, 2026-09-28, replacing the 2026-09-24 refund
-promise): the terms and the buy box say all sales are final (the landing and
-audience pages lose their refund line in the redesign). Before Checkout the
-buyer must tick "the report is delivered at once and the purchase is not
-refundable" (`final_sale=yes`, ES/EN/PT); the acceptance and the terms
-version (`legal.LEGAL_UPDATED`) are kept per order in the additive table
-`checkout_order_terms`, as evidence for a chargeback. A full report that misreads the file (trades,
-balance or dates that do not match the platform) is fixed or replaced by a
-new credit (`quant-trade audit codes create --credits 1`). Only a duplicate
-charge or a charge that delivered no report (the `duplicate` and
-`paid_review` rows in the owner panel) is refunded, by hand from the Stripe
-dashboard; the terms keep one sentence that statutory rights are not
-limited. The refund webhook handling stays so those manual refunds are
-recorded.
+A 7-day refund (Sergio's decision, 2026-10-09, replacing "all sales are
+final" of 2026-09-28; `legal._refund`, ES/EN/PT): if a paid report is no use,
+the buyer writes to the support contact within `paid_offer.REFUND_DAYS` (7)
+days of the payment, with the report's or the purchase's id, and gets the
+full amount back. A pack with no credit used in those 7 days is refunded in
+full; with some used, the part of the unused credits (a pack bought by card
+from a report has already used one: that report's). A duplicate charge or a
+charge that delivered no report is always refunded. The operator refunds a
+card payment by hand from the Stripe dashboard, to the same payment method
+in the bank's times; a code paid outside the site, through the method it was
+paid with. The terms keep the sentence that statutory rights are not
+limited. Before Checkout the buyer must tick "the report opens at once and I
+can ask for a refund within 7 days under the terms" (`final_sale=yes`,
+ES/EN/PT; same field and logic as before, only the words changed); the
+acceptance and the terms version (`legal.LEGAL_UPDATED`) are kept per order
+in the additive table `checkout_order_terms`, as evidence for a chargeback.
+A full report that misreads the file (trades, balance or dates that do not
+match the platform) is fixed or replaced by a new credit (`quant-trade audit
+codes create --credits 1`). What a refund does in the code: `refund.created`
+(and `refund.updated`, `refund.failed`) is recorded with
+`store.record_stripe_refund` for the owner panel; nothing locks the report
+again and nothing removes credits, so the terms promise neither. After
+refunding a pack or credits, disable the code by hand (below) so its unused
+credits go too. `/precios` (next to the full report's and the pack's
+buttons), `/preguntas` and the landing («¿Y si el informe no me sirve?»)
+repeat it under the paid offer (`paid_offer.refund_text`,
+`paid_offer.pack_refund_text`, `paid_offer.refund_question`).
 
 Credits bought from "My account" follow the same rules: the same required
-box (worded for a credit), stored in `checkout_order_terms`, and sales are
-final. The credits sit on a code derived from the Stripe session with the
+box (worded for a credit), stored in `checkout_order_terms`, and the same
+7-day refund. The credits sit on a code derived from the Stripe session with the
 webhook secret (`payments.credit_code`), linked to the buyer's account, so a
 Stripe retry never grants twice and the buyer never has to type a code. A
 paid session held for review (billing country) blocks a second purchase
@@ -4185,10 +4229,11 @@ e-mails and reports print neither (`tests/test_audit_customer_audit_fixes.py`).
 
 **Have a lawyer in the jurisdiction where the service is sold review both
 texts before charging anyone.** They are an honest description of what the
-code does, not legal advice. Points to check in particular: the no-refund
-policy (sales are final; a misread report gets a fix or a new credit; only
-a duplicate charge or one that delivered no report is refunded; statutory
-rights are not limited), the 30-day answer to privacy requests, the liability cap,
+code does, not legal advice. Points to check in particular: the 7-day
+refund policy (a paid report on request within 7 days, a pack's unused
+credits, always a duplicate charge or one that delivered no report; a
+misread report gets a fix or a new credit; statutory rights are not
+limited), the 30-day answer to privacy requests, the liability cap,
 international hosting, and whether consumer or data-protection law in the
 client's country requires more (for example a data-processing register or a
 named representative).
@@ -5517,12 +5562,15 @@ account, payment, credit, e-mail, legal or engine rule changed.
   is a text link. With `AUDIT_EMAIL_VERIFICATION_REQUIRED` the existing
   e-mail note is added. In free mode the text says every full report is free
   and only the file is needed (the form asks for no account there). Without
-  the free first report (`accounts.WELCOME_FULL_REPORT = False`) the page
-  keeps the articles' call.
+  the free first report (`AUDIT_WELCOME_FULL_REPORT=false`, the paid offer)
+  it reads "Empieza por la vista previa gratis": the free preview, the price
+  and the 7-day refund (`paid_offer.paid_text`), with "Subir mi archivo".
 - **Sample report** (`report.render(sample_cta=True, sample_offer=...)`, only
   from `web._sample_html`). Under the synthetic-data notice, a `no-print` band
   says the first report with one's own file is free with an account (free
-  mode: every full report is free; `paid`: no free wording), with a button to
+  mode: every full report is free; `paid`: "Audita tu propio archivo de la
+  misma forma." followed, with its price, by the paid offer's three
+  sentences), with a button to
   the form and "¿Qué archivo produce un informe así?" linking the MT5 and MT5
   optimisation guides. The toolbar shows "Crear cuenta"
   (`/registro?next=/auditar`, `/signup?next=/en/audit`,

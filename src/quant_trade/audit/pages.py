@@ -18,7 +18,7 @@ from datetime import datetime
 from typing import Any
 from urllib.parse import quote, urlencode
 
-from quant_trade.audit import accounts, institutional, reading, winrate
+from quant_trade.audit import accounts, institutional, paid_offer, reading, winrate
 from quant_trade.audit.accounts import FREE_PREVIEWS_PER_MONTH as _FREE
 from quant_trade.audit.article_numbers import STREAK_ROWS
 from quant_trade.audit.articles import (
@@ -1819,13 +1819,32 @@ def _status_chip(status: str, locale: str) -> str:
     return f"<span class='badge {_e(status)}'>{_e(text)}</span>"
 
 
-def _hero(locale: str, sample: str, *, price_usd: float = 0.0, free_mode: bool = True) -> str:
+def _landing_offer(free_mode: bool, offer: paid_offer.Offer | None) -> paid_offer.Offer:
+    """The offer a landing or upload page words: the configured one, else (old
+    callers) every report free in free mode and the free first report otherwise."""
+    return offer or paid_offer.Offer(kind="free" if free_mode else "welcome")
+
+
+def _hero(
+    locale: str,
+    sample: str,
+    *,
+    price_usd: float = 0.0,
+    free_mode: bool = True,
+    offer: paid_offer.Offer | None = None,
+) -> str:
     ui = _UI[locale]
-    trust = "".join(f"<li>{icon(name)}{_e(text)}</li>" for name, text in ui["trust"])
+    terms = _landing_offer(free_mode, offer)
+    items = list(ui["trust"])
+    if terms.paid:
+        # The free first report's line names the free preview instead.
+        line = paid_offer.words(locale)["trust_anon" if terms.anon_preview else "trust_account"]
+        items = [(name, line if name == "key" else text) for name, text in items]
+    trust = "".join(f"<li>{icon(name)}{_e(text)}</li>" for name, text in items)
     # The anchor names the free first report and the price after it, so it needs both.
     anchor = (
         f"<p class='hero-anchor'>{_e(ui['hero_anchor'].format(price=usd(price_usd)))}</p>"
-        if not free_mode and price_usd > 0 and accounts.WELCOME_FULL_REPORT
+        if not free_mode and price_usd > 0 and terms.kind == "welcome"
         else ""
     )
     # Text on the left, the report on the right: the first screen shows the product.
@@ -2118,10 +2137,11 @@ INVESTOR_COPY: dict[str, dict[str, Any]] = {
 INVESTOR_COPY["pt"] = INVESTOR_PT
 
 
-def _how_html(copy: dict[str, Any], locale: str) -> str:
+def _how_html(copy: dict[str, Any], locale: str, offer: paid_offer.Offer | None = None) -> str:
     ui = _UI[locale]
+    how = paid_offer.how_steps(locale, offer) if offer is not None and offer.paid else copy["how"]
     steps = "".join(
-        f"<li data-reveal style='--i:{i}'>{_e(step)}</li>" for i, step in enumerate(copy["how"])
+        f"<li data-reveal style='--i:{i}'>{_e(step)}</li>" for i, step in enumerate(how)
     )
     return (
         "<section class='section dark' id='how'><div class='wrap'>"
@@ -2194,9 +2214,24 @@ def _prices_html(
     contact_url: str,
     pack_price_usd: float = 0.0,
     card_markets: Sequence[str] = (),
+    offer: paid_offer.Offer | None = None,
 ) -> str:
+    """The landing's prices. Under the paid offer the first card is the free
+    preview and the full report's card carries the terms' 7-day refund."""
     ui = _UI[locale]
     head = _section_head(ui["pricing_eyebrow"], f"<h2 class='h2'>{_e(copy['prices_title'])}</h2>")
+    free_title, free_text = copy["price_free_title"], copy["price_free"].format(n=_FREE)
+    full_text, full_button, refund = copy["price_full"], ui["cta_full"], ""
+    if offer is not None and offer.paid:
+        words = paid_offer.words(locale)
+        free_title = words["preview_title"]
+        free_text = f"{paid_offer.preview_text(locale, offer)} " + words["account_previews"].format(
+            n=_FREE
+        )
+        full_text, full_button = paid_offer.full_text(locale, offer), words["upload"]
+        refund = paid_offer.refund_text(locale)
+        if pack_price_usd:
+            refund += " " + paid_offer.pack_refund_text(locale)
     # Five lines on the landing; the sample report shows everything a full report has.
     more = (
         f"<p class='price-more'><a href='{_sample_url(locale)}'>{_e(ui['full_more'])}"
@@ -2230,16 +2265,16 @@ def _prices_html(
         body = (
             "<div class='prices'>"
             f"<div class='price' data-reveal style='--i:0'><span class='price-name'>"
-            f"{_e(copy['price_free_title'])}</span>"
+            f"{_e(free_title)}</span>"
             f"<div class='price-amount'>{_e(ui['plan_free_amount'])}</div>"
-            f"<p class='muted'>{_e(copy['price_free'].format(n=_FREE))}</p>"
+            f"<p class='muted'>{_e(free_text)}</p>"
             + f"<a class='btn btn-ghost' href='{audit_path(locale)}'>{_e(ui['cta'])}</a></div>"
             f"<div class='price featured' data-reveal style='--i:1'>"
             f"<span class='ribbon'>{_e(ui['plan_badge'])}</span>"
             f"<span class='price-name'>{_e(copy['price_full_title'])}"
             f"</span><div class='price-amount'>{_e(usd(price_usd))}"
             f"<small>{_e(ui['plan_full_note'])}</small></div>"
-            f"<p class='muted'>{_e(copy['price_full'])}</p>"
+            f"<p class='muted'>{_e(full_text)}</p>"
             + (
                 "<p class='price-pack'><strong>"
                 + _e(
@@ -2255,7 +2290,8 @@ def _prices_html(
             )
             + _checks(_full_items(locale))
             + more
-            + f"<a class='btn btn-primary' href='{audit_path(locale)}'>{_e(ui['cta_full'])}</a>"
+            + (f"<p class='muted price-refund'>{_e(refund)}</p>" if refund else "")
+            + f"<a class='btn btn-primary' href='{audit_path(locale)}'>{_e(full_button)}</a>"
             + "</div></div>"
             + (f"<ul class='checks pay-ways' data-reveal>{''.join(ways)}</ul>" if ways else "")
             + f"<p class='method-link' data-reveal><a href='{_e(method_url(locale))}'>"
@@ -2328,14 +2364,19 @@ def _field(label: str, control: str, help_text: str = "") -> str:
     )
 
 
-def _signin_first(copy: dict[str, Any], locale: str, *, anon_preview: bool = False) -> str:
+def _signin_first(
+    copy: dict[str, Any], locale: str, *, anon_preview: bool = False, paid: bool = False
+) -> str:
     """Before the file: the upload needs an account (or a bought code).
 
     With ``anon_preview`` the file goes through without one, and the note says
-    what that shows and what the account adds.
+    what that shows and what the account adds. Under the paid offer (``paid``)
+    the panel's note already says it, and this line only invites the account.
     """
     signup, signin, _ = _ACCOUNT_PATHS.get(locale, _ACCOUNT_PATHS["es"])
     text = copy["anon_preview_note" if anon_preview else "signin_first"]
+    if paid:
+        text = paid_offer.words(locale)["signin_anon" if anon_preview else "signin_account"]
     return (
         f"<div class='signin-first'><p>{_e(text)}</p>"
         "<div class='inline-form'>"
@@ -2378,10 +2419,12 @@ def _upload_form(
     signin_first: bool = False,
     carried: Mapping[str, str] | None = None,
     anon_preview: bool = False,
+    offer: paid_offer.Offer | None = None,
 ) -> str:
     ui = _UI[locale]
     linked = link_locale(locale)
     values = carried or {}
+    paid = offer is not None and offer.paid
 
     def value(name: str) -> str:
         return _e(values.get(name, ""))
@@ -2512,9 +2555,13 @@ def _upload_form(
         )
         + "</div></details>"
     )
-    points = "".join(
-        f"<li>{icon('check')}<span>{_e(point)}</span></li>" for point in ui["upload_points"]
-    )
+    upload_points = list(ui["upload_points"])
+    if offer is not None and paid:
+        # The second point is the free first report's: the paid offer's line instead.
+        upload_points[1] = paid_offer.words(locale)["upload_point"].format(
+            price=usd(offer.price_usd)
+        )
+    points = "".join(f"<li>{icon('check')}<span>{_e(point)}</span></li>" for point in upload_points)
     busy_steps = "".join(
         f"<li style='--i:{i}'>{_e(step)}</li>" for i, step in enumerate(ui["busy_steps"])
     )
@@ -2527,7 +2574,11 @@ def _upload_form(
         + f"<h2 class='label' style='font-size:1.2rem;margin-bottom:6px'>{_e(copy['form_title'])}"
         "</h2>"
         + f"{flash}{err}<p class='panel-note'>{icon('shield')}{_e(note)}</p>"
-        + (_signin_first(copy, locale, anon_preview=anon_preview) if signin_first else "")
+        + (
+            _signin_first(copy, locale, anon_preview=anon_preview, paid=paid)
+            if signin_first
+            else ""
+        )
         # With JavaScript the answer comes back in place (data-inplace): a refusal
         # fills upload-alert, the column menus fill map-fields, and the file stays
         # chosen. Without it the form posts as always.
@@ -2641,7 +2692,10 @@ def _faq_html(
     retention_days: int,
     operator: tuple[str, str] = ("", ""),
     contact_url: str = "",
+    offer: paid_offer.Offer | None = None,
+    support_email: str = "",
 ) -> str:
+    """The landing's questions; the paid offer adds «¿Y si el informe no me sirve?»."""
     from quant_trade.audit.faq import FAQ_PATH
 
     ui = _UI[locale]
@@ -2654,10 +2708,15 @@ def _faq_html(
             f"<p class='muted faq-who'>{_e(ask)} "
             f"<a href='{_e(contact_url)}' rel='noopener'>{_e(ask_link)}</a></p>"
         )
-    items = "".join(
-        f"<details><summary>{_e(question)}</summary>"
-        f"<p>{_e(answer.format(retention=retention_days))}</p></details>"
+    pairs = [
+        (question, answer.format(retention=retention_days))
         for question, answer in (copy["faq"][i] for i in _LANDING_FAQ[locale])
+    ]
+    if offer is not None and offer.paid:
+        pairs.append(paid_offer.refund_question(locale, support_email))
+    items = "".join(
+        f"<details><summary>{_e(question)}</summary><p>{_e(answer)}</p></details>"
+        for question, answer in pairs
     )
     return (
         "<section class='section dark' id='faq'><div class='wrap wrap-mid'>"
@@ -2791,6 +2850,8 @@ def landing(
     card_markets: Sequence[str] = (),
     email_confirmation: bool = False,
     completed_audits: int | None = None,
+    offer: paid_offer.Offer | None = None,
+    support_email: str = "",
 ) -> str:
     """The public landing; the upload form lives on its own page (``upload_page``).
 
@@ -2804,7 +2865,11 @@ def landing(
     note; the upload and account pages say when an address must be confirmed.
     ``operator`` (name, address): the name signs "who is behind it" (``_founder``);
     while that block is not shown, both stay in one line under the questions, and
-    so does the WhatsApp link (``contact_url``)."""
+    so does the WhatsApp link (``contact_url``). ``offer`` (``paid_offer.offer_of``)
+    words the free tier: under the paid offer the hero, the steps, the prices and
+    the questions name the free preview, the price and the 7-day refund
+    (``support_email`` is where the refund is asked for); without it the page
+    keeps the free first report."""
     locale = _locale(locale)
     copy = _COPY[locale]
     title = copy.get("meta_title", copy["title"])
@@ -2816,11 +2881,11 @@ def landing(
     # ``home`` tightens the sections' spacing on this page only.
     body = (
         "<div class='home'>"
-        + _hero(locale, sample, price_usd=price_usd, free_mode=free_mode)
+        + _hero(locale, sample, price_usd=price_usd, free_mode=free_mode, offer=offer)
         + ("<div class='wrap'>" + count_html + "</div>" if count_html else "")
         + _example_section(locale)
         + _audiences(locale)
-        + _how_html(copy, locale)
+        + _how_html(copy, locale, offer)
         + _prices_html(
             copy,
             locale,
@@ -2831,6 +2896,7 @@ def landing(
             contact_url=contact_url,
             pack_price_usd=pack_price_usd,
             card_markets=card_markets,
+            offer=offer,
         )
         + founder
         # The operator's and WhatsApp lines move into "who is behind it" when it shows.
@@ -2840,6 +2906,8 @@ def landing(
             retention_days=retention_days,
             operator=("", "") if founder else operator,
             contact_url="" if founder else contact_url,
+            offer=offer,
+            support_email=support_email,
         )
         + _final_cta(copy, locale, sample, joined=joined, err=err)
         + "</div>"
@@ -2862,6 +2930,7 @@ def upload_page(
     rejection_html: str = "",
     notice_link_html: str = "",
     anon_preview: bool = False,
+    offer: paid_offer.Offer | None = None,
 ) -> str:
     """The upload form on its own page, so the landing can stay short.
 
@@ -2873,10 +2942,19 @@ def upload_page(
     ``notice_link_html`` is trusted, fixed markup after it (a link to the guides).
     ``carried`` restores only declaration fields after a refusal; file pickers and
     access codes remain empty. ``rejection_html`` is trusted, localized guidance.
-    Client declarations are escaped form values, never report claims or logs."""
+    Client declarations are escaped form values, never report claims or logs.
+    Under the paid ``offer`` the notes say the free preview, the price and the
+    7-day refund instead of the free first report."""
     locale = _locale(locale)
     copy = _COPY[locale]
-    note = copy["free_note"] if free_mode else copy["paid_note"].format(price=price_usd)
+    terms = _landing_offer(free_mode, offer)
+    note = (
+        copy["free_note"]
+        if free_mode
+        else paid_offer.paid_text(locale, terms)
+        if terms.paid
+        else copy["paid_note"].format(price=price_usd)
+    )
     # A refusal answers a POST and is never a page of its own: it stays private
     # (noindex, nofollow) like error_page, while the empty form is public.
     meta = (
@@ -2909,6 +2987,7 @@ def upload_page(
         signin_first=signed_in is False and not free_mode,
         carried=carried,
         anon_preview=anon_preview,
+        offer=terms,
     )
     # The language switch keeps the extra boxes open.
     alternates = {
@@ -4483,7 +4562,9 @@ def guides_index_page(*, locale: str = "es", base_url: str = "") -> str:
     )
 
 
-def _guide_offer(guide: Guide, locale: str, *, offer: str, email_verification: bool) -> str:
+def _guide_offer(
+    guide: Guide, locale: str, *, offer: str | paid_offer.Offer, email_verification: bool
+) -> str:
     """ "What you get" on a guide: the report's contents and the free report as the
     sign-up panel and /precios word them, the upload button, the sample report
     and the free tool that fits the guide (``guide_capabilities.GUIDE_TOOL``).
@@ -4492,13 +4573,17 @@ def _guide_offer(guide: Guide, locale: str, *, offer: str, email_verification: b
     report comes with the limits the upload applies to it (``web._first_look``:
     one per e-mail, browser and file, and a monthly share per network). Without
     a free report the block says the full report is paid, next to the free
-    previews, and links the prices. A file that only goes next to a report (the
-    optimisation XML, ``field == "optimization"``) says so, and in free mode
-    drops "you only need the file".
+    previews, and links the prices; with its price (``paid_offer.Offer``) it says
+    the paid offer first: the free preview, the price and the 7-day refund. A file
+    that only goes next to a report (the optimisation XML,
+    ``field == "optimization"``) says so, and in free mode drops "you only need
+    the file".
     """
     # Lazy: account_pages imports this module.
     from quant_trade.audit.account_pages import report_contents
 
+    terms = paid_offer.as_offer(offer)
+    offer = terms.kind
     words = GUIDES_COPY[locale]
     if offer == "welcome":
         contents = f"{report_contents(locale, 'welcome')} {words['free_terms']}"
@@ -4507,6 +4592,8 @@ def _guide_offer(guide: Guide, locale: str, *, offer: str, email_verification: b
         contents = report_contents(locale, "")
     else:
         contents = words["paid_terms"].format(n=accounts.FREE_PREVIEWS_PER_MONTH)
+        if terms.price_usd > 0:
+            contents = f"{paid_offer.paid_text(locale, terms)} {contents}"
     lines = [contents]
     note = offer_text(offer, locale, email_verification=email_verification)
     if guide.field == "optimization":
@@ -4541,7 +4628,7 @@ def guide_page(
     *,
     locale: str = "es",
     base_url: str = "",
-    offer: str = "free",
+    offer: str | paid_offer.Offer = "free",
     email_verification: bool = False,
 ) -> str:
     """One platform's export guide.

@@ -17,6 +17,7 @@ import re
 from collections.abc import Collection, Mapping
 from dataclasses import dataclass, field
 
+from quant_trade.audit.accounts import WELCOME_FULL_REPORT
 from quant_trade.audit.indexnow import INDEXNOW_KEY, clean_key
 from quant_trade.audit.schema import MAX_UPLOAD_BYTES
 
@@ -200,6 +201,14 @@ class AuditSettings:
     #: report, under the usual limits. Off by default: the upload then needs
     #: an account first, exactly as before (``AUDIT_ANON_PREVIEW=true``).
     anon_preview: bool = False
+    #: Paid mode only: a new account's first upload comes out as a free full
+    #: report, once (``accounts.WELCOME_FULL_REPORT`` is the default). With it
+    #: off (``AUDIT_WELCOME_FULL_REPORT=false``) every full report is paid from
+    #: the first one: the free tier is the preview (the class and red flags),
+    #: no path grants a free full report (upload, a confirmed e-mail, a card,
+    #: an invite) and the pages say the full report costs the price, with the
+    #: 7-day refund of the terms. Access codes and credits work as always.
+    welcome_full_report: bool = WELCOME_FULL_REPORT
     email_token_secret: str = field(default="", repr=False)
     smtp_host: str = ""
     smtp_port: int = 587
@@ -471,6 +480,11 @@ class AuditSettings:
             .lower()
             in TRUE_VALUES,
             anon_preview=env.get("AUDIT_ANON_PREVIEW", "").strip().lower() in TRUE_VALUES,
+            welcome_full_report=(
+                env.get("AUDIT_WELCOME_FULL_REPORT", "").strip().lower()
+                or ("true" if WELCOME_FULL_REPORT else "false")
+            )
+            in TRUE_VALUES,
             email_token_secret=_email_token_secret(env),
             smtp_host=env.get("AUDIT_SMTP_HOST", "").strip(),
             smtp_port=int(env.get("AUDIT_SMTP_PORT", "").strip() or "587"),

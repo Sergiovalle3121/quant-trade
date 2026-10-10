@@ -5,7 +5,8 @@ reports they uploaded or saved, the access codes they redeemed or added,
 and what they paid for. It never changes what a report says or how a
 report is unlocked; a report link keeps working without an account. The free
 preview needs one: :data:`FREE_PREVIEWS_PER_MONTH` a month per account, after a
-first full report that is free once (:data:`WELCOME_FULL_REPORT`).
+first full report that is free once while ``AUDIT_WELCOME_FULL_REPORT`` is on
+(``AuditSettings.welcome_full_report``, default :data:`WELCOME_FULL_REPORT`).
 
 Design choices, all standard library:
 
@@ -80,7 +81,9 @@ FREE_PREVIEWS_PER_IPV4_PER_MONTH = 30
 
 #: A new account's first upload comes out as a free full report, once. The
 #: same browser (``DEVICE_COOKIE``) or the same file never gets a second one
-#: on another account, and each network address gets a few a month.
+#: on another account, and each network address gets a few a month. This is
+#: the default of ``AuditSettings.welcome_full_report``, which the service
+#: reads (``AUDIT_WELCOME_FULL_REPORT=false`` sells every full report).
 WELCOME_FULL_REPORT = True
 WELCOME_REPORTS_PER_IP_PER_MONTH = 3
 #: The same for an IPv4 address: a new customer on a phone in Mexico or
