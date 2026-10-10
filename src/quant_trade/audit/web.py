@@ -6280,7 +6280,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             notice = account_pages.COPY[ui]["credit_used"]
         elif acct_done == "upload_credit" and record.paid:
             notice = account_pages.COPY[ui]["credit_on_upload"]
-        elif acct_done == "welcome" and record.paid:
+        elif acct_done == "welcome" and record.paid and cfg.welcome_full_report:
+            # Under the paid offer no flow sends here; an old link says nothing.
             notice = account_pages.COPY[ui]["welcome_notice"].format(
                 limit=acct.FREE_PREVIEWS_PER_MONTH,
                 price=f"USD {cfg.price_usd:.0f}",
@@ -6315,6 +6316,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             and acct_done.startswith("preview_")
             and acct_done[8:] in WELCOME_REFUSALS
             and not record.paid
+            and cfg.welcome_full_report
         ):
             notice = account_pages.COPY[ui][f"welcome_refused_{acct_done[8:]}"]
             if acct_done[8:] == "unverified":

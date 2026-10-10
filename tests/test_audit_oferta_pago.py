@@ -870,3 +870,20 @@ def test_the_price_comes_from_the_settings(tmp_path: Path) -> None:
     assert "USD 29" not in start_cta(settings, "es")
     offer = paid_offer.offer_of(settings)
     assert "USD 35" in paid_offer.anon_box_text("pt", offer)
+
+
+@pytest.mark.parametrize(
+    "acct", ["welcome", "preview_network", "preview_device", "preview_file", "preview_unverified"]
+)
+def test_old_free_report_notices_stay_quiet_under_the_paid_offer(tmp_path: Path, acct: str) -> None:
+    """No paid-offer flow sends these, but an old link may carry them: the report
+    then shows no notice that promises or explains a free full report."""
+    app, store, _ = _app(tmp_path)
+    visitor = _browser(app)
+    audit_id, token = _location(_upload(visitor, 77))
+    page = visitor.get(f"/audits/{audit_id}", params={"token": token, "lang": "es", "acct": acct})
+    assert page.status_code == 200
+    text = _visible(page.text)
+    for key in ("welcome_notice", "welcome_refused_network", "welcome_refused_device"):
+        assert _escaped(account_pages.COPY["es"][key].split("{")[0][:40]) not in page.text, key
+    assert _promises(text, "es") == []

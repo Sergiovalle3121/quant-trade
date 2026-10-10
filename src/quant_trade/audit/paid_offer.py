@@ -456,7 +456,7 @@ PROMISES: dict[str, tuple[tuple[str, str], ...]] = {
         ),
         (
             r"Empieza por el primer informe completo gratis con tu cuenta para revisar",
-            "Empieza por la vista previa gratis y el informe completo para revisar",
+            "Empieza por la vista previa gratis; con el informe completo, de pago, revisas",
         ),
         (r"El informe gratis permite empezar", "El informe permite empezar"),
         (r"Qué llevar al informe gratis", "Qué llevar al informe"),
@@ -490,7 +490,7 @@ PROMISES: dict[str, tuple[tuple[str, str], ...]] = {
         ),
         (
             r"Start with the free first full report available with your account to review",
-            "Start with the free preview and the full report to review",
+            "Start with the free preview; with the paid full report you review",
         ),
         (r"The free report lets you start", "The report lets you start"),
         (r"What to bring to the free report", "What to bring to the report"),
@@ -521,7 +521,7 @@ PROMISES: dict[str, tuple[tuple[str, str], ...]] = {
         ),
         (
             r"Comece pelo primeiro relatório completo grátis com sua conta para examinar",
-            "Comece pela prévia grátis e pelo relatório completo para examinar",
+            "Comece pela prévia grátis; com o relatório completo, pago, você examina",
         ),
         (r"O relatório grátis permite começar", "O relatório permite começar"),
         (r"O que levar ao relatório grátis", "O que levar ao relatório"),
