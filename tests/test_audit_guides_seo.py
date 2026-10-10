@@ -244,6 +244,7 @@ def test_every_sitemap_url_has_an_iso_lastmod_from_the_code(tmp_path: Path) -> N
         SIGNAL_SAMPLE_PUBLISHED,
         SITE_UPDATED,
         page_lastmod,
+        rules_table_lastmod,
     )
 
     response = _client(tmp_path).get("/sitemap.xml")
@@ -255,6 +256,7 @@ def test_every_sitemap_url_has_an_iso_lastmod_from_the_code(tmp_path: Path) -> N
         SIGNAL_SAMPLE_PUBLISHED,
         CHALLENGE_PUBLISHED,
         RULES_TABLE_PUBLISHED,
+        rules_table_lastmod(),
         OFFER_UPDATED,
         *ARTICLE_PUBLICATION_DATES.values(),
     }

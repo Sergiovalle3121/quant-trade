@@ -30,7 +30,8 @@ RULES_TABLE_PATH: dict[str, str] = {
     "en": "/en/prop-firm-rules",
     "pt": "/pt/regras-prop-firm",
 }
-#: The day the table was published (its sitemap date).
+#: The day the table was published; its sitemap date is this or a later
+#: reading of a preset (``rules_table_lastmod``).
 RULES_TABLE_PUBLISHED = "2026-10-10"
 
 #: The query fields of the filters, the same in every language so one link
@@ -69,14 +70,13 @@ class Filters:
     def active(self) -> bool:
         return bool(self.firm or self.loss or self.market)
 
+    def values(self) -> dict[str, str]:
+        """The query's fields, as ``parse_filters`` reads them back."""
+        return {FILTER_FIRM: self.firm, FILTER_LOSS: self.loss, FILTER_MARKET: self.market}
+
     def query(self) -> str:
         """``?firma=ftmo&mercado=fx``, or "" when nothing is filtered."""
-        fields = {
-            FILTER_FIRM: self.firm,
-            FILTER_LOSS: self.loss,
-            FILTER_MARKET: self.market,
-        }
-        chosen = {name: value for name, value in fields.items() if value}
+        chosen = {name: value for name, value in self.values().items() if value}
         return "?" + urlencode(chosen) if chosen else ""
 
     def with_(self, **changes: str) -> Filters:
@@ -152,6 +152,12 @@ def latest_as_of() -> str:
     return max(row.rules.as_of for row in ROWS)
 
 
+def rules_table_lastmod() -> str:
+    """The page's sitemap date: its publication, or a later reading of a preset,
+    so the sitemap and the ``Dataset``'s ``dateModified`` never fall out of step."""
+    return max(RULES_TABLE_PUBLISHED, latest_as_of())
+
+
 def firm_rows(firm: str) -> tuple[Row, ...]:
     return tuple(row for row in ROWS if row.firm == firm)
 
@@ -179,6 +185,23 @@ def counts() -> dict[str, int]:
         "best_day": sum(1 for r in first if r.best_day_limit is not None),
         "markets_unknown": sum(1 for r in first if r.markets is None),
     }
+
+
+#: The calculator's wording of each type of maximum loss (``calc.COPY`` key by
+#: ``prop_presets.TOTAL_LOSS_TYPES`` value).
+_LOSS_WORDS: dict[str, str] = {
+    "static": "total_static",
+    "trailing_eod": "total_trailing",
+    "trailing_eod_lock": "total_lock",
+}
+
+
+def loss_names(locale: str) -> dict[str, str]:
+    """Each type of maximum loss worded exactly as the table's cells word it: the
+    calculator's own text without its figure, so the filter chips, the cells and
+    the questions never name the same rule three ways."""
+    words = calc.COPY[_locale(locale)]
+    return {kind: str(words[key]).removeprefix("{value}, ") for kind, key in _LOSS_WORDS.items()}
 
 
 #: The markets as the page names them (``prop_presets.MARKETS``).
@@ -214,16 +237,18 @@ COPY: dict[str, dict[str, Any]] = {
     "es": {
         "nav": "Tabla de reglas de prop firms",
         "eyebrow": "Reglas publicadas, con fuente y fecha",
-        "title": "Reglas de prop firms, programa por programa, con fuente y fecha",
-        "seo_title": "Reglas de prop firms: tabla con fuente y fecha",
+        "title": "Comparativa de reglas de prop firms, programa por programa, con fuente y fecha",
+        "seo_title": "Comparativa de reglas de prop firms con fuente y fecha",
         "summary": (
-            "Objetivo, pérdida diaria, pérdida total, días, plazo y regla del mejor día de "
-            "{firms} firmas, transcritos de sus páginas con fecha. Sin afiliación ni cupones."
+            "Comparativa de reglas de {firms} prop firms: objetivo, pérdida diaria y total, "
+            "días, plazo y regla del mejor día, con fuente y fecha. Sin afiliación ni cupones."
         ),
         "lead": (
             "Una fila por programa y fase, transcrita de la página de cada firma el día que se "
-            "indica, con el enlace a esa página. Rigor no está afiliado a ninguna firma, no "
-            "cobra comisiones ni recomienda comprar ningún reto."
+            "indica y tal como la usa la calculadora de Rigor; cuando una firma vende varias "
+            "variantes de una regla, las notas del programa, en su calculadora, dicen cuál es "
+            "la de la fila. Rigor no está afiliado a ninguna firma, no cobra comisiones ni "
+            "recomienda comprar ningún reto."
         ),
         "filters_title": "Filtrar la tabla",
         "filters_help": "Cada filtro es un enlace; no hace falta JavaScript.",
@@ -232,11 +257,6 @@ COPY: dict[str, dict[str, Any]] = {
         "filter_market": "Mercado",
         "all": "Todas",
         "all_markets": "Todos",
-        "loss_names": {
-            "static": "fija",
-            "trailing_eod": "sigue al mayor cierre diario",
-            "trailing_eod_lock": "sigue al mayor cierre y se fija en el balance inicial",
-        },
         "showing": "Se muestran {n} de {total} filas.",
         "show_all": "Ver la tabla completa",
         "market_note": (
@@ -257,6 +277,7 @@ COPY: dict[str, dict[str, Any]] = {
         "col_source": "Fuente",
         "col_as_of": "Leída el",
         "markets_unknown": "no indicado",
+        "markets_read": "leídos el {date}",
         "daily_untranscribed": "no transcrita: ver las notas en la calculadora de la firma",
         "source_link": "página de {firm}",
         "table_note": (
@@ -264,13 +285,14 @@ COPY: dict[str, dict[str, Any]] = {
             "estricta cuando una página se contradice; cada firma puede haberlas cambiado."
         ),
         "firms_title": "Las firmas, una a una",
-        "firm_programs": (
-            "{n} programas transcritos de la página de {firm}, leída el {date}: {programs}."
-        ),
-        "firm_programs_one": (
-            "Un programa transcrito de la página de {firm}, leída el {date}: {programs}."
-        ),
-        "firm_rows": "Solo sus filas",
+        "firm_programs": "{count} {source}: {programs}.",
+        "firm_count": "{n} programas transcritos",
+        "firm_count_one": "Un programa transcrito",
+        "firm_page": "de la página de {firm}, leída el {date}",
+        "firm_pages": "de las páginas de {firm}, leídas el {date}",
+        "firm_page_dates": "de la página de {firm}, leída entre el {first} y el {last}",
+        "firm_pages_dates": "de las páginas de {firm}, leídas entre el {first} y el {last}",
+        "firm_rows": "Solo las filas de esta firma",
         "firm_calculator": "Calculadora del reto {firm}",
         "not_affiliated": (
             "Rigor no está afiliado a ninguna firma; las reglas cambian, comprueba la página "
@@ -297,9 +319,9 @@ COPY: dict[str, dict[str, Any]] = {
                 "¿Qué es una pérdida total que sigue al cierre diario (trailing EOD)?",
                 "Es un límite que sube con el mayor balance de cierre del día: cada cierre más "
                 "alto mueve el balance mínimo hacia arriba, y la cuenta termina si lo toca. En "
-                "la tabla está marcado «sigue al mayor cierre diario»; cuando además se fija al "
-                "llegar al balance inicial, «se fija en el balance inicial». {trailing} "
-                "programas de la tabla lo usan y {lock} más lo usan con el tope.",
+                "la columna «{col_total}» aparece como «{trailing_label}»; cuando además se "
+                "detiene al llegar al balance inicial, «{lock_label}». {trailing} programas de "
+                "la tabla lo usan y {lock} más lo usan con el tope.",
             ),
             (
                 "¿Qué es la regla del mejor día?",
@@ -318,12 +340,12 @@ COPY: dict[str, dict[str, Any]] = {
             ),
             (
                 "¿Por qué hay programas y firmas que no están?",
-                "Solo están los programas cuyas reglas encajan en los tipos que el simulador de "
-                "Rigor entiende, tal cual o con una aproximación más estricta que la regla de la "
-                "firma: {programs} programas de {firms} firmas. Quedan fuera los que miden la "
-                "pérdida máxima sobre el máximo intradía, limitan la ganancia diaria o piden "
-                "días con una ganancia mínima, y cualquier firma que no hemos transcrito "
-                "todavía.",
+                "Solo están los programas cuyas reglas caben en los tipos que el simulador de "
+                "Rigor entiende; cuando la lectura es una aproximación, las notas del programa, "
+                "en su calculadora, dicen si es más estricta o más optimista que la regla de la "
+                "firma: {programs} programas de {firms} firmas. Quedan fuera, por ejemplo, los "
+                "que miden la pérdida máxima sobre el máximo intradía o limitan la ganancia "
+                "diaria, y cualquier firma que no hemos transcrito todavía.",
             ),
         ),
         "read_title": "Para seguir",
@@ -332,16 +354,18 @@ COPY: dict[str, dict[str, Any]] = {
     "en": {
         "nav": "Prop firm rules table",
         "eyebrow": "Published rules, with source and date",
-        "title": "Prop firm rules, program by program, with source and date",
-        "seo_title": "Prop firm rules: table with source and date",
+        "title": "Prop firm rules comparison, program by program, with source and date",
+        "seo_title": "Prop firm rules comparison with source and date",
         "summary": (
-            "Target, daily loss, total loss, days, time limit and best-day rule of {firms} "
-            "firms, transcribed from their pages with the date. No affiliation, no coupons."
+            "Prop firm rules comparison for {firms} firms: target, daily and total loss, days, "
+            "time limit and best-day rule, with source and date. No affiliation, no coupons."
         ),
         "lead": (
             "One row per program and phase, transcribed from each firm's page on the day "
-            "shown, with a link to that page. Rigor is not affiliated with any firm, earns no "
-            "commission and recommends buying no challenge."
+            "shown and as Rigor's calculator uses it; when a firm sells several variants of a "
+            "rule, the program's notes, on its calculator, say which one the row shows. Rigor "
+            "is not affiliated with any firm, earns no commission and does not recommend "
+            "buying any challenge."
         ),
         "filters_title": "Filter the table",
         "filters_help": "Every filter is a link; no JavaScript needed.",
@@ -350,11 +374,6 @@ COPY: dict[str, dict[str, Any]] = {
         "filter_market": "Market",
         "all": "All",
         "all_markets": "All",
-        "loss_names": {
-            "static": "static",
-            "trailing_eod": "trails the highest daily close",
-            "trailing_eod_lock": "trails the highest close and locks at the initial balance",
-        },
         "showing": "Showing {n} of {total} rows.",
         "show_all": "See the whole table",
         "market_note": (
@@ -375,6 +394,7 @@ COPY: dict[str, dict[str, Any]] = {
         "col_source": "Source",
         "col_as_of": "Read on",
         "markets_unknown": "not stated",
+        "markets_read": "read on {date}",
         "daily_untranscribed": "not transcribed: see the notes on the firm's calculator",
         "source_link": "{firm} page",
         "table_note": (
@@ -382,13 +402,14 @@ COPY: dict[str, dict[str, Any]] = {
             "reading where a page contradicts itself; every firm may have changed them since."
         ),
         "firms_title": "The firms, one by one",
-        "firm_programs": (
-            "{n} programs transcribed from the {firm} page, read on {date}: {programs}."
-        ),
-        "firm_programs_one": (
-            "One program transcribed from the {firm} page, read on {date}: {programs}."
-        ),
-        "firm_rows": "Only its rows",
+        "firm_programs": "{count} {source}: {programs}.",
+        "firm_count": "{n} programs transcribed",
+        "firm_count_one": "One program transcribed",
+        "firm_page": "from the {firm} page, read on {date}",
+        "firm_pages": "from the {firm} pages, read on {date}",
+        "firm_page_dates": "from the {firm} page, read between {first} and {last}",
+        "firm_pages_dates": "from the {firm} pages, read between {first} and {last}",
+        "firm_rows": "Only this firm's rows",
         "firm_calculator": "{firm} challenge calculator",
         "not_affiliated": (
             "Rigor is not affiliated with any firm; rules change, check the official page "
@@ -415,9 +436,9 @@ COPY: dict[str, dict[str, Any]] = {
                 "What is a total loss that trails the daily close (trailing EOD)?",
                 "A limit that rises with the highest end-of-day balance: every higher close "
                 "moves the minimum balance up, and the account ends if the balance touches it. "
-                "The table marks it “trails the highest daily close”; when it also stops "
-                "rising at the initial balance, “locks at the initial balance”. "
-                "{trailing} programs in the table use it and {lock} more use it with the lock.",
+                "The “{col_total}” column reads “{trailing_label}”; when it also stops rising "
+                "at the initial balance, “{lock_label}”. {trailing} programs in the table use "
+                "it and {lock} more use it with the lock.",
             ),
             (
                 "What is the best-day rule?",
@@ -436,11 +457,12 @@ COPY: dict[str, dict[str, Any]] = {
             ),
             (
                 "Why are some programs and firms missing?",
-                "Only the programs whose rules fit the types Rigor's simulator understands, "
-                "exactly or by an approximation stricter than the firm's rule, are here: "
-                "{programs} programs from {firms} firms. Left out are those that measure the "
-                "maximum loss from the intraday high, cap the daily gain or ask for days with a "
-                "minimum gain, and any firm we have not transcribed yet.",
+                "Only the programs whose rules fit the types Rigor's simulator understands are "
+                "here; where the reading is an approximation, the program's notes, on its "
+                "calculator, say whether it is stricter or more optimistic than the firm's "
+                "rule: {programs} programs from {firms} firms. Left out are, for example, "
+                "those that measure the maximum loss from the intraday high or cap the daily "
+                "gain, and any firm we have not transcribed yet.",
             ),
         ),
         "read_title": "Keep reading",
@@ -449,16 +471,18 @@ COPY: dict[str, dict[str, Any]] = {
     "pt": {
         "nav": "Tabela de regras de prop firms",
         "eyebrow": "Regras publicadas, com fonte e data",
-        "title": "Regras de prop firms, programa por programa, com fonte e data",
-        "seo_title": "Regras de prop firms: tabela com fonte e data",
+        "title": "Comparativo de regras de prop firms, programa por programa, com fonte e data",
+        "seo_title": "Comparativo de regras de prop firms com fonte e data",
         "summary": (
-            "Meta, perda diária, perda total, dias, prazo e regra do melhor dia de {firms} "
-            "empresas, transcritos das páginas delas com a data. Sem afiliação nem cupons."
+            "Comparativo de regras de {firms} prop firms: meta, perda diária e total, dias, "
+            "prazo e regra do melhor dia, com fonte e data. Sem afiliação nem cupons."
         ),
         "lead": (
             "Uma linha por programa e fase, transcrita da página de cada empresa no dia "
-            "indicado, com o link para essa página. O Rigor não é afiliado a nenhuma empresa, "
-            "não recebe comissão e não recomenda comprar nenhum desafio."
+            "indicado e tal como a calculadora do Rigor a usa; quando uma empresa vende várias "
+            "variantes de uma regra, as notas do programa, na calculadora dela, dizem qual é a "
+            "da linha. O Rigor não é afiliado a nenhuma empresa, não recebe comissão e não "
+            "recomenda comprar nenhum desafio."
         ),
         "filters_title": "Filtrar a tabela",
         "filters_help": "Cada filtro é um link; não precisa de JavaScript.",
@@ -467,11 +491,6 @@ COPY: dict[str, dict[str, Any]] = {
         "filter_market": "Mercado",
         "all": "Todas",
         "all_markets": "Todos",
-        "loss_names": {
-            "static": "fixa",
-            "trailing_eod": "acompanha o maior fechamento diário",
-            "trailing_eod_lock": "acompanha o maior fechamento e trava no saldo inicial",
-        },
         "showing": "Mostrando {n} de {total} linhas.",
         "show_all": "Ver a tabela completa",
         "market_note": (
@@ -492,6 +511,7 @@ COPY: dict[str, dict[str, Any]] = {
         "col_source": "Fonte",
         "col_as_of": "Lida em",
         "markets_unknown": "não indicado",
+        "markets_read": "lidos em {date}",
         "daily_untranscribed": "não transcrita: ver as notas na calculadora da empresa",
         "source_link": "página da {firm}",
         "table_note": (
@@ -499,13 +519,14 @@ COPY: dict[str, dict[str, Any]] = {
             "estrita quando uma página se contradiz; cada empresa pode tê-los mudado."
         ),
         "firms_title": "As empresas, uma a uma",
-        "firm_programs": (
-            "{n} programas transcritos da página da {firm}, lida em {date}: {programs}."
-        ),
-        "firm_programs_one": (
-            "Um programa transcrito da página da {firm}, lida em {date}: {programs}."
-        ),
-        "firm_rows": "Só as linhas dela",
+        "firm_programs": "{count} {source}: {programs}.",
+        "firm_count": "{n} programas transcritos",
+        "firm_count_one": "Um programa transcrito",
+        "firm_page": "da página da {firm}, lida em {date}",
+        "firm_pages": "das páginas da {firm}, lidas em {date}",
+        "firm_page_dates": "da página da {firm}, lida entre {first} e {last}",
+        "firm_pages_dates": "das páginas da {firm}, lidas entre {first} e {last}",
+        "firm_rows": "Só as linhas desta empresa",
         "firm_calculator": "Calculadora do desafio {firm}",
         "not_affiliated": (
             "O Rigor não é afiliado a nenhuma empresa; as regras mudam, confira a página "
@@ -532,9 +553,9 @@ COPY: dict[str, dict[str, Any]] = {
                 "O que é uma perda total que acompanha o fechamento diário (trailing EOD)?",
                 "É um limite que sobe com o maior saldo de fechamento do dia: cada fechamento "
                 "mais alto move o saldo mínimo para cima, e a conta termina se o saldo o tocar. "
-                "Na tabela está marcado «acompanha o maior fechamento diário»; quando também "
-                "para ao chegar ao saldo inicial, «trava no saldo inicial». {trailing} "
-                "programas da tabela o usam e {lock} outros o usam com a trava.",
+                "Na coluna «{col_total}» aparece como «{trailing_label}»; quando também para "
+                "ao chegar ao saldo inicial, «{lock_label}». {trailing} programas da tabela o "
+                "usam e {lock} outros o usam com a trava.",
             ),
             (
                 "O que é a regra do melhor dia?",
@@ -554,10 +575,11 @@ COPY: dict[str, dict[str, Any]] = {
             (
                 "Por que há programas e empresas que não estão?",
                 "Só estão os programas cujas regras cabem nos tipos que o simulador do Rigor "
-                "entende, tal como são ou com uma aproximação mais estrita que a regra da "
-                "empresa: {programs} programas de {firms} empresas. Ficam de fora os que medem a "
-                "perda máxima sobre a máxima intradiária, limitam o ganho diário ou pedem dias "
-                "com um ganho mínimo, e qualquer empresa que ainda não transcrevemos.",
+                "entende; quando a leitura é uma aproximação, as notas do programa, na "
+                "calculadora dele, dizem se ela é mais estrita ou mais otimista que a regra da "
+                "empresa: {programs} programas de {firms} empresas. Ficam de fora, por exemplo, "
+                "os que medem a perda máxima sobre a máxima intradiária ou limitam o ganho "
+                "diário, e qualquer empresa que ainda não transcrevemos.",
             ),
         ),
         "read_title": "Para continuar",
@@ -572,11 +594,17 @@ def summary(locale: str) -> str:
 
 
 def faq(locale: str) -> tuple[tuple[str, str], ...]:
-    """The four questions of fact, their counts filled from the presets."""
-    numbers = counts()
-    return tuple(
-        (question, answer.format(**numbers)) for question, answer in COPY[_locale(locale)]["faq"]
-    )
+    """The four questions of fact: their counts filled from the presets and the
+    rule types named exactly as the table's cells name them."""
+    locale = _locale(locale)
+    labels = loss_names(locale)
+    fields: dict[str, Any] = {
+        **counts(),
+        "col_total": COPY[locale]["col_total"],
+        "trailing_label": labels["trailing_eod"],
+        "lock_label": labels["trailing_eod_lock"],
+    }
+    return tuple((question, answer.format(**fields)) for question, answer in COPY[locale]["faq"])
 
 
 def market_words(markets: tuple[str, ...] | None, locale: str) -> str:
@@ -607,10 +635,12 @@ __all__ = [
     "firm_programs",
     "firm_rows",
     "latest_as_of",
+    "loss_names",
     "market_words",
     "matches",
     "parse_filters",
     "rows",
+    "rules_table_lastmod",
     "rules_table_paths",
     "rules_table_url",
     "summary",

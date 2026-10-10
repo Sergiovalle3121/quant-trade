@@ -168,7 +168,7 @@ from quant_trade.audit.report import render, report_kind, result_sha256
 from quant_trade.audit.retention import RetentionWorker
 from quant_trade.audit.return_series import is_return_series
 from quant_trade.audit.rules_table import FILTER_FIELDS as RULES_TABLE_FIELDS
-from quant_trade.audit.rules_table import RULES_TABLE_PATH
+from quant_trade.audit.rules_table import RULES_TABLE_PATH, Filters, parse_filters
 from quant_trade.audit.sample import sample_result, signal_sample_result
 from quant_trade.audit.sample_publication import (
     SAMPLE_KIND_BY_PUBLIC_ID,
@@ -7280,14 +7280,23 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             challenge_path, public_challenge, methods=["GET"], response_class=HTMLResponse
         )
 
+    @functools.lru_cache(maxsize=64)
+    def _rules_table_html(
+        locale: str, filters: Filters, base_url: str, offer: paid_offer.Offer
+    ) -> str:
+        """The rules table for one language, set of filters, address and offer,
+        worded by the offer and past the claim guard. The page reads nothing per
+        request, so the guard (most of its cost) runs once per combination."""
+        page = rules_table_page(locale=locale, base_url=base_url, values=filters.values())
+        return guard_page(paid_offer.rewrite_html(page, locale, offer))
+
     def public_rules_table(request: Request) -> str:
         """The public table of prop-firm rules. Its filters are query fields that
         the page's own links set; a value that names nothing shows the whole
         table, never an error, and the canonical is the address without a query."""
         locale = next(lang for lang, path in RULES_TABLE_PATH.items() if path == request.url.path)
         values = {name: request.query_params.get(name, "") for name in RULES_TABLE_FIELDS}
-        page = rules_table_page(locale=locale, base_url=_site_url(request), values=values)
-        return guard_page(_offered(page, locale))
+        return _rules_table_html(locale, parse_filters(values), _site_url(request), _offer_terms())
 
     for rules_path in RULES_TABLE_PATH.values():
         app.add_api_route(

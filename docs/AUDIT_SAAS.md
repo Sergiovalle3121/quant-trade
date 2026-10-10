@@ -183,23 +183,35 @@ so on the page. Tests: `tests/test_audit_challenge_calculator.py`.
 The public table of prop-firm rules (`audit/rules_table.py`, rendered by
 `challenge_pages.rules_table_page`) lives at `/reglas-prop-firm`,
 `/en/prop-firm-rules` and `/pt/regras-prop-firm`, in the sitemap with the date
-`rules_table.RULES_TABLE_PUBLISHED`. One row per published preset (every
+`rules_table.rules_table_lastmod()`: the later of `RULES_TABLE_PUBLISHED` and
+the most recent preset `as_of`, the same date the `Dataset` names as
+`dateModified`. One row per published preset (every
 program, phase by phase, in `PRESETS` order; the generic reference is not one):
 firm, program and phase, target, daily loss with its basis, total loss with its
 type (static, trailing the highest daily close, or trailing and locking at the
 initial balance), minimum days, time limit, best-day rule, the markets when a
-page states them (`markets`, linked to `markets_source`), the source page and
-its `as_of`. Every cell is read from the preset with the calculator's own
-words; no figure is typed into a text, and the counts the texts name (firms,
-programs, how many use each basis or type) are counted from the presets. The
-filters are links with a query, no JavaScript: `?firma=<FIRMS key>`,
-`?perdida=<TOTAL_LOSS_TYPES value>` and `?mercado=fx|futures`, combined, each
-chip keeping the other two; a value that names nothing is ignored (the whole
-table, a 200, never a 400), a market filter says that programs whose pages
-state no markets are not shown, and the canonical and hreflang links never
-carry the query. Below the table, one block per firm with two sentences of
-fact from its presets (its programs and reading date, then its first program's
-first note) and the links to its calculator page and to its rows, then the
+page states them (`markets`, linked to `markets_source`, with `markets_as_of`
+shown when it differs from the row's `as_of`), the source page and its `as_of`.
+Every cell is read from the preset with the calculator's own words; no figure
+is typed into a text, and the counts the texts name (firms, programs, how many
+use each basis or type) are counted from the presets. The lead says the rows
+are the rules as the calculator uses them and that a program's notes (which
+variant was simulated, whether an approximation is stricter or optimistic) are
+on its calculator page. The types of maximum loss are named once
+(`rules_table.loss_names`, the calculator's cell text without the figure) for
+the cells, the filter chips and the questions. The filters are links with a
+query, no JavaScript: `?firma=<FIRMS key>`, `?perdida=<TOTAL_LOSS_TYPES value>`
+and `?mercado=fx|futures`, combined, each chip keeping the other two; a chip
+whose combination would show no row is rendered as plain text, not a link; a
+value that names nothing is ignored (the whole table, a 200, never a 400), a
+market filter says that programs whose pages state no markets are not shown,
+and the canonical and hreflang links never carry the query. The route keeps
+each rendered combination (language, filters, address, offer) in a bounded
+`lru_cache` after the claim guard, which is most of the page's cost. Below the
+table, one block per firm with two sentences of fact from its presets (its
+programs, how many of its pages they were read from and when, then its first
+program's first note, named by that program) and the links to its calculator
+page and to its rows, then the
 fixed "not affiliated; rules change, check the official page" line, a "what
 this table does not see" list (intraday trailing, news, payout rules, account
 sizes, fees) that recommends buying nothing, and four questions of fact (what

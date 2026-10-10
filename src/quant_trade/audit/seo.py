@@ -41,7 +41,11 @@ from quant_trade.audit.legal import LEGAL_PATHS, LEGAL_UPDATED
 from quant_trade.audit.method import METHOD_PATH
 from quant_trade.audit.pricing import PRICING_PATH
 from quant_trade.audit.reading import READING_PATH
-from quant_trade.audit.rules_table import RULES_TABLE_PUBLISHED, rules_table_paths
+from quant_trade.audit.rules_table import (
+    RULES_TABLE_PUBLISHED,
+    rules_table_lastmod,
+    rules_table_paths,
+)
 from quant_trade.audit.tools_hub import TOOLS_PATH
 from quant_trade.audit.winrate import WINRATE_PATH
 
@@ -140,7 +144,9 @@ def _page_dates() -> dict[str, str]:
             for path in challenge_paths(firm).values()
         }
     )
-    dates.update({path: RULES_TABLE_PUBLISHED for path in rules_table_paths().values()})
+    # The rules table: its publication, or a later reading of a preset (the same
+    # date its ``Dataset`` names as ``dateModified``).
+    dates.update({path: rules_table_lastmod() for path in rules_table_paths().values()})
     # The institutional review's offer and its sample review changed together.
     institutional = (*REVIEW_PATHS.values(), *SAMPLE_PATHS.values())
     dates.update({path: OFFER_UPDATED for path in institutional})
@@ -542,6 +548,7 @@ __all__ = [
     "page_paths",
     "private_meta",
     "robots_txt",
+    "rules_table_lastmod",
     "sitemap_xml",
     "tools_structured_data",
     "web_application_structured_data",

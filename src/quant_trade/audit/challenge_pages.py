@@ -700,8 +700,17 @@ def _filter_links(filters: Filters, locale: str) -> str:
     def chips(label: str, field: str, options: Sequence[tuple[str, str]], current: str) -> str:
         items = ""
         for value, name in options:
-            href = path + filters.with_(**{field: value}).query()
+            chosen = filters.with_(**{field: value})
             on = " aria-current='true'" if value == current else ""
+            if not on and not rules_table.filtered_rows(chosen):
+                # A chip that would show no row is not a link: a dead end for the
+                # visitor and one more thin page for a crawler.
+                items += (
+                    f"<li><span class='muted' data-filter='{_e(field)}' "
+                    f"data-value='{_e(value)}' data-empty>{_e(name)}</span></li>"
+                )
+                continue
+            href = path + chosen.query()
             items += (
                 f"<li><a href='{_e(href)}'{on} data-filter='{_e(field)}' "
                 f"data-value='{_e(value)}'>{_e(name)}</a></li>"
@@ -709,8 +718,9 @@ def _filter_links(filters: Filters, locale: str) -> str:
         return f"<p class='help'><b>{_e(label)}</b></p><ul class='chips rules-filters'>{items}</ul>"
 
     firms: list[tuple[str, str]] = [("", str(words["all"])), *calc.FIRMS.items()]
-    losses: list[tuple[str, str]] = [("", str(words["all"]))] + [
-        (kind, str(words["loss_names"][kind])) for kind in words["loss_names"]
+    losses: list[tuple[str, str]] = [
+        ("", str(words["all"])),
+        *rules_table.loss_names(locale).items(),
     ]
     markets: list[tuple[str, str]] = [("", str(words["all_markets"]))] + [
         (market, rules_table.MARKET_WORDS[locale][market]) for market in rules_table.MARKET_FILTERS
@@ -756,6 +766,11 @@ def _rules_table(rows: Sequence[Row], filters: Filters, locale: str) -> str:
                 f"<a href='{_e(rules.markets_source or '')}' rel='noopener nofollow'>"
                 f"{_e(markets)}</a>"
             )
+            if rules.markets_as_of and rules.markets_as_of != rules.as_of:
+                # The markets come from another page of the firm, read on its own
+                # day: the row's "read on" date does not cover them.
+                read = words["markets_read"].format(date=rules.markets_as_of)
+                markets_cell += f" <time datetime='{_e(rules.markets_as_of)}'>({_e(read)})</time>"
         else:
             markets_cell = f"<span class='muted'>{_e(words['markets_unknown'])}</span>"
         source = (
@@ -800,6 +815,29 @@ def _rules_table(rows: Sequence[Row], filters: Filters, locale: str) -> str:
     )
 
 
+def _firm_facts(slug: str, name: str, locale: str) -> str:
+    """The firm's programs, how many pages they were read from and when: one page
+    or several, one reading day or a span, each worded as such."""
+    words = RULES_COPY[locale]
+    programs = rules_table.firm_programs(slug)
+    rows = rules_table.firm_rows(slug)
+    names = [localize(PRESETS[key].program, locale) for key in programs]
+    dates = sorted({row.rules.as_of for row in rows})
+    pages = {row.rules.source_url for row in rows}
+    count = (
+        words["firm_count_one"]
+        if len(programs) == 1
+        else words["firm_count"].format(n=len(programs))
+    )
+    source_key = "firm_page" if len(pages) == 1 else "firm_pages"
+    if len(dates) > 1:
+        source_key += "_dates"
+    source = words[source_key].format(firm=name, date=dates[0], first=dates[0], last=dates[-1])
+    return str(words["firm_programs"]).format(
+        count=count, source=source, programs=_join(names, locale)
+    )
+
+
 def _firm_blocks(locale: str) -> str:
     """Two sentences of fact per firm, from its presets and their notes, and the
     links to its calculator and to its rows of the table."""
@@ -808,18 +846,17 @@ def _firm_blocks(locale: str) -> str:
     out = ""
     for slug, name in calc.FIRMS.items():
         programs = rules_table.firm_programs(slug)
-        names = [localize(PRESETS[key].program, locale) for key in programs]
-        dates = sorted({row.rules.as_of for row in rules_table.firm_rows(slug)})
-        template = words["firm_programs_one"] if len(programs) == 1 else words["firm_programs"]
-        facts = template.format(
-            n=len(programs), firm=name, date=_join(dates, locale), programs=_join(names, locale)
-        )
-        note = localize(PRESETS[programs[0]].notes[0], locale)
+        facts = _firm_facts(slug, name, locale)
+        # The second sentence is one program's note, named as such: a firm's
+        # programs differ, so an unnamed note would read as a fact of them all.
+        first = PRESETS[programs[0]]
+        note = localize(first.notes[0], locale)
         rows_href = path + Filters(firm=slug).query()
         out += (
             f"<div class='rules-firm' id='firma-{_e(slug)}' data-rules-firm='{_e(slug)}'>"
             f"<h3>{_e(name)}</h3><p>{_e(facts)}</p>"
-            f"<p data-firm-note>{_note_html(note, locale)}</p>"
+            f"<p data-firm-note>{_e(localize(first.program, locale))}: "
+            f"{_note_html(note, locale)}</p>"
             f"<p><a href='{_e(calc.challenge_url(locale, slug))}' data-firm-calculator>"
             f"{_e(words['firm_calculator'].format(firm=name))}</a> · "
             f"<a href='{_e(rows_href)}'>{_e(words['firm_rows'])}</a></p></div>"

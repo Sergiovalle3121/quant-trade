@@ -24,6 +24,7 @@ from quant_trade.audit.audiences import audience_url  # noqa: E402
 from quant_trade.audit.challenge_pages import (  # noqa: E402
     ARTICLE_KEY,
     _best_rule,
+    _join,
     _note_html,
     _total_rule,
     rules_table_page,
@@ -192,8 +193,15 @@ def test_every_row_is_its_preset(site: TestClient, locale: str) -> None:
         else:
             assert cells[7] == cwords["best_none"]
         if rules.markets:
-            assert cells[8] == table.market_words(rules.markets, locale)
+            markets = table.market_words(rules.markets, locale)
             assert f"href='{html.escape(rules.markets_source or '')}'" in inner
+            if rules.markets_as_of != rules.as_of:
+                # The markets were read on another page and another day: the row says so.
+                read = words["markets_read"].format(date=rules.markets_as_of)
+                assert cells[8] == f"{markets} ({read})", rules.key
+                assert f"<time datetime='{rules.markets_as_of}'>" in inner
+            else:
+                assert cells[8] == markets
         else:
             assert cells[8] == words["markets_unknown"]
         assert f"href='{html.escape(rules.source_url)}'" in inner
@@ -299,6 +307,32 @@ def test_filters_narrow_the_rows_and_keep_each_other(site: TestClient, locale: s
     assert table.COPY[locale]["showing"].format(n=len(_rows(ftmo)), total=len(table.ROWS)) in (
         html.unescape(ftmo)
     )
+    # A chip that would show no row is plain text, never a link: no linked chip
+    # leads to an empty table, on the whole table or on any filtered view.
+    seen_linked = seen_muted = 0
+    for params in (
+        {},
+        {"firma": "ftmo"},
+        {"firma": "topstep"},
+        {"perdida": "static"},
+        {"perdida": "trailing_eod"},
+        {"mercado": "fx"},
+        {"mercado": "futures"},
+        {"firma": "e8-markets", "mercado": "futures"},
+    ):
+        page = site.get(path, params=params).text
+        for href in re.findall(r"<a href='([^']*)'(?: aria-current='true')? data-filter=", page):
+            parsed = urlsplit(html.unescape(href))
+            linked = {name: value[0] for name, value in parse_qs(parsed.query).items()}
+            assert table.filtered_rows(table.parse_filters(linked)), (params, href)
+            seen_linked += 1
+        for field, value in re.findall(
+            r"<span class='muted' data-filter='(\w+)' data-value='([^']*)' data-empty>", page
+        ):
+            muted = table.parse_filters(params).with_(**{field: value})
+            assert not table.filtered_rows(muted), (params, field, value)
+            seen_muted += 1
+    assert seen_linked and seen_muted
     # A market filter says that programs whose pages state no markets are not shown.
     assert "data-rules-market-note" in site.get(path, params={"mercado": "fx"}).text
     assert "data-rules-market-note" not in ftmo
@@ -315,6 +349,8 @@ def test_the_filters_parse_only_what_names_something() -> None:
     chosen = table.parse_filters({"firma": "ftmo", "perdida": "static", "mercado": "fx"})
     assert chosen == table.Filters(firm="ftmo", loss="static", market="fx")
     assert chosen.query() == "?firma=ftmo&perdida=static&mercado=fx"
+    assert table.parse_filters(chosen.values()) == chosen
+    assert table.Filters().values() == {"firma": "", "perdida": "", "mercado": ""}
     assert chosen.with_(firm="").query() == "?perdida=static&mercado=fx"
     assert table.Filters().query() == ""
     assert not table.Filters().active and chosen.active
@@ -329,9 +365,12 @@ def test_sitemap_lists_the_table_with_its_date(site: TestClient) -> None:
         url.findtext("s:loc", namespaces=ns): url.findtext("s:lastmod", namespaces=ns)
         for url in root.findall("s:url", ns)
     }
+    # The sitemap's date is the publication or a later reading of a preset: the
+    # same date the Dataset names, so neither falls behind the other.
+    assert table.rules_table_lastmod() == max(table.RULES_TABLE_PUBLISHED, table.latest_as_of())
     for path in table.rules_table_paths().values():
-        assert dates[BASE + path] == table.RULES_TABLE_PUBLISHED, path
-        assert seo.page_lastmod(path) == table.RULES_TABLE_PUBLISHED
+        assert dates[BASE + path] == table.rules_table_lastmod(), path
+        assert seo.page_lastmod(path) == table.rules_table_lastmod()
 
 
 @pytest.mark.parametrize("locale", LOCALES)
@@ -355,6 +394,23 @@ def test_structured_data_is_a_dataset_and_four_questions_of_fact(
     for question, answer in expected:
         assert question in visible and answer in visible
         assert "{" not in answer
+    # The first answer names the rule types exactly as the cells (and the chips) do.
+    labels = table.loss_names(locale)
+    totals = [_cells(inner)[4] for inner in _rows(page).values()]
+    for kind in ("trailing_eod", "trailing_eod_lock"):
+        assert labels[kind] in expected[0][1], kind
+        assert any(cell.endswith(labels[kind]) or f"{labels[kind]} (" in cell for cell in totals)
+    assert table.COPY[locale]["col_total"] in expected[0][1]
+    for name in labels.values():
+        assert "{" not in name and name == name.strip()
+    # The last answer does not claim every approximation is the stricter one:
+    # some presets' notes say theirs is optimistic, and the answer says so.
+    caveat = {"es": "más optimista", "en": "more optimistic", "pt": "mais otimista"}[locale]
+    assert caveat in expected[3][1]
+    for _question, answer in expected:
+        for stricter in ("más estricta", "stricter", "mais estrita"):
+            if stricter in answer:
+                assert caveat in answer, answer
 
 
 @pytest.mark.parametrize("locale", LOCALES)
@@ -378,10 +434,38 @@ def test_each_firm_has_two_sentences_from_its_presets_and_its_links(
         text = _visible(block)
         for key in programs:
             assert localize(PRESETS[key].program, locale) in text, key
-        assert PRESETS[programs[0]].as_of in text
-        # The first note of its first program, its addresses as short links by host.
-        note = _note_html(localize(PRESETS[programs[0]].notes[0], locale), locale)
-        assert f"<p data-firm-note>{note}</p>" in block, slug
+        rows = table.firm_rows(slug)
+        dates = sorted({row.rules.as_of for row in rows})
+        pages = {row.rules.source_url for row in rows}
+        # One page or several, one reading day or a span: the sentence says which.
+        count = (
+            words["firm_count_one"]
+            if len(programs) == 1
+            else words["firm_count"].format(n=len(programs))
+        )
+        source_key = ("firm_page" if len(pages) == 1 else "firm_pages") + (
+            "_dates" if len(dates) > 1 else ""
+        )
+        source = words[source_key].format(firm=name, date=dates[0], first=dates[0], last=dates[-1])
+        names = [localize(PRESETS[key].program, locale) for key in programs]
+        facts = words["firm_programs"].format(
+            count=count, source=source, programs=_join(names, locale)
+        )
+        assert html.escape(facts) in block, slug
+        plural = {"es": "páginas", "en": "pages", "pt": "páginas"}[locale]
+        assert (plural in facts) == (len(pages) > 1), (slug, facts)
+        for date in dates:
+            assert date in facts
+        # The first note of its first program, named by that program so it does
+        # not read as a fact of the firm's other programs; its addresses as short
+        # links by host.
+        first = PRESETS[programs[0]]
+        note = _note_html(localize(first.notes[0], locale), locale)
+        program = html.escape(localize(first.program, locale))
+        assert f"<p data-firm-note>{program}: {note}</p>" in block, slug
+        shown = re.search(r"<p data-firm-note>(.*?)</p>", block, re.S)
+        assert shown is not None
+        assert _visible(shown.group(1)).startswith(f"{localize(first.program, locale)}: ")
         assert f"href='{calc.challenge_url(locale, slug)}' data-firm-calculator" in block
         assert words["firm_calculator"].format(firm=name) in text
         assert f"href='{table.rules_table_url(locale)}?firma={slug}'" in block
@@ -426,8 +510,50 @@ def test_metadata_is_unique_per_language_and_in_bounds() -> None:
         assert 50 <= len(description) <= 160, description
         assert seo.BRAND in title
         assert str(table.counts()["firms"]) in description
+        # The searches the page answers: a comparison of the firms' rules.
+        assert re.search(r"compar", title, re.IGNORECASE), title
+        assert re.search(r"compar", description, re.IGNORECASE), description
+        assert re.search(r"<h1[^>]*>[^<]*[Cc]ompar", page), locale
         titles.add(title)
     assert len(titles) == 3
+
+
+def test_the_loss_types_are_named_once_for_cells_chips_and_questions() -> None:
+    for locale in LOCALES:
+        labels = table.loss_names(locale)
+        assert set(labels) == {"static", "trailing_eod", "trailing_eod_lock"}
+        cwords = calc.COPY[locale]
+        for kind, key in (
+            ("static", "total_static"),
+            ("trailing_eod", "total_trailing"),
+            ("trailing_eod_lock", "total_lock"),
+        ):
+            assert cwords[key] == "{value}, " + labels[kind]
+        page = rules_table_page(locale=locale, base_url=BASE)
+        chips = dict(re.findall(r"data-filter='loss' data-value='([^']*)'>([^<]*)<", page))
+        for kind, name in labels.items():
+            assert html.unescape(chips[kind]) == name, kind
+    assert "loss_names" not in table.COPY["es"]
+
+
+def test_the_english_copy_reads_naturally() -> None:
+    assert "does not recommend buying any challenge" in table.COPY["en"]["lead"]
+    assert "recommends buying no" not in table.COPY["en"]["lead"]
+    assert table.COPY["en"]["firm_rows"] == "Only this firm's rows"
+    assert table.COPY["es"]["firm_rows"] == "Solo las filas de esta firma"
+    assert table.COPY["pt"]["firm_rows"] == "Só as linhas desta empresa"
+
+
+def test_the_route_serves_the_same_page_from_its_cache(site: TestClient) -> None:
+    path = table.rules_table_url("es")
+    first = site.get(path, params={"firma": "ftmo"}).text
+    again = site.get(path, params={"firma": "ftmo", "x": "y"}).text
+    assert first == again
+    other = site.get(path, params={"firma": "topstep"}).text
+    assert other != first and "topstep-50k-combine" in other
+    assert "topstep-50k-combine" not in first
+    for locale in LOCALES:
+        assert f"<html lang='{locale}'>" in site.get(table.rules_table_url(locale)).text
 
 
 def test_a_page_without_a_base_url_renders(tmp_path: Path) -> None:
