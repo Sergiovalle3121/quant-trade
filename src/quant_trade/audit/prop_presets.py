@@ -677,8 +677,10 @@ TRADEIFY_SELECT_URL = _TRADEIFY_HELP + "12853921-select-evaluation-accounts"
 TRADEIFY_GROWTH_URL = _TRADEIFY_HELP + "10495915-growth-evaluation-accounts"
 TRADEIFY_DRAWDOWN_URL = _TRADEIFY_HELP + "10495897-rules-trailing-max-drawdowns"
 TRADEIFY_DAILY_URL = _TRADEIFY_HELP + "10468321-rules-daily-loss-limit"
+#: "Growth Sim Funded Accounts must follow a 35% Consistency Rule", measured up to
+#: the payout request; the Growth evaluation has none.
+TRADEIFY_CONSISTENCY_URL = _TRADEIFY_HELP + "10468320-rules-consistency-rule"
 TRADEIFY_ESSENTIAL_URL = _TRADEIFY_HELP + "12268167-essential-trading-rules-overview"
-TRADEIFY_PRICING_URL = _TRADEIFY_HELP + "14369021-tradeify-pricing-reference"
 TRADEIFY_HOURS_URL = _TRADEIFY_HELP + "10495876-rules-permitted-times-to-trade"
 TRADEIFY_NEWS_URL = _TRADEIFY_HELP + "10495874-rules-news-trading"
 #: "We support instruments from the following exchanges: CME, COMEX, NYMEX, and CBOT."
@@ -687,6 +689,8 @@ TRADEIFY_PRODUCTS_URL = _TRADEIFY_HELP + "10468222-rules-supported-trading-produ
 BULENOX_PRICING_URL = "https://bulenox.com/accounts-pricing"
 BULENOX_QUALIFICATION_URL = "https://bulenox.com/help-center/qualification#option-2"
 BULENOX_MOMENTUM_URL = "https://bulenox.com/help-center/momentum"
+#: "A reset does not extend your 30-day access period" (Qualification > Reset).
+BULENOX_RESET_URL = "https://bulenox.com/help-center/qualification#reset"
 #: "41 futures contracts on all four CME Group exchanges — CME, CBOT, NYMEX and COMEX."
 BULENOX_FAQ_URL = "https://bulenox.com/faq"
 
@@ -715,6 +719,8 @@ ALPHA_FUTURES_MLL_URL = _ALPHA_FUTURES_HELP + "9491999-maximum-loss-limit-mll"
 ALPHA_FUTURES_TRADE_URL = _ALPHA_FUTURES_HELP + "9492096-what-and-when-you-can-trade"
 ALPHA_FUTURES_NEWS_URL = _ALPHA_FUTURES_HELP + "9492063-news-trading-policy"
 ALPHA_FUTURES_SUBSCRIPTION_URL = _ALPHA_FUTURES_HELP + "9492068-monthly-subscription"
+#: "you must place a trade at least once every 10 trading days".
+ALPHA_FUTURES_INACTIVITY_URL = _ALPHA_FUTURES_HELP + "12757982-inactivity-rule"
 ALPHA_FUTURES_PROHIBITED_URL = _ALPHA_FUTURES_HELP + "9508585-prohibited-trading-practices"
 
 _LUCID_HELP = "https://support.lucidtrading.com/en/articles/"
@@ -723,7 +729,14 @@ LUCID_DRAWDOWN_URL = _LUCID_HELP + "12890136-lucidpro-drawdown"
 LUCID_DAILY_URL = _LUCID_HELP + "12890122-lucidpro-daily-loss-limit"
 LUCID_CONSISTENCY_URL = _LUCID_HELP + "12890109-lucidpro-consistency-percentage"
 LUCID_TIMES_URL = _LUCID_HELP + "11404729-allowed-trading-times"
+#: "Daily Loss Limit: On or Off", chosen at purchase.
+LUCID_CUSTOMIZATION_URL = _LUCID_HELP + "16226068-lucidpro-customization"
+#: News trading allowed on Pro; "Automated trading systems and trade copiers are
+#: permitted".
 LUCID_OTHER_URL = _LUCID_HELP + "11404728-other-trading-activities"
+LUCID_MICROSCALPING_URL = _LUCID_HELP + "11404742-prohibited-microscalping"
+LUCID_HFT_URL = _LUCID_HELP + "11404736-prohibited-high-frequency-trading"
+LUCID_HEDGING_URL = _LUCID_HELP + "11404734-prohibited-hedging"
 #: The futures products Lucid Trading lets its accounts trade, by article number
 #: (the help center opens it from the number; its titled address carries a word the
 #: claims guard refuses).
@@ -818,6 +831,12 @@ _UNSTATED_INTRADAY = (
     "The pages read do not say whether the floors are also checked within the day; the "
     "simulator checks daily closes only."
 )
+#: The same for a program whose daily limit the pages do describe, or that is
+#: simulated without one: only the maximum-loss floor is left unstated.
+_UNSTATED_INTRADAY_FLOOR = (
+    "The pages read do not say whether the maximum-loss floor is also checked within the "
+    "day; the simulator checks daily closes only."
+)
 
 _TPT_NOTES = (
     _dollars_note("take-profit-trader-test-50k"),
@@ -881,7 +900,7 @@ def _bulenox_overnight(url: str) -> str:
 
 
 _E2T_DAILY = (
-    "Daily loss: counted from the balance the day starts with, over the 5:00 pm to 5:00 pm CT "
+    "Daily loss: counted from the balance the day starts with, over the 5:00 PM to 5:00 PM CT "
     f"day, with open and closed trades and commissions ({E2T_DAILY_URL})."
 )
 _E2T_FOUR_DAYS = (
@@ -909,8 +928,9 @@ _ALPHA_FUTURES_BANNED = (
     f"({ALPHA_FUTURES_PROHIBITED_URL})."
 )
 _ALPHA_FUTURES_TIME = (
-    "No time limit is stated: the monthly fee rebills until the evaluation ends, and at least "
-    f"one trade is needed every 10 trading days ({ALPHA_FUTURES_SUBSCRIPTION_URL})."
+    "No time limit is stated: the monthly fee rebills until the evaluation ends "
+    f"({ALPHA_FUTURES_SUBSCRIPTION_URL}), and at least one trade is needed every 10 trading "
+    f"days ({ALPHA_FUTURES_INACTIVITY_URL})."
 )
 
 
@@ -1084,7 +1104,6 @@ _FUTURES_PRESETS: tuple[ChallengeRules, ...] = (
         "Growth 50K",
         total="trailing_eod",
         days=1,
-        best=0.35,
         notes=(
             _dollars_note("tradeify-growth-50k"),
             _TRADEIFY_LOCK,
@@ -1093,9 +1112,8 @@ _FUTURES_PRESETS: tuple[ChallengeRules, ...] = (
             "The daily loss limit resets at the start of each session (6:00 PM ET) and rises to "
             "the size of the drawdown at 6 % profit, which in the evaluation is the target "
             f"({TRADEIFY_DAILY_URL}).",
-            "The Growth page and the consistency article say the evaluation has no consistency "
-            "rule; the pricing reference names a 35 % one, and the simulator checks that 35 % "
-            f"against the profit target, the stricter reading ({TRADEIFY_PRICING_URL}).",
+            "No consistency rule in the evaluation; the 35 % rule applies to Growth Sim Funded "
+            f"payouts ({TRADEIFY_CONSISTENCY_URL}).",
             _intraday_only("4:45 PM ET", TRADEIFY_HOURS_URL),
             _TRADEIFY_WEEKLY,
             _news_allowed(TRADEIFY_NEWS_URL),
@@ -1114,16 +1132,17 @@ _FUTURES_PRESETS: tuple[ChallengeRules, ...] = (
         notes=(
             _dollars_note("bulenox-qualification-eod-50k"),
             "The profit target, the USD 2,500 drawdown and the 30-day access come from the "
-            f"pricing page ({BULENOX_PRICING_URL}); a reset does not extend the 30 days, while "
-            f"the FAQ says there is no maximum number of trading days ({BULENOX_FAQ_URL}), so "
-            "the simulator uses the 30 days, which is stricter.",
+            f"pricing page ({BULENOX_PRICING_URL}); the help center says a reset does not "
+            f"extend the 30 days ({BULENOX_RESET_URL}), while the FAQ says there is no maximum "
+            f"number of trading days ({BULENOX_FAQ_URL}), so the simulator uses the 30 days, "
+            "which is stricter.",
             "The end-of-day drawdown is updated once a day after the close and does not lock in "
             "the Qualification; the lock at the starting balance plus USD 100 applies to the "
             "Master Account.",
             "The daily loss limit counts realized and unrealized P&L with commissions over the "
             "5:00 PM to 4:00 PM CT session, which daily closes cannot see.",
             _SOFT_DAILY,
-            _UNSTATED_INTRADAY,
+            _UNSTATED_INTRADAY_FLOOR,
             "Contracts scale with the profit: 2 up to USD 1,500, 4 up to USD 4,000 and 7 after; "
             "not simulated.",
             _bulenox_overnight(BULENOX_QUALIFICATION_URL),
@@ -1188,7 +1207,8 @@ _FUTURES_PRESETS: tuple[ChallengeRules, ...] = (
                 "The Daily Loss Guard is 2 % of the starting balance on the day's open and "
                 "closed P&L; reaching it flattens the positions and locks the account until the "
                 "next trading day (6 PM ET) without ending it; the simulator ends the path there, "
-                f"which is stricter ({ALPHA_FUTURES_DAILY_URL}).",
+                "which is stricter, but it checks daily closes only and does not see a touch on "
+                f"open P&L within the day, which is optimistic ({ALPHA_FUTURES_DAILY_URL}).",
                 "No consistency rule in the evaluation; the 40 % rule applies to Qualified "
                 "accounts.",
             ),
@@ -1234,17 +1254,18 @@ _FUTURES_PRESETS: tuple[ChallengeRules, ...] = (
         days=1,
         notes=(
             _dollars_note("lucid-pro-50k"),
-            "Simulated with the daily loss limit off, an option chosen at purchase; with it on, "
-            "a fixed USD 1,200 limit pauses the day without ending the account; not simulated "
-            f"({LUCID_DAILY_URL}).",
+            "Simulated with the daily loss limit off, an option chosen at purchase "
+            f"({LUCID_CUSTOMIZATION_URL}); with it on, a fixed USD 1,200 limit pauses the day "
+            f"without ending the account; not simulated ({LUCID_DAILY_URL}).",
             _lock_plus_100(LUCID_DRAWDOWN_URL),
-            _UNSTATED_INTRADAY,
+            _UNSTATED_INTRADAY_FLOOR,
             "No minimum number of days is published; the target can be reached in one trading day.",
             "No consistency rule in the evaluation; the 40 % one applies to the funded account "
             f"({LUCID_CONSISTENCY_URL}).",
             _intraday_only("4:45 PM EST", LUCID_TIMES_URL),
-            "Microscalping, high-frequency trading and hedging are prohibited; news trading is "
-            f"allowed ({LUCID_OTHER_URL}).",
+            f"Microscalping ({LUCID_MICROSCALPING_URL}), high-frequency trading ({LUCID_HFT_URL}) "
+            f"and hedging ({LUCID_HEDGING_URL}) are prohibited; news trading, automated trading "
+            f"systems and trade copiers are allowed ({LUCID_OTHER_URL}).",
             _contracts(4),
         ),
         source=LUCID_PRO_URL,

@@ -5856,6 +5856,16 @@ RULES: tuple[tuple[str, str], ...] = (
         ),
     ),
     (
+        (
+            "The pages read do not say whether the maximum-loss floor is also checked within the "
+            "day; the simulator checks daily closes only."
+        ),
+        (
+            "As páginas lidas não dizem se o piso da perda máxima também é vigiado dentro do "
+            "dia; o simulador só olha os fechamentos diários."
+        ),
+    ),
+    (
         "The Test rules (Rules 1 to 6) list no daily loss limit.",
         "As regras do Test (Rules 1 a 6) não incluem nenhum limite de perda diária.",
     ),
@@ -6003,27 +6013,26 @@ RULES: tuple[tuple[str, str], ...] = (
     ),
     (
         (
-            "The Growth page and the consistency article say the evaluation has no consistency "
-            "rule; the pricing reference names a 35 % one, and the simulator checks that 35 % "
-            "against the profit target, the stricter reading ({url})."
+            "No consistency rule in the evaluation; the 35 % rule applies to Growth Sim Funded "
+            "payouts ({url})."
         ),
         (
-            "A página do Growth e o artigo de consistência dizem que a avaliação não tem regra de "
-            "consistência; a referência de preços cita uma de 35 %, e o simulador confere esses "
-            "35 % contra a meta de lucro, a leitura mais rigorosa ({url})."
+            "Sem regra de consistência na avaliação; a regra de 35 % vale para os saques do "
+            "Growth Sim Funded ({url})."
         ),
     ),
     (
         (
             "The profit target, the USD 2,500 drawdown and the 30-day access come from the "
-            "pricing page ({url}); a reset does not extend the 30 days, while the FAQ says there "
-            "is no maximum number of trading days ({url2}), so the simulator uses the 30 days, "
-            "which is stricter."
+            "pricing page ({url}); the help center says a reset does not extend the 30 days "
+            "({url2}), while the FAQ says there is no maximum number of trading days ({url3}), "
+            "so the simulator uses the 30 days, which is stricter."
         ),
         (
             "A meta, o drawdown de USD 2.500 e o acesso de 30 dias vêm da página de preços "
-            "({url}); um reset não estende os 30 dias, enquanto a FAQ diz que não há máximo de "
-            "dias de trading ({url2}), então o simulador usa os 30 dias, o que é mais rigoroso."
+            "({url}); a central de ajuda diz que um reset não estende os 30 dias ({url2}), "
+            "enquanto a FAQ diz que não há máximo de dias de trading ({url3}), então o simulador "
+            "usa os 30 dias, o que é mais rigoroso."
         ),
     ),
     (
@@ -6076,11 +6085,11 @@ RULES: tuple[tuple[str, str], ...] = (
     ),
     (
         (
-            "Daily loss: counted from the balance the day starts with, over the 5:00 pm to 5:00 "
-            "pm CT day, with open and closed trades and commissions ({url})."
+            "Daily loss: counted from the balance the day starts with, over the 5:00 PM to 5:00 "
+            "PM CT day, with open and closed trades and commissions ({url})."
         ),
         (
-            "Perda diária: contada a partir do saldo com que o dia começa, de 5:00 pm a 5:00 pm "
+            "Perda diária: contada a partir do saldo com que o dia começa, de 5:00 PM a 5:00 PM "
             "CT, com operações abertas e fechadas e comissões ({url})."
         ),
     ),
@@ -6100,13 +6109,15 @@ RULES: tuple[tuple[str, str], ...] = (
             "The Daily Loss Guard is 2 % of the starting balance on the day's open and closed "
             "P&L; reaching it flattens the positions and locks the account until the next trading "
             "day (6 PM ET) without ending it; the simulator ends the path there, which is "
-            "stricter ({url})."
+            "stricter, but it checks daily closes only and does not see a touch on open P&L "
+            "within the day, which is optimistic ({url})."
         ),
         (
             "O Daily Loss Guard é 2 % do saldo inicial sobre o P&L aberto e fechado do dia; ao "
             "atingi-lo, as posições são zeradas e a conta fica bloqueada até o próximo dia de "
             "trading (6 PM ET) sem ser encerrada; o simulador encerra ali o percurso, o que é "
-            "mais rigoroso ({url})."
+            "mais rigoroso, mas só olha os fechamentos diários e não vê um toque com o P&L aberto "
+            "dentro do dia, o que é otimista ({url})."
         ),
     ),
     (
@@ -6126,12 +6137,12 @@ RULES: tuple[tuple[str, str], ...] = (
     ),
     (
         (
-            "No time limit is stated: the monthly fee rebills until the evaluation ends, and at "
-            "least one trade is needed every 10 trading days ({url})."
+            "No time limit is stated: the monthly fee rebills until the evaluation ends ({url}), "
+            "and at least one trade is needed every 10 trading days ({url2})."
         ),
         (
-            "Não há prazo indicado: a taxa mensal é cobrada de novo até a avaliação terminar, e é "
-            "preciso pelo menos uma operação a cada 10 dias de trading ({url})."
+            "Não há prazo indicado: a taxa mensal é cobrada de novo até a avaliação terminar "
+            "({url}), e é preciso pelo menos uma operação a cada 10 dias de trading ({url2})."
         ),
     ),
     (
@@ -6146,14 +6157,14 @@ RULES: tuple[tuple[str, str], ...] = (
     ),
     (
         (
-            "Simulated with the daily loss limit off, an option chosen at purchase; with it on, a "
-            "fixed USD 1,200 limit pauses the day without ending the account; not simulated "
-            "({url})."
+            "Simulated with the daily loss limit off, an option chosen at purchase ({url}); with "
+            "it on, a fixed USD 1,200 limit pauses the day without ending the account; not "
+            "simulated ({url2})."
         ),
         (
-            "Simulado com o limite de perda diária desativado, uma opção escolhida na compra; "
-            "ativado, um limite fixo de USD 1.200 pausa o dia sem encerrar a conta; não é "
-            "simulado ({url})."
+            "Simulado com o limite de perda diária desativado, uma opção escolhida na compra "
+            "({url}); ativado, um limite fixo de USD 1.200 pausa o dia sem encerrar a conta; não "
+            "é simulado ({url2})."
         ),
     ),
     (
@@ -6169,12 +6180,14 @@ RULES: tuple[tuple[str, str], ...] = (
     ),
     (
         (
-            "Microscalping, high-frequency trading and hedging are prohibited; news trading is "
-            "allowed ({url})."
+            "Microscalping ({url}), high-frequency trading ({url2}) and hedging ({url3}) are "
+            "prohibited; news trading, automated trading systems and trade copiers are allowed "
+            "({url4})."
         ),
         (
-            "São proibidos o microscalping, o trading de alta frequência e o hedge; é permitido "
-            "operar notícias ({url})."
+            "São proibidos o microscalping ({url}), o trading de alta frequência ({url2}) e o "
+            "hedge ({url3}); é permitido operar notícias, assim como os sistemas de trading "
+            "automático e os copiadores de operações ({url4})."
         ),
     ),
     (

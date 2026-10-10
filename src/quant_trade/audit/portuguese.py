@@ -539,7 +539,7 @@ UI_PT: dict[str, Any] = {
         "Bandeiras vermelhas e impressões digitais dos seus arquivos",
     ],
     "full_items": [
-        "Simulação do desafio que você escolher da {firms}, com as regras publicadas",
+        "Simulação do desafio que você escolher ({firms}), com as regras publicadas",
         "Quanto custo aguenta antes de terminar no prejuízo",
         "Risco reamostrado em um ano e o capital que pede",
         "As perguntas que deixa abertas: que arquivo responde cada uma ou o que perguntar ao "

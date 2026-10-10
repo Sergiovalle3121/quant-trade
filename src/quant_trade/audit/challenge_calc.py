@@ -130,8 +130,9 @@ PROGRAMS: tuple[str, ...] = tuple(
 
 
 #: Every firm with published rules, in the order the presets list them (the
-#: order of ``FIRMS``, the pages' own), for every list of firms on the site
-#: (``firm_names``): the price card, the prop-firm page and the article.
+#: order of ``FIRMS``, the pages' own), for every whole list of firms on the site
+#: (``firm_names``): the prop-firm page and the article. The price card names three
+#: and counts the others (``firms_short``).
 FIRM_NAMES: tuple[str, ...] = tuple(
     dict.fromkeys(rules.firm for rules in PRESETS.values() if _published(rules))
 )

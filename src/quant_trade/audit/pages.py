@@ -1355,7 +1355,7 @@ _UI: dict[str, dict[str, Any]] = {
             "Red flags and your files' fingerprints",
         ],
         "full_items": [
-            "Simulation of the {firms} challenge you choose, with its published rules",
+            "Simulation of the challenge you choose ({firms}), with its published rules",
             "How much cost it can bear before it ends in a loss",
             "Resampled one-year risk and the capital it needs",
             "The questions it leaves open: which file answers each one, or what to ask the "
@@ -2171,8 +2171,9 @@ def _how_html(copy: dict[str, Any], locale: str, offer: paid_offer.Offer | None 
 
 def _full_items(locale: str) -> list[str]:
     """What the full report adds, as the price card lists it (``_UI['full_items']``):
-    "your challenge of A, B or C", every firm with published rules from A to Z."""
-    firms = challenge.firm_names(locale, "or")
+    "your challenge of A, B, C and N other firms", three firms by name and how many
+    others (``challenge.firms_short``), so the card does not grow with each firm read."""
+    firms = challenge.firms_short(locale)
     return [item.format(firms=firms) for item in _UI[locale]["full_items"]]
 
 
@@ -5083,11 +5084,13 @@ def audience_page(
     copy = _COPY[locale]
     words = AUDIENCE_COPY[locale]
     text = audience.text[locale]
-    # The firms a text names, from the presets: ``{firms}`` every one of them,
-    # ``{firms_short}`` three and how many others (for a description with a limit).
+    # The firms a text names, from the presets: ``{firms}`` every one of them (as a
+    # sentence of its own, counted by ``{firm_count}``), ``{firms_short}`` three and
+    # how many others (for a description with a limit).
     fill = {
         "presets": FIRM_CHALLENGES,
         "programs": FIRM_PROGRAMS,
+        "firm_count": len(challenge.FIRM_NAMES),
         "firms": challenge.firm_names(locale),
         "firms_short": challenge.firms_short(locale),
     }

@@ -128,7 +128,7 @@ NUMERIC = {
     "myfundedfutures-pro-50k": (0.06, None, 0.04, 2, 0.50),
     "myfundedfutures-builder-50k": (0.06, 0.02, 0.04, 1, None),
     "tradeify-select-50k": (0.06, None, 0.04, 3, 0.40),
-    "tradeify-growth-50k": (0.06, 0.025, 0.04, 1, 0.35),
+    "tradeify-growth-50k": (0.06, 0.025, 0.04, 1, None),
     "bulenox-qualification-eod-50k": (0.06, 0.022, 0.05, 0, None),
     "bulenox-momentum-eod-50k": (0.06, 0.024, 0.045, 0, None),
     "earn2trade-tcp-25k": (0.07, 0.022, 0.06, 0, 0.30),

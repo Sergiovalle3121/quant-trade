@@ -104,8 +104,8 @@ FUTURES_FIRM_COPY: dict[str, dict[str, dict[str, Any]]] = {
                     "¿Puedo usar un robot o mantener posiciones de noche en Take Profit Trader?",
                     "Según las políticas leídas el {as_of}, no: los bots, los algoritmos y la "
                     "ejecución automática están prohibidos también en el Test, y ninguna posición "
-                    "puede quedar abierta para el día de trading siguiente (las abiertas se "
-                    "cierran a las 4:55 PM ET). La calculadora da cifras con tus números "
+                    "puede quedar abierta para el día de trading siguiente (todas se cierran "
+                    "antes de las 4:55 PM ET). La calculadora da cifras con tus números "
                     "declarados, pero una estrategia automática o que mantiene posiciones de "
                     "noche no se puede operar ahí tal cual.",
                 ),
@@ -146,8 +146,8 @@ FUTURES_FIRM_COPY: dict[str, dict[str, dict[str, Any]]] = {
                 (
                     "Can I trade a bot or hold positions overnight at Take Profit Trader?",
                     "According to the policies read on {as_of}, no: bots, algorithms and "
-                    "automated execution are prohibited on Test accounts too, and no position "
-                    "may be held into the next trading day (open ones are closed at 4:55 PM ET). "
+                    "automated execution are prohibited on Test accounts too, and no position may "
+                    "be held into the next trading day (every position is closed by 4:55 PM ET). "
                     "The calculator gives figures for your declared numbers, but an automated or "
                     "overnight strategy cannot be traded there as it is.",
                 ),
@@ -190,7 +190,7 @@ FUTURES_FIRM_COPY: dict[str, dict[str, dict[str, Any]]] = {
                     "Trader?",
                     "Segundo as políticas lidas em {as_of}, não: bots, algoritmos e execução "
                     "automática são proibidos também no Test, e nenhuma posição pode ficar aberta "
-                    "para o dia de trading seguinte (as abertas são fechadas às 4:55 PM ET). A "
+                    "para o dia de trading seguinte (todas são fechadas até as 4:55 PM ET). A "
                     "calculadora dá números com os seus dados declarados, mas uma estratégia "
                     "automática ou que mantém posições de um dia para o outro não pode ser "
                     "operada lá do jeito que está.",
@@ -235,11 +235,13 @@ FUTURES_FIRM_COPY: dict[str, dict[str, dict[str, Any]]] = {
                 ),
                 (
                     "¿Qué reglas de MyFundedFutures no ve la calculadora?",
-                    "Según las páginas leídas el {as_of}: las posiciones abiertas se cierran solas "
-                    "a las 4:10 PM EST, así que ninguna se mantiene de un día a otro; una cuenta "
-                    "sin operaciones durante 7 días naturales seguidos puede cerrarse; cada plan "
-                    "limita sus contratos, y la política de noticias se contradice. La regla de "
-                    f"consistencia ({{field[{_MFF_RAPID_EOD}.best_day_limit]}} en Rapid EOD 50K, "
+                    "Según las páginas leídas el {as_of}: las posiciones abiertas se cierran "
+                    "solas a las 4:10 PM EST, así que ninguna se mantiene de un día a otro; una "
+                    "cuenta sin operaciones durante 7 días naturales seguidos puede cerrarse; "
+                    "cada plan limita sus contratos, y en Rapid EOD, Rapid y Pro la política de "
+                    "noticias se contradice, mientras que en Builder se permite operar con "
+                    "noticias. La regla de consistencia "
+                    f"({{field[{_MFF_RAPID_EOD}.best_day_limit]}} en Rapid EOD 50K, "
                     f"{{field[{_MFF_RAPID}.best_day_limit]}} en Rapid 50K y Pro 50K) no termina "
                     "la cuenta: pide más días de trading.",
                 ),
@@ -284,7 +286,8 @@ FUTURES_FIRM_COPY: dict[str, dict[str, dict[str, Any]]] = {
                     "According to the pages read on {as_of}: open positions are closed "
                     "automatically at 4:10 PM EST, so none are held overnight; an account with no "
                     "trade for 7 consecutive calendar days may be closed; each plan caps its "
-                    "contracts; and the news policy contradicts itself. The consistency rule "
+                    "contracts; and on Rapid EOD, Rapid and Pro the news policy contradicts "
+                    "itself, while Builder allows news trading. The consistency rule "
                     f"({{field[{_MFF_RAPID_EOD}.best_day_limit]}} on Rapid EOD 50K, "
                     f"{{field[{_MFF_RAPID}.best_day_limit]}} on Rapid 50K and Pro 50K) does not "
                     "end the account: it asks for more trading days.",
@@ -330,7 +333,8 @@ FUTURES_FIRM_COPY: dict[str, dict[str, dict[str, Any]]] = {
                     "Segundo as páginas lidas em {as_of}: as posições abertas são fechadas "
                     "automaticamente às 4:10 PM EST, então nenhuma fica de um dia para o outro; "
                     "uma conta sem operações por 7 dias corridos seguidos pode ser encerrada; "
-                    "cada plano limita os contratos; e a política de notícias se contradiz. A "
+                    "cada plano limita os contratos; e no Rapid EOD, no Rapid e no Pro a política "
+                    "de notícias se contradiz, enquanto o Builder permite operar notícias. A "
                     f"regra de consistência ({{field[{_MFF_RAPID_EOD}.best_day_limit]}} no Rapid "
                     f"EOD 50K, {{field[{_MFF_RAPID}.best_day_limit]}} no Rapid 50K e no Pro 50K) "
                     "não encerra a conta: pede mais dias de trading.",
@@ -364,14 +368,13 @@ FUTURES_FIRM_COPY: dict[str, dict[str, dict[str, Any]]] = {
                 ),
                 (
                     "¿Cómo trata la calculadora la consistencia de Select y de Growth?",
-                    "Según las páginas leídas el {as_of}, en Select ningún día puede superar el "
-                    f"{{field[{_TRADEIFY_SELECT}.best_day_limit]}} de la ganancia total, y por eso "
-                    f"pide al menos {{field[{_TRADEIFY_SELECT}.min_trading_days]}} días. En "
-                    "Growth, la página del programa dice que la evaluación no tiene regla de "
-                    "consistencia y la referencia de precios nombra una del "
-                    f"{{field[{_TRADEIFY_GROWTH}.best_day_limit]}}: la calculadora usa esa, la "
-                    "lectura más estricta. En los dos casos compara el mejor día con el objetivo "
-                    "cuando una trayectoria lo alcanza.",
+                    "Según las páginas leídas el {as_of}, en la evaluación Select ningún día "
+                    f"puede superar el {{field[{_TRADEIFY_SELECT}.best_day_limit]}} de la "
+                    "ganancia total, y por eso pide al menos "
+                    f"{{field[{_TRADEIFY_SELECT}.min_trading_days]}} días; la calculadora compara "
+                    "el mejor día con el objetivo cuando una trayectoria lo alcanza. La "
+                    "evaluación Growth no tiene regla de consistencia: su regla del 35 % rige los "
+                    "cobros de la cuenta Sim Funded, así que la calculadora no aplica ninguna.",
                 ),
                 (
                     "¿Cómo cuenta la calculadora el límite diario de Growth 50K?",
@@ -408,14 +411,13 @@ FUTURES_FIRM_COPY: dict[str, dict[str, dict[str, Any]]] = {
                 ),
                 (
                     "How does the calculator treat the Select and Growth consistency rules?",
-                    "According to the pages read on {as_of}, on Select no day may exceed "
-                    f"{{field[{_TRADEIFY_SELECT}.best_day_limit]}} of the total profit, which is "
-                    f"why it asks for at least {{field[{_TRADEIFY_SELECT}.min_trading_days]}} "
-                    "days. On Growth, the program page says the evaluation has no consistency "
-                    "rule and the pricing reference names one of "
-                    f"{{field[{_TRADEIFY_GROWTH}.best_day_limit]}}: the calculator uses that one, "
-                    "the stricter reading. In both it compares the best day with the profit "
-                    "target when a path reaches it.",
+                    "According to the pages read on {as_of}, in the Select evaluation no day may "
+                    f"exceed {{field[{_TRADEIFY_SELECT}.best_day_limit]}} of the total profit, "
+                    "which is why it asks for at least "
+                    f"{{field[{_TRADEIFY_SELECT}.min_trading_days]}} days; the calculator compares "
+                    "the best day with the profit target when a path reaches it. The Growth "
+                    "evaluation has no consistency rule: its 35 % rule governs the Sim Funded "
+                    "account's payouts, so the calculator applies none.",
                 ),
                 (
                     "How does the calculator count the Growth 50K daily loss limit?",
@@ -452,14 +454,13 @@ FUTURES_FIRM_COPY: dict[str, dict[str, dict[str, Any]]] = {
                 ),
                 (
                     "Como a calculadora trata a consistência do Select e do Growth?",
-                    "Segundo as páginas lidas em {as_of}, no Select nenhum dia pode superar "
-                    f"{{field[{_TRADEIFY_SELECT}.best_day_limit]}} do resultado total, e por isso "
-                    f"ele pede pelo menos {{field[{_TRADEIFY_SELECT}.min_trading_days]}} dias. No "
-                    "Growth, a página do programa diz que a avaliação não tem regra de "
-                    "consistência e a referência de preços cita uma de "
-                    f"{{field[{_TRADEIFY_GROWTH}.best_day_limit]}}: a calculadora usa essa, a "
-                    "leitura mais estrita. Nos dois casos compara o melhor dia com a meta quando "
-                    "uma trajetória a atinge.",
+                    "Segundo as páginas lidas em {as_of}, na avaliação Select nenhum dia pode "
+                    f"superar {{field[{_TRADEIFY_SELECT}.best_day_limit]}} do resultado total, e "
+                    f"por isso ela pede pelo menos {{field[{_TRADEIFY_SELECT}.min_trading_days]}} "
+                    "dias; a calculadora compara o melhor dia com a meta quando uma trajetória a "
+                    "atinge. A avaliação Growth não tem regra de consistência: a sua regra de 35 % "
+                    "vale para os saques da conta Sim Funded, então a calculadora não aplica "
+                    "nenhuma.",
                 ),
                 (
                     "Como a calculadora conta o limite diário do Growth 50K?",
@@ -492,9 +493,9 @@ FUTURES_FIRM_COPY: dict[str, dict[str, dict[str, Any]]] = {
                 (
                     "¿Por qué la calculadora pone un plazo de 30 días a la Qualification de "
                     "Bulenox?",
-                    "Según la página de precios leída el {as_of}, el acceso dura 30 días y un "
-                    "reset no lo alarga, mientras que la FAQ dice que no hay máximo de días de "
-                    "trading. La calculadora usa los "
+                    "Según las páginas leídas el {as_of}, la página de precios da 30 días de "
+                    "acceso y el centro de ayuda dice que un reset no los alarga, mientras que la "
+                    "FAQ dice que no hay máximo de días de trading. La calculadora usa los "
                     f"{{field[{_BULENOX_QUALIFICATION}.time_limit_days]}} días, la lectura más "
                     "estricta: {horizon} días hábiles en sus trayectorias.",
                 ),
@@ -536,9 +537,9 @@ FUTURES_FIRM_COPY: dict[str, dict[str, dict[str, Any]]] = {
                 ),
                 (
                     "Why does the calculator give the Bulenox Qualification a 30-day time limit?",
-                    "According to the pricing page read on {as_of}, access lasts 30 days and a "
-                    "reset does not extend it, while the FAQ says there is no maximum number of "
-                    "trading days. The calculator uses the "
+                    "According to the pages read on {as_of}, the pricing page gives 30 days of "
+                    "access and the help center says a reset does not extend them, while the FAQ "
+                    "says there is no maximum number of trading days. The calculator uses the "
                     f"{{field[{_BULENOX_QUALIFICATION}.time_limit_days]}} days, the stricter "
                     "reading: {horizon} business days on its paths.",
                 ),
@@ -578,8 +579,9 @@ FUTURES_FIRM_COPY: dict[str, dict[str, dict[str, Any]]] = {
                 ),
                 (
                     "Por que a calculadora dá um prazo de 30 dias ao Qualification da Bulenox?",
-                    "Segundo a página de preços lida em {as_of}, o acesso dura 30 dias e um reset "
-                    "não o estende, enquanto a FAQ diz que não há máximo de dias de trading. A "
+                    "Segundo as páginas lidas em {as_of}, a página de preços dá 30 dias de acesso "
+                    "e a central de ajuda diz que um reset não os estende, enquanto a FAQ diz que "
+                    "não há máximo de dias de trading. A "
                     f"calculadora usa os {{field[{_BULENOX_QUALIFICATION}.time_limit_days]}} "
                     "dias, a leitura mais estrita: {horizon} dias úteis nas suas trajetórias.",
                 ),
@@ -629,7 +631,7 @@ FUTURES_FIRM_COPY: dict[str, dict[str, dict[str, Any]]] = {
                 (
                     "¿Cómo cuenta la calculadora la pérdida diaria y el drawdown de Earn2Trade?",
                     "Según el centro de ayuda leído el {as_of}, la pérdida diaria se cuenta desde "
-                    "el balance con el que empieza el día (de 5:00 pm a 5:00 pm CT) con "
+                    "el balance con el que empieza el día (de 5:00 PM a 5:00 PM CT) con "
                     "operaciones abiertas y cerradas y comisiones, y el drawdown sigue al mayor "
                     "cierre diario hasta el balance inicial, también con pérdidas abiertas. La "
                     "calculadora revisa los dos en cada cierre diario: no ve el flotante dentro "
@@ -669,7 +671,7 @@ FUTURES_FIRM_COPY: dict[str, dict[str, dict[str, Any]]] = {
                 (
                     "How does the calculator count the Earn2Trade daily loss and drawdown?",
                     "According to the help center read on {as_of}, the daily loss is counted from "
-                    "the balance the day starts with (5:00 pm to 5:00 pm CT) with open and closed "
+                    "the balance the day starts with (5:00 PM to 5:00 PM CT) with open and closed "
                     "trades and commissions, and the drawdown trails the highest daily close up "
                     "to the starting balance, open losses included. The calculator checks both "
                     "at every daily close: it does not see the floating loss within the day, so "
@@ -709,7 +711,7 @@ FUTURES_FIRM_COPY: dict[str, dict[str, dict[str, Any]]] = {
                 (
                     "Como a calculadora conta a perda diária e o drawdown da Earn2Trade?",
                     "Segundo a central de ajuda lida em {as_of}, a perda diária é contada a partir "
-                    "do saldo com que o dia começa (de 5:00 pm a 5:00 pm CT) com operações "
+                    "do saldo com que o dia começa (de 5:00 PM a 5:00 PM CT) com operações "
                     "abertas e fechadas e comissões, e o drawdown acompanha o maior fechamento "
                     "diário até o saldo inicial, também com perdas abertas. A calculadora confere "
                     "os dois em cada fechamento diário: não vê a perda flutuante dentro do dia, "
@@ -756,8 +758,9 @@ FUTURES_FIRM_COPY: dict[str, dict[str, dict[str, Any]]] = {
                     f"{{field[{_ALPHA_ZERO}.max_daily_loss]}} del balance inicial sobre el P&L "
                     "abierto y cerrado del día: al tocarlo se cierran las posiciones y la cuenta "
                     "queda bloqueada hasta el siguiente día de trading (6 PM ET), sin terminar. "
-                    "La calculadora termina ahí la trayectoria, que es más estricto. Standard 50K "
-                    "y Advanced 50K no tienen límite de pérdida diaria en la evaluación.",
+                    "La calculadora termina ahí la trayectoria: más estricta por terminarla, "
+                    "optimista por no ver el P&L abierto dentro del día. Standard 50K y Advanced "
+                    "50K no tienen límite de pérdida diaria en la evaluación.",
                 ),
                 (
                     "¿Puedo usar un robot en Alpha Futures?",
@@ -799,8 +802,9 @@ FUTURES_FIRM_COPY: dict[str, dict[str, dict[str, Any]]] = {
                     f"{{field[{_ALPHA_ZERO}.max_daily_loss]}} of the starting balance on the "
                     "day's open and closed P&L: reaching it flattens the positions and locks the "
                     "account until the next trading day (6 PM ET) without ending it. The "
-                    "calculator ends the path there, the stricter reading. Standard 50K and "
-                    "Advanced 50K have no daily loss limit in the evaluation.",
+                    "calculator ends the path there: stricter for ending it, optimistic for not "
+                    "seeing the open P&L within the day. Standard 50K and Advanced 50K have no "
+                    "daily loss limit in the evaluation.",
                 ),
                 (
                     "Can I trade a bot at Alpha Futures?",
@@ -841,8 +845,9 @@ FUTURES_FIRM_COPY: dict[str, dict[str, dict[str, Any]]] = {
                     f"{{field[{_ALPHA_ZERO}.max_daily_loss]}} do saldo inicial sobre o P&L aberto "
                     "e fechado do dia: ao atingi-lo, as posições são zeradas e a conta fica "
                     "bloqueada até o próximo dia de trading (6 PM ET), sem ser encerrada. A "
-                    "calculadora encerra ali a trajetória, a leitura mais estrita. O Standard 50K "
-                    "e o Advanced 50K não têm limite de perda diária na avaliação.",
+                    "calculadora encerra ali a trajetória: mais estrita por encerrá-la, otimista "
+                    "por não ver o P&L aberto dentro do dia. O Standard 50K e o Advanced 50K não "
+                    "têm limite de perda diária na avaliação.",
                 ),
                 (
                     "Posso usar um robô na Alpha Futures?",
@@ -870,15 +875,17 @@ FUTURES_FIRM_COPY: dict[str, dict[str, dict[str, Any]]] = {
                     "¿Qué objetivo y qué límites tiene LucidPro 50K de Lucid Trading?",
                     "Según el centro de ayuda de Lucid Trading leído el {as_of}: "
                     f"{{rules[{_LUCID_PRO}]}}. En la cuenta de USD 50.000 son USD 3.000 de "
-                    "objetivo y USD 2.000 de pérdida máxima, con un pago único y sin plazo.",
+                    "objetivo y USD 2.000 de pérdida máxima, con un pago único.",
                 ),
                 (
                     "¿Por qué la calculadora no fija la pérdida máxima de LucidPro?",
                     "Según el centro de ayuda leído el {as_of}, la pérdida máxima sigue al mayor "
                     "balance de cierre diario y se fija en el balance inicial más USD 100. La "
-                    "calculadora la deja seguir sin fijarse, la lectura más estricta: nunca "
-                    "mantiene viva una trayectoria que la regla de la firma terminaría. Las "
-                    "páginas leídas no dicen si también se vigila dentro del día.",
+                    "calculadora la deja seguir sin fijarse, la lectura más estricta en cuanto al "
+                    "bloqueo: en cierres diarios nunca mantiene viva una trayectoria que la regla "
+                    "de la firma terminaría. Las páginas leídas no dicen si también se vigila "
+                    "dentro del día; la calculadora solo mira cierres diarios, así que, si se "
+                    "vigila, aquí es optimista.",
                 ),
                 (
                     "¿Simula la calculadora el límite de pérdida diaria de LucidPro?",
@@ -909,16 +916,17 @@ FUTURES_FIRM_COPY: dict[str, dict[str, dict[str, Any]]] = {
                     "What target and limits does the Lucid Trading LucidPro 50K have?",
                     "According to the Lucid Trading help center read on {as_of}: "
                     f"{{rules[{_LUCID_PRO}]}}. On the USD 50,000 account that is a USD 3,000 "
-                    "target and a USD 2,000 maximum loss, for a one-time fee and with no time "
-                    "limit.",
+                    "target and a USD 2,000 maximum loss, for a one-time fee.",
                 ),
                 (
                     "Why does the calculator not lock the LucidPro maximum loss?",
                     "According to the help center read on {as_of}, the maximum loss trails the "
                     "highest end-of-day balance and locks at the starting balance plus USD 100. "
-                    "The calculator lets it trail without locking, the stricter reading: it never "
-                    "keeps alive a path the firm's rule would end. The pages read do not say "
-                    "whether it is also checked within the day.",
+                    "The calculator lets it trail without locking, the stricter reading of the "
+                    "lock: on daily closes it never keeps alive a path the firm's rule would end. "
+                    "The pages read do not say whether it is also checked within the day; the "
+                    "calculator only checks daily closes, so if it is, the calculator is "
+                    "optimistic here.",
                 ),
                 (
                     "Does the calculator simulate the LucidPro daily loss limit?",
@@ -950,15 +958,17 @@ FUTURES_FIRM_COPY: dict[str, dict[str, dict[str, Any]]] = {
                     "Que meta e que limites tem o LucidPro 50K da Lucid Trading?",
                     "Segundo a central de ajuda da Lucid Trading lida em {as_of}: "
                     f"{{rules[{_LUCID_PRO}]}}. Na conta de USD 50.000 são USD 3.000 de meta e "
-                    "USD 2.000 de perda máxima, com pagamento único e sem prazo.",
+                    "USD 2.000 de perda máxima, com pagamento único.",
                 ),
                 (
                     "Por que a calculadora não fixa a perda máxima do LucidPro?",
                     "Segundo a central de ajuda lida em {as_of}, a perda máxima acompanha o maior "
                     "saldo de fechamento diário e se fixa no saldo inicial mais USD 100. A "
-                    "calculadora a deixa acompanhar sem se fixar, a leitura mais estrita: nunca "
-                    "mantém viva uma trajetória que a regra da firma encerraria. As páginas lidas "
-                    "não dizem se ela também é vigiada dentro do dia.",
+                    "calculadora a deixa acompanhar sem se fixar, a leitura mais estrita quanto à "
+                    "fixação: em fechamentos diários nunca mantém viva uma trajetória que a regra "
+                    "da firma encerraria. As páginas lidas não dizem se ela também é vigiada "
+                    "dentro do dia; a calculadora só olha fechamentos diários, então, se for, aqui "
+                    "é otimista.",
                 ),
                 (
                     "A calculadora simula o limite de perda diária do LucidPro?",

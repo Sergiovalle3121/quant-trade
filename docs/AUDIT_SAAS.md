@@ -155,11 +155,14 @@ challenge" in the table). Several phases with the same target read "a target of
 repeated rule set does. The main page's description names three firms and
 counts the others (`challenge_calc.firms_short`: "FTMO, FundingPips, Topstep and
 6 other firms"), so it fits 160 characters and never reads as the whole list;
-every full list of firms on the site comes from `challenge_calc.firm_names`
-(in the presets' order, the order of `FIRMS`, closed with "and" or "or"), and a
-test walks every public page for a list that ends in The5ers and Topstep. Each
-firm page has its own title and a description that says the tool is
-independent and not affiliated with the firm, all of the firm's programs and
+the landing's price card says the same, so it does not grow with each firm read
+and the landing keeps its 1,300-word budget. Every full list of firms on the site
+comes from `challenge_calc.firm_names` (in the presets' order, the order of
+`FIRMS`, closed with "and" or "or"), a sentence of its own on the prop-firm
+case page, never inside a noun phrase, and a test walks every public page for a
+list that ends in The5ers and Topstep. Each firm page has its own title and a
+description that says the tool is independent and not affiliated with the
+firm, all of the firm's programs and
 four questions whose figures are filled from the presets
 (`challenge_calc.firm_faq`: `{rules[key]}`, `{daily[key]}`, `{field[key.name]}`,
 `{accounts}` (the dollars of the programs that name an account), `{horizon}`,
@@ -264,17 +267,23 @@ and `FIRM_COPY` after the others:
   limit) and Growth 50K (a USD 1,250 daily limit that pauses the session,
   simulated as one that ends the path). The drawdown article says the
   evaluation drawdown does not lock, a rules overview shows one at USD 50,100:
-  no lock. The Growth page and the consistency article say the evaluation has
-  no consistency rule and the pricing reference names 35 %: the preset checks
-  35 % (stricter). Left out: Lightning Funded (no evaluation).
+  no lock. The Growth evaluation has no consistency rule (its page: "NO
+  consistency requirement"); the 35 % of the consistency article is the Growth
+  Sim Funded payouts' rule, measured up to the payout request, and the pricing
+  reference only names it in its one-line summary of the account. The preset
+  checks no best day, and its note says where the 35 % applies. Left out:
+  Lightning Funded (no evaluation).
 - **Bulenox** (pricing page, help center and FAQ, read from the site's own CMS
   that the accordions load): Qualification EOD 50K (Option 2: USD 1,100 daily
   pause, USD 2,500 end-of-day drawdown without the Master's lock; the pricing
-  page gives 30 days of access and the FAQ "as long as you need": the preset
-  uses 30, stricter) and Momentum EOD 50K (USD 1,200 daily pause, USD 2,250
-  drawdown, 30 days). The pages read do not say whether the floors are also
-  checked within the day. Left out: Option 1 (a trailing drawdown on intraday
-  equity) and Fast Track (no evaluation).
+  page gives 30 days of access, the help center says a reset does not extend
+  them, and the FAQ "as long as you need": the preset uses 30, stricter) and
+  Momentum EOD 50K (USD 1,200 daily pause, USD 2,250 drawdown, 30 days). The
+  Qualification's daily limit counts realized and unrealized P&L and can be
+  watched in real time, which daily closes cannot see; the pages read do not
+  say whether its maximum-loss floor is also checked within the day, nor, for
+  Momentum, whether either floor is. Left out: Option 1 (a trailing drawdown on
+  intraday equity) and Fast Track (no evaluation).
 - **Earn2Trade** (program pages and help center): Trader Career Path 25K
   (USD 1,750 target, a hard USD 550 daily limit from the day's starting
   balance, USD 1,500 end-of-day drawdown that stops at the starting balance)
@@ -282,17 +291,25 @@ and `FIRM_COPY` after the others:
   Maintain Consistency rule, checked against the target. The 25K is the size the
   page shows without script.
 - **Alpha Futures** (product pages and help center): Zero 50K (a 2 % Daily Loss
-  Guard that flattens and locks the day, simulated as one that ends the path;
-  1 day), Standard 50K (50 %, 2 days) and Advanced 50K (USD 4,000 target,
-  USD 1,750 loss, 40 %, 3 days); the maximum loss trails the end-of-day balance
-  and stops at the starting balance. AI, bots and automated trading are
-  prohibited on every account type, and the notes say so.
+  Guard on open and closed P&L that flattens and locks the day, simulated as one
+  that ends the path: stricter for ending it, optimistic for not seeing the open
+  P&L within the day; 1 day), Standard 50K (50 %, 2 days) and Advanced 50K
+  (USD 4,000 target, USD 1,750 loss, 40 %, 3 days); the maximum loss trails the
+  end-of-day balance and stops at the starting balance. AI, bots and automated
+  trading are prohibited on every account type, and the notes say so; the one
+  trade every 10 trading days is cited from the inactivity article, not the
+  subscription's.
 - **Lucid Trading** (help center; lucidtrading.com refuses automated readers):
-  LucidPro 50K with the daily limit off (an option chosen at purchase; on, a
-  USD 1,200 soft limit, not simulated), its end-of-day trailing that locks at
-  the starting balance plus USD 100 trailing without a lock. Left out:
-  LucidFlex (its reading did not carry the sources and quotes this transcription
-  needs), LucidDirect (no evaluation), LucidMaxx (invitation only) and
+  LucidPro 50K with the daily limit off (an option chosen at purchase, from the
+  customization article; on, a USD 1,200 soft limit, not simulated), its
+  end-of-day trailing that locks at the starting balance plus USD 100 trailing
+  without a lock: never more lenient on daily closes, optimistic if the floor is
+  also checked within the day, which the pages read do not say. Microscalping,
+  high-frequency trading and hedging are cited from their own prohibition
+  articles; the other-activities article allows news trading, automated systems
+  and trade copiers. Left out: LucidFlex (its reading did not carry the sources
+  and quotes this transcription needs), LucidDirect (no evaluation), LucidMaxx
+  (invitation only) and
   LucidBlack (legacy).
 
 Elite Trader Funding is not in: its reading did not reach this transcription.

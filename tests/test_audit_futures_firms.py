@@ -185,8 +185,11 @@ def test_the_stricter_readings_are_the_ones_simulated() -> None:
     for key in KEYS:
         rules = PRESETS[key]
         assert rules.best_day_basis in (None, "profit_target"), key
-    # Tradeify Growth: the pricing reference's 35 %, the stricter of the pages read.
-    assert PRESETS["tradeify-growth-50k"].best_day_limit == 0.35
+    # Tradeify Growth: its evaluation has no consistency rule; the 35 % one is the
+    # Sim Funded payouts' (consistency article), so no best day is checked.
+    growth = PRESETS["tradeify-growth-50k"]
+    assert growth.best_day_limit is None and growth.best_day_basis is None
+    assert any("35 %" in note and "Sim Funded payouts" in note for note in growth.notes)
     # Bulenox Qualification: the 30-day access, not the FAQ's "as long as you need".
     assert PRESETS["bulenox-qualification-eod-50k"].time_limit_days == 30
     assert calc.horizon("bulenox-qualification-eod-50k") < calc.SIMULATOR_MAX_DAYS
@@ -233,6 +236,55 @@ def test_a_program_whose_page_says_none_has_no_daily_limit(locale: str) -> None:
     # an option: both read "not simulated", never "none".
     for key in ("take-profit-trader-test-50k", "lucid-pro-50k"):
         assert key not in calc.NO_DAILY_LIMIT and calc.daily_clause(key, locale) == unstated
+
+
+def test_each_note_cites_the_page_that_states_it() -> None:
+    """Whoever opens a note's source finds the rule there."""
+    notes = {key: " ".join(PRESETS[key].notes) for key in KEYS}
+    assert "10468320-rules-consistency-rule" in notes["tradeify-growth-50k"]
+    assert "14369021" not in notes["tradeify-growth-50k"]
+    for key in (k for k in KEYS if k.startswith("alpha-futures-")):
+        # The monthly fee's article says nothing about inactivity; its own one does.
+        time = next(note for note in PRESETS[key].notes if "10 trading days" in note)
+        assert time.index("9492068-monthly-subscription") < time.index("10 trading days")
+        assert time.index("10 trading days") < time.index("12757982-inactivity-rule")
+    for article in (
+        "16226068-lucidpro-customization",
+        "11404742-prohibited-microscalping",
+        "11404736-prohibited-high-frequency-trading",
+        "11404734-prohibited-hedging",
+        "11404728-other-trading-activities",
+    ):
+        assert article in notes["lucid-pro-50k"], article
+    assert "help-center/qualification#reset" in notes["bulenox-qualification-eod-50k"]
+    for locale in LOCALES:
+        deadline = calc.firm_faq("bulenox", locale)[1][1]
+        center = {"es": "centro de ayuda", "en": "help center", "pt": "central de ajuda"}
+        assert center[locale] in deadline
+
+
+def test_what_daily_closes_cannot_see_is_said_with_the_stricter_side() -> None:
+    # Bulenox Qualification: its daily limit counts open P&L and the page says it can be
+    # watched in real time, so only the maximum-loss floor is left unstated there.
+    floors = "whether the floors are also checked"
+    floor = "whether the maximum-loss floor is also checked"
+    qualification = PRESETS["bulenox-qualification-eod-50k"].notes
+    assert not any(floors in note for note in qualification)
+    assert any(floor in note for note in qualification)
+    assert any(floors in note for note in PRESETS["bulenox-momentum-eod-50k"].notes)
+    # Alpha Futures Zero: the Daily Loss Guard counts open P&L within the day.
+    guard = next(n for n in PRESETS["alpha-futures-zero-50k"].notes if "Daily Loss Guard" in n)
+    assert "stricter" in guard and "optimistic" in guard
+    for locale, optimistic, once in (
+        ("es", "optimista", "sin plazo"),
+        ("en", "optimistic", "no time limit"),
+        ("pt", "otimista", "sem prazo"),
+    ):
+        assert optimistic in calc.firm_faq("alpha-futures", locale)[2][1]
+        # LucidPro: "never" holds on daily closes only; within the day it may not.
+        lucid = calc.firm_faq("lucid-trading", locale)
+        assert optimistic in lucid[1][1]
+        assert lucid[0][1].count(once) == 1
 
 
 # -- the pages -------------------------------------------------------------------

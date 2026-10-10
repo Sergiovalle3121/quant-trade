@@ -159,12 +159,7 @@ def test_the_landing_is_short_and_keeps_its_ways_out(locale: str, with_photo: Pa
     page = _paid_landing(locale, operator=("Sergio Valle", "Ciudad de México"))
     main = _main(page)
     if locale == "es":
-        # The price card names every firm with published rules (the full report lines
-        # test below), a list that grows with each firm read: the budget is the prose's,
-        # the 1,300 words less the 14 of the list when it had nine firms.
-        text, firms = _text(main), pages.challenge.firm_names("es", "or")
-        assert text.count(firms) == 1
-        assert len(text.split()) - len(firms.split()) <= 1300 - 14
+        assert len(_text(main).split()) <= 1300
     assert main.count("data-reveal") <= 25
     for href in (_sample_url(locale), tools_url(locale), PRICING_PATH[locale]):
         assert f"href='{href}" in main, href
@@ -364,8 +359,11 @@ def test_motion_never_blurs_and_the_hero_text_does_not_rise() -> None:
 def test_the_full_report_lines_name_only_what_exists(locale: str) -> None:
     items = pages._full_items(locale)
     assert len(items) == 5
-    firms = sorted({rules.firm for rules in PRESETS.values() if rules.firm != "Generic"})
-    assert all(firm in items[0] for firm in firms)
+    firms = {rules.firm for rules in PRESETS.values() if rules.firm != "Generic"}
+    # Three firms by name and how many others: the card does not grow with each firm.
+    assert pages.challenge.firms_short(locale) in items[0]
+    assert set(pages.challenge.NAMED_FIRMS) <= firms
+    assert f" {len(firms) - len(pages.challenge.NAMED_FIRMS)} " in items[0]
     assert "{" not in " ".join(items)
     prices = _paid_landing(locale).split("id='pricing'", 1)[1].split("</section>", 1)[0]
     assert f"href='{_sample_url(locale)}'" in prices

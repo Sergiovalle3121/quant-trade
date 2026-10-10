@@ -592,7 +592,7 @@ def test_prop_page_counts_rule_sets_and_programs_from_the_presets(
     text = _visible(_get(site, audience_url("retos-prop-firm", locale)))
     expected = {
         "es": f"{rule_sets} juegos de reglas de {programs} programas",
-        "en": f"{rule_sets} rule sets from {programs} FTMO",
+        "en": f"{rule_sets} rule sets from {programs} programs",
         "pt": f"{rule_sets} conjuntos de regras de {programs} programas",
     }[locale]
     assert expected in text
