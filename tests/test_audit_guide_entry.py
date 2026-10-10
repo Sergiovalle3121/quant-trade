@@ -39,7 +39,7 @@ from test_audit_forward import _back  # noqa: E402
 from test_audit_forward import _export as _forward_export  # noqa: E402
 from test_audit_tracking_exports import MQL5_HISTORY, _fxblue, _myfxbook  # noqa: E402
 
-from quant_trade.audit import accounts, decay  # noqa: E402
+from quant_trade.audit import accounts, decay, paid_offer  # noqa: E402
 from quant_trade.audit.account import ACCOUNT_FORMATS, account_review  # noqa: E402
 from quant_trade.audit.account_pages import COPY as ACCOUNT_COPY  # noqa: E402
 from quant_trade.audit.account_pages import report_contents  # noqa: E402
@@ -432,9 +432,7 @@ def _has(block: str, text: str) -> bool:
 
 
 @pytest.mark.parametrize("locale", LOCALES)
-def test_the_free_report_line_follows_the_configuration(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, locale: str
-) -> None:
+def test_the_free_report_line_follows_the_configuration(tmp_path: Path, locale: str) -> None:
     pricing = PRICING_COPY[locale]
     account = ACCOUNT_COPY[locale]
     words = GUIDES_COPY[locale]
@@ -461,9 +459,10 @@ def test_the_free_report_line_follows_the_configuration(
     assert has(verify, offer_text("welcome", locale, email_verification=True))
     assert has(verify, pricing["email_note"]) and has(verify, first_free)
 
-    monkeypatch.setattr(accounts, "WELCOME_FULL_REPORT", False)
     (tmp_path / "paid").mkdir()
-    paid = _offer_block(_client(tmp_path / "paid", free_mode=False), locale)
+    paid = _offer_block(
+        _client(tmp_path / "paid", free_mode=False, welcome_full_report=False), locale
+    )
     for text in (
         pricing["start_text"],
         pricing["start_text_free"],
@@ -474,7 +473,16 @@ def test_the_free_report_line_follows_the_configuration(
         report_contents(locale, ""),
     ):
         assert not has(paid, text), text
-    assert has(paid, words["paid_terms"].format(n=accounts.FREE_PREVIEWS_PER_MONTH))
+    # With its price the paid offer names the price once: the free preview, the
+    # price, the refund and the account's monthly previews, not the guide's own
+    # "the full report is paid" after it.
+    terms = paid_offer.offer_of(AuditSettings(free_mode=False, welcome_full_report=False))
+    monthly = paid_offer.words(locale)["account_previews"].format(
+        n=accounts.FREE_PREVIEWS_PER_MONTH
+    )
+    assert has(paid, f"{paid_offer.paid_text(locale, terms)} {monthly}")
+    assert not has(paid, words["paid_terms"].format(n=accounts.FREE_PREVIEWS_PER_MONTH))
+    assert _visible(paid).count(paid_offer.full_text(locale, terms)) == 1
     assert f"href='{PRICING_PATH[locale]}'" in paid
     assert len({free, welcome, verify, paid}) == 4
     for block in (free, welcome, verify, paid):

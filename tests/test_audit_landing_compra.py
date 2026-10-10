@@ -20,7 +20,7 @@ pytest.importorskip("sqlalchemy")
 
 from fastapi.testclient import TestClient  # noqa: E402
 
-from quant_trade.audit import pages, theme  # noqa: E402
+from quant_trade.audit import pages, paid_offer, theme  # noqa: E402
 from quant_trade.audit.account_pages import COPY as ACCOUNT_COPY  # noqa: E402
 from quant_trade.audit.account_pages import path as account_path  # noqa: E402
 from quant_trade.audit.account_pages import report_box  # noqa: E402
@@ -147,11 +147,11 @@ def test_the_first_screen_names_the_price_and_never_a_card(tmp_path: Path, local
     assert "USD 29" not in _text(_first_section(free))
 
 
-def test_the_anchor_needs_the_free_first_report(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_the_anchor_needs_the_free_first_report() -> None:
     assert "class='hero-anchor'" in _paid_landing("es")
     assert "class='hero-anchor'" not in _paid_landing("es", price_usd=0.0)
-    monkeypatch.setattr(pages.accounts, "WELCOME_FULL_REPORT", False)
-    assert "class='hero-anchor'" not in _paid_landing("es")
+    paid = paid_offer.Offer(kind="paid", price_usd=29.0)
+    assert "class='hero-anchor'" not in _paid_landing("es", offer=paid)
 
 
 @pytest.mark.parametrize("locale", sorted(HOMES))

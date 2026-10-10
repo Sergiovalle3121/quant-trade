@@ -26,7 +26,7 @@ pytest.importorskip("sqlalchemy")
 
 from fastapi.testclient import TestClient  # noqa: E402
 
-from quant_trade.audit import account_pages, accounts, web  # noqa: E402
+from quant_trade.audit import account_pages, paid_offer, web  # noqa: E402
 from quant_trade.audit.articles import (  # noqa: E402
     ARTICLE_NEXT_STEPS,
     ARTICLES,
@@ -48,7 +48,6 @@ from quant_trade.audit.pages import (  # noqa: E402
     AUDIT_PATHS,
     PLATFORMS,
     SAMPLE_PAGE_PATHS,
-    _articles_cta,
     upload_page,
 )
 from quant_trade.audit.portuguese import STATUS_TEXT_PT  # noqa: E402
@@ -260,9 +259,7 @@ def test_pricing_closes_with_the_free_report_over_http(tmp_path: Path, locale: s
 
 
 @pytest.mark.parametrize("locale", LOCALES)
-def test_pricing_close_follows_the_configuration(
-    tmp_path: Path, locale: str, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_pricing_close_follows_the_configuration(tmp_path: Path, locale: str) -> None:
     words = PRICING_COPY[locale]
     paid = _paid(tmp_path)
     welcome = _visible(start_cta(paid, locale))
@@ -275,9 +272,12 @@ def test_pricing_close_follows_the_configuration(
     assert words["start_text"] not in free and words["email_note"] not in free
     client = _client(_settings(tmp_path))
     assert client.get(AUDIT_PATHS[locale], follow_redirects=False).status_code == 200
-    # Without a free first report the page keeps the articles' close.
-    monkeypatch.setattr(accounts, "WELCOME_FULL_REPORT", False)
-    assert start_cta(paid, locale) == _articles_cta(locale)
+    # Without a free first report the close starts with the free preview, the
+    # price and the 7-day refund (AUDIT_WELCOME_FULL_REPORT=false).
+    off = replace(paid, welcome_full_report=False)
+    closing = _visible(start_cta(off, locale))
+    assert paid_offer.paid_text(locale, paid_offer.offer_of(off)) in closing
+    assert words["start_text"] not in closing and words["start_title"] not in closing
 
 
 # -- 2. The sample report ---------------------------------------------------------
@@ -413,18 +413,19 @@ def test_the_sample_offers_the_free_report_and_a_check_of_its_pdf(
 
 @pytest.mark.parametrize("locale", LOCALES)
 def test_the_sample_band_follows_the_configuration(
-    tmp_path: Path, locale: str, pdf_pages: list[str], monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, locale: str, pdf_pages: list[str]
 ) -> None:
     words = SAMPLE_CTA_COPY[locale]
     free = _client(_settings(tmp_path / "free")).get(SAMPLE_PAGE_PATHS[locale]).text
     band = _visible(_between(free, "<div class='sample-cta no-print'>", "</div>"))
     assert words["lead_free"] in band and words["button_free"] in band
     assert words["lead_welcome"] not in band
-    monkeypatch.setattr(accounts, "WELCOME_FULL_REPORT", False)
-    paid = _client(_paid(tmp_path / "paid")).get(SAMPLE_PAGE_PATHS[locale]).text
+    off = replace(_paid(tmp_path / "paid"), welcome_full_report=False)
+    paid = _client(off).get(SAMPLE_PAGE_PATHS[locale]).text
     band = _visible(_between(paid, "<div class='sample-cta no-print'>", "</div>"))
-    assert words["lead_paid"] in band and "gratis" not in band and "grátis" not in band
-    assert "free" not in band
+    # No free first report: the free preview, the price and the refund instead.
+    assert words["lead_paid"] in band and words["lead_welcome"] not in band
+    assert paid_offer.paid_text(locale, paid_offer.offer_of(off)) in band
 
 
 def test_without_a_pdf_renderer_the_sample_has_no_check_block(

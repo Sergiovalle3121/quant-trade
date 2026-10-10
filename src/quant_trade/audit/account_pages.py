@@ -13,7 +13,8 @@ from dataclasses import dataclass
 from typing import Any
 from urllib.parse import quote
 
-from quant_trade.audit.account_pt import COPY_PT, PATHS_PT
+from quant_trade.audit import paid_offer
+from quant_trade.audit.account_pt import COPY_PT, PATHS_PT, STORES_PAID_PT
 from quant_trade.audit.accounts import (
     FREE_PREVIEWS_PER_MONTH,
     MIN_PASSWORD_CHARS,
@@ -156,6 +157,11 @@ COPY: dict[str, dict[str, str]] = {
             "recibir el informe gratis: cuyo archivo y navegador no lo hayan tenido en otra "
             "cuenta y cuya red no haya agotado los del mes. Si ninguna puede, lo recibe la "
             "primera que hagas después que cumpla lo mismo."
+        ),
+        "welcome_confirm_paid": (
+            "Cuenta creada. Te enviamos un enlace para confirmar tu correo (si no lo ves, "
+            "revisa la carpeta de spam): hace falta confirmarlo para pagar. Ya puedes subir tu "
+            "archivo."
         ),
         "welcome_confirm_guides": "Mientras llega el correo, exporta tu archivo",
         "next_title": "Así sigue",
@@ -383,9 +389,13 @@ COPY: dict[str, dict[str, str]] = {
         "buy_country": "País de facturación",
         "buy_country_prompt": "Elige tu país",
         "buy_final_sale": (
-            "Entiendo que el crédito se entrega al momento y que la compra no es reembolsable."
+            "Entiendo que el crédito se entrega al momento y que puedo pedir la devolución en "
+            "7 días según los términos."
         ),
-        "buy_final_sale_note": "El crédito se entrega al momento y la compra no es reembolsable.",
+        "buy_final_sale_note": (
+            "El crédito se entrega al momento y puedes pedir la devolución en 7 días según los "
+            "términos."
+        ),
         "buy_alt": "¿Prefieres pagar por WhatsApp?",
         "card_paid": (
             "Pago recibido. Tus créditos aparecen aquí en cuanto Stripe lo confirma; si aún "
@@ -393,7 +403,7 @@ COPY: dict[str, dict[str, str]] = {
         ),
         "buy_off": "El pago con tarjeta no está disponible en este momento.",
         "buy_market": "Elige tu país de facturación para pagar.",
-        "buy_final_sale_needed": "Marca la casilla de compra no reembolsable para pagar.",
+        "buy_final_sale_needed": "Marca la casilla de los términos de compra para pagar.",
         "buy_email": "Confirma tu correo para comprar créditos.",
         "buy_review": "Hay un cobro pendiente de revisión. No vuelvas a pagar; pide ayuda.",
         "security_title": "Contraseña y datos",
@@ -459,6 +469,14 @@ COPY: dict[str, dict[str, str]] = {
             "El envío de correos no está disponible ahora. El primer informe completo gratis, "
             "las compras y los créditos por invitaciones requieren confirmar el correo."
         ),
+        # The paid offer: confirming opens no free report and there are no invites.
+        "email_unverified_status_paid": (
+            "Tu correo aún no está confirmado. Confírmalo para desbloquear las compras."
+        ),
+        "email_delivery_unavailable_paid": (
+            "El envío de correos no está disponible ahora. Las compras requieren confirmar el "
+            "correo."
+        ),
         "email_request_button": "Enviar enlace de confirmación",
         "email_pending_note": (
             "Cambio pendiente a {email}. Sigue entrando con tu correo actual hasta abrir "
@@ -473,6 +491,7 @@ COPY: dict[str, dict[str, str]] = {
         "email_verified": (
             "Correo confirmado. Ya puedes usar las compras y las recompensas disponibles."
         ),
+        "email_verified_paid": "Correo confirmado. Ya puedes usar las compras disponibles.",
         "email_verified_signin": "Correo confirmado. Inicia sesión.",
         "email_verified_report": (
             "Correo confirmado. Tu informe ya está completo, con PDF: lo tienes en tu lista de "
@@ -485,6 +504,7 @@ COPY: dict[str, dict[str, str]] = {
             "Confirma tu correo desde Mi cuenta antes de pagar. Confirmarlo también "
             "desbloquea tu primer informe completo gratis."
         ),
+        "email_checkout_required_paid": "Confirma tu correo desde Mi cuenta antes de pagar.",
         "email_now": "Ahora entras con {email}. Desde el cambio entrarás con el correo nuevo.",
         "email_new": "Correo nuevo",
         "email_again": "Repite el correo nuevo",
@@ -792,6 +812,20 @@ COPY: dict[str, dict[str, str]] = {
         ),
         "anon_signup": "Crear cuenta",
         "anon_signin": "Entrar",
+        "anon_preview": (
+            "Vista previa sin cuenta: la clase de A a D y las banderas rojas de tu archivo. El "
+            "informe completo y el PDF se abren con una cuenta. Guarda este enlace: sin cuenta, "
+            "es la única forma de volver a abrirla."
+        ),
+        "anon_preview_link": (
+            "Vista previa sin cuenta: la clase de A a D y las banderas rojas de tu archivo. "
+            "Guarda este enlace: sin cuenta, es la única forma de volver a abrirla."
+        ),
+        "anon_preview_box": (
+            "Crea tu cuenta con tu correo y este mismo informe se abre completo, gratis, con PDF."
+        ),
+        "anon_preview_signup": "Abrir mi informe completo gratis",
+        "anon_preview_signin": "Ya tengo cuenta",
         "credit_button": "Desbloquear con 1 crédito de tu cuenta",
         "credit_left": "Tienes {n} créditos.",
         "credit_left_one": "Tienes 1 crédito.",
@@ -922,6 +956,11 @@ COPY: dict[str, dict[str, str]] = {
             "in full, free: one whose file and browser have not had it on another account and "
             "whose network has not used up this month's. If none can, the first one you make "
             "afterwards that meets the same gets it."
+        ),
+        "welcome_confirm_paid": (
+            "Account created. We sent you a link to confirm your e-mail (if you do not see it, "
+            "check the spam folder): you need to confirm it to pay. You can upload your file "
+            "now."
         ),
         "welcome_confirm_guides": "While the e-mail arrives, export your file",
         "next_title": "What happens next",
@@ -1146,10 +1185,12 @@ COPY: dict[str, dict[str, str]] = {
         "buy_country": "Billing country",
         "buy_country_prompt": "Choose your country",
         "buy_final_sale": (
-            "I understand that the credit is delivered at once and the purchase is not refundable."
+            "I understand that the credit is delivered at once and that I can ask for a refund "
+            "within 7 days under the terms."
         ),
         "buy_final_sale_note": (
-            "The credit is delivered at once and the purchase is not refundable."
+            "The credit is delivered at once, and you can ask for a refund within 7 days under "
+            "the terms."
         ),
         "buy_alt": "Prefer to pay on WhatsApp?",
         "card_paid": (
@@ -1158,7 +1199,7 @@ COPY: dict[str, dict[str, str]] = {
         ),
         "buy_off": "Card payment is not available right now.",
         "buy_market": "Choose your billing country to pay.",
-        "buy_final_sale_needed": "Tick the non-refundable purchase box to pay.",
+        "buy_final_sale_needed": "Tick the purchase terms box to pay.",
         "buy_email": "Confirm your e-mail to buy credits.",
         "buy_review": "A charge is under review. Do not pay again; ask for help.",
         "security_title": "Password and data",
@@ -1222,6 +1263,12 @@ COPY: dict[str, dict[str, str]] = {
             "E-mail delivery is unavailable now. The first free full report, purchases and "
             "referral credits require a confirmed e-mail."
         ),
+        "email_unverified_status_paid": (
+            "Your e-mail is not confirmed yet. Confirm it to unlock purchases."
+        ),
+        "email_delivery_unavailable_paid": (
+            "E-mail delivery is unavailable now. Purchases require a confirmed e-mail."
+        ),
         "email_request_button": "Send a confirmation link",
         "email_pending_note": (
             "Change pending to {email}. Keep signing in with your current e-mail until you "
@@ -1234,6 +1281,7 @@ COPY: dict[str, dict[str, str]] = {
             "The change is pending. Open the link sent to the new e-mail to finish it."
         ),
         "email_verified": "E-mail confirmed. You can now use available purchases and rewards.",
+        "email_verified_paid": "E-mail confirmed. You can now use available purchases.",
         "email_verified_signin": "E-mail confirmed. Sign in.",
         "email_verified_report": (
             "E-mail confirmed. Your report is now complete, with the PDF: it is in your list "
@@ -1246,6 +1294,7 @@ COPY: dict[str, dict[str, str]] = {
             "Confirm your e-mail from My account before paying. Confirming it also unlocks "
             "your first free full report."
         ),
+        "email_checkout_required_paid": "Confirm your e-mail from My account before paying.",
         "email_now": "You sign in with {email}. After the change you sign in with the new address.",
         "email_new": "New e-mail",
         "email_again": "Repeat the new e-mail",
@@ -1542,6 +1591,21 @@ COPY: dict[str, dict[str, str]] = {
         "anon_box": "Create a free account to save this report and find it without the link.",
         "anon_signup": "Create account",
         "anon_signin": "Sign in",
+        "anon_preview": (
+            "Preview without an account: your file's A to D class and red flags. The full "
+            "report and the PDF open with an account. Keep this link: without an account, it "
+            "is the only way back to it."
+        ),
+        "anon_preview_link": (
+            "Preview without an account: your file's A to D class and red flags. Keep this "
+            "link: without an account, it is the only way back to it."
+        ),
+        "anon_preview_box": (
+            "Create your account with your email and this same report opens in full, free, "
+            "with the PDF."
+        ),
+        "anon_preview_signup": "Open my full report free",
+        "anon_preview_signin": "I have an account",
         "credit_button": "Unlock with 1 credit from your account",
         "credit_left": "You have {n} credits.",
         "credit_left_one": "You have 1 credit.",
@@ -1583,6 +1647,67 @@ COPY: dict[str, dict[str, str]] = {
 }
 COPY["pt"] = COPY_PT
 PATHS["pt"] = PATHS_PT
+
+
+def _swap_items(items: str, swaps: dict[str, str]) -> str:
+    """``items`` (split by ``|``) with the one that starts with each key of
+    ``swaps`` replaced by its value; a key that names no single item fails."""
+    parts = items.split("|")
+    for start, new in swaps.items():
+        found = [n for n, part in enumerate(parts) if part.startswith(start)]
+        if len(found) != 1:
+            raise ValueError(f"no single 'What we keep' item starts with {start!r}")
+        parts[found[0]] = new
+    return "|".join(parts)
+
+
+#: "What we keep" under the paid offer (``stores_paid``): previews go after the
+#: retention days and full reports stay; what the free first report and the
+#: invites kept is said only of the accounts that had them, back when we offered
+#: them. Every other item is the same as ``stores``.
+STORES_PAID: dict[str, dict[str, str]] = {
+    "es": {
+        "Tus informes y los archivos que subes.": (
+            "Tus informes y los archivos que subes. De las vistas previas borramos archivos e "
+            "informe a los {days} días (queda solo su huella); los informes completos quedan "
+            "para que sigas abriéndolos."
+        ),
+        "Una marca aleatoria de tu navegador y la huella del archivo": (
+            "Si recibiste el primer informe gratis cuando lo ofrecíamos: la marca aleatoria de "
+            "tu navegador y la huella del archivo de entonces, que se conservan aunque borres "
+            "la cuenta, sin tu correo."
+        ),
+        "Si te uniste con el enlace de un colega": (
+            "Si te uniste con el enlace de un colega o alguien se unió con el tuyo cuando había "
+            "invitaciones: la fecha, si ya hubo primer informe y una marca aleatoria del "
+            "navegador (un hash). Nadie ve quién se unió. Se borra con la cuenta de quien "
+            "invitó; si borra la suya quien se unió, queda solo la fecha y el resultado, sin "
+            "nada suyo."
+        ),
+    },
+    "en": {
+        "Your reports and the files you upload.": (
+            "Your reports and the files you upload. For previews we delete the files and the "
+            "report after {days} days (only their fingerprint stays); full reports stay so you "
+            "can keep opening them."
+        ),
+        "A random mark of your browser and the file's fingerprint": (
+            "If you got the free first report when we offered it: the random mark of your "
+            "browser and the file's fingerprint from then, which stay even if you delete the "
+            "account, without your e-mail."
+        ),
+        "If you joined through a colleague's link": (
+            "If you joined through a colleague's link, or someone joined through yours, when "
+            "there were invites: the date, whether the first report happened and a random "
+            "browser mark (a hash). Nobody sees who joined. It goes with the inviter's account; "
+            "if the person who joined deletes theirs, only the date and outcome stay, with "
+            "nothing of theirs."
+        ),
+    },
+    "pt": STORES_PAID_PT,
+}
+for _lang, _swaps in STORES_PAID.items():
+    COPY[_lang]["stores_paid"] = _swap_items(COPY[_lang]["stores"], _swaps)
 #: Addresses people type by analogy with another language's sign-up path.
 SIGNUP_ALIASES: dict[str, tuple[str, ...]] = {"pt": ("/pt/registro", "/pt/signup")}
 #: The languages every account screen exists in.
@@ -1864,7 +1989,9 @@ def _alert(copy: dict[str, str], error: str = "", flash: str = "", *, locale: st
     out = ""
     if flash and flash in copy:
         extra = (
-            f" {welcome_confirm_guides(locale)}" if flash == "welcome_confirm" and locale else ""
+            f" {welcome_confirm_guides(locale)}"
+            if flash in ("welcome_confirm", "welcome_confirm_paid") and locale
+            else ""
         )
         out += f"<div class='flash' role='status'>{_e(copy[flash])}{extra}</div>"
     if error and error in copy:
@@ -1937,19 +2064,31 @@ def report_contents(locale: str, offer: str = "") -> str:
     return f"{text} {copy[free]}" if free else text
 
 
-def _next_steps(copy: dict[str, str], locale: str, *, email_verification: bool, offer: str) -> str:
+def _next_steps(
+    copy: dict[str, str],
+    locale: str,
+    *,
+    email_verification: bool,
+    offer: str,
+    paid: paid_offer.Offer | None = None,
+) -> str:
     """ "What happens next" beside the sign-up form when ``next`` is the upload page.
 
     Every step comes from the configuration: the e-mail step only when a confirmed
     address is required, the free report as the service offers it (``welcome``:
-    the first full report with an account; ``free``: every full report). The
+    the first full report with an account; ``free``: every full report; ``paid``,
+    with its price: the free preview, the price and the 7-day refund). The
     formats are the upload form's own list; the counts and the statuses each
     check comes out with are the engine's.
     """
     from quant_trade.audit.guides import guides_index_url
     from quant_trade.audit.pages import PLATFORMS, SAMPLE_PAGE_PATHS
 
-    report = report_contents(locale, "welcome" if offer == "welcome" else "free")
+    report = (
+        paid_offer.next_report_text(locale, paid)
+        if offer == "paid" and paid is not None
+        else report_contents(locale, "welcome" if offer == "welcome" else "free")
+    )
     steps = [_e(copy["next_account"])]
     if email_verification:
         steps.append(_e(copy["next_confirm_welcome" if offer == "welcome" else "next_confirm"]))
@@ -1977,11 +2116,12 @@ def _stores_short(copy: dict[str, str], locale: str) -> str:
     )
 
 
-def _stores(copy: dict[str, str], retention_days: int) -> str:
-    """What the account keeps and how to delete it, in plain words."""
+def _stores(copy: dict[str, str], retention_days: int, *, paid: bool = False) -> str:
+    """What the account keeps and how to delete it, in plain words; ``paid``
+    (the paid offer) says the free first report only of the accounts that had it."""
+    listed = copy["stores_paid" if paid else "stores"].format(days=retention_days)
     items = "".join(
-        f"<li>{icon('check')}<span>{_e(item)}</span></li>"
-        for item in copy["stores"].format(days=retention_days).split("|")
+        f"<li>{icon('check')}<span>{_e(item)}</span></li>" for item in listed.split("|")
     )
     return (
         f"<div class='acct-card acct-stores'><h3>{icon('shield')}{_e(copy['stores_title'])}</h3>"
@@ -2050,7 +2190,7 @@ def signup_page(
     typo_of: str = "",
     typo_kept: bool = False,
     email_verification: bool = False,
-    offer: str = "welcome",
+    offer: str | paid_offer.Offer = "welcome",
 ) -> str:
     """The sign-up form; ``typo_of`` asks whether that address was meant as ``email``.
 
@@ -2058,9 +2198,20 @@ def signup_page(
     With ``next`` on the upload page the side panel says what happens next, from
     ``email_verification`` and ``offer`` (``welcome``, ``free`` or ``paid``; with
     ``paid`` and any other ``next`` it lists the account's benefits as before).
+    The paid offer with its price (``paid_offer.Offer``) also says, in the lead
+    and in "What happens next", the free preview, the price and the 7-day refund
+    instead of a free first report.
     """
     locale = _locale(locale)
     copy = COPY[locale]
+    terms = paid_offer.as_offer(offer)
+    offer = terms.kind
+    priced = terms.paid and terms.price_usd > 0
+    lead = (
+        paid_offer.signup_lead(locale, terms, FREE_PREVIEWS_PER_MONTH)
+        if priced
+        else copy["signup_lead"]
+    )
     from quant_trade.audit.legal import legal_url
 
     typo = ""
@@ -2107,8 +2258,14 @@ def signup_page(
         f"<a href='{_e(signin)}'>{_e(copy['signin_link'])}</a></p>"
     )
     side = (
-        _next_steps(copy, locale, email_verification=email_verification, offer=offer)
-        if offer in ("welcome", "free") and is_upload_next(next_path)
+        _next_steps(
+            copy,
+            locale,
+            email_verification=email_verification,
+            offer=offer,
+            paid=terms if priced else None,
+        )
+        if (offer in ("welcome", "free") or priced) and is_upload_next(next_path)
         else _benefits(copy)
     )
     body = (
@@ -2118,7 +2275,7 @@ def signup_page(
     return _shell(
         locale,
         copy["signup_title"],
-        copy["signup_lead"],
+        lead,
         body,
         switch=_switch("signup", locale, next_path),
         describe="signup",
@@ -2309,11 +2466,20 @@ def compare_mine_note(locale: str) -> str:
     )
 
 
-def gate_page(*, locale: str, reason: str, limit: int, extras: bool = False) -> str:
+def gate_page(
+    *,
+    locale: str,
+    reason: str,
+    limit: int,
+    extras: bool = False,
+    offer: paid_offer.Offer | None = None,
+) -> str:
     """Why an upload did not run: no account, a bad code, or the month's free previews used.
 
     ``reason`` is ``signin``, ``code``, ``quota`` or ``network``; ``extras`` brings the
-    visitor back to the upload page with its extra boxes open.
+    visitor back to the upload page with its extra boxes open. Under the paid
+    ``offer`` the "create your account" page names the account's free previews,
+    the price and the 7-day refund instead of a free first report.
     """
     locale = _locale(locale)
     copy = COPY[locale]
@@ -2339,10 +2505,14 @@ def gate_page(*, locale: str, reason: str, limit: int, extras: bool = False) -> 
         "<div class='wrap-narrow'><div class='acct-card acct-gate'>"
         f"<div class='inline-form'>{buttons}</div></div></div>"
     )
+    title = copy[f"gate_{reason}_title"].format(limit=limit)
+    lead = copy[f"gate_{reason}_lead"].format(limit=limit)
+    if reason == "signin" and offer is not None and offer.paid:
+        title, lead = paid_offer.gate_text(locale, offer, limit)
     return _shell(
         locale,
-        copy[f"gate_{reason}_title"].format(limit=limit),
-        copy[f"gate_{reason}_lead"].format(limit=limit),
+        title,
+        lead,
         body,
         switch={lang: path("signup", lang) for lang in LANGUAGES},
     )
@@ -2776,17 +2946,21 @@ def _email_status_card(
     pending: str,
     delivery_ready: bool,
     verification_required: bool,
+    paid: bool = False,
 ) -> str:
+    """The account e-mail's state; ``paid`` (the paid offer): confirming unlocks
+    the purchases only, never a free report or invite credits."""
     if not verification_required:
         return ""
-    status = "email_verified_status" if verified else "email_unverified_status"
+    suffix = "_paid" if paid else ""
+    status = "email_verified_status" if verified else f"email_unverified_status{suffix}"
     pending_note = (
         f"<p class='muted'>{_e(copy['email_pending_note'].format(email=_safe_text(pending)))}</p>"
         if pending
         else ""
     )
     delivery_note = (
-        f"<p class='muted'>{_e(copy['email_delivery_unavailable'])}</p>"
+        f"<p class='muted'>{_e(copy['email_delivery_unavailable' + suffix])}</p>"
         if not delivery_ready and not verified
         else ""
     )
@@ -2987,14 +3161,20 @@ def account_page(
     email_pending: str = "",
     email_delivery_ready: bool = False,
     email_verification_required: bool = False,
+    offer: str = "welcome",
 ) -> str:
     """ "My reports": the reports, credits, codes and purchases of one account.
 
     ``recovery_created`` is when the account's recovery key was made (empty
-    without one).
+    without one). ``offer`` is the service's (``free``, ``welcome`` or ``paid``,
+    ``paid_offer.offer_kind``): under the paid offer the e-mail card, the
+    "e-mail confirmed" notice and "What we keep" promise no free report.
     """
     locale = _locale(locale)
     copy = COPY[locale]
+    paid = offer == "paid"
+    if paid and flash == "email_verified":
+        flash = "email_verified_paid"
     from quant_trade.audit.pages import AUDIT_PATHS
 
     signout = (
@@ -3244,7 +3424,9 @@ def account_page(
         + "<label class='check'><input type='checkbox' name='with_reports' value='yes'> "
         f"<span>{_e(copy['delete_reports'])}</span></label>"
         f"<p><button class='btn btn-ghost' type='submit'>{_e(copy['delete_button'])}</button></p>"
-        "</form></div>" + _stores(copy, retention_days) + "<div class='acct-card acct-export'>"
+        "</form></div>"
+        + _stores(copy, retention_days, paid=paid)
+        + "<div class='acct-card acct-export'>"
         f"<h3>{_e(copy['export_title'])}</h3><p class='muted'>{_e(copy['export_help'])}</p>"
         f"<a class='btn btn-ghost' href='{path('account', locale)}/datos' download>"
         f"{icon('file')} {_e(copy['export_button'])}</a></div>"
@@ -3274,6 +3456,7 @@ def account_page(
             pending=email_pending,
             delivery_ready=email_delivery_ready,
             verification_required=email_verification_required,
+            paid=paid,
         )
         + recovery_nudge
         + security,
@@ -3318,6 +3501,8 @@ def report_box(
     credits: int = 0,
     locked: bool = False,
     card_offer: bool = False,
+    anon_preview: bool = False,
+    offer: paid_offer.Offer | None = None,
 ) -> str:
     """The account line on a report page.
 
@@ -3326,20 +3511,33 @@ def report_box(
     account). ``query`` is the report's own query string (token and language)
     for the forms; ``credits`` offers the one-click unlock when ``locked``.
     A signed-out visitor goes to sign-up or sign-in through a form, so the
-    report's key is never written inside a ``next`` address.
+    report's key is never written inside a ``next`` address. ``anon_preview``
+    (a preview uploaded without an account that the account would open in
+    full) says so, with "open my full report" as the main button. Under the paid
+    ``offer`` that preview's box says the account opens it in full for the price,
+    with the 7-day refund (``paid_offer.anon_box_text``), never for free.
     """
     locale = _locale(locale)
     copy = COPY[locale]
     base = f"/audits/{audit_id}"
     parts: list[str] = []
     if state == "anon":
+        box, signup, signin, main = (
+            ("anon_preview_box", "anon_preview_signup", "anon_preview_signin", "btn-primary")
+            if anon_preview
+            else ("anon_box", "anon_signup", "anon_signin", "btn-dark")
+        )
+        box_text, signup_text = copy[box], copy[signup]
+        if anon_preview and offer is not None and offer.paid:
+            box_text = paid_offer.anon_box_text(locale, offer)
+            signup_text = paid_offer.words(locale)["anon_signup"]
         parts.append(
-            f"<span>{_e(copy['anon_box'])}</span>"
+            f"<span>{_e(box_text)}</span>"
             f"<form method='post' action='{_e(base)}/account{_e(query)}'>"
-            "<button class='btn btn-dark btn-sm' type='submit' name='go' value='signup'>"
-            f"{_e(copy['anon_signup'])}</button> "
+            f"<button class='btn {main} btn-sm' type='submit' name='go' value='signup'>"
+            f"{_e(signup_text)}</button> "
             "<button class='btn btn-ghost btn-sm' type='submit' name='go' value='signin'>"
-            f"{_e(copy['anon_signin'])}</button></form>"
+            f"{_e(copy[signin])}</button></form>"
         )
     elif state == "mine":
         parts.append(

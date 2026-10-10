@@ -118,11 +118,12 @@ REPORT: dict[str, Any] = {
         "pay_pack": "Comprar o pacote de 3 (USD {price:.0f})",
         "pay_secure": (
             "Pagamento seguro com Stripe. Você vê o relatório completo assim que o pagamento é "
-            "confirmado; nós nunca vemos nem guardamos os dados do seu cartão. Todas as vendas "
-            "são finais."
+            "confirmado; nós nunca vemos nem guardamos os dados do seu cartão. Se não servir "
+            "para você, pode pedir a devolução em 7 dias conforme os termos."
         ),
         "final_sale": (
-            "Entendo que o relatório é entregue na hora e que a compra não é reembolsável."
+            "Entendo que o relatório abre na hora e que posso pedir a devolução em 7 dias "
+            "conforme os termos."
         ),
         "pay_links_note": (
             "O pagamento abre em outra aba. Quando terminar, volte aqui: o relatório é "

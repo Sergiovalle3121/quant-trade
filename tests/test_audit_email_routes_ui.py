@@ -44,7 +44,9 @@ def _outbox_id(store: Store, account_id: str, kind: str) -> str:
     return str(row[0])
 
 
-def _client(tmp_path: Path, *, free_mode: bool = False) -> tuple[TestClient, Store]:
+def _client(
+    tmp_path: Path, *, free_mode: bool = False, welcome_full_report: bool = True
+) -> tuple[TestClient, Store]:
     settings = AuditSettings(
         database_url=f"sqlite:///{tmp_path}/email.db",
         base_url="https://rigor.example",
@@ -53,6 +55,7 @@ def _client(tmp_path: Path, *, free_mode: bool = False) -> tuple[TestClient, Sto
         smtp_host="smtp.example",
         smtp_from="hello@rigor.example",
         free_mode=free_mode,
+        welcome_full_report=welcome_full_report,
     )
     store = make_store(settings.database_url)
     client = TestClient(create_app(settings, store), base_url="https://rigor.example")
@@ -184,14 +187,16 @@ def test_confirmation_requires_a_post_and_recovery_keeps_language(
 @pytest.mark.parametrize("welcome_state", ["available", "used", "off", "free_mode", "inbox_used"])
 def test_confirmation_without_a_session_keeps_the_notice_on_signin(
     tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
     locale: str,
     welcome_notice: str,
     used_notice: str,
     welcome_state: str,
 ) -> None:
-    monkeypatch.setattr(accounts, "WELCOME_FULL_REPORT", welcome_state != "off")
-    client, store = _client(tmp_path, free_mode=welcome_state == "free_mode")
+    client, store = _client(
+        tmp_path,
+        free_mode=welcome_state == "free_mode",
+        welcome_full_report=welcome_state != "off",
+    )
     welcome_used = welcome_state == "used"
     welcome_available = welcome_state == "available"
     paths = account_pages.PATHS[locale]
