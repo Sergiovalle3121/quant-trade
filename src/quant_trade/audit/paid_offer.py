@@ -130,8 +130,7 @@ COPY: dict[str, dict[str, Any]] = {
             "de una cuenta o una serie de retornos.",
             "Gratis ves la clase de A a D, las banderas rojas y qué significa cada dimensión, "
             "en lenguaje llano.",
-            "Crea tu cuenta y abre el informe completo, con cada cifra y el PDF, por {price}. "
-            "Si no te sirve, te devolvemos el dinero: pídelo en los 7 días siguientes al pago.",
+            "Crea tu cuenta y abre el informe completo, con cada cifra y el PDF, por {price}.",
             "Tus informes quedan guardados en tu cuenta.",
         ),
         "how_account": (
@@ -140,8 +139,7 @@ COPY: dict[str, dict[str, Any]] = {
             "o una serie de retornos.",
             "Gratis ves la clase de A a D, las banderas rojas y qué significa cada dimensión, "
             "en lenguaje llano.",
-            "Abre el informe completo, con cada cifra y el PDF, por {price}. Si no te sirve, te "
-            "devolvemos el dinero: pídelo en los 7 días siguientes al pago.",
+            "Abre el informe completo, con cada cifra y el PDF, por {price}.",
         ),
         "refund_q": "¿Y si el informe no me sirve?",
         "refund_a": (
@@ -208,7 +206,7 @@ COPY: dict[str, dict[str, Any]] = {
             "For free you see the A to D class, the red flags and what each dimension means, "
             "in plain language.",
             "Create your account and open the full report, with every figure and the PDF, for "
-            "{price}. If it is no use to you, we refund your money: ask within 7 days of paying.",
+            "{price}.",
             "Your reports stay saved in your account.",
         ),
         "how_account": (
@@ -217,8 +215,7 @@ COPY: dict[str, dict[str, Any]] = {
             "return series.",
             "For free you see the A to D class, the red flags and what each dimension means, "
             "in plain language.",
-            "Open the full report, with every figure and the PDF, for {price}. If it is no use "
-            "to you, we refund your money: ask within 7 days of paying.",
+            "Open the full report, with every figure and the PDF, for {price}.",
         ),
         "refund_q": "What if the report is no use to me?",
         "refund_a": (
@@ -289,9 +286,7 @@ COPY: dict[str, dict[str, Any]] = {
             "de uma conta ou uma série de retornos.",
             "Grátis, você vê a classe de A a D, os alertas e o que cada dimensão significa, em "
             "linguagem simples.",
-            "Crie a sua conta e abra o relatório completo, com cada número e o PDF, por {price}. "
-            "Se não servir para você, devolvemos o seu dinheiro: peça nos 7 dias seguintes ao "
-            "pagamento.",
+            "Crie a sua conta e abra o relatório completo, com cada número e o PDF, por {price}.",
             "Os seus relatórios ficam guardados na sua conta.",
         ),
         "how_account": (
@@ -300,8 +295,7 @@ COPY: dict[str, dict[str, Any]] = {
             "conta ou uma série de retornos.",
             "Grátis, você vê a classe de A a D, os alertas e o que cada dimensão significa, em "
             "linguagem simples.",
-            "Abra o relatório completo, com cada número e o PDF, por {price}. Se não servir "
-            "para você, devolvemos o seu dinheiro: peça nos 7 dias seguintes ao pagamento.",
+            "Abra o relatório completo, com cada número e o PDF, por {price}.",
         ),
         "refund_q": "E se o relatório não me servir?",
         "refund_a": (

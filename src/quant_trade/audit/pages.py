@@ -2228,10 +2228,9 @@ def _prices_html(
         free_text = f"{paid_offer.preview_text(locale, offer)} " + words["account_previews"].format(
             n=_FREE
         )
+        # The pack's refund is in the questions below and on the prices page.
         full_text, full_button = paid_offer.full_text(locale, offer), words["upload"]
         refund = paid_offer.refund_text(locale)
-        if pack_price_usd:
-            refund += " " + paid_offer.pack_refund_text(locale)
     # Five lines on the landing; the sample report shows everything a full report has.
     more = (
         f"<p class='price-more'><a href='{_sample_url(locale)}'>{_e(ui['full_more'])}"
