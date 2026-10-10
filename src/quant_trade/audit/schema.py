@@ -42,8 +42,10 @@ NOT_MEASURED: EvidenceClass = "NOT_MEASURED"
 #: request cannot pin the process.
 MAX_UPLOAD_BYTES = 5_000_000
 #: A platform report may be twice that: MetaTrader writes its HTML reports
-#: in UTF-16, two bytes per character, so 5 MB held only ~6,000 trades.
-MAX_REPORT_BYTES = 2 * MAX_UPLOAD_BYTES
+#: in UTF-16, two bytes per character, so 5 MB held only ~6,000 trades. The
+#: upload fields that may carry one take the same factor of the configured limit.
+REPORT_SIZE_FACTOR = 2
+MAX_REPORT_BYTES = REPORT_SIZE_FACTOR * MAX_UPLOAD_BYTES
 MAX_ROWS = 200_000
 MAX_TRADES = 50_000
 MAX_VARIANTS = 500
@@ -1688,6 +1690,7 @@ __all__ = [
     "MAX_TRADES",
     "MAX_REPORT_BYTES",
     "MAX_UPLOAD_BYTES",
+    "REPORT_SIZE_FACTOR",
     "MAX_CSV_LINE_BYTES",
     "MAX_VARIANTS",
     "MEASURED",

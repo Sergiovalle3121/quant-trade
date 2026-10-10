@@ -1023,9 +1023,11 @@ GUIDES: tuple[Guide, ...] = (
         text={
             "es": GuideText(
                 title="Cómo exportar el historial de una cuenta de Myfxbook",
+                # The same as its steps: the holder exports it; anyone else asks for it.
                 summary=(
-                    "Descarga en CSV el historial de una cuenta de Myfxbook y súbelo para ver "
-                    "sus operaciones, depósitos y retiros con las mismas pruebas que un backtest."
+                    "Exporta en CSV el historial de una cuenta de Myfxbook (si no es tuya, "
+                    "pídeselo a su dueño) y revisa operaciones, depósitos y retiros como en un "
+                    "backtest."
                 ),
                 file=(
                     "Un .csv con las columnas Open Date, Close Date, Symbol, Action, Units/Lots, "
@@ -1055,8 +1057,9 @@ GUIDES: tuple[Guide, ...] = (
             "en": GuideText(
                 title="How to export a Myfxbook account's history",
                 summary=(
-                    "Download a Myfxbook account's history as CSV and upload it to see its "
-                    "trades, deposits and withdrawals under the same tests as a backtest."
+                    "Export a Myfxbook account's history as CSV (if it is not yours, ask its "
+                    "owner for it) and check its trades, deposits and withdrawals as in a "
+                    "backtest."
                 ),
                 file=(
                     "A .csv with the columns Open Date, Close Date, Symbol, Action, Units/Lots, "
@@ -1085,9 +1088,8 @@ GUIDES: tuple[Guide, ...] = (
             "pt": GuideText(
                 title="Como exportar o histórico de uma conta do Myfxbook",
                 summary=(
-                    "Baixe o histórico de uma conta do Myfxbook em CSV e envie para ver as "
-                    "operações, depósitos e saques dela sob os mesmos testes de um "
-                    "backtest."
+                    "Exporte em CSV o histórico de uma conta do Myfxbook (se não for sua, peça "
+                    "ao titular) e revise operações, depósitos e saques como num backtest."
                 ),
                 file=(
                     "Um .csv com as colunas Open Date, Close Date, Symbol, Action, "

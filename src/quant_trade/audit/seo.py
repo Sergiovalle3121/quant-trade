@@ -19,6 +19,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
+from quant_trade.audit.about import ABOUT_PATH
 from quant_trade.audit.articles import (
     ARTICLE_PUBLICATION_DATES,
     ARTICLES,
@@ -94,6 +95,8 @@ PUBLIC_PAGES: tuple[dict[str, str], ...] = (
     {"es": "/privacidad", "en": "/privacy", "pt": "/pt/privacidade"},
     # The contact page (pages.CONTACT_PATHS, kept in step by a test).
     {"es": "/contacto", "en": "/en/contact", "pt": "/pt/contato"},
+    # Who is behind Rigor (about.py): the operator's published details.
+    dict(ABOUT_PATH),
     # The institutional intake (institutional.REVIEW_PATHS, kept in step by a test).
     {
         "es": "/revision-institucional",

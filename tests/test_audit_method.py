@@ -46,7 +46,7 @@ def test_references_join_their_authors_in_each_language() -> None:
         listed = references(locale)
         assert len(listed) == len(REFERENCES)
         assert all(" y " not in ref for ref in listed)
-        assert f"Politis, D. N. {word} Romano, J. P. (1994)" in listed[3]
+        assert any(f"Politis, D. N. {word} Romano, J. P. (1994)" in ref for ref in listed)
     client = TestClient(create_app())
     assert "Politis, D. N. e Romano" in _text(client.get(METHOD_PATH["pt"]).text)
 

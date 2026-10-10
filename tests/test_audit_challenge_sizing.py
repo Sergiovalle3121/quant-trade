@@ -18,13 +18,19 @@ from audit_fixtures import csv_bytes, positive_drift, returns_frame, signed_in
 from quant_trade.audit import analytics, engine, firmfit
 from quant_trade.audit.engine import (
     RETURNS_NOT_MONEY,
+    SIZING_ACCOUNT_LOT_NOTE,
+    SIZING_ACCOUNT_LOT_ROW_NOTE,
     SIZING_ACCOUNT_NOTE,
     SIZING_BALANCE_ASSUMED,
     SIZING_BALANCE_CURVE,
     SIZING_BALANCE_NOTE,
+    SIZING_LOT_NOTE,
+    SIZING_LOT_ROW_NOTE,
     SIZING_MULTIPLIERS,
     SIZING_NO_ACCOUNT,
+    SIZING_NO_ACCOUNT_BEFORE,
     SIZING_NO_SIZE,
+    SIZING_NO_SIZE_BEFORE,
     SIZING_NOTE,
     run_audit,
 )
@@ -38,7 +44,7 @@ from quant_trade.audit.report import (
     _challenge_sizing_html,
     render_html,
 )
-from quant_trade.audit.sample import _sample_report
+from quant_trade.audit.sample import _sample_report, synthetic_mt5_report
 from quant_trade.audit.schema import AuditResult, DeclaredMetadata, build_inputs
 
 NOW = datetime(2026, 10, 1, tzinfo=UTC)
@@ -56,6 +62,13 @@ NEW_NOTES = (
     SIZING_BALANCE_NOTE,
     SIZING_BALANCE_CURVE,
     SIZING_BALANCE_ASSUMED,
+    SIZING_LOT_ROW_NOTE,
+    SIZING_LOT_NOTE.format(lots="641.00", count="1,282", traded="1,282.00"),
+    SIZING_ACCOUNT_LOT_NOTE.format(account="100,000", balance="10,000"),
+    SIZING_ACCOUNT_LOT_ROW_NOTE,
+    # Stored results keep these; their rules stay.
+    SIZING_NO_SIZE_BEFORE,
+    SIZING_NO_ACCOUNT_BEFORE,
     firmfit.OUTCOME_NOTE,
 )
 #: The importer's own warning when the file states no starting balance.
@@ -213,15 +226,64 @@ def test_the_size_table_is_deterministic(audited: tuple[Any, AuditResult]) -> No
     assert _sizing(again) == _sizing(result)
 
 
-def test_lot_and_account_are_never_invented(audited: tuple[Any, AuditResult]) -> None:
-    _, result = audited
+def test_the_average_lot_adds_up_by_hand(audited: tuple[Any, AuditResult]) -> None:
+    inputs, result = audited
     sizing = _sizing(result)
-    # The importers fold lots into units and read no stop loss: no lot is given.
+    # The sample robot trades 0.5 lots on every one of its 1,282 trades.
+    lots = inputs.trade_lots
+    assert lots is not None and len(lots) == len(inputs.trades.trades) == 1282
+    assert set(lots) == {0.5}
+    by_hand = sum(lots) / len(lots)
+    assert by_hand == 0.5
+    note = SIZING_LOT_NOTE.format(lots="641.00", count="1,282", traded="1,282.00")
+    assert sizing["size_per_trade"] == {"value": by_hand, "evidence": "MEASURED", "note": note}
+    # The cost section divides by the lots traded counting entries and exits: twice as many.
+    per_lot = result.costs["break_even_per_lot"]
+    assert per_lot["evidence"] == "MEASURED" and "1,282.00 lots traded" in per_lot["note"]
+    for row in sizing["rows"]:
+        assert row["average_lot"] == {
+            "value": pytest.approx(by_hand * row["multiplier"]),
+            "evidence": "MEASURED",
+            "note": SIZING_LOT_ROW_NOTE,
+        }
+    assert [row["average_lot"]["value"] for row in sizing["rows"]] == [0.25, 0.5, 0.75, 1.0]
+
+
+def test_the_average_lot_follows_lots_that_vary() -> None:
+    # Three lot sizes over a short history: the average is their mean, by hand.
+    report = synthetic_mt5_report(120, lots=0.3, seed=11)
+    inputs = build_inputs(
+        None, _declared(oos_start=None), report_bytes=report, report_filename="r.html", now=NOW
+    )
+    assert inputs.trade_lots and set(inputs.trade_lots) == {0.3}
+    per_lot = {"value": 1.0, "evidence": "MEASURED", "note": "x"}
+    lot = engine._average_lot(inputs, per_lot)
+    assert lot["value"] == pytest.approx(0.3) and lot["evidence"] == "MEASURED"
+    varied = replace(inputs, trade_lots=[0.1, 0.2, 0.6] * 40)
+    assert engine._average_lot(varied, per_lot)["value"] == pytest.approx(0.3)
+    # Without the cost per lot measured, the lots are not summable: not measured.
+    mixed = {"value": None, "evidence": "NOT_MEASURED", "note": engine.PER_LOT_MIXED}
+    assert engine._average_lot(inputs, mixed) == {
+        "value": None,
+        "evidence": "NOT_MEASURED",
+        "note": engine.PER_LOT_MIXED,
+    }
+    assert engine._average_lot(inputs, None)["note"] == SIZING_NO_SIZE
+
+
+def test_lot_and_account_are_never_invented(no_balance: AuditResult) -> None:
+    # A plain trade list is not a MetaTrader report: its volume is not read as lots.
+    sizing = _sizing(no_balance)
     assert sizing["size_per_trade"] == {
         "value": None,
         "evidence": "NOT_MEASURED",
         "note": SIZING_NO_SIZE,
     }
+    assert all("average_lot" not in row for row in sizing["rows"])
+    # The reason no longer says the audit keeps no lot: it names where lots are read.
+    assert "keeps neither the lot" not in SIZING_NO_SIZE and "MetaTrader 4 and 5" in SIZING_NO_SIZE
+    _, result = _audit()
+    sizing = _sizing(result)
     # FTMO's rules are shares of the balance: no account size either.
     assert sizing["account_size"]["evidence"] == "NOT_MEASURED"
     assert sizing["account_size"]["note"] == SIZING_NO_ACCOUNT
@@ -327,7 +389,7 @@ def test_new_sentences_read_in_every_language_and_pass_the_guard(
             shown = localize(text, locale)
             assert shown != text and find_claims(shown) == [], (locale, text)
     keys = [key for key in LABELS["es"] if key.startswith("ch_size_")]
-    assert len(keys) == 12
+    assert len(keys) == 21
     for locale in LOCALES:
         texts = [LABELS[locale][key] for key in keys] + [LOCKED_GAINS[locale]["ch_size_title"]]
         for key in keys:
@@ -372,11 +434,16 @@ def test_the_report_shows_the_size_table_and_the_open_loss_warning(
     ladder = text.index(labels["ch_ladder_title"])
     assert text.index(labels["ch_size_title"]) > ladder
     block = _size_block(text, labels)
+    lot_note = SIZING_LOT_NOTE.format(lots="641.00", count="1,282", traded="1,282.00")
     for needed in (
         labels["ch_size_one"],
         labels["ch_size_lot"],
-        localize(SIZING_NO_SIZE, locale),
-        labels["ch_size_no_account"],
+        labels["ch_size_lots_on"].format(
+            lots=labels["ch_size_lots"].format(lots="0.50"), balance="10,000"
+        ),
+        localize(lot_note, locale),
+        labels["ch_size_lot_col_on"].format(balance="10,000"),
+        labels["ch_size_no_account_lots"].format(balance="10,000"),
         labels["ch_ladder_pass"],
         labels["fail_daily_loss"],
         labels["fail_total_loss"],
@@ -409,8 +476,11 @@ def test_the_table_prints_the_ladder_formats_and_the_rules_it_has(
     for row in _sizing(result)["rows"]:
         value = float(row["pass"]["value"])
         shown = "≥99%" if value >= 0.99 else f"{value:.0%}"
+        lot = f"{float(row['average_lot']['value']):.2f}"
+        head = labels["ch_size_lot_col_on"].format(balance="10,000")
+        lots = f"<td class='val' data-l='{head}'>{lot}</td>"
         cell = f"<td class='val' data-l='{labels['ch_ladder_pass']}'>{shown}</td>"
-        assert f"<tr><td>{row['key']}</td>{cell}" in page
+        assert f"<tr><td>{row['key']}</td>{lots}{cell}" in page
     assert labels["ff_clean"] not in page and labels["ff_no_rule"] not in page
     # Topstep: a best-day rule, no daily limit and an account size the program names.
     topstep = _chosen("topstep-100k-combine")

@@ -406,7 +406,8 @@ def test_after_backtest_cost_example_is_computed_and_declared(locale: str) -> No
         for paragraph in section.paragraphs
         if "break_even_bps" in paragraph
     )
-    assert example.startswith("DECLARED ·")
+    # Running text carries no evidence label; the example says it is one itself.
+    assert not example.startswith("DECLARED")
     assert ("49.75" if locale == "en" else "49,75") in example
     assert find_claims(example) == []
 
@@ -414,7 +415,7 @@ def test_after_backtest_cost_example_is_computed_and_declared(locale: str) -> No
 @pytest.mark.parametrize("locale", LOCALES)
 def test_shared_luck_example_is_computed_and_localized(locale: str) -> None:
     example = INDEPENDENT_LUCK_EXAMPLE[locale]
-    assert example.startswith("DECLARED ·")
+    assert not example.startswith("DECLARED")
     expected = compute(LUCK_EXAMPLE_INPUT)["luck_sharpe"]["value"]
     assert round(expected, 2) == 1.47
     assert ("1.47" if locale == "en" else "1,47") in example

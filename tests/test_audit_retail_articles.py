@@ -74,13 +74,16 @@ def test_prop_examples_follow_preset_and_declared_arithmetic(locale: str) -> Non
     paragraphs = _paragraphs(RETAIL_KEYS[0], locale)
     rules = get_preset("generic-2step-phase1")
     preset = paragraphs[0]
-    assert preset.startswith("DECLARED ·")
+    # Plain words for where the generic rules come from: no evidence label, no
+    # internal file path.
+    assert not preset.startswith("DECLARED")
     for field in (rules.profit_target, rules.max_total_loss, rules.max_daily_loss):
         assert f"{field:.0%}" in preset
     assert str(rules.min_trading_days) in preset
-    assert rules.as_of in preset and rules.source_url in preset
+    assert rules.as_of in preset and rules.source_url not in preset
+    assert {"es": "dos fases", "en": "two-step", "pt": "duas fases"}[locale] in preset
     examples = paragraphs[4]
-    assert examples.startswith("DECLARED ·")
+    assert not examples.startswith("DECLARED")
     for win_rate in PROP_WIN_RATES:
         assert f"{win_rate:.0%}" in examples
         for risk in PROP_RISKS:
@@ -88,7 +91,7 @@ def test_prop_examples_follow_preset_and_declared_arithmetic(locale: str) -> Non
             assert f"{risk:.1%}" in examples
             assert f"{value.expected_attempts:.2f}" in examples
     streak = paragraphs[6]
-    assert streak.startswith("DECLARED ·")
+    assert not streak.startswith("DECLARED")
     assert str(PROP_STREAK_LENGTH) in streak
     for win_rate in PROP_WIN_RATES:
         assert f"{(1 - win_rate) ** PROP_STREAK_LENGTH:.1%}" in streak
@@ -99,7 +102,8 @@ def test_prop_examples_follow_preset_and_declared_arithmetic(locale: str) -> Non
 @pytest.mark.parametrize("locale", ("es", "en", "pt"))
 def test_signal_normal_example_is_derived_and_labeled(locale: str) -> None:
     paragraphs = _paragraphs(RETAIL_KEYS[1], locale)
-    declared = " ".join(p for p in paragraphs if p.startswith("DECLARED ·"))
+    assert not any(p.startswith("DECLARED") for p in paragraphs)
+    declared = " ".join(paragraphs)
     tail = normal_coin_tail_probability(
         COIN_TRADE_COUNT, COIN_NULL_WIN_RATE, COIN_THRESHOLD_WIN_RATE
     )
@@ -135,4 +139,4 @@ def test_ai_article_reuses_calculator_table_and_public_reader(locale: str) -> No
         ]
     assert f"href='{READING_PATH[locale]}'" in page
     costs = next(p for p in _paragraphs(RETAIL_KEYS[2], locale) if "2x" in p)
-    assert costs.startswith("DECLARED ·") and "NOT_MEASURED" in costs
+    assert not costs.startswith("DECLARED") and "NOT_MEASURED" in costs

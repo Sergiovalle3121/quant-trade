@@ -83,8 +83,8 @@ from quant_trade.audit.guides import (
     guides_index_url,
 )
 from quant_trade.audit.legal import LegalText, legal_url
+from quant_trade.audit.method import CHALLENGE_SECTION, dimension_rows, method_url, references
 from quant_trade.audit.method import COPY as METHOD_COPY
-from quant_trade.audit.method import dimension_rows, method_url, references
 from quant_trade.audit.ownership import FORM as OWNERSHIP_FORM
 from quant_trade.audit.ownership import ROLES as OWNERSHIP_ROLES
 from quant_trade.audit.portuguese import (
@@ -117,7 +117,9 @@ from quant_trade.audit.report import (
     report_kind,
     source_name,
 )
+from quant_trade.audit.report import LABELS as REPORT_LABELS
 from quant_trade.audit.sample_publication import SamplePage, public_pages_line
+from quant_trade.audit.schema import MAX_UPLOAD_BYTES
 from quant_trade.audit.seo import (
     BRAND,
     OG_IMAGE_SIZE,
@@ -149,6 +151,7 @@ from quant_trade.audit.theme import (
 )
 from quant_trade.audit.tools_hub import COPY as TOOLS_COPY
 from quant_trade.audit.tools_hub import TOOL_KEYS, TOOLS_PATH, tools_url
+from quant_trade.audit.upload_limits import guide_limit_text, upload_limit_text
 from quant_trade.audit.verdict import class_text, meaning, trials_undeclared
 
 #: The fixed wording of the badge and of the verification page's notice. It
@@ -301,7 +304,7 @@ _COPY: dict[str, dict[str, Any]] = {
             "NinjaTrader, QuantConnect, backtesting.py o vectorbt, o el historial de "
             "operaciones en CSV o Excel de cualquier otro bróker o exchange. Reconoce el "
             "formato de exportación de " + PLATFORMS_ES + ". También un estado de cuenta en PDF "
-            "con su tabla de operaciones: antes de medir revisas las columnas. Hasta 10 MB."
+            "con su tabla de operaciones: antes de medir revisas las columnas."
         ),
         "live": "Estado de cuenta real o demo (opcional)",
         "live_help": (
@@ -584,7 +587,7 @@ _COPY: dict[str, dict[str, Any]] = {
         "v_period": "Periodo de los datos",
         "v_age": "Días entre el último dato y la auditoría",
         "v_format": "Formato del archivo",
-        "v_engine": "Motor",
+        "v_engine": "Versión del motor",
         "v_trials_declared": "Intentos declarados",
         "v_trials_used": "Intentos usados en el Sharpe deflactado",
         "v_trials_undeclared": "sin declarar; se calcula con 1, el caso más favorable",
@@ -632,7 +635,7 @@ _COPY: dict[str, dict[str, Any]] = {
             "any other broker or exchange. It recognises the export format of "
             + PLATFORMS_EN
             + ". A PDF statement with its trade table works too: you check the columns "
-            "before it measures. Up to 10 MB."
+            "before it measures."
         ),
         "live": "Live or demo account statement (optional)",
         "live_help": (
@@ -906,7 +909,7 @@ _COPY: dict[str, dict[str, Any]] = {
         "v_period": "Data period",
         "v_age": "Days between the last data point and the audit",
         "v_format": "File format",
-        "v_engine": "Engine",
+        "v_engine": "Engine version",
         "v_trials_declared": "Trials declared",
         "v_trials_used": "Trials used in the deflated Sharpe",
         "v_trials_undeclared": "not declared; computed at 1, the most favourable case",
@@ -1022,7 +1025,7 @@ _UI: dict[str, dict[str, Any]] = {
         "stats": [
             ("6", "dimensiones auditadas"),
             ("{flags}", "banderas rojas revisadas en cada archivo"),
-            ("{presets}", "retos de prop firms simulables"),
+            ("{presets}", "juegos de reglas de prop firms simulables"),
             ("{platforms}", "plataformas que reconoce"),
         ],
         "evidence_eyebrow": "Evidencia",
@@ -1158,7 +1161,9 @@ _UI: dict[str, dict[str, Any]] = {
         "v_eyebrow": "Verificación pública",
         "v_copy": "Copiar código",
         "v_copied": "Copiado",
-        "v_id": "ID",
+        # What a publication's id is: the code of its public page, never the
+        # report's identifier (a sample's page says that one, report.LABELS).
+        "v_id": "Código de la página pública",
         "guides_eyebrow": "Guías de exportación",
         "legal_eyebrow": "Legal",
         "error_eyebrow": "Algo no cuadra",
@@ -1263,7 +1268,7 @@ _UI: dict[str, dict[str, Any]] = {
         "stats": [
             ("6", "audited dimensions"),
             ("{flags}", "red flags checked on every file"),
-            ("{presets}", "prop-firm challenges to simulate"),
+            ("{presets}", "prop-firm rule sets to simulate"),
             ("{platforms}", "platforms it recognises"),
         ],
         "evidence_eyebrow": "Evidence",
@@ -1397,7 +1402,7 @@ _UI: dict[str, dict[str, Any]] = {
         "v_eyebrow": "Public verification",
         "v_copy": "Copy code",
         "v_copied": "Copied",
-        "v_id": "ID",
+        "v_id": "Public page code",
         "guides_eyebrow": "Export guides",
         "legal_eyebrow": "Legal",
         "error_eyebrow": "Something is off",
@@ -1865,9 +1870,12 @@ def _hero(
     )
 
 
-#: Challenges from named firms; the generic two-step reference is not a firm's
-#: challenge, so pages that say "N challenges from FTMO, ..." leave it out.
+#: The firms' rule sets, one preset each; the generic two-step reference is not
+#: a firm's, so pages that count the firms' rule sets leave it out. A rule set is
+#: not always one phase: The5ers' Bootcamp preset holds for each of its three steps.
 FIRM_CHALLENGES = sum(1 for rules in PRESETS.values() if rules.firm != "Generic")
+#: The firms' programs those rule sets belong to (a two-step one may have two).
+FIRM_PROGRAMS = len({(r.firm, r.program) for r in PRESETS.values() if r.firm != "Generic"})
 
 
 def _specs(locale: str) -> str:
@@ -2419,6 +2427,7 @@ def _upload_form(
     carried: Mapping[str, str] | None = None,
     anon_preview: bool = False,
     offer: paid_offer.Offer | None = None,
+    max_upload_bytes: int = MAX_UPLOAD_BYTES,
 ) -> str:
     ui = _UI[locale]
     linked = link_locale(locale)
@@ -2460,11 +2469,13 @@ def _upload_form(
             "placeholder='AUD-XXXX-XXXX-XXXX' spellcheck='false'>",
             copy["access_code_help"],
         )
-    # One short line; the full list of formats and the export guides open on demand.
+    # One short line; the full list of formats, the size limits (from the settings,
+    # as the questions page and the guides say them) and the export guides open on demand.
     report_help = (
         f"{_e(copy['report_short'])}<details class='more-help'><summary>"
         f"{_e(copy['guide_q'])}</summary>"
         f"<p>{_e(copy['report_help'])}</p>"
+        f"<p class='upload-limit'>{_e(upload_limit_text(max_upload_bytes, locale))}</p>"
         f"<p>{_e(copy['guide_list'])}: {_guide_links(locale)}</p></details>"
     )
     mapping = (
@@ -2930,6 +2941,7 @@ def upload_page(
     notice_link_html: str = "",
     anon_preview: bool = False,
     offer: paid_offer.Offer | None = None,
+    max_upload_bytes: int = MAX_UPLOAD_BYTES,
 ) -> str:
     """The upload form on its own page, so the landing can stay short.
 
@@ -2987,6 +2999,7 @@ def upload_page(
         carried=carried,
         anon_preview=anon_preview,
         offer=terms,
+        max_upload_bytes=max_upload_bytes,
     )
     # The language switch keeps the extra boxes open.
     alternates = {
@@ -3203,7 +3216,9 @@ def verification_page(
             copy["v_format"],
             source_name(inputs) or inputs.get("source") or "-",
         ),
-        (copy["v_engine"], f"{engine.get('name', '')} {engine.get('package_version', '')}"),
+        # The engine's version, worded as the report prints it ("versión del motor
+        # 0.1.0"); the stored engine name (``engine.ENGINE_NAME``) stays in the view.
+        (copy["v_engine"], str(engine.get("package_version", "")) or "-"),
     ]
     # Words read as words, figures carry their evidence badge, and only the
     # hash keeps the code style.
@@ -3235,6 +3250,9 @@ def verification_page(
         description = f"{sample.meta_lead} · {description}"
     alternates = {lang: f"/v/{public_id}?lang={lang}" for lang in CLASS_WORD}
     alternates["es"] = f"/v/{public_id}"
+    # The language switch names Spanish too: without it, /v/{id} follows the
+    # browser's language and would send an English browser back to English.
+    switch = {**alternates, "es": f"/v/{public_id}?lang=es"}
     # Never indexed (an unpublished page should not linger in search), but it
     # previews its class and date when the link is shared.
     meta = head_meta(
@@ -3264,8 +3282,16 @@ def verification_page(
         "<div class='v-facts'>"
         f"<div><b>{_e(copy['v_audited'])}</b><span>{_utc_time(audited, locale)}</span></div>"
         f"<div><b>{_e(copy['v_published'])}</b><span>{_utc_time(published_at, locale)}</span></div>"
-        f"<div><b>{_e(ui['v_id'])}</b><span>{_e(public_id)}</span></div>"
-        "</div></div></div></div></section>"
+        # A sample's page shows the identifier its report shows, under the report's
+        # word; a publication shows the code of its page, under its own words, since
+        # the report's identifier is not kept here.
+        + (
+            f"<div><b>{_e(REPORT_LABELS[locale]['audit_id'])}</b>"
+            f"<span>{_e(sample.shown_id or public_id)}</span></div>"
+            if sample is not None
+            else f"<div><b>{_e(ui['v_id'])}</b><span>{_e(public_id)}</span></div>"
+        )
+        + "</div></div></div></div></section>"
     )
     main = (
         "<div class='paper page-main'><div class='wrap wrap-mid'>"
@@ -3309,7 +3335,7 @@ def verification_page(
         locale,
         hero + main,
         meta_html=meta,
-        alternates=alternates,
+        alternates=switch,
         solid_nav=True,
     )
 
@@ -3899,6 +3925,7 @@ def method_page(*, locale: str = "es", base_url: str = "") -> str:
                 (words["evidence_title"], f"<ul class='mtags'>{evidence}</ul>"),
                 (words["flags_title"], f"<ul class='chips'>{flags}</ul>"),
                 (words["resampling_title"], bullets(words["resampling"])),
+                (CHALLENGE_SECTION[locale][0], bullets(CHALLENGE_SECTION[locale][1])),
                 (words["repro_title"], bullets(words["repro"])),
                 (words["limits_title"], bullets(words["limits"], "minus")),
                 (words["refs_title"], f"<ol class='refs'>{refs}</ol>"),
@@ -4635,6 +4662,7 @@ def guide_page(
     base_url: str = "",
     offer: str | paid_offer.Offer = "free",
     email_verification: bool = False,
+    max_upload_bytes: int = MAX_UPLOAD_BYTES,
 ) -> str:
     """One platform's export guide.
 
@@ -4642,7 +4670,9 @@ def guide_page(
     code that does it, ``guide_capabilities``) and what the visitor gets, with
     the free report as ``offer`` and ``email_verification`` say: the same values
     the sign-up page receives. The title, description, heading, address and
-    language links do not depend on them.
+    language links do not depend on them. Where to upload the file ends with the
+    limit of the field it goes in (``guide.field``) for ``max_upload_bytes``, from
+    the same ``upload_limits`` as the form and the questions page.
     """
     locale = _locale(locale)
     ui = _UI[locale]
@@ -4665,7 +4695,12 @@ def guide_page(
     sections = [
         (words["file"], f"<p>{_e(text.file)}</p>"),
         (words["steps"], f"<ol class='list-steps steps-guide'>{steps}</ol>"),
-        (words["upload"], f"<p>{_e(text.upload)}</p>"),
+        (
+            words["upload"],
+            f"<p>{_e(text.upload)}</p>"
+            f"<p class='upload-limit'>"
+            f"{_e(guide_limit_text(guide.field, max_upload_bytes, locale))}</p>",
+        ),
         (words["tips"], f"<ul class='checks'>{tips}</ul>"),
     ]
     if does:
@@ -4992,7 +5027,8 @@ def audience_page(
         else words["price_text"].format(price=price_usd, pack=pack_price_usd or price_usd * 3)
     )
     faq = "".join(
-        f"<details><summary>{_e(q)}</summary><p>{_e(a.format(presets=FIRM_CHALLENGES))}</p></details>"
+        f"<details><summary>{_e(q)}</summary>"
+        f"<p>{_e(a.format(presets=FIRM_CHALLENGES, programs=FIRM_PROGRAMS))}</p></details>"
         for q, a in text.faq
     )
     others = "".join(

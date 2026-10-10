@@ -209,6 +209,14 @@ def _num(value: float, locale: str, decimals: int) -> str:
     return _separators(f"{value:,.{decimals}f}", locale)
 
 
+def _years(value: float, locale: str) -> str:
+    """A span in years as the site writes it: two decimals at most (9 weeks over 52 are
+    0.17, never 0.173077), with the language's separators. Only the display rounds;
+    every calculation keeps the declared value."""
+    shown = round(value, 2)
+    return _separators(f"{shown if shown else value:g}", locale)
+
+
 def _pct(value: float, locale: str) -> str:
     """A proportion as a percentage with one decimal: 56.5 % in en, 56,5 % in es/pt."""
     return f"{_num(value * 100, locale, 1)} %"
@@ -325,6 +333,8 @@ def public_card_svg(claim: PublicClaim) -> str:
             else (
                 _pct(value, claim.locale)
                 if name == "win_rate"
+                else _years(value, claim.locale)
+                if name == "years"
                 else _separators(f"{value:g}", claim.locale)
             )
         )

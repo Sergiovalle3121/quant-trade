@@ -53,6 +53,31 @@ SAMPLE_PAGES_PUBLISHED = "2026-10-09"
 #: The funnel tag of a shared sample page (``funnel.REF_TAGS``), so its visits never
 #: count as a shared publication's ("share").
 SAMPLE_SHARE_REF = "v-ejemplo"
+#: The identifier a reader sees for each sample, in each language: on its report
+#: and PDF (``report.LABELS[locale]['audit_id']``, in place of the stored id
+#: ``check.SAMPLE_AUDIT_ID``, which ``/comprobar`` keeps reading) and on its public
+#: page. The PDFs' file names use the same words.
+SAMPLE_SHOWN_IDS: dict[str, dict[str, str]] = {
+    "backtest": {"es": "ejemplo", "en": "sample", "pt": "exemplo"},
+    "signal": {"es": "ejemplo-senal", "en": "sample-signal", "pt": "exemplo-sinal"},
+}
+#: Beside the holdout seal's identifier, where the report keeps the stored id: the
+#: seal's SHA-256 is computed with it, so it is never swapped, only explained when
+#: the report shows the sample under another word (``SAMPLE_SHOWN_IDS``).
+SAMPLE_SEAL_NOTE: dict[str, str] = {
+    "es": (
+        "el identificador con el que se guardó este ejemplo y con el que se calcula su "
+        "sello; el resto del informe lo muestra como «{shown}»"
+    ),
+    "en": (
+        "the identifier this sample was stored under, which its seal is computed "
+        "with; the rest of the report shows it as “{shown}”"
+    ),
+    "pt": (
+        "o identificador com que este exemplo foi guardado e com o qual o selo é "
+        "calculado; o resto do relatório o mostra como «{shown}»"
+    ),
+}
 
 #: The notice on top of a sample's public page: what the page is, then the
 #: synthetic-data notice of the sample reports.
@@ -264,6 +289,8 @@ class SamplePage:
     share_template: str
     share_ref: str
     badge_help: str
+    #: The identifier its report shows (``SAMPLE_SHOWN_IDS``), in place of the page's id.
+    shown_id: str = ""
 
 
 def sample_page(public_id: str, locale: str) -> SamplePage | None:
@@ -279,7 +306,32 @@ def sample_page(public_id: str, locale: str) -> SamplePage | None:
         share_template=SAMPLE_SHARE_TEXT[lang],
         share_ref=SAMPLE_SHARE_REF,
         badge_help=SAMPLE_BADGE_HELP[lang],
+        shown_id=SAMPLE_SHOWN_IDS[SAMPLE_KIND_BY_PUBLIC_ID[public_id]][lang],
     )
+
+
+def show_sample_id(page: str, kind: str, locale: str) -> str:
+    """A sample report's HTML with its identifier as the reader sees it everywhere
+    (``SAMPLE_SHOWN_IDS``): the report prints the stored id, ``check.SAMPLE_AUDIT_ID``,
+    after ``report.LABELS[locale]['audit_id']``. Only those words change; nothing the
+    report measured does, and the stored id stays what ``/comprobar`` reads.
+
+    The holdout seal's identifier keeps the stored id, since its SHA-256 is computed
+    with it; when the shown word differs, ``SAMPLE_SEAL_NOTE`` says so beside it."""
+    from quant_trade.audit.check import SAMPLE_AUDIT_ID
+    from quant_trade.audit.report import KEY_LABELS, LABELS
+
+    lang = _lang(locale)
+    label = html.escape(LABELS[lang]["audit_id"], quote=True)
+    word = SAMPLE_SHOWN_IDS[kind][lang]
+    shown = html.escape(word, quote=True)
+    page = page.replace(f"<span>{label} {SAMPLE_AUDIT_ID}", f"<span>{label} {shown}")
+    if word == SAMPLE_AUDIT_ID:
+        return page
+    seal = html.escape(KEY_LABELS[lang]["seal_id"], quote=True)
+    row = f"<tr><td>{seal}</td><td><code>{SAMPLE_AUDIT_ID}</code>"
+    note = html.escape(SAMPLE_SEAL_NOTE[lang].format(shown=word), quote=True)
+    return page.replace(row, f"{row} <span class='muted'>({note})</span>")
 
 
 @dataclass(frozen=True)
@@ -332,8 +384,10 @@ __all__ = [
     "SAMPLE_PUBLICATION_NOTICE",
     "SAMPLE_PUBLIC_IDS",
     "SAMPLE_REPORT_LINK",
+    "SAMPLE_SEAL_NOTE",
     "SAMPLE_SHARE_REF",
     "SAMPLE_SHARE_TEXT",
+    "SAMPLE_SHOWN_IDS",
     "SAMPLE_SPANISH_SOURCE",
     "SAMPLE_TITLE_WORD",
     "SampleAudit",
@@ -346,4 +400,5 @@ __all__ = [
     "sample_public_path",
     "sample_publication",
     "sample_report_path",
+    "show_sample_id",
 ]

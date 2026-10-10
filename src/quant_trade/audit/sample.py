@@ -32,6 +32,9 @@ SAMPLE_DAYS = 500
 #: windows in full, and the recent-period section is measured.
 SAMPLE_LEAD_DAYS = 782
 SAMPLE_PASSES = 120
+#: The tester's own header for the sample: a test on every tick based on real
+#: ticks with the whole price history, as MT5 prints it ("100% real ticks").
+SAMPLE_HISTORY_QUALITY = "100% real ticks"
 #: The sample robot trades two majors (the same pip value in a USD account), so
 #: the per-instrument section has something to show; each trade's result is
 #: the same whichever pair it lands on.
@@ -72,6 +75,8 @@ def synthetic_mt5_report(
     lead_days: int = 0,
     symbols: tuple[str, ...] = ("EURUSD",),
     hold_hours: tuple[float, float] | None = None,
+    history_quality: str | None = None,
+    equity_drawdown: bool = False,
 ) -> bytes:
     """An MT5 tester HTML report (UTF-16 LE with BOM, as the terminal writes
     it) with one round trip per business day. Synthetic by design.
@@ -80,7 +85,14 @@ def synthetic_mt5_report(
     stream, so the ``days`` from ``start`` on keep the same results. The pair
     of each trade (from ``symbols``, pips worth the same) and, with
     ``hold_hours``, how long it stays open come from their own streams too,
-    so neither changes any result; without it every trade lasts 3.5 hours."""
+    so neither changes any result; without it every trade lasts 3.5 hours.
+
+    ``history_quality`` is printed as the tester's "History Quality" line.
+    With ``equity_drawdown`` the report also prints "Equity Drawdown
+    Maximal" and "Relative", the drawdown with the open trade counted: each
+    trade's deepest floating loss is drawn, from its own stream, as the low
+    of a random walk from its entry to its exit (``_floating_low``), so no
+    result changes."""
     rng = np.random.default_rng(seed)
     lead_rng = np.random.default_rng(seed + 2)
     # Entry hours come from their own stream so the trades' results stay the
@@ -94,7 +106,11 @@ def synthetic_mt5_report(
     streams = [lead_rng] * lead_days + [rng] * days
     pairs = np.random.default_rng(seed + 4).choice(len(symbols), size=len(dates))
     holds = np.random.default_rng(seed + 5).uniform(*(hold_hours or (3.5, 3.5)), size=len(dates))
+    lows = np.random.default_rng(seed + 6).exponential(1.0, size=len(dates))
     balance = 10_000.0
+    # The equity drawdown: the highest balance so far against each trade's
+    # deepest floating point and each close.
+    peak, deepest, deepest_share = balance, (0.0, 0.0), (0.0, 0.0)
     prices = {symbol: _START_PRICE.get(symbol, 1.1) for symbol in symbols}
     first = dates[0].strftime("%Y.%m.%d")
     rows = [
@@ -105,7 +121,9 @@ def synthetic_mt5_report(
     deal = 2
     # 7.00 per lot per side: 3.50 at the sample's 0.5 lots.
     fee = round(7.0 * lots, 2)
-    for day, hour, draw, pair, hold in zip(dates, hours, streams, pairs, holds, strict=True):
+    for day, hour, draw, pair, hold, low in zip(
+        dates, hours, streams, pairs, holds, lows, strict=True
+    ):
         symbol = symbols[pair]
         side = "buy" if draw.random() < 0.5 else "sell"
         sign = 1.0 if side == "buy" else -1.0
@@ -124,7 +142,15 @@ def synthetic_mt5_report(
             f"<td>in</td><td>{lots}</td><td>{entry:.5f}</td><td>{deal}</td><td>{-fee:.2f}</td>"
             f"<td>0.00</td><td>0.00</td><td>{_money(balance)}</td><td></td></tr>"
         )
+        trough = balance + _floating_low(pips, low) * 10.0 * lots
         balance += profit - fee
+        for equity in (trough, balance):
+            peak = max(peak, equity)
+            fall = peak - equity
+            if fall > deepest[0]:
+                deepest = (fall, fall / peak)
+            if fall / peak > deepest_share[1]:
+                deepest_share = (fall, fall / peak)
         close = "sell" if side == "buy" else "buy"
         rows.append(
             f"<tr><td>{exit_at:%Y.%m.%d %H:%M}:00</td><td>{deal + 1}</td><td>{symbol}</td>"
@@ -141,6 +167,19 @@ def synthetic_mt5_report(
         "<td><b>Profit</b></td><td><b>Balance</b></td><td><b>Comment</b></td></tr>"
     )
     end = dates[-1].strftime("%Y.%m.%d")
+    results = ""
+    if history_quality:
+        results += (
+            "<tr><td colspan='3'>History Quality:</td>"
+            f"<td colspan='10'><b>{history_quality}</b></td></tr>"
+        )
+    if equity_drawdown:
+        results += (
+            "<tr><td colspan='3'>Equity Drawdown Maximal:</td>"
+            f"<td colspan='10'><b>{_money(deepest[0])} ({deepest[1]:.2%})</b></td></tr>"
+            "<tr><td colspan='3'>Equity Drawdown Relative:</td>"
+            f"<td colspan='10'><b>{deepest_share[1]:.2%} ({_money(deepest_share[0])})</b></td></tr>"
+        )
     html_text = (
         "<html><head><title>Strategy Tester Report</title></head><body><table>"
         "<tr><td colspan='13'><b>Strategy Tester Report</b></td></tr>"
@@ -150,11 +189,20 @@ def synthetic_mt5_report(
         "</td></tr>"
         "<tr><td colspan='3'>Currency:</td><td colspan='10'><b>USD</b></td></tr>"
         "<tr><td colspan='3'>Initial Deposit:</td><td colspan='10'><b>10 000.00</b></td></tr>"
-        "</table><table>"
+        + results
+        + "</table><table>"
         "<tr><th colspan='13'><b>Deals</b></th></tr>" + header + "".join(rows) + "</table>"
         "</body></html>"
     )
     return b"\xff\xfe" + html_text.encode("utf-16-le")
+
+
+def _floating_low(pips: float, draw: float, spread: float = 25.0) -> float:
+    """The deepest point, in pips, of a random walk that starts at 0 and ends
+    at ``pips``, with the trade's own spread (``spread`` pips over the hold,
+    as the trades are drawn): the low of a Brownian bridge, from an
+    exponential ``draw``. Never above 0 nor above the exit."""
+    return (pips - float(np.sqrt(pips * pips + 2.0 * spread * spread * draw))) / 2.0
 
 
 _MYFXBOOK_HEAD = (
@@ -170,7 +218,11 @@ def _stamp(moment: pd.Timestamp) -> str:
 def _sample_report() -> bytes:
     """The sample's backtest: two pairs, varied hold times, over two years."""
     return synthetic_mt5_report(
-        lead_days=SAMPLE_LEAD_DAYS, symbols=SAMPLE_SYMBOLS, hold_hours=SAMPLE_HOLD_HOURS
+        lead_days=SAMPLE_LEAD_DAYS,
+        symbols=SAMPLE_SYMBOLS,
+        hold_hours=SAMPLE_HOLD_HOURS,
+        history_quality=SAMPLE_HISTORY_QUALITY,
+        equity_drawdown=True,
     )
 
 

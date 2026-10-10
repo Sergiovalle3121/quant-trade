@@ -63,7 +63,7 @@ COPY_PT: dict[str, Any] = {
         "XLSX), o CSV de operações do NinjaTrader, QuantConnect, backtesting.py ou vectorbt, ou "
         "o histórico de operações em CSV ou Excel de qualquer outra corretora ou exchange. "
         "Reconhece o formato de exportação de " + PLATFORMS_PT + ". Também um extrato em PDF "
-        "com a tabela de operações: antes de medir você revisa as colunas. Até 10 MB."
+        "com a tabela de operações: antes de medir você revisa as colunas."
     ),
     "live": "Extrato da conta real ou demo (opcional)",
     "live_help": (
@@ -343,7 +343,7 @@ COPY_PT: dict[str, Any] = {
     "v_period": "Período dos dados",
     "v_age": "Dias entre o último dado e a auditoria",
     "v_format": "Formato do arquivo",
-    "v_engine": "Motor",
+    "v_engine": "Versão do motor",
     "v_trials_declared": "Tentativas declaradas",
     "v_trials_used": "Tentativas usadas no Sharpe deflacionado",
     "v_trials_undeclared": "não declarado; calculado com 1, o caso mais favorável",
@@ -456,7 +456,7 @@ UI_PT: dict[str, Any] = {
     "stats": [
         ("6", "dimensões auditadas"),
         ("{flags}", "bandeiras vermelhas revisadas em cada arquivo"),
-        ("{presets}", "desafios de prop firms para simular"),
+        ("{presets}", "conjuntos de regras de prop firms para simular"),
         ("{platforms}", "plataformas que reconhece"),
     ],
     "evidence_eyebrow": "Evidência",
@@ -589,7 +589,7 @@ UI_PT: dict[str, Any] = {
     "v_eyebrow": "Verificação pública",
     "v_copy": "Copiar código",
     "v_copied": "Copiado",
-    "v_id": "ID",
+    "v_id": "Código da página pública",
     "guides_eyebrow": "Guias de exportação",
     "legal_eyebrow": "Jurídico",
     "error_eyebrow": "Algo não bate",

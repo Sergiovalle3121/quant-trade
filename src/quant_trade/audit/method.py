@@ -30,9 +30,93 @@ REFERENCES: tuple[str, ...] = (
     "Management 40(5).",
     "Bailey, D. H., Borwein, J., López de Prado, M. y Zhu, Q. J. (2017). The Probability "
     "of Backtest Overfitting. Journal of Computational Finance 20(4).",
+    # The haircut after the search (luck.py), the Sharpe corrected for autocorrelation
+    # (engine.autocorrelation_adjusted_sharpe) and the test for a change in the mean
+    # (breaks.py): the report names all three next to their figures.
+    "Harvey, C. R. y Liu, Y. (2015). Backtesting. Journal of Portfolio Management 42(1).",
+    "Lo, A. W. (2002). The Statistics of Sharpe Ratios. Financial Analysts Journal 58(4).",
+    "Ploberger, W. y Krämer, W. (1992). The CUSUM Test with OLS Residuals. Econometrica 60(2).",
     "Politis, D. N. y Romano, J. P. (1994). The Stationary Bootstrap. Journal of the "
     "American Statistical Association 89(428).",
 )
+
+
+#: The prop-firm challenge simulator's section of the page, from
+#: ``analytics.simulate_challenge`` and its ``CHALLENGE_ASSUMPTIONS`` and the
+#: report's own notes beside the simulator (source, date, open losses). It has
+#: no new figure. Its own table, not ``COPY``: ``report_pt`` installs the
+#: Portuguese ``COPY`` over the English one, which would show this in English.
+CHALLENGE_SECTION: dict[str, tuple[str, list[str]]] = {
+    "es": (
+        "Simulador de retos de prop firm",
+        [
+            "Remuestrea tu historial en bloques de días consecutivos (bootstrap "
+            "estacionario) y recorre miles de caminos diarios por las reglas de una fase "
+            "del reto.",
+            "Cada camino se revisa en cada cierre diario, en este orden: la pérdida diaria, "
+            "la pérdida total y el objetivo, que solo cuenta con los días mínimos operados. "
+            "Cada día con retorno distinto de cero cuenta como día operado.",
+            "Las reglas de cada firma son las publicadas en su web oficial: el informe cita "
+            "la fuente y la fecha en que se leyeron, y pueden haber cambiado después. Las "
+            "reglas genéricas son una referencia típica de las evaluaciones en dos fases, "
+            "no las de ninguna firma.",
+            "Con cierres diarios no se ve el drawdown flotante dentro del día, y un balance "
+            "de operaciones cerradas no ve las pérdidas de las operaciones abiertas: una "
+            "firma que cuenta la pérdida diaria con posiciones abiertas puede cortar un "
+            "camino que aquí sigue en marcha. Por eso la estimación es optimista frente a "
+            "los límites diarios y totales; si tu plataforma imprime un drawdown con "
+            "operaciones abiertas mayor que el límite total, el informe lo avisa junto al "
+            "simulador.",
+            "Es una estimación remuestreada del historial aportado, no una predicción, y "
+            "supone que el futuro se parece al historial. No cambia la clase.",
+        ],
+    ),
+    "en": (
+        "Prop-firm challenge simulator",
+        [
+            "It resamples your history in blocks of consecutive days (stationary bootstrap) "
+            "and walks thousands of daily paths through the rules of one challenge phase.",
+            "Each path is checked at every daily close, in this order: the daily loss, the "
+            "total loss and the target, which only counts once the minimum trading days are "
+            "reached. Every day with a non-zero return counts as a trading day.",
+            "Each firm's rules are those posted on its official website: the report cites "
+            "the source and the date they were read, and they may have changed since. The "
+            "generic rules are a reference typical of two-step evaluations, not any one "
+            "firm's terms.",
+            "Daily closes cannot see floating drawdown within the day, and a closed-trade "
+            "balance cannot see the losses of open trades: a firm that counts the daily loss "
+            "with open positions can stop a path that is still running here. That is why the "
+            "estimate is optimistic against the daily and total limits; when your platform "
+            "prints an open-trade drawdown beyond the total limit, the report says so next "
+            "to the simulator.",
+            "It is a resampled estimate from the supplied history, not a prediction, and it "
+            "assumes the future resembles the history. It does not change the class.",
+        ],
+    ),
+    "pt": (
+        "Simulador de desafios de prop firm",
+        [
+            "Reamostra o seu histórico em blocos de dias consecutivos (bootstrap "
+            "estacionário) e percorre milhares de caminhos diários pelas regras de uma fase "
+            "do desafio.",
+            "Cada caminho é revisado em cada fechamento diário, nesta ordem: a perda "
+            "diária, a perda total e o objetivo, que só conta depois dos dias mínimos "
+            "operados. Cada dia com retorno diferente de zero conta como dia operado.",
+            "As regras de cada mesa são as publicadas no site oficial dela: o relatório cita "
+            "a fonte e a data em que foram lidas, e elas podem ter mudado depois. As regras "
+            "genéricas são uma referência típica das avaliações em duas fases, não as de "
+            "nenhuma mesa.",
+            "Com fechamentos diários não se vê o drawdown flutuante dentro do dia, e um saldo "
+            "de operações fechadas não vê as perdas das operações abertas: uma mesa que conta "
+            "a perda diária com posições abertas pode encerrar um caminho que aqui continua. "
+            "Por isso a estimativa é otimista frente aos limites diários e totais; quando a "
+            "sua plataforma imprime um drawdown com operações abertas além do limite total, "
+            "o relatório avisa junto ao simulador.",
+            "É uma estimativa reamostrada do histórico fornecido, não uma previsão, e supõe "
+            "que o futuro se parece com o histórico. Não muda a classe.",
+        ],
+    ),
+}
 
 
 #: The references join their authors with the Spanish "y"; each page uses its own word.
@@ -474,4 +558,12 @@ COPY: dict[str, dict[str, object]] = {
 }
 
 
-__all__ = ["COPY", "METHOD_PATH", "REFERENCES", "dimension_rows", "method_url", "references"]
+__all__ = [
+    "CHALLENGE_SECTION",
+    "COPY",
+    "METHOD_PATH",
+    "REFERENCES",
+    "dimension_rows",
+    "method_url",
+    "references",
+]

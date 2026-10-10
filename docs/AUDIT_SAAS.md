@@ -1105,7 +1105,20 @@ The `/ejemplo` backtest trades two pairs, EURUSD and AUDUSD (`SAMPLE_SYMBOLS`,
 the pair drawn from its own random stream, so no result changes), and holds
 each trade between 1 and 7 hours (`SAMPLE_HOLD_HOURS`, also its own stream),
 so the per-instrument and "Cómo se comporta al perder" sections have real
-variety to show. The class stays C.
+variety to show. The class stays C. Its header prints what an MT5 tester
+report prints and the importer reads: "History Quality: 100% real ticks"
+(`SAMPLE_HISTORY_QUALITY`; the test-data section shows real ticks and 100 %,
+DECLARED, and the modelling question is answered for the developer) and
+"Equity Drawdown Maximal" and "Relative", the drawdown with the open trade
+counted: each trade's deepest floating loss is the low of a Brownian bridge
+from its entry to its exit with the trades' 25-pip spread, drawn from its
+own stream (`_floating_low`), so no trade, class, flag, challenge, ladder or
+size figure changes. It reads 1 570.26 (5.78 %) and 8.76 % (1 008.99),
+against 8.22 % on closed trades: the report adds "Drawdown con operaciones
+abiertas (tu plataforma)" (DECLARED), the capital section shows the
+platform's fall in money as a floor (below the resampled reference, so no
+capital figure moves) with its open-loss line, and the rows read grow by
+three.
 
 "Qué hacer ahora" / "What to do now" follows "Qué significa para ti": up to
 three checks for whoever runs the robot, from the live comparison, serious
@@ -1372,11 +1385,62 @@ and report wire them in during the integration step):
   Ranked by the figure that matters for a payout (within the best-day rule
   where the firm has one), ties by name. Figures read "≥99%" at the top.
   When every program is at or above 99 % or at or below 1 %, the table
-  gives way to one sentence (and, for all failing, the most common reason).
-  A program where no path fails reads "Nothing in the simulations". When
-  the balance hides open losses, the table repeats that its figures are
-  optimistic. MEASURED under the simulator's assumptions; it compares rules
-  and never recommends buying a challenge. No class change.
+  gives way to one sentence (and, for all failing, the most common reason);
+  with programs left out for their markets the sentence says "every
+  simulated program" and the left-out programs are still listed under it,
+  each with why. A program where no path fails reads "Nothing in the
+  simulations". When the balance hides open losses, the table repeats that
+  its figures are optimistic; and since each row carries its own rules, a
+  row whose own total loss limit (the smallest of its phases) the
+  platform's drawdown with open trades already reaches says so under the
+  program's name, with the same comparison as the chosen program's
+  open-loss line (`_row_open_loss`). On the public sample (-8.76 % with
+  open trades) that marks The5ers Hyper Growth (6 %), FundedNext Stellar
+  1-Step (6 %), Stellar Lite (8 %) and The5ers Bootcamp (5 %).
+  MEASURED under the simulator's assumptions; it compares rules and never
+  recommends buying a challenge. No class change.
+  Each row carries `rules` (one entry per phase: target, daily loss and its
+  basis, total loss and its type, minimum days, time limit, best-day rule,
+  copied from `prop_presets`) and the report folds them under the program's
+  name with "rules read on {as_of}" and a link to `source_url`; a field a
+  program does not have is left out. The `<details>` is served open (a
+  print, a saved page and a browser without script keep the rules) and
+  `static/app.js` folds it on screen and opens it again before printing,
+  as it does for the report's technical details. `ChallengeRules.markets` lists what a
+  program lets the trader trade only when a page of the firm says so
+  (`markets_source`, `markets_as_of`): Topstep is futures only ("Topstep is a
+  Futures-only program", help article 8284206), The5ers High Stakes and Hyper
+  Growth list their assets on their own pages; FTMO, FundedNext and Bootcamp
+  pages read say nothing, so they are never restricted. What each symbol
+  can be traded as comes from `crises.symbol_market` and
+  `firmfit.symbol_venues` (`SYMBOL_MARKETS`: a pair against a currency,
+  `EURUSD`, `XAUUSD` or `BTCUSD`, is spot or CFD and never a future, so
+  gold and bitcoin pairs are treated alike; an index name, a bare coin root
+  such as `BTC` or a perpetual can be either). When every symbol is known
+  and a program does not take one of them, the program is not simulated
+  and goes last with `market`: what the page allows and only the symbols
+  (the most traded first, four at most, then "…") and markets it does not
+  take, with `spot` when they are all spot or CFD pairs ("Only futures: the
+  history trades spot or CFD forex (EURUSD, AUDUSD), which this program does
+  not take according to its page; not simulated"); a forex and index
+  history names the forex only. With symbols the audit cannot place,
+  nothing is restricted. The chosen program is never left out: its section
+  was simulated, so its row keeps its figures (the ladder's own) and says
+  "it is simulated because you chose it, but its figures are those of rules
+  that would not apply to this history" instead of "not simulated";
+  `challenge.market` carries the same fit, and the challenge section, the
+  ladder, the size table and the line under the verdict repeat it. `firmfit.scenario_columns`
+  repeats the ladder's `out_of_sample` and `reference_cost` rungs for every
+  program, named as the ladder names them: the chosen program's figures are
+  the ladder's own, every other program runs `program_pass` on the same
+  series at 2,000 paths per phase. A rung the ladder could not measure is
+  one NOT_MEASURED line under the table with the ladder's reason. The note
+  above the table says that "Passes" uses the full history with the costs
+  the file already carries, without the declared or reference cost. Time
+  measured with `time.perf_counter` at the production paths: about 0.8 s
+  extra on the sample report and 0.6 s with FTMO 2-Step chosen (the three
+  Topstep programs left out for a forex history are not simulated), under
+  2 s, so the columns keep the firm table's 2,000 paths.
 - `challenge.scenarios`, the challenge ladder ("¿Cuánto cambia con lo que
   encontró este informe?"): the chosen program (all its phases, through
   `firmfit.program_pass`; the generic preset is one phase) run again with
@@ -1415,8 +1479,10 @@ and report wire them in during the integration step):
   measure (too few daily returns) says why. The rows are scenarios of the
   same history, not predictions; the ladder is MEASURED, informational and
   changes neither the class, the dimensions, the challenge's own figures
-  nor the firm table, which now says that its figures come from the full
-  history without the reference cost. When the client chose the challenge,
+  nor the firm table's full-history column; the firm table repeats the
+  `out_of_sample` and `reference_cost` rungs for every program. The target
+  column reads "Reaches the target" for a one-phase program and "Reaches the
+  target in every phase" with more. When the client chose the challenge,
   one line under the verdict gives the full-history figure next to the
   lowest measured row and links to the section; when the section warns that
   the balance hides open losses (the platform's drawdown with open trades
@@ -1453,16 +1519,34 @@ and report wire them in during the integration step):
   file states none (the importer's or the column mapping's "does not state a
   starting balance" warning on a curve built from it); the report then says
   the balance was assumed and that 1x scales with it. `size_per_trade`
-  is NOT_MEASURED: the importers fold each trade's lots into units of the
-  instrument and read no stop loss, so the report does not know the lot or
-  the risk per trade behind 1x and never gives one; 1x is "the size of the
+  is the average lot per trade at 1x (MEASURED) when the costs section
+  measured `break_even_per_lot` (MetaTrader lots that can be added): every
+  trade's lots added and divided by the number of trades, which is half the
+  "lots traded" the cost section divides by (it counts entries and exits);
+  each row then has `average_lot`, that average times the size. Those lots
+  are the balance's the shares at 1x are measured on (`starting_balance`),
+  and the report says so ("0.50 lots on a 10,000 balance"): the same shares
+  on another balance take the lots times that balance over this one. When
+  the program names an account (`ACCOUNT_SIZES`) and the balance was not
+  assumed, `size_per_trade_account` and each row's `average_lot_account`
+  give the lots on that account (0.50 × 100,000 / 10,000 = 5.00 on Topstep
+  100K for the sample) in a column of their own. Otherwise
+  NOT_MEASURED, with the cost section's reason for mixed lots or with
+  `SIZING_NO_SIZE` (lots are read only from MetaTrader 4 and 5 reports). No
+  stop loss is read, so no risk per trade is given; 1x is "the size of the
   history you uploaded" (each simulated day gains or loses the same share of
   the balance as a day of the file). `account_size` is DECLARED only when
   the preset's program names one (`prop_presets.ACCOUNT_SIZES`: Topstep
   50K/100K/150K, whose dollar limits are shares of that account); otherwise
   NOT_MEASURED, and the report says the simulated rules fix no account size
-  (they are shares of the starting balance or of the day's), so the table
-  does not depend on the account size. The whole block is
+  (they are shares of the starting balance or of the day's), so the table's
+  shares do not depend on the account size, and, with the lots given, that
+  the lots do (`SIZING_NO_ACCOUNT`). Results stored before the average lot
+  keep the old `SIZING_NO_SIZE` and `SIZING_NO_ACCOUNT` sentences
+  (`SIZING_NO_SIZE_BEFORE`, `SIZING_NO_ACCOUNT_BEFORE`): their translation
+  rules stay, and the old reason keeps its old name ("Lot or risk per trade
+  at 1x"). The intro counts every phase only for a program of several
+  (`ch_size_intro_one` otherwise). The whole block is
   NOT_MEASURED, with the same reason, when the challenge or the ladder's
   `full` row is not measured, and with "uploaded returns are not money"
   (`RETURNS_NOT_MONEY`, the reconciliation's own reason) for a returns
@@ -2717,6 +2801,7 @@ Routes:
 | `GET /auditar` | The upload form on its own page (`/en/audit`, `/pt/auditar`; `?extras=1` opens the extra files). Outside free mode a visitor without an account gets a 303 to sign-up with `next` back here (`/registro?next=/auditar`, `/signup?next=/en/audit`, `/pt/cadastro?next=/pt/auditar`), so nobody fills the form and loses it. A visitor who came with `?extras=1` keeps it (`next=/auditar%3Fextras%3D1`) and lands on the form with the extra files open after signing up or in; the language switch of the form and the "account first" answer to an upload that used an extra box keep it too. With `AUDIT_ANON_PREVIEW=true` there is no redirect: the form is served, and its note says that without an account the file's A to D class and red flags are shown, and that with an e-mail the first full report is free (`pages._COPY[...]["anon_preview_note"]`); under the paid offer (`AUDIT_WELCOME_FULL_REPORT=false`) the notes say instead the free preview, the price and the 7-day refund (`paid_offer.paid_text`); see "Preview without an account" and "Paid offer" below. |
 | `GET /precios` | 301 to the landing's prices (`/#pricing`); `/pricing` and `/en/pricing` go to `/en#pricing`, `/pt/precos` to `/pt#pricing`. |
 | `GET /contacto` | Contact page (`/en/contact`, `/pt/contato`; `/soporte`, `/contact`, `/support`, `/en/support`, `/pt/suporte` redirect there), linked from every footer. It shows only what the operator set: `AUDIT_OPERATOR_CONTACT` as a mail link and `AUDIT_CONTACT_URL` as the chat link; with neither it says no channel is published yet. It also says never to send a password, recovery key or card details. |
+| `GET /acerca` | Who is behind Rigor (`/en/about`, `/pt/sobre`; `/about` and `/pt/about` redirect there; `about.py`). It shows only what the terms and the landing already publish, each from its setting: `AUDIT_OPERATOR_NAME`, the country (`AUDIT_OPERATOR_ADDRESS`, `_EN`, `_PT`), `AUDIT_OPERATOR_CONTACT` and `AUDIT_CONTACT_URL`; no photo. With none set it says the operator has not published them. `/sample-signal`, `/en/compare`, `/en/signup`, `/register` and `/pt-br` answer 301 to the page that exists. |
 | `POST /audits` | Upload. An optional `access_code` field redeems a code (paid mode with codes on). With `AUDIT_ANON_PREVIEW=true`, an upload without an account and without a working code is stored as a locked preview and answers 303 to `/audits/{id}?token=…&acct=anon_preview` (201 with that `location` for JSON). |
 | `GET /audits/{id}?token=…` | The report, in the language chosen at upload; `&lang=en` or `&lang=es` shows it in the other one. `GET /audits/{id}.json?token=…` the record (402 while locked). |
 | `POST /audits/{id}/checkout?token=…` | Stripe Checkout (503 without Stripe). Form field `plan=single` (default) or `plan=pack`; the return link `?session_id=…` is confirmed with Stripe before anything unlocks. Needs a signed-in account: a visitor is sent to sign in and back to the report, a report on another account is refused (403), and the order is recorded on the buyer's account (`tests/test_audit_card_payments.py::test_checkout_needs_the_signed_in_account_that_owns_the_report`). |
@@ -2725,7 +2810,7 @@ Routes:
 | `POST /audits/{id}/account?token=…` | The account box of a report opened by its link, for a visitor without a session. Form field `go=signup` or `go=signin`; 404 without a valid token, 403 to a post from another site. It keeps the report's key in the cookie `rigor_report` (1 hour) and answers 303 to sign-up or sign-in with a `next` that names the report without its token. |
 | `POST /audits/{id}/publish?token=…` | Create (or return) the public verification page. Paid audits, or any audit in free mode; 402 otherwise. |
 | `POST /audits/{id}/unpublish?token=…` | Remove the public page. |
-| `GET /v/{public_id}` | Public verification page. `GET /v/{public_id}/badge.svg` its badge. Survives the retention purge (only the shown fields are kept); 404 once unpublished. |
+| `GET /v/{public_id}` | Public verification page. `GET /v/{public_id}/badge.svg` its badge. Survives the retention purge (only the shown fields are kept); 404 once unpublished. Without `?lang=` it is the Spanish page with its usual canonical, except for a browser whose `Accept-Language` asks for English or Portuguese: that one gets a 302 to `?lang=en` or `?lang=pt` (`Vary: Accept-Language`, the rest of the query such as `?ref=` kept). The language switch links Spanish as `?lang=es`, so the visitor's choice wins. |
 | `GET /v/ejemplo`, `GET /v/ejemplo-senal` | The public page each sample's report would get, with the synthetic-data notice on top, and the same `badge.svg`, `card.svg` and `card.png`; built in memory, never stored. |
 | `GET /ejemplo`, `GET /sample` | A full report of synthetic data, Spanish and English. |
 | `GET /ejemplo-senal`, `/en/sample-signal`, `/pt/exemplo-sinal` | The signal sample: a full report of a made-up Myfxbook account, for a copier; each with its `.pdf`. |
@@ -4547,7 +4632,7 @@ Redesign pass 54 walks the free tier's path on a phone first: upload without an 
 
 Redesign pass 55 makes each locked figure in a preview's summary a link to the unlock box (`a.kpi.locked`, `href='#unlock'`, labelled with the figure's name and "Desbloquear"), so tapping what someone wants to see takes them to how to see it. The tile looks the same; on hover or focus its border darkens.
 
-Redesign pass 56 opens the PDF on a one-page summary (`_pdf_cover` in `report.py`, print only, hidden on screen): the class in an SVG ring, the verdict's first sentence, each dimension with its badge, the first four key figures and up to three "what to do now" steps, then the evidence legend. It reuses the report's own labels and figures; nothing on it is new. A page notice (the sample's "synthetic data") repeats on the cover so the first page never passes for a real account, and a locked preview gets no cover. The class ring in the verdict also gets an SVG copy for print (`ring_svg` in `theme.py`), since WeasyPrint draws no conic gradient.
+Redesign pass 56 opens the PDF on a one-page summary (`_pdf_cover` in `report.py`, print only, hidden on screen): the class in an SVG ring, the verdict's first sentence, each dimension with its badge, the first four key figures (when the platform's drawdown with open trades shows, it takes the resampled p95's place, not the Sharpe's: `_cover_kpis`, so the sample's cover keeps the 1.79 Sharpe the landing quotes) and up to three "what to do now" steps, then the evidence legend. It reuses the report's own labels and figures; nothing on it is new. A page notice (the sample's "synthetic data") repeats on the cover so the first page never passes for a real account, and a locked preview gets no cover. The class ring in the verdict also gets an SVG copy for print (`ring_svg` in `theme.py`), since WeasyPrint draws no conic gradient.
 
 Redesign pass 58 styles "Mis estrategias". On the account page each strategy is a card with its latest class, name and version count; on a phone the count goes under the name and "Ver estrategia" spans the card. On a strategy's page the version table uses tabular figures, its "Quitar de la estrategia" buttons sit quietly at the right, and on a phone each version becomes a card with every figure under its column name (`data-label`). In "Qué cambió" each line ends in a chip coloured by its meaning only: green for "mejor", red for "peor", grey for "cambió", "igual" or "sin cambio claro". The wording and the rules behind each word are unchanged.
 

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from quant_trade.audit import paid_offer
 from quant_trade.audit.settings import AuditSettings
+from quant_trade.audit.upload_limits import upload_limit_text
 
 FAQ_PATH: dict[str, str] = {"es": "/preguntas", "en": "/en/faq", "pt": "/pt/perguntas"}
 FAQ_COPY: dict[str, dict[str, str]] = {
@@ -129,30 +130,31 @@ _QUESTIONS: tuple[dict[str, tuple[str, str]], ...] = (
         "pt": ("De quais países é possível pagar com cartão?", "{markets}"),
     },
     # Sources: pages._COPY['report_short'/'report_help'/'faq'], portuguese.COPY_PT;
-    # settings.AuditSettings.max_upload_bytes controls the configured size limit.
+    # upload_limits.upload_limit_text words each field's limit from
+    # settings.AuditSettings.max_upload_bytes and the readers' own ceilings, as the
+    # upload form does.
     {
         "es": (
             "¿Qué formatos acepta Rigor?",
             "Informes HTML de MetaTrader, listas de operaciones CSV o XLSX de TradingView, "
             "historiales CSV o Excel de cuentas y series de equity o retornos. También "
             "estados de cuenta PDF con tabla de operaciones: revisas sus columnas antes "
-            "de medir. DECLARED · Límite por archivo: {upload_mb} MB. Las guías explican "
-            "cómo exportar desde cada plataforma.",
+            "de medir. {upload_limit} Las guías explican cómo exportar desde cada "
+            "plataforma.",
         ),
         "en": (
             "Which file formats does Rigor accept?",
             "MetaTrader HTML reports, TradingView CSV or XLSX trade lists, CSV or Excel "
             "account histories, and equity or return series. PDF statements with a trade "
-            "table also work: you review their columns before measuring. DECLARED · "
-            "Limit per file: {upload_mb} MB. The guides explain how to export from each platform.",
+            "table also work: you review their columns before measuring. {upload_limit} "
+            "The guides explain how to export from each platform.",
         ),
         "pt": (
             "Quais formatos a Rigor aceita?",
             "Relatórios HTML do MetaTrader, listas de operações CSV ou XLSX do TradingView, "
             "históricos de contas em CSV ou Excel e séries de equity ou retornos. Também "
             "extratos PDF com tabela de operações: você revisa as colunas antes de medir. "
-            "DECLARED · Limite por arquivo: {upload_mb} MB. Os guias explicam como "
-            "exportar de cada plataforma.",
+            "{upload_limit} Os guias explicam como exportar de cada plataforma.",
         ),
     },
     # Sources: legal.terms_text service scope and pages._COPY['not']: no broker access,
@@ -293,7 +295,7 @@ _QUESTIONS: tuple[dict[str, tuple[str, str]], ...] = (
     {
         "es": (
             "¿Qué ocurre con mis archivos y cuánto tiempo se guardan?",
-            "Tus archivos no se publican. DECLARED · Las auditorías no pagadas se "
+            "Tus archivos no se publican. Las auditorías no pagadas se "
             "eliminan a los {retention} días; quedan datos mínimos del registro. Las "
             "pagadas y el primer informe completo gratis se conservan hasta que los "
             "borres con tu cuenta o solicites su borrado. Una página de verificación "
@@ -302,7 +304,7 @@ _QUESTIONS: tuple[dict[str, tuple[str, str]], ...] = (
         ),
         "en": (
             "What happens to my files and how long are they kept?",
-            "Your files are not published. DECLARED · Unpaid audits are deleted after "
+            "Your files are not published. Unpaid audits are deleted after "
             "{retention} days; minimal registry data remains. Paid audits and the first "
             "free full report are kept until you delete them with your account or "
             "request deletion. A verification page you published keeps only its public "
@@ -311,7 +313,7 @@ _QUESTIONS: tuple[dict[str, tuple[str, str]], ...] = (
         ),
         "pt": (
             "O que acontece com meus arquivos e por quanto tempo são guardados?",
-            "Seus arquivos não são publicados. DECLARED · Auditorias não pagas são "
+            "Seus arquivos não são publicados. Auditorias não pagas são "
             "excluídas após {retention} dias; restam dados mínimos do registro. As pagas "
             "e o primeiro relatório completo grátis ficam até você excluí-los com a "
             "conta ou pedir sua exclusão. Uma página de verificação que você publicou "
@@ -369,7 +371,10 @@ def faq_items(settings: AuditSettings, locale: str = "es") -> tuple[tuple[str, s
     """The same localized answers feed the visible page and FAQPage JSON-LD.
 
     ``_QUESTIONS`` first, then the landing's questions it does not show
-    (``landing_only_questions``), and the contact question last. Under the paid
+    (``landing_only_questions``), and the contact question last. The price, the
+    countries, the retention and the size limits are the operator's own settings,
+    said as plain facts: no evidence label, which is for what a file or a client says.
+    Under the paid
     offer (``AUDIT_WELCOME_FULL_REPORT=false``) the first question is the full
     report's price, «¿Y si el informe no me sirve?» follows it with the terms'
     7-day refund, and no answer names a free first report
@@ -387,9 +392,9 @@ def faq_items(settings: AuditSettings, locale: str = "es") -> tuple[tuple[str, s
         }[locale]
     else:
         price = {
-            "es": "DECLARED · Un informe completo adicional cuesta USD {amount:.2f}.",
-            "en": "DECLARED · An additional full report costs USD {amount:.2f}.",
-            "pt": "DECLARED · Um relatório completo adicional custa USD {amount:.2f}.",
+            "es": "Un informe completo adicional cuesta USD {amount:.2f}.",
+            "en": "An additional full report costs USD {amount:.2f}.",
+            "pt": "Um relatório completo adicional custa USD {amount:.2f}.",
         }[locale].format(amount=settings.price_usd)
     offer = paid_offer.offer_of(settings)
     email = ""
@@ -400,7 +405,7 @@ def faq_items(settings: AuditSettings, locale: str = "es") -> tuple[tuple[str, s
             "pt": " Para o primeiro relatório grátis, é preciso confirmar o e-mail da conta.",
         }[locale]
     if settings.card_public:
-        markets = "DECLARED · " + card_markets_line(tuple(settings.approved_markets), locale)
+        markets = card_markets_line(tuple(settings.approved_markets), locale)
         markets += {
             "es": " Se usa el país de facturación, no tu idioma ni tu dirección de red.",
             "en": " This uses the billing country, not your language or network address.",
@@ -426,7 +431,7 @@ def faq_items(settings: AuditSettings, locale: str = "es") -> tuple[tuple[str, s
         "price": price,
         "email": email,
         "markets": markets,
-        "upload_mb": f"{settings.max_upload_bytes / (1024 * 1024):g}",
+        "upload_limit": upload_limit_text(settings.max_upload_bytes, locale),
         "retention": settings.retention_days,
         "contact": contact,
     }
