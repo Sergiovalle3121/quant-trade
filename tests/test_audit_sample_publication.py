@@ -335,7 +335,11 @@ def test_each_page_is_the_page_a_real_publication_of_the_same_report_gets(
                 if name.endswith(".svg"):
                     assert mine.text == theirs.text.replace(real_id, public_id)
                 else:
-                    assert mine.content == theirs.content
+                    # The PNG is drawn from that SVG, id included, so with a real
+                    # renderer (CI) the bytes differ by the id; without one both are
+                    # the site's generic card. Either way: same kind of image, same size.
+                    assert mine.content[:8] == theirs.content[:8] == b"\x89PNG\r\n\x1a\n"
+                    assert mine.content[16:24] == theirs.content[16:24]  # IHDR width, height
 
 
 def test_badge_and_cards_answer_with_their_content_type_and_cache(tmp_path: Path) -> None:
