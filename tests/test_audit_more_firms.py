@@ -373,7 +373,8 @@ def test_the_firm_lists_come_from_one_helper() -> None:
 
     for locale, conjunction in (("es", "o"), ("en", "or"), ("pt", "ou")):
         assert calc.firm_names(locale, "or") in _full_items(locale)[0]
-        assert calc.firm_names(locale, "or").endswith(f" {conjunction} Maven Trading")
+        # The futures firms read after these five close the list (test_audit_futures_firms).
+        assert calc.firm_names(locale, "or").endswith(f" {conjunction} Lucid Trading")
 
 
 @pytest.mark.parametrize("locale", LOCALES)

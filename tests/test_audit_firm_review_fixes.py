@@ -46,8 +46,27 @@ from quant_trade.audit.theme import STATIC_DIR
 NOW = datetime(2026, 10, 1, tzinfo=UTC)
 LOCALES = ("es", "en", "pt")
 TOPSTEP = ("topstep-50k-combine", "topstep-100k-combine", "topstep-150k-combine")
+#: The futures firms read on 2026-10-10 (Take Profit Trader, MyFundedFutures,
+#: Tradeify, Bulenox, Earn2Trade, Alpha Futures, Lucid Trading): futures only too.
+FUTURES_FIRM_KEYS = (
+    "take-profit-trader-test-50k",
+    "myfundedfutures-rapid-eod-50k",
+    "myfundedfutures-rapid-50k",
+    "myfundedfutures-pro-50k",
+    "myfundedfutures-builder-50k",
+    "tradeify-select-50k",
+    "tradeify-growth-50k",
+    "bulenox-qualification-eod-50k",
+    "bulenox-momentum-eod-50k",
+    "earn2trade-tcp-25k",
+    "earn2trade-gauntlet-mini-50k",
+    "alpha-futures-zero-50k",
+    "alpha-futures-standard-50k",
+    "alpha-futures-advanced-50k",
+    "lucid-pro-50k",
+)
 #: Every program whose page says it is futures only, in the presets' order.
-FUTURES_ONLY = (*TOPSTEP, "e8-zero-100k")
+FUTURES_ONLY = (*TOPSTEP, "e8-zero-100k", *FUTURES_FIRM_KEYS)
 CHOSEN = "topstep-100k-combine"
 #: Words the new texts must never use, in any of its languages.
 BANNED = ("verificado", "certificado", "aprobado", "garantiza", "rentable", "recomend")

@@ -159,7 +159,12 @@ def test_the_landing_is_short_and_keeps_its_ways_out(locale: str, with_photo: Pa
     page = _paid_landing(locale, operator=("Sergio Valle", "Ciudad de México"))
     main = _main(page)
     if locale == "es":
-        assert len(_text(main).split()) <= 1300
+        # The price card names every firm with published rules (the full report lines
+        # test below), a list that grows with each firm read: the budget is the prose's,
+        # the 1,300 words less the 14 of the list when it had nine firms.
+        text, firms = _text(main), pages.challenge.firm_names("es", "or")
+        assert text.count(firms) == 1
+        assert len(text.split()) - len(firms.split()) <= 1300 - 14
     assert main.count("data-reveal") <= 25
     for href in (_sample_url(locale), tools_url(locale), PRICING_PATH[locale]):
         assert f"href='{href}" in main, href
