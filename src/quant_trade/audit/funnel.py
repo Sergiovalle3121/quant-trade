@@ -108,6 +108,7 @@ REF_TAGS: dict[str, str] = {
     "linkedin": "LinkedIn",
     "tiktok": "TikTok",
     "email": "Firma de correo",
+    "inst": "Correo a una empresa de la lista institucional (10-oct)",
     # Campaign of 2026-09-29: one tag per community, so /panel shows which
     # group brings accounts and payments.
     "fo-en-01": "Forex Peace Army · Classifieds",
