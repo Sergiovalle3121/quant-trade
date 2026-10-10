@@ -17,7 +17,7 @@ from typing import Any
 TOOLS_PATH: dict[str, str] = {"es": "/herramientas", "en": "/en/tools", "pt": "/pt/ferramentas"}
 
 #: The tools, in the order the page and the landing show them.
-TOOL_KEYS: tuple[str, ...] = ("calculator", "winrate", "reading", "check")
+TOOL_KEYS: tuple[str, ...] = ("calculator", "winrate", "challenge", "reading", "check")
 
 
 def tools_url(locale: str) -> str:
@@ -31,8 +31,8 @@ COPY: dict[str, dict[str, Any]] = {
         "title": "Herramientas gratis para revisar un backtest",
         "seo_title": "Herramientas gratis para backtests e historiales",
         "summary": (
-            "Calculadoras de suerte y de % de aciertos, tarjeta de cifras y comprobación de "
-            "informes: gratis y sin registro. Cifras declaradas y supuestos visibles."
+            "Calculadoras de suerte, de % de aciertos y de reto de prop firm, tarjeta de cifras "
+            "y comprobación de informes: gratis y sin registro. Supuestos visibles."
         ),
         "intro": (
             "Todas usan cifras que tú declaras y muestran sus supuestos. No son una auditoría: "
@@ -65,6 +65,20 @@ COPY: dict[str, dict[str, Any]] = {
             "returns": (
                 "Intervalo de confianza al 95 %, % de aciertos de equilibrio y cuántas "
                 "operaciones hacen falta."
+            ),
+        },
+        "challenge": {
+            "question": (
+                "¿Con qué frecuencia alcanzarías el objetivo de un reto de prop firm, o tocarías "
+                "un límite, con tus cifras?"
+            ),
+            "inputs": (
+                "% de aciertos, ganancia y pérdida medias, operaciones por día, firma y programa; "
+                "opcionales: operaciones del historial y cuota."
+            ),
+            "returns": (
+                "Probabilidad de alcanzar el objetivo, de tocar el límite diario o el total y de "
+                "quedar sin terminar, con las reglas publicadas de la firma y su fecha."
             ),
         },
         "reading": {
@@ -105,8 +119,8 @@ COPY: dict[str, dict[str, Any]] = {
         "title": "Free tools to check a backtest",
         "seo_title": "Free tools for backtests and track records",
         "summary": (
-            "Luck and win rate calculators, figures card and report check: free and no "
-            "signup. Declared figures and visible assumptions; none of them is an audit."
+            "Luck, win rate and prop firm challenge calculators, figures card and report "
+            "check: free and no signup. Declared figures and visible assumptions."
         ),
         "intro": (
             "Each one uses figures you declare and shows its assumptions. They are not an "
@@ -134,6 +148,20 @@ COPY: dict[str, dict[str, Any]] = {
             "inputs": "Trades, win rate, target and stop in R.",
             "returns": (
                 "95 % confidence interval, break-even win rate and how many trades are needed."
+            ),
+        },
+        "challenge": {
+            "question": (
+                "How often would you reach a prop firm challenge target, or hit a limit, with "
+                "your figures?"
+            ),
+            "inputs": (
+                "Win rate, average win and loss, trades per day, firm and program; optional: "
+                "trades in your history and the fee."
+            ),
+            "returns": (
+                "Chance of reaching the target, hitting the daily or total limit and being left "
+                "unfinished, under the firm's dated published rules."
             ),
         },
         "reading": {
@@ -173,8 +201,8 @@ COPY: dict[str, dict[str, Any]] = {
         "title": "Ferramentas grátis para revisar um backtest",
         "seo_title": "Ferramentas grátis para backtests e históricos",
         "summary": (
-            "Calculadoras de sorte e de taxa de acerto, cartão de números e conferência de "
-            "relatórios: grátis e sem cadastro. Números declarados e suposições visíveis."
+            "Calculadoras de sorte, de taxa de acerto e de desafio de prop firm, cartão de "
+            "números e conferência de relatórios: grátis e sem cadastro."
         ),
         "intro": (
             "Todas usam números que você declara e mostram as suas suposições. Não são uma "
@@ -205,6 +233,20 @@ COPY: dict[str, dict[str, Any]] = {
             "returns": (
                 "Intervalo de confiança de 95 %, taxa de acerto de equilíbrio e quantas "
                 "operações são necessárias."
+            ),
+        },
+        "challenge": {
+            "question": (
+                "Com que frequência você atingiria a meta de um desafio de prop firm, ou tocaria "
+                "um limite, com os seus números?"
+            ),
+            "inputs": (
+                "Taxa de acerto, ganho e perda médios, operações por dia, empresa e programa; "
+                "opcionais: operações do histórico e taxa."
+            ),
+            "returns": (
+                "Probabilidade de atingir a meta, de tocar o limite diário ou o total e de ficar "
+                "sem terminar, com as regras publicadas da empresa e a data."
             ),
         },
         "reading": {
