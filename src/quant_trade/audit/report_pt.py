@@ -1118,9 +1118,9 @@ REPORT: dict[str, Any] = {
         "ff_title": "Com as regras de qual firma seu histórico se encaixa?",
         "ff_intro": (
             "O mesmo histórico, reamostrado da mesma forma, com as regras publicadas de cada "
-            "firma, da maior para a menor probabilidade de passar por todas as fases do programa "
-            "dentro da regra do melhor dia, se a firma a tiver; em caso de empate, por nome. "
-            "Compara regras; não recomenda comprar nenhum desafio."
+            "firma, da maior para a menor probabilidade de atingir a meta em todas as fases do "
+            "programa dentro da regra do melhor dia, se a firma a tiver; em caso de empate, por "
+            "nome. Compara regras; não recomenda comprar nenhum desafio."
         ),
         "ff_basis": (
             "Números com o histórico completo e sem o custo de referência; a escada acima "

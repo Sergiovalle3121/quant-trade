@@ -1881,9 +1881,9 @@ LABELS: dict[str, dict[str, str]] = {
         "ff_title": "¿Con qué firma encaja tu historial?",
         "ff_intro": (
             "El mismo historial, remuestreado igual, con las reglas publicadas de cada firma, "
-            "de más a menos probabilidad de pasar todas las fases del programa dentro de la "
-            "regla del mejor día, si la firma la tiene; a igual cifra, por nombre. Compara "
-            "reglas; no recomienda comprar ningún reto."
+            "de más a menos probabilidad de alcanzar el objetivo en todas las fases del programa "
+            "dentro de la regla del mejor día, si la firma la tiene; a igual cifra, por nombre. "
+            "Compara reglas; no recomienda comprar ningún reto."
         ),
         "ff_basis": (
             "Cifras con la historia completa y sin el costo de referencia; la escalera de "
@@ -3574,9 +3574,9 @@ LABELS: dict[str, dict[str, str]] = {
         "ff_title": "Which firm's rules does your history fit?",
         "ff_intro": (
             "The same history, resampled the same way, under each firm's published rules, "
-            "from most to least likely to pass every phase of the program within the best-day "
-            "rule, where the firm has one; ties go by name. It compares rules; it does not "
-            "recommend buying any challenge."
+            "from most to least likely to reach the target in every phase of the program within "
+            "the best-day rule, where the firm has one; ties go by name. It compares rules; it "
+            "does not recommend buying any challenge."
         ),
         "ff_basis": (
             "Figures from the full history without the reference cost; the ladder above shows "
