@@ -1931,6 +1931,7 @@ LABELS: dict[str, dict[str, str]] = {
             "inicial"
         ),
         "ff_rule_days": "mínimo {n} días de trading",
+        "ff_rule_day": "mínimo 1 día de trading",
         "ff_rule_time": "plazo de {n} días",
         "ff_rule_best_target": "mejor día como máximo el {value} del objetivo",
         "ff_rule_best_positive": (
@@ -3624,6 +3625,7 @@ LABELS: dict[str, dict[str, str]] = {
             "starting balance"
         ),
         "ff_rule_days": "at least {n} trading days",
+        "ff_rule_day": "at least 1 trading day",
         "ff_rule_time": "time limit of {n} days",
         "ff_rule_best_target": "best day at most {value} of the target",
         "ff_rule_best_positive": "best day at most {value} of the positive days' gain",
@@ -6668,7 +6670,9 @@ def _firm_rules_html(row: dict[str, Any], labels: dict[str, str]) -> str:
     value = _per_phase([p.get("max_total_loss") for p in phases], labels)
     parts.append(labels[total].format(value=value))
     days = int(first.get("min_trading_days") or 0)
-    if days > 0:
+    if days == 1:
+        parts.append(labels["ff_rule_day"])
+    elif days > 0:
         parts.append(labels["ff_rule_days"].format(n=days))
     if first.get("time_limit_days"):
         parts.append(labels["ff_rule_time"].format(n=int(first["time_limit_days"])))

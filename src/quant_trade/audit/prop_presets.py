@@ -202,6 +202,404 @@ def _topstep(size: str, maximum_loss: float) -> ChallengeRules:
     )
 
 
+# ---------------------------------------------------------------------------
+# Firms read on 2026-10-10: FundingPips, Alpha Capital Group, E8 Markets, FXIFY
+# and Maven Trading. Only the programs whose rules fit the simulator's types,
+# exactly or by an approximation that is stricter than the firm's rule, are
+# here; the programs left out and why are in docs/AUDIT_SAAS.md (a maximum loss
+# that trails a high reached within the day, a daily profit cap, or a minimum of
+# days that each close with a set gain).
+# ---------------------------------------------------------------------------
+
+#: The day the rules of these five firms, and the markets they name, were read.
+NEW_FIRMS_AS_OF = "2026-10-10"
+
+FUNDINGPIPS_STANDARD_URL = (
+    "https://help.fundingpips.com/hc/en-us/articles/34501809112081-2-Step-Standard"
+)
+FUNDINGPIPS_PRO_URL = (
+    "https://help.fundingpips.com/hc/en-us/articles/34502027344017-2-Step-Pro-Model"
+)
+FUNDINGPIPS_FLEX_URL = "https://help.fundingpips.com/hc/en-us/articles/47835196271249-2-Step-Flex"
+FUNDINGPIPS_1STEP_FLEX_URL = (
+    "https://help.fundingpips.com/hc/en-us/articles/34501697434385-1-Step-Flex"
+)
+FUNDINGPIPS_NEWS_URL = (
+    "https://help.fundingpips.com/hc/en-us/articles/34504137479441-News-Trading-Weekend-Holding"
+)
+FUNDINGPIPS_LEGACY_URL = (
+    "https://help.fundingpips.com/hc/en-us/articles/51307058233361-FundingPips-Legacy-Rules"
+)
+#: "41 instruments across 5 asset classes": "Forex, Metals, Indices, Energies,
+#: and Crypto" (2-Step Standard page; the other programs' pages read do not say).
+FUNDINGPIPS_STANDARD_MARKETS: tuple[str, ...] = ("fx", "metals", "indices", "energy", "crypto")
+
+ALPHA_PRO_URL = "https://help.alphacapitalgroup.uk/en/articles/8420429-alpha-pro-8-10"
+ALPHA_PRO_6_URL = "https://help.alphacapitalgroup.uk/en/articles/11378706-alpha-pro-6"
+ALPHA_SWING_URL = "https://help.alphacapitalgroup.uk/en/articles/9789907-alpha-swing"
+ALPHA_DAILY_URL = (
+    "https://help.alphacapitalgroup.uk/en/articles/"
+    "6934210-what-are-the-daily-risk-limits-and-how-do-they-work"
+)
+#: "The following assets are tradeable with Alpha Capital Group": forex pairs,
+#: index and oil CFDs (UKOIL, USOIL), gold and silver; no crypto.
+ALPHA_ASSETS_URL = "https://help.alphacapitalgroup.uk/en/articles/8786240-tradeable-assets"
+ALPHA_MARKETS: tuple[str, ...] = ("fx", "metals", "indices", "energy")
+
+E8_SIGNATURE_URL = "https://help.e8markets.com/en/articles/11755943-e8-signature"
+E8_ZERO_URL = "https://helpfutures.e8markets.com/en/articles/15935817-e8-zero-starter-and-max"
+E8_EOD_URL = "https://help.e8markets.com/en/articles/11864596-eod-dynamic-drawdown"
+#: The product overview: "Daily limits | No" and "Markets | Futures" for E8 Zero.
+E8_OVERVIEW_URL = (
+    "https://help.e8markets.com/en/articles/"
+    "13106558-all-product-overviews-e8-one-vs-e8-zero-vs-e8-pro-vs-e8-signature"
+)
+
+FXIFY_STATIC_URL = (
+    "https://fxify.com/faqs/all-faqs/everything-you-need-to-know-about-the-2-phase-static-account/"
+)
+FXIFY_ASSESSMENT_URL = (
+    "https://fxify.com/faqs/all-faqs/what-are-the-rules-for-the-assessment-account/"
+)
+FXIFY_BREACH_URL = (
+    "https://fxify.com/faqs/all-faqs/"
+    "why-was-my-account-breached-even-though-the-balance-shows-above-the-daily-max-drawdown/"
+)
+
+MAVEN_3STEP_URL = "https://maventrading.com/challenges/3-step"
+#: "Including all majors in FX, commodities, indices, cryptocurrencies and
+#: digital ETF's." (FAQ); its commodities are metals and energy.
+MAVEN_FAQ_URL = "https://maventrading.com/faqs"
+MAVEN_MARKETS: tuple[str, ...] = ("fx", "metals", "indices", "energy", "crypto")
+
+_FUNDINGPIPS_NEWS = (
+    "FundingPips' help pages say both that the evaluation has no news trading restrictions "
+    "and that trading news on purpose is prohibited in the evaluation and in the master "
+    "phase (" + FUNDINGPIPS_NEWS_URL + "); not simulated."
+)
+_FUNDINGPIPS_TIME = "No time limit on either phase."
+_FUNDINGPIPS_NOTES: dict[str, tuple[str, ...]] = {
+    "2-Step Standard": (
+        "Daily loss: 5 % of the higher of the opening balance or equity, reset at 00:00 "
+        "platform time (UTC+3); the 3 % daily loss add-on, not simulated here, has no "
+        "minimum trading days.",
+        _FUNDINGPIPS_NEWS,
+        _FUNDINGPIPS_TIME,
+    ),
+    "2-Step Pro": (
+        "Daily loss: 3 % of the higher of the opening balance or opening equity of the day.",
+        "No minimum trading days on the current rules; accounts bought before them follow "
+        "the Legacy Rules (" + FUNDINGPIPS_LEGACY_URL + ").",
+        _FUNDINGPIPS_NEWS,
+        _FUNDINGPIPS_TIME,
+    ),
+    "2-Step Flex": (
+        "Daily loss: 4 % of the higher of the opening balance or opening equity of the day.",
+        "Simulated with the 80 % split, which asks for 1 minimum trading day; the 95 % split "
+        "asks instead for 3 days each with a gain of at least 0.5 % of the starting account "
+        "size, which the simulator does not model.",
+        _FUNDINGPIPS_NEWS,
+        _FUNDINGPIPS_TIME,
+    ),
+    "1-Step Flex": (
+        "Simulated with the 3 % daily loss configuration (a 2 % one is also sold): 3 % of "
+        "the higher of the balance or equity at the start of the day.",
+        "No minimum trading days and no time limit.",
+        _FUNDINGPIPS_NEWS,
+    ),
+}
+_FUNDINGPIPS_SOURCES = {
+    "2-Step Standard": FUNDINGPIPS_STANDARD_URL,
+    "2-Step Pro": FUNDINGPIPS_PRO_URL,
+    "2-Step Flex": FUNDINGPIPS_FLEX_URL,
+    "1-Step Flex": FUNDINGPIPS_1STEP_FLEX_URL,
+}
+
+
+def _fundingpips(
+    key: str,
+    program: str,
+    phase: str,
+    target: float,
+    daily: float,
+    total: float,
+    days: int,
+) -> ChallengeRules:
+    """A FundingPips phase: the daily limit is a share of the higher of the
+    day's opening balance or equity, the maximum loss a static floor."""
+    markets = FUNDINGPIPS_STANDARD_MARKETS if program == "2-Step Standard" else None
+    return ChallengeRules(
+        key=key,
+        firm="FundingPips",
+        program=program,
+        phase=phase,
+        profit_target=target,
+        max_daily_loss=daily,
+        daily_loss_basis="start_of_day",
+        max_total_loss=total,
+        total_loss_type="static",
+        min_trading_days=days,
+        time_limit_days=None,
+        notes=_FUNDINGPIPS_NOTES[program],
+        source_url=_FUNDINGPIPS_SOURCES[program],
+        as_of=NEW_FIRMS_AS_OF,
+        markets=markets,
+        markets_source=FUNDINGPIPS_STANDARD_URL if markets else None,
+        markets_as_of=NEW_FIRMS_AS_OF if markets else None,
+    )
+
+
+_ALPHA_DAY = (
+    "A trading day is a day on which a trade is opened and closed; the simulator counts every "
+    "day with a non-zero return, so it may count more days than the firm does."
+)
+_ALPHA_DURATION = (
+    "The average duration of all trades must be greater than 2 minutes; not simulated."
+)
+_ALPHA_TIME = "No time limit to reach the targets."
+_ALPHA_NEWS_FREE = "News trading is unrestricted during the evaluation phases."
+
+
+def _alpha_balance_daily(value: str) -> str:
+    return (
+        f"Daily loss: {value} % of the balance at the start of the day (00:00 GMT+3), without "
+        "the floating profit or loss carried from the day before; the breach is measured on "
+        f"current equity ({ALPHA_DAILY_URL})."
+    )
+
+
+_ALPHA_NOTES: dict[str, tuple[str, ...]] = {
+    "Alpha Pro 8%": (
+        _alpha_balance_daily("4"),
+        _ALPHA_DAY,
+        _ALPHA_DURATION,
+        _ALPHA_NEWS_FREE,
+        _ALPHA_TIME,
+    ),
+    "Alpha Pro 10%": (
+        _alpha_balance_daily("5"),
+        _ALPHA_DAY,
+        _ALPHA_DURATION,
+        _ALPHA_NEWS_FREE,
+        _ALPHA_TIME,
+    ),
+    "Alpha Pro 6%": (
+        "Daily loss: 3 % of the higher of the balance or equity at the start of the day "
+        f"(00:00 GMT+3); the breach is measured on current equity ({ALPHA_DAILY_URL}).",
+        _ALPHA_DAY,
+        _ALPHA_DURATION,
+        _ALPHA_NEWS_FREE,
+        _ALPHA_TIME,
+    ),
+    "Alpha Swing": (
+        _alpha_balance_daily("5"),
+        "A trade opened from 2 minutes before to 2 minutes after a news release must last "
+        "more than 2 minutes to be valid; not simulated.",
+        _ALPHA_DAY,
+        _ALPHA_DURATION,
+        _ALPHA_TIME,
+    ),
+}
+_ALPHA_SOURCES = {
+    "Alpha Pro 8%": ALPHA_PRO_URL,
+    "Alpha Pro 10%": ALPHA_PRO_URL,
+    "Alpha Pro 6%": ALPHA_PRO_6_URL,
+    "Alpha Swing": ALPHA_SWING_URL,
+}
+
+
+def _alpha(
+    key: str, program: str, phase: str, target: float, daily: float, total: float
+) -> ChallengeRules:
+    """An Alpha Capital Group phase: static maximum loss, 3 trading days per phase."""
+    return ChallengeRules(
+        key=key,
+        firm="Alpha Capital Group",
+        program=program,
+        phase=phase,
+        profit_target=target,
+        max_daily_loss=daily,
+        daily_loss_basis="start_of_day",
+        max_total_loss=total,
+        total_loss_type="static",
+        min_trading_days=3,
+        time_limit_days=None,
+        notes=_ALPHA_NOTES[program],
+        source_url=_ALPHA_SOURCES[program],
+        as_of=NEW_FIRMS_AS_OF,
+        markets=ALPHA_MARKETS,
+        markets_source=ALPHA_ASSETS_URL,
+        markets_as_of=NEW_FIRMS_AS_OF,
+    )
+
+
+def _fxify_daily(value: str) -> str:
+    return (
+        f"Daily loss: {value} % of the balance recorded at 5 PM EST the day before; a breach "
+        f"is measured on real-time equity ({FXIFY_BREACH_URL})."
+    )
+
+
+_FXIFY_CLASSIC_NOTES = (
+    _fxify_daily("4"),
+    "Static maximum loss: 10 % of the initial balance for the life of the account.",
+    "Minimum trading days: the 2 Phase Static page says 4, the general assessment rules say "
+    "5 for all accounts (" + FXIFY_ASSESSMENT_URL + "); the simulator uses 5 (stricter).",
+    "No consistency rule in the evaluation phases; no maximum number of trading days.",
+)
+
+
+def _fxify_classic(key: str, phase: str, target: float) -> ChallengeRules:
+    """FXIFY's two-phase account with a static drawdown (Classic)."""
+    return ChallengeRules(
+        key=key,
+        firm="FXIFY",
+        program="Two Phase Classic",
+        phase=phase,
+        profit_target=target,
+        max_daily_loss=0.04,
+        daily_loss_basis="start_of_day",
+        max_total_loss=0.10,
+        total_loss_type="static",
+        min_trading_days=5,
+        time_limit_days=None,
+        notes=_FXIFY_CLASSIC_NOTES,
+        source_url=FXIFY_STATIC_URL,
+        as_of=NEW_FIRMS_AS_OF,
+    )
+
+
+#: E8 Markets states these programs' target and maximum loss in dollars at one
+#: account size: the preset and that size.
+_E8_ACCOUNTS: dict[str, int] = {"e8-signature-100k": 100_000, "e8-zero-100k": 100_000}
+
+_NEW_FIRM_PRESETS: tuple[ChallengeRules, ...] = (
+    _fundingpips("fundingpips-2step-standard-phase1", "2-Step Standard", "1", 0.08, 0.05, 0.10, 3),
+    _fundingpips("fundingpips-2step-standard-phase2", "2-Step Standard", "2", 0.05, 0.05, 0.10, 3),
+    _fundingpips("fundingpips-2step-pro-phase1", "2-Step Pro", "1", 0.06, 0.03, 0.06, 0),
+    _fundingpips("fundingpips-2step-pro-phase2", "2-Step Pro", "2", 0.06, 0.03, 0.06, 0),
+    _fundingpips("fundingpips-2step-flex-phase1", "2-Step Flex", "1", 0.10, 0.04, 0.12, 1),
+    _fundingpips("fundingpips-2step-flex-phase2", "2-Step Flex", "2", 0.08, 0.04, 0.12, 1),
+    _fundingpips("fundingpips-1step-flex", "1-Step Flex", "1", 0.12, 0.03, 0.12, 0),
+    _alpha("alpha-pro-8-phase1", "Alpha Pro 8%", "1", 0.08, 0.04, 0.08),
+    _alpha("alpha-pro-8-phase2", "Alpha Pro 8%", "2", 0.05, 0.04, 0.08),
+    _alpha("alpha-pro-10-phase1", "Alpha Pro 10%", "1", 0.10, 0.05, 0.10),
+    _alpha("alpha-pro-10-phase2", "Alpha Pro 10%", "2", 0.05, 0.05, 0.10),
+    _alpha("alpha-pro-6-phase1", "Alpha Pro 6%", "1", 0.06, 0.03, 0.06),
+    _alpha("alpha-pro-6-phase2", "Alpha Pro 6%", "2", 0.06, 0.03, 0.06),
+    _alpha("alpha-swing-phase1", "Alpha Swing", "1", 0.10, 0.05, 0.10),
+    _alpha("alpha-swing-phase2", "Alpha Swing", "2", 0.05, 0.05, 0.10),
+    ChallengeRules(
+        key="e8-signature-100k",
+        firm="E8 Markets",
+        program="Signature 100K",
+        phase="1",
+        # "$6,000 Profit Target - $100,000 account"; "$3,000 EOD - $100,000 account".
+        profit_target=6_000 / _E8_ACCOUNTS["e8-signature-100k"],
+        max_daily_loss=None,
+        daily_loss_basis="none",
+        max_total_loss=3_000 / _E8_ACCOUNTS["e8-signature-100k"],
+        total_loss_type="trailing_eod_lock",
+        min_trading_days=0,
+        time_limit_days=None,
+        notes=(
+            "No daily loss limit in the challenge: the daily pause applies only to the "
+            "Performance account (" + E8_OVERVIEW_URL + ").",
+            "The maximum loss trails the highest end-of-day balance, updates once a day at "
+            "market close and locks at the initial balance; a breach is checked whenever "
+            "equity or balance reaches the level (" + E8_EOD_URL + ").",
+            "All positions are closed by 23:00 server time: no overnight or weekend holding.",
+            "No best-day rule in the challenge; the 35 % best-day rule applies to the "
+            "Performance account's payouts.",
+            "No minimum trading days; no time limit stated on the pages read.",
+        ),
+        source_url=E8_SIGNATURE_URL,
+        as_of=NEW_FIRMS_AS_OF,
+    ),
+    ChallengeRules(
+        key="e8-zero-100k",
+        firm="E8 Markets",
+        program="Zero 100K",
+        phase="1",
+        # "$100,000 - $6,500" (target); "$100,000 - $3,000" (EOD drawdown).
+        profit_target=6_500 / _E8_ACCOUNTS["e8-zero-100k"],
+        max_daily_loss=None,
+        daily_loss_basis="none",
+        max_total_loss=3_000 / _E8_ACCOUNTS["e8-zero-100k"],
+        total_loss_type="trailing_eod",
+        min_trading_days=0,
+        time_limit_days=None,
+        notes=(
+            "No daily loss limit (" + E8_OVERVIEW_URL + ").",
+            "The maximum loss trails the highest end-of-day balance; the drawdown article "
+            "says it does not lock at the initial balance in the challenge, the product "
+            "overview says it does, and the simulator lets it trail without locking "
+            "(stricter) (" + E8_EOD_URL + ").",
+            "Best-day rule: no day may exceed 40 % of the total profit; checked against the "
+            "profit target when a path reaches it, on daily closes, which is stricter.",
+            "All open positions are closed every day at 15:10 CT: no overnight holding.",
+            "No minimum trading days; at least one trade must be placed and closed every 7 days.",
+        ),
+        source_url=E8_ZERO_URL,
+        as_of=NEW_FIRMS_AS_OF,
+        best_day_limit=0.40,
+        best_day_basis="profit_target",
+        markets=("futures",),
+        markets_source=E8_OVERVIEW_URL,
+        markets_as_of=NEW_FIRMS_AS_OF,
+    ),
+    _fxify_classic("fxify-2phase-classic-phase1", "1", 0.05),
+    _fxify_classic("fxify-2phase-classic-phase2", "2", 0.10),
+    ChallengeRules(
+        key="fxify-3phase-step",
+        firm="FXIFY",
+        program="Three Phase",
+        phase="each of phases 1-3",
+        profit_target=0.05,
+        max_daily_loss=0.05,
+        daily_loss_basis="start_of_day",
+        max_total_loss=0.05,
+        total_loss_type="static",
+        min_trading_days=5,
+        time_limit_days=None,
+        notes=(
+            _fxify_daily("5"),
+            "Static maximum loss: 5 % of the initial balance for the life of the account.",
+            "No maximum number of trading days in any of the three phases.",
+        ),
+        source_url=FXIFY_ASSESSMENT_URL,
+        as_of=NEW_FIRMS_AS_OF,
+    ),
+    ChallengeRules(
+        key="maven-3step-step",
+        firm="Maven Trading",
+        program="3-Step",
+        phase="each of steps 1-3",
+        profit_target=0.03,
+        max_daily_loss=0.02,
+        daily_loss_basis="start_of_day",
+        max_total_loss=0.03,
+        total_loss_type="static",
+        min_trading_days=0,
+        time_limit_days=None,
+        notes=(
+            "Daily loss: 2 % of the higher of the equity or balance at 00:00 UTC; the trading "
+            "day runs from 00:00 to 23:59 UTC (" + MAVEN_FAQ_URL + ").",
+            "The pages read state no minimum trading days or time limit for the 3-Step; "
+            "accounts may not be dormant for more than 30 calendar days.",
+            "No trade may be opened or closed from 2 minutes before to 2 minutes after a "
+            "red-folder news release; not simulated.",
+            "Expert advisors are not allowed on this model.",
+        ),
+        source_url=MAVEN_3STEP_URL,
+        as_of=NEW_FIRMS_AS_OF,
+        markets=MAVEN_MARKETS,
+        markets_source=MAVEN_FAQ_URL,
+        markets_as_of=NEW_FIRMS_AS_OF,
+    ),
+)
+
+
 _PRESET_LIST: tuple[ChallengeRules, ...] = (
     ChallengeRules(
         key="generic-2step-phase1",
@@ -441,6 +839,7 @@ _PRESET_LIST: tuple[ChallengeRules, ...] = (
         as_of=AS_OF,
     ),
     *(_topstep(size, loss / account) for size, account, loss in _TOPSTEP_ACCOUNTS),
+    *_NEW_FIRM_PRESETS,
 )
 
 PRESETS: dict[str, ChallengeRules] = {rules.key: rules for rules in _PRESET_LIST}
@@ -449,7 +848,8 @@ PRESETS: dict[str, ChallengeRules] = {rules.key: rules for rules in _PRESET_LIST
 #: firm states its limits in dollars at that size). Every other preset's rules
 #: are shares of whatever balance the account starts with.
 ACCOUNT_SIZES: dict[str, float] = {
-    f"topstep-{size.lower()}-combine": float(account) for size, account, _ in _TOPSTEP_ACCOUNTS
+    **{f"topstep-{size.lower()}-combine": float(account) for size, account, _ in _TOPSTEP_ACCOUNTS},
+    **{key: float(account) for key, account in _E8_ACCOUNTS.items()},
 }
 
 
@@ -489,6 +889,7 @@ __all__ = [
     "AS_OF",
     "MARKETS",
     "MARKETS_AS_OF",
+    "NEW_FIRMS_AS_OF",
     "PRESETS",
     "TOTAL_LOSS_TYPES",
     "ChallengeRules",

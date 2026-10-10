@@ -108,8 +108,9 @@ Tests: `tests/test_audit_winrate.py`.
 The free challenge calculator (`audit/challenge_calc.py`, rendered by
 `audit/challenge_pages.py`) lives at `/calculadora-reto`,
 `/en/challenge-calculator` and `/pt/calculadora-desafio`, with one page per firm
-that has a published preset (`/ftmo`, `/fundednext`, `/the5ers`, `/topstep`
-under each), all fifteen in the sitemap with the date
+that has a published preset (`/ftmo`, `/fundednext`, `/the5ers`, `/topstep`,
+`/fundingpips`, `/alpha-capital-group`, `/e8-markets`, `/fxify`, `/maven-trading`
+under each), all thirty in the sitemap with the date
 `seo.CHALLENGE_PUBLISHED`. Its GET form takes DECLARED fields: win rate, the
 average win and loss in % of the balance or in R with the risk per trade,
 trades per day, the program (the first preset of each published firm and
@@ -149,7 +150,8 @@ firm page has its own title and a description that says the tool is
 independent and not affiliated with the firm, all of the firm's programs and
 four questions whose figures are filled from the presets
 (`challenge_calc.firm_faq`: `{rules[key]}`, `{daily[key]}`, `{field[key.name]}`,
-`{horizon}`, with the date read in every answer that cites a rule; a test checks
+`{accounts}` (the dollars of the programs that name an account), `{horizon}`,
+with the date read in every answer that cites a rule; a test checks
 each figure against the preset's fields and notes), also as `FAQPage` JSON-LD.
 Every page carries a `WebApplication` with price 0 and Rigor as publisher. The
 figures are kept in no database or file and nothing touches the database, the
@@ -162,6 +164,48 @@ free tools page and is linked from the prop-firm case page and the article
 "cuantos-intentos-reto-prop-firm". It assumes average-sized wins and losses,
 no costs, slippage or intraday floating loss, and independent trades, and says
 so on the page. Tests: `tests/test_audit_challenge_calculator.py`.
+
+Five firms were added on 2026-10-10 (`prop_presets.NEW_FIRMS_AS_OF`), each
+from its official site and only with the programs whose rules fit the
+simulator's types exactly or by an approximation stricter than the firm's:
+
+- **FundingPips** (help center): 2-Step Standard (5 % daily configuration),
+  2-Step Pro, 2-Step Flex (80 % split, 1 minimum day) and 1-Step Flex (3 %
+  daily configuration); daily loss on the higher of the day's opening balance
+  or equity (`start_of_day`), static maximum loss. Left out: Zero (no
+  evaluation), the 1 Step Model (no longer offered) and the Legacy Rules.
+- **Alpha Capital Group** (help center and product pages): Alpha Pro 8 %,
+  10 % and 6 %, Alpha Swing; static maximum loss, 3 days per phase; markets
+  from its tradeable-assets list (no crypto). Left out: Alpha One (its
+  maximum loss trails the highest balance reached, updated at every close
+  within the day), Alpha Direct (no evaluation) and Alpha Three (not on the
+  current product pages).
+- **E8 Markets** (help centers): Signature 100K (end-of-day trailing that
+  locks, no daily limit in the challenge) and Zero 100K (futures only; the
+  pages disagree on whether its end-of-day trailing locks in the challenge,
+  so it trails without locking, the stricter reading; its 40 % best-day rule
+  of the total profit is checked against the target, never larger at the
+  pass). Both state dollars at 100K, so they are in `ACCOUNT_SIZES`. Left
+  out: E8 One (trails closed profits within the day) and E8 Pro (a 2 % daily
+  profit cap the simulator does not apply).
+- **FXIFY** (FAQ and program pages): Two Phase Classic (static; its page says
+  4 minimum days, the general rules 5: the simulator uses 5) and Three Phase
+  (one rule set for each of its three phases, `firmfit.REPEATS`). Left out:
+  One Phase, Two Phase Standard and Lightning (maximum loss trailing the
+  closed-balance high within the day) and Two Phase Pro (a USD 4,000 daily
+  profit cap and days that must each close with a set gain).
+- **Maven Trading** (challenge pages and FAQ): 3-Step (one rule set for each
+  of its three steps). Left out: 2-Step (3 days that each close at least
+  0.5 % in gain, which the simulator's count of trading days cannot see) and
+  1-Step (maximum loss trailing the intraday equity high, as a share of it).
+
+Apex Trader Funding, Take Profit Trader and MyFundedFutures are not in yet:
+their rules were not part of this reading. Each new firm page has its
+rules, sources and dates, four questions filled from the presets and
+"Rigor is not affiliated with any firm"; every note reads in Spanish and
+Portuguese (`i18n`, `report_pt`). The upload form says the rules were read
+between the first and the last reading date, and the prop-firm case page
+names every firm it counts. Tests: `tests/test_audit_more_firms.py`.
 
 The public name is **Rigor** (the same word in Spanish and English: statistical
 rigor is what the audit sells). It replaced "Contraprueba" on 2026-09-24.
@@ -1454,7 +1498,10 @@ and report wire them in during the integration step):
   program's name, with the same comparison as the chosen program's
   open-loss line (`_row_open_loss`). On the public sample (-8.76 % with
   open trades) that marks The5ers Hyper Growth (6 %), FundedNext Stellar
-  1-Step (6 %), Stellar Lite (8 %) and The5ers Bootcamp (5 %).
+  1-Step (6 %), Stellar Lite (8 %), The5ers Bootcamp (5 %), FundingPips
+  2-Step Pro (6 %), Alpha Pro 8 % (8 %) and 6 % (6 %), E8 Markets Signature
+  100K (3 %), FXIFY Three Phase (5 %) and Maven Trading 3-Step (3 %); E8
+  Markets Zero 100K is futures only and left out for that forex sample.
   MEASURED under the simulator's assumptions; it compares rules and never
   recommends buying a challenge. No class change.
   Each row carries `rules` (one entry per phase: target, daily loss and its
@@ -1468,8 +1515,11 @@ and report wire them in during the integration step):
   program lets the trader trade only when a page of the firm says so
   (`markets_source`, `markets_as_of`): Topstep is futures only ("Topstep is a
   Futures-only program", help article 8284206), The5ers High Stakes and Hyper
-  Growth list their assets on their own pages; FTMO, FundedNext and Bootcamp
-  pages read say nothing, so they are never restricted. What each symbol
+  Growth list their assets on their own pages; so do FundingPips 2-Step
+  Standard, Alpha Capital Group (its tradeable-assets article, no crypto),
+  E8 Markets Zero (futures only) and Maven Trading (its FAQ); FTMO,
+  FundedNext, Bootcamp and the other new programs' pages read say nothing,
+  so they are never restricted. What each symbol
   can be traded as comes from `crises.symbol_market` and
   `firmfit.symbol_venues` (`SYMBOL_MARKETS`: a pair against a currency,
   `EURUSD`, `XAUUSD` or `BTCUSD`, is spot or CFD and never a future, so
@@ -2876,7 +2926,7 @@ Routes:
 | `GET /privacidad`, `GET /privacy` | Privacy policy, Spanish and English. |
 | `GET /en/terms`, `/en/privacy`, `/pt/terms`, `/pt/privacy` | 301 to the legal page in that language (guessed addresses). |
 | `GET /herramientas` | The free tools page (`/en/tools`, `/pt/ferramentas`; `/tools` and `/pt/tools` redirect there): luck calculator, win-rate calculator, challenge calculator, figure reader and report check. |
-| `GET /calculadora-reto`, `/en/challenge-calculator`, `/pt/calculadora-desafio` | The free prop-firm challenge calculator, and its firm pages under each (`/ftmo`, `/fundednext`, `/the5ers`, `/topstep`). |
+| `GET /calculadora-reto`, `/en/challenge-calculator`, `/pt/calculadora-desafio` | The free prop-firm challenge calculator, and its firm pages under each (`/ftmo`, `/fundednext`, `/the5ers`, `/topstep`, `/fundingpips`, `/alpha-capital-group`, `/e8-markets`, `/fxify`, `/maven-trading`). |
 | `GET /en/calculator`, `/reading`, `/en/methodology`, `/en/articles`, `/en/guides`, `/en/sample`, `/en/check`, `/faq`, `/examples` | 301 to the page people meant (`/calculator`, `/en/reading`, `/methodology`, `/articles`, `/guides`, `/sample`, `/check`, `/en/faq`, `/en/examples`). The first two keep the query string. |
 | `POST /webhooks/stripe`, `POST /waitlist`, `GET /health` | Payment confirmation, waiting list, health check. |
 

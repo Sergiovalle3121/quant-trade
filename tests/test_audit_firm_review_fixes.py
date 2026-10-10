@@ -46,6 +46,8 @@ from quant_trade.audit.theme import STATIC_DIR
 NOW = datetime(2026, 10, 1, tzinfo=UTC)
 LOCALES = ("es", "en", "pt")
 TOPSTEP = ("topstep-50k-combine", "topstep-100k-combine", "topstep-150k-combine")
+#: Every program whose page says it is futures only, in the presets' order.
+FUTURES_ONLY = (*TOPSTEP, "e8-zero-100k")
 CHOSEN = "topstep-100k-combine"
 #: Words the new texts must never use, in any of its languages.
 BANNED = ("verificado", "certificado", "aprobado", "garantiza", "rentable", "recomend")
@@ -274,7 +276,7 @@ def test_a_forex_and_index_history_names_only_the_forex(locale: str) -> None:
     why = labels["ff_market_why_spot"].format(
         history=labels["ff_hist_fx"], symbols="GBPUSD, EURUSD"
     )
-    assert page.count(f"{only}: {why}; {labels['ff_market_skip']}.") == len(TOPSTEP)
+    assert page.count(f"{only}: {why}; {labels['ff_market_skip']}.") == len(FUTURES_ONLY)
     assert labels["ff_hist_us_equity"] not in page
     # The5ers' pages take forex and indices: simulated.
     assert _row(fit, ["the5ers-hyper-growth"])["pass"]["evidence"] == "MEASURED"
@@ -312,11 +314,12 @@ def test_the_chosen_program_keeps_its_figures_and_its_market(
     assert row["pass"]["value"] == challenge["probability"]["pass"]["value"]
     for name in firmfit.SCENARIO_COLUMNS:
         assert row["scenarios"][name]["pass"] == rungs[name]["pass"]
-    # The Topstep programs it did not choose are still left out, last.
-    for key in ("topstep-50k-combine", "topstep-150k-combine"):
+    # The futures-only programs it did not choose are still left out, last.
+    others = [key for key in FUTURES_ONLY if key != CHOSEN]
+    for key in others:
         assert "pass" not in _row(fit, [key])
-    tail = [r["keys"] for r in fit["firms"][-2:]]
-    assert tail == [["topstep-50k-combine"], ["topstep-150k-combine"]]
+    tail = [r["keys"] for r in fit["firms"][-len(others) :]]
+    assert tail == [[key] for key in others]
     # Another choice puts no market on the section.
     assert "market" not in _challenge(_audit("ftmo-1step")[1])
 
@@ -339,8 +342,8 @@ def test_the_report_never_says_the_chosen_program_was_not_simulated(
     places = [m.start() for m in re.finditer(re.escape(chosen), text)]
     assert len(places) == 4
     assert places[0] < ladder < places[1] < size < places[2] < firms < places[3]
-    # Only the two programs it did not choose read "not simulated".
-    assert text.count(skipped) == 2
+    # Only the futures-only programs it did not choose read "not simulated".
+    assert text.count(skipped) == len(FUTURES_ONLY) - 1
     assert labels["hero_challenge_market"] in text
     rows = re.findall(r"<tr(?: class='ff-out')?>(.*?)</tr>", page, flags=re.S)
     mine = next(r for r in rows if html.escape("Topstep · Trading Combine 100K") in r)
@@ -373,17 +376,25 @@ def test_each_row_warns_when_the_platform_drawdown_reaches_its_limit(
         assert shown == (bool(row.get("pass")) and abs(dd) >= limit), row["program"]
         if shown:
             flagged.add(f"{row['firm']} · {row['program']}")
+    # Every simulated program whose total loss limit is at or under 8.76 %; E8 Markets'
+    # Zero 100K (3 %) is futures only and left out for this forex sample.
     assert flagged == {
         "The5ers · Hyper Growth",
         "FundedNext · Stellar 1-Step",
         "FundedNext · Stellar Lite",
         "The5ers · Bootcamp",
+        "FundingPips · 2-Step Pro",
+        "Alpha Capital Group · Alpha Pro 8%",
+        "Alpha Capital Group · Alpha Pro 6%",
+        "E8 Markets · Signature 100K",
+        "FXIFY · Three Phase",
+        "Maven Trading · 3-Step",
     }
     assert labels["ff_optimistic"] not in page
     # The public sample page shows them.
     text = _visible(render_html(sample, watermark=False, locale=locale))
     lead = labels["ff_open_loss"].split("{limit}")[0].format(dd=f"{abs(dd):.1%}")
-    assert text.count(lead) == 4
+    assert text.count(lead) == len(flagged)
     assert find_claims(text) == []
     assert find_claims(labels["ff_open_loss"]) == []
 
@@ -412,7 +423,7 @@ def test_every_program_passing_counts_only_the_simulated_ones(locale: str) -> No
     assert labels["ff_all_pass_simulated"] in page and labels["ff_all_pass"] not in page
     assert "<table" not in page
     left = [row for row in fit["firms"] if not row.get("pass")]
-    assert len(left) == len(TOPSTEP)
+    assert len(left) == len(FUTURES_ONLY)
     for row in left:
         reason = _market_text(row["market"], labels)
         assert f"{row['firm']} · {row['program']} — {reason}" in page

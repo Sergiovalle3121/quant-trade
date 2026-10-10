@@ -48,6 +48,11 @@ FIRMS: dict[str, str] = {
     "fundednext": "FundedNext",
     "the5ers": "The5ers",
     "topstep": "Topstep",
+    "fundingpips": "FundingPips",
+    "alpha-capital-group": "Alpha Capital Group",
+    "e8-markets": "E8 Markets",
+    "fxify": "FXIFY",
+    "maven-trading": "Maven Trading",
 }
 #: The query fields, in the order a shared link writes them.
 FIELDS = ("win_rate", "unit", "avg_win", "avg_loss", "risk", "per_day", "trades", "program", "fee")
@@ -1643,6 +1648,695 @@ FIRM_COPY: dict[str, dict[str, dict[str, Any]]] = {
             ),
         },
     },
+    "fundingpips": {
+        "es": {
+            "title": "Calculadora del reto FundingPips",
+            "seo_title": "Calculadora del reto FundingPips: objetivo y límites",
+            "summary": (
+                "Calculadora gratis e independiente, no afiliada a FundingPips: frecuencia de "
+                "alcanzar el objetivo de sus retos 2-Step y 1-Step o de tocar sus límites."
+            ),
+            "lead": (
+                "La calculadora de reto con las reglas publicadas de FundingPips: escribe tu % "
+                "de aciertos, tu ganancia y tu pérdida medias y tus operaciones por día. Rigor "
+                "no está afiliado a FundingPips."
+            ),
+            "faq": (
+                (
+                    "¿Qué objetivo y qué límites tiene el 2-Step Standard?",
+                    "Según el centro de ayuda de FundingPips leído el {as_of}: "
+                    "{rules[fundingpips-2step-standard-phase1]}. La calculadora usa la "
+                    "configuración de pérdida diaria del "
+                    "{field[fundingpips-2step-standard-phase1.max_daily_loss]}; con el "
+                    "complemento de pérdida diaria del 3 % no hay mínimo de días.",
+                ),
+                (
+                    "¿En qué se diferencian 2-Step Pro, 2-Step Flex y 1-Step Flex?",
+                    "Según el centro de ayuda de FundingPips leído el {as_of}, 2-Step Pro: "
+                    "{rules[fundingpips-2step-pro-phase1]}. 2-Step Flex, con el reparto del "
+                    "80 %: {rules[fundingpips-2step-flex-phase1]}. 1-Step Flex: "
+                    "{rules[fundingpips-1step-flex]}.",
+                ),
+                (
+                    "¿Cómo cuenta la calculadora la pérdida diaria de FundingPips?",
+                    "Según el centro de ayuda de FundingPips leído el {as_of}, es un porcentaje "
+                    "del mayor entre el balance y la equity de apertura del día "
+                    "({field[fundingpips-2step-standard-phase1.max_daily_loss]} en 2-Step "
+                    "Standard, {field[fundingpips-2step-pro-phase1.max_daily_loss]} en 2-Step "
+                    "Pro, {field[fundingpips-2step-flex-phase1.max_daily_loss]} en 2-Step Flex "
+                    "y {field[fundingpips-1step-flex.max_daily_loss]} en 1-Step Flex), y en "
+                    "2-Step Standard se reinicia a las 00:00 hora de la plataforma (UTC+3). La "
+                    "calculadora toma como apertura el cierre del día anterior y no ve el "
+                    "flotante dentro del día, así que frente a ese límite es optimista.",
+                ),
+                (
+                    "¿Simula la calculadora la regla de noticias de FundingPips?",
+                    "No. Según el centro de ayuda de FundingPips leído el {as_of}, la evaluación "
+                    "no tiene restricciones para operar noticias, pero operar noticias a "
+                    "propósito está prohibido en la evaluación y en la fase master. Con cifras "
+                    "diarias declaradas eso no se puede simular.",
+                ),
+            ),
+        },
+        "en": {
+            "title": "FundingPips challenge calculator",
+            "seo_title": "FundingPips challenge calculator: target and limits",
+            "summary": (
+                "Free, independent calculator, not affiliated with FundingPips: how often you "
+                "would reach the 2-Step Standard, Pro, Flex or 1-Step Flex target or hit a limit."
+            ),
+            "lead": (
+                "The challenge calculator with FundingPips' published rules: enter your win "
+                "rate, your average win and loss and your trades per day. Rigor is not "
+                "affiliated with FundingPips."
+            ),
+            "faq": (
+                (
+                    "What target and limits does the 2-Step Standard have?",
+                    "According to the FundingPips help center read on {as_of}: "
+                    "{rules[fundingpips-2step-standard-phase1]}. The calculator uses the "
+                    "{field[fundingpips-2step-standard-phase1.max_daily_loss]} daily loss "
+                    "configuration; with the 3 % daily loss add-on there is no minimum of days.",
+                ),
+                (
+                    "How do 2-Step Pro, 2-Step Flex and 1-Step Flex differ?",
+                    "According to the FundingPips help center read on {as_of}, 2-Step Pro: "
+                    "{rules[fundingpips-2step-pro-phase1]}. 2-Step Flex, with the 80 % split: "
+                    "{rules[fundingpips-2step-flex-phase1]}. 1-Step Flex: "
+                    "{rules[fundingpips-1step-flex]}.",
+                ),
+                (
+                    "How does the calculator count FundingPips' daily loss?",
+                    "According to the FundingPips help center read on {as_of}, it is a share of "
+                    "the higher of the day's opening balance or equity "
+                    "({field[fundingpips-2step-standard-phase1.max_daily_loss]} on 2-Step "
+                    "Standard, {field[fundingpips-2step-pro-phase1.max_daily_loss]} on 2-Step "
+                    "Pro, {field[fundingpips-2step-flex-phase1.max_daily_loss]} on 2-Step Flex "
+                    "and {field[fundingpips-1step-flex.max_daily_loss]} on 1-Step Flex), and on "
+                    "2-Step Standard it resets at 00:00 platform time (UTC+3). The calculator "
+                    "takes the previous daily close as the opening and does not see the "
+                    "intraday floating loss, so it is optimistic against that limit.",
+                ),
+                (
+                    "Does the calculator simulate FundingPips' news rule?",
+                    "No. According to the FundingPips help center read on {as_of}, the "
+                    "evaluation has no news trading restrictions, but trading news on purpose "
+                    "is prohibited in the evaluation and in the master phase. With declared "
+                    "daily figures that cannot be simulated.",
+                ),
+            ),
+        },
+        "pt": {
+            "title": "Calculadora do desafio FundingPips",
+            "seo_title": "Calculadora do desafio FundingPips: meta e limites",
+            "summary": (
+                "Calculadora grátis e independente, não afiliada à FundingPips: frequência de "
+                "atingir a meta do 2-Step Standard, Pro, Flex ou 1-Step Flex ou de tocar os "
+                "limites."
+            ),
+            "lead": (
+                "A calculadora de desafio com as regras publicadas da FundingPips: digite a sua "
+                "taxa de acerto, o seu ganho e a sua perda médios e as suas operações por dia. "
+                "O Rigor não é afiliado à FundingPips."
+            ),
+            "faq": (
+                (
+                    "Que meta e que limites tem o 2-Step Standard?",
+                    "Segundo a central de ajuda da FundingPips lida em {as_of}: "
+                    "{rules[fundingpips-2step-standard-phase1]}. A calculadora usa a "
+                    "configuração de perda diária de "
+                    "{field[fundingpips-2step-standard-phase1.max_daily_loss]}; com o "
+                    "complemento de perda diária de 3 % não há mínimo de dias.",
+                ),
+                (
+                    "Em que o 2-Step Pro, o 2-Step Flex e o 1-Step Flex diferem?",
+                    "Segundo a central de ajuda da FundingPips lida em {as_of}, 2-Step Pro: "
+                    "{rules[fundingpips-2step-pro-phase1]}. 2-Step Flex, com a divisão de "
+                    "80 %: {rules[fundingpips-2step-flex-phase1]}. 1-Step Flex: "
+                    "{rules[fundingpips-1step-flex]}.",
+                ),
+                (
+                    "Como a calculadora conta a perda diária da FundingPips?",
+                    "Segundo a central de ajuda da FundingPips lida em {as_of}, é uma "
+                    "porcentagem do maior entre o saldo e o patrimônio de abertura do dia "
+                    "({field[fundingpips-2step-standard-phase1.max_daily_loss]} no 2-Step "
+                    "Standard, {field[fundingpips-2step-pro-phase1.max_daily_loss]} no 2-Step "
+                    "Pro, {field[fundingpips-2step-flex-phase1.max_daily_loss]} no 2-Step Flex "
+                    "e {field[fundingpips-1step-flex.max_daily_loss]} no 1-Step Flex), e no "
+                    "2-Step Standard é reiniciada às 00:00 no horário da plataforma (UTC+3). A "
+                    "calculadora toma como abertura o fechamento do dia anterior e não vê a "
+                    "perda flutuante dentro do dia, então é otimista diante desse limite.",
+                ),
+                (
+                    "A calculadora simula a regra de notícias da FundingPips?",
+                    "Não. Segundo a central de ajuda da FundingPips lida em {as_of}, a "
+                    "avaliação não tem restrições para operar notícias, mas operar notícias de "
+                    "propósito é proibido na avaliação e na fase master. Com números diários "
+                    "declarados isso não pode ser simulado.",
+                ),
+            ),
+        },
+    },
+    "alpha-capital-group": {
+        "es": {
+            "title": "Calculadora del reto Alpha Capital Group",
+            "seo_title": "Calculadora del reto Alpha Capital Group: Pro y Swing",
+            "summary": (
+                "Calculadora gratis e independiente, no afiliada a Alpha Capital Group: "
+                "frecuencia de alcanzar el objetivo de Alpha Pro o Alpha Swing o de tocar sus "
+                "límites."
+            ),
+            "lead": (
+                "La calculadora de reto con las reglas publicadas de Alpha Capital Group: "
+                "escribe tu % de aciertos, tu ganancia y tu pérdida medias y tus operaciones "
+                "por día. Rigor no está afiliado a Alpha Capital Group."
+            ),
+            "faq": (
+                (
+                    "¿Qué objetivo y qué límites tiene Alpha Pro?",
+                    "Según el centro de ayuda de Alpha Capital Group leído el {as_of}, Alpha "
+                    "Pro 8%: {rules[alpha-pro-8-phase1]}. Alpha Pro 10%: "
+                    "{rules[alpha-pro-10-phase1]}. Alpha Pro 6%: {rules[alpha-pro-6-phase1]}.",
+                ),
+                (
+                    "¿Y Alpha Swing?",
+                    "Según el centro de ayuda de Alpha Capital Group leído el {as_of}: "
+                    "{rules[alpha-swing-phase1]}. Además, una operación abierta desde 2 minutos "
+                    "antes hasta 2 minutos después de una noticia debe durar más de 2 minutos "
+                    "para ser válida; la calculadora no lo simula.",
+                ),
+                (
+                    "¿Cómo cuenta la calculadora la pérdida diaria de Alpha Capital Group?",
+                    "Según el centro de ayuda de Alpha Capital Group leído el {as_of}, en Alpha "
+                    "Pro 8%, Alpha Pro 10% y Alpha Swing es un porcentaje del balance al "
+                    "empezar el día (00:00 GMT+3), sin el flotante del día anterior; en Alpha "
+                    "Pro 6%, del mayor entre el balance y la equity. La ruptura se mide sobre "
+                    "la equity del momento y la calculadora revisa cierres diarios, así que "
+                    "frente a ese límite es optimista.",
+                ),
+                (
+                    "¿Qué cuenta Alpha Capital Group como día de trading?",
+                    "Según el centro de ayuda de Alpha Capital Group leído el {as_of}, un día en "
+                    "que se abre y se cierra una operación, y cada fase pide "
+                    "{field[alpha-pro-8-phase1.min_trading_days]} días. La calculadora cuenta "
+                    "todo día con un retorno distinto de cero, así que puede contar más días "
+                    "que la firma.",
+                ),
+            ),
+        },
+        "en": {
+            "title": "Alpha Capital Group challenge calculator",
+            "seo_title": "Alpha Capital Group challenge calculator: Pro and Swing",
+            "summary": (
+                "Free, independent calculator, not affiliated with Alpha Capital Group: how "
+                "often you would reach the Alpha Pro or Alpha Swing target or hit a limit."
+            ),
+            "lead": (
+                "The challenge calculator with Alpha Capital Group's published rules: enter "
+                "your win rate, your average win and loss and your trades per day. Rigor is not "
+                "affiliated with Alpha Capital Group."
+            ),
+            "faq": (
+                (
+                    "What target and limits does Alpha Pro have?",
+                    "According to the Alpha Capital Group help center read on {as_of}, Alpha "
+                    "Pro 8%: {rules[alpha-pro-8-phase1]}. Alpha Pro 10%: "
+                    "{rules[alpha-pro-10-phase1]}. Alpha Pro 6%: {rules[alpha-pro-6-phase1]}.",
+                ),
+                (
+                    "And Alpha Swing?",
+                    "According to the Alpha Capital Group help center read on {as_of}: "
+                    "{rules[alpha-swing-phase1]}. A trade opened from 2 minutes before to 2 "
+                    "minutes after a news release must also last more than 2 minutes to be "
+                    "valid; the calculator does not simulate it.",
+                ),
+                (
+                    "How does the calculator count Alpha Capital Group's daily loss?",
+                    "According to the Alpha Capital Group help center read on {as_of}, on "
+                    "Alpha Pro 8%, Alpha Pro 10% and Alpha Swing it is a share of the balance "
+                    "at the start of the day (00:00 GMT+3), without the previous day's "
+                    "floating profit or loss; on Alpha Pro 6%, of the higher of the balance or "
+                    "equity. The breach is measured on current equity and the calculator "
+                    "checks daily closes, so it is optimistic against that limit.",
+                ),
+                (
+                    "What does Alpha Capital Group count as a trading day?",
+                    "According to the Alpha Capital Group help center read on {as_of}, a day on "
+                    "which a trade is opened and closed, and each phase asks for "
+                    "{field[alpha-pro-8-phase1.min_trading_days]} days. The calculator counts "
+                    "every day with a non-zero return, so it may count more days than the firm.",
+                ),
+            ),
+        },
+        "pt": {
+            "title": "Calculadora do desafio Alpha Capital Group",
+            "seo_title": "Calculadora do desafio Alpha Capital Group: Pro e Swing",
+            "summary": (
+                "Calculadora grátis e independente, não afiliada à Alpha Capital Group: "
+                "frequência de atingir a meta do Alpha Pro ou do Alpha Swing ou de tocar os "
+                "limites."
+            ),
+            "lead": (
+                "A calculadora de desafio com as regras publicadas da Alpha Capital Group: "
+                "digite a sua taxa de acerto, o seu ganho e a sua perda médios e as suas "
+                "operações por dia. O Rigor não é afiliado à Alpha Capital Group."
+            ),
+            "faq": (
+                (
+                    "Que meta e que limites tem o Alpha Pro?",
+                    "Segundo a central de ajuda da Alpha Capital Group lida em {as_of}, Alpha "
+                    "Pro 8%: {rules[alpha-pro-8-phase1]}. Alpha Pro 10%: "
+                    "{rules[alpha-pro-10-phase1]}. Alpha Pro 6%: {rules[alpha-pro-6-phase1]}.",
+                ),
+                (
+                    "E o Alpha Swing?",
+                    "Segundo a central de ajuda da Alpha Capital Group lida em {as_of}: "
+                    "{rules[alpha-swing-phase1]}. Além disso, uma operação aberta de 2 minutos "
+                    "antes até 2 minutos depois de uma notícia deve durar mais de 2 minutos "
+                    "para ser válida; a calculadora não simula isso.",
+                ),
+                (
+                    "Como a calculadora conta a perda diária da Alpha Capital Group?",
+                    "Segundo a central de ajuda da Alpha Capital Group lida em {as_of}, no "
+                    "Alpha Pro 8%, no Alpha Pro 10% e no Alpha Swing é uma porcentagem do saldo "
+                    "no início do dia (00:00 GMT+3), sem o resultado flutuante do dia anterior; "
+                    "no Alpha Pro 6%, do maior entre o saldo e o patrimônio. O rompimento é "
+                    "medido sobre o patrimônio do momento e a calculadora confere fechamentos "
+                    "diários, então é otimista diante desse limite.",
+                ),
+                (
+                    "O que a Alpha Capital Group conta como dia de trading?",
+                    "Segundo a central de ajuda da Alpha Capital Group lida em {as_of}, um dia "
+                    "em que se abre e se fecha uma operação, e cada fase pede "
+                    "{field[alpha-pro-8-phase1.min_trading_days]} dias. A calculadora conta "
+                    "todo dia com retorno diferente de zero, então pode contar mais dias que a "
+                    "firma.",
+                ),
+            ),
+        },
+    },
+    "e8-markets": {
+        "es": {
+            "title": "Calculadora del reto E8 Markets",
+            "seo_title": "Calculadora del reto E8 Markets: Signature y Zero",
+            "summary": (
+                "Calculadora gratis e independiente, no afiliada a E8 Markets: frecuencia de "
+                "alcanzar el objetivo de E8 Signature o E8 Zero o de tocar su pérdida máxima."
+            ),
+            "lead": (
+                "La calculadora de reto con las reglas publicadas de E8 Markets: escribe tu % "
+                "de aciertos, tu ganancia y tu pérdida medias y tus operaciones por día. Rigor "
+                "no está afiliado a E8 Markets."
+            ),
+            "faq": (
+                (
+                    "¿Cuál es la pérdida máxima de Signature 100K y de Zero 100K?",
+                    "Según el centro de ayuda de E8 Markets leído el {as_of}: {accounts}. En "
+                    "Signature 100K sigue al mayor cierre diario y se fija al llegar al balance "
+                    "inicial; en Zero 100K la calculadora la deja seguir sin fijarse, lo más "
+                    "estricto, porque las páginas leídas no coinciden en si se fija durante el "
+                    "reto.",
+                ),
+                (
+                    "¿Qué objetivo y qué reglas tienen Signature 100K y Zero 100K?",
+                    "Según el centro de ayuda de E8 Markets leído el {as_of}, Signature 100K: "
+                    "{rules[e8-signature-100k]}. Zero 100K: {rules[e8-zero-100k]}.",
+                ),
+                (
+                    "¿Cómo trata la calculadora la regla del mejor día de Zero 100K?",
+                    "Según el centro de ayuda de E8 Markets leído el {as_of}, ningún día puede "
+                    "superar el {field[e8-zero-100k.best_day_limit]} de la ganancia total. La "
+                    "calculadora lo compara con el objetivo de ganancia cuando una trayectoria "
+                    "lo alcanza, que es más estricto, y lo muestra como «dentro de la regla del "
+                    "mejor día».",
+                ),
+                (
+                    "¿Tiene E8 Markets un límite de pérdida diaria en el reto?",
+                    "Según el centro de ayuda de E8 Markets leído el {as_of}, ni Signature 100K "
+                    "ni Zero 100K tienen límite de pérdida diaria en el reto; la pausa diaria de "
+                    "Signature 100K solo existe en la cuenta Performance. Las posiciones se "
+                    "cierran cada día (antes de las 23:00 hora del servidor en Signature 100K y "
+                    "a las 15:10 CT en Zero 100K), así que no se mantienen de un día a otro.",
+                ),
+            ),
+        },
+        "en": {
+            "title": "E8 Markets challenge calculator",
+            "seo_title": "E8 Markets challenge calculator: Signature and Zero",
+            "summary": (
+                "Free, independent calculator, not affiliated with E8 Markets: how often you "
+                "would reach the E8 Signature or E8 Zero target or hit its trailing maximum loss."
+            ),
+            "lead": (
+                "The challenge calculator with E8 Markets' published rules: enter your win "
+                "rate, your average win and loss and your trades per day. Rigor is not "
+                "affiliated with E8 Markets."
+            ),
+            "faq": (
+                (
+                    "What is the maximum loss of Signature 100K and Zero 100K?",
+                    "According to the E8 Markets help center read on {as_of}: {accounts}. On "
+                    "Signature 100K it trails the highest daily close and locks once it reaches "
+                    "the initial balance; on Zero 100K the calculator lets it trail without "
+                    "locking, the stricter reading, because the pages read disagree on whether "
+                    "it locks during the challenge.",
+                ),
+                (
+                    "What target and rules do Signature 100K and Zero 100K have?",
+                    "According to the E8 Markets help center read on {as_of}, Signature 100K: "
+                    "{rules[e8-signature-100k]}. Zero 100K: {rules[e8-zero-100k]}.",
+                ),
+                (
+                    "How does the calculator treat the Zero 100K best-day rule?",
+                    "According to the E8 Markets help center read on {as_of}, no day may exceed "
+                    "{field[e8-zero-100k.best_day_limit]} of the total profit. The calculator "
+                    "compares it with the profit target when a path reaches it, the stricter "
+                    "reading, and shows it as within the best-day rule.",
+                ),
+                (
+                    "Does E8 Markets have a daily loss limit in the challenge?",
+                    "According to the E8 Markets help center read on {as_of}, neither Signature "
+                    "100K nor Zero 100K has a daily loss limit in the challenge; the Signature "
+                    "100K daily pause exists only on the Performance account. Positions are "
+                    "closed every day (by 23:00 server time on Signature 100K and at 15:10 CT "
+                    "on Zero 100K), so none are held from one day to the next.",
+                ),
+            ),
+        },
+        "pt": {
+            "title": "Calculadora do desafio E8 Markets",
+            "seo_title": "Calculadora do desafio E8 Markets: Signature e Zero",
+            "summary": (
+                "Calculadora grátis e independente, não afiliada à E8 Markets: frequência de "
+                "atingir a meta do E8 Signature ou do E8 Zero ou de tocar a perda máxima "
+                "trailing."
+            ),
+            "lead": (
+                "A calculadora de desafio com as regras publicadas da E8 Markets: digite a sua "
+                "taxa de acerto, o seu ganho e a sua perda médios e as suas operações por dia. "
+                "O Rigor não é afiliado à E8 Markets."
+            ),
+            "faq": (
+                (
+                    "Qual é a perda máxima do Signature 100K e do Zero 100K?",
+                    "Segundo a central de ajuda da E8 Markets lida em {as_of}: {accounts}. No "
+                    "Signature 100K ela acompanha o maior fechamento diário e para ao chegar ao "
+                    "saldo inicial; no Zero 100K a calculadora a deixa acompanhar sem parar, a "
+                    "leitura mais estrita, porque as páginas lidas não concordam sobre se ela "
+                    "para durante o desafio.",
+                ),
+                (
+                    "Que meta e que regras têm o Signature 100K e o Zero 100K?",
+                    "Segundo a central de ajuda da E8 Markets lida em {as_of}, Signature 100K: "
+                    "{rules[e8-signature-100k]}. Zero 100K: {rules[e8-zero-100k]}.",
+                ),
+                (
+                    "Como a calculadora trata a regra do melhor dia do Zero 100K?",
+                    "Segundo a central de ajuda da E8 Markets lida em {as_of}, nenhum dia pode "
+                    "superar {field[e8-zero-100k.best_day_limit]} do resultado total. A "
+                    "calculadora a compara com a meta de lucro quando uma trajetória a atinge, "
+                    "a leitura mais estrita, e mostra como «dentro da regra do melhor dia».",
+                ),
+                (
+                    "A E8 Markets tem limite de perda diária no desafio?",
+                    "Segundo a central de ajuda da E8 Markets lida em {as_of}, nem o Signature "
+                    "100K nem o Zero 100K têm limite de perda diária no desafio; a pausa diária "
+                    "do Signature 100K só existe na conta Performance. As posições são fechadas "
+                    "todo dia (até as 23:00 no horário do servidor no Signature 100K e às 15:10 "
+                    "CT no Zero 100K), então não se mantêm de um dia para o outro.",
+                ),
+            ),
+        },
+    },
+    "fxify": {
+        "es": {
+            "title": "Calculadora del reto FXIFY",
+            "seo_title": "Calculadora del reto FXIFY: Two Phase y Three Phase",
+            "summary": (
+                "Calculadora gratis e independiente, no afiliada a FXIFY: frecuencia de "
+                "alcanzar el objetivo de Two Phase Classic o Three Phase o de tocar sus "
+                "límites."
+            ),
+            "lead": (
+                "La calculadora de reto con las reglas publicadas de FXIFY: escribe tu % de "
+                "aciertos, tu ganancia y tu pérdida medias y tus operaciones por día. Rigor no "
+                "está afiliado a FXIFY."
+            ),
+            "faq": (
+                (
+                    "¿Qué objetivo y qué límites tiene Two Phase Classic?",
+                    "Según las páginas de FXIFY leídas el {as_of}: "
+                    "{rules[fxify-2phase-classic-phase1]}. La página de esa cuenta pide 4 días "
+                    "mínimos y las reglas generales piden 5 en todas las cuentas; la "
+                    "calculadora usa 5, lo más estricto.",
+                ),
+                (
+                    "¿Y Three Phase?",
+                    "Según las páginas de FXIFY leídas el {as_of}: {rules[fxify-3phase-step]}. "
+                    "Cada fase empieza de cero y solo se llega a ella alcanzando el objetivo de "
+                    "la anterior.",
+                ),
+                (
+                    "¿Cómo cuenta la calculadora la pérdida diaria de FXIFY?",
+                    "Según las páginas de FXIFY leídas el {as_of}, es un porcentaje del balance "
+                    "registrado a las 5 PM EST del día anterior "
+                    "({field[fxify-2phase-classic-phase1.max_daily_loss]} en Two Phase Classic "
+                    "y {field[fxify-3phase-step.max_daily_loss]} en Three Phase), y la ruptura "
+                    "se mide sobre la equity en tiempo real. La calculadora revisa cierres "
+                    "diarios, así que frente a ese límite es optimista.",
+                ),
+                (
+                    "¿Por qué no están One Phase, Two Phase Standard ni Lightning?",
+                    "Según las páginas de FXIFY leídas el {as_of}, su pérdida máxima sigue al "
+                    "máximo del balance cerrado, que sube con cada cierre dentro del día. Una "
+                    "cifra por cierre diario no ve ese máximo y aproximarla sería optimista, así "
+                    "que la calculadora no los incluye.",
+                ),
+            ),
+        },
+        "en": {
+            "title": "FXIFY challenge calculator",
+            "seo_title": "FXIFY challenge calculator: Two Phase and Three Phase",
+            "summary": (
+                "Free, independent calculator, not affiliated with FXIFY: how often you would "
+                "reach the Two Phase Classic or Three Phase target or hit a limit."
+            ),
+            "lead": (
+                "The challenge calculator with FXIFY's published rules: enter your win rate, "
+                "your average win and loss and your trades per day. Rigor is not affiliated "
+                "with FXIFY."
+            ),
+            "faq": (
+                (
+                    "What target and limits does Two Phase Classic have?",
+                    "According to the FXIFY pages read on {as_of}: "
+                    "{rules[fxify-2phase-classic-phase1]}. That account's page asks for 4 "
+                    "minimum days and the general rules ask for 5 on every account; the "
+                    "calculator uses 5, the stricter reading.",
+                ),
+                (
+                    "And Three Phase?",
+                    "According to the FXIFY pages read on {as_of}: {rules[fxify-3phase-step]}. "
+                    "Each phase starts afresh and is reached only by reaching the previous "
+                    "phase's target.",
+                ),
+                (
+                    "How does the calculator count FXIFY's daily loss?",
+                    "According to the FXIFY pages read on {as_of}, it is a share of the balance "
+                    "recorded at 5 PM EST the day before "
+                    "({field[fxify-2phase-classic-phase1.max_daily_loss]} on Two Phase Classic "
+                    "and {field[fxify-3phase-step.max_daily_loss]} on Three Phase), and the "
+                    "breach is measured on real-time equity. The calculator checks daily "
+                    "closes, so it is optimistic against that limit.",
+                ),
+                (
+                    "Why are One Phase, Two Phase Standard and Lightning not here?",
+                    "According to the FXIFY pages read on {as_of}, their maximum loss trails the "
+                    "high of the closed balance, which rises with every close within the day. "
+                    "One figure per daily close cannot see that high and approximating it "
+                    "would be optimistic, so the calculator leaves them out.",
+                ),
+            ),
+        },
+        "pt": {
+            "title": "Calculadora do desafio FXIFY",
+            "seo_title": "Calculadora do desafio FXIFY: Two Phase e Three Phase",
+            "summary": (
+                "Calculadora grátis e independente, não afiliada à FXIFY: frequência de atingir "
+                "a meta do Two Phase Classic ou do Three Phase ou de tocar os limites."
+            ),
+            "lead": (
+                "A calculadora de desafio com as regras publicadas da FXIFY: digite a sua taxa "
+                "de acerto, o seu ganho e a sua perda médios e as suas operações por dia. O "
+                "Rigor não é afiliado à FXIFY."
+            ),
+            "faq": (
+                (
+                    "Que meta e que limites tem o Two Phase Classic?",
+                    "Segundo as páginas da FXIFY lidas em {as_of}: "
+                    "{rules[fxify-2phase-classic-phase1]}. A página dessa conta pede 4 dias "
+                    "mínimos e as regras gerais pedem 5 em todas as contas; a calculadora usa "
+                    "5, a leitura mais estrita.",
+                ),
+                (
+                    "E o Three Phase?",
+                    "Segundo as páginas da FXIFY lidas em {as_of}: {rules[fxify-3phase-step]}. "
+                    "Cada fase começa do zero e só se chega a ela atingindo a meta da anterior.",
+                ),
+                (
+                    "Como a calculadora conta a perda diária da FXIFY?",
+                    "Segundo as páginas da FXIFY lidas em {as_of}, é uma porcentagem do saldo "
+                    "registrado às 5 PM EST do dia anterior "
+                    "({field[fxify-2phase-classic-phase1.max_daily_loss]} no Two Phase Classic "
+                    "e {field[fxify-3phase-step.max_daily_loss]} no Three Phase), e o "
+                    "rompimento é medido sobre o patrimônio em tempo real. A calculadora "
+                    "confere fechamentos diários, então é otimista diante desse limite.",
+                ),
+                (
+                    "Por que o One Phase, o Two Phase Standard e o Lightning não estão aqui?",
+                    "Segundo as páginas da FXIFY lidas em {as_of}, a perda máxima deles "
+                    "acompanha o máximo do saldo fechado, que sobe a cada fechamento dentro do "
+                    "dia. Um número por fechamento diário não vê esse máximo e aproximá-lo "
+                    "seria otimista, então a calculadora os deixa de fora.",
+                ),
+            ),
+        },
+    },
+    "maven-trading": {
+        "es": {
+            "title": "Calculadora del reto Maven Trading",
+            "seo_title": "Calculadora del reto Maven Trading: 3-Step",
+            "summary": (
+                "Calculadora gratis e independiente, no afiliada a Maven Trading: frecuencia de "
+                "alcanzar el objetivo del 3-Step o de tocar sus límites diario y total."
+            ),
+            "lead": (
+                "La calculadora de reto con las reglas publicadas de Maven Trading: escribe tu % "
+                "de aciertos, tu ganancia y tu pérdida medias y tus operaciones por día. Rigor "
+                "no está afiliado a Maven Trading."
+            ),
+            "faq": (
+                (
+                    "¿Qué objetivo y qué límites tiene el 3-Step de Maven Trading?",
+                    "Según las páginas de Maven Trading leídas el {as_of}: "
+                    "{rules[maven-3step-step]}. Esas páginas no indican mínimo de días ni plazo "
+                    "para el 3-Step; las cuentas no pueden quedar inactivas más de 30 días "
+                    "naturales.",
+                ),
+                (
+                    "¿Por qué no están el 1-Step y el 2-Step de Maven Trading?",
+                    "Según las páginas de Maven Trading leídas el {as_of}, el 2-Step pide un "
+                    "mínimo de días que cierren con una ganancia dada y el 1-Step tiene una "
+                    "pérdida máxima que sigue al máximo de equity dentro del día. Con cifras "
+                    "diarias ninguna de las dos reglas se puede simular sin ser optimista, así "
+                    "que la calculadora no los incluye.",
+                ),
+                (
+                    "¿Cómo cuenta la calculadora la pérdida diaria de Maven Trading?",
+                    "Según las páginas de Maven Trading leídas el {as_of}, es el "
+                    "{field[maven-3step-step.max_daily_loss]} del mayor entre la equity y el "
+                    "balance a las 00:00 UTC, y el día de trading va de 00:00 a 23:59 UTC. La "
+                    "calculadora revisa cierres diarios sin flotante, así que frente a ese "
+                    "límite es optimista.",
+                ),
+                (
+                    "¿Simula la calculadora la regla de noticias de Maven Trading?",
+                    "No. Según las páginas de Maven Trading leídas el {as_of}, no se puede abrir "
+                    "ni cerrar una operación desde 2 minutos antes hasta 2 minutos después de "
+                    "una noticia «red folder». Con cifras diarias declaradas eso no se puede "
+                    "simular.",
+                ),
+            ),
+        },
+        "en": {
+            "title": "Maven Trading challenge calculator",
+            "seo_title": "Maven Trading challenge calculator: 3-Step",
+            "summary": (
+                "Free, independent calculator, not affiliated with Maven Trading: how often you "
+                "would reach the 3-Step target or hit its daily or total limit."
+            ),
+            "lead": (
+                "The challenge calculator with Maven Trading's published rules: enter your win "
+                "rate, your average win and loss and your trades per day. Rigor is not "
+                "affiliated with Maven Trading."
+            ),
+            "faq": (
+                (
+                    "What target and limits does the Maven Trading 3-Step have?",
+                    "According to the Maven Trading pages read on {as_of}: "
+                    "{rules[maven-3step-step]}. Those pages state no minimum days or time limit "
+                    "for the 3-Step; accounts may not be dormant for more than 30 calendar days.",
+                ),
+                (
+                    "Why are the Maven Trading 1-Step and 2-Step not here?",
+                    "According to the Maven Trading pages read on {as_of}, the 2-Step asks for a "
+                    "minimum of days that each close with a set gain and the 1-Step has a "
+                    "maximum loss that trails the intraday equity high. With daily figures "
+                    "neither rule can be simulated without being optimistic, so the calculator "
+                    "leaves them out.",
+                ),
+                (
+                    "How does the calculator count Maven Trading's daily loss?",
+                    "According to the Maven Trading pages read on {as_of}, it is "
+                    "{field[maven-3step-step.max_daily_loss]} of the higher of the equity or "
+                    "balance at 00:00 UTC, and the trading day runs from 00:00 to 23:59 UTC. "
+                    "The calculator checks daily closes with no floating loss, so it is "
+                    "optimistic against that limit.",
+                ),
+                (
+                    "Does the calculator simulate Maven Trading's news rule?",
+                    "No. According to the Maven Trading pages read on {as_of}, no trade may be "
+                    "opened or closed from 2 minutes before to 2 minutes after a red-folder news "
+                    "release. With declared daily figures that cannot be simulated.",
+                ),
+            ),
+        },
+        "pt": {
+            "title": "Calculadora do desafio Maven Trading",
+            "seo_title": "Calculadora do desafio Maven Trading: 3-Step",
+            "summary": (
+                "Calculadora grátis e independente, não afiliada à Maven Trading: frequência de "
+                "atingir a meta do 3-Step ou de tocar os limites diário e total."
+            ),
+            "lead": (
+                "A calculadora de desafio com as regras publicadas da Maven Trading: digite a "
+                "sua taxa de acerto, o seu ganho e a sua perda médios e as suas operações por "
+                "dia. O Rigor não é afiliado à Maven Trading."
+            ),
+            "faq": (
+                (
+                    "Que meta e que limites tem o 3-Step da Maven Trading?",
+                    "Segundo as páginas da Maven Trading lidas em {as_of}: "
+                    "{rules[maven-3step-step]}. Essas páginas não indicam mínimo de dias nem "
+                    "prazo para o 3-Step; as contas não podem ficar inativas por mais de 30 dias "
+                    "corridos.",
+                ),
+                (
+                    "Por que o 1-Step e o 2-Step da Maven Trading não estão aqui?",
+                    "Segundo as páginas da Maven Trading lidas em {as_of}, o 2-Step pede um "
+                    "mínimo de dias que fechem com um ganho dado e o 1-Step tem uma perda máxima "
+                    "que acompanha o máximo do patrimônio dentro do dia. Com números diários "
+                    "nenhuma das duas regras pode ser simulada sem ser otimista, então a "
+                    "calculadora os deixa de fora.",
+                ),
+                (
+                    "Como a calculadora conta a perda diária da Maven Trading?",
+                    "Segundo as páginas da Maven Trading lidas em {as_of}, é "
+                    "{field[maven-3step-step.max_daily_loss]} do maior entre o patrimônio e o "
+                    "saldo às 00:00 UTC, e o dia de trading vai de 00:00 a 23:59 UTC. A "
+                    "calculadora confere fechamentos diários sem perda flutuante, então é "
+                    "otimista diante desse limite.",
+                ),
+                (
+                    "A calculadora simula a regra de notícias da Maven Trading?",
+                    "Não. Segundo as páginas da Maven Trading lidas em {as_of}, nenhuma operação "
+                    "pode ser aberta ou fechada de 2 minutos antes até 2 minutos depois de uma "
+                    "notícia «red folder». Com números diários declarados isso não pode ser "
+                    "simulado.",
+                ),
+            ),
+        },
+    },
 }
 
 
@@ -1675,6 +2369,7 @@ _RULE_WORDS: dict[str, dict[str, str]] = {
             "inicial"
         ),
         "days": "mínimo {n} días de trading",
+        "day": "mínimo 1 día de trading",
         "no_days": "sin mínimo de días",
         "time": "plazo de {n} días",
         "no_time": "sin plazo",
@@ -1697,6 +2392,7 @@ _RULE_WORDS: dict[str, dict[str, str]] = {
             "balance"
         ),
         "days": "at least {n} trading days",
+        "day": "at least 1 trading day",
         "no_days": "no minimum days",
         "time": "a {n}-day time limit",
         "no_time": "no time limit",
@@ -1719,6 +2415,7 @@ _RULE_WORDS: dict[str, dict[str, str]] = {
             "inicial"
         ),
         "days": "mínimo de {n} dias de trading",
+        "day": "mínimo de 1 dia de trading",
         "no_days": "sem mínimo de dias",
         "time": "prazo de {n} dias",
         "no_time": "sem prazo",
@@ -1769,7 +2466,10 @@ def rules_sentence(key: str, locale: str) -> str:
     )
     parts.append(words[total].format(value=_pct(first.max_total_loss, locale)))
     days = first.min_trading_days
-    parts.append(words["days"].format(n=days) if days else words["no_days"])
+    if days == 1:
+        parts.append(words["day"])
+    else:
+        parts.append(words["days"].format(n=days) if days else words["no_days"])
     time = first.time_limit_days
     parts.append(words["time"].format(n=time) if time else words["no_time"])
     if first.best_day_limit is not None:
@@ -1778,10 +2478,14 @@ def rules_sentence(key: str, locale: str) -> str:
     return "; ".join(parts)
 
 
-def _accounts_sentence(locale: str) -> str:
-    """Topstep's sizes and maximum losses, from ``ACCOUNT_SIZES`` and the presets."""
+def _accounts_sentence(firm: str, locale: str) -> str:
+    """The maximum loss in dollars of each of the firm's programs that names an
+    account (Topstep's sizes, E8 Markets' 100K), from ``ACCOUNT_SIZES`` and the
+    presets; empty when none names one."""
     pieces = []
-    for key in firm_programs("topstep"):
+    for key in firm_programs(firm):
+        if key not in ACCOUNT_SIZES:
+            continue
         account = ACCOUNT_SIZES[key]
         loss = PRESETS[key].max_total_loss * account
         pieces.append(
@@ -1824,10 +2528,10 @@ def firm_faq(firm: str, locale: str) -> tuple[tuple[str, str], ...]:
 
     An answer names its figures through ``{rules[key]}`` (the program's rules
     sentence), ``{daily[key]}`` (its daily loss rule), ``{field[key.name]}``
-    (one preset field), ``{accounts}`` (Topstep's sizes) and ``{horizon}`` (the
-    simulator's business days), and its date through ``{as_of}``; the few
-    figures that are only in a preset's notes are written out, and a test
-    checks each one against those notes."""
+    (one preset field), ``{accounts}`` (the dollars of the programs that name an
+    account) and ``{horizon}`` (the simulator's business days), and its date
+    through ``{as_of}``; the few figures that are only in a preset's notes are
+    written out, and a test checks each one against those notes."""
     locale = _locale(locale)
     keys = firm_programs(firm)
     fill = {
@@ -1835,7 +2539,7 @@ def firm_faq(firm: str, locale: str) -> tuple[tuple[str, str], ...]:
         "daily": _Lookup(lambda key: daily_clause(key, locale)),
         "field": _Lookup(lambda spec: _field(spec, locale)),
         "as_of": PRESETS[keys[0]].as_of,
-        "accounts": _accounts_sentence(locale) if firm == "topstep" else "",
+        "accounts": _accounts_sentence(firm, locale),
         "horizon": str(horizon(keys[0])),
     }
     return tuple(

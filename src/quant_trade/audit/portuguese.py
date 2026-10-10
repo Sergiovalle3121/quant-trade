@@ -87,7 +87,7 @@ COPY_PT: dict[str, Any] = {
     ),
     "initial_balance": "Saldo inicial (se o relatório não informar)",
     "challenge": "Desafio de prop firm para simular",
-    "challenge_help": "Regras lidas no site oficial de cada firma em {as_of}. "
+    "challenge_help": "Regras lidas no site oficial de cada firma {when}. "
     "O relatório cita a fonte; confirme as regras com a firma antes de pagar o desafio.",
     "trades": "Operações fechadas (CSV, opcional)",
     "trades_help": "entry_time, exit_time, quantity, entry_price, exit_price, side. Até 5 MB.",

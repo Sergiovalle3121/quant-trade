@@ -45,8 +45,9 @@ SAMPLES = 2000
 #: ranking says nothing and the report says so in one sentence.
 UNIFORM_HIGH = 0.99
 UNIFORM_LOW = 0.01
-#: Presets that stand for several identical phases in a row.
-REPEATS = {"the5ers-bootcamp-step": 3}
+#: Presets that stand for several identical phases in a row: The5ers Bootcamp,
+#: FXIFY Three Phase and Maven Trading 3-Step each repeat one rule set three times.
+REPEATS = {"the5ers-bootcamp-step": 3, "fxify-3phase-step": 3, "maven-3step-step": 3}
 
 NOTE = (
     "every published preset simulated on the same resampled daily paths, rules as each "
