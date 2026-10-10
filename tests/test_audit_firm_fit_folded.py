@@ -1,6 +1,6 @@
 """The firm table folds the programs its history's markets leave out: one
 counted summary over the rows without a figure, the ranked rows untouched,
-the PDF printing them open under that summary. Offline."""
+the PDF and the browser's print showing them open under that summary. Offline."""
 
 from __future__ import annotations
 
@@ -20,6 +20,7 @@ from quant_trade.audit.prop_presets import PRESETS
 from quant_trade.audit.report import LABELS, _firm_fit_html, render_html
 from quant_trade.audit.sample import sample_result
 from quant_trade.audit.schema import AuditResult, DeclaredMetadata, build_inputs
+from quant_trade.audit.theme import STATIC_DIR
 
 LOCALES = ("es", "en", "pt")
 NOW = datetime(2026, 10, 10, tzinfo=UTC)
@@ -341,3 +342,28 @@ def test_the_new_texts_are_clean_and_translated(locale: str) -> None:
     ):
         assert find_claims(example) == [] and FORBIDDEN.search(example) is None, example
         assert "{" not in example and "}" not in example
+
+
+# ------------------------------------------------- 5. the browser prints it open
+
+
+def test_the_browser_opens_the_fold_to_print_it() -> None:
+    """A closed ``<details>`` prints nothing, so the page's script opens the
+    fold (and the challenge's, PR 489) on ``beforeprint`` and puts it back
+    afterwards; on screen and on load it stays closed, as the ranked table's
+    rules do. The server's PDF opens the same three kinds."""
+    script = (STATIC_DIR / "app.js").read_text(encoding="utf-8")
+    selector = 'd.querySelectorAll("details.ff-fold, details.unseen-open")'
+    assert selector in script
+    before = script.index('window.addEventListener("beforeprint"')
+    after = script.index('window.addEventListener("afterprint"')
+    assert script.index(selector) < before < after
+    opened = "printDetails.forEach(function (item) { item.open = true; });"
+    restored = "printDetails.forEach(function (item, i) { item.open = openBeforePrint[i]; });"
+    assert opened in script[before:after] and restored in script[after:]
+    # The on-load fold of the rules does not touch it: that list keeps its own selector.
+    assert 'd.querySelectorAll("details.report-detail, details.ff-rules")' in script
+    assert "ff-fold" not in script[: script.index(selector)]
+    expander = pdf_lib._expand_details_for_pdf
+    for kind in ("detail report-detail", "unseen-open", "ff-fold"):
+        assert f"<details open class='{kind}'>x" in expander(f"<details class='{kind}'>x</details>")

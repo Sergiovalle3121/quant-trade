@@ -7092,7 +7092,8 @@ def _left_out_folds(
     """The programs left out for their markets, folded after the ranked rows:
     one ``<details>`` per set of allowed markets, its summary counting them
     (:func:`_fold_summary`), ``inner`` rendering its rows as before. The PDF
-    opens them under that summary (``pdf._expand_details_for_pdf``)."""
+    opens them under that summary (``pdf._expand_details_for_pdf``), and so
+    does the browser's print (``beforeprint`` in ``static/app.js``)."""
     return "".join(
         f"<details class='ff-fold'><summary>"
         f"{_e(_fold_summary(len(members), allowed, history, labels))}</summary>"
