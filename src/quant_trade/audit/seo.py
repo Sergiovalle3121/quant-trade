@@ -41,6 +41,7 @@ from quant_trade.audit.legal import LEGAL_PATHS, LEGAL_UPDATED
 from quant_trade.audit.method import METHOD_PATH
 from quant_trade.audit.pricing import PRICING_PATH
 from quant_trade.audit.reading import READING_PATH
+from quant_trade.audit.ruin_calc import RUIN_PATH
 from quant_trade.audit.rules_table import (
     RULES_TABLE_PUBLISHED,
     rules_table_lastmod,
@@ -80,6 +81,8 @@ SIGNAL_SAMPLE_PATHS: dict[str, str] = {
 SIGNAL_SAMPLE_PUBLISHED = "2026-10-09"
 #: The day the challenge calculator and its firm pages were published.
 CHALLENGE_PUBLISHED = "2026-10-10"
+#: The day the risk-of-ruin calculator was published.
+RUIN_PUBLISHED = "2026-10-10"
 
 #: Each public page as its path per language. The sitemap lists exactly these.
 #: Spanish and English exist for every page; Portuguese only where translated.
@@ -99,6 +102,8 @@ PUBLIC_PAGES: tuple[dict[str, str], ...] = (
     # The challenge calculator and one page per firm with a published preset.
     challenge_paths(),
     *(challenge_paths(firm) for firm in CHALLENGE_FIRMS),
+    # The risk-of-ruin calculator, the third of the declared-figure calculators.
+    dict(RUIN_PATH),
     # The public table of every firm's rules, from the same presets (``rules_table``).
     rules_table_paths(),
     dict(TOOLS_PATH),
@@ -144,6 +149,7 @@ def _page_dates() -> dict[str, str]:
             for path in challenge_paths(firm).values()
         }
     )
+    dates.update({path: RUIN_PUBLISHED for path in RUIN_PATH.values()})
     # The rules table: its publication, or a later reading of a preset (the same
     # date its ``Dataset`` names as ``dateModified``).
     dates.update({path: rules_table_lastmod() for path in rules_table_paths().values()})
@@ -534,6 +540,7 @@ __all__ = [
     "OG_LOCALE",
     "PAGE_DATES",
     "PUBLIC_PAGES",
+    "RUIN_PUBLISHED",
     "RULES_TABLE_PUBLISHED",
     "SITE_NAME",
     "SIGNAL_SAMPLE_PATHS",

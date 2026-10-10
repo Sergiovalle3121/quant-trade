@@ -13,7 +13,7 @@ from typing import Any
 from urllib.parse import urlencode, urlsplit
 
 from quant_trade.audit import challenge_calc as calc
-from quant_trade.audit import firmfit, reading, rules_table, winrate
+from quant_trade.audit import firmfit, reading, ruin_calc, rules_table, winrate
 from quant_trade.audit.articles import ARTICLES_BY_KEY, _num, article_url
 from quant_trade.audit.audiences import AUDIENCE_PAGES, audience_url
 from quant_trade.audit.guides import GUIDES_COPY
@@ -548,6 +548,7 @@ def _further(locale: str, firm: str) -> str:
         # Every firm's rules on one page, from the same presets.
         (str(RULES_COPY[locale]["nav"]), rules_table_url(locale)),
         (str(winrate.COPY[locale]["nav"]), winrate.WINRATE_PATH[locale]),
+        (str(ruin_calc.COPY[locale]["nav"]), ruin_calc.ruin_url(locale)),
         (title, article_url(ARTICLE_KEY, locale)),
         (audience.text[locale].title, audience_url(audience.slug, locale)),
         (str(TOOLS_COPY[locale]["nav"]), tools_url(locale)),

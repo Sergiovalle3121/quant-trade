@@ -103,6 +103,7 @@ REF_TAGS: dict[str, str] = {
     "calculadora": "Calculadora de suerte compartida",
     "aciertos": "Calculadora de % de aciertos compartida",
     "reto": "Calculadora de reto compartida",
+    "ruina": "Calculadora de riesgo de ruina compartida",
     "instagram": "Instagram",
     "facebook": "Facebook",
     "linkedin": "LinkedIn",
