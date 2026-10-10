@@ -109,8 +109,9 @@ The free challenge calculator (`audit/challenge_calc.py`, rendered by
 `audit/challenge_pages.py`) lives at `/calculadora-reto`,
 `/en/challenge-calculator` and `/pt/calculadora-desafio`, with one page per firm
 that has a published preset (`/ftmo`, `/fundednext`, `/the5ers`, `/topstep`,
-`/fundingpips`, `/alpha-capital-group`, `/e8-markets`, `/fxify`, `/maven-trading`
-under each), all thirty in the sitemap with the date
+`/fundingpips`, `/alpha-capital-group`, `/e8-markets`, `/fxify`, `/maven-trading`,
+`/take-profit-trader`, `/myfundedfutures`, `/tradeify`, `/bulenox`, `/earn2trade`,
+`/alpha-futures`, `/lucid-trading` under each), all fifty-one in the sitemap with the date
 `seo.CHALLENGE_PUBLISHED`. Its GET form takes DECLARED fields: win rate, the
 average win and loss in % of the balance or in R with the risk per trade,
 trades per day, the program (the first preset of each published firm and
@@ -154,11 +155,14 @@ challenge" in the table). Several phases with the same target read "a target of
 repeated rule set does. The main page's description names three firms and
 counts the others (`challenge_calc.firms_short`: "FTMO, FundingPips, Topstep and
 6 other firms"), so it fits 160 characters and never reads as the whole list;
-every full list of firms on the site comes from `challenge_calc.firm_names`
-(in the presets' order, the order of `FIRMS`, closed with "and" or "or"), and a
-test walks every public page for a list that ends in The5ers and Topstep. Each
-firm page has its own title and a description that says the tool is
-independent and not affiliated with the firm, all of the firm's programs and
+the landing's price card says the same, so it does not grow with each firm read
+and the landing keeps its 1,300-word budget. Every full list of firms on the site
+comes from `challenge_calc.firm_names` (in the presets' order, the order of
+`FIRMS`, closed with "and" or "or"), a sentence of its own on the prop-firm
+case page, never inside a noun phrase, and a test walks every public page for a
+list that ends in The5ers and Topstep. Each firm page has its own title and a
+description that says the tool is independent and not affiliated with the
+firm, all of the firm's programs and
 four questions whose figures are filled from the presets
 (`challenge_calc.firm_faq`: `{rules[key]}`, `{daily[key]}`, `{field[key.name]}`,
 `{accounts}` (the dollars of the programs that name an account), `{horizon}`,
@@ -257,13 +261,97 @@ simulator's types exactly or by an approximation stricter than the firm's:
   0.5 % in gain, which the simulator's count of trading days cannot see) and
   1-Step (maximum loss trailing the intraday equity high, as a share of it).
 
-Apex Trader Funding, Take Profit Trader and MyFundedFutures are not in yet:
-their rules were not part of this reading. Each new firm page has its
+Take Profit Trader and MyFundedFutures came next, with the other futures firms
+(below); Apex Trader Funding could not be read. Each new firm page has its
 rules, sources and dates, four questions filled from the presets and
 "Rigor is not affiliated with any firm"; every note reads in Spanish and
 Portuguese (`i18n`, `report_pt`). The upload form says the rules were read
 between the first and the last reading date, and the prop-firm case page
 names every firm it counts. Tests: `tests/test_audit_more_firms.py`.
+
+Seven futures firms were added the same day (`prop_presets.FUTURES_AS_OF`,
+2026-10-10). Each states its limits in dollars at one account size, which the
+preset converts to shares of that account as Topstep's are (`_FUTURES_DOLLARS`,
+in `ACCOUNT_SIZES`); every program is a single-phase evaluation, futures only
+(CME Group exchanges), intraday only. Only evaluations whose maximum loss moves
+at the day's close are in, and only where the simulator's types fit exactly or
+by a stricter approximation; the notes say what daily closes cannot see (a
+breach on open equity within the day, the forced close, the contract caps, the
+news policy). The pages' words are data in `audit/challenge_futures.py`
+(`FUTURES_FIRMS`, `FUTURES_FIRM_COPY`), which `challenge_calc` adds to `FIRMS`
+and `FIRM_COPY` after the others:
+
+- **Take Profit Trader** (help center, Zendesk): Trading Test 50K, a USD 3,000
+  target, a USD 2,000 end-of-day trailing loss that stops at the starting
+  balance (`trailing_eod_lock`, exact), 3 minimum days and a best day below
+  50 % of the net profit, checked against the target (stricter); the Test rules
+  list no daily limit. Bots, algorithms and automated execution are prohibited
+  on Test accounts too, and the note says so. Two help-center addresses (Rule 4
+  and LucidPro's products list) are cited by article number: their titled
+  address carries "approved", which the claims guard refuses on any page.
+- **MyFundedFutures** (help center): Rapid EOD 50K (30 % consistency, 4
+  days), Rapid 50K and Pro 50K (50 %, 2 days; Rapid's Sim Funded stage trails
+  intraday and is not simulated, Pro without the One-Day add-on) and Builder
+  50K (a USD 1,000 daily limit that only pauses the day, simulated as one that
+  ends the path, stricter). The end-of-day trailing locks at the starting
+  balance plus USD 100, and one page puts that lock in Sim Funded only: the
+  presets trail without locking (`trailing_eod`), stricter under either
+  reading. Left out: Studio #001/#002 (a limited release with a daily purchase
+  cap, sold only on a page that renders in the browser).
+- **Tradeify** (help center, read on its official Intercom mirror, whose
+  canonical is help.tradeify.co, because help.tradeify.co answers automated
+  readers with a challenge): Select 50K (40 % consistency, 3 days, no daily
+  limit) and Growth 50K (a USD 1,250 daily limit that pauses the session,
+  simulated as one that ends the path). The drawdown article says the
+  evaluation drawdown does not lock, a rules overview shows one at USD 50,100:
+  no lock. The Growth evaluation has no consistency rule (its page: "NO
+  consistency requirement"); the 35 % of the consistency article is the Growth
+  Sim Funded payouts' rule, measured up to the payout request, and the pricing
+  reference only names it in its one-line summary of the account. The preset
+  checks no best day, and its note says where the 35 % applies. Left out:
+  Lightning Funded (no evaluation).
+- **Bulenox** (pricing page, help center and FAQ, read from the site's own CMS
+  that the accordions load): Qualification EOD 50K (Option 2: USD 1,100 daily
+  pause, USD 2,500 end-of-day drawdown without the Master's lock; the pricing
+  page gives 30 days of access, the help center says a reset does not extend
+  them, and the FAQ "as long as you need": the preset uses 30, stricter) and
+  Momentum EOD 50K (USD 1,200 daily pause, USD 2,250 drawdown, 30 days). The
+  Qualification's daily limit counts realized and unrealized P&L and can be
+  watched in real time, which daily closes cannot see; the pages read do not
+  say whether its maximum-loss floor is also checked within the day, nor, for
+  Momentum, whether either floor is. Left out: Option 1 (a trailing drawdown on
+  intraday equity) and Fast Track (no evaluation).
+- **Earn2Trade** (program pages and help center): Trader Career Path 25K
+  (USD 1,750 target, a hard USD 550 daily limit from the day's starting
+  balance, USD 1,500 end-of-day drawdown that stops at the starting balance)
+  and Gauntlet Mini 50K (USD 3,000, USD 1,100, USD 2,000); both with the 30 %
+  Maintain Consistency rule, checked against the target. The 25K is the size the
+  page shows without script.
+- **Alpha Futures** (product pages and help center): Zero 50K (a 2 % Daily Loss
+  Guard on open and closed P&L that flattens and locks the day, simulated as one
+  that ends the path: stricter for ending it, optimistic for not seeing the open
+  P&L within the day; 1 day), Standard 50K (50 %, 2 days) and Advanced 50K
+  (USD 4,000 target, USD 1,750 loss, 40 %, 3 days); the maximum loss trails the
+  end-of-day balance and stops at the starting balance. AI, bots and automated
+  trading are prohibited on every account type, and the notes say so; the one
+  trade every 10 trading days is cited from the inactivity article, not the
+  subscription's.
+- **Lucid Trading** (help center; lucidtrading.com refuses automated readers):
+  LucidPro 50K with the daily limit off (an option chosen at purchase, from the
+  customization article; on, a USD 1,200 soft limit, not simulated), its
+  end-of-day trailing that locks at the starting balance plus USD 100 trailing
+  without a lock: never more lenient on daily closes, optimistic if the floor is
+  also checked within the day, which the pages read do not say. Microscalping,
+  high-frequency trading and hedging are cited from their own prohibition
+  articles; the other-activities article allows news trading, automated systems
+  and trade copiers. Left out: LucidFlex (its reading did not carry the sources
+  and quotes this transcription needs), LucidDirect (no evaluation), LucidMaxx
+  (invitation only) and
+  LucidBlack (legacy).
+
+Elite Trader Funding is not in: its reading did not reach this transcription.
+The futures-only rows are listed without a figure when a history trades only
+spot or CFD pairs, as Topstep's are. Tests: `tests/test_audit_futures_firms.py`.
 
 The public name is **Rigor** (the same word in Spanish and English: statistical
 rigor is what the audit sells). It replaced "Contraprueba" on 2026-09-24.
@@ -1561,7 +1649,8 @@ and report wire them in during the integration step):
   1-Step (6 %), Stellar Lite (8 %), The5ers Bootcamp (5 %), FundingPips
   2-Step Pro (6 %), Alpha Pro 8 % (8 %) and 6 % (6 %), E8 Markets Signature
   100K (3 %), FXIFY Three Phase (5 %) and Maven Trading 3-Step (3 %); E8
-  Markets Zero 100K is futures only and left out for that forex sample.
+  Markets Zero 100K and the seven futures firms' programs are futures only and
+  left out for that forex sample.
   MEASURED under the simulator's assumptions; it compares rules and never
   recommends buying a challenge. No class change.
   Each row carries `rules` (one entry per phase: target, daily loss and its
@@ -2988,6 +3077,8 @@ Routes:
 | `GET /terminos`, `GET /terms` | Terms of service (`audit/legal.py`), Spanish and English; either answers `?lang=`. |
 | `GET /privacidad`, `GET /privacy` | Privacy policy, Spanish and English. |
 | `GET /en/terms`, `/en/privacy`, `/pt/terms`, `/pt/privacy` | 301 to the legal page in that language (guessed addresses). |
+| `GET /herramientas` | The free tools page (`/en/tools`, `/pt/ferramentas`; `/tools` and `/pt/tools` redirect there): luck calculator, win-rate calculator, challenge calculator, figure reader and report check. |
+| `GET /calculadora-reto`, `/en/challenge-calculator`, `/pt/calculadora-desafio` | The free prop-firm challenge calculator, and its firm pages under each (`/ftmo`, `/fundednext`, `/the5ers`, `/topstep`, `/fundingpips`, `/alpha-capital-group`, `/e8-markets`, `/fxify`, `/maven-trading`, `/take-profit-trader`, `/myfundedfutures`, `/tradeify`, `/bulenox`, `/earn2trade`, `/alpha-futures`, `/lucid-trading`). |
 | `GET /herramientas` | The free tools page (`/en/tools`, `/pt/ferramentas`; `/tools` and `/pt/tools` redirect there): luck calculator, win-rate calculator, challenge calculator, risk-of-ruin calculator, figure reader and report check. |
 | `GET /calculadora-reto`, `/en/challenge-calculator`, `/pt/calculadora-desafio` | The free prop-firm challenge calculator, and its firm pages under each (`/ftmo`, `/fundednext`, `/the5ers`, `/topstep`, `/fundingpips`, `/alpha-capital-group`, `/e8-markets`, `/fxify`, `/maven-trading`). |
 | `GET /calculadora-ruina`, `/en/risk-of-ruin-calculator`, `/pt/calculadora-risco-de-ruina` | The free risk-of-ruin and expectancy calculator (`audit/ruin_calc.py`, `audit/ruin_pages.py`): declared figures, fixed-size paths, the engine's streak function and the win rate's Wilson interval. |

@@ -32,6 +32,7 @@ import numpy as np
 
 from quant_trade.audit import firmfit, winrate
 from quant_trade.audit.analytics import _day_limit, simulate_challenge
+from quant_trade.audit.challenge_futures import FUTURES_FIRM_COPY, FUTURES_FIRMS
 from quant_trade.audit.prop_presets import ACCOUNT_SIZES, PRESETS, ChallengeRules
 from quant_trade.audit.public_card import PublicClaim
 
@@ -42,7 +43,8 @@ CHALLENGE_PATH: dict[str, str] = {
     "pt": "/pt/calculadora-desafio",
 }
 #: One page per firm with a published preset: its path segment and its name in
-#: ``prop_presets`` (``ChallengeRules.firm``), in the order the pages list them.
+#: ``prop_presets`` (``ChallengeRules.firm``), in the order the pages list them;
+#: the futures firms' pages (``challenge_futures``) come last, as their presets do.
 FIRMS: dict[str, str] = {
     "ftmo": "FTMO",
     "fundednext": "FundedNext",
@@ -53,6 +55,7 @@ FIRMS: dict[str, str] = {
     "e8-markets": "E8 Markets",
     "fxify": "FXIFY",
     "maven-trading": "Maven Trading",
+    **FUTURES_FIRMS,
 }
 #: The query fields, in the order a shared link writes them.
 FIELDS = ("win_rate", "unit", "avg_win", "avg_loss", "risk", "per_day", "trades", "program", "fee")
@@ -127,8 +130,9 @@ PROGRAMS: tuple[str, ...] = tuple(
 
 
 #: Every firm with published rules, in the order the presets list them (the
-#: order of ``FIRMS``, the pages' own), for every list of firms on the site
-#: (``firm_names``): the price card, the prop-firm page and the article.
+#: order of ``FIRMS``, the pages' own), for every whole list of firms on the site
+#: (``firm_names``): the prop-firm page and the article. The price card names three
+#: and counts the others (``firms_short``).
 FIRM_NAMES: tuple[str, ...] = tuple(
     dict.fromkeys(rules.firm for rules in PRESETS.values() if _published(rules))
 )
@@ -167,7 +171,20 @@ def firms_short(locale: str) -> str:
 #: does not apply (Topstep's optional one, Hyper Growth's daily pause) says
 #: "not simulated". The preset fields are the same (``max_daily_loss=None``).
 NO_DAILY_LIMIT: frozenset[str] = frozenset(
-    {"e8-signature-100k", "e8-zero-100k", "the5ers-bootcamp-step"}
+    {
+        "e8-signature-100k",
+        "e8-zero-100k",
+        "the5ers-bootcamp-step",
+        # "Daily Loss Limit | None" (MyFundedFutures), "Daily Loss Limit: None"
+        # (Tradeify Select), "Daily Loss Guard (NONE on Evaluation!)" and "No Daily
+        # Loss Guard on Evaluation" (Alpha Futures Standard and Advanced).
+        "myfundedfutures-rapid-eod-50k",
+        "myfundedfutures-rapid-50k",
+        "myfundedfutures-pro-50k",
+        "tradeify-select-50k",
+        "alpha-futures-standard-50k",
+        "alpha-futures-advanced-50k",
+    }
 )
 
 
@@ -571,7 +588,8 @@ def compute(value: ChallengeInput) -> ChallengeReading:
 
 
 def account_size(key: str) -> float | None:
-    """The account the program names, in US dollars (Topstep), when it names one."""
+    """The account the program names, in US dollars (Topstep, E8 Markets and the
+    futures firms), when it names one."""
     return ACCOUNT_SIZES.get(key)
 
 
@@ -1197,7 +1215,8 @@ COPY: dict[str, dict[str, Any]] = {
 
 #: The firm pages' own words. ``faq`` answers are templates: ``{rules[key]}``
 #: is the rules sentence of that program (:func:`rules_sentence`), so a figure
-#: in an answer is always the preset's.
+#: in an answer is always the preset's. The futures firms' words are in
+#: ``challenge_futures`` and come last.
 FIRM_COPY: dict[str, dict[str, dict[str, Any]]] = {
     "ftmo": {
         "es": {
@@ -2399,6 +2418,7 @@ FIRM_COPY: dict[str, dict[str, dict[str, Any]]] = {
             ),
         },
     },
+    **FUTURES_FIRM_COPY,
 }
 
 
@@ -2547,8 +2567,8 @@ def rules_sentence(key: str, locale: str) -> str:
 
 def _accounts_sentence(firm: str, locale: str) -> str:
     """The maximum loss in dollars of each of the firm's programs that names an
-    account (Topstep's sizes, E8 Markets' 100K), from ``ACCOUNT_SIZES`` and the
-    presets; empty when none names one."""
+    account (Topstep's sizes, E8 Markets' 100K, the futures firms' sizes), from
+    ``ACCOUNT_SIZES`` and the presets; empty when none names one."""
     pieces = []
     for key in firm_programs(firm):
         if key not in ACCOUNT_SIZES:

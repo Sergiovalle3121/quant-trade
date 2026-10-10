@@ -359,8 +359,11 @@ def test_motion_never_blurs_and_the_hero_text_does_not_rise() -> None:
 def test_the_full_report_lines_name_only_what_exists(locale: str) -> None:
     items = pages._full_items(locale)
     assert len(items) == 5
-    firms = sorted({rules.firm for rules in PRESETS.values() if rules.firm != "Generic"})
-    assert all(firm in items[0] for firm in firms)
+    firms = {rules.firm for rules in PRESETS.values() if rules.firm != "Generic"}
+    # Three firms by name and how many others: the card does not grow with each firm.
+    assert pages.challenge.firms_short(locale) in items[0]
+    assert set(pages.challenge.NAMED_FIRMS) <= firms
+    assert f" {len(firms) - len(pages.challenge.NAMED_FIRMS)} " in items[0]
     assert "{" not in " ".join(items)
     prices = _paid_landing(locale).split("id='pricing'", 1)[1].split("</section>", 1)[0]
     assert f"href='{_sample_url(locale)}'" in prices

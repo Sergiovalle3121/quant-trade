@@ -2750,6 +2750,460 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
             "simula."
         ),
     ),
+    # prop_presets: the futures firms read on 2026-10-10
+    (
+        (
+            "In US dollars, on the USD {usd_account} account: a USD {usd_target} profit target, a "
+            "USD {usd_daily} daily loss limit and a USD {usd_loss} maximum loss."
+        ),
+        (
+            "En dólares estadounidenses, en la cuenta de USD {usd_account}: objetivo de USD "
+            "{usd_target}, límite de pérdida diaria de USD {usd_daily} y pérdida máxima de USD "
+            "{usd_loss}."
+        ),
+    ),
+    (
+        (
+            "In US dollars, on the USD {usd_account} account: a USD {usd_target} profit target "
+            "and a USD {usd_loss} maximum loss."
+        ),
+        (
+            "En dólares estadounidenses, en la cuenta de USD {usd_account}: objetivo de USD "
+            "{usd_target} y pérdida máxima de USD {usd_loss}."
+        ),
+    ),
+    (
+        (
+            "The maximum-loss floor moves only at the day's close, but a breach counts at any "
+            "moment, open losses included ({url}); daily closes cannot see it, so the figures are "
+            "optimistic here."
+        ),
+        (
+            "El piso de la pérdida máxima solo se mueve al cierre del día, pero la ruptura cuenta "
+            "en cualquier momento, con las pérdidas abiertas incluidas ({url}); los cierres "
+            "diarios no la ven, así que aquí las cifras son optimistas."
+        ),
+    ),
+    (
+        (
+            "Best-day rule: no day may exceed {value} % of the total profit; checked against the "
+            "profit target when a path reaches it, on daily closes, which is stricter."
+        ),
+        (
+            "Regla del mejor día: ningún día puede superar el {value} % de la ganancia total; se "
+            "comprueba contra el objetivo de beneficio cuando un recorrido llega a él, con "
+            "cierres diarios, lo que es más estricto."
+        ),
+    ),
+    (
+        (
+            "Breaking the consistency rule does not end the account: it asks for more trading "
+            "days ({url})."
+        ),
+        "Romper la regla de consistencia no termina la cuenta: pide más días de trading ({url}).",
+    ),
+    (
+        (
+            "Intraday only: no position may be held overnight; every position is closed by {time} "
+            "({url})."
+        ),
+        (
+            "Solo intradía: ninguna posición puede mantenerse de un día a otro; todas se cierran "
+            "antes de las {time} ({url})."
+        ),
+    ),
+    (
+        "At most {minis} minis or {micros} micros at a time.",
+        "Como mucho {minis} minis o {micros} micros a la vez.",
+    ),
+    (
+        "News trading is allowed in the evaluation ({url}).",
+        "Se permite operar con noticias en la evaluación ({url}).",
+    ),
+    (
+        (
+            "The maximum loss trails the highest end-of-day balance and locks at the starting "
+            "balance plus USD 100; the simulator lets it trail without locking, which is stricter "
+            "({url})."
+        ),
+        (
+            "La pérdida máxima sigue al mayor balance de cierre diario y se fija en el balance "
+            "inicial más USD 100; el simulador la deja seguir sin fijarse, lo que es más estricto "
+            "({url})."
+        ),
+    ),
+    (
+        (
+            "The daily loss limit pauses trading for the rest of the day without ending the "
+            "account; the simulator ends the path when a daily close breaks it, which is "
+            "stricter."
+        ),
+        (
+            "El límite de pérdida diaria pausa el trading el resto del día sin terminar la "
+            "cuenta; el simulador termina el recorrido cuando un cierre diario lo rompe, lo que "
+            "es más estricto."
+        ),
+    ),
+    (
+        (
+            "The pages read do not say whether the floors are also checked within the day; the "
+            "simulator checks daily closes only."
+        ),
+        (
+            "Las páginas leídas no dicen si los pisos también se vigilan dentro del día; el "
+            "simulador solo mira los cierres diarios."
+        ),
+    ),
+    (
+        (
+            "The pages read do not say whether the maximum-loss floor is also checked within the "
+            "day; the simulator checks daily closes only."
+        ),
+        (
+            "Las páginas leídas no dicen si el piso de la pérdida máxima también se vigila "
+            "dentro del día; el simulador solo mira los cierres diarios."
+        ),
+    ),
+    (
+        "The Test rules (Rules 1 to 6) list no daily loss limit.",
+        "Las reglas del Test (Rules 1 a 6) no incluyen ningún límite de pérdida diaria.",
+    ),
+    (
+        (
+            "Breaking the consistency rule raises the profit target instead of ending the Test "
+            "({url})."
+        ),
+        (
+            "Romper la regla de consistencia sube el objetivo de beneficio en lugar de terminar "
+            "el Test ({url})."
+        ),
+    ),
+    (
+        "No time limit while the monthly subscription is active ({url}).",
+        "Sin plazo mientras la suscripción mensual esté activa ({url}).",
+    ),
+    (
+        (
+            "Trading bots, algorithms and automated execution are prohibited, Test accounts "
+            "included ({url})."
+        ),
+        (
+            "Están prohibidos los bots de trading, los algoritmos y la ejecución automática, "
+            "también en las cuentas Test ({url})."
+        ),
+    ),
+    (
+        (
+            "The maximum loss trails the highest end-of-day balance and locks at the starting "
+            "balance plus USD 100 ({url}); another page puts that lock in the Sim Funded stage "
+            "({url2}), and the simulator lets it trail without locking, the stricter reading of "
+            "both."
+        ),
+        (
+            "La pérdida máxima sigue al mayor balance de cierre diario y se fija en el balance "
+            "inicial más USD 100 ({url}); otra página sitúa ese bloqueo en la etapa Sim Funded "
+            "({url2}), y el simulador la deja seguir sin fijarse, la lectura más estricta de las "
+            "dos."
+        ),
+    ),
+    (
+        (
+            "No time limit is stated (one-time payment); an account with no trade for 7 "
+            "consecutive calendar days may be closed ({url})."
+        ),
+        (
+            "No se indica plazo (pago único); una cuenta sin operaciones durante 7 días naturales "
+            "seguidos puede cerrarse ({url})."
+        ),
+    ),
+    (
+        (
+            "T1 news trading is permitted in every evaluation, while the same policy page also "
+            "asks for no open positions or orders from 2 minutes before to 2 minutes after a data "
+            "release; the two statements conflict; not simulated ({url})."
+        ),
+        (
+            "Operar noticias T1 está permitido en todas las evaluaciones, mientras que la misma "
+            "página de la política también pide no tener posiciones ni órdenes abiertas desde 2 "
+            "minutos antes hasta 2 minutos después de un dato publicado; las dos frases se "
+            "contradicen; no se simula ({url})."
+        ),
+    ),
+    (
+        (
+            "Only the evaluation is simulated; in the Sim Funded stage the maximum loss trails "
+            "the intraday high ({url})."
+        ),
+        (
+            "Solo se simula la evaluación; en la etapa Sim Funded la pérdida máxima sigue al "
+            "máximo dentro del día ({url})."
+        ),
+    ),
+    (
+        (
+            "Simulated without the optional One-Day add-on, a USD 4,000 target in one day with no "
+            "consistency rule ({url})."
+        ),
+        (
+            "Se simula sin el complemento opcional One-Day, un objetivo de USD 4.000 en un día "
+            "sin regla de consistencia ({url})."
+        ),
+    ),
+    (
+        "No consistency rule in the evaluation; the 50 % rule applies to Sim Funded payouts.",
+        (
+            "Sin regla de consistencia en la evaluación; la regla del 50 % se aplica a los pagos "
+            "de Sim Funded."
+        ),
+    ),
+    (
+        "Intraday only: all positions must be closed before the end of the trading session.",
+        (
+            "Solo intradía: todas las posiciones deben cerrarse antes del final de la sesión de "
+            "trading."
+        ),
+    ),
+    (
+        (
+            "Simulated with the default maximum loss; the Add-On option has a USD 1,500 one and "
+            "is otherwise the same."
+        ),
+        (
+            "Se simula con la pérdida máxima por defecto; la opción Add-On tiene una de USD 1.500 "
+            "y en lo demás es igual."
+        ),
+    ),
+    (
+        (
+            "The maximum loss trails the highest end-of-day balance and does not lock in the "
+            "evaluation ({url}); a rules overview shows a lock at USD 50,100 under evaluation "
+            "accounts, and the simulator follows the drawdown article, which is stricter "
+            "({url2})."
+        ),
+        (
+            "La pérdida máxima sigue al mayor balance de cierre diario y no se fija en la "
+            "evaluación ({url}); un resumen de reglas muestra un bloqueo en USD 50.100 bajo las "
+            "cuentas de evaluación, y el simulador sigue el artículo del drawdown, que es más "
+            "estricto ({url2})."
+        ),
+    ),
+    (
+        (
+            "The 3 minimum days come from the 40 % consistency rule (2 with the 50 % add-on, not "
+            "simulated); the simulator counts every day with a non-zero return."
+        ),
+        (
+            "Los 3 días mínimos vienen de la regla de consistencia del 40 % (2 con el complemento "
+            "del 50 %, que no se simula); el simulador cuenta todo día con un retorno distinto de "
+            "cero."
+        ),
+    ),
+    (
+        "At least 1 trade per week, Monday to Friday, is needed ({url}).",
+        "Hace falta al menos 1 operación por semana, de lunes a viernes ({url}).",
+    ),
+    (
+        "50K accounts bought before the new dashboard keep a USD 2,500 target.",
+        "Las cuentas de 50K compradas antes del nuevo panel conservan un objetivo de USD 2.500.",
+    ),
+    (
+        (
+            "The daily loss limit resets at the start of each session (6:00 PM ET) and rises to "
+            "the size of the drawdown at 6 % profit, which in the evaluation is the target "
+            "({url})."
+        ),
+        (
+            "El límite de pérdida diaria se reinicia al empezar cada sesión (6:00 PM ET) y sube "
+            "al tamaño del drawdown con un 6 % de ganancia, que en la evaluación es el objetivo "
+            "({url})."
+        ),
+    ),
+    (
+        (
+            "No consistency rule in the evaluation; the 35 % rule applies to Growth Sim Funded "
+            "payouts ({url})."
+        ),
+        (
+            "Sin regla de consistencia en la evaluación; la regla del 35 % se aplica a los pagos "
+            "de Growth Sim Funded ({url})."
+        ),
+    ),
+    (
+        (
+            "The profit target, the USD 2,500 drawdown and the 30-day access come from the "
+            "pricing page ({url}); the help center says a reset does not extend the 30 days "
+            "({url2}), while the FAQ says there is no maximum number of trading days ({url3}), "
+            "so the simulator uses the 30 days, which is stricter."
+        ),
+        (
+            "El objetivo, el drawdown de USD 2.500 y el acceso de 30 días vienen de la página de "
+            "precios ({url}); el centro de ayuda dice que un reset no alarga los 30 días "
+            "({url2}), mientras que la FAQ dice que no hay máximo de días de trading ({url3}), "
+            "así que el simulador usa los 30 días, lo que es más estricto."
+        ),
+    ),
+    (
+        (
+            "The end-of-day drawdown is updated once a day after the close and does not lock in "
+            "the Qualification; the lock at the starting balance plus USD 100 applies to the "
+            "Master Account."
+        ),
+        (
+            "El drawdown de cierre del día se actualiza una vez al día tras el cierre y no se "
+            "fija en la Qualification; el bloqueo en el balance inicial más USD 100 se aplica a "
+            "la Master Account."
+        ),
+    ),
+    (
+        (
+            "The daily loss limit counts realized and unrealized P&L with commissions over the "
+            "5:00 PM to 4:00 PM CT session, which daily closes cannot see."
+        ),
+        (
+            "El límite de pérdida diaria cuenta el P&L realizado y no realizado con comisiones "
+            "durante la sesión de 5:00 PM a 4:00 PM CT, algo que los cierres diarios no ven."
+        ),
+    ),
+    (
+        (
+            "Contracts scale with the profit: 2 up to USD 1,500, 4 up to USD 4,000 and 7 after; "
+            "not simulated."
+        ),
+        (
+            "Los contratos crecen con la ganancia: 2 hasta USD 1.500, 4 hasta USD 4.000 y 7 "
+            "después; no se simula."
+        ),
+    ),
+    (
+        "Overnight and weekend positions are prohibited ({url}).",
+        "Están prohibidas las posiciones de un día a otro y de fin de semana ({url}).",
+    ),
+    (
+        (
+            "The end-of-day drawdown is recalculated at each day's close; the Momentum page names "
+            "no lock in the qualification stage, and the simulator lets it trail without locking, "
+            "which is stricter."
+        ),
+        (
+            "El drawdown de cierre del día se recalcula en cada cierre diario; la página de "
+            "Momentum no nombra ningún bloqueo en la etapa de calificación, y el simulador lo "
+            "deja seguir sin fijarse, lo que es más estricto."
+        ),
+    ),
+    (
+        (
+            "Daily loss: counted from the balance the day starts with, over the 5:00 PM to 5:00 "
+            "PM CT day, with open and closed trades and commissions ({url})."
+        ),
+        (
+            "Pérdida diaria: se cuenta desde el balance con el que empieza el día, de 5:00 PM a "
+            "5:00 PM CT, con operaciones abiertas y cerradas y comisiones ({url})."
+        ),
+    ),
+    (
+        "No minimum trading days, but with the 30 % rule at least 4 days must close with a gain.",
+        (
+            "Sin mínimo de días de trading, pero con la regla del 30 % al menos 4 días deben "
+            "cerrar con ganancia."
+        ),
+    ),
+    (
+        "Going over the contract limit of the progression ladder ends the account ({url}).",
+        "Superar el límite de contratos de la escalera de progresión termina la cuenta ({url}).",
+    ),
+    (
+        (
+            "The Daily Loss Guard is 2 % of the starting balance on the day's open and closed "
+            "P&L; reaching it flattens the positions and locks the account until the next trading "
+            "day (6 PM ET) without ending it; the simulator ends the path there, which is "
+            "stricter, but it checks daily closes only and does not see a touch on open P&L "
+            "within the day, which is optimistic ({url})."
+        ),
+        (
+            "El Daily Loss Guard es el 2 % del balance inicial sobre el P&L abierto y cerrado del "
+            "día; al tocarlo se cierran las posiciones y la cuenta queda bloqueada hasta el "
+            "siguiente día de trading (6 PM ET) sin terminar; el simulador termina ahí el "
+            "recorrido, lo que es más estricto, pero solo mira los cierres diarios y no ve un "
+            "toque con el P&L abierto dentro del día, lo que es optimista ({url})."
+        ),
+    ),
+    (
+        "No consistency rule in the evaluation; the 40 % rule applies to Qualified accounts.",
+        (
+            "Sin regla de consistencia en la evaluación; la regla del 40 % se aplica a las "
+            "cuentas Qualified."
+        ),
+    ),
+    (
+        (
+            "AI, bots and other automated trading are prohibited on every account type, as are "
+            "high-frequency trading, tick scalping and hedging between accounts ({url})."
+        ),
+        (
+            "La IA, los bots y el resto del trading automático están prohibidos en todos los "
+            "tipos de cuenta, igual que el trading de alta frecuencia, el tick scalping y la "
+            "cobertura entre cuentas ({url})."
+        ),
+    ),
+    (
+        (
+            "No time limit is stated: the monthly fee rebills until the evaluation ends ({url}), "
+            "and at least one trade is needed every 10 trading days ({url2})."
+        ),
+        (
+            "No se indica plazo: la cuota mensual se cobra de nuevo hasta que termina la "
+            "evaluación ({url}), y hace falta al menos una operación cada 10 días de trading "
+            "({url2})."
+        ),
+    ),
+    (
+        (
+            "The evaluation is complete only once the target is reached and kept and the "
+            "consistency rule holds ({url})."
+        ),
+        (
+            "La evaluación solo se completa cuando el objetivo se alcanza y se mantiene y la "
+            "regla de consistencia se cumple ({url})."
+        ),
+    ),
+    (
+        (
+            "Simulated with the daily loss limit off, an option chosen at purchase ({url}); with "
+            "it on, a fixed USD 1,200 limit pauses the day without ending the account; not "
+            "simulated ({url2})."
+        ),
+        (
+            "Se simula con el límite de pérdida diaria desactivado, una opción que se elige al "
+            "comprar ({url}); activado, un límite fijo de USD 1.200 pausa el día sin terminar la "
+            "cuenta; no se simula ({url2})."
+        ),
+    ),
+    (
+        "No minimum number of days is published; the target can be reached in one trading day.",
+        "No se publica un mínimo de días; el objetivo puede alcanzarse en un día de trading.",
+    ),
+    (
+        (
+            "No consistency rule in the evaluation; the 40 % one applies to the funded account "
+            "({url})."
+        ),
+        (
+            "Sin regla de consistencia en la evaluación; la del 40 % se aplica a la cuenta funded "
+            "({url})."
+        ),
+    ),
+    (
+        (
+            "Microscalping ({url}), high-frequency trading ({url2}) and hedging ({url3}) are "
+            "prohibited; news trading, automated trading systems and trade copiers are allowed "
+            "({url4})."
+        ),
+        (
+            "Están prohibidos el microscalping ({url}), el trading de alta frecuencia ({url2}) y "
+            "la cobertura ({url3}); se permite operar con noticias, igual que los sistemas de "
+            "trading automático y los copiadores de operaciones ({url4})."
+        ),
+    ),
     # audit/luck.py
     (
         "the curve never falls below a previous high",
@@ -3235,6 +3689,9 @@ def _translate_values(values: dict[str, str], locale: str = "es") -> dict[str, s
     out = dict(values)
     if "difference" in out:
         out["difference"] = local_number(out["difference"])
+    for name in [name for name in out if name.startswith("usd_")]:
+        # A dollar amount a futures preset's note states: 50,000 reads 50.000.
+        out[name] = local_number(out[name])
     if out.get("currency") == "in file units":
         out["currency"] = _FILE_UNITS[locale]
     if "what" in out:

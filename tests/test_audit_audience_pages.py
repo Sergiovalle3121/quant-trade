@@ -221,9 +221,12 @@ def test_prop_page_counts_firm_challenges_apart_from_the_generic_one(tmp_path: P
     es = client.get("/para/retos-prop-firm").text
     en = client.get("/for/prop-firm-challenges").text
     pt = client.get(audience_url("retos-prop-firm", "pt")).text
-    assert f"{firms} juegos de reglas de {programs} programas de FTMO" in es
+    count = len({r.firm for r in PRESETS.values() if r.firm != "Generic"})
+    assert f"{firms} juegos de reglas de {programs} programas de {count} firmas" in es
     assert "más la fase 1 de un reto genérico de dos fases" in es
-    assert f"{firms} rule sets from {programs} FTMO, FundedNext" in en
-    assert f"{firms} conjuntos de regras de {programs} programas da FTMO" in pt
+    assert f"{firms} rule sets from {programs} programs of {count} firms" in en
+    assert f"{firms} conjuntos de regras de {programs} programas de {count} firmas" in pt
+    # The firms they count, named in a sentence of their own.
+    assert "Las firmas: FTMO, FundedNext" in es and "The firms: FTMO, FundedNext" in en
     assert f"{firms} fases de" not in es and f"{firms} phases of" not in en
     assert f"{firms} retos de FTMO" not in es and f"{firms} desafios da FTMO" not in pt
