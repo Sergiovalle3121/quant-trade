@@ -392,7 +392,8 @@ def test_new_sentences_read_in_every_language_and_pass_the_guard(
             shown = localize(text, locale)
             assert shown != text and find_claims(shown) == [], (locale, text)
     keys = [key for key in LABELS["es"] if key.startswith("ch_size_")]
-    assert len(keys) == 21
+    # 22 since ch_size_balance_declared (#489): the 1x line of an account names the file's balance.
+    assert len(keys) == 22
     for locale in LOCALES:
         texts = [LABELS[locale][key] for key in keys] + [LOCKED_GAINS[locale]["ch_size_title"]]
         for key in keys:
