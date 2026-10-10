@@ -85,7 +85,7 @@ from quant_trade.audit.calculator import (
     share_values,
 )
 from quant_trade.audit.calculator_card import calculator_card_svg
-from quant_trade.audit.challenge_pages import challenge_page
+from quant_trade.audit.challenge_pages import challenge_page, rules_table_page
 from quant_trade.audit.compare import (
     COMPARE_PATH,
     MAX_COMPARED,
@@ -169,6 +169,8 @@ from quant_trade.audit.report import render, report_kind, result_sha256
 from quant_trade.audit.retention import RetentionWorker
 from quant_trade.audit.return_series import is_return_series
 from quant_trade.audit.ruin_pages import ruin_page
+from quant_trade.audit.rules_table import FILTER_FIELDS as RULES_TABLE_FIELDS
+from quant_trade.audit.rules_table import RULES_TABLE_PATH, Filters, parse_filters
 from quant_trade.audit.sample import sample_result, signal_sample_result
 from quant_trade.audit.sample_publication import (
     SAMPLE_KIND_BY_PUBLIC_ID,
@@ -1438,6 +1440,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     # The challenge calculator and its firm pages, like the other free tools.
     visit_paths.update({path: loc for path, (loc, _firm) in challenge_calc.PAGES.items()})
     visit_paths.update({path: loc for loc, path in ruin_calc.RUIN_PATH.items()})
+    # The public table of every firm's rules, built from the same presets.
+    visit_paths.update({path: loc for loc, path in RULES_TABLE_PATH.items()})
 
     def _funnel_visit(request: Request, response: Any) -> None:
         """Count a person's visit to the landing or a case page; remember its tag.
@@ -7316,6 +7320,29 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
 
     for ruin_path in ruin_calc.RUIN_PATH.values():
         app.add_api_route(ruin_path, public_ruin, methods=["GET"], response_class=HTMLResponse)
+
+    @functools.lru_cache(maxsize=64)
+    def _rules_table_html(
+        locale: str, filters: Filters, base_url: str, offer: paid_offer.Offer
+    ) -> str:
+        """The rules table for one language, set of filters, address and offer,
+        worded by the offer and past the claim guard. The page reads nothing per
+        request, so the guard (most of its cost) runs once per combination."""
+        page = rules_table_page(locale=locale, base_url=base_url, values=filters.values())
+        return guard_page(paid_offer.rewrite_html(page, locale, offer))
+
+    def public_rules_table(request: Request) -> str:
+        """The public table of prop-firm rules. Its filters are query fields that
+        the page's own links set; a value that names nothing shows the whole
+        table, never an error, and the canonical is the address without a query."""
+        locale = next(lang for lang, path in RULES_TABLE_PATH.items() if path == request.url.path)
+        values = {name: request.query_params.get(name, "") for name in RULES_TABLE_FIELDS}
+        return _rules_table_html(locale, parse_filters(values), _site_url(request), _offer_terms())
+
+    for rules_path in RULES_TABLE_PATH.values():
+        app.add_api_route(
+            rules_path, public_rules_table, methods=["GET"], response_class=HTMLResponse
+        )
 
     def public_faq(request: Request) -> str:
         locale = next(lang for lang, path in FAQ_PATH.items() if path == request.url.path)
