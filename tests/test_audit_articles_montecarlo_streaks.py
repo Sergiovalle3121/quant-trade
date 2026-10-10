@@ -246,7 +246,8 @@ def test_streak_table_follows_the_calculation_section_by_its_title(locale: str) 
     assert headings[index + 1][0] < table.start() < headings[index + 2][0]
     # The explanation the table follows names the engine function and the assumption.
     assert STREAK_METHOD[locale] in _paragraphs(STREAKS, locale)
-    assert STREAK_METHOD[locale].startswith("DECLARED ·")
+    # Running text carries no evidence label: that belongs in the table.
+    assert not STREAK_METHOD[locale].startswith("DECLARED")
     assert "longest_run_tail" in STREAK_METHOD[locale]
 
 
@@ -255,7 +256,7 @@ def test_streak_prose_reads_the_computed_rows(locale: str) -> None:
     paragraphs = _paragraphs(STREAKS, locale)
     reading, stakes = STREAK_READING[locale], STREAK_STAKES[locale]
     assert reading in paragraphs and stakes in paragraphs
-    assert reading.startswith("DECLARED ·") and stakes.startswith("DECLARED ·")
+    assert not reading.startswith("DECLARED") and not stakes.startswith("DECLARED")
     example = numbers.streak_for(*numbers.STREAK_EXAMPLE)
     assert (example.median_run, example.rare_run) == (7, 10)
     # The 1-in-20 streak is the longest one chance gives at least that often; for
@@ -271,7 +272,7 @@ def test_streak_prose_reads_the_computed_rows(locale: str) -> None:
         assert exact not in reading and exact not in stakes
     high, low = numbers.streak_for(0.60, 200), numbers.streak_for(0.45, 200)
     short, long = numbers.streak_for(0.50, 100), numbers.streak_for(0.50, 500)
-    prose = reading.split("·", 1)[1].replace(printed, "")
+    prose = reading.replace(printed, "")
     figures = [int(value) for value in re.findall(r"\b\d+\b", prose)]
     # Each row's figures in the order the paragraph reads them.
     assert figures == [
@@ -382,8 +383,7 @@ def test_monte_carlo_prose_prints_the_computed_figures(locale: str) -> None:
     example = MONTE_CARLO_EXAMPLE[locale]
     search = MONTE_CARLO_SEARCH_EXAMPLE[locale]
     assert all(paragraph in paragraphs for paragraph in (*example, search))
-    assert example[0].startswith("DECLARED ·") and example[1].startswith("DECLARED ·")
-    assert search.startswith("DECLARED ·")
+    assert not any(text.startswith("DECLARED") for text in (*example, search))
     for value in (
         numbers.MC_SHUFFLE.observed,
         numbers.MC_SHUFFLE.low,

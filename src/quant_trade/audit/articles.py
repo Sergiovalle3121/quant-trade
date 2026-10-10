@@ -104,7 +104,7 @@ LUCK_TABLE_INPUTS = tuple(
 _EXAMPLE_LUCK = compute(LUCK_EXAMPLE_INPUT)["luck_sharpe"]["value"]
 INDEPENDENT_LUCK_EXAMPLE = {
     "es": (
-        f"DECLARED · Supongamos {LUCK_EXAMPLE_INPUT.trials} variantes independientes y "
+        f"Supongamos {LUCK_EXAMPLE_INPUT.trials} variantes independientes y "
         f"{LUCK_EXAMPLE_INPUT.years:g} años de rendimientos diarios, con "
         f"{PERIODS_PER_YEAR:g} periodos al año y un Sharpe anual declarado de "
         f"{_num(LUCK_EXAMPLE_INPUT.sharpe, 'es', 1)}. La calculadora sitúa el Sharpe esperado "
@@ -113,7 +113,7 @@ INDEPENDENT_LUCK_EXAMPLE = {
         "asimetría nula y colas normales, no una medición de una cartera."
     ),
     "en": (
-        f"DECLARED · Assume {LUCK_EXAMPLE_INPUT.trials} independent variants and "
+        f"Assume {LUCK_EXAMPLE_INPUT.trials} independent variants and "
         f"{LUCK_EXAMPLE_INPUT.years:g} years of daily returns, with "
         f"{PERIODS_PER_YEAR:g} periods per year and a declared annual Sharpe of "
         f"{_num(LUCK_EXAMPLE_INPUT.sharpe, 'en', 1)}. The calculator puts the expected Sharpe "
@@ -122,7 +122,7 @@ INDEPENDENT_LUCK_EXAMPLE = {
         "normal tails; it is not a measurement of a portfolio."
     ),
     "pt": (
-        f"DECLARED · Suponha {LUCK_EXAMPLE_INPUT.trials} variantes independentes e "
+        f"Suponha {LUCK_EXAMPLE_INPUT.trials} variantes independentes e "
         f"{LUCK_EXAMPLE_INPUT.years:g} anos de retornos diários, com "
         f"{PERIODS_PER_YEAR:g} períodos por ano e Sharpe anual declarado de "
         f"{_num(LUCK_EXAMPLE_INPUT.sharpe, 'pt', 1)}. A calculadora situa o Sharpe esperado "
@@ -239,7 +239,7 @@ def _mc(locale: str, value: float) -> str:
 
 MONTE_CARLO_EXAMPLE: dict[str, tuple[str, str, str]] = {
     "es": (
-        f"DECLARED · Una serie sintética de {_MC_DAYS['es']} rendimientos diarios, generada con "
+        f"Una serie sintética de {_MC_DAYS['es']} rendimientos diarios, generada con "
         f"NumPy con semilla {MC_SERIES_SEED}, media de {_MC_MEAN['es']} % y desviación de "
         f"{_MC_SD['es']} % al día. En el orden generado, su caída máxima es de "
         f"{_mc('es', MC_SHUFFLE.observed)}. Con shuffled_drawdown, "
@@ -247,7 +247,7 @@ MONTE_CARLO_EXAMPLE: dict[str, tuple[str, str, str]] = {
         f"semilla {MC_SHUFFLE_SEED}, la peor caída va de {_mc('es', MC_SHUFFLE.low)} a "
         f"{_mc('es', MC_SHUFFLE.high)} en 9 de cada 10 órdenes, con una mediana de "
         f"{_mc('es', MC_SHUFFLE.median)}.",
-        f"DECLARED · Con drawdown_risk, el bootstrap estacionario del informe "
+        f"Con drawdown_risk, el bootstrap estacionario del informe "
         f"({_num(MC_RISK.samples, 'es', 0)} historias de {_num(MC_RISK.horizon, 'es', 0)} días, "
         f"bloque esperado de {_num(MC_RISK.block, 'es', 0)} días y semilla {MC_RISK_SEED}), la "
         f"caída máxima a un año tiene una mediana de {_mc('es', MC_RISK.median)} y llega a "
@@ -260,7 +260,7 @@ MONTE_CARLO_EXAMPLE: dict[str, tuple[str, str, str]] = {
         "cálculo da siempre estas cifras.",
     ),
     "en": (
-        f"DECLARED · A synthetic series of {_MC_DAYS['en']} daily returns, drawn with NumPy from "
+        f"A synthetic series of {_MC_DAYS['en']} daily returns, drawn with NumPy from "
         f"seed {MC_SERIES_SEED}, with a mean of {_MC_MEAN['en']} % and a standard deviation of "
         f"{_MC_SD['en']} % a day. In the order drawn, its maximum drawdown is "
         f"{_mc('en', MC_SHUFFLE.observed)}. With shuffled_drawdown, "
@@ -268,7 +268,7 @@ MONTE_CARLO_EXAMPLE: dict[str, tuple[str, str, str]] = {
         f"{MC_SHUFFLE_SEED}, the worst fall runs from {_mc('en', MC_SHUFFLE.low)} to "
         f"{_mc('en', MC_SHUFFLE.high)} in 9 orders out of 10, with a median of "
         f"{_mc('en', MC_SHUFFLE.median)}.",
-        f"DECLARED · With drawdown_risk, the report's stationary bootstrap "
+        f"With drawdown_risk, the report's stationary bootstrap "
         f"({_num(MC_RISK.samples, 'en', 0)} histories of {_num(MC_RISK.horizon, 'en', 0)} days, "
         f"an expected block of {_num(MC_RISK.block, 'en', 0)} days and seed {MC_RISK_SEED}), the "
         f"one-year maximum drawdown has a median of {_mc('en', MC_RISK.median)} and reaches "
@@ -281,7 +281,7 @@ MONTE_CARLO_EXAMPLE: dict[str, tuple[str, str, str]] = {
         "calculation always gives these figures.",
     ),
     "pt": (
-        f"DECLARED · Uma série sintética de {_MC_DAYS['pt']} retornos diários, gerada com NumPy "
+        f"Uma série sintética de {_MC_DAYS['pt']} retornos diários, gerada com NumPy "
         f"com semente {MC_SERIES_SEED}, média de {_MC_MEAN['pt']} % e desvio de "
         f"{_MC_SD['pt']} % ao dia. Na ordem gerada, sua queda máxima é de "
         f"{_mc('pt', MC_SHUFFLE.observed)}. Com shuffled_drawdown, "
@@ -289,7 +289,7 @@ MONTE_CARLO_EXAMPLE: dict[str, tuple[str, str, str]] = {
         f"semente {MC_SHUFFLE_SEED}, a pior queda vai de {_mc('pt', MC_SHUFFLE.low)} a "
         f"{_mc('pt', MC_SHUFFLE.high)} em 9 de cada 10 ordens, com mediana de "
         f"{_mc('pt', MC_SHUFFLE.median)}.",
-        f"DECLARED · Com drawdown_risk, o bootstrap estacionário do relatório "
+        f"Com drawdown_risk, o bootstrap estacionário do relatório "
         f"({_num(MC_RISK.samples, 'pt', 0)} históricos de {_num(MC_RISK.horizon, 'pt', 0)} "
         f"dias, bloco esperado de {_num(MC_RISK.block, 'pt', 0)} dias e semente "
         f"{MC_RISK_SEED}), a queda máxima em um ano tem mediana de {_mc('pt', MC_RISK.median)} "
@@ -305,7 +305,7 @@ MONTE_CARLO_EXAMPLE: dict[str, tuple[str, str, str]] = {
 
 MONTE_CARLO_SEARCH_EXAMPLE: dict[str, str] = {
     "es": (
-        f"DECLARED · Generamos {MC_SEARCH_SERIES} series sintéticas de {MC_SEARCH_DAYS} "
+        f"Generamos {MC_SEARCH_SERIES} series sintéticas de {MC_SEARCH_DAYS} "
         f"rendimientos diarios con media cero y desviación de {_MC_SD['es']} % (semilla "
         f"{MC_SEARCH_SEED}) y nos quedamos con la de mayor resultado final. Con drawdown_risk y "
         "los mismos parámetros, su caída máxima a un año tiene una mediana de "
@@ -317,7 +317,7 @@ MONTE_CARLO_SEARCH_EXAMPLE: dict[str, str] = {
         f"{_MC_LEVEL['es']}. Ninguna serie tenía ventaja: la diferencia la pone la selección."
     ),
     "en": (
-        f"DECLARED · We drew {MC_SEARCH_SERIES} synthetic series of {MC_SEARCH_DAYS} daily "
+        f"We drew {MC_SEARCH_SERIES} synthetic series of {MC_SEARCH_DAYS} daily "
         f"returns with zero mean and a standard deviation of {_MC_SD['en']} % (seed "
         f"{MC_SEARCH_SEED}) and kept the one with the highest final result. With drawdown_risk "
         "and the same parameters, its one-year maximum drawdown has a median of "
@@ -329,7 +329,7 @@ MONTE_CARLO_SEARCH_EXAMPLE: dict[str, str] = {
         f"{_MC_LEVEL['en']}. No series had an edge: the difference comes from the selection."
     ),
     "pt": (
-        f"DECLARED · Geramos {MC_SEARCH_SERIES} séries sintéticas de {MC_SEARCH_DAYS} retornos "
+        f"Geramos {MC_SEARCH_SERIES} séries sintéticas de {MC_SEARCH_DAYS} retornos "
         f"diários com média zero e desvio de {_MC_SD['pt']} % (semente {MC_SEARCH_SEED}) e "
         "ficamos com a de maior resultado final. Com drawdown_risk e os mesmos parâmetros, sua "
         f"queda máxima em um ano tem mediana de {_mc('pt', MC_SEARCH_RISK.median)}, e "
@@ -437,7 +437,7 @@ def _rate(row_rate: float, locale: str) -> str:
 
 STREAK_METHOD: dict[str, str] = {
     "es": (
-        "DECLARED · Supuesto: operaciones independientes y la misma probabilidad de perder en "
+        "Supuesto: operaciones independientes y la misma probabilidad de perder en "
         "cada una, igual a uno menos el porcentaje de aciertos. La función longest_run_tail del "
         "motor de Rigor calcula de forma exacta, con la recurrencia de Feller, la probabilidad "
         "de que la racha perdedora más larga llegue al menos a cada longitud. La racha mediana "
@@ -446,7 +446,7 @@ STREAK_METHOD: dict[str, str] = {
         f"de al menos {_num(STREAK_RARE, 'es', 2)}."
     ),
     "en": (
-        "DECLARED · Assumption: independent trades with the same probability of losing on "
+        "Assumption: independent trades with the same probability of losing on "
         "each, equal to one minus the win rate. The longest_run_tail function in Rigor's "
         "engine computes exactly, with Feller's recurrence, the probability that the longest "
         "losing streak reaches at least each length. The median streak is the longest length "
@@ -454,7 +454,7 @@ STREAK_METHOD: dict[str, str] = {
         f"streak, the longest with a probability of at least {_num(STREAK_RARE, 'en', 2)}."
     ),
     "pt": (
-        "DECLARED · Suposição: operações independentes e a mesma probabilidade de perder em "
+        "Suposição: operações independentes e a mesma probabilidade de perder em "
         "cada uma, igual a um menos a taxa de acerto. A função longest_run_tail do motor do "
         "Rigor calcula de forma exata, com a recorrência de Feller, a probabilidade de a maior "
         "sequência de perdas chegar pelo menos a cada comprimento. A sequência mediana é o "
@@ -466,7 +466,7 @@ STREAK_METHOD: dict[str, str] = {
 
 STREAK_READING: dict[str, str] = {
     "es": (
-        f"DECLARED · Con {_rate(_STREAK.win_rate, 'es')} de aciertos y {_STREAK.trades} "
+        f"Con {_rate(_STREAK.win_rate, 'es')} de aciertos y {_STREAK.trades} "
         f"operaciones, la racha más larga llega a {_STREAK.median_run} pérdidas en al menos la "
         f"mitad de los historiales y a {_STREAK.rare_run} en al menos 1 de cada {_ONE_IN}: en "
         f"el {_pct(_STREAK.rare_chance, 'es')} de ellos. Con "
@@ -478,7 +478,7 @@ STREAK_READING: dict[str, str] = {
         f"{_STREAK_SHORT.median_run} a {_STREAK_LONG.median_run}."
     ),
     "en": (
-        f"DECLARED · At a {_rate(_STREAK.win_rate, 'en')} win rate and {_STREAK.trades} "
+        f"At a {_rate(_STREAK.win_rate, 'en')} win rate and {_STREAK.trades} "
         f"trades, the longest streak reaches {_STREAK.median_run} losses in at least half of "
         f"the histories and {_STREAK.rare_run} in at least 1 history in {_ONE_IN}: in "
         f"{_pct(_STREAK.rare_chance, 'en')} of them. At "
@@ -490,7 +490,7 @@ STREAK_READING: dict[str, str] = {
         f"{_STREAK_SHORT.median_run} to {_STREAK_LONG.median_run}."
     ),
     "pt": (
-        f"DECLARED · Com {_rate(_STREAK.win_rate, 'pt')} de acerto e {_STREAK.trades} "
+        f"Com {_rate(_STREAK.win_rate, 'pt')} de acerto e {_STREAK.trades} "
         f"operações, a maior sequência chega a {_STREAK.median_run} perdas em pelo menos "
         f"metade dos históricos e a {_STREAK.rare_run} em pelo menos 1 em cada {_ONE_IN}: em "
         f"{_pct(_STREAK.rare_chance, 'pt')} deles. Com "
@@ -507,7 +507,7 @@ STREAK_READING: dict[str, str] = {
 _SMALL, _LARGE = sorted(STREAK_RISKS)
 STREAK_STAKES: dict[str, str] = {
     "es": (
-        f"DECLARED · Con un riesgo de {_stake_pct(_LARGE, 'es')} por operación, la racha de 1 "
+        f"Con un riesgo de {_stake_pct(_LARGE, 'es')} por operación, la racha de 1 "
         f"de cada {_ONE_IN} de la fila de {_rate(_STREAK.win_rate, 'es')} y {_STREAK.trades} "
         f"operaciones resta {_stake_pct(_STREAK.rare_run * _LARGE, 'es')} del saldo inicial; "
         f"con {_stake_pct(_SMALL, 'es')}, resta {_stake_pct(_STREAK.rare_run * _SMALL, 'es')}. "
@@ -515,7 +515,7 @@ STREAK_STAKES: dict[str, str] = {
         f"en el {_pct(_STREAK.rare_chance, 'es')} de los historiales termina el intento."
     ),
     "en": (
-        f"DECLARED · At a risk of {_stake_pct(_LARGE, 'en')} per trade, the 1-in-{_ONE_IN} "
+        f"At a risk of {_stake_pct(_LARGE, 'en')} per trade, the 1-in-{_ONE_IN} "
         f"streak of the {_rate(_STREAK.win_rate, 'en')} and {_STREAK.trades}-trade row takes "
         f"{_stake_pct(_STREAK.rare_run * _LARGE, 'en')} of the initial balance; at "
         f"{_stake_pct(_SMALL, 'en')}, it takes {_stake_pct(_STREAK.rare_run * _SMALL, 'en')}. "
@@ -523,7 +523,7 @@ STREAK_STAKES: dict[str, str] = {
         f"{_pct(_STREAK.rare_chance, 'en')} of histories ends the attempt."
     ),
     "pt": (
-        f"DECLARED · Com risco de {_stake_pct(_LARGE, 'pt')} por operação, a sequência de 1 em "
+        f"Com risco de {_stake_pct(_LARGE, 'pt')} por operação, a sequência de 1 em "
         f"cada {_ONE_IN} da linha de {_rate(_STREAK.win_rate, 'pt')} e {_STREAK.trades} "
         f"operações tira {_stake_pct(_STREAK.rare_run * _LARGE, 'pt')} do saldo inicial; com "
         f"{_stake_pct(_SMALL, 'pt')}, tira {_stake_pct(_STREAK.rare_run * _SMALL, 'pt')}. Se o "
@@ -4285,23 +4285,24 @@ ARTICLES_DATA: tuple[dict[str, Any], ...] = (
                     "heading": "Empieza por las reglas y su fecha",
                     "paragraphs": [
                         (
-                            "DECLARED · El preset genérico del repositorio fija un objetivo de "
-                            f"{PROP_RULES.profit_target:.0%}, una pérdida total máxima de "
-                            f"{PROP_RULES.max_total_loss:.0%}, un límite diario de "
+                            "Las reglas genéricas de este ejemplo son reglas de referencia "
+                            "típicas de las evaluaciones en dos fases, no las de ninguna firma: "
+                            f"un objetivo de {PROP_RULES.profit_target:.0%}, una pérdida total "
+                            f"máxima de {PROP_RULES.max_total_loss:.0%}, un límite diario de "
                             f"{PROP_RULES.max_daily_loss:.0%} y un mínimo de "
-                            f"{PROP_RULES.min_trading_days} días con actividad. No tiene plazo "
-                            f"máximo. Su fecha es {PROP_RULES.as_of} y su fuente es "
-                            f"{PROP_RULES.source_url}. Es una referencia didáctica, no las "
-                            "condiciones actuales de una firma. El suelo de pérdida total es "
-                            "estático y se refiere al saldo inicial."
+                            f"{PROP_RULES.min_trading_days} días con actividad, sin plazo "
+                            f"máximo. Están fechadas el {PROP_RULES.as_of} y sirven como "
+                            "referencia didáctica. El suelo de pérdida total es estático y se "
+                            "refiere al saldo inicial."
                         ),
                         (
                             "Las reglas de un contrato pueden definir el día de otra manera, "
                             "incluir posiciones abiertas o mover el suelo cuando sube el saldo. "
                             "Antes de interpretar cualquier cifra, identifica exactamente qué "
                             "saldo, horario y fase describe. Cambiar una de esas definiciones "
-                            "cambia la pregunta. Un preset fechado ayuda a reconocer el supuesto "
-                            "utilizado; no sustituye la lectura de las condiciones vigentes."
+                            "cambia la pregunta. Un conjunto de reglas fechado ayuda a reconocer "
+                            "el supuesto utilizado; no sustituye la lectura de las condiciones "
+                            "vigentes."
                         ),
                     ],
                 },
@@ -4309,7 +4310,7 @@ ARTICLES_DATA: tuple[dict[str, Any], ...] = (
                     "heading": "Una cuenta sencilla, separada del simulador",
                     "paragraphs": [
                         (
-                            "DECLARED · El ejemplo supone una operación independiente por día, con "
+                            "El ejemplo supone una operación independiente por día, con "
                             "pérdidas y ganancias del mismo tamaño respecto al saldo inicial, sin "
                             "costos y sin límite temporal. Cada intento comienza de nuevo con "
                             "idénticas condiciones. Se detiene al tocar el objetivo o el suelo de "
@@ -4332,7 +4333,7 @@ ARTICLES_DATA: tuple[dict[str, Any], ...] = (
                     "heading": "Dos tasas de acierto y dos tamaños de riesgo",
                     "paragraphs": [
                         (
-                            f"DECLARED · Con acierto de {PROP_WIN_RATES[0]:.0%}, el riesgo de "
+                            f"Con acierto de {PROP_WIN_RATES[0]:.0%}, el riesgo de "
                             f"{PROP_RISKS[0]:.1%} por operación produce una media de "
                             f"{PROP_ATTEMPT_EXAMPLES[0].expected_attempts:.2f} intentos; con "
                             f"riesgo de {PROP_RISKS[1]:.1%}, la media es "
@@ -4360,7 +4361,7 @@ ARTICLES_DATA: tuple[dict[str, Any], ...] = (
                     "heading": "La racha que suele quedar fuera de la captura",
                     "paragraphs": [
                         (
-                            f"DECLARED · Una racha ilustrativa de {PROP_STREAK_LENGTH} pérdidas "
+                            f"Una racha ilustrativa de {PROP_STREAK_LENGTH} pérdidas "
                             f"consume {PROP_STREAK_LENGTH * PROP_RISKS[0]:.1%} o "
                             f"{PROP_STREAK_LENGTH * PROP_RISKS[1]:.1%} del saldo inicial con los "
                             "riesgos anteriores. Son operaciones en días distintos. Para una "
@@ -4432,13 +4433,13 @@ ARTICLES_DATA: tuple[dict[str, Any], ...] = (
                     "heading": "Start with the rules and their date",
                     "paragraphs": [
                         (
-                            "DECLARED · The repository's generic preset sets a target of "
+                            "The generic rules in this example are reference rules typical of "
+                            "two-step evaluations, not any one firm's terms: a target of "
                             f"{PROP_RULES.profit_target:.0%}, maximum total loss of "
-                            f"{PROP_RULES.max_total_loss:.0%}, daily loss limit of "
-                            f"{PROP_RULES.max_daily_loss:.0%}, and at least "
-                            f"{PROP_RULES.min_trading_days} active days. It has no deadline. Its "
-                            f"date is {PROP_RULES.as_of} and its source is {PROP_RULES.source_url}"
-                            ". This is a teaching reference, not any firm's current terms. The "
+                            f"{PROP_RULES.max_total_loss:.0%}, a daily loss limit of "
+                            f"{PROP_RULES.max_daily_loss:.0%} and at least "
+                            f"{PROP_RULES.min_trading_days} active days, with no deadline. They "
+                            f"are dated {PROP_RULES.as_of} and serve as a teaching reference. The "
                             "total loss floor is static and relates to the initial balance."
                         ),
                         (
@@ -4446,8 +4447,9 @@ ARTICLES_DATA: tuple[dict[str, Any], ...] = (
                             "positions or move the floor as the balance rises. Before interpreting "
                             "a number, identify exactly which balance, time zone and phase it "
                             "describes. Changing any of those definitions changes the question. A "
-                            "dated preset makes the assumption traceable; it does not replace "
-                            "reading the current contract or checking how its limits are applied."
+                            "dated set of rules makes the assumption traceable; it does not "
+                            "replace reading the current contract or checking how its limits are "
+                            "applied."
                         ),
                     ],
                 },
@@ -4455,7 +4457,7 @@ ARTICLES_DATA: tuple[dict[str, Any], ...] = (
                     "heading": "A simple calculation, separate from the simulator",
                     "paragraphs": [
                         (
-                            "DECLARED · This example assumes an independent trade each day, equal "
+                            "This example assumes an independent trade each day, equal "
                             "win and loss amounts relative to the initial balance, no costs and "
                             "unlimited time. Each attempt restarts under identical conditions. It "
                             "stops upon touching either the target or loss floor; ending a path at "
@@ -4479,7 +4481,7 @@ ARTICLES_DATA: tuple[dict[str, Any], ...] = (
                     "heading": "Two win rates and two risk sizes",
                     "paragraphs": [
                         (
-                            f"DECLARED · At a {PROP_WIN_RATES[0]:.0%} win rate, risk of "
+                            f"At a {PROP_WIN_RATES[0]:.0%} win rate, risk of "
                             f"{PROP_RISKS[0]:.1%} per trade gives a mean of "
                             f"{PROP_ATTEMPT_EXAMPLES[0].expected_attempts:.2f} attempts; at "
                             f"{PROP_RISKS[1]:.1%} risk, the mean is "
@@ -4507,7 +4509,7 @@ ARTICLES_DATA: tuple[dict[str, Any], ...] = (
                     "heading": "The losing streak a screenshot leaves out",
                     "paragraphs": [
                         (
-                            f"DECLARED · An illustrative streak of {PROP_STREAK_LENGTH} losses "
+                            f"An illustrative streak of {PROP_STREAK_LENGTH} losses "
                             f"consumes {PROP_STREAK_LENGTH * PROP_RISKS[0]:.1%} or "
                             f"{PROP_STREAK_LENGTH * PROP_RISKS[1]:.1%} of initial balance at the "
                             "risk sizes above. Those trades occur on separate days. In a window "
@@ -4578,22 +4580,23 @@ ARTICLES_DATA: tuple[dict[str, Any], ...] = (
                     "heading": "Comece pelas regras e sua data",
                     "paragraphs": [
                         (
-                            "DECLARED · O preset genérico do repositório fixa um objetivo de "
-                            f"{PROP_RULES.profit_target:.0%}, perda total máxima de "
+                            "As regras genéricas deste exemplo são regras de referência típicas "
+                            "das avaliações em duas fases, não as de nenhuma empresa: objetivo "
+                            f"de {PROP_RULES.profit_target:.0%}, perda total máxima de "
                             f"{PROP_RULES.max_total_loss:.0%}, limite diário de "
                             f"{PROP_RULES.max_daily_loss:.0%} e mínimo de "
-                            f"{PROP_RULES.min_trading_days} dias com atividade. Não há prazo "
-                            f"máximo. Sua data é {PROP_RULES.as_of} e sua fonte é "
-                            f"{PROP_RULES.source_url}. É uma referência didática, não as "
-                            "condições atuais de uma empresa. O piso de perda total é estático e "
-                            "se refere ao saldo inicial."
+                            f"{PROP_RULES.min_trading_days} dias com atividade, sem prazo "
+                            f"máximo. Estão datadas de {PROP_RULES.as_of} e servem como "
+                            "referência didática. O piso de perda total é estático e se refere "
+                            "ao saldo inicial."
                         ),
                         (
                             "As regras de um contrato podem definir o dia de outra forma, incluir "
                             "posições abertas ou mover o piso quando o saldo sobe. Antes de "
                             "interpretar qualquer número, identifique exatamente qual saldo, "
                             "horário e fase ele descreve. Mudar uma dessas definições muda a "
-                            "pergunta. Um preset datado ajuda a reconhecer a hipótese utilizada; "
+                            "pergunta. Um conjunto de regras datado ajuda a reconhecer a hipótese "
+                            "utilizada; "
                             "não substitui a leitura das condições vigentes nem o exame de sua "
                             "aplicação."
                         ),
@@ -4603,7 +4606,7 @@ ARTICLES_DATA: tuple[dict[str, Any], ...] = (
                     "heading": "Uma conta simples, separada do simulador",
                     "paragraphs": [
                         (
-                            "DECLARED · O exemplo supõe uma operação independente por dia, perdas "
+                            "O exemplo supõe uma operação independente por dia, perdas "
                             "e ganhos do mesmo tamanho em relação ao saldo inicial, sem custos e "
                             "sem limite de tempo. Cada tentativa recomeça em condições idênticas. "
                             "Ela termina ao tocar o objetivo ou o piso de perda; encerrar no "
@@ -4626,7 +4629,7 @@ ARTICLES_DATA: tuple[dict[str, Any], ...] = (
                     "heading": "Duas taxas de acerto e dois tamanhos de risco",
                     "paragraphs": [
                         (
-                            f"DECLARED · Com acerto de {PROP_WIN_RATES[0]:.0%}, o risco de "
+                            f"Com acerto de {PROP_WIN_RATES[0]:.0%}, o risco de "
                             f"{PROP_RISKS[0]:.1%} por operação produz uma média de "
                             f"{PROP_ATTEMPT_EXAMPLES[0].expected_attempts:.2f} tentativas; com "
                             f"risco de {PROP_RISKS[1]:.1%}, a média é "
@@ -4654,7 +4657,7 @@ ARTICLES_DATA: tuple[dict[str, Any], ...] = (
                     "heading": "A sequência de perdas ausente na captura",
                     "paragraphs": [
                         (
-                            f"DECLARED · Uma sequência ilustrativa de {PROP_STREAK_LENGTH} perdas "
+                            f"Uma sequência ilustrativa de {PROP_STREAK_LENGTH} perdas "
                             f"consome {PROP_STREAK_LENGTH * PROP_RISKS[0]:.1%} ou "
                             f"{PROP_STREAK_LENGTH * PROP_RISKS[1]:.1%} do saldo inicial com os "
                             "riscos anteriores. São operações em dias diferentes. Para uma "
@@ -4829,7 +4832,7 @@ ARTICLES_DATA: tuple[dict[str, Any], ...] = (
                     "heading": "Una tasa de acierto no describe el tamaño de las pérdidas",
                     "paragraphs": [
                         (
-                            "DECLARED · Imagina una señal que anuncia "
+                            "Imagina una señal que anuncia "
                             f"{SIGNAL_DECLARED_WIN_RATE:.0%} "
                             "de aciertos y poco drawdown. Es un ejemplo declarado, no una medición "
                             "de MQL5, Myfxbook ni una cuenta concreta. El porcentaje cuenta "
@@ -4854,7 +4857,7 @@ ARTICLES_DATA: tuple[dict[str, Any], ...] = (
                     "heading": "La moneda: una referencia pequeña y explícita",
                     "paragraphs": [
                         (
-                            f"DECLARED · Supón {COIN_TRADE_COUNT} operaciones independientes, cada "
+                            f"Supón {COIN_TRADE_COUNT} operaciones independientes, cada "
                             f"una con probabilidad de acierto {COIN_NULL_WIN_RATE:.0%}, como una "
                             f"moneda equilibrada. Alcanzar al menos {COIN_THRESHOLD_WIN_RATE:.0%} "
                             "de aciertos tiene una probabilidad aproximada de "
@@ -4961,7 +4964,7 @@ ARTICLES_DATA: tuple[dict[str, Any], ...] = (
                     "heading": "A win rate does not describe the size of losses",
                     "paragraphs": [
                         (
-                            "DECLARED · Imagine a signal advertising a "
+                            "Imagine a signal advertising a "
                             f"{SIGNAL_DECLARED_WIN_RATE:.0%} "
                             "win rate and little drawdown. This is a declared example, not a "
                             "measurement of MQL5, Myfxbook or any particular account. The "
@@ -4985,7 +4988,7 @@ ARTICLES_DATA: tuple[dict[str, Any], ...] = (
                     "heading": "The coin: a small, explicit reference model",
                     "paragraphs": [
                         (
-                            f"DECLARED · Assume {COIN_TRADE_COUNT} independent trades, each with "
+                            f"Assume {COIN_TRADE_COUNT} independent trades, each with "
                             f"a {COIN_NULL_WIN_RATE:.0%} chance of a win, like a fair coin. "
                             f"Reaching a win rate of at least {COIN_THRESHOLD_WIN_RATE:.0%} has an "
                             f"approximate probability of {COIN_NORMAL_TAIL:.2%}, rounded to "
@@ -5094,7 +5097,7 @@ ARTICLES_DATA: tuple[dict[str, Any], ...] = (
                     "heading": "A taxa de acerto não descreve o tamanho das perdas",
                     "paragraphs": [
                         (
-                            "DECLARED · Imagine um sinal anunciando "
+                            "Imagine um sinal anunciando "
                             f"{SIGNAL_DECLARED_WIN_RATE:.0%} "
                             "de acertos e pouco drawdown. É um exemplo declarado, não uma "
                             "medição da MQL5, do Myfxbook ou de alguma conta específica. A "
@@ -5119,7 +5122,7 @@ ARTICLES_DATA: tuple[dict[str, Any], ...] = (
                     "heading": "A moeda: uma referência pequena e explícita",
                     "paragraphs": [
                         (
-                            f"DECLARED · Suponha {COIN_TRADE_COUNT} operações independentes, cada "
+                            f"Suponha {COIN_TRADE_COUNT} operações independentes, cada "
                             f"uma com probabilidade de acerto de {COIN_NULL_WIN_RATE:.0%}, como "
                             "uma "
                             f"moeda equilibrada. Alcançar pelo menos {COIN_THRESHOLD_WIN_RATE:.0%} "
@@ -5325,7 +5328,7 @@ ARTICLES_DATA: tuple[dict[str, Any], ...] = (
         },
         "intro": {
             "es": (
-                "DECLARED · Los treinta minutos del título describen una situación ilustrativa, no "
+                "Los treinta minutos del título describen una situación ilustrativa, no "
                 "un"
                 " desarrollo cronometrado por Rigor. Un hilo viral muestra el mensaje enviado a un "
                 "agente, el código y una curva ascendente. Lo que suele faltar es el recorrido "
@@ -5338,7 +5341,7 @@ ARTICLES_DATA: tuple[dict[str, Any], ...] = (
                 "de encontrar una coincidencia favorable en el mismo pasado."
             ),
             "en": (
-                "DECLARED · The thirty minutes in the title describe an illustrative situation, "
+                "The thirty minutes in the title describe an illustrative situation, "
                 "not "
                 "development timed by Rigor. A viral thread shows a prompt, generated code and an "
                 "upward curve. What often disappears is the path between those images: discarded "
@@ -5350,7 +5353,7 @@ ARTICLES_DATA: tuple[dict[str, Any], ...] = (
                 "for you."
             ),
             "pt": (
-                "DECLARED · Os trinta minutos do título descrevem uma situação ilustrativa, não um "
+                "Os trinta minutos do título descrevem uma situação ilustrativa, não um "
                 "desenvolvimento cronometrado pelo Rigor. Um tópico viral mostra a instrução "
                 "enviada "
                 "ao agente, o código e uma curva ascendente. O que costuma desaparecer é o caminho "
@@ -5440,7 +5443,7 @@ ARTICLES_DATA: tuple[dict[str, Any], ...] = (
                     "heading": "Somete los costos al doble",
                     "paragraphs": [
                         (
-                            "DECLARED · La prueba a 2x es un escenario: duplica los supuestos de "
+                            "La prueba a 2x es un escenario: duplica los supuestos de "
                             "costos y compara el resultado con la ejecución base. Documenta "
                             "comisión,"
                             " spread, deslizamiento y financiación cuando correspondan. Evita "
@@ -5577,7 +5580,7 @@ ARTICLES_DATA: tuple[dict[str, Any], ...] = (
                     "heading": "Stress costs at twice the baseline",
                     "paragraphs": [
                         (
-                            "DECLARED · The 2x cost test is a scenario: double the cost "
+                            "The 2x cost test is a scenario: double the cost "
                             "assumptions "
                             "and compare with the baseline calculation. Record commission, spread, "
                             "slippage and financing where relevant. Avoid subtracting a cost again "
@@ -5720,7 +5723,7 @@ ARTICLES_DATA: tuple[dict[str, Any], ...] = (
                     "heading": "Examine os custos em dobro",
                     "paragraphs": [
                         (
-                            "DECLARED · O teste a 2x é um cenário: dobre as suposições de custos e "
+                            "O teste a 2x é um cenário: dobre as suposições de custos e "
                             "compare com o cálculo base. Documente comissão, spread, deslizamento "
                             "e "
                             "financiamento quando aplicáveis. Evite descontar novamente um custo "
@@ -5916,7 +5919,7 @@ ARTICLES_DATA += (
                             "sale mal."
                         ),
                         (
-                            "DECLARED · Ejemplo ilustrativo: 45 operaciones y 71 % de aciertos"
+                            "Ejemplo ilustrativo: 45 operaciones y 71 % de aciertos"
                             " declarado, quizá redondeado. La función Wilson del lector de "
                             "Rigor calcula un intervalo al 95 % de "
                             f"{win_rate_interval(0.71, 45, 'es')}. No procede de un archivo de "
@@ -5963,7 +5966,7 @@ ARTICLES_DATA += (
                             "pregunta."
                         ),
                         (
-                            "DECLARED · Ejemplo sintético separado: una compra de 1 unidad a "
+                            "Ejemplo sintético separado: una compra de 1 unidad a "
                             "100 y cierre a 101, sin comisiones reportadas. La función "
                             "break_even_bps de Rigor calcula "
                             f"{_num(_COST_EXAMPLE_BPS, 'es', 2)} puntos básicos por lado de "
@@ -6090,7 +6093,7 @@ ARTICLES_DATA += (
                             "goes wrong."
                         ),
                         (
-                            "DECLARED · Illustrative example: 45 trades and a declared, "
+                            "Illustrative example: 45 trades and a declared, "
                             "possibly rounded, 71 % win rate. Rigor's reader Wilson function "
                             f"calculates a 95 % interval of {win_rate_interval(0.71, 45, 'en')}"
                             ". This does not come from a client file. It is not a significance"
@@ -6135,7 +6138,7 @@ ARTICLES_DATA += (
                             "already deducted changes the question."
                         ),
                         (
-                            "DECLARED · Separate synthetic example: buy 1 unit at 100 and "
+                            "Separate synthetic example: buy 1 unit at 100 and "
                             "close at 101, with no reported commissions. Rigor's "
                             "break_even_bps function calculates "
                             f"{_num(_COST_EXAMPLE_BPS, 'en', 2)} basis points per side of "
@@ -6258,7 +6261,7 @@ ARTICLES_DATA += (
                             "descreve quanto se perde quando a operação dá errado."
                         ),
                         (
-                            "DECLARED · Exemplo ilustrativo: 45 operações e taxa de acerto "
+                            "Exemplo ilustrativo: 45 operações e taxa de acerto "
                             "declarada de 71 %, talvez arredondada. A função Wilson do leitor "
                             "do Rigor calcula um intervalo de 95 % de "
                             f"{win_rate_interval(0.71, 45, 'pt')}. Isso não vem de um arquivo "
@@ -6304,7 +6307,7 @@ ARTICLES_DATA += (
                             "novamente uma comissão já descontada muda a pergunta."
                         ),
                         (
-                            "DECLARED · Exemplo sintético separado: compra de 1 unidade a 100 "
+                            "Exemplo sintético separado: compra de 1 unidade a 100 "
                             "e fechamento a 101, sem comissões reportadas. A função "
                             f"break_even_bps do Rigor calcula {_num(_COST_EXAMPLE_BPS, 'pt', 2)} "
                             "pontos-base por lado de custo adicional até o equilíbrio. Isso se"
@@ -6534,7 +6537,7 @@ ARTICLES_DATA += (
                             "mismo margen al porcentaje publicado."
                         ),
                         (
-                            "DECLARED · La tabla usa un nivel de confianza del 95 %. Bajo el "
+                            "La tabla usa un nivel de confianza del 95 %. Bajo el "
                             "modelo de operaciones independientes con una probabilidad de "
                             "acierto estable, el procedimiento cubriría esa probabilidad en "
                             "aproximadamente el 95 % de muchas muestras repetidas. No atribuye"
@@ -6547,7 +6550,7 @@ ARTICLES_DATA += (
                     "heading": "Cómo se calculó la tabla",
                     "paragraphs": [
                         (
-                            "DECLARED · Todas las celdas se calculan al generar el artículo "
+                            "Todas las celdas se calculan al generar el artículo "
                             "con la misma función Wilson del lector de cifras de Rigor: 20, "
                             "45, 100, 300 y 1.000 operaciones, con tasas declaradas de 55 %, "
                             "60 % y 71 %. Son ejemplos matemáticos, no mediciones de un "
@@ -6567,7 +6570,7 @@ ARTICLES_DATA += (
                     "heading": "Cómo leer una fila sin convertirla en una meta",
                     "paragraphs": [
                         (
-                            "DECLARED · Con 45 operaciones al 71 %, el intervalo calculado es "
+                            "Con 45 operaciones al 71 %, el intervalo calculado es "
                             f"{win_rate_interval(0.71, 45, 'es')}. Con 1.000 operaciones al "
                             f"mismo porcentaje es {win_rate_interval(0.71, 1000, 'es')}. El "
                             "intervalo se estrecha bajo los mismos supuestos; no demuestra que"
@@ -6587,7 +6590,7 @@ ARTICLES_DATA += (
                     "heading": "La mejor de muchas configuraciones cambia la lectura",
                     "paragraphs": [
                         (
-                            "DECLARED · Supón que publicas la mejor de 100 configuraciones "
+                            "Supón que publicas la mejor de 100 configuraciones "
                             "probadas sobre el mismo historial. La elección favorece "
                             "porcentajes que recibieron una desviación favorable por azar. Es "
                             "un supuesto de búsqueda, no una medición de cuántas variantes se "
@@ -6633,7 +6636,7 @@ ARTICLES_DATA += (
                     "heading": "Reproduce el ejemplo en el lector",
                     "paragraphs": [
                         (
-                            "DECLARED · El enlace de ejemplo abre el lector con 45 "
+                            "El enlace de ejemplo abre el lector con 45 "
                             "operaciones, 71 % de aciertos, Sharpe anual de "
                             f"{_num(LUCK_EXAMPLE_INPUT.sharpe, 'es', 1)}, 3 años y 100 "
                             "configuraciones. Los campos de Sharpe, años e intentos sirven "
@@ -6660,7 +6663,7 @@ ARTICLES_DATA += (
                             "same margin from the published percentage."
                         ),
                         (
-                            "DECLARED · The table uses a 95 % confidence level. Under a model "
+                            "The table uses a 95 % confidence level. Under a model "
                             "of independent trades with a stable win probability, the "
                             "procedure would cover that probability in approximately 95 % of "
                             "many repeated samples. It does not assign that probability to a "
@@ -6672,7 +6675,7 @@ ARTICLES_DATA += (
                     "heading": "How the table was calculated",
                     "paragraphs": [
                         (
-                            "DECLARED · Every cell is calculated when generating the article "
+                            "Every cell is calculated when generating the article "
                             "with the same Wilson function used by Rigor's figure reader: 20, "
                             "45, 100, 300 and 1,000 trades, with declared rates of 55 %, 60 % "
                             "and 71 %. These are mathematical examples, not measurements of a "
@@ -6691,7 +6694,7 @@ ARTICLES_DATA += (
                     "heading": "How to read a row without turning it into a target",
                     "paragraphs": [
                         (
-                            "DECLARED · With 45 trades at 71 %, the calculated interval is "
+                            "With 45 trades at 71 %, the calculated interval is "
                             f"{win_rate_interval(0.71, 45, 'en')}. With 1,000 trades at the "
                             f"same percentage it is {win_rate_interval(0.71, 1000, 'en')}. The "
                             "interval narrows under the same assumptions; it does not "
@@ -6711,7 +6714,7 @@ ARTICLES_DATA += (
                     "heading": "The best of many configurations changes the reading",
                     "paragraphs": [
                         (
-                            "DECLARED · Suppose you publish the best of 100 configurations "
+                            "Suppose you publish the best of 100 configurations "
                             "tried on the same history. Selection favours percentages that "
                             "received a favourable random deviation. This is a search "
                             "assumption, not a measurement of how many variants were actually "
@@ -6754,7 +6757,7 @@ ARTICLES_DATA += (
                     "heading": "Reproduce the example in the reader",
                     "paragraphs": [
                         (
-                            "DECLARED · The example link opens the reader with 45 trades, a 71"
+                            "The example link opens the reader with 45 trades, a 71"
                             " % win rate, annual Sharpe of "
                             f"{_num(LUCK_EXAMPLE_INPUT.sharpe, 'en', 1)}, 3 years and 100 "
                             "configurations. Sharpe, years and trial count feed the luck "
@@ -6781,7 +6784,7 @@ ARTICLES_DATA += (
                             "margem da porcentagem publicada."
                         ),
                         (
-                            "DECLARED · A tabela usa um nível de confiança de 95 %. Sob um "
+                            "A tabela usa um nível de confiança de 95 %. Sob um "
                             "modelo de operações independentes com probabilidade de acerto "
                             "estável, o procedimento cobriria essa probabilidade em "
                             "aproximadamente 95 % de muitas amostras repetidas. Ele não "
@@ -6794,7 +6797,7 @@ ARTICLES_DATA += (
                     "heading": "Como a tabela foi calculada",
                     "paragraphs": [
                         (
-                            "DECLARED · Todas as células são calculadas ao gerar o artigo com "
+                            "Todas as células são calculadas ao gerar o artigo com "
                             "a mesma função Wilson do leitor de números do Rigor: 20, 45, 100,"
                             " 300 e 1.000 operações, com taxas declaradas de 55 %, 60 % e 71 "
                             "%. São exemplos matemáticos, não medições de um histórico."
@@ -6813,7 +6816,7 @@ ARTICLES_DATA += (
                     "heading": "Como ler uma linha sem transformá-la em meta",
                     "paragraphs": [
                         (
-                            "DECLARED · Com 45 operações a 71 %, o intervalo calculado é "
+                            "Com 45 operações a 71 %, o intervalo calculado é "
                             f"{win_rate_interval(0.71, 45, 'pt')}. Com 1.000 operações à mesma "
                             f"porcentagem, ele é {win_rate_interval(0.71, 1000, 'pt')}. O "
                             "intervalo fica mais estreito sob as mesmas suposições; isso não "
@@ -6833,7 +6836,7 @@ ARTICLES_DATA += (
                     "heading": "A melhor de muitas configurações muda a leitura",
                     "paragraphs": [
                         (
-                            "DECLARED · Suponha que você publique a melhor de 100 "
+                            "Suponha que você publique a melhor de 100 "
                             "configurações testadas no mesmo histórico. A escolha favorece "
                             "porcentagens que receberam um desvio favorável por acaso. É uma "
                             "suposição de busca, não uma medição de quantas variantes foram "
@@ -6879,7 +6882,7 @@ ARTICLES_DATA += (
                     "heading": "Reproduza o exemplo no leitor",
                     "paragraphs": [
                         (
-                            "DECLARED · O link de exemplo abre o leitor com 45 operações, 71 %"
+                            "O link de exemplo abre o leitor com 45 operações, 71 %"
                             " de acertos, Sharpe anual de "
                             f"{_num(LUCK_EXAMPLE_INPUT.sharpe, 'pt', 1)}, 3 anos e 100 "
                             "configurações. Os "

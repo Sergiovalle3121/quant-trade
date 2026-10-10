@@ -509,11 +509,16 @@ def test_the_modelling_question_does_not_send_the_developer_back_to_the_same_fil
 ) -> None:
     buyer_answer = ownership.QUESTIONS["modelling"][locale][1]
     unread = ownership.QUESTIONS["modelling_unread"][locale][1]
-    # The sample's MT5 report prints no mode we recognise: ask for one that does.
-    sample = _sample(locale).model_dump(mode="json")
-    assert sample["test_data"]["tick_model"]["evidence"] == "NOT_MEASURED"
-    shown = _text(_sample_page(locale, ownership.OWN))
+    # An MT5 report that prints no mode we recognise: ask for one that does.
+    bare = _backtest(ownership.OWN)
+    assert (bare.test_data or {})["tick_model"]["evidence"] == "NOT_MEASURED"
+    shown = _text(render_html(bare, watermark=False, locale=locale))
     assert unread in shown and buyer_answer not in shown
+    # The sample's MT5 report prints "100% real ticks", as the tester does: answered.
+    sample = _sample(locale).model_dump(mode="json")
+    assert sample["test_data"]["tick_model"]["value"] == "real ticks"
+    shown = _text(_sample_page(locale, ownership.OWN))
+    assert unread not in shown and buyer_answer not in shown
     # The fixture's MT5 report states real ticks: the question is answered, so it goes.
     fixture = _own("fixture")
     data = fixture.model_dump(mode="json")

@@ -148,14 +148,51 @@ SIZING_NOTE = (
     "leverage does when the costs grow in proportion to the size (the same cost per lot) and "
     "the execution does not worsen with more volume"
 )
+#: Why the average lot at 1x is not given outside ``importers.LOT_FORMATS``;
+#: 1x itself is still the history's own size, as the capital section says.
 SIZING_NO_SIZE = (
+    "the lots of each trade are read only from MetaTrader 4 and 5 reports, whose volume column "
+    "is the platform's lots, so the average lot at 1x is not known; 1x is still the size the "
+    "history traded at"
+)
+#: The reason results stored before the average lot (2026-10-09) keep: the
+#: engine no longer writes it, the report still reads it in every language.
+SIZING_NO_SIZE_BEFORE = (
     "the audit keeps neither the lot nor the stop loss of each trade, so the lot or risk per "
     "trade at 1x is not known"
 )
+#: The average lot at 1x: the lots the trades opened over the trades. The cost
+#: section's "lots traded" count each trade twice (its entry and its exit).
+SIZING_LOT_NOTE = (
+    "lots per trade on average at the history's own size: the {lots} lots of the {count} "
+    "trades divided by their number; the cost section counts {traded} lots traded because it "
+    "adds entries and exits"
+)
+SIZING_LOT_ROW_NOTE = "the average lot per trade at 1x multiplied by the size"
+#: The lots are those of the balance the shares at 1x are measured on: on the
+#: account a program names (``ACCOUNT_SIZES``) the same shares take the lots
+#: times the account over that balance.
+SIZING_ACCOUNT_LOT_NOTE = (
+    "the average lot per trade at 1x on the program's {account} account: the lots at 1x times "
+    "the account over the {balance} balance the shares at 1x are measured on"
+)
+SIZING_ACCOUNT_LOT_ROW_NOTE = (
+    "the average lot per trade at 1x on the program's account multiplied by the size"
+)
+#: The firm table's out-of-sample and cost columns: paths per phase of every
+#: program other than the chosen one (whose figures are the ladder's), as the
+#: full-history column simulates them.
+FIRM_SCENARIO_SAMPLES = firmfit_lib.SAMPLES
 SIZING_ACCOUNT_NOTE = (
     "account size in US dollars that the program names; its limits are shares of it"
 )
 SIZING_NO_ACCOUNT = (
+    "the simulated rules fix no account size: they are shares (of the starting balance or of "
+    "the day's), so the table's shares do not depend on the account size; its lots, when the "
+    "report gives them, are those of the starting balance"
+)
+#: The same note as results stored before the average lot (2026-10-09) keep it.
+SIZING_NO_ACCOUNT_BEFORE = (
     "the simulated rules fix no account size: they are shares (of the starting balance or of "
     "the day's), so the table does not depend on the account size"
 )
@@ -1784,6 +1821,7 @@ def _challenge(
     money_curve: bool = False,
     luck: dict[str, Any] | None = None,
     reconciliation: dict[str, Any] | None = None,
+    per_lot: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     key = inputs.declared.challenge or DEFAULT_PRESET
     rules = get_preset(key)
@@ -1807,9 +1845,22 @@ def _challenge(
         out["reason"] = result["probability"]["pass"]["note"]
         out["sizing"] = {"status": "NOT_MEASURED", "reason": out["reason"]}
     else:
+        # The history's markets: a program whose page does not take them is left
+        # out of the firm table; the chosen one is simulated and says so.
+        symbols = [name for name in inputs.trade_symbols or [] if name] or [
+            str((inputs.report_metadata or {}).get("symbol") or "")
+        ]
+        market = firmfit_lib.market_fit(key, symbols)
+        if market is not None:
+            out["market"] = market
         out["firm_fit"] = firmfit_lib.firm_fit(
-            daily, samples=min(samples, firmfit_lib.SAMPLES), seed=seed, known={key: result}
+            daily,
+            samples=min(samples, firmfit_lib.SAMPLES),
+            seed=seed,
+            known={key: result},
+            symbols=symbols,
         )
+        series: dict[str, pd.Series | None] = {}
         out["scenarios"] = _challenge_scenarios(
             inputs,
             daily,
@@ -1822,9 +1873,25 @@ def _challenge(
             money_curve=money_curve,
             luck=luck,
             reconciliation=reconciliation,
+            keep=series,
+        )
+        out["firm_fit"] = firmfit_lib.scenario_columns(
+            out["firm_fit"],
+            {str(row["key"]): row for row in out["scenarios"]["rows"]},
+            series,
+            key,
+            samples=min(samples, FIRM_SCENARIO_SAMPLES),
+            seed=seed,
         )
         out["sizing"] = _challenge_sizing(
-            inputs, daily, key, result, out["scenarios"], samples=samples, seed=seed
+            inputs,
+            daily,
+            key,
+            result,
+            out["scenarios"],
+            samples=samples,
+            seed=seed,
+            per_lot=per_lot,
         )
     return out
 
@@ -1923,15 +1990,21 @@ def _challenge_scenarios(
     money_curve: bool,
     luck: dict[str, Any] | None,
     reconciliation: dict[str, Any] | None = None,
+    keep: dict[str, pd.Series | None] | None = None,
 ) -> dict[str, Any]:
     """The chosen program on the full history, on each side of the declared
     out-of-sample start, with the reference cost and with the luck of the
     search discounted: same simulator, seed and rules, so only the history
-    changes. Informational; nothing here feeds the verdict."""
+    changes. Informational; nothing here feeds the verdict.
+
+    ``keep`` receives the daily returns each rung was simulated on (``None``
+    for a rung with a reason), so the firm table repeats them per program."""
     rules = get_preset(key)
     keys = firmfit_lib.program_keys(key)
 
     def rung(name: str, series: pd.Series | None, **extra: Any) -> dict[str, Any]:
+        if keep is not None:
+            keep[name] = series if extra.get("reason") is None else None
         return _ladder_row(name, series, key, samples=samples, seed=seed, **extra)
 
     rows = [rung("full", daily, known={key: result})]
@@ -2012,6 +2085,7 @@ def _challenge_sizing(
     *,
     samples: int,
     seed: int,
+    per_lot: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """The chosen program at 0.5x, 1x, 1.5x and 2x the history's size.
 
@@ -2020,7 +2094,14 @@ def _challenge_sizing(
     multiplied by the size, plus how the program ends when it is not passed.
     The 1x row is the full-history row itself. Not measured, with the same
     reason, when the ladder's full row is not, or when the upload is returns
-    rather than money. Informational; nothing here feeds the verdict."""
+    rather than money. Informational; nothing here feeds the verdict.
+
+    With the cost per lot measured (``per_lot``, the costs section's
+    ``break_even_per_lot``) the lots are known and summable, so each row
+    also gives the average lot per trade at its size (:func:`_average_lot`),
+    on the balance the shares at 1x are measured on; when the program names
+    an account (``ACCOUNT_SIZES``) and that balance was not assumed, also on
+    that account (:func:`_account_lot`)."""
     rows: list[dict[str, Any]] = scenarios.get("rows") or []
     full = next((row for row in rows if row.get("key") == "full"), {})
     figure = full.get("pass") or {}
@@ -2028,6 +2109,10 @@ def _challenge_sizing(
         return {"status": "NOT_MEASURED", "reason": str(figure.get("note") or "not measured")}
     if inputs.equity.source != "equity":
         return {"status": "NOT_MEASURED", "reason": RETURNS_NOT_MONEY}
+    lot = _average_lot(inputs, per_lot)
+    balance = _sizing_balance(inputs)
+    account = ACCOUNT_SIZES.get(key)
+    on_account = _account_lot(lot, balance, account)
     sized: list[dict[str, Any]] = []
     for size in SIZING_MULTIPLIERS:
         # 1x is the history untouched and the chosen phase already simulated.
@@ -2047,14 +2132,19 @@ def _challenge_sizing(
             row["pass_within_best_day"] = program["pass_within_best_day"]
         for fail in ("fail_daily_loss", "fail_total_loss", "unfinished"):
             row[fail] = program[fail]
+        if lot["evidence"] == MEASURED:
+            row["average_lot"] = measured(float(lot["value"]) * size, SIZING_LOT_ROW_NOTE)
+        if on_account is not None:
+            row["average_lot_account"] = measured(
+                _round(float(on_account["value"]) * size), SIZING_ACCOUNT_LOT_ROW_NOTE
+            )
         sized.append(row)
-    account = ACCOUNT_SIZES.get(key)
-    return {
+    out: dict[str, Any] = {
         "status": "MEASURED",
         "program": scenarios.get("program"),
         "note": SIZING_NOTE,
-        "starting_balance": _sizing_balance(inputs),
-        "size_per_trade": not_measured(SIZING_NO_SIZE),
+        "starting_balance": balance,
+        "size_per_trade": lot,
         "account_size": (
             declared(account, SIZING_ACCOUNT_NOTE)
             if account is not None
@@ -2062,6 +2152,47 @@ def _challenge_sizing(
         ),
         "rows": sized,
     }
+    if on_account is not None:
+        out["size_per_trade_account"] = on_account
+    return out
+
+
+def _account_lot(
+    lot: dict[str, Any], balance: dict[str, Any], account: float | None
+) -> dict[str, Any] | None:
+    """The average lot per trade at 1x on the account the program names: the
+    same daily shares on a larger balance take more lots, in proportion.
+    ``None`` without a measured lot, without an account, or when the balance
+    the shares are measured on was assumed (then the proportion is a guess)."""
+    value = balance.get("value")
+    if (
+        account is None
+        or lot.get("evidence") != MEASURED
+        or balance.get("evidence") == NOT_MEASURED
+        or not isinstance(value, int | float)
+        or value <= 0
+    ):
+        return None
+    shown = f"{float(value):,.2f}".removesuffix(".00")
+    note = SIZING_ACCOUNT_LOT_NOTE.format(account=f"{account:,.0f}", balance=shown)
+    return measured(_round(float(lot["value"]) * account / float(value)), note)
+
+
+def _average_lot(inputs: AuditInputs, per_lot: dict[str, Any] | None) -> dict[str, Any]:
+    """The average lot per trade at 1x: every trade's lots added and divided by
+    the number of trades, only when the costs section measured the cost per lot
+    (MetaTrader lots that can be added, ``_break_even_per_lot``); otherwise
+    not measured, with that section's reason when it is about mixed lots."""
+    lots = inputs.trade_lots or []
+    trades = inputs.trades.trades if inputs.trades is not None else []
+    if (per_lot or {}).get("evidence") != MEASURED or not lots or len(lots) != len(trades):
+        reason = str((per_lot or {}).get("note") or "")
+        return not_measured(PER_LOT_MIXED if reason == PER_LOT_MIXED else SIZING_NO_SIZE)
+    total = float(sum(lots))
+    note = SIZING_LOT_NOTE.format(
+        lots=f"{total:,.2f}", count=f"{len(lots):,}", traded=f"{2.0 * total:,.2f}"
+    )
+    return measured(total / len(lots), note)
 
 
 def _sizing_balance(inputs: AuditInputs) -> dict[str, Any]:
@@ -2525,6 +2656,7 @@ def run_audit(
             money_curve=money_curve,
             luck=luck,
             reconciliation=reconciliation,
+            per_lot=costs.get("break_even_per_lot"),
         )
     )
 

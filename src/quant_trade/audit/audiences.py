@@ -781,9 +781,9 @@ AUDIENCE_PAGES: tuple[Audience, ...] = (
                 faq=(
                     (
                         "¿Qué firmas y retos incluye?",
-                        "{presets} retos de FTMO, FundedNext, The5ers y Topstep, más un reto "
-                        "genérico de dos fases. El formulario muestra la fecha en que se "
-                        "leyeron las reglas.",
+                        "{presets} juegos de reglas de {programs} programas de FTMO, "
+                        "FundedNext, The5ers y Topstep, más la fase 1 de un reto genérico de "
+                        "dos fases. El formulario muestra la fecha en que se leyeron las reglas.",
                     ),
                     (
                         "¿Me dice si conseguiré la cuenta?",
@@ -870,8 +870,9 @@ AUDIENCE_PAGES: tuple[Audience, ...] = (
                 faq=(
                     (
                         "Which firms and challenges are included?",
-                        "{presets} FTMO, FundedNext, The5ers and Topstep challenges, plus a "
-                        "generic two-phase one. The form shows the date the rules were read.",
+                        "{presets} rule sets from {programs} FTMO, FundedNext, The5ers and "
+                        "Topstep programs, plus phase 1 of a generic two-phase challenge. The "
+                        "form shows the date the rules were read.",
                     ),
                     (
                         "Does it tell me whether I will get the account?",
@@ -959,9 +960,9 @@ AUDIENCE_PAGES: tuple[Audience, ...] = (
                 faq=(
                     (
                         "Quais firmas e desafios estão incluídos?",
-                        "{presets} desafios da FTMO, FundedNext, The5ers e Topstep, mais um "
-                        "genérico de duas fases. O formulário mostra a data em que as regras "
-                        "foram lidas.",
+                        "{presets} conjuntos de regras de {programs} programas da FTMO, "
+                        "FundedNext, The5ers e Topstep, mais a fase 1 de um desafio genérico de "
+                        "duas fases. O formulário mostra a data em que as regras foram lidas.",
                     ),
                     (
                         "Ele me diz se vou conseguir a conta?",

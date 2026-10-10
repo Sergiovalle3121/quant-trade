@@ -433,7 +433,7 @@ def test_institutional_articles_length_and_calculator_evidence(locale: str) -> N
         assert 700 <= len(_text(prose.group(1)).split()) <= 1100, (article.key, locale)
 
     example = INDEPENDENT_LUCK_EXAMPLE[locale]
-    assert example.startswith("DECLARED ·")
+    assert not example.startswith("DECLARED")
     expected = compute(LUCK_EXAMPLE_INPUT)["luck_sharpe"]["value"]
     expected_text = f"{expected:.2f}"
     assert (expected_text if locale == "en" else expected_text.replace(".", ",")) in example

@@ -166,7 +166,8 @@ def test_large_counts_read_with_the_reports_thousands_separator(
         (shuffle.format("1,000"), shuffle.format("1000")),
         (tail.format("1,282"), tail.format("1282")),
         (f"{copy_['recon_trades']}: 1,282", f"{copy_['recon_trades']}: 1282"),
-        (f"{copy_['forensic_rows']}: 2,573", f"{copy_['forensic_rows']}: 2573"),
+        # 2,573 table rows plus the header's History Quality and two equity drawdown rows.
+        (f"{copy_['forensic_rows']}: 2,576", f"{copy_['forensic_rows']}: 2576"),
     ):
         assert shown in text and bare not in text, shown
 

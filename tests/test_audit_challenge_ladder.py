@@ -392,8 +392,11 @@ def test_the_ladder_html_reads_not_measured_rows_with_their_reason() -> None:
         assert low[:1].upper() + low[1:] in page
         assert find_claims(page) == []
     fit = _firm_fit_html(result.challenge["firm_fit"], LABELS["es"], ladder=True)
-    assert LABELS["es"]["ff_basis"] in html.unescape(fit)
-    assert LABELS["es"]["ff_basis"] not in html.unescape(
+    # The cost column is measured, so the basis names the columns; the
+    # out-of-sample one is not, and says why with the ladder's own reason.
+    assert LABELS["es"]["ff_basis_columns"] in html.unescape(fit)
+    assert localize("no out-of-sample start declared", "es") in html.unescape(fit)
+    assert LABELS["es"]["ff_basis_columns"] not in html.unescape(
         _firm_fit_html(result.challenge["firm_fit"], LABELS["es"])
     )
 

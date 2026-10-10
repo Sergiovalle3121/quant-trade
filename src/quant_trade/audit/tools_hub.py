@@ -87,7 +87,7 @@ COPY: dict[str, dict[str, Any]] = {
         "report_title": "¿Tienes el archivo?",
         "report_text": (
             "Con el archivo que exporta tu plataforma, el informe mide en lugar de suponer: "
-            "significancia, configuraciones probadas, coste de equilibrio, dentro y fuera de "
+            "significancia, configuraciones probadas, costo de equilibrio, dentro y fuera de "
             "muestra, calidad de datos y referencia. El primer informe completo es gratis con "
             "cuenta."
         ),
