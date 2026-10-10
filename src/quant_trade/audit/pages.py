@@ -3651,30 +3651,52 @@ def institutional_review_page(
     received: bool = False,
     error: str = "",
 ) -> str:
-    """Only static confirmation/error copy is returned; client fields are never echoed."""
+    """The institutional review: its offer (scope, deliverables, timeline and terms,
+    priced from ``institutional``'s constants), the sample review and the request form.
+
+    Only static confirmation/error copy is returned; client fields are never echoed.
+    The confirmation and the error pages show no offer and are not indexed."""
+    from quant_trade.audit.seo import _json_ld
+
     words = institutional.COPY[locale]
-    title = words["received"] if received else words["title"]
-    lead = words["next"] if received else words["lead"]
-    # The tab and the search result carry the brand; the heading stays as written.
-    page_title = f"{title} · {BRAND}"
-    meta = (
-        private_meta(page_title, locale, lead)
-        if received or error
-        else _public_meta(page_title, lead, locale, institutional.REVIEW_PATHS[locale], base_url)
-    )
-    content = (
-        f"<p><a href='{_home(locale)}'>{_e(words['back'])}</a></p>"
-        if received
-        else (f"<p class='error' role='alert'>{_e(words[error])}</p>" if error else "")
+    form = (
+        (f"<p class='error' role='alert'>{_e(words[error])}</p>" if error else "")
         + f"<p>{_e(words['note'])}</p>"
         + institutional.form_html(locale, ref=ref)
         + f"<p><a href='{legal_url('privacy', locale)}'>{_e(words['privacy'])}</a></p>"
     )
+    if received or error:
+        title = words["received"] if received else words["title"]
+        lead = words["next"] if received else words["lead"]
+        # The tab and the search result carry the brand; the heading stays as written.
+        page_title = f"{title} · {BRAND}"
+        meta = private_meta(page_title, locale, lead)
+        hero = _page_hero(words["title"], title, lead)
+        content = f"<p><a href='{_home(locale)}'>{_e(words['back'])}</a></p>" if received else form
+    else:
+        path = institutional.REVIEW_PATHS[locale]
+        page_title = f"{institutional.offer_text(locale, 'seo_title')} · {BRAND}"
+        summary = institutional.offer_text(locale, "summary")
+        url = base_url.rstrip("/") + path if base_url else ""
+        meta = _public_meta(page_title, summary, locale, path, base_url) + _json_ld(
+            institutional.offer_structured_data(locale, url)
+        )
+        crumbs = f"<a href='{_home(locale)}'>{_e(words['back'])}</a>" + _language_crumbs(
+            institutional.REVIEW_PATHS, locale
+        )
+        hero = _page_hero(
+            institutional.offer_text(locale, "eyebrow"),
+            institutional.offer_text(locale, "title"),
+            institutional.offer_text(locale, "lead"),
+            crumbs,
+            note=institutional.offer_text(locale, "not_audit"),
+        )
+        content = institutional.offer_html(locale, privacy_url=legal_url("privacy", locale)) + (
+            f"<section class='rsec' id='{institutional.FORM_ANCHOR}'><h2>{_e(words['title'])}</h2>"
+            f"<p>{_e(institutional.offer_text(locale, 'form_lead'))}</p>{form}</section>"
+        )
     body = (
-        _page_hero(words["title"], title, lead)
-        + "<div class='paper page-main'><div class='wrap wrap-mid'>"
-        + content
-        + "</div></div>"
+        hero + "<div class='paper page-main'><div class='wrap wrap-mid'>" + content + "</div></div>"
     )
     return _page(
         page_title,

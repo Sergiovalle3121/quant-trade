@@ -47,6 +47,7 @@ from quant_trade.audit import (
     funnel,
     inbox,
     institutional,
+    institutional_sample,
     mapping,
     owner_card,
     paid_offer,
@@ -7002,6 +7003,106 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     @app.get(SIGNAL_SAMPLE_PATHS["pt"], response_class=HTMLResponse)
     async def signal_sample_pt(request: Request) -> str:
         return await run_in_threadpool(_sample_html, "pt", _site_url(request), "signal")
+
+    # The sample institutional review (``institutional_sample``): its notes page, the
+    # report with the notes on top and their PDF. The input and the clock are fixed and
+    # no public series is read, so each is built once per language (and address) and
+    # kept; the run, the pages and the PDF have a lock each, so a PDF build never holds
+    # up the pages.
+    review_results: dict[str, AuditResult] = {}
+    review_result_lock = threading.Lock()
+    review_pages: dict[tuple[str, str, str], str] = {}
+    review_page_lock = threading.Lock()
+    review_pdfs: dict[str, bytes] = {}
+    review_pdf_lock = threading.Lock()
+
+    def _review_result(locale: str) -> AuditResult:
+        with review_result_lock:
+            if locale not in review_results:
+                review_results[locale] = institutional_sample.sample_result(locale)
+            return review_results[locale]
+
+    def _review_html(kind: str, locale: str, base_url: str) -> str:
+        key = (kind, locale, base_url)
+        with review_page_lock:
+            if key not in review_pages:
+                result = _review_result(locale)
+                review_pages[key] = guard_page(
+                    institutional_sample.sample_page(
+                        result, locale=locale, base_url=base_url, pdf_ok=pdf_ok
+                    )
+                    if kind == "notes"
+                    else institutional_sample.report_with_notes(
+                        result,
+                        locale=locale,
+                        pdf_url=institutional.SAMPLE_PDF_PATHS[locale] if pdf_ok else None,
+                    )
+                )
+            return review_pages[key]
+
+    def _review_pdf(locale: str) -> Response:
+        with review_pdf_lock:
+            if locale not in review_pdfs:
+                page = institutional_sample.report_with_notes(_review_result(locale), locale=locale)
+                try:
+                    review_pdfs[locale] = pdf_lib.report_pdf(
+                        page,
+                        audit_id=institutional_sample.REPORT_NAMES[locale],
+                        locale=locale,
+                        wait_seconds=PDF_WAIT_SECONDS,
+                    )
+                    # A public sample, recorded as the sample: /comprobar says so.
+                    _record_issued(
+                        review_pdfs[locale], audit_id=check_lib.SAMPLE_AUDIT_ID, kind="pdf"
+                    )
+                except (pdf_lib.PdfBusy, pdf_lib.PdfUnavailable):
+                    return HTMLResponse(
+                        error_page(message("pdf_busy", locale), locale=locale), status_code=503
+                    )
+        name = f"rigor-{institutional_sample.REPORT_NAMES[locale]}.pdf"
+        return Response(
+            content=review_pdfs[locale],
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": f'attachment; filename="{name}"',
+                "Cache-Control": "public, max-age=3600",
+            },
+        )
+
+    def _review_locale(path: str, paths: dict[str, str]) -> str:
+        return next(locale for locale, known in paths.items() if known == path)
+
+    async def review_sample_notes(request: Request) -> HTMLResponse:
+        locale = _review_locale(request.url.path, institutional.SAMPLE_PATHS)
+        page = await run_in_threadpool(_review_html, "notes", locale, _site_url(request))
+        return HTMLResponse(page)
+
+    async def review_sample_report(request: Request) -> HTMLResponse:
+        locale = _review_locale(request.url.path, institutional.SAMPLE_REPORT_PATHS)
+        page = await run_in_threadpool(_review_html, "report", locale, _site_url(request))
+        # The notes page is the public one; the report behind it is not listed.
+        return HTMLResponse(page, headers={"X-Robots-Tag": NOINDEX})
+
+    async def review_sample_pdf(request: Request) -> Response:
+        locale = _review_locale(request.url.path, institutional.SAMPLE_PDF_PATHS)
+        return await run_in_threadpool(_review_pdf, locale)
+
+    for review_locale in institutional.SAMPLE_PATHS:
+        app.add_api_route(
+            institutional.SAMPLE_PATHS[review_locale],
+            review_sample_notes,
+            methods=["GET"],
+            response_class=HTMLResponse,
+        )
+        app.add_api_route(
+            institutional.SAMPLE_REPORT_PATHS[review_locale],
+            review_sample_report,
+            methods=["GET"],
+            response_class=HTMLResponse,
+        )
+        app.add_api_route(
+            institutional.SAMPLE_PDF_PATHS[review_locale], review_sample_pdf, methods=["GET"]
+        )
 
     @app.get("/guias", response_class=HTMLResponse)
     def guides_es(request: Request, lang: str | None = None) -> str:
