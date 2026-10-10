@@ -41,7 +41,9 @@ def _grid(years: int = 6, seed: int = 5) -> bytes:
 
 @pytest.fixture(scope="module")
 def fund_data() -> dict:
-    inputs = build_inputs(_grid(), DeclaredMetadata())
+    # A declared investor: with no answer the report speaks in a neutral voice
+    # (test_audit_ownership.py), and these tests read the investor's.
+    inputs = build_inputs(_grid(), DeclaredMetadata(ownership="buyer"))
     result = run_audit(inputs, now=NOW, audit_id="fundread", bootstrap_samples=200)
     data = result.model_dump(mode="json")
     assert data["fund"]["track_record"] is True
@@ -108,7 +110,7 @@ def test_a_fund_shows_its_calendar_once(fund_data: dict, locale: str) -> None:
 
 def test_a_backtest_keeps_its_robot_steps_and_sections() -> None:
     frame_bytes = _daily_curve()
-    inputs = build_inputs(frame_bytes, DeclaredMetadata())
+    inputs = build_inputs(frame_bytes, DeclaredMetadata(ownership="buyer"))
     data = run_audit(inputs, now=NOW, audit_id="btread", bootstrap_samples=200).model_dump(
         mode="json"
     )

@@ -50,6 +50,13 @@ class Audience:
     slug_pt: str = ""
     #: Institutional visitors start by discussing the supplied record.
     contact_cta: bool = False
+    #: Which public sample report fits the case: "backtest" (``/ejemplo``) or
+    #: "signal" (``/ejemplo-senal``). A signal copier's main button opens the
+    #: signal sample, and starting comes after it.
+    sample: str = "backtest"
+    #: Whoever publishes a history for clients sees, under the first buttons, the
+    #: public page, badge and card of both samples (``sample_publication``).
+    public_example: bool = False
 
     def slug_for(self, locale: str) -> str:
         if locale == "pt":
@@ -774,9 +781,9 @@ AUDIENCE_PAGES: tuple[Audience, ...] = (
                 faq=(
                     (
                         "¿Qué firmas y retos incluye?",
-                        "{presets} retos de FTMO, FundedNext, The5ers y Topstep, más un reto "
-                        "genérico de dos fases. El formulario muestra la fecha en que se "
-                        "leyeron las reglas.",
+                        "{presets} juegos de reglas de {programs} programas de FTMO, "
+                        "FundedNext, The5ers y Topstep, más la fase 1 de un reto genérico de "
+                        "dos fases. El formulario muestra la fecha en que se leyeron las reglas.",
                     ),
                     (
                         "¿Me dice si conseguiré la cuenta?",
@@ -863,8 +870,9 @@ AUDIENCE_PAGES: tuple[Audience, ...] = (
                 faq=(
                     (
                         "Which firms and challenges are included?",
-                        "{presets} FTMO, FundedNext, The5ers and Topstep challenges, plus a "
-                        "generic two-phase one. The form shows the date the rules were read.",
+                        "{presets} rule sets from {programs} FTMO, FundedNext, The5ers and "
+                        "Topstep programs, plus phase 1 of a generic two-phase challenge. The "
+                        "form shows the date the rules were read.",
                     ),
                     (
                         "Does it tell me whether I will get the account?",
@@ -952,9 +960,9 @@ AUDIENCE_PAGES: tuple[Audience, ...] = (
                 faq=(
                     (
                         "Quais firmas e desafios estão incluídos?",
-                        "{presets} desafios da FTMO, FundedNext, The5ers e Topstep, mais um "
-                        "genérico de duas fases. O formulário mostra a data em que as regras "
-                        "foram lidas.",
+                        "{presets} conjuntos de regras de {programs} programas da FTMO, "
+                        "FundedNext, The5ers e Topstep, mais a fase 1 de um desafio genérico de "
+                        "duas fases. O formulário mostra a data em que as regras foram lidas.",
                     ),
                     (
                         "Ele me diz se vou conseguir a conta?",
@@ -1309,6 +1317,7 @@ AUDIENCE_PAGES: tuple[Audience, ...] = (
         slug_en="signal-copiers",
         slug_pt="copiar-sinais",
         icon="copy",
+        sample="signal",
         text={
             "es": AudienceText(
                 title="Antes de copiar una señal, mira el riesgo que no enseña",
@@ -1820,6 +1829,7 @@ AUDIENCE_PAGES: tuple[Audience, ...] = (
         slug_pt="gestoras-e-sinais",
         icon="chart",
         contact_cta=True,
+        public_example=True,
         text={
             "es": AudienceText(
                 title=(

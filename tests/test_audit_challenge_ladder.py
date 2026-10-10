@@ -192,6 +192,23 @@ def test_a_one_phase_program_shows_the_section_figure_on_the_full_rung() -> None
     assert rows["out_of_sample"]["pass"]["value"] < rows["full"]["pass"]["value"]
 
 
+def test_the_intro_counts_phases_only_for_a_program_with_several(
+    audited: tuple[Any, AuditResult],
+) -> None:
+    """The generic reference is named after its phase ("..., phase 1"), so the
+    intro does not add "1 phase" after it; a two-phase program keeps its count."""
+    _, one = _audit(_declared(challenge=None))
+    _, two = audited
+    assert one.challenge is not None and two.challenge is not None
+    for locale in LOCALES:
+        labels = LABELS[locale]
+        single = html.unescape(_challenge_ladder_html(one.challenge["scenarios"], locale, labels))
+        double = html.unescape(_challenge_ladder_html(two.challenge["scenarios"], locale, labels))
+        assert labels["ch_ladder_title"] in single and labels["ch_ladder_title"] in double
+        assert f", {labels['ff_phase']})" not in single
+        assert f", {labels['ff_phases'].format(n=2)})" in double
+
+
 def test_without_a_start_the_sides_are_not_measured() -> None:
     _, result = _audit(_declared(oos_start=None))
     rows = _rows(result)
@@ -375,8 +392,11 @@ def test_the_ladder_html_reads_not_measured_rows_with_their_reason() -> None:
         assert low[:1].upper() + low[1:] in page
         assert find_claims(page) == []
     fit = _firm_fit_html(result.challenge["firm_fit"], LABELS["es"], ladder=True)
-    assert LABELS["es"]["ff_basis"] in html.unescape(fit)
-    assert LABELS["es"]["ff_basis"] not in html.unescape(
+    # The cost column is measured, so the basis names the columns; the
+    # out-of-sample one is not, and says why with the ladder's own reason.
+    assert LABELS["es"]["ff_basis_columns"] in html.unescape(fit)
+    assert localize("no out-of-sample start declared", "es") in html.unescape(fit)
+    assert LABELS["es"]["ff_basis_columns"] not in html.unescape(
         _firm_fit_html(result.challenge["firm_fit"], LABELS["es"])
     )
 
@@ -489,7 +509,7 @@ def test_the_report_shows_the_ladder_and_the_hero_line(tmp_path: Path, locale: s
     assert labels["ch_ladder_full_program"] in text
     assert labels["ch_ladder_in_sample"].format(date="2024-06-02") in text
     assert labels["ch_ladder_out_of_sample"].format(date="2024-06-03") in text
-    assert labels["ch_ladder_cost"].format(bps="1") in text
+    assert labels["ch_ladder_cost_declared"].format(bps="1") in text
     assert labels["ch_ladder_haircut"].split("{")[0] in text
     assert HERO[locale] in text and labels["hero_challenge_link"] in text
     assert OLD_UNFINISHED[locale] not in text

@@ -172,6 +172,16 @@ TEXT: dict[str, str] = {
         "Saldo de cobros USD tras devoluciones registradas|Contribución USD"
     ),
     "funnel_total": "Total",
+    "funnel_anon": "Vistas previas sin cuenta",
+    "funnel_anon_cols": (
+        "Etiqueta|Vistas previas sin cuenta|Pasaron después a una cuenta (registro o entrada)"
+    ),
+    "funnel_anon_note": (
+        "Subidas sin cuenta que mostraron la clase y las banderas rojas (AUDIT_ANON_PREVIEW), "
+        "por la etiqueta con la que llegó el navegador, y cuántas de ellas quedaron después en "
+        "una cuenta al registrarse o entrar desde el informe. Las dos cifras se cuentan por "
+        "su propio día, así que en una ventana pueden no coincidir."
+    ),
     "funnel_direct": "sin etiqueta",
     "funnel_tags": "Etiquetas que cuentan",
     "funnel_limits": (
@@ -518,8 +528,13 @@ def funnel_section(
     days: int,
     example: str,
     country_rows: Sequence[tuple[str, int, int, int]] = (),
+    anon_previews: bool = False,
 ) -> str:
-    """Visits, accounts, free reports, previews and payments by tag and by day."""
+    """Visits, accounts, free reports, previews and payments by tag and by day.
+
+    ``anon_previews`` (``AUDIT_ANON_PREVIEW`` on) adds the previews uploaded
+    without an account and how many went on an account afterwards.
+    """
     title = TEXT["funnel_title"].format(days=days)
     lead = TEXT["funnel_lead"].format(example=example)
     out = f"<h2 style='margin-top:40px'>{_e(title)}</h2><p>{_e(lead)}</p>"
@@ -579,6 +594,28 @@ def funnel_section(
         " fb, yt, nl, ev, x, tv, li, dir, ph, hn), mercado opcional de dos letras y número"
         " de 2 o 3 cifras, como dc-us-103, tg-mx-161 o dir-04."
     )
+    if anon_previews:
+        anon_rows = [
+            [
+                TEXT["funnel_direct"] if ref == DIRECT else ref,
+                str(counts.counts["anon_previews"]),
+                str(counts.counts["anon_linked"]),
+            ]
+            for ref, counts in sorted(funnel.by_ref.items())
+            if counts.counts["anon_previews"] or counts.counts["anon_linked"]
+        ]
+        anon_rows.append(
+            [
+                TEXT["funnel_total"],
+                str(funnel.total.counts["anon_previews"]),
+                str(funnel.total.counts["anon_linked"]),
+            ]
+        )
+        out += (
+            f"<h3>{_e(TEXT['funnel_anon'])}</h3>"
+            f"<p class='muted'>{_e(TEXT['funnel_anon_note'])}</p>"
+            + _table(TEXT["funnel_anon_cols"], anon_rows)
+        )
     country_table = (
         _table(
             TEXT["funnel_country_cols"],

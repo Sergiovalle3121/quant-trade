@@ -60,14 +60,14 @@ COPY: dict[str, dict[str, Any]] = {
         "submit": "Calcular",
         "result_title": "Resultado",
         "interval": "Intervalo de confianza al 95 % (Wilson)",
-        "breakeven": "% de aciertos de equilibrio antes de costes",
+        "breakeven": "% de aciertos de equilibrio antes de costos",
         "above": (
             "Con estas cifras declaradas, todo el intervalo al 95 % queda por encima del % de "
-            "aciertos de equilibrio antes de costes. No mide costes, deslizamiento ni si las "
+            "aciertos de equilibrio antes de costos. No mide costos, deslizamiento ni si las "
             "operaciones son independientes."
         ),
         "below": (
-            "Todo el intervalo al 95 % queda por debajo del equilibrio antes de costes: con "
+            "Todo el intervalo al 95 % queda por debajo del equilibrio antes de costos: con "
             "este objetivo y este stop, la muestra declarada no llega al equilibrio."
         ),
         "inside": (
@@ -106,16 +106,16 @@ COPY: dict[str, dict[str, Any]] = {
             "muestra si las operaciones son independientes. Con pocas operaciones es ancho.",
             "El % de aciertos de equilibrio es stop ÷ (objetivo + stop): con ese % y "
             "operaciones que terminan en el objetivo o en el stop, lo ganado y lo perdido se "
-            "compensan antes de costes.",
+            "compensan antes de costos.",
             "Un porcentaje redondeado se trata como proporción; no reconstruimos cuántas "
             "operaciones ganaron.",
-            "No mide costes, deslizamiento, rachas ni si la regla se fijó antes de ver los "
+            "No mide costos, deslizamiento, rachas ni si la regla se fijó antes de ver los "
             "resultados.",
         ],
         "cta_title": "Con tu archivo, las cifras son medidas",
         "cta": (
             "El informe mide tus operaciones reales: el % de aciertos con su intervalo, el "
-            "coste de equilibrio, dentro y fuera de muestra y la calidad de datos. El primer "
+            "costo de equilibrio, dentro y fuera de muestra y la calidad de datos. El primer "
             "informe completo es gratis con cuenta."
         ),
         "cta_button": "Auditar mi archivo",

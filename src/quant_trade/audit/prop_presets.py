@@ -28,6 +28,12 @@ Loss rules the simulator understands:
   exceed that share of the profit target (``profit_target``) or of the
   positive days' summed gain (``positive_days``); checked at the pass.
 
+``markets`` lists what a program lets the trader trade (``MARKETS``), only when
+a page of the firm says so: ``markets_source`` is that page and
+``markets_as_of`` the day it was read. ``None`` means the pages read do not
+say, and the program is never left out for its markets. The numeric rules do
+not depend on it.
+
 Rules the simulator cannot see (news restrictions, intraday trailing) are
 listed in ``notes``.
 """
@@ -43,6 +49,10 @@ BestDayBasis = Literal["profit_target", "positive_days"]
 
 DAILY_LOSS_BASES: tuple[str, ...] = ("initial_balance", "start_of_day", "none")
 TOTAL_LOSS_TYPES: tuple[str, ...] = ("static", "trailing_eod", "trailing_eod_lock")
+#: What a program may let the trader trade, in the words its page uses: spot
+#: currency pairs, spot metals, index CFDs, energy (oil) CFDs, crypto CFDs, and
+#: exchange-traded futures.
+MARKETS: tuple[str, ...] = ("fx", "metals", "indices", "energy", "crypto", "futures")
 
 
 @dataclass(frozen=True)
@@ -65,6 +75,11 @@ class ChallengeRules:
     #: share of the profit target or of the positive days' summed gain.
     best_day_limit: float | None = None
     best_day_basis: BestDayBasis | None = None
+    #: What the program lets the trader trade (``MARKETS``), as the page at
+    #: ``markets_source`` said on ``markets_as_of``; ``None`` when no page read says.
+    markets: tuple[str, ...] | None = None
+    markets_source: str | None = None
+    markets_as_of: str | None = None
 
     def __post_init__(self) -> None:
         if not 0.0 < self.profit_target < 1.0:
@@ -89,10 +104,19 @@ class ChallengeRules:
             raise ValueError(f"{self.key}: best_day_limit and best_day_basis go together")
         if self.best_day_limit is not None and not 0.0 < self.best_day_limit < 1.0:
             raise ValueError(f"{self.key}: best_day_limit must be a fraction in (0, 1)")
+        if self.markets is not None:
+            if not self.markets or any(market not in MARKETS for market in self.markets):
+                raise ValueError(f"{self.key}: markets must be a non-empty subset of MARKETS")
+            if not self.markets_source or not self.markets_as_of:
+                raise ValueError(f"{self.key}: markets need markets_source and markets_as_of")
+        elif self.markets_source or self.markets_as_of:
+            raise ValueError(f"{self.key}: markets_source and markets_as_of need markets")
 
     def to_dict(self) -> dict[str, Any]:
         data = asdict(self)
         data["notes"] = list(self.notes)
+        if self.markets is not None:
+            data["markets"] = list(self.markets)
         return data
 
 
@@ -107,6 +131,16 @@ THE5ERS_HIGH_STAKES_URL = "https://the5ers.com/high-stakes/"
 THE5ERS_HYPER_GROWTH_URL = "https://the5ers.com/hyper-growth/"
 THE5ERS_BOOTCAMP_URL = "https://the5ers.com/bootcamp/"
 TOPSTEP_URL = "https://help.topstep.com/en/articles/8284204-what-is-the-maximum-loss-limit"
+#: "Topstep is a Futures-only program": every CME Group product, no forex.
+TOPSTEP_PRODUCTS_URL = (
+    "https://help.topstep.com/en/articles/8284206-when-and-what-products-can-i-trade"
+)
+#: The day the markets of the programs that state them were read.
+MARKETS_AS_OF = "2026-10-09"
+#: "Assets available: FX, Metals, Indices Oil and Crypto." (High Stakes)
+THE5ERS_HIGH_STAKES_MARKETS: tuple[str, ...] = ("fx", "metals", "indices", "energy", "crypto")
+#: "Assets available: FX, Metals, Indices, crypto." (Hyper Growth)
+THE5ERS_HYPER_GROWTH_MARKETS: tuple[str, ...] = ("fx", "metals", "indices", "crypto")
 
 _FTMO_NOTES = (
     "Daily loss: 5 % of the initial balance below the balance recorded at 00:00 CE(S)T.",
@@ -136,6 +170,14 @@ _TOPSTEP_NOTES = (
 )
 
 
+#: Topstep's Trading Combine sizes: the account and its maximum loss, in US dollars.
+_TOPSTEP_ACCOUNTS: tuple[tuple[str, int, int], ...] = (
+    ("50K", 50_000, 2_000),
+    ("100K", 100_000, 3_000),
+    ("150K", 150_000, 4_500),
+)
+
+
 def _topstep(size: str, maximum_loss: float) -> ChallengeRules:
     return ChallengeRules(
         key=f"topstep-{size.lower()}-combine",
@@ -154,6 +196,9 @@ def _topstep(size: str, maximum_loss: float) -> ChallengeRules:
         as_of=AS_OF,
         best_day_limit=0.55,
         best_day_basis="profit_target",
+        markets=("futures",),
+        markets_source=TOPSTEP_PRODUCTS_URL,
+        markets_as_of=MARKETS_AS_OF,
     )
 
 
@@ -325,6 +370,9 @@ _PRESET_LIST: tuple[ChallengeRules, ...] = (
         notes=_THE5ERS_HS_NOTES,
         source_url=THE5ERS_HIGH_STAKES_URL,
         as_of=AS_OF,
+        markets=THE5ERS_HIGH_STAKES_MARKETS,
+        markets_source=THE5ERS_HIGH_STAKES_URL,
+        markets_as_of=MARKETS_AS_OF,
     ),
     ChallengeRules(
         key="the5ers-high-stakes-step2",
@@ -341,6 +389,9 @@ _PRESET_LIST: tuple[ChallengeRules, ...] = (
         notes=_THE5ERS_HS_NOTES,
         source_url=THE5ERS_HIGH_STAKES_URL,
         as_of=AS_OF,
+        markets=THE5ERS_HIGH_STAKES_MARKETS,
+        markets_source=THE5ERS_HIGH_STAKES_URL,
+        markets_as_of=MARKETS_AS_OF,
     ),
     ChallengeRules(
         key="the5ers-hyper-growth",
@@ -365,6 +416,9 @@ _PRESET_LIST: tuple[ChallengeRules, ...] = (
         ),
         source_url=THE5ERS_HYPER_GROWTH_URL,
         as_of=AS_OF,
+        markets=THE5ERS_HYPER_GROWTH_MARKETS,
+        markets_source=THE5ERS_HYPER_GROWTH_URL,
+        markets_as_of=MARKETS_AS_OF,
     ),
     ChallengeRules(
         key="the5ers-bootcamp-step",
@@ -386,12 +440,17 @@ _PRESET_LIST: tuple[ChallengeRules, ...] = (
         source_url=THE5ERS_BOOTCAMP_URL,
         as_of=AS_OF,
     ),
-    _topstep("50K", 2_000 / 50_000),
-    _topstep("100K", 3_000 / 100_000),
-    _topstep("150K", 4_500 / 150_000),
+    *(_topstep(size, loss / account) for size, account, loss in _TOPSTEP_ACCOUNTS),
 )
 
 PRESETS: dict[str, ChallengeRules] = {rules.key: rules for rules in _PRESET_LIST}
+
+#: The account size, in US dollars, of the presets whose program names one (the
+#: firm states its limits in dollars at that size). Every other preset's rules
+#: are shares of whatever balance the account starts with.
+ACCOUNT_SIZES: dict[str, float] = {
+    f"topstep-{size.lower()}-combine": float(account) for size, account, _ in _TOPSTEP_ACCOUNTS
+}
 
 
 def get_preset(key: str) -> ChallengeRules:
@@ -424,9 +483,12 @@ def preset_label(firm: str, program: str, phase: str, locale: str = "es") -> str
 
 __all__ = [
     "preset_label",
+    "ACCOUNT_SIZES",
     "DAILY_LOSS_BASES",
     "DEFAULT_PRESET",
     "AS_OF",
+    "MARKETS",
+    "MARKETS_AS_OF",
     "PRESETS",
     "TOTAL_LOSS_TYPES",
     "ChallengeRules",

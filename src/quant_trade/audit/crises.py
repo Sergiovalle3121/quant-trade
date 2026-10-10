@@ -20,12 +20,14 @@ figure is MEASURED from the uploaded series.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Any
 
 import numpy as np
 import pandas as pd
 
+from quant_trade.audit.market import asset_of
 from quant_trade.audit.schema import measured
 
 
@@ -87,6 +89,66 @@ MARKET: dict[str, tuple[MarketMove, ...]] = {
     ),
     "crypto_2022": (MarketMove("Bitcoin (Coinbase)", -0.7305, _BITCOIN),),
 }
+#: The market each window's fall belongs to: the class of the public index
+#: beside it in ``MARKET`` (US equities for the S&P 500 and the Nasdaq,
+#: crypto for bitcoin).
+WINDOW_MARKET: dict[str, str] = {
+    "dotcom": "us_equity",
+    "gfc": "us_equity",
+    "euro": "us_equity",
+    "china_oil": "us_equity",
+    "late_2018": "us_equity",
+    "covid": "us_equity",
+    "rates_2022": "us_equity",
+    "crypto_2022": "crypto",
+}
+#: The class of each market ``market.asset_of`` recognises in a symbol name.
+_ASSET_MARKET: dict[str, str] = {
+    "sp500": "us_equity",
+    "nasdaq100": "us_equity",
+    "bitcoin": "crypto",
+}
+
+
+#: Metal codes quoted against a currency (``XAUUSD``), a market of their own.
+_METALS = frozenset({"XAU", "XAG", "XPT", "XPD"})
+
+
+def symbol_market(name: str) -> str | None:
+    """The market one symbol name trades, with the readings the audit already
+    uses: ``market.asset_of`` for US equity indices and bitcoin, and the
+    currency pairs ``engine.fx_pair`` recognises (``EURUSD.m`` is ``fx``);
+    a metal against a currency is ``metal``. ``None`` when the name says
+    nothing certain (a stock, another index, another coin)."""
+    # Imported here: the engine imports this module.
+    from quant_trade.audit.engine import FX_CURRENCIES
+
+    text = str(name).rsplit(":", 1)[-1]
+    asset = asset_of(text)
+    if asset is not None and asset.key in _ASSET_MARKET:
+        return _ASSET_MARKET[asset.key]
+    pair = "".join(ch for ch in text.upper() if ch.isalnum())[:6]
+    if len(pair) == 6 and pair[3:] in FX_CURRENCIES:
+        if pair[:3] in FX_CURRENCIES:
+            return "fx"
+        if pair[:3] in _METALS:
+            return "metal"
+    return None
+
+
+def traded_markets(symbols: Iterable[str]) -> set[str] | None:
+    """The markets the named symbols trade, or ``None`` when one of them is not
+    certain: the crises of other markets are left out only when every symbol
+    is known (``AUDUSD`` and ``EURUSD`` trade no US equities and no bitcoin)."""
+    found: set[str] = set()
+    for name in symbols:
+        market = symbol_market(name)
+        if market is None:
+            return None
+        found.add(market)
+    return found
+
+
 #: Months of rolling windows for the worst and best stretch.
 ROLLING = 12
 #: Share of covered windows in which trailing the benchmark is a finding.
@@ -219,9 +281,12 @@ __all__ = [
     "MARKET",
     "MARKET_AS_OF",
     "WINDOWS",
+    "WINDOW_MARKET",
     "MarketMove",
     "Window",
     "crisis_review",
     "curve_crises",
     "curve_months",
+    "symbol_market",
+    "traded_markets",
 ]

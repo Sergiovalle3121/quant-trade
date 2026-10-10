@@ -90,7 +90,9 @@ def test_an_index_with_a_missing_month_is_not_used() -> None:
 @pytest.mark.parametrize("locale", ["es", "en", "pt"])
 def test_a_fund_record_reads_as_a_fund_in_the_verdict_and_the_plan(locale: str) -> None:
     fund, _ = _pair()
-    result = _run(_dated(fund), locale, trials_declared=False)
+    # A declared investor reads the questions for the manager; with no answer the
+    # wording is neutral (test_audit_ownership.py).
+    result = _run(_dated(fund), locale, trials_declared=False, ownership="buyer")
     flags = {flag["code"] for flag in result.red_flags}  # type: ignore[attr-defined]
     assert "ZERO_DECLARED_COSTS" not in flags
     assert result.holdout["reason"] == FUND_OOS_REASON  # type: ignore[attr-defined]

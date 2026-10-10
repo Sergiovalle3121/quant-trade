@@ -212,11 +212,18 @@ def test_prop_page_counts_firm_challenges_apart_from_the_generic_one(tmp_path: P
     from quant_trade.audit.prop_presets import PRESETS
 
     firms = sum(1 for rules in PRESETS.values() if rules.firm != "Generic")
+    programs = len({(r.firm, r.program) for r in PRESETS.values() if r.firm != "Generic"})
     assert firms == len(PRESETS) - 1
+    # Each preset is one rule set of a firm's program (The5ers' Bootcamp one holds
+    # for each of its three steps): the page counts rule sets and programs.
+    assert programs < firms
     client = _client(tmp_path)
     es = client.get("/para/retos-prop-firm").text
     en = client.get("/for/prop-firm-challenges").text
     pt = client.get(audience_url("retos-prop-firm", "pt")).text
-    assert f"{firms} retos de FTMO" in es and "más un reto genérico" in es
-    assert f"{firms} FTMO, FundedNext" in en
-    assert f"{firms} desafios da FTMO" in pt
+    assert f"{firms} juegos de reglas de {programs} programas de FTMO" in es
+    assert "más la fase 1 de un reto genérico de dos fases" in es
+    assert f"{firms} rule sets from {programs} FTMO, FundedNext" in en
+    assert f"{firms} conjuntos de regras de {programs} programas da FTMO" in pt
+    assert f"{firms} fases de" not in es and f"{firms} phases of" not in en
+    assert f"{firms} retos de FTMO" not in es and f"{firms} desafios da FTMO" not in pt

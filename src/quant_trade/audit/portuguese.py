@@ -63,7 +63,7 @@ COPY_PT: dict[str, Any] = {
         "XLSX), o CSV de operações do NinjaTrader, QuantConnect, backtesting.py ou vectorbt, ou "
         "o histórico de operações em CSV ou Excel de qualquer outra corretora ou exchange. "
         "Reconhece o formato de exportação de " + PLATFORMS_PT + ". Também um extrato em PDF "
-        "com a tabela de operações: antes de medir você revisa as colunas. Até 10 MB."
+        "com a tabela de operações: antes de medir você revisa as colunas."
     ),
     "live": "Extrato da conta real ou demo (opcional)",
     "live_help": (
@@ -113,6 +113,7 @@ COPY_PT: dict[str, Any] = {
         "São rentabilidades de um fundo, já líquidas das suas taxas (só histórico mensal)"
     ),
     "benchmark_applicable": "Um benchmark se aplica?",
+    "unanswered": "Sem resposta (conta como sim)",
     "yes": "Sim",
     "no": "Não",
     "locale": "Idioma do relatório",
@@ -136,6 +137,10 @@ COPY_PT: dict[str, Any] = {
     "signin_first": (
         "Antes de enviar, crie a sua conta grátis: o seu primeiro relatório sai completo, com "
         "PDF, sem pagar."
+    ),
+    "anon_preview_note": (
+        "Sem conta você vê a classe de A a D e os alertas do seu arquivo. Com o seu e-mail, o "
+        "primeiro relatório completo é grátis."
     ),
     "signin_create": "Criar conta grátis",
     "signin_enter": "Já tenho conta",
@@ -252,11 +257,13 @@ COPY_PT: dict[str, Any] = {
         ),
         (
             "O que eu recebo?",
-            "De graça, a prévia: classe de A a D, gráficos, bandeiras vermelhas e o "
-            "que cada dimensão significa. O relatório completo acrescenta cada número, testes de "
+            "De graça, a prévia: classe de A a D, gráficos, a revisão de "
+            f"{len(FLAG_TITLES)} bandeiras vermelhas e o que cada dimensão significa. "
+            "O relatório completo acrescenta cada número, testes de "
             "estresse, risco e capital, simulador de desafios, a conta real frente ao backtest "
-            "se você a enviar, perguntas para o vendedor e o PDF. Veja o exemplo completo antes "
-            "de pagar.",
+            "se você a enviar, as perguntas que o relatório deixa abertas (que arquivo responde "
+            "cada uma ou, se você a comprou, o que perguntar ao vendedor) e o PDF. Veja o "
+            "exemplo completo antes de pagar.",
         ),
         (
             "Em que idioma sai o relatório?",
@@ -336,7 +343,7 @@ COPY_PT: dict[str, Any] = {
     "v_period": "Período dos dados",
     "v_age": "Dias entre o último dado e a auditoria",
     "v_format": "Formato do arquivo",
-    "v_engine": "Motor",
+    "v_engine": "Versão do motor",
     "v_trials_declared": "Tentativas declaradas",
     "v_trials_used": "Tentativas usadas no Sharpe deflacionado",
     "v_trials_undeclared": "não declarado; calculado com 1, o caso mais favorável",
@@ -449,7 +456,7 @@ UI_PT: dict[str, Any] = {
     "stats": [
         ("6", "dimensões auditadas"),
         ("{flags}", "bandeiras vermelhas revisadas em cada arquivo"),
-        ("{presets}", "desafios de prop firms para simular"),
+        ("{presets}", "conjuntos de regras de prop firms para simular"),
         ("{platforms}", "plataformas que reconhece"),
     ],
     "evidence_eyebrow": "Evidência",
@@ -505,8 +512,8 @@ UI_PT: dict[str, Any] = {
             "chart",
             "Mercado tranquilo e agitado",
             "Cada rentabilidade é atribuída segundo o VIX do dia anterior, e cada crise de data "
-            "pública que o seu histórico cobre é medida à parte: você vê se o resultado depende "
-            "de um só tipo de mercado.",
+            "pública que o seu histórico cobre é medida à parte, exceto as de mercados que você "
+            "não opera: você vê se o resultado depende de um só tipo de mercado.",
         ),
         (
             "globe",
@@ -535,7 +542,8 @@ UI_PT: dict[str, Any] = {
         "Simulação do desafio que você escolher da {firms}, com as regras publicadas",
         "Quanto custo aguenta antes de terminar no prejuízo",
         "Risco reamostrado em um ano e o capital que pede",
-        "Perguntas concretas para o vendedor do robô ou para o gestor",
+        "As perguntas que deixa abertas: que arquivo responde cada uma ou o que perguntar ao "
+        "vendedor ou ao gestor",
         "PDF e, se você quiser, página pública com selo",
     ],
     "full_more": "Ver um relatório completo de exemplo",
@@ -581,7 +589,7 @@ UI_PT: dict[str, Any] = {
     "v_eyebrow": "Verificação pública",
     "v_copy": "Copiar código",
     "v_copied": "Copiado",
-    "v_id": "ID",
+    "v_id": "Código da página pública",
     "guides_eyebrow": "Guias de exportação",
     "legal_eyebrow": "Jurídico",
     "error_eyebrow": "Algo não bate",

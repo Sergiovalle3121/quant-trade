@@ -49,6 +49,7 @@ from quant_trade.audit import (
     institutional,
     mapping,
     owner_card,
+    paid_offer,
     payments,
     raster,
     reading,
@@ -66,6 +67,7 @@ from quant_trade.audit import (
 from quant_trade.audit import passkeys as pk
 from quant_trade.audit import pdf as pdf_lib
 from quant_trade.audit import strategies as strategies_lib
+from quant_trade.audit.about import ABOUT_ALIASES, ABOUT_PATH, about_page
 from quant_trade.audit.articles import article_url, find_article
 from quant_trade.audit.audiences import AUDIENCES_BY_PATH, audience_url
 from quant_trade.audit.calculator import (
@@ -82,6 +84,7 @@ from quant_trade.audit.calculator import (
 from quant_trade.audit.calculator_card import calculator_card_svg
 from quant_trade.audit.compare import (
     COMPARE_PATH,
+    MAX_COMPARED,
     compare_form,
     comparison_body,
     guard_page,
@@ -126,6 +129,8 @@ from quant_trade.audit.pages import (
     AUDIT_PATHS,
     LANDING_PATHS,
     SAMPLE_BANNER,
+    SIGNAL_SAMPLE_BANNER,
+    SIGNAL_SAMPLE_PATHS,
     article_page,
     articles_index_page,
     audience_page,
@@ -144,6 +149,7 @@ from quant_trade.audit.pages import (
     method_page,
     reading_page,
     sample_meta,
+    signal_sample_meta,
     tools_page,
     upload_page,
     verification_card_svg,
@@ -158,9 +164,18 @@ from quant_trade.audit.public_card import public_card_svg
 from quant_trade.audit.report import render, report_kind, result_sha256
 from quant_trade.audit.retention import RetentionWorker
 from quant_trade.audit.return_series import is_return_series
-from quant_trade.audit.sample import sample_result
+from quant_trade.audit.sample import sample_result, signal_sample_result
+from quant_trade.audit.sample_publication import (
+    SAMPLE_KIND_BY_PUBLIC_ID,
+    SAMPLE_PUBLICATION_LOCALE,
+    SAMPLE_SHOWN_IDS,
+    sample_page,
+    sample_publication,
+    show_sample_id,
+)
 from quant_trade.audit.schema import (
     MAX_UPLOAD_BYTES,
+    REPORT_SIZE_FACTOR,
     AuditResult,
     DeclaredMetadata,
     ParseError,
@@ -530,14 +545,13 @@ STRATEGY_PDFS_PER_WINDOW = 10
 STRATEGY_PDF_WINDOW = timedelta(minutes=10)
 #: How many upload fields ``POST /audits`` takes.
 UPLOAD_FIELDS = 7
-#: The fields that may carry a platform report, and how much larger than
-#: ``max_upload_bytes`` they may be. The MT5 optimisation XML is one: about
-#: 900 bytes a pass, so 5 MB stopped at some 5,500 passes, fewer than a
-#: common genetic run.
+#: The fields that may carry a platform report; each may be
+#: ``schema.REPORT_SIZE_FACTOR`` times ``max_upload_bytes``. The MT5
+#: optimisation XML is one: about 900 bytes a pass, so 5 MB stopped at some
+#: 5,500 passes, fewer than a common genetic run.
 REPORT_FIELDS = frozenset({"equity", "report", "live", "optimization"})
 #: Bytes a pass takes in an MT5 optimisation export, for the size refusal.
 OPTIMIZATION_PASS_BYTES = 900
-REPORT_SIZE_FACTOR = 2
 #: How a picture begins (PNG, JPEG, GIF, TIFF): named as such when it
 #: arrives in the curve box, which takes tables only. A PDF is not listed:
 #: a PDF statement's table is read through the column screen.
@@ -587,6 +601,29 @@ def _megabytes(size: int) -> str:
     if size >= 1_000_000:
         return f"{size / 1_000_000:.1f}".rstrip("0").rstrip(".") + " MB"
     return f"{max(size // 1000, 1)} KB"
+
+
+def accept_language_locale(header: str | None) -> str | None:
+    """The report language a browser asks for in ``Accept-Language`` (``pt-BR``
+    gives "pt", ``en-US`` "en"), by its own preference order; ``None`` when it
+    names none of ``REPORT_LOCALES``. Only a page without its language in the
+    address or in ``?lang=`` reads it: the public page ``/v/{id}``, which sends
+    such a browser on to its own language's address."""
+    choices: list[tuple[float, int, str]] = []
+    for index, part in enumerate((header or "").split(",")):
+        tag, _, params = part.strip().partition(";")
+        weight = 1.0
+        for param in params.split(";"):
+            name, _, value = param.strip().partition("=")
+            if name.strip().lower() == "q":
+                try:
+                    weight = float(value)
+                except ValueError:
+                    weight = 0.0
+        primary = tag.strip().lower().split("-", 1)[0]
+        if primary in REPORT_LOCALES and weight > 0:
+            choices.append((-weight, index, primary))
+    return min(choices)[2] if choices else None
 
 
 def message(key: str, locale: str, **values: Any) -> str:
@@ -1113,8 +1150,28 @@ def _sentence(text: str) -> str:
 
 #: Where the sample report's PDF is served, per language.
 SAMPLE_PDF_PATHS = {"es": "/ejemplo.pdf", "en": "/sample.pdf", "pt": "/pt/exemplo.pdf"}
-#: The sample PDF's name inside the file and on download.
-SAMPLE_PDF_NAMES = {"es": "ejemplo", "en": "sample", "pt": "exemplo"}
+#: The sample PDF's name inside the file and on download: the identifier its report
+#: and its public page show (``sample_publication.SAMPLE_SHOWN_IDS``).
+SAMPLE_PDF_NAMES = SAMPLE_SHOWN_IDS["backtest"]
+#: The same for the signal sample: its PDF sits next to its page, as the first one's.
+SIGNAL_SAMPLE_PDF_PATHS = {lang: f"{path}.pdf" for lang, path in SIGNAL_SAMPLE_PATHS.items()}
+SIGNAL_SAMPLE_PDF_NAMES = SAMPLE_SHOWN_IDS["signal"]
+
+
+@dataclasses.dataclass(frozen=True)
+class _PublicSample:
+    """One public sample report (``report.SAMPLE_KINDS``) as its pages serve it."""
+
+    #: Builds the result in a language, with the public series in memory.
+    result: Callable[..., AuditResult]
+    banner: dict[str, str]
+    #: Head tags: (locale, base URL) -> HTML.
+    meta: Callable[[str, str], str]
+    #: The address the report's language links start from, per language.
+    switch: dict[str, str]
+    pdf_paths: dict[str, str]
+    #: The page's word in its tab title and PDF name.
+    names: dict[str, str]
 
 
 def _route_roots(locale: str) -> frozenset[str]:
@@ -1123,7 +1180,7 @@ def _route_roots(locale: str) -> frozenset[str]:
     paths = [pair[locale] for pair in PUBLIC_PAGES if locale in pair]
     paths += account_pages.PATHS[locale].values()
     paths += mail_lib.PATHS[locale].values()
-    paths += [COMPARE_PATH[locale], SAMPLE_PDF_PATHS[locale]]
+    paths += [COMPARE_PATH[locale], SAMPLE_PDF_PATHS[locale], SIGNAL_SAMPLE_PDF_PATHS[locale]]
     return frozenset(path.split("/")[1] for path in paths)
 
 
@@ -1563,8 +1620,10 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             price_usd=cfg.price_usd,
             access_codes=cfg.access_codes_enabled,
             retention_days=cfg.retention_days,
+            offer=_offer_terms(),
             carried=getattr(request.state, "upload_declarations", {}),
             rejection_html=f"<p role='alert'>{escape(text)}</p>" + guidance,
+            max_upload_bytes=cfg.max_upload_bytes,
         )
         return HTMLResponse(page, status_code=status)
 
@@ -1898,6 +1957,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                     days=funnel.FUNNEL_DAYS,
                     example=f"{_site_url(request)}{audience_url('retos-prop-firm', 'es')}?ref=f6",
                     country_rows=db.funnel_country_events(funnel.since_day(now)),
+                    anon_previews=cfg.anon_preview,
                 )
                 + attempts_html,
                 panel_path=app.state.panel_path,
@@ -2094,6 +2154,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         # Only known codes are shown, so the query string cannot inject text.
         shown = message("invalid_email", locale) if error == "email" else None
         page = landing(
+            offer=_offer_terms(),
+            support_email=cfg.operator_contact if "@" in cfg.operator_contact else "",
             locale=locale,
             free_mode=cfg.free_mode,
             price_usd=cfg.price_usd,
@@ -2118,12 +2180,13 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         # Only the known value is shown, so the query cannot inject text.
         notice = notice_link = ""
         if done == "welcome_confirm" and _confirm_pending(request):
-            notice = account_pages.COPY[locale]["welcome_confirm"]
+            notice = account_pages.COPY[locale][_welcome_confirm_key()]
             # While the e-mail arrives, the export guides.
             notice_link = account_pages.welcome_confirm_guides(locale)
-        if not signed_in and not cfg.free_mode:
+        if not signed_in and not cfg.free_mode and not cfg.anon_preview:
             # Uploads need an account: sign up (or sign in) first, then come back here,
-            # so nobody fills the form and loses it.
+            # so nobody fills the form and loses it. With AUDIT_ANON_PREVIEW the form
+            # is served: the upload is a preview until the account exists.
             signup = _ACCOUNT_PATHS[locale][0]
             back = AUDIT_PATHS[locale] + (f"?{acct.NEXT_EXTRAS_QUERY}" if extras else "")
             return RedirectResponse(f"{signup}?next={quote(back, safe='/')}", status_code=303)
@@ -2139,6 +2202,9 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 signed_in=signed_in,
                 notice=notice,
                 notice_link_html=notice_link,
+                anon_preview=cfg.anon_preview,
+                offer=_offer_terms(),
+                max_upload_bytes=cfg.max_upload_bytes,
             )
         )
 
@@ -2305,6 +2371,30 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         ("/pt/suporte", "/pt/contato"),
     ):
         _forward(alias, contact_path)
+
+    def _about(request: Request) -> HTMLResponse:
+        """Who is behind Rigor (``about.py``): only the details the terms and the
+        landing already publish, from the settings."""
+        locale = next(k for k, v in ABOUT_PATH.items() if v == request.url.path)
+        return HTMLResponse(about_page(cfg, locale=locale, base_url=_site_url(request)))
+
+    for about_path in ABOUT_PATH.values():
+        app.add_api_route(about_path, _about, methods=["GET"], response_class=HTMLResponse)
+    for alias, about_path in ABOUT_ALIASES.items():
+        _forward(alias, about_path)
+
+    # Addresses people guess for pages that live elsewhere: the English signal
+    # sample, the comparison and the sign-up (English pages without "/en"), and the
+    # Portuguese landing under its regional tag. Each gave a 404 before.
+    for guessed, kept_query, page_path in (
+        ("/sample-signal", False, SIGNAL_SAMPLE_PATHS["en"]),
+        ("/en/compare", True, COMPARE_PATH["en"]),
+        ("/en/signup", True, account_pages.PATHS["en"]["signup"]),
+        ("/register", True, account_pages.PATHS["en"]["signup"]),
+        ("/pt-br", False, "/pt"),
+        ("/pt-BR", False, "/pt"),
+    ):
+        _forward(guessed, page_path, keep_query=kept_query)
 
     @app.get("/en", response_class=HTMLResponse)
     def index_en(request: Request, extras: int = 0) -> Response:
@@ -2514,7 +2604,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
 
     def _welcome_status(account_id: str, email: str) -> str:
         """Read the same welcome availability for account and confirmation notices."""
-        if cfg.free_mode or not acct.WELCOME_FULL_REPORT:
+        if cfg.free_mode or not cfg.welcome_full_report:
             return ""
         if db.welcome_used(account_id) or db.free_claim_taken(inbox.welcome_key(email)):
             return "used"
@@ -2591,19 +2681,28 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         "passkey_full",
     )
 
-    def _offer() -> str:
-        """What a new visitor gets for a first file: every full report free (free
-        mode), the free first full report with an account, or neither."""
-        if cfg.free_mode:
-            return "free"
-        return "welcome" if acct.WELCOME_FULL_REPORT else "paid"
+    def _offer_terms() -> paid_offer.Offer:
+        """The offer with its price, for the pages that word it (``paid_offer``):
+        ``kind`` says what a new visitor gets for a first file, every full report
+        free (free mode), the free first full report with an account, or neither."""
+        return paid_offer.offer_of(cfg)
+
+    def _offered(page: str, locale: str) -> str:
+        """A public page as the offer words it: under the paid offer each sentence
+        that promised the free first report says the paid offer instead."""
+        return paid_offer.rewrite_html(page, locale, _offer_terms())
+
+    def _welcome_confirm_key() -> str:
+        """The "account created, confirm the e-mail" notice: with the free first
+        report it says what confirming opens; without it, only the link."""
+        return "welcome_confirm" if cfg.welcome_full_report else "welcome_confirm_paid"
 
     def _referrals_on() -> bool:
         # The reward is paid when the invitee's free first report exists and
         # both addresses are confirmed, so without mail nothing is offered.
         return (
             not cfg.free_mode
-            and acct.WELCOME_FULL_REPORT
+            and cfg.welcome_full_report
             and cfg.referral_rewards
             and cfg.email_delivery_ready
         )
@@ -2630,7 +2729,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         limits (:data:`CARD_REFUSALS`) and only those: the account, inbox and
         e-mail confirmation rules still hold.
         """
-        if not acct.WELCOME_FULL_REPORT:
+        if not cfg.welcome_full_report:
             return "off"
         refused = db.welcome_refusal(
             account.id,
@@ -2713,7 +2812,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         The most recent one of the last ``WELCOME_PENDING_DAYS`` days that
         ``_pending_refusal`` finds nothing against: the rule the notices state.
         """
-        if cfg.free_mode or not acct.WELCOME_FULL_REPORT:
+        if cfg.free_mode or not cfg.welcome_full_report:
             return None
         pending = db.welcome_pending_for(
             account_id, since=now - timedelta(days=WELCOME_PENDING_DAYS)
@@ -2797,6 +2896,195 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         finally:
             with contextlib.suppress(Exception):
                 db.clear_welcome_pending(account_id)
+
+    def _anon_uploader(request: Request, row: Any) -> bool:
+        """This browser uploaded the preview ``row`` notes: its device cookie is
+        the one hashed at the upload. Whoever was sent the link has another."""
+        device = request.cookies.get(acct.DEVICE_COOKIE) or ""
+        return (
+            row is not None
+            and 0 < len(device) <= 128
+            and acct.same_secret(acct.hash_secret(device), row.device_sha256)
+        )
+
+    def _anon_offer(request: Request, record: Any, owner: str | None, now: datetime) -> bool:
+        """A preview this browser uploaded without an account that the account would open in full.
+
+        Only with ``AUDIT_ANON_PREVIEW`` on, for a locked report no account holds,
+        uploaded in the last ``WELCOME_PENDING_DAYS`` days by this same browser
+        (``_anon_uploader``: whoever was sent the link is never offered the
+        uploader's free report), whose browser, file and network have not had
+        their free report meanwhile, and only while a required confirmation
+        e-mail can be sent: what the report's box then promises is what signing
+        up does.
+        """
+        if not cfg.anon_preview or cfg.free_mode or not cfg.welcome_full_report:
+            return False
+        if cfg.email_verification_required and not cfg.email_delivery_ready:
+            return False
+        if record.paid or owner is not None:
+            return False
+        row = db.anon_pending(record.id)
+        if row is None or not row.file_sha256 or not _anon_uploader(request, row):
+            return False
+        oldest = now - timedelta(days=WELCOME_PENDING_DAYS)
+        if row.created_at < oldest.astimezone(UTC).isoformat().replace("+00:00", "Z"):
+            return False
+        return not db.welcome_refusal(
+            "",
+            device_sha256=row.device_sha256,
+            file_sha256=row.file_sha256,
+            client_ip=row.client_ip,
+            since=acct.month_start(now),
+            per_ip=_welcome_cap(row.client_ip),
+        )
+
+    def _anon_paid(request: Request, record: Any, owner: str | None) -> bool:
+        """Under the paid offer, a locked preview this browser uploaded without an
+        account and no account holds: its box offers the account and the price.
+
+        Only with ``AUDIT_ANON_PREVIEW`` on and the free first report off; whoever
+        was sent the link gets the usual box (``_anon_uploader``)."""
+        if not cfg.anon_preview or cfg.free_mode or cfg.welcome_full_report:
+            return False
+        if record.paid or owner is not None:
+            return False
+        return _anon_uploader(request, db.anon_pending(record.id))
+
+    def _waits_for_email(request: Request, audit_id: str) -> bool:
+        """The signed-in account holds ``audit_id`` as a preview waiting for its e-mail."""
+        session = _session(request)
+        if session is None:
+            return False
+        rows = db.welcome_pending_for(session[0].id, since=datetime(2000, 1, 1, tzinfo=UTC))
+        return any(row.audit_id == audit_id for row in rows)
+
+    def _with_notice(next_path: str, notice: str) -> str:
+        """``next_path`` with ``acct=<notice>`` for the report's banner; as is for ``""``."""
+        if not notice:
+            return next_path
+        parts = urlsplit(next_path)
+        query = f"{parts.query}&" if parts.query else ""
+        target = f"{parts.path}?{query}acct={notice}"
+        return target + (f"#{parts.fragment}" if parts.fragment else "")
+
+    def _claim_month_preview(account_id: str, net: str, reservation: str, now: datetime) -> bool:
+        """Take one of the account's and the network's free previews of the month.
+
+        The slots an upload made signed in takes (``claim_preview`` in
+        ``create_audit``), all or nothing. ``True`` when taken under ``reservation``.
+        """
+        month = acct.claim_month(now)
+        slots = {
+            "account": [
+                f"preview:account:{account_id}:{month}:{n}"
+                for n in range(acct.FREE_PREVIEWS_PER_MONTH)
+            ]
+        }
+        if net:
+            cap = acct.network_cap(
+                net,
+                per_ip=acct.FREE_PREVIEWS_PER_IP_PER_MONTH,
+                per_ipv4=acct.FREE_PREVIEWS_PER_IPV4_PER_MONTH,
+            )
+            key = acct.network_key(net)
+            slots["network"] = [f"preview:ip:{key}:{month}:{n}" for n in range(cap)]
+        return not db.claim_free(reservation, keys=(), slots=slots, at=now)
+
+    def _anon_to_account(request: Request, account: Any, record: Any) -> str | None:
+        """Put on ``account`` a preview this browser uploaded without an account.
+
+        ``None`` when ``record`` is not one: the switch is off, an account holds
+        it, it has no pending row of an upload without an account, or this is
+        another browser (``_anon_uploader``). Whoever was sent the link keeps
+        "save" or paying, as with any report, and never takes the uploader's
+        free report or its marks.
+
+        Otherwise the report goes on the account as its own upload and its
+        pending row is attached (``store.welcome_pending_attach``). When the
+        account, browser, file, inbox or network rule refuses the free report,
+        the report counts as one of the month's free previews of the account
+        and the network, as an upload made signed in would; past that cap it
+        goes on the account as saved, not as its own upload. Otherwise it opens
+        as the free full report (``_grant_pending_welcome``), at once or on
+        confirming the address. Returns the ``acct`` notice, ``""`` for none.
+        """
+        if not cfg.anon_preview or cfg.free_mode or db.account_for_audit(record.id) is not None:
+            return None
+        row = db.anon_pending(record.id)
+        if row is None or not _anon_uploader(request, row):
+            return None
+        now = datetime.now(UTC)
+        if record.paid:
+            # Paid by its link meanwhile: only the link to the account is left.
+            if db.link_audit(account.id, record.id, at=now, via=VIA_UPLOAD) == "linked":
+                db.note_anon_linked(record.id, at=now)
+            return ""
+        # Without the free first report (the paid offer) nothing can open it for
+        # free: it goes on the account as one of the month's previews, locked,
+        # with the usual purchase, exactly as a refused free report does.
+        refused = (
+            _pending_refusal(
+                account.id,
+                device_sha256=row.device_sha256,
+                file_sha256=row.file_sha256,
+                net=row.client_ip,
+                now=now,
+            )
+            if cfg.welcome_full_report
+            else "off"
+        )
+        reservation = acct.new_secret()
+        counted = bool(refused) and _claim_month_preview(
+            account.id, row.client_ip, reservation, now
+        )
+        via = VIA_SAVED if refused and not counted else VIA_UPLOAD
+        if db.link_audit(account.id, record.id, at=now, via=via) != "linked":
+            if counted:
+                db.release_free(reservation)
+            return ""
+        if counted:
+            db.record_free_preview(record.id, account.id, client_ip=row.client_ip, at=now)
+        db.note_anon_linked(record.id, at=now)
+        if not cfg.welcome_full_report:
+            # No pending free report: confirming the e-mail opens nothing.
+            return ""
+        if not db.welcome_pending_attach(record.id, account.id):
+            return ""
+        if refused:
+            return f"preview_{refused}" if refused in WELCOME_REFUSALS else ""
+        if cfg.email_verification_required and not db.email_verified(account.id):
+            # Confirming the address opens it (``_grant_pending_welcome``).
+            return "preview_unverified"
+        return "welcome" if _grant_pending_welcome(account.id, now) else ""
+
+    def _take_anon_report(request: Request, account: Any, next_path: str) -> str:
+        """Put on the account the preview a visitor signed up or in from.
+
+        Only with ``AUDIT_ANON_PREVIEW`` on. ``next`` names the report and the
+        report-key cookie holds its key, checked as ``_load`` checks it; the
+        rest is ``_anon_to_account`` (this browser's own preview only).
+        Returns the ``acct`` notice for the way back, ``""`` for none.
+        """
+        if not cfg.anon_preview or cfg.free_mode or not next_path:
+            return ""
+        match = re.fullmatch(r"/audits/([A-Za-z0-9_-]{1,64})", urlsplit(next_path).path)
+        audit_id, _, token = (request.cookies.get(acct.REPORT_KEY_COOKIE) or "").partition(".")
+        if match is None or audit_id != match.group(1) or not token:
+            return ""
+        try:
+            record = db.get_audit(audit_id)
+            if (
+                record is None
+                or not token_matches(record.token_hash, token)
+                or record.purged_at
+                or not record.result_json
+            ):
+                return ""
+            return _anon_to_account(request, account, record) or ""
+        except Exception:  # noqa: BLE001 - signing up or in never fails over the report
+            logger.warning("could not put a report on the account it was opened from")
+            return ""
 
     def _card_offer(request: Request, account: Any, now: datetime) -> bool:
         """A card check would give this account its free full report."""
@@ -2918,7 +3206,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 next_path=acct.safe_next(next),
                 invite=_invite(invita) if _referrals_on() else "",
                 email_verification=cfg.email_verification_required,
-                offer=_offer(),
+                offer=_offer_terms(),
             )
             return _anon_page(page, csrf)
 
@@ -2959,7 +3247,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                     typo_of=typo_of or (clean if email_as_typed else ""),
                     typo_kept=bool(email_as_typed) and not typo_of,
                     email_verification=cfg.email_verification_required,
-                    offer=_offer(),
+                    offer=_offer_terms(),
                 )
                 answer = _anon_page(page, new_csrf, status)
                 if status == 429:
@@ -3021,7 +3309,10 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             # The confirmation link was queued with the account.
             mailed = cfg.email_verification_required and cfg.email_delivery_ready
             if next_path:
-                response: Response = _back_to(request, next_path, mailed=mailed)
+                notice = _take_anon_report(request, account, next_path)
+                # With the link sent, the report's own notice says what confirming opens.
+                back = next_path if mailed else _with_notice(next_path, notice)
+                response: Response = _back_to(request, back, mailed=mailed)
             else:
                 response = _account_redirect(locale, "welcome_confirm" if mailed else "welcome")
             _start_session(response, account, request, event="signup")
@@ -3144,7 +3435,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 )
                 return response
             if next_path:
-                response = _back_to(request, next_path)
+                notice = _take_anon_report(request, found[0], next_path)
+                response = _back_to(request, _with_notice(next_path, notice))
             else:
                 response = _account_redirect(found[0].locale if lang is None else locale)
             _start_session(response, found[0], request, event="signin")
@@ -3237,7 +3529,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             if not db.end_two_step_challenge(digest) and not done:
                 return again("code_bad", 400)  # pragma: no cover - finished twice at once
             if next_path and not done:
-                response: Response = _back_to(request, next_path)
+                notice = _take_anon_report(request, account, next_path)
+                response: Response = _back_to(request, _with_notice(next_path, notice))
             else:
                 response = _account_redirect(locale, done)
             response.delete_cookie(acct.TWO_STEP_COOKIE, path="/")
@@ -3572,7 +3865,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             if pending is not None:
                 db.end_two_step_challenge(pending[0])
             if next_path:
-                response: Response = _back_to(request, next_path)
+                notice = _take_anon_report(request, account, next_path)
+                response: Response = _back_to(request, _with_notice(next_path, notice))
             else:
                 response = _account_redirect(account.locale if lang is None else locale)
             response.delete_cookie(pk.COOKIE, path="/")
@@ -3646,7 +3940,13 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                     credits=db.account_credits(account.id, now),
                     csrf=csrf,
                     now=now.isoformat().replace("+00:00", "Z"),
-                    flash=done if done in account_flashes else "",
+                    flash=(
+                        _welcome_confirm_key()
+                        if done == "welcome_confirm"
+                        else done
+                        if done in account_flashes
+                        else ""
+                    ),
                     error=error if error in account_errors else "",
                     access_codes=cfg.access_codes_enabled,
                     card_payments=cfg.stripe_enabled,
@@ -3660,6 +3960,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                     email_pending=db.pending_email_change(account.id, now),
                     email_delivery_ready=cfg.email_delivery_ready,
                     email_verification_required=cfg.email_verification_required,
+                    offer=_offer_terms().kind,
                     free_mode=cfg.free_mode,
                     price_cents=cfg.price_usd_cents,
                     pack_price_cents=cfg.pack_price_usd_cents,
@@ -3916,14 +4217,19 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 # Back to this comparison after signing in, not to the list.
                 here = request.url.path + (f"?{request.url.query}" if request.url.query else "")
                 return _signin_redirect(locale, next_path=here)
-            picked = list(dict.fromkeys(id or []))
+            picked = list(id or [])
             mine = {item.audit_id: item for item in db.account_audits_list(session[0].id)}
             ready = {
                 audit_id
                 for audit_id, item in mine.items()
                 if account_pages.comparable(item, free_mode=cfg.free_mode)
             }
-            if len(picked) != 2 or not ready.issuperset(picked):
+            # Two or three different full reports of the list; one twice is refused.
+            if (
+                not 2 <= len(picked) <= MAX_COMPARED
+                or len(set(picked)) != len(picked)
+                or not ready.issuperset(picked)
+            ):
                 return RedirectResponse(f"{base}?error=compare_pick", status_code=303)
             results = []
             for audit_id in picked:
@@ -3933,20 +4239,22 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 result = AuditResult.model_validate_json(record.result_json)
                 results.append(result.model_dump(mode="json"))
             view = locale
+            three = len(picked) == 3
             body = comparison_body(
-                results[0],
-                results[1],
-                href_a=account_pages.report_href(picked[0], locale),
-                href_b=account_pages.report_href(picked[1], locale),
+                results,
+                hrefs=[account_pages.report_href(audit_id, locale) for audit_id in picked],
                 locale=view,
+                same_system=three and _same_strategy(session[0].id, picked),
             )
             copy = account_pages.COPY[view]
             body += f"<p><a class='btn btn-ghost' href='{base}'>{copy['compare_back']}</a></p>"
+            # The shareable address carries every report, in the order shown.
             query = "&".join(f"id={audit_id}" for audit_id in picked)
             page = compare_page(
                 body,
                 locale=view,
-                lead=copy["compare_lead"],
+                lead=copy["compare_lead_three" if three else "compare_lead"],
+                title=COMPARE_COPY[view]["title_three"] if three else "",
                 alternates={
                     lang: f"{account_pages.path('account', lang)}/comparar?{query}"
                     for lang in ("es", "en", "pt")
@@ -3955,6 +4263,17 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             return HTMLResponse(guard_page(page))
 
         return handler
+
+    def _same_strategy(account_id: str, audit_ids: list[str]) -> bool:
+        """Whether the account filed every report in one of its strategies.
+
+        "Mis estrategias" is where a customer says that reports are versions
+        of one system; a report is filed in one strategy at most.
+        """
+        wanted = set(audit_ids)
+        return any(
+            wanted.issubset(strategy.audit_ids) for strategy in db.list_strategies(account_id)
+        )
 
     def _signed_in_action(
         request: Request, path_locale: str, lang: str | None, csrf: str
@@ -4897,7 +5216,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         cost_bps: Annotated[str, Form(max_length=20)] = "",
         oos_start: Annotated[str, Form()] = "",
         description: Annotated[str, Form()] = "",
-        benchmark_applicable: Annotated[str, Form()] = "yes",
+        benchmark_applicable: Annotated[str, Form()] = "",
         locale: Annotated[str, Form()] = "es",
         consent: Annotated[str, Form()] = "",
         challenge: Annotated[str, Form()] = "",
@@ -4906,6 +5225,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         net_of_fees: Annotated[str, Form(max_length=8)] = "",
         return_frequency: Annotated[str, Form(max_length=16)] = "",
         return_unit: Annotated[str, Form(max_length=16)] = "",
+        ownership: Annotated[str, Form(max_length=16)] = "",
     ) -> Response:
         # The report's language, which the refusals below also speak.
         report_loc = _report_locale(locale)
@@ -4924,6 +5244,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             "net_of_fees": net_of_fees,
             "return_frequency": return_frequency,
             "return_unit": return_unit,
+            "ownership": ownership,
         }
         form = await request.form()
         # Keep explicit column choices for every refusal, including header/size checks.
@@ -4972,25 +5293,38 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         welcome = False
         free_preview = False
         spend_credit = False
+        #: AUDIT_ANON_PREVIEW: no account and no working code, so the upload is
+        #: a locked preview (a few per network a day) that signing up can open.
+        anonymous = False
         device = request.cookies.get(acct.DEVICE_COOKIE) or ""
         new_device = ""
         if not (0 < len(device) <= 128):
             device = new_device = acct.new_secret()
+
+        def signin_gate() -> Response:
+            # Whoever filled an extra box finds them open after signing up.
+            # The challenge list always sends its first choice: that is no choice.
+            chose_extras = bool(
+                (optimization is not None and optimization.filename)
+                or (live is not None and live.filename)
+                or challenge.strip() not in ("", DEFAULT_PRESET)
+            )
+            return _gate(request, report_loc, "signin", 401, extras=chose_extras)
+
         if not cfg.free_mode:
             session = _session(request)
             # Account first: every upload, code or not, belongs to an account.
-            if session is None:
-                # Whoever filled an extra box finds them open after signing up.
-                # The challenge list always sends its first choice: that is no choice.
-                chose_extras = bool(
-                    (optimization is not None and optimization.filename)
-                    or (live is not None and live.filename)
-                    or challenge.strip() not in ("", DEFAULT_PRESET)
-                )
-                return _gate(request, report_loc, "signin", 401, extras=chose_extras)
+            if session is None and not cfg.anon_preview:
+                return signin_gate()
             typed = access_code.strip()[:_CODE_MAX] if cfg.access_codes_enabled else ""
             usable = bool(typed) and await run_in_threadpool(db.code_usable, typed, now)
-            if not usable:
+            if session is None:
+                # A working code still belongs to an account; without one the
+                # file is seen as a preview without an account.
+                if usable:
+                    return signin_gate()
+                anonymous = True
+            elif not usable:
                 gate_account = session[0]
         # Strong signatures can decide a refusal from a bounded prefix. Starlette
         # has already spooled multipart, but no importer or whole-file read runs.
@@ -5211,6 +5545,30 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 return _gate(request, report_loc, "quota" if full == "account" else "network", 402)
             return None
 
+        # The day's previews without an account, per network (an IPv6 /64 or
+        # an IPv4 address): this first look answers at once, the claim taken
+        # after parsing is what holds when uploads arrive together.
+        anon_slots: list[str] = []
+        if anonymous:
+            anon_cap = acct.network_cap(
+                net,
+                per_ip=acct.ANON_PREVIEWS_PER_NETWORK_PER_DAY,
+                per_ipv4=acct.ANON_PREVIEWS_PER_IPV4_PER_DAY,
+            )
+            day = acct.claim_day(now)
+            anon_slots = [f"anon:ip:{acct.network_key(ip)}:{day}:{n}" for n in range(anon_cap)]
+            if all(db.free_claim_taken(slot) for slot in anon_slots):
+                return _gate(request, report_loc, "signin", 401)
+
+        def claim_anon_preview(inputs: Any) -> Response | None:
+            """Take one of the network's previews of the day, or ask for the account."""
+            nonlocal fingerprint
+            fingerprint = acct.content_fingerprint(inputs.equity.frame)
+            if db.claim_free(reservation, keys=(), slots={"network": anon_slots}, at=now):
+                db.release_free(reservation)
+                return _gate(request, report_loc, "signin", 401)
+            return None
+
         if gate_account is not None:
             account_email = gate_account.email
             first_look = _first_look(gate_account, device_sha256, net, now)
@@ -5231,15 +5589,22 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 trials=int(trials) if trials.strip() else 1,
                 trials_declared=bool(trials.strip()),
                 cost_bps_per_side=float(cost_bps) if cost_bps.strip() else 0.0,
+                cost_declared=bool(cost_bps.strip()),
                 oos_start=oos_start.strip() or None,
                 description=description,
                 benchmark_applicable=benchmark_applicable.lower() not in ("no", "false", "0"),
+                # The form preselects "no answer", which counts as "yes": only an
+                # explicit "yes" or "no" is an answer the client gave.
+                benchmark_declared=benchmark_applicable.strip().lower()
+                in ("yes", "true", "1", "no", "false", "0"),
                 locale=report_loc,
                 initial_balance=_positive_or_none(initial_balance),
                 challenge=challenge.strip() or None,
                 net_of_fees=net_of_fees.lower() in ("on", "yes", "true", "1"),
                 return_frequency=return_frequency.strip() or None,
                 return_unit=return_unit.strip() or None,
+                # Whose strategy it is: blank ("I'd rather not say") declares nothing.
+                ownership=ownership.strip() or None,
             )
         except (ValidationError, ValueError):
             return _upload_error(
@@ -5286,7 +5651,10 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         live_name = live_digest_name(live_filename) if uploads["live"] else None
         # A code is only redeemed where something is locked; in free mode it
         # is ignored so no credit is spent on a report that is free anyway.
+        # A preview without an account carries none (a working code asked for one).
         code = access_code.strip()[:_CODE_MAX] if cfg.access_codes_enabled else ""
+        if anonymous:
+            code = ""
         # Named columns belong to the report: a file sent with them in the
         # curve field is read with them, before any automatic reader.
         if report_columns and uploads["equity"] and not uploads["report"]:
@@ -5447,6 +5815,10 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 refusal = claim_free_use(gate_account.id, inputs)
                 if refusal is not None:
                     return refusal
+            elif anonymous:
+                refusal = claim_anon_preview(inputs)
+                if refusal is not None:
+                    return refusal
             try:
                 return _run_and_store(
                     inputs, ip, uploads, report_name, code or None, live_name=live_name
@@ -5494,10 +5866,30 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             "audit", audit_outcome, time.monotonic() - audit_started, locale=report_loc
         )
         if not isinstance(outcome, tuple):
-            if gate_account is not None:
+            if gate_account is not None or anonymous:
                 db.release_free(reservation)
             return outcome
         audit_id, token, paid = outcome
+        if anonymous:
+            try:
+                # Signing up from this report attaches the row and opens it in
+                # full under the free report's limits, with these marks.
+                db.record_welcome_pending(
+                    audit_id,
+                    "",
+                    device_sha256=device_sha256,
+                    file_sha256=fingerprint if cfg.welcome_full_report else "",
+                    client_ip=net,
+                    at=now,
+                )
+                db.record_anon_preview(
+                    audit_id,
+                    locale=report_loc,
+                    ref=funnel.clean_ref(request.cookies.get(funnel.REF_COOKIE)),
+                    at=now,
+                )
+            except Exception:  # the stored preview matters more than the offer
+                logger.warning("could not note a preview uploaded without an account")
         if mapper and report_columns and uploads["report"]:
             try:
                 table = mapping.read_table(uploads["report"])
@@ -5569,7 +5961,9 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         if paid or _session(request) is not None:
             _link_delivered(request, audit_id, via=VIA_UPLOAD)
         location = f"/audits/{audit_id}?token={token}"
-        if welcomed:
+        if anonymous:
+            location += "&acct=anon_preview"
+        elif welcomed:
             location += "&acct=welcome"
         elif credit_used:
             location += "&acct=upload_credit"
@@ -5683,7 +6077,11 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         if _wants_json(request):
             return JSONResponse({"error": f"free_tier_{reason}"}, status_code=status)
         page = account_pages.gate_page(
-            locale=locale, reason=reason, limit=acct.FREE_PREVIEWS_PER_MONTH, extras=extras
+            locale=locale,
+            reason=reason,
+            limit=acct.FREE_PREVIEWS_PER_MONTH,
+            extras=extras,
+            offer=_offer_terms(),
         )
         return HTMLResponse(page, status_code=status)
 
@@ -5882,7 +6280,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             notice = account_pages.COPY[ui]["credit_used"]
         elif acct_done == "upload_credit" and record.paid:
             notice = account_pages.COPY[ui]["credit_on_upload"]
-        elif acct_done == "welcome" and record.paid:
+        elif acct_done == "welcome" and record.paid and cfg.welcome_full_report:
+            # Under the paid offer no flow sends here; an old link says nothing.
             notice = account_pages.COPY[ui]["welcome_notice"].format(
                 limit=acct.FREE_PREVIEWS_PER_MONTH,
                 price=f"USD {cfg.price_usd:.0f}",
@@ -5891,12 +6290,33 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         elif acct_done == "saved":
             notice = account_pages.COPY[ui]["saved_notice"]
         elif acct_done == "welcome_confirm" and _confirm_pending(request):
-            notice = account_pages.COPY[ui]["welcome_confirm"]
+            notice = account_pages.COPY[ui][_welcome_confirm_key()]
+            if cfg.anon_preview and not record.paid and _waits_for_email(request, record.id):
+                # Back on the preview it signed up from: what confirming opens.
+                notice = _pending_notice(record.id, ui) or notice
+        elif (
+            acct_done == "anon_preview"
+            and cfg.anon_preview
+            and not cfg.free_mode
+            and not record.paid
+            and db.account_for_audit(record.id) is None
+        ):
+            # "Opens with an account" only where creating it would: signed out,
+            # this browser's upload, and the box's own offer holds.
+            # Under the paid offer the account never opens it for free: the
+            # box says the price instead, and the notice keeps to the preview.
+            opens = (
+                cfg.welcome_full_report
+                and _session(request) is None
+                and _anon_offer(request, record, None, datetime.now(UTC))
+            )
+            notice = account_pages.COPY[ui]["anon_preview" if opens else "anon_preview_link"]
         elif (
             acct_done
             and acct_done.startswith("preview_")
             and acct_done[8:] in WELCOME_REFUSALS
             and not record.paid
+            and cfg.welcome_full_report
         ):
             notice = account_pages.COPY[ui][f"welcome_refused_{acct_done[8:]}"]
             if acct_done[8:] == "unverified":
@@ -5958,11 +6378,23 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         if session is None:
             if not token:
                 return ""
+            if not cfg.welcome_full_report:
+                # The paid offer: this browser's own preview opens in full on its
+                # account for the price, with the refund; never for free.
+                return account_pages.report_box(
+                    locale=locale,
+                    state="anon",
+                    audit_id=record.id,
+                    query=query,
+                    anon_preview=_anon_paid(request, record, owner),
+                    offer=_offer_terms(),
+                )
             return account_pages.report_box(
                 locale=locale,
                 state="anon",
                 audit_id=record.id,
                 query=query,
+                anon_preview=_anon_offer(request, record, owner, datetime.now(UTC)),
             )
         account, csrf, _ = session
         state = "mine" if owner == account.id else ("unsaved" if owner is None else "other")
@@ -6012,9 +6444,21 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             return checked
         record, session = checked
         locale = _view_locale(record, lang)
-        outcome = db.link_audit(session[0].id, record.id, at=datetime.now(UTC))
+        account = session[0]
+        try:
+            # A preview this browser uploaded without an account goes on as on
+            # signing up from it (an account made from the menu, then "save").
+            notice = _anon_to_account(request, account, record)
+        except Exception:  # noqa: BLE001 - saving never fails over the free report
+            logger.warning("could not put a preview without an account on the account")
+            notice = None
+        if notice is None:
+            outcome = db.link_audit(account.id, record.id, at=datetime.now(UTC))
+            saved = outcome in ("linked", "already")
+        else:
+            saved = db.account_for_audit(record.id) == account.id
         back = f"/audits/{audit_id}?token={token}" if token else f"/audits/{audit_id}?"
-        done = "&acct=saved" if outcome in ("linked", "already") else ""
+        done = f"&acct={notice}" if notice else "&acct=saved" if saved else ""
         return RedirectResponse(f"{back}&lang={locale}{done}", status_code=303)
 
     @app.post("/audits/{audit_id}/credit")
@@ -6253,8 +6697,12 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         """Publication, record, the page's data and the result's SHA-256.
 
         A purged audit is served from the view the purge kept; without one
-        the page is gone (410).
+        the page is gone (410). A public sample's reserved id
+        (``sample_publication``) is answered from the sample itself, before any
+        lookup: no real id can be one (``Store.publish`` draws 12 characters).
         """
+        if public_id in SAMPLE_KIND_BY_PUBLIC_ID:
+            return _sample_publication(public_id)
         publication = db.get_publication(public_id)
         if publication is None:
             raise _not_found()
@@ -6317,19 +6765,55 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         return static(og_image_name(f"class-{overall}", locale))
 
     @app.get("/v/{public_id}", response_class=HTMLResponse)
-    def verification(request: Request, public_id: str, lang: str | None = None) -> str:
+    def verification(request: Request, public_id: str, lang: str | None = None) -> Response:
         publication, _, data, digest = _published(public_id)
-        return verification_page(
+        if lang is None:
+            # No language in the address (a badge's link, Spanish's own address): a
+            # browser that asks for English or Portuguese goes on to that page's
+            # address, with the rest of the query (its ?ref=). /v/{id} itself stays
+            # the Spanish page, with the same canonical as always.
+            wanted = accept_language_locale(request.headers.get("accept-language"))
+            if wanted is not None and wanted != "es":
+                query = urlencode([*request.query_params.multi_items(), ("lang", wanted)])
+                moved = RedirectResponse(f"/v/{quote(public_id, safe='')}?{query}", 302)
+                moved.headers["Vary"] = "Accept-Language"
+                return moved
+        locale = _report_locale(lang)
+        page = verification_page(
             data,
             public_id=publication.public_id,
             published_at=publication.created_at,
             result_sha256=digest,
             base_url=_site_url(request),
-            locale=_report_locale(lang),
+            locale=locale,
+            # None for a publication: only a public sample's page has its own words.
+            sample=sample_page(public_id, locale),
         )
+        shown = HTMLResponse(page)
+        if lang is None:
+            shown.headers["Vary"] = "Accept-Language"
+        return shown
 
-    sample_cache: dict[tuple[str, str, tuple[str, ...]], str] = {}
+    sample_cache: dict[tuple[str, str, str, tuple[str, ...]], str] = {}
     sample_lock = threading.Lock()
+    samples = {
+        "backtest": _PublicSample(
+            result=sample_result,
+            banner=SAMPLE_BANNER,
+            meta=sample_meta,
+            switch={"es": "/sample?lang=en", "en": "/ejemplo?lang=es", "pt": "/ejemplo?lang=es"},
+            pdf_paths=SAMPLE_PDF_PATHS,
+            names=SAMPLE_PDF_NAMES,
+        ),
+        "signal": _PublicSample(
+            result=signal_sample_result,
+            banner=SIGNAL_SAMPLE_BANNER,
+            meta=signal_sample_meta,
+            switch=SIGNAL_SAMPLE_PATHS,
+            pdf_paths=SIGNAL_SAMPLE_PDF_PATHS,
+            names=SIGNAL_SAMPLE_PDF_NAMES,
+        ),
+    }
 
     def _sample_market() -> tuple[Callable[[str], Any] | None, tuple[str, ...]]:
         """The public series already in memory for the sample, never waiting on
@@ -6337,78 +6821,127 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         ready = market_data.ready() if market_data is not None else ()
         return (market_data.closes if market_data is not None and ready else None), ready
 
-    def _sample_html(locale: str, base_url: str) -> str:
-        """Built once per locale, address and set of public series in memory, and
-        kept: the input and the clock are fixed."""
+    # Each sample's audit per language, for the set of public series it was built
+    # with: its page, its PDF and its public page share one run, so /v/ejemplo reads
+    # the Spanish result /ejemplo already built (and the other way round).
+    sample_audits: dict[tuple[str, str], tuple[tuple[str, ...], AuditResult]] = {}
+    sample_audit_locks: dict[tuple[str, str], threading.Lock] = {}
+    sample_audit_guard = threading.Lock()
+
+    def _sample_audit(
+        kind: str, locale: str, market: Callable[[str], Any] | None, ready: tuple[str, ...]
+    ) -> AuditResult:
+        """The sample's result in ``locale`` for the series ``ready``: run once and
+        kept until the series change. One lock per sample and language, so a run
+        never holds up another language, and two requests never run the same one."""
+        key = (kind, locale)
+        with sample_audit_guard:
+            lock = sample_audit_locks.setdefault(key, threading.Lock())
+        with lock:
+            kept = sample_audits.get(key)
+            if kept is None or kept[0] != ready:
+                kept = (ready, samples[kind].result(locale, market=market))
+                sample_audits[key] = kept
+            return kept[1]
+
+    sample_views: dict[tuple[str, tuple[str, ...]], tuple[Any, Any, dict[str, Any], str]] = {}
+    # Its own lock: building a sample's view never holds up the sample pages.
+    sample_view_lock = threading.Lock()
+
+    def _sample_publication(public_id: str) -> tuple[Any, Any, dict[str, Any], str]:
+        """``_published`` for a public sample's reserved id: its publication (the day
+        it was published), its record (the audit's date and class), the view a purge
+        keeps of the sample's Spanish report and its hash, with the public series in
+        memory as its page has them. Built once per sample and set of series, from
+        the run its report page shares, and kept; nothing is read from or written to
+        the database."""
+        kind = SAMPLE_KIND_BY_PUBLIC_ID[public_id]
+        with sample_view_lock:
+            market, ready = _sample_market()
+            for stale in [k for k in sample_views if k[1] != ready]:
+                del sample_views[stale]
+            key = (kind, ready)
+            if key not in sample_views:
+                result = _sample_audit(kind, SAMPLE_PUBLICATION_LOCALE, market, ready)
+                sample_views[key] = sample_publication(public_id, result)
+            return sample_views[key]
+
+    def _sample_html(locale: str, base_url: str, kind: str = "backtest") -> str:
+        """Built once per sample, locale, address and set of public series in
+        memory, and kept: the input and the clock are fixed."""
+        sample = samples[kind]
         with sample_lock:
             # Read the series in memory under the lock, so a request that saw an
             # older set never evicts a page built for a newer one.
             market, ready = _sample_market()
-            key = (locale, base_url, ready)
+            key = (kind, locale, base_url, ready)
             # Only the current set of series is worth keeping.
-            for stale in [k for k in sample_cache if k[2] != ready]:
+            for stale in [k for k in sample_cache if k[3] != ready]:
                 del sample_cache[stale]
             if key not in sample_cache:
                 html_text, _ = render(
-                    sample_result(locale, market=market),
+                    _sample_audit(kind, locale, market, ready),
                     watermark=False,
                     free_mode=True,
-                    notice=SAMPLE_BANNER[locale],
+                    notice=sample.banner[locale],
                     legal_links=True,
-                    switch_url="/sample?lang=en" if locale == "es" else "/ejemplo?lang=es",
+                    switch_url=sample.switch[locale],
                     locale=locale,
-                    head_meta=sample_meta(locale, base_url),
-                    pdf_url=(SAMPLE_PDF_PATHS[locale] if pdf_ok else None),
+                    head_meta=sample.meta(locale, base_url),
+                    pdf_url=(sample.pdf_paths[locale] if pdf_ok else None),
                     tools_link=True,
                     sample_cta=True,
-                    sample_offer=_offer(),
+                    sample_offer=_offer_terms(),
+                    sample_kind=kind,
                 )
-                # The tab title ends with the report's id, "sample": show the
-                # page's own word. Nothing inside the report changes.
+                # The tab title and the identifier line end with the report's id,
+                # "sample": show the page's own word, the one its public page shows
+                # too. Nothing the report measured changes.
                 html_text = html_text.replace(
-                    " · sample</title>", f" · {SAMPLE_PDF_NAMES[locale]}</title>", 1
+                    " · sample</title>", f" · {sample.names[locale]}</title>", 1
                 )
-                sample_cache[key] = html_text
+                sample_cache[key] = show_sample_id(html_text, kind, locale)
             return sample_cache[key]
 
-    sample_pdfs: dict[tuple[str, tuple[str, ...]], bytes] = {}
+    sample_pdfs: dict[tuple[str, str, tuple[str, ...]], bytes] = {}
     # Its own lock: a PDF build (seconds) never holds up the sample page.
     sample_pdf_lock = threading.Lock()
 
-    def _sample_pdf(locale: str) -> Response:
-        """The sample report as the PDF a buyer gets, built once per language and
-        set of public series in memory."""
+    def _sample_pdf(locale: str, kind: str = "backtest") -> Response:
+        """The sample report as the PDF a buyer gets, built once per sample,
+        language and set of public series in memory."""
+        sample = samples[kind]
         with sample_pdf_lock:
             market, ready = _sample_market()
-            key = (locale, ready)
-            for stale in [k for k in sample_pdfs if k[1] != ready]:
+            key = (kind, locale, ready)
+            for stale in [k for k in sample_pdfs if k[2] != ready]:
                 del sample_pdfs[stale]
             if key not in sample_pdfs:
                 page, _ = render(
-                    sample_result(locale, market=market),
+                    _sample_audit(kind, locale, market, ready),
                     watermark=False,
                     free_mode=True,
-                    notice=SAMPLE_BANNER[locale],
+                    notice=sample.banner[locale],
                     legal_links=True,
                     locale=locale,
                 )
-                # The PDF's own title carries the page's word too, not "sample".
-                page = page.replace(
-                    " · sample</title>", f" · {SAMPLE_PDF_NAMES[locale]}</title>", 1
-                )
+                # The PDF's own title and identifier carry the page's word too, not "sample".
+                page = page.replace(" · sample</title>", f" · {sample.names[locale]}</title>", 1)
+                page = show_sample_id(page, kind, locale)
                 try:
                     sample_pdfs[key] = pdf_lib.report_pdf(
                         page,
-                        audit_id=SAMPLE_PDF_NAMES[locale],
+                        audit_id=sample.names[locale],
                         locale=locale,
                         wait_seconds=PDF_WAIT_SECONDS,
                     )
+                    # Both samples are recorded as the sample: /comprobar says so.
                     _record_issued(sample_pdfs[key], audit_id=check_lib.SAMPLE_AUDIT_ID, kind="pdf")
                 except (pdf_lib.PdfBusy, pdf_lib.PdfUnavailable):
                     return HTMLResponse(
                         error_page(message("pdf_busy", locale), locale=locale), status_code=503
                     )
-        name = f"rigor-{SAMPLE_PDF_NAMES[locale]}.pdf"
+        name = f"rigor-{sample.names[locale]}.pdf"
         return Response(
             content=sample_pdfs[key],
             media_type="application/pdf",
@@ -6441,6 +6974,31 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     @app.get("/sample", response_class=HTMLResponse)
     async def sample_en(request: Request, lang: str | None = None) -> str:
         return await run_in_threadpool(_sample_html, _locale(lang or "en"), _site_url(request))
+
+    # The signal sample: the same pages, cache and PDF, one address per language.
+    @app.get(SIGNAL_SAMPLE_PDF_PATHS["es"])
+    async def signal_sample_pdf_es() -> Response:
+        return await run_in_threadpool(_sample_pdf, "es", "signal")
+
+    @app.get(SIGNAL_SAMPLE_PDF_PATHS["en"])
+    async def signal_sample_pdf_en() -> Response:
+        return await run_in_threadpool(_sample_pdf, "en", "signal")
+
+    @app.get(SIGNAL_SAMPLE_PDF_PATHS["pt"])
+    async def signal_sample_pdf_pt() -> Response:
+        return await run_in_threadpool(_sample_pdf, "pt", "signal")
+
+    @app.get(SIGNAL_SAMPLE_PATHS["es"], response_class=HTMLResponse)
+    async def signal_sample_es(request: Request) -> str:
+        return await run_in_threadpool(_sample_html, "es", _site_url(request), "signal")
+
+    @app.get(SIGNAL_SAMPLE_PATHS["en"], response_class=HTMLResponse)
+    async def signal_sample_en(request: Request) -> str:
+        return await run_in_threadpool(_sample_html, "en", _site_url(request), "signal")
+
+    @app.get(SIGNAL_SAMPLE_PATHS["pt"], response_class=HTMLResponse)
+    async def signal_sample_pt(request: Request) -> str:
+        return await run_in_threadpool(_sample_html, "pt", _site_url(request), "signal")
 
     @app.get("/guias", response_class=HTMLResponse)
     def guides_es(request: Request, lang: str | None = None) -> str:
@@ -6520,7 +7078,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             png_enabled=bool(image_path) and owner_card.png_available(),
         )
         return HTMLResponse(
-            guard_page(page),
+            guard_page(_offered(page, locale)),
             status_code=status,
             headers={"Retry-After": "3600"} if status == 429 else None,
         )
@@ -6562,7 +7120,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             error=error,
             image_path=image_path,
         )
-        return HTMLResponse(guard_page(page), status_code=status)
+        return HTMLResponse(guard_page(_offered(page, locale)), status_code=status)
 
     for winrate_path in winrate.WINRATE_PATH.values():
         app.add_api_route(
@@ -6578,7 +7136,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
 
     def public_tools(request: Request) -> str:
         locale = next(lang for lang, path in TOOLS_PATH.items() if path == request.url.path)
-        return tools_page(locale=locale, base_url=_site_url(request))
+        return _offered(tools_page(locale=locale, base_url=_site_url(request)), locale)
 
     for tools_path in TOOLS_PATH.values():
         app.add_api_route(tools_path, public_tools, methods=["GET"], response_class=HTMLResponse)
@@ -6618,7 +7176,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             within = calculator_attempts.hit(ip, datetime.now(UTC)) < CARD_REQUESTS_PER_HOUR
             if within and _calculator_card(locale, parsed) is not None:
                 image_path = calculator_url(locale) + "/card.png?" + urlencode(share_values(parsed))
-        return calculator_page(
+        page = calculator_page(
             locale=locale,
             base_url=_site_url(request),
             sharpe=sharpe,
@@ -6627,6 +7185,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             periods_per_year=periods_per_year,
             image_path=image_path,
         )
+        return _offered(page, locale)
 
     def calculator_card_png(request: Request) -> Response:
         """The share card of a calculator result, for link previews.
@@ -6717,7 +7276,17 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 # A missing page, not a missing audit: the ordinary 404 text.
                 raise HTTPException(status_code=404, detail="page_missing")
             return RedirectResponse(guide_url(other.slug, path_locale), status_code=301)
-        return HTMLResponse(guide_page(guide, locale=locale, base_url=_site_url(request)))
+        return HTMLResponse(
+            guide_page(
+                guide,
+                locale=locale,
+                base_url=_site_url(request),
+                # The free report as the sign-up page states it.
+                offer=_offer_terms(),
+                email_verification=cfg.email_verification_required,
+                max_upload_bytes=cfg.max_upload_bytes,
+            )
+        )
 
     def _audience(request: Request, slug: str, path_locale: str, locale: str) -> Response:
         page = AUDIENCES_BY_PATH[path_locale].get(slug)
@@ -6734,16 +7303,15 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             if other is None:
                 raise HTTPException(status_code=404, detail="page_missing")
             return RedirectResponse(audience_url(other.slug, path_locale), status_code=301)
-        return HTMLResponse(
-            audience_page(
-                page,
-                locale=locale,
-                base_url=_site_url(request),
-                free_mode=cfg.free_mode,
-                price_usd=cfg.price_usd,
-                pack_price_usd=cfg.pack_price_usd,
-            )
+        html_page = audience_page(
+            page,
+            locale=locale,
+            base_url=_site_url(request),
+            free_mode=cfg.free_mode,
+            price_usd=cfg.price_usd,
+            pack_price_usd=cfg.pack_price_usd,
         )
+        return HTMLResponse(_offered(html_page, locale))
 
     @app.get("/para/{slug}", response_class=HTMLResponse)
     def audience_es(request: Request, slug: str, lang: str | None = None) -> Response:
@@ -6775,27 +7343,29 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
 
     @app.get("/ejemplos", response_class=HTMLResponse)
     def examples_es(request: Request) -> str:
-        return examples_page(locale="es", base_url=_site_url(request))
+        return _offered(examples_page(locale="es", base_url=_site_url(request)), "es")
 
     @app.get("/en/examples", response_class=HTMLResponse)
     def examples_en(request: Request) -> str:
-        return examples_page(locale="en", base_url=_site_url(request))
+        return _offered(examples_page(locale="en", base_url=_site_url(request)), "en")
 
     @app.get("/pt/exemplos", response_class=HTMLResponse)
     def examples_pt(request: Request) -> str:
-        return examples_page(locale="pt", base_url=_site_url(request))
+        return _offered(examples_page(locale="pt", base_url=_site_url(request)), "pt")
 
     @app.get("/articulos", response_class=HTMLResponse)
     def articles_es(request: Request, lang: str | None = None) -> str:
-        return articles_index_page(locale=_locale(lang or "es"), base_url=_site_url(request))
+        locale = _locale(lang or "es")
+        return _offered(articles_index_page(locale=locale, base_url=_site_url(request)), locale)
 
     @app.get("/articles", response_class=HTMLResponse)
     def articles_en(request: Request, lang: str | None = None) -> str:
-        return articles_index_page(locale=_locale(lang or "en"), base_url=_site_url(request))
+        locale = _locale(lang or "en")
+        return _offered(articles_index_page(locale=locale, base_url=_site_url(request)), locale)
 
     @app.get("/pt/artigos", response_class=HTMLResponse)
     def articles_pt(request: Request) -> str:
-        return articles_index_page(locale="pt", base_url=_site_url(request))
+        return _offered(articles_index_page(locale="pt", base_url=_site_url(request)), "pt")
 
     def _article(request: Request, slug: str, path_locale: str, locale: str) -> Response:
         found = find_article(slug, path_locale)
@@ -6806,7 +7376,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         if slug_locale != path_locale:
             # An article's slug in another language moves to this language's own.
             return RedirectResponse(article_url(article.key, path_locale), status_code=301)
-        return HTMLResponse(article_page(article, locale=locale, base_url=_site_url(request)))
+        page = article_page(article, locale=locale, base_url=_site_url(request))
+        return HTMLResponse(_offered(page, locale))
 
     @app.get("/articulos/{slug}", response_class=HTMLResponse)
     def article_es(request: Request, slug: str, lang: str | None = None) -> Response:
@@ -6838,6 +7409,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             email_delivery_ready=cfg.email_delivery_ready,
             email_via_resend=cfg.resend_ready,
             email_verification_required=cfg.email_verification_required,
+            welcome_full_report=cfg.welcome_full_report,
+            anon_preview=cfg.anon_preview,
         )
 
     def _terms(request: Request, locale: str) -> str:
@@ -6863,7 +7436,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         if request is not None and _session(request) is not None:
             # Signed in: their own reports compare without pasting links.
             form = account_pages.compare_mine_note(locale) + form
-        page = compare_page(form, locale=locale)
+        page = compare_page(form, locale=locale, title=COMPARE_COPY[locale]["title_form"])
         return HTMLResponse(page, status_code=status)
 
     @app.get("/comparar", response_class=HTMLResponse)
@@ -6878,15 +7451,20 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     def compare_pt(request: Request) -> Response:
         return _compare_form_page("pt", request=request)
 
-    def _compare(link_a: str, link_b: str, lang: str | None, default: str) -> Response:
+    def _compare(request: Request, links: list[str], lang: str | None, default: str) -> Response:
         # A Portuguese report posted to another language's address stays Portuguese.
         locale = "pt" if "pt" in (default, lang) else _locale(lang or default)
         copy = COMPARE_COPY[locale]
-        first, second = parse_report_link(link_a), parse_report_link(link_b)
-        if first is None or second is None:
-            return _compare_form_page(locale, error=copy["bad_link"], status=400)
-        parsed = [first, second]
-        if first[0] == second[0]:
+        # The third field is optional: left empty, two reports are compared.
+        texts = links[:2] + [text for text in links[2:MAX_COMPARED] if text.strip()]
+        parsed: list[tuple[str, str]] = []
+        for text in texts:
+            link = parse_report_link(text)
+            if link is None:
+                return _compare_form_page(locale, error=copy["bad_link"], status=400)
+            parsed.append(link)
+        ids = [audit_id for audit_id, _ in parsed]
+        if len(set(ids)) != len(ids):
             return _compare_form_page(locale, error=copy["same"], status=400)
         results = []
         for audit_id, token in parsed:
@@ -6902,41 +7480,49 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 return _compare_form_page(locale, error=copy["locked"], status=402)
             result = AuditResult.model_validate_json(record.result_json)
             results.append((result.model_dump(mode="json"), f"/audits/{audit_id}?token={token}"))
-        (data_a, href_a), (data_b, href_b) = results
+        three = len(results) == 3
+        # Versions of one strategy only for whoever filed all three in it.
+        session = _session(request) if three else None
         body = comparison_body(
-            data_a,
-            data_b,
-            href_a=f"{href_a}&lang={locale}",
-            href_b=f"{href_b}&lang={locale}",
+            [data for data, _ in results],
+            hrefs=[f"{href}&lang={locale}" for _, href in results],
             locale=locale,
+            same_system=session is not None and _same_strategy(session[0].id, ids),
         )
         again = COMPARE_PATH[locale] + ("" if locale == "pt" else f"?lang={locale}")
         body += f"<p><a class='btn btn-ghost' href='{again}'>{copy['again']}</a></p>"
-        return HTMLResponse(guard_page(compare_page(body, locale=locale)))
+        title = copy["title_three"] if three else ""
+        return HTMLResponse(guard_page(compare_page(body, locale=locale, title=title)))
 
     @app.post("/comparar", response_class=HTMLResponse)
     def compare_post_es(
+        request: Request,
         link_a: Annotated[str, Form(max_length=1000)],
         link_b: Annotated[str, Form(max_length=1000)],
+        link_c: Annotated[str, Form(max_length=1000)] = "",
         lang: Annotated[str | None, Form()] = None,
     ) -> Response:
-        return _compare(link_a, link_b, lang, "es")
+        return _compare(request, [link_a, link_b, link_c], lang, "es")
 
     @app.post("/compare", response_class=HTMLResponse)
     def compare_post_en(
+        request: Request,
         link_a: Annotated[str, Form(max_length=1000)],
         link_b: Annotated[str, Form(max_length=1000)],
+        link_c: Annotated[str, Form(max_length=1000)] = "",
         lang: Annotated[str | None, Form()] = None,
     ) -> Response:
-        return _compare(link_a, link_b, lang, "en")
+        return _compare(request, [link_a, link_b, link_c], lang, "en")
 
     @app.post("/pt/comparar", response_class=HTMLResponse)
     def compare_post_pt(
+        request: Request,
         link_a: Annotated[str, Form(max_length=1000)],
         link_b: Annotated[str, Form(max_length=1000)],
+        link_c: Annotated[str, Form(max_length=1000)] = "",
         lang: Annotated[str | None, Form()] = None,
     ) -> Response:
-        return _compare(link_a, link_b, lang, "pt")
+        return _compare(request, [link_a, link_b, link_c], lang, "pt")
 
     def _check_page(request: Request, locale: str, content: str, status: int = 200) -> Response:
         page = check_page(content, locale=locale, base_url=_site_url(request))
@@ -7092,17 +7678,18 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 or buyer_session[0].id != account_id
                 or not db.email_verified(account_id)
             ):
-                return _html_error(
-                    request,
-                    403,
-                    account_pages.COPY[locale]["email_checkout_required"],
-                    locale,
+                # Under the paid offer confirming opens no free report: only the payment.
+                required = (
+                    "email_checkout_required_paid"
+                    if _offer_terms().paid
+                    else "email_checkout_required"
                 )
+                return _html_error(request, 403, account_pages.COPY[locale][required], locale)
         if final_sale != "yes":
             final_sale_needed = {
-                "es": "Marca la casilla de compra no reembolsable para pagar.",
-                "en": "Tick the non-refundable purchase box to pay.",
-                "pt": "Marque a caixa de compra não reembolsável para pagar.",
+                "es": "Marca la casilla de los términos de compra para pagar.",
+                "en": "Tick the purchase terms box to pay.",
+                "pt": "Marque a caixa dos termos de compra para pagar.",
             }
             return _html_error(request, 400, final_sale_needed[locale], locale)
         # The pack is sold only while it is on sale; anything else is one audit.

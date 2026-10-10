@@ -18,7 +18,7 @@ from datetime import datetime
 from typing import Any
 from urllib.parse import quote, urlencode
 
-from quant_trade.audit import accounts, institutional, reading, winrate
+from quant_trade.audit import accounts, institutional, paid_offer, reading, winrate
 from quant_trade.audit.accounts import FREE_PREVIEWS_PER_MONTH as _FREE
 from quant_trade.audit.article_numbers import STREAK_ROWS
 from quant_trade.audit.articles import (
@@ -73,6 +73,7 @@ from quant_trade.audit.examples import (
     examples_content,
     examples_url,
 )
+from quant_trade.audit.guide_capabilities import GUIDE_TOOL, guide_points, guide_purpose
 from quant_trade.audit.guides import (
     GUIDES,
     GUIDES_COPY,
@@ -82,8 +83,10 @@ from quant_trade.audit.guides import (
     guides_index_url,
 )
 from quant_trade.audit.legal import LegalText, legal_url
+from quant_trade.audit.method import CHALLENGE_SECTION, dimension_rows, method_url, references
 from quant_trade.audit.method import COPY as METHOD_COPY
-from quant_trade.audit.method import dimension_rows, method_url, references
+from quant_trade.audit.ownership import FORM as OWNERSHIP_FORM
+from quant_trade.audit.ownership import ROLES as OWNERSHIP_ROLES
 from quant_trade.audit.portuguese import (
     AUDIENCES_PT,
     CLASS_B_PT,
@@ -97,7 +100,7 @@ from quant_trade.audit.portuguese import (
     UI_PT,
     link_locale,
 )
-from quant_trade.audit.pricing import PRICING_COPY, PRICING_PATH, usd
+from quant_trade.audit.pricing import PRICING_COPY, PRICING_PATH, offer_text, usd
 from quant_trade.audit.prop_presets import AS_OF, DEFAULT_PRESET, PRESETS, preset_label
 from quant_trade.audit.public_card import PublicClaim
 from quant_trade.audit.redflags import FLAG_TITLES
@@ -114,9 +117,13 @@ from quant_trade.audit.report import (
     report_kind,
     source_name,
 )
+from quant_trade.audit.report import LABELS as REPORT_LABELS
+from quant_trade.audit.sample_publication import SamplePage, public_pages_line
+from quant_trade.audit.schema import MAX_UPLOAD_BYTES
 from quant_trade.audit.seo import (
     BRAND,
     OG_IMAGE_SIZE,
+    SIGNAL_SAMPLE_PATHS,
     TAGLINE,
     PageMeta,
     article_structured_data,
@@ -144,6 +151,7 @@ from quant_trade.audit.theme import (
 )
 from quant_trade.audit.tools_hub import COPY as TOOLS_COPY
 from quant_trade.audit.tools_hub import TOOL_KEYS, TOOLS_PATH, tools_url
+from quant_trade.audit.upload_limits import guide_limit_text, upload_limit_text
 from quant_trade.audit.verdict import class_text, meaning, trials_undeclared
 
 #: The fixed wording of the badge and of the verification page's notice. It
@@ -210,6 +218,57 @@ SAMPLE_BANNER: dict[str, str] = {
     ),
 }
 
+#: The second sample (``SIGNAL_SAMPLE_PATHS``, ``sample.signal_sample_result``): its
+#: notice opens by saying what the signal is, then repeats the synthetic-data notice.
+SIGNAL_SAMPLE_BANNER: dict[str, str] = {
+    "es": (
+        "Es una señal inventada para mostrar qué ve quien va a copiar una señal, y no es de "
+        "nadie. Informe de ejemplo con datos sintéticos generados por computadora, en el "
+        "formato del CSV que exporta Myfxbook: no es la cuenta ni la estrategia de nadie. Así "
+        "se ve un informe completo."
+    ),
+    "en": (
+        "This is a made-up signal, built to show what someone about to copy a signal sees, and "
+        "it belongs to nobody. Sample report built from computer-generated synthetic data, in "
+        "the format of the CSV Myfxbook exports: it is nobody's account or strategy. This is "
+        "what a full report looks like."
+    ),
+    "pt": (
+        "É um sinal inventado para mostrar o que vê quem vai copiar um sinal, e não é de "
+        "ninguém. Relatório de exemplo feito com dados sintéticos gerados por computador, no "
+        "formato do CSV que o Myfxbook exporta: não é a conta nem a estratégia de ninguém. "
+        "Assim fica um relatório completo."
+    ),
+}
+
+#: The signal sample's search title and description, and the words of the links to it.
+SIGNAL_SAMPLE_COPY: dict[str, dict[str, str]] = {
+    "es": {
+        "title": "Informe de ejemplo de una señal para copiar (datos sintéticos)",
+        "description": (
+            "Informe de ejemplo de una señal inventada, exportada de Myfxbook: martingala, "
+            "rejilla, depósito en plena pérdida y pérdida abierta, como los ve quien copia."
+        ),
+        "link": "Ver el informe de ejemplo de una señal",
+    },
+    "en": {
+        "title": "Sample report of a signal to copy (synthetic data)",
+        "description": (
+            "Sample report of a made-up signal exported from Myfxbook: martingale, a grid, a "
+            "deposit deep in a loss and an open loss, as someone about to copy it sees them."
+        ),
+        "link": "See the sample report of a signal",
+    },
+    "pt": {
+        "title": "Relatório de exemplo de um sinal para copiar (dados sintéticos)",
+        "description": (
+            "Relatório de exemplo de um sinal inventado exportado do Myfxbook: martingale, "
+            "grade, depósito em plena perda e perda aberta, como os vê quem vai copiá-lo."
+        ),
+        "link": "Ver o relatório de exemplo de um sinal",
+    },
+}
+
 _COPY: dict[str, dict[str, Any]] = {
     "es": {
         "title": f"{BRAND} · Auditoría de backtests",
@@ -245,7 +304,7 @@ _COPY: dict[str, dict[str, Any]] = {
             "NinjaTrader, QuantConnect, backtesting.py o vectorbt, o el historial de "
             "operaciones en CSV o Excel de cualquier otro bróker o exchange. Reconoce el "
             "formato de exportación de " + PLATFORMS_ES + ". También un estado de cuenta en PDF "
-            "con su tabla de operaciones: antes de medir revisas las columnas. Hasta 10 MB."
+            "con su tabla de operaciones: antes de medir revisas las columnas."
         ),
         "live": "Estado de cuenta real o demo (opcional)",
         "live_help": (
@@ -300,6 +359,7 @@ _COPY: dict[str, dict[str, Any]] = {
             "Son rentabilidades de un fondo, ya netas de sus comisiones (solo historial mensual)"
         ),
         "benchmark_applicable": "¿Aplica un benchmark?",
+        "unanswered": "Sin respuesta (cuenta como sí)",
         "yes": "Sí",
         "no": "No",
         "locale": "Idioma del informe",
@@ -322,6 +382,10 @@ _COPY: dict[str, dict[str, Any]] = {
         "signin_first": (
             "Antes de subir, crea tu cuenta gratis: tu primer informe sale completo, con PDF, "
             "sin pagar."
+        ),
+        "anon_preview_note": (
+            "Sin cuenta ves la clase de A a D y las banderas rojas de tu archivo. Con tu correo, "
+            "el primer informe completo es gratis."
         ),
         "signin_create": "Crear cuenta gratis",
         "signin_enter": "Ya tengo cuenta",
@@ -442,11 +506,13 @@ _COPY: dict[str, dict[str, Any]] = {
             ),
             (
                 "¿Qué recibo?",
-                "Gratis, la vista previa: clase de A a D, gráficas, banderas rojas "
-                "y qué significa cada dimensión. El informe completo añade cada cifra, pruebas "
+                "Gratis, la vista previa: clase de A a D, gráficas, la revisión de "
+                f"{len(FLAG_TITLES)} banderas rojas y qué significa cada dimensión. "
+                "El informe completo añade cada cifra, pruebas "
                 "de estrés, riesgo y capital, simulador de retos, la cuenta real frente al "
-                "backtest si la subes, preguntas para el vendedor y el PDF. Mira el ejemplo "
-                "completo antes de pagar.",
+                "backtest si la subes, las preguntas que el informe deja abiertas (qué archivo "
+                "responde cada una o, si la compraste, qué preguntarle al vendedor) y el PDF. "
+                "Mira el ejemplo completo antes de pagar.",
             ),
             (
                 "¿Por qué subir el XML de optimización de MT5?",
@@ -521,7 +587,7 @@ _COPY: dict[str, dict[str, Any]] = {
         "v_period": "Periodo de los datos",
         "v_age": "Días entre el último dato y la auditoría",
         "v_format": "Formato del archivo",
-        "v_engine": "Motor",
+        "v_engine": "Versión del motor",
         "v_trials_declared": "Intentos declarados",
         "v_trials_used": "Intentos usados en el Sharpe deflactado",
         "v_trials_undeclared": "sin declarar; se calcula con 1, el caso más favorable",
@@ -569,7 +635,7 @@ _COPY: dict[str, dict[str, Any]] = {
             "any other broker or exchange. It recognises the export format of "
             + PLATFORMS_EN
             + ". A PDF statement with its trade table works too: you check the columns "
-            "before it measures. Up to 10 MB."
+            "before it measures."
         ),
         "live": "Live or demo account statement (optional)",
         "live_help": (
@@ -621,6 +687,7 @@ _COPY: dict[str, dict[str, Any]] = {
             "These are a fund's returns, already net of its fees (monthly track record only)"
         ),
         "benchmark_applicable": "Does a benchmark apply?",
+        "unanswered": "No answer (counts as yes)",
         "yes": "Yes",
         "no": "No",
         "locale": "Report language",
@@ -643,6 +710,10 @@ _COPY: dict[str, dict[str, Any]] = {
         "signin_first": (
             "Before you upload, create your free account: your first report comes out in full, "
             "with the PDF, at no cost."
+        ),
+        "anon_preview_note": (
+            "Without an account you see your file's A to D class and red flags. With your "
+            "email, the first full report is free."
         ),
         "signin_create": "Create a free account",
         "signin_enter": "I have an account",
@@ -758,11 +829,13 @@ _COPY: dict[str, dict[str, Any]] = {
             ),
             (
                 "What do I get?",
-                "For free, the preview: A to D class, charts, red flags and what each "
-                "dimension means. The full report adds every figure, stress tests, risk and "
+                "For free, the preview: A to D class, charts, the check for "
+                f"{len(FLAG_TITLES)} red flags and what each dimension means. "
+                "The full report adds every figure, stress tests, risk and "
                 "capital, the challenge simulator, the live account against the backtest if you "
-                "upload it, questions for the vendor and the PDF. See the full sample before you "
-                "pay.",
+                "upload it, the questions the report leaves open (which file answers each one "
+                "or, if you bought it, what to ask the vendor) and the PDF. See the full sample "
+                "before you pay.",
             ),
             (
                 "Why upload the MT5 optimisation XML?",
@@ -836,7 +909,7 @@ _COPY: dict[str, dict[str, Any]] = {
         "v_period": "Data period",
         "v_age": "Days between the last data point and the audit",
         "v_format": "File format",
-        "v_engine": "Engine",
+        "v_engine": "Engine version",
         "v_trials_declared": "Trials declared",
         "v_trials_used": "Trials used in the deflated Sharpe",
         "v_trials_undeclared": "not declared; computed at 1, the most favourable case",
@@ -952,7 +1025,7 @@ _UI: dict[str, dict[str, Any]] = {
         "stats": [
             ("6", "dimensiones auditadas"),
             ("{flags}", "banderas rojas revisadas en cada archivo"),
-            ("{presets}", "retos de prop firms simulables"),
+            ("{presets}", "juegos de reglas de prop firms simulables"),
             ("{platforms}", "plataformas que reconoce"),
         ],
         "evidence_eyebrow": "Evidencia",
@@ -1008,8 +1081,8 @@ _UI: dict[str, dict[str, Any]] = {
                 "chart",
                 "Mercado tranquilo y agitado",
                 "Cada rentabilidad se asigna según el VIX del día anterior, y cada crisis de "
-                "fecha pública que cubre tu historial se mide por separado: ves si el resultado "
-                "depende de un solo tipo de mercado.",
+                "fecha pública que cubre tu historial se mide por separado, salvo las de "
+                "mercados que no operas: ves si el resultado depende de un solo tipo de mercado.",
             ),
             (
                 "globe",
@@ -1039,7 +1112,8 @@ _UI: dict[str, dict[str, Any]] = {
             "Simulación del reto que elijas de {firms}, con sus reglas publicadas",
             "Cuánto costo aguanta antes de quedar en pérdida",
             "Riesgo remuestreado a un año y el capital que pide",
-            "Preguntas concretas para el vendedor del robot o el gestor",
+            "Las preguntas que deja abiertas: qué archivo responde cada una o qué preguntar al "
+            "vendedor o al gestor",
             "PDF y, si tú quieres, página pública con sello",
         ],
         "full_more": "Ver un informe completo de ejemplo",
@@ -1087,7 +1161,9 @@ _UI: dict[str, dict[str, Any]] = {
         "v_eyebrow": "Verificación pública",
         "v_copy": "Copiar código",
         "v_copied": "Copiado",
-        "v_id": "ID",
+        # What a publication's id is: the code of its public page, never the
+        # report's identifier (a sample's page says that one, report.LABELS).
+        "v_id": "Código de la página pública",
         "guides_eyebrow": "Guías de exportación",
         "legal_eyebrow": "Legal",
         "error_eyebrow": "Algo no cuadra",
@@ -1192,7 +1268,7 @@ _UI: dict[str, dict[str, Any]] = {
         "stats": [
             ("6", "audited dimensions"),
             ("{flags}", "red flags checked on every file"),
-            ("{presets}", "prop-firm challenges to simulate"),
+            ("{presets}", "prop-firm rule sets to simulate"),
             ("{platforms}", "platforms it recognises"),
         ],
         "evidence_eyebrow": "Evidence",
@@ -1248,8 +1324,8 @@ _UI: dict[str, dict[str, Any]] = {
                 "chart",
                 "Calm and agitated markets",
                 "Each return is placed by the previous day's VIX, and every publicly dated "
-                "crisis your history covers is measured on its own: you see whether the result "
-                "depends on one kind of market.",
+                "crisis your history covers is measured on its own, except those of markets you "
+                "do not trade: you see whether the result depends on one kind of market.",
             ),
             (
                 "globe",
@@ -1279,7 +1355,8 @@ _UI: dict[str, dict[str, Any]] = {
             "Simulation of the {firms} challenge you choose, with its published rules",
             "How much cost it can bear before it ends in a loss",
             "Resampled one-year risk and the capital it needs",
-            "Specific questions for the robot's vendor or the manager",
+            "The questions it leaves open: which file answers each one, or what to ask the "
+            "vendor or the manager",
             "PDF and, if you want, a public page with a badge",
         ],
         "full_more": "See a full sample report",
@@ -1325,7 +1402,7 @@ _UI: dict[str, dict[str, Any]] = {
         "v_eyebrow": "Public verification",
         "v_copy": "Copy code",
         "v_copied": "Copied",
-        "v_id": "ID",
+        "v_id": "Public page code",
         "guides_eyebrow": "Export guides",
         "legal_eyebrow": "Legal",
         "error_eyebrow": "Something is off",
@@ -1593,6 +1670,20 @@ def sample_meta(locale: str, base_url: str) -> str:
     return _public_meta(title, copy["sample_description"], locale, path, base_url, "sample")
 
 
+def signal_sample_meta(locale: str, base_url: str) -> str:
+    """Head tags for the signal sample: indexable like the first sample, same card."""
+    locale = _locale(locale)
+    words = SIGNAL_SAMPLE_COPY[locale]
+    return _public_meta(
+        f"{words['title']} · {BRAND}",
+        words["description"],
+        locale,
+        SIGNAL_SAMPLE_PATHS[locale],
+        base_url,
+        "sample",
+    )
+
+
 def _guide_links(locale: str) -> str:
     return " · ".join(
         f"<a href='{_e(guide_url(g.slug, locale))}'>{_e(g.platform_for(locale))}</a>"
@@ -1733,13 +1824,32 @@ def _status_chip(status: str, locale: str) -> str:
     return f"<span class='badge {_e(status)}'>{_e(text)}</span>"
 
 
-def _hero(locale: str, sample: str, *, price_usd: float = 0.0, free_mode: bool = True) -> str:
+def _landing_offer(free_mode: bool, offer: paid_offer.Offer | None) -> paid_offer.Offer:
+    """The offer a landing or upload page words: the configured one, else (old
+    callers) every report free in free mode and the free first report otherwise."""
+    return offer or paid_offer.Offer(kind="free" if free_mode else "welcome")
+
+
+def _hero(
+    locale: str,
+    sample: str,
+    *,
+    price_usd: float = 0.0,
+    free_mode: bool = True,
+    offer: paid_offer.Offer | None = None,
+) -> str:
     ui = _UI[locale]
-    trust = "".join(f"<li>{icon(name)}{_e(text)}</li>" for name, text in ui["trust"])
+    terms = _landing_offer(free_mode, offer)
+    items = list(ui["trust"])
+    if terms.paid:
+        # The free first report's line names the free preview instead.
+        line = paid_offer.words(locale)["trust_anon" if terms.anon_preview else "trust_account"]
+        items = [(name, line if name == "key" else text) for name, text in items]
+    trust = "".join(f"<li>{icon(name)}{_e(text)}</li>" for name, text in items)
     # The anchor names the free first report and the price after it, so it needs both.
     anchor = (
         f"<p class='hero-anchor'>{_e(ui['hero_anchor'].format(price=usd(price_usd)))}</p>"
-        if not free_mode and price_usd > 0 and accounts.WELCOME_FULL_REPORT
+        if not free_mode and price_usd > 0 and terms.kind == "welcome"
         else ""
     )
     # Text on the left, the report on the right: the first screen shows the product.
@@ -1760,9 +1870,12 @@ def _hero(locale: str, sample: str, *, price_usd: float = 0.0, free_mode: bool =
     )
 
 
-#: Challenges from named firms; the generic two-step reference is not a firm's
-#: challenge, so pages that say "N challenges from FTMO, ..." leave it out.
+#: The firms' rule sets, one preset each; the generic two-step reference is not
+#: a firm's, so pages that count the firms' rule sets leave it out. A rule set is
+#: not always one phase: The5ers' Bootcamp preset holds for each of its three steps.
 FIRM_CHALLENGES = sum(1 for rules in PRESETS.values() if rules.firm != "Generic")
+#: The firms' programs those rule sets belong to (a two-step one may have two).
+FIRM_PROGRAMS = len({(r.firm, r.program) for r in PRESETS.values() if r.firm != "Generic"})
 
 
 def _specs(locale: str) -> str:
@@ -2032,10 +2145,11 @@ INVESTOR_COPY: dict[str, dict[str, Any]] = {
 INVESTOR_COPY["pt"] = INVESTOR_PT
 
 
-def _how_html(copy: dict[str, Any], locale: str) -> str:
+def _how_html(copy: dict[str, Any], locale: str, offer: paid_offer.Offer | None = None) -> str:
     ui = _UI[locale]
+    how = paid_offer.how_steps(locale, offer) if offer is not None and offer.paid else copy["how"]
     steps = "".join(
-        f"<li data-reveal style='--i:{i}'>{_e(step)}</li>" for i, step in enumerate(copy["how"])
+        f"<li data-reveal style='--i:{i}'>{_e(step)}</li>" for i, step in enumerate(how)
     )
     return (
         "<section class='section dark' id='how'><div class='wrap'>"
@@ -2108,9 +2222,23 @@ def _prices_html(
     contact_url: str,
     pack_price_usd: float = 0.0,
     card_markets: Sequence[str] = (),
+    offer: paid_offer.Offer | None = None,
 ) -> str:
+    """The landing's prices. Under the paid offer the first card is the free
+    preview and the full report's card carries the terms' 7-day refund."""
     ui = _UI[locale]
     head = _section_head(ui["pricing_eyebrow"], f"<h2 class='h2'>{_e(copy['prices_title'])}</h2>")
+    free_title, free_text = copy["price_free_title"], copy["price_free"].format(n=_FREE)
+    full_text, full_button, refund = copy["price_full"], ui["cta_full"], ""
+    if offer is not None and offer.paid:
+        words = paid_offer.words(locale)
+        free_title = words["preview_title"]
+        free_text = f"{paid_offer.preview_text(locale, offer)} " + words["account_previews"].format(
+            n=_FREE
+        )
+        # The pack's refund is in the questions below and on the prices page.
+        full_text, full_button = paid_offer.full_text(locale, offer), words["upload"]
+        refund = paid_offer.refund_text(locale)
     # Five lines on the landing; the sample report shows everything a full report has.
     more = (
         f"<p class='price-more'><a href='{_sample_url(locale)}'>{_e(ui['full_more'])}"
@@ -2144,16 +2272,16 @@ def _prices_html(
         body = (
             "<div class='prices'>"
             f"<div class='price' data-reveal style='--i:0'><span class='price-name'>"
-            f"{_e(copy['price_free_title'])}</span>"
+            f"{_e(free_title)}</span>"
             f"<div class='price-amount'>{_e(ui['plan_free_amount'])}</div>"
-            f"<p class='muted'>{_e(copy['price_free'].format(n=_FREE))}</p>"
+            f"<p class='muted'>{_e(free_text)}</p>"
             + f"<a class='btn btn-ghost' href='{audit_path(locale)}'>{_e(ui['cta'])}</a></div>"
             f"<div class='price featured' data-reveal style='--i:1'>"
             f"<span class='ribbon'>{_e(ui['plan_badge'])}</span>"
             f"<span class='price-name'>{_e(copy['price_full_title'])}"
             f"</span><div class='price-amount'>{_e(usd(price_usd))}"
             f"<small>{_e(ui['plan_full_note'])}</small></div>"
-            f"<p class='muted'>{_e(copy['price_full'])}</p>"
+            f"<p class='muted'>{_e(full_text)}</p>"
             + (
                 "<p class='price-pack'><strong>"
                 + _e(
@@ -2169,7 +2297,8 @@ def _prices_html(
             )
             + _checks(_full_items(locale))
             + more
-            + f"<a class='btn btn-primary' href='{audit_path(locale)}'>{_e(ui['cta_full'])}</a>"
+            + (f"<p class='muted price-refund'>{_e(refund)}</p>" if refund else "")
+            + f"<a class='btn btn-primary' href='{audit_path(locale)}'>{_e(full_button)}</a>"
             + "</div></div>"
             + (f"<ul class='checks pay-ways' data-reveal>{''.join(ways)}</ul>" if ways else "")
             + f"<p class='method-link' data-reveal><a href='{_e(method_url(locale))}'>"
@@ -2242,11 +2371,21 @@ def _field(label: str, control: str, help_text: str = "") -> str:
     )
 
 
-def _signin_first(copy: dict[str, Any], locale: str) -> str:
-    """Before the file: the upload needs an account (or a bought code)."""
+def _signin_first(
+    copy: dict[str, Any], locale: str, *, anon_preview: bool = False, paid: bool = False
+) -> str:
+    """Before the file: the upload needs an account (or a bought code).
+
+    With ``anon_preview`` the file goes through without one, and the note says
+    what that shows and what the account adds. Under the paid offer (``paid``)
+    the panel's note already says it, and this line only invites the account.
+    """
     signup, signin, _ = _ACCOUNT_PATHS.get(locale, _ACCOUNT_PATHS["es"])
+    text = copy["anon_preview_note" if anon_preview else "signin_first"]
+    if paid:
+        text = paid_offer.words(locale)["signin_anon" if anon_preview else "signin_account"]
     return (
-        f"<div class='signin-first'><p>{_e(copy['signin_first'])}</p>"
+        f"<div class='signin-first'><p>{_e(text)}</p>"
         "<div class='inline-form'>"
         f"<a class='btn btn-primary' href='{signup}'>{_e(copy['signin_create'])}</a>"
         f"<a class='btn btn-ghost' href='{signin}'>{_e(copy['signin_enter'])}</a>"
@@ -2257,6 +2396,21 @@ def _signin_first(copy: dict[str, Any], locale: str) -> str:
 #: What the file pickers offer for a platform file: web pages (and the tables
 #: brokers save as .xls), text tables, workbooks and a zip holding one export.
 REPORT_ACCEPT = ".htm,.html,.csv,.txt,.tsv,.xlsx,.xls,.ods,.xml,.zip,.pdf"
+
+
+def _ownership_field(locale: str, chosen: str) -> str:
+    """The optional "Whose strategy is this?" field, on "I'd rather not say"
+    unless the client chose another answer (kept after a refusal). It only sets
+    to whom the report speaks (``audit/ownership.py``)."""
+    words = OWNERSHIP_FORM[locale]
+    chosen = chosen if chosen in OWNERSHIP_ROLES else ""
+    options = "".join(
+        f"<option value='{_e(value)}'"
+        + (" selected" if value == chosen else "")
+        + f">{_e(text)}</option>"
+        for value, text in words["choices"].items()
+    )
+    return _field(words["label"], f"<select name='ownership'>{options}</select>", words["help"])
 
 
 def _upload_form(
@@ -2271,10 +2425,14 @@ def _upload_form(
     extras_open: bool = False,
     signin_first: bool = False,
     carried: Mapping[str, str] | None = None,
+    anon_preview: bool = False,
+    offer: paid_offer.Offer | None = None,
+    max_upload_bytes: int = MAX_UPLOAD_BYTES,
 ) -> str:
     ui = _UI[locale]
     linked = link_locale(locale)
     values = carried or {}
+    paid = offer is not None and offer.paid
 
     def value(name: str) -> str:
         return _e(values.get(name, ""))
@@ -2311,11 +2469,13 @@ def _upload_form(
             "placeholder='AUD-XXXX-XXXX-XXXX' spellcheck='false'>",
             copy["access_code_help"],
         )
-    # One short line; the full list of formats and the export guides open on demand.
+    # One short line; the full list of formats, the size limits (from the settings,
+    # as the questions page and the guides say them) and the export guides open on demand.
     report_help = (
         f"{_e(copy['report_short'])}<details class='more-help'><summary>"
         f"{_e(copy['guide_q'])}</summary>"
         f"<p>{_e(copy['report_help'])}</p>"
+        f"<p class='upload-limit'>{_e(upload_limit_text(max_upload_bytes, locale))}</p>"
         f"<p>{_e(copy['guide_list'])}: {_guide_links(locale)}</p></details>"
     )
     mapping = (
@@ -2379,11 +2539,13 @@ def _upload_form(
         + _field(
             copy["benchmark_applicable"],
             "<select name='benchmark_applicable'>"
+            # Left unanswered it counts as "yes", shown as a default and not
+            # as the client's declaration; "yes" and "no" are answers.
             + "".join(
-                f"<option value='{option}'"
-                + (" selected" if values.get("benchmark_applicable", "yes") == option else "")
+                f"<option value='{value_}'"
+                + (" selected" if values.get("benchmark_applicable", "") == value_ else "")
                 + f">{_e(copy[option])}</option>"
-                for option in ("yes", "no")
+                for value_, option in (("", "unanswered"), ("yes", "yes"), ("no", "no"))
             )
             + "</select>",
         )
@@ -2403,9 +2565,13 @@ def _upload_form(
         )
         + "</div></details>"
     )
-    points = "".join(
-        f"<li>{icon('check')}<span>{_e(point)}</span></li>" for point in ui["upload_points"]
-    )
+    upload_points = list(ui["upload_points"])
+    if offer is not None and paid:
+        # The second point is the free first report's: the paid offer's line instead.
+        upload_points[1] = paid_offer.words(locale)["upload_point"].format(
+            price=usd(offer.price_usd)
+        )
+    points = "".join(f"<li>{icon('check')}<span>{_e(point)}</span></li>" for point in upload_points)
     busy_steps = "".join(
         f"<li style='--i:{i}'>{_e(step)}</li>" for i, step in enumerate(ui["busy_steps"])
     )
@@ -2418,7 +2584,11 @@ def _upload_form(
         + f"<h2 class='label' style='font-size:1.2rem;margin-bottom:6px'>{_e(copy['form_title'])}"
         "</h2>"
         + f"{flash}{err}<p class='panel-note'>{icon('shield')}{_e(note)}</p>"
-        + (_signin_first(copy, locale) if signin_first else "")
+        + (
+            _signin_first(copy, locale, anon_preview=anon_preview, paid=paid)
+            if signin_first
+            else ""
+        )
         # With JavaScript the answer comes back in place (data-inplace): a refusal
         # fills upload-alert, the column menus fill map-fields, and the file stays
         # chosen. Without it the form posts as always.
@@ -2452,6 +2622,7 @@ def _upload_form(
             f"value='{value('trials')}'>",
             copy["trials_help"],
         )
+        + _ownership_field(locale, values.get("ownership", ""))
         # The one-file case stays short; the second files and the challenge open on demand.
         + f"<details class='adv extras'{' open' if extras_open else ''}><summary><span>"
         f"{_e(ui['extras'])} <small>· {_e(ui['extras_note'])}</small></span>"
@@ -2531,7 +2702,10 @@ def _faq_html(
     retention_days: int,
     operator: tuple[str, str] = ("", ""),
     contact_url: str = "",
+    offer: paid_offer.Offer | None = None,
+    support_email: str = "",
 ) -> str:
+    """The landing's questions; the paid offer adds «¿Y si el informe no me sirve?»."""
     from quant_trade.audit.faq import FAQ_PATH
 
     ui = _UI[locale]
@@ -2544,10 +2718,15 @@ def _faq_html(
             f"<p class='muted faq-who'>{_e(ask)} "
             f"<a href='{_e(contact_url)}' rel='noopener'>{_e(ask_link)}</a></p>"
         )
-    items = "".join(
-        f"<details><summary>{_e(question)}</summary>"
-        f"<p>{_e(answer.format(retention=retention_days))}</p></details>"
+    pairs = [
+        (question, answer.format(retention=retention_days))
         for question, answer in (copy["faq"][i] for i in _LANDING_FAQ[locale])
+    ]
+    if offer is not None and offer.paid:
+        pairs.append(paid_offer.refund_question(locale, support_email))
+    items = "".join(
+        f"<details><summary>{_e(question)}</summary><p>{_e(answer)}</p></details>"
+        for question, answer in pairs
     )
     return (
         "<section class='section dark' id='faq'><div class='wrap wrap-mid'>"
@@ -2681,6 +2860,8 @@ def landing(
     card_markets: Sequence[str] = (),
     email_confirmation: bool = False,
     completed_audits: int | None = None,
+    offer: paid_offer.Offer | None = None,
+    support_email: str = "",
 ) -> str:
     """The public landing; the upload form lives on its own page (``upload_page``).
 
@@ -2694,7 +2875,11 @@ def landing(
     note; the upload and account pages say when an address must be confirmed.
     ``operator`` (name, address): the name signs "who is behind it" (``_founder``);
     while that block is not shown, both stay in one line under the questions, and
-    so does the WhatsApp link (``contact_url``)."""
+    so does the WhatsApp link (``contact_url``). ``offer`` (``paid_offer.offer_of``)
+    words the free tier: under the paid offer the hero, the steps, the prices and
+    the questions name the free preview, the price and the 7-day refund
+    (``support_email`` is where the refund is asked for); without it the page
+    keeps the free first report."""
     locale = _locale(locale)
     copy = _COPY[locale]
     title = copy.get("meta_title", copy["title"])
@@ -2706,11 +2891,11 @@ def landing(
     # ``home`` tightens the sections' spacing on this page only.
     body = (
         "<div class='home'>"
-        + _hero(locale, sample, price_usd=price_usd, free_mode=free_mode)
+        + _hero(locale, sample, price_usd=price_usd, free_mode=free_mode, offer=offer)
         + ("<div class='wrap'>" + count_html + "</div>" if count_html else "")
         + _example_section(locale)
         + _audiences(locale)
-        + _how_html(copy, locale)
+        + _how_html(copy, locale, offer)
         + _prices_html(
             copy,
             locale,
@@ -2721,6 +2906,7 @@ def landing(
             contact_url=contact_url,
             pack_price_usd=pack_price_usd,
             card_markets=card_markets,
+            offer=offer,
         )
         + founder
         # The operator's and WhatsApp lines move into "who is behind it" when it shows.
@@ -2730,6 +2916,8 @@ def landing(
             retention_days=retention_days,
             operator=("", "") if founder else operator,
             contact_url="" if founder else contact_url,
+            offer=offer,
+            support_email=support_email,
         )
         + _final_cta(copy, locale, sample, joined=joined, err=err)
         + "</div>"
@@ -2751,19 +2939,33 @@ def upload_page(
     carried: Mapping[str, str] | None = None,
     rejection_html: str = "",
     notice_link_html: str = "",
+    anon_preview: bool = False,
+    offer: paid_offer.Offer | None = None,
+    max_upload_bytes: int = MAX_UPLOAD_BYTES,
 ) -> str:
     """The upload form on its own page, so the landing can stay short.
 
     ``signed_in=False`` in paid mode keeps the "account first" note above the fields
-    (the web layer normally sends such a visitor to sign-up before this page).
+    (the web layer normally sends such a visitor to sign-up before this page);
+    with ``anon_preview`` (``AUDIT_ANON_PREVIEW`` on) the visitor uploads without
+    an account and the note says what that shows instead.
     ``notice`` is one line above the fields, such as "confirmation link sent";
     ``notice_link_html`` is trusted, fixed markup after it (a link to the guides).
     ``carried`` restores only declaration fields after a refusal; file pickers and
     access codes remain empty. ``rejection_html`` is trusted, localized guidance.
-    Client declarations are escaped form values, never report claims or logs."""
+    Client declarations are escaped form values, never report claims or logs.
+    Under the paid ``offer`` the notes say the free preview, the price and the
+    7-day refund instead of the free first report."""
     locale = _locale(locale)
     copy = _COPY[locale]
-    note = copy["free_note"] if free_mode else copy["paid_note"].format(price=price_usd)
+    terms = _landing_offer(free_mode, offer)
+    note = (
+        copy["free_note"]
+        if free_mode
+        else paid_offer.paid_text(locale, terms)
+        if terms.paid
+        else copy["paid_note"].format(price=price_usd)
+    )
     # A refusal answers a POST and is never a page of its own: it stays private
     # (noindex, nofollow) like error_page, while the empty form is public.
     meta = (
@@ -2795,6 +2997,9 @@ def upload_page(
         extras_open=extras_open,
         signin_first=signed_in is False and not free_mode,
         carried=carried,
+        anon_preview=anon_preview,
+        offer=terms,
+        max_upload_bytes=max_upload_bytes,
     )
     # The language switch keeps the extra boxes open.
     alternates = {
@@ -2820,7 +3025,10 @@ def _evidence_value(item: Any, locale: str = "es") -> str:
     return "—" if item is None else _e(str(item))
 
 
-def _page_hero(eyebrow: str, title: str, lead: str = "", crumbs: str = "", *, dot: str = "") -> str:
+def _page_hero(
+    eyebrow: str, title: str, lead: str = "", crumbs: str = "", *, dot: str = "", note: str = ""
+) -> str:
+    """A page's first screen; ``note`` is one more line of plain text under the lead."""
     return (
         "<section class='page-hero'>"
         + aurora()
@@ -2831,6 +3039,12 @@ def _page_hero(eyebrow: str, title: str, lead: str = "", crumbs: str = "", *, do
         f"<span class='dot{' ' + dot if dot else ''}'></span>"
         f"{_e(eyebrow)}</div><h1 class='rise' style='--i:2'>{_e(title)}</h1>"
         + (f"<p class='lead rise' style='--i:3'>{_e(lead)}</p>" if lead else "")
+        # The landing's anchor style, aligned with the lead instead of centred.
+        + (
+            f"<p class='hero-anchor rise' style='--i:4;margin-left:0'>{_e(note)}</p>"
+            if note
+            else ""
+        )
         + "</div></section>"
     )
 
@@ -2858,7 +3072,8 @@ def _utc_time(stamp: str, locale: str) -> str:
     """An ISO UTC stamp as a readable ``<time>`` (24 sep 2026 · 17:30 UTC).
 
     The exact stamp stays in the ``datetime`` attribute; anything that does
-    not parse is shown as it came.
+    not parse is shown as it came. A bare date (a public sample's day of
+    publication) is shown without a time of day.
     """
     try:
         when = datetime.fromisoformat(stamp.replace("Z", "+00:00"))
@@ -2869,6 +3084,8 @@ def _utc_time(stamp: str, locale: str) -> str:
         day = f"{when.day} {month} {when.year}"
     else:
         day = f"{month} {when.day}, {when.year}"
+    if len(stamp) == len("2026-10-09"):
+        return f"<time datetime='{_e(stamp)}'>{day}</time>"
     return f"<time datetime='{_e(stamp)}'>{day} · {when:%H:%M} UTC</time>"
 
 
@@ -2931,6 +3148,7 @@ def verification_page(
     result_sha256: str,
     base_url: str,
     locale: str = "es",
+    sample: SamplePage | None = None,
 ) -> str:
     """The public page of a published audit.
 
@@ -2943,6 +3161,12 @@ def verification_page(
     observations, files and token are never read here, so they cannot leak. A
     view kept before the period was shown has no dates, and those rows are
     left out.
+
+    ``sample`` is only a public sample's page (``sample_publication.sample_page``),
+    which is nobody's audit: its notice goes on top, above the title; its title
+    and link preview start with "Sample"; its share text is its own; and its
+    badge code is shown as the sample's, without a copy button. A publication's
+    page never has one, and without it nothing on the page changes.
     """
     locale = _locale(locale)
     copy = _COPY[locale]
@@ -2992,7 +3216,9 @@ def verification_page(
             copy["v_format"],
             source_name(inputs) or inputs.get("source") or "-",
         ),
-        (copy["v_engine"], f"{engine.get('name', '')} {engine.get('package_version', '')}"),
+        # The engine's version, worded as the report prints it ("versión del motor
+        # 0.1.0"); the stored engine name (``engine.ENGINE_NAME``) stays in the view.
+        (copy["v_engine"], str(engine.get("package_version", "")) or "-"),
     ]
     # Words read as words, figures carry their evidence badge, and only the
     # hash keeps the code style.
@@ -3019,8 +3245,14 @@ def verification_page(
     description = copy["v_description"].format(
         cls_label=cls_label, overall=overall, date=audited[:10], notice=BADGE_NOTICE[locale]
     )
+    if sample is not None:
+        title = f"{sample.title_word} · {title}"
+        description = f"{sample.meta_lead} · {description}"
     alternates = {lang: f"/v/{public_id}?lang={lang}" for lang in CLASS_WORD}
     alternates["es"] = f"/v/{public_id}"
+    # The language switch names Spanish too: without it, /v/{id} follows the
+    # browser's language and would send an English browser back to English.
+    switch = {**alternates, "es": f"/v/{public_id}?lang=es"}
     # Never indexed (an unpublished page should not linger in search), but it
     # previews its class and date when the link is shared.
     meta = head_meta(
@@ -3036,8 +3268,12 @@ def verification_page(
         base_url=base_url,
     )
     hero = (
-        "<section class='page-hero'>" + aurora() + grid_bg() + "<div class='wrap'>"
-        f"<div class='eyebrow rise'><span class='dot'></span>{_e(ui['v_eyebrow'])}</div>"
+        "<section class='page-hero'>"
+        + aurora()
+        + grid_bg()
+        + "<div class='wrap'>"
+        + (sample.notice_html if sample is not None else "")
+        + f"<div class='eyebrow rise'><span class='dot'></span>{_e(ui['v_eyebrow'])}</div>"
         f"<h1 class='rise' style='--i:1'>{_e(copy['v_title'])}</h1>"
         "<div class='v-hero rise' style='--i:2'>"
         + class_ring(overall, size="xl")
@@ -3046,8 +3282,16 @@ def verification_page(
         "<div class='v-facts'>"
         f"<div><b>{_e(copy['v_audited'])}</b><span>{_utc_time(audited, locale)}</span></div>"
         f"<div><b>{_e(copy['v_published'])}</b><span>{_utc_time(published_at, locale)}</span></div>"
-        f"<div><b>{_e(ui['v_id'])}</b><span>{_e(public_id)}</span></div>"
-        "</div></div></div></div></section>"
+        # A sample's page shows the identifier its report shows, under the report's
+        # word; a publication shows the code of its page, under its own words, since
+        # the report's identifier is not kept here.
+        + (
+            f"<div><b>{_e(REPORT_LABELS[locale]['audit_id'])}</b>"
+            f"<span>{_e(sample.shown_id or public_id)}</span></div>"
+            if sample is not None
+            else f"<div><b>{_e(ui['v_id'])}</b><span>{_e(public_id)}</span></div>"
+        )
+        + "</div></div></div></div></section>"
     )
     main = (
         "<div class='paper page-main'><div class='wrap wrap-mid'>"
@@ -3065,16 +3309,24 @@ def verification_page(
         f"<section class='rsec'><h2>{_e(copy['v_badge'])}</h2><div class='badge-preview'>"
         f"<img src='/v/{_e(public_id)}/badge.svg?lang={_e(locale)}' "
         f"alt='{_e(BADGE_NOTICE[locale])}' width='480' height='72'></div>"
-        f"<p class='muted' style='margin-top:18px'>{_e(copy['v_badge_help'])}</p>"
+        f"<p class='muted' style='margin-top:18px'>"
+        f"{_e(sample.badge_help if sample is not None else copy['v_badge_help'])}</p>"
         f"<pre><code id='badge-code'>{_e(snippet)}</code></pre>"
-        f"<div class='copy-row'><button class='btn btn-dark btn-sm' type='button' "
-        f"data-copy='badge-code' data-done='{_e(ui['v_copied'])}' hidden>{_e(ui['v_copy'])}"
-        "</button></div></section>"
+        + (
+            ""
+            if sample is not None
+            else "<div class='copy-row'><button class='btn btn-dark btn-sm' type='button' "
+            f"data-copy='badge-code' data-done='{_e(ui['v_copied'])}' hidden>{_e(ui['v_copy'])}"
+            "</button></div>"
+        )
+        + "</section>"
         + share_block(
             overall=overall,
             public_id=public_id,
             locale=locale,
             kind=kind,
+            template=sample.share_template if sample is not None else None,
+            ref=sample.share_ref if sample is not None else "share",
         )
         + "</div></div>"
     )
@@ -3083,7 +3335,7 @@ def verification_page(
         locale,
         hero + main,
         meta_html=meta,
-        alternates=alternates,
+        alternates=switch,
         solid_nav=True,
     )
 
@@ -3235,9 +3487,11 @@ PAGE_DESCRIPTIONS: dict[str, dict[str, str]] = {
         ),
     },
     "compare": {
-        "es": "Compara dos de tus informes de Rigor, lado a lado, para ver qué cambió.",
-        "en": "Compare two of your Rigor reports, side by side, to see what changed.",
-        "pt": "Compare dois dos seus relatórios do Rigor, lado a lado, para ver o que mudou.",
+        "es": "Compara dos o tres de tus informes de Rigor, lado a lado, para ver qué cambió.",
+        "en": "Compare two or three of your Rigor reports, side by side, to see what changed.",
+        "pt": (
+            "Compare dois ou três dos seus relatórios do Rigor, lado a lado, para ver o que mudou."
+        ),
     },
     "signup": {
         "es": "Crea tu cuenta de Rigor para subir tus archivos y guardar tus informes.",
@@ -3492,24 +3746,27 @@ def compare_page(
     locale: str = "es",
     lead: str = "",
     alternates: dict[str, str] | None = None,
+    title: str = "",
 ) -> str:
-    """The private page that compares two reports (``audit/compare.py`` builds ``content``)."""
+    """The private page that compares two or three reports (``audit/compare.py``
+    builds ``content``); ``title`` names three reports or the form."""
     from quant_trade.audit.compare import COMPARE_CSS, COMPARE_PATH, COPY
 
     locale = _locale(locale)
     copy = COPY[locale]
+    title = title or copy["title"]
     body = (
-        _page_hero(copy["eyebrow"], copy["title"], lead or copy["lead"])
+        _page_hero(copy["eyebrow"], title, lead or copy["lead"])
         + f"<div class='paper page-main'><div class='wrap'><style>{COMPARE_CSS}</style>"
         + content
         + "</div></div>"
     )
     # A comparison reached from Mi cuenta passes its own addresses.
     return _page(
-        copy["title"],
+        title,
         locale,
         body,
-        meta_html=private_meta(copy["title"], locale, PAGE_DESCRIPTIONS["compare"][locale]),
+        meta_html=private_meta(title, locale, PAGE_DESCRIPTIONS["compare"][locale]),
         alternates=alternates or dict(COMPARE_PATH),
         solid_nav=True,
     )
@@ -3668,6 +3925,7 @@ def method_page(*, locale: str = "es", base_url: str = "") -> str:
                 (words["evidence_title"], f"<ul class='mtags'>{evidence}</ul>"),
                 (words["flags_title"], f"<ul class='chips'>{flags}</ul>"),
                 (words["resampling_title"], bullets(words["resampling"])),
+                (CHALLENGE_SECTION[locale][0], bullets(CHALLENGE_SECTION[locale][1])),
                 (words["repro_title"], bullets(words["repro"])),
                 (words["limits_title"], bullets(words["limits"], "minus")),
                 (words["refs_title"], f"<ol class='refs'>{refs}</ol>"),
@@ -4239,6 +4497,9 @@ def winrate_page(
 
 #: Guides for an account's history rather than a backtest, listed apart on /guias.
 ACCOUNT_GUIDES = frozenset({"cuenta-proveedor", "myfxbook", "mql5-signal", "fxblue"})
+#: The tracking-site exports: their "What you get" also links the signal sample,
+#: a report of the same kind of file.
+SIGNAL_SAMPLE_GUIDES = frozenset({"myfxbook", "mql5-signal", "fxblue"})
 _GUIDE_GROUPS: dict[str, tuple[tuple[str, str], tuple[str, str]]] = {
     "es": (
         ("Backtests", "Informes del probador de estrategias y listas de operaciones."),
@@ -4327,8 +4588,92 @@ def guides_index_page(*, locale: str = "es", base_url: str = "") -> str:
     )
 
 
-def guide_page(guide: Guide, *, locale: str = "es", base_url: str = "") -> str:
-    """One platform's export guide."""
+def _guide_offer(
+    guide: Guide, locale: str, *, offer: str | paid_offer.Offer, email_verification: bool
+) -> str:
+    """ "What you get" on a guide: the report's contents and the free report as the
+    sign-up panel and /precios word them, the upload button, the sample report
+    and the free tool that fits the guide (``guide_capabilities.GUIDE_TOOL``).
+
+    ``offer`` is the service's (``free``, ``welcome`` or ``paid``). The free first
+    report comes with the limits the upload applies to it (``web._first_look``:
+    one per e-mail, browser and file, and a monthly share per network). Without
+    a free report the block says the full report is paid, next to the free
+    previews, and links the prices; with its price (``paid_offer.Offer``) it says
+    the paid offer instead: the free preview, the price, the 7-day refund and the
+    account's monthly previews. A file
+    that only goes next to a report (the optimisation XML,
+    ``field == "optimization"``) says so, and in free mode drops "you only need
+    the file".
+    """
+    # Lazy: account_pages imports this module.
+    from quant_trade.audit.account_pages import report_contents
+
+    terms = paid_offer.as_offer(offer)
+    offer = terms.kind
+    words = GUIDES_COPY[locale]
+    if offer == "welcome":
+        contents = f"{report_contents(locale, 'welcome')} {words['free_terms']}"
+    elif offer == "free":
+        # The line under the button already says every report is free.
+        contents = report_contents(locale, "")
+    elif terms.price_usd > 0:
+        # The paid offer already says the full report is paid: only the account's
+        # monthly previews are added, not the guide's own "is paid" sentence.
+        monthly = paid_offer.words(locale)["account_previews"].format(
+            n=accounts.FREE_PREVIEWS_PER_MONTH
+        )
+        contents = f"{paid_offer.paid_text(locale, terms)} {monthly}"
+    else:
+        contents = words["paid_terms"].format(n=accounts.FREE_PREVIEWS_PER_MONTH)
+    lines = [contents]
+    note = offer_text(offer, locale, email_verification=email_verification)
+    if guide.field == "optimization":
+        lines.append(words["optimization_with_report"].format(upload=words["upload"]))
+        if offer == "free":
+            note = PRICING_COPY[locale]["free"]
+    after = (
+        f"<p>{_e(note)}</p>"
+        if note
+        else f"<p><a href='{_e(PRICING_PATH[locale])}'>{_e(_UI[locale]['nav_pricing'])}</a></p>"
+    )
+    tool = GUIDE_TOOL.get(guide.slug, "calculator")
+    signal = (
+        f" · <a href='{_e(SIGNAL_SAMPLE_PATHS[locale])}'>"
+        f"{_e(SIGNAL_SAMPLE_COPY[locale]['link'])}</a>"
+        if guide.slug in SIGNAL_SAMPLE_GUIDES
+        else ""
+    )
+    return (
+        "".join(f"<p>{_e(line)}</p>" for line in lines)
+        + f"<p><a class='btn btn-dark' href='{_e(_form_url(locale))}'>{_e(words['upload_this'])}"
+        f"<span class='go'>{icon('arrow')}</span></a> "
+        f"<a href='{_e(SAMPLE_PAGE_PATHS[locale])}'>{_e(PRICING_COPY[locale]['start_sample'])}</a>"
+        f"{signal}</p>{after}"
+        f"<p>{_e(words['tool'])} <a href='{_e(_tool_url(tool, locale))}'>"
+        f"{_e(_tool_name(tool, locale))}</a>. {_e(TOOLS_COPY[locale][tool]['question'])}</p>"
+    )
+
+
+def guide_page(
+    guide: Guide,
+    *,
+    locale: str = "es",
+    base_url: str = "",
+    offer: str | paid_offer.Offer = "free",
+    email_verification: bool = False,
+    max_upload_bytes: int = MAX_UPLOAD_BYTES,
+) -> str:
+    """One platform's export guide.
+
+    After the steps, what the report does with this file (each point from the
+    code that does it, ``guide_capabilities``) and what the visitor gets, with
+    the free report as ``offer`` and ``email_verification`` say: the same values
+    the sign-up page receives. The title, description, heading, address and
+    language links do not depend on them. Where to upload the file ends with the
+    limit of the field it goes in (``guide.field``) for ``max_upload_bytes``, from
+    the same ``upload_limits`` as the form and the questions page.
+    """
     locale = _locale(locale)
     ui = _UI[locale]
     words = GUIDES_COPY[locale]
@@ -4340,25 +4685,48 @@ def guide_page(guide: Guide, *, locale: str = "es", base_url: str = "") -> str:
     )
     steps = "".join(f"<li>{_e(step)}</li>" for step in text.steps)
     tips = "".join(f"<li>{icon('check')}<span>{_e(tip)}</span></li>" for tip in text.tips)
+    does = "".join(
+        f"<li>{icon('check')}<span>{_e(point)}</span></li>"
+        for point in guide_points(guide.slug, locale)
+    )
     crumbs = f"<a href='{_e(guides_index_url(locale))}'>{_e(words['all'])}</a>" + (
         _language_crumbs(alternates, locale)
     )
+    sections = [
+        (words["file"], f"<p>{_e(text.file)}</p>"),
+        (words["steps"], f"<ol class='list-steps steps-guide'>{steps}</ol>"),
+        (
+            words["upload"],
+            f"<p>{_e(text.upload)}</p>"
+            f"<p class='upload-limit'>"
+            f"{_e(guide_limit_text(guide.field, max_upload_bytes, locale))}</p>",
+        ),
+        (words["tips"], f"<ul class='checks'>{tips}</ul>"),
+    ]
+    if does:
+        sections.append((words["does"], f"<ul class='checks guide-does'>{does}</ul>"))
+    sections.append(
+        (
+            words["get"],
+            _guide_offer(guide, locale, offer=offer, email_verification=email_verification),
+        )
+    )
     body = (
-        _page_hero(ui["guides_eyebrow"], text.title, text.summary, crumbs)
+        _page_hero(
+            ui["guides_eyebrow"],
+            text.title,
+            text.summary,
+            crumbs,
+            note=guide_purpose(guide.slug, locale),
+        )
         + "<div class='paper page-main'><div class='wrap'>"
         + _doc(
-            [
-                (words["file"], f"<p>{_e(text.file)}</p>"),
-                (words["steps"], f"<ol class='list-steps steps-guide'>{steps}</ol>"),
-                (words["upload"], f"<p>{_e(text.upload)}</p>"),
-                (words["tips"], f"<ul class='checks'>{tips}</ul>"),
-            ],
+            sections,
             locale,
             aside=f"<a class='btn btn-dark btn-sm toc-cta' href='{_e(_form_url(locale))}'>"
-            f"{_e(words['form'])}<span class='go'>{icon('arrow')}</span></a>",
+            f"{_e(words['upload_this'])}<span class='go'>{icon('arrow')}</span></a>",
         )
-        + f"<div class='back-row'><a class='btn btn-dark' href='{_e(_form_url(locale))}'>"
-        f"{_e(words['form'])}<span class='go'>{icon('arrow')}</span></a></div></div></div>"
+        + "</div></div>"
     )
     return _page(
         title,
@@ -4659,7 +5027,8 @@ def audience_page(
         else words["price_text"].format(price=price_usd, pack=pack_price_usd or price_usd * 3)
     )
     faq = "".join(
-        f"<details><summary>{_e(q)}</summary><p>{_e(a.format(presets=FIRM_CHALLENGES))}</p></details>"
+        f"<details><summary>{_e(q)}</summary>"
+        f"<p>{_e(a.format(presets=FIRM_CHALLENGES, programs=FIRM_PROGRAMS))}</p></details>"
         for q, a in text.faq
     )
     others = "".join(
@@ -4680,13 +5049,30 @@ def audience_page(
     if audience.contact_cta:
         start = institutional.REVIEW_PATHS[locale]
         start_label = institutional.COPY[locale]["title"]
+    sample_label = words["sample"]
+    if audience.sample == "signal":
+        sample = SIGNAL_SAMPLE_PATHS[locale]
+        sample_label = SIGNAL_SAMPLE_COPY[locale]["link"]
     buttons = (
         "<div class='hero-cta'>"
         f"<a class='btn btn-dark' href='{_e(start)}'>{_e(start_label)}"
         f"<span class='go'>{icon('arrow')}</span></a>"
-        f"<a class='link-more' href='{_e(sample)}'>{_e(words['sample'])}{icon('arrow')}</a>"
+        f"<a class='link-more' href='{_e(sample)}'>{_e(sample_label)}{icon('arrow')}</a>"
         "</div>"
     )
+    lead = buttons
+    if audience.sample == "signal":
+        # Whoever is about to copy a signal sees what they would get first.
+        lead = (
+            "<div class='hero-cta'>"
+            f"<a class='btn btn-dark' href='{_e(sample)}'>{_e(sample_label)}"
+            f"<span class='go'>{icon('arrow')}</span></a>"
+            f"<a class='link-more' href='{_e(start)}'>{_e(start_label)}{icon('arrow')}</a>"
+            "</div>"
+        )
+    if audience.public_example:
+        # What the provider's clients would see, before uploading anything.
+        lead += public_pages_line(locale, css="aud-example")
     alternates = {lang: audience_url(audience.slug, lang) for lang in ("es", "en", "pt")}
     crumbs = f"<a href='{_e(_home(locale))}'>{_e(words['home'])}</a>" + _language_crumbs(
         alternates, locale
@@ -4711,7 +5097,7 @@ def audience_page(
                 (words["others"], f"<ul class='aud-others'>{others}</ul>"),
             ],
             locale,
-            lead=buttons,
+            lead=lead,
             aside=f"<a class='btn btn-dark btn-sm toc-cta' href='{_e(start)}'>"
             f"{_e(start_label)}<span class='go'>{icon('arrow')}</span></a>",
         )
@@ -4730,6 +5116,9 @@ def audience_page(
 __all__ = [
     "BADGE_NOTICE",
     "SAMPLE_BANNER",
+    "SIGNAL_SAMPLE_BANNER",
+    "SIGNAL_SAMPLE_COPY",
+    "SIGNAL_SAMPLE_PATHS",
     "VERIFICATION_NOTICE",
     "audience_page",
     "badge_svg",
@@ -4740,6 +5129,7 @@ __all__ = [
     "legal_page",
     "method_page",
     "sample_meta",
+    "signal_sample_meta",
     "tools_page",
     "verification_card_svg",
     "verification_page",

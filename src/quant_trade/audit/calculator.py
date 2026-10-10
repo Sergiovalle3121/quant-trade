@@ -17,6 +17,7 @@ the upload form, where the same figures come from the real returns.
 from __future__ import annotations
 
 import math
+import re
 from dataclasses import dataclass
 from typing import Any
 from urllib.parse import urlencode
@@ -63,6 +64,31 @@ class CalculatorInput:
     periods_per_year: float = PERIODS_PER_YEAR
 
 
+#: Digit groups of three after a dot or a comma: "1.000" and "12.500" as typed
+#: in Spanish or Portuguese, "1,000" in English. Trials count whole
+#: configurations, so such a separator is never a decimal point here.
+_THOUSANDS = re.compile(r"\d{1,3}(?:[.,]\d{3})+")
+_SPACES = (" ", "\u00a0", "\u202f")  # space, no-break space, narrow no-break
+
+
+def _trial_count(raw: Any) -> int:
+    """A whole number of trials from what someone typed.
+
+    "1.000", "1,000" and "1 000" are a thousand (before, "1.000" read as 1 and
+    "1,5" as 15). A count with a fraction ("1,5", "12.5") is not a number of
+    configurations: ``ValueError``. Past float's range ``int`` raises
+    ``OverflowError``, which :func:`read_input` turns into ``error_number``."""
+    text = str(raw).strip()
+    for space in _SPACES:
+        text = text.replace(space, "")
+    if _THOUSANDS.fullmatch(text):
+        return int(re.sub(r"[.,]", "", text))
+    value = float(text.replace(",", "."))
+    if math.isfinite(value) and not value.is_integer():
+        raise ValueError("a trial count is a whole number")
+    return int(value)
+
+
 def parse_input(
     sharpe: str | None,
     years: str | None,
@@ -76,7 +102,7 @@ def parse_input(
     try:
         sr = float(str(sharpe).replace(",", "."))
         yrs = float(str(years).replace(",", "."))
-        n = int(float(str(trials).replace(",", "").replace(" ", "")))
+        n = _trial_count(trials)
     except (TypeError, ValueError):
         return "error_number"
     if not all(math.isfinite(v) for v in (sr, yrs)):
@@ -258,8 +284,8 @@ COPY: dict[str, dict[str, Any]] = {
             "dispersión que la de tu Sharpe.",
             "Descuento de Harvey y Liu con corrección de Bonferroni; suerte esperada de Bailey "
             "y López de Prado; longitud mínima de Bailey, Borwein, López de Prado y Zhu.",
-            "No guardamos lo que escribes. Es la misma cuenta que la sección de suerte del "
-            "informe, sin tu archivo.",
+            "No guardamos lo que escribes. Es la misma fórmula que la sección de suerte del "
+            "informe; el informe usa la frecuencia real de tu archivo.",
             "Describe el pasado que declaras; no dice nada del futuro.",
         ],
     },
@@ -363,8 +389,8 @@ COPY: dict[str, dict[str, Any]] = {
             "Configurations are treated as independent tries with the same spread as your Sharpe.",
             "Harvey and Liu haircut with the Bonferroni correction; expected luck from Bailey "
             "and López de Prado; minimum length from Bailey, Borwein, López de Prado and Zhu.",
-            "We do not store what you type. It is the same arithmetic as the report's luck "
-            "section, without your file.",
+            "We do not store what you type. It is the same formula as the report's luck "
+            "section; the report uses your file's actual frequency.",
             "It describes the past you declare; it says nothing about the future.",
         ],
     },
@@ -473,8 +499,8 @@ COPY: dict[str, dict[str, Any]] = {
             "dispersão do seu Sharpe.",
             "Desconto de Harvey e Liu com a correção de Bonferroni; sorte esperada de Bailey "
             "e López de Prado; comprimento mínimo de Bailey, Borwein, López de Prado e Zhu.",
-            "Não guardamos o que você digita. É a mesma conta da seção de sorte do relatório, "
-            "sem o seu arquivo.",
+            "Não guardamos o que você digita. É a mesma fórmula da seção de sorte do "
+            "relatório; o relatório usa a frequência real do seu arquivo.",
             "Descreve o passado que você declara; não diz nada sobre o futuro.",
         ],
     },

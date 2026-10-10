@@ -225,7 +225,7 @@ Portuguese slug (`Audience.slug_pt`; a Spanish or English slug under
 `/pt/guias/<slug>` (`Guide.slug_pt`; the guides name the Portuguese form
 fields). The language switch on these pages offers the other two languages.
 The methodology (`/pt/metodologia`), the report check (`/pt/comprovar`) and
-the comparison of two reports (`/pt/comparar`) have Portuguese pages, linked
+the comparison of two or three reports (`/pt/comparar`) have Portuguese pages, linked
 from every Portuguese page and offered in the language bar of their Spanish and
 English twins (`tests/test_audit_trust_pages_pt.py`). Pages not translated yet
 (the terms and the privacy policy, until the Spanish ones have had their legal
@@ -292,6 +292,145 @@ curve that arrived with a name and 0 bytes keeps its own "arrived empty"
 refusal instead of being replaced by the statement. A CSV the parser cannot read
 is explained in the form's language (header row, same number of columns),
 without the parser's English message.
+
+### Whose strategy it is (`audit/ownership.py`)
+
+An optional field under the trials, "¿De quién es esta estrategia?" / "Whose
+strategy is this?" / "De quem é esta estratégia?", offers four answers: "Es
+mía (la desarrollé o la opero yo)", "La compré o la voy a comprar / copiar",
+"Soy el proveedor y la muestro a otros" and "Prefiero no decirlo", the
+default. An answer is stored as `declared.ownership` (`own`, `buyer` or
+`provider`, tagged DECLARED, listed with the other declarations in the
+report); "Prefiero no decirlo" declares nothing and the key is absent. A
+refused upload keeps the answer like the other declarations (the form's
+`carried` values and `mapping.CARRIED_FIELDS`). An unknown value is refused
+as an invalid declaration.
+
+The answer changes only to whom the sentences speak, never the order of the
+sections, a figure, the class or a tag:
+
+- `buyer`: the wording as it was, with the questions to put to the seller.
+- `own`: developer actions. "Qué hacer ahora" asks to test the settings on
+  data the optimiser never saw (reoptimise without the last months and
+  declare the cut-off as the out-of-sample start: only a declared start
+  measures that test, and a forward export has its own section in
+  `forward.py`, so a forward export already uploaded is not asked for
+  again); once a declared out-of-sample stretch was measured and fell short,
+  to validate on later dates, since reoptimising on a stretch already seen
+  does not make it unseen data. It asks to cut the trials in the next
+  version only when more than one was declared or counted: an undeclared
+  count was taken at 1, the most favourable case, so the step asks to
+  declare it and says that a longer history, not fewer trials, can change
+  the deflated Sharpe (`ownership.trials_step`). When the backtest has a
+  trade list and no live comparison is measured, it asks to run the robot
+  on demo until it has `MIN_LIVE_TRADES` closed trades and upload that
+  history; with fewer than `MIN_BACKTEST_TRADES` closed trades in the
+  backtest the step names both minimums of `live.compare_live` instead
+  (`ownership.demo_step`). The questions section becomes "Preguntas que
+  deja abiertas este informe", each question with what answers it.
+- `provider`: what clients will ask on seeing the report ("Te van a
+  preguntar…") and what to provide for each question (the equity curve with
+  floating results, the closed accounts, the tester's HTML report, the
+  optimisation XML...).
+- no answer: a neutral wording that serves all three; the buyer's wording is
+  never the default.
+
+The voice covers "Qué hacer ahora" (and the PDF cover's first steps, a
+fund's included), the questions section and its title in the lock box, the
+plan's actions and titles that sent the reader to a provider or manager
+(`ownership.PLAN`), the lines that named the seller (live account at the
+edge, the pairing with too few matches, the crises, the luck table, the
+account without a floating figure, the evidence legend) and the meanings
+that sent the reader to someone: an unmeasured out-of-sample stretch on an
+account history or a fund, and a weak multiplicity (with its wording for a
+fund and for an undeclared count). Outside the buyer's voice the questions
+list only what the files do not answer yet (`ownership.open_questions`): the
+modelling question, asked of every backtest, goes when the tester report
+already states a mode `testdata.py` recognises, asks about a rerun when a
+red flag says the mode or the history's quality falls short, and asks for a
+report that prints the mode when the uploaded one prints none we recognise;
+the buyer still asks the seller to confirm the header. The landing describes
+that section for every reader ("las preguntas que el informe deja
+abiertas"), not as questions for a vendor. Each text keeps the buyer's wording
+where it was and lists only the voices that differ, in Spanish, English and
+Portuguese side by side; `tests/test_audit_ownership.py` checks that the
+developer and neutral reports say neither "vendedor", "proveedor" nor "si
+compraste" (nor their English and Portuguese), that figures, class and tags
+are identical across voices, and that every new text passes the guard. The
+public verification page and its cards never read the answer. The public
+sample (`/ejemplo`) declares `own`, so it shows the developer's actions; the
+signal sample (`/ejemplo-senal`) declares `buyer`, so it speaks to a copier.
+
+#### The message for the seller (`audit/seller_message.py`)
+
+A buyer of a signal asked for "the questions for the seller in a message ready
+to copy into the MQL5 or Telegram chat, with the key figures and the costs in
+pips". With `buyer` declared, the questions section of the full report ends
+with a block "Mensaje para el vendedor" / "Message for the seller" /
+"Mensagem para o vendedor" ("... para el gestor" for a fund's monthly
+record): a read-only text area and a "Copiar mensaje" button that is the
+site's `data-copy` button (`static/app.js`, hidden until the script runs; no
+new script). The text is plain, in the report's language, and built only from
+the report (`report._seller_message`):
+
+- a neutral greeting ("Hola. Revisé los archivos de esta estrategia con Rigor y
+  me quedaron algunas preguntas.");
+- the class ("Clase del informe: C (A es la más alta, D la más baja).") and
+  the dimensions that fail or are weak, by the report's names, with their
+  status in words ("Costos (no supera), Número de configuraciones probadas
+  (débil)"), or "ninguna", then the dimensions not measured ("Dimensiones sin
+  medir: Costos, Fuera de muestra, Benchmark."; one that does not apply is not
+  listed). A class B from a curve alone is B because pieces are missing; without
+  that line it would read as "only one weak point";
+- two to four key figures, each with its evidence tag in words
+  (`report._seller_figures`): the break-even cost as the summary tile gives
+  it (basis points per side, then the pips of PR 479 and the money per lot
+  when measured, or "ya pierde sin costo extra"; a backtest without trades
+  says "no medido" with the costs' reason; a fund and a table of gross and
+  net period returns, which have no cost per trade, have no such line), the
+  live account against its backtest when one was uploaded (its badge and both
+  shares of backtest histories its section gives, net result as low or lower
+  and fall as deep or deeper, since either decides the badge; a share short of
+  none or of all reads "<1%" or ">99%", never "0%" or "100%"; or "no medido"
+  with the reason), the trials used in the deflated Sharpe (an undeclared
+  count says "no medido" with the engine's note, not the 1 it was computed
+  with) and the maximum drawdown, with the platform's drawdown with open
+  trades beside it ("según el informe de la plataforma", declared) whenever
+  the summary shows that red tile. At least two lines carry a measured or
+  declared figure: when the files gave fewer, the summary's Sharpe, total
+  return or drawdown p95 complete them with their own tag, and past four
+  lines the last "no medido" one makes room;
+- the open questions (`ownership.open_questions`), numbered. The stored
+  questions that speak to the buyer ("Pide el archivo de optimización", "¿Son
+  los de su bróker?") are put to the seller in `seller_message.SELLER_ASK`
+  ("¿Puedes enviar el archivo de optimización?"); the stored ones are
+  unchanged and the section above keeps them;
+- "Gracias de antemano.", the public page
+  (`https://rigorscore.com/v/<id>?ref=vendedor`, with `lang=en`/`lang=pt`)
+  only when the report is published, and "Informe hecho con Rigor
+  (rigorscore.com)". `vendedor` is a tag of `funnel.REF_TAGS`, so `/panel`
+  counts the visits the message brings.
+
+The text stays under 4,000 characters as a chat counts them (UTF-16 code
+units; Telegram takes 4,096). When the questions do not fit, the last ones
+are left out, the text ends its list with "Quedan N preguntas más en el
+informe." and a note under the text area says how many it carries. No
+"verificado", "certificado", "aprobado" or promise: every text passes
+`guard.find_claims`.
+
+Only the buyer gets the block. The developer's and the neutral voice send
+nobody to a seller, and the provider's questions section already reads, item
+by item, "Te van a preguntar: «...» Aporta ...", which is what a "lo que te
+van a preguntar" text would repeat, so the provider gets no second block.
+The locked preview does not render it; its lock box lists "Un mensaje para el
+vendedor con esas preguntas, listo para copiar" right after the questions,
+for the buyer only. The block is `no-print`: the PDF (the page under the
+print stylesheet) leaves it out and keeps the questions.
+`tests/test_audit_seller_message.py` covers the three languages, the figures
+against the report's own helpers (a badge decided by the fall, the tail
+shares, the platform's drawdown, a curve alone, period returns), the
+unmeasured dimensions, the other voices, the public link, the lock box, the
+trimming, a fund and the PDF.
 
 ### Dates and numbers in a hand-made file
 
@@ -811,27 +950,61 @@ Sharpe, profit factor, break-even cost) carry one plain line under the name,
 for example "lo ganado por cada 1 perdido" under the profit factor; locked
 tiles show the name only.
 
-### Comparing two reports
+### Comparing two or three reports
 
-`/comparar` (Spanish) and `/compare` (English) take the links of two of the
-customer's own reports and show them side by side: class, period and file
-format, the six dimensions and the executive-summary figures, with the
-figures that differ in bold (`audit/compare.py`). Every unlocked report has
-a small form that fills in its own link. Rules:
+`/comparar` (Spanish), `/compare` (English) and `/pt/comparar` take the links
+of two of the customer's own reports, plus an optional third (`link_c`, the
+pack of three audited side by side), and show them one column per report:
+class, period and file format, the six dimensions and the executive-summary
+figures (`audit/compare.py`, `comparison_body(results, hrefs=..., locale=...)`,
+two or three results, `compare.MAX_COMPARED = 3`). A figure is in bold
+("distinta") when it is not the same in every report. Every unlocked report
+has a small form that fills in its own link (the second field only). Rules:
 
 - the links travel in a POST body, never in a URL, so no token reaches a
-  log line; the id and token are read from the pasted address and checked
-  exactly like the report page (wrong token: 404, same report twice or an
-  unreadable link: 400);
-- only paid reports (or any report in free mode) can be compared: a locked
-  one gets 402 and the unlocked figures are never shown;
+  log line; the id and token are read from each pasted address and checked
+  exactly like the report page (wrong token: 404, the same report more than
+  once or an unreadable link: 400; an empty third field compares two);
+- only paid reports (or any report in free mode) can be compared: if any of
+  the two or three is locked the answer is the same 402 and no figure is
+  shown;
+- the break-even row has one fixed name in every report, "Costo extra que lo
+  lleva a cero (pb por lado)" (`compare._breakeven_row`), and each cell carries
+  that report's own detail (`compare._breakeven_cell`): "8.00 · 12.3 pips" (a
+  JPY pair's pip is another scale), "8.00" without pips, or "0 · ya pierde sin
+  costo extra" when the report already loses before any extra cost, with the
+  evidence of every number the cell shows. The report tile's name carries the
+  pips; used as the row's key it split the row in one per report and tagged
+  "No medido" figures that were measured;
+- with two reports the body is otherwise byte for byte the two-column one it
+  was (`tests/test_audit_compare_three.py` rebuilds the old layout and
+  compares; the break-even row above is the one deliberate change); with
+  three the cards, the dimension table and the figure table get a third
+  column (`cmp3`; three cards in a row above 860 px, stacked below, and the
+  tables scroll inside their box on a narrow phone), and the page title is
+  "Tres informes, lado a lado";
+- the change summary (`comparison_delta.change_summary`) is still between
+  two reports. With two it follows the cards, as before. With three it is
+  shown only when all three are versions of one strategy, which is how the
+  code already says that reports are versions of one system: the signed-in
+  account filed the three in the same strategy of "Mis estrategias"
+  (`web._same_strategy`). Then there is one summary per consecutive pair,
+  1 to 2 and 2 to 3 (`numbers=(1, 2)`, `(2, 3)`: "Qué cambió del informe 2
+  al 3", report numbers in the reasons and unique section ids). Otherwise it
+  is left out and a fixed line says why (`compare.COPY[*]['summary_three']`).
+  Visitors who are not signed in, or whose account did not file the three
+  together, see the three columns without it;
 - the page is private (`noindex`), passes the profit-claim guard and says
   that a class difference shows which tests changed, not that one version
   will work better.
 
 The existing account picker (`/cuenta/comparar`, `/account/comparar`,
 `/pt/conta/comparar`) uses the signed-in customer's report list; it never exposes
-tokens or consumes credits. A new stored-evidence summary shows the class change,
+tokens or consumes credits. It takes two or three ticked reports (`?id=` repeated,
+in the order shown; the same id twice, four or more, or one not complete goes
+back to the list with `compare_pick`), and that address, with the three ids,
+is the one the language switch links and that opens the same comparison
+again. A new stored-evidence summary shows the class change,
 which dimensions changed result, and flags that appear or are absent in report 2.
 An absent flag can reflect missing data, not a resolved risk. Classification and
 tests retain their own reports' declarations, including attempts and costs.
@@ -932,7 +1105,20 @@ The `/ejemplo` backtest trades two pairs, EURUSD and AUDUSD (`SAMPLE_SYMBOLS`,
 the pair drawn from its own random stream, so no result changes), and holds
 each trade between 1 and 7 hours (`SAMPLE_HOLD_HOURS`, also its own stream),
 so the per-instrument and "Cómo se comporta al perder" sections have real
-variety to show. The class stays C.
+variety to show. The class stays C. Its header prints what an MT5 tester
+report prints and the importer reads: "History Quality: 100% real ticks"
+(`SAMPLE_HISTORY_QUALITY`; the test-data section shows real ticks and 100 %,
+DECLARED, and the modelling question is answered for the developer) and
+"Equity Drawdown Maximal" and "Relative", the drawdown with the open trade
+counted: each trade's deepest floating loss is the low of a Brownian bridge
+from its entry to its exit with the trades' 25-pip spread, drawn from its
+own stream (`_floating_low`), so no trade, class, flag, challenge, ladder or
+size figure changes. It reads 1 570.26 (5.78 %) and 8.76 % (1 008.99),
+against 8.22 % on closed trades: the report adds "Drawdown con operaciones
+abiertas (tu plataforma)" (DECLARED), the capital section shows the
+platform's fall in money as a floor (below the resampled reference, so no
+capital figure moves) with its open-loss line, and the rows read grow by
+three.
 
 "Qué hacer ahora" / "What to do now" follows "Qué significa para ti": up to
 three checks for whoever runs the robot, from the live comparison, serious
@@ -1006,7 +1192,8 @@ Every leaf value in the JSON carries an evidence tag:
 
 - `MEASURED`: computed from the uploaded bytes.
 - `DECLARED`: asserted by the client (trials, cost, out-of-sample start,
-  the reference cost assumed when the client declares zero). Not verifiable.
+  whose strategy it is, the reference cost assumed when the client declares
+  zero). Not verifiable.
 - `NOT_MEASURED`: could not be computed from what was supplied; the reason
   is stated next to it.
 
@@ -1055,8 +1242,59 @@ Three details a buyer reading a real MetaTrader report asked about:
   GBP, JPY, CHF, AUD, NZD or CAD (a broker suffix is ignored), the break-even
   and reference costs are also given in pips per side at the median entry
   price (`costs.break_even_pips`, `costs.reference_pips`, `costs.pip_symbol`;
-  a pip is 0.01 on yen pairs, else 0.0001). Metals, indices and mixed
-  symbols stay in basis points only.
+  a pip is 0.01 on yen pairs, else 0.0001). Indices and other symbols stay in
+  basis points only.
+- Costs in pips by symbol: when the trades are on more than one symbol and
+  at least one is such a pair, `costs.pips_by_symbol` lists each pair and
+  each metal (`crises.symbol_market`: XAU, XAG, XPT or XPD against one of
+  those currencies), most traded first: `{"note", "rows": [{"symbol",
+  "trades", "median_entry_price", "pip_size", "break_even_pips",
+  "reference_pips"}], "others"}`. An exchange prefix is dropped first
+  (`OANDA:XAUUSD` is XAUUSD, `FX:EURUSD` is EURUSD, also for one pair).
+  Each pair's figures are the same formula as for one pair
+  (`bps / 10,000 × median entry price / pip`) with that pair's own median
+  entry price: the break-even is the whole history's (`break_even_bps`),
+  converted, not a break-even of that pair's trades alone, and the note says
+  so. The repository defines no pip size for metals, so a metal's row has no
+  `pip_size` and its two figures are NOT_MEASURED ("no pip size is defined for
+  metals; this symbol's cost stays in bps"). Every other symbol traded
+  (USDMXN, US30, BTCUSD...) is named in `others` (`{"symbols", "note"}`,
+  most traded first), and the report prints that note under the table:
+  "other symbols traded (USDMXN, US30) stay in bps: the audit defines no pip
+  size for them". The key is absent with one pair (the three keys above say
+  it) and when no pair is traded: a history of gold alone, or of gold and
+  silver, has no figure in pips to show.
+- Costs per lot: `costs.break_even_per_lot` is the extra cost per lot and
+  side at which the ledger nets to zero, MEASURED only for the formats whose
+  volume is the platform's lots and whose rows print each trade's result in
+  money (`importers.LOT_FORMATS`: MT5 tester and history, HTML or XLSX; MT4
+  tester and statement). It is the net the file prints for the closed trades
+  (each row's profit after the commission and swap the report itemises, the
+  same net as the stress tile's "with all") divided by twice the lots traded
+  (each trade buys and sells its volume); the note gives both figures so it
+  can be checked by hand against the file, and `costs.per_lot_currency` is the
+  account currency (null when the file does not state it: the note then says
+  "in file units"). Any other format is NOT_MEASURED ("the money per lot is
+  given only for MetaTrader 4 and 5 reports, whose volume column is the
+  platform's lots"): Myfxbook, FX Blue and MQL5 files print a volume too, but
+  no contract size is assumed for them. The lots of several symbols are added
+  only when every one is a pair of two of the currencies above (a broker
+  usually quotes its commission per lot of any of them), and the note then adds "the
+  lots of the 2 currency pairs are added as the platform prints them"; with a
+  metal, an index, a coin or any other symbol among several it is
+  NOT_MEASURED ("... a lot of gold is not a lot of EURUSD, so their lots are
+  not added together").
+- In the report, the executive summary's break-even tile reads "(bps per side;
+  1.7 pips)" with one pair, "(bps per side; ≈ 4.3 pips on EURUSD / 5.0 pips on
+  GBPUSD)" with several (the three most traded), and adds "52.54 USD per lot
+  and side" when the per-lot figure is measured; the basis points stay the
+  figure. The costs section adds a table "In pips, by symbol" under the
+  re-costed ledger. The improvement plan's costs step quotes those figures
+  when the break-even is above zero and then drops the generic "on EURUSD at
+  1.10, 1 bp per side is about 1.1 pips": it names the table's symbols, metals
+  included, when they are every symbol traded and no more than three, and
+  says "on each symbol you trade" otherwise. With a break-even at or below
+  zero it quotes no figure of its own and keeps the generic line.
 
 ### The variance policy behind the deflated Sharpe
 
@@ -1147,11 +1385,62 @@ and report wire them in during the integration step):
   Ranked by the figure that matters for a payout (within the best-day rule
   where the firm has one), ties by name. Figures read "≥99%" at the top.
   When every program is at or above 99 % or at or below 1 %, the table
-  gives way to one sentence (and, for all failing, the most common reason).
-  A program where no path fails reads "Nothing in the simulations". When
-  the balance hides open losses, the table repeats that its figures are
-  optimistic. MEASURED under the simulator's assumptions; it compares rules
-  and never recommends buying a challenge. No class change.
+  gives way to one sentence (and, for all failing, the most common reason);
+  with programs left out for their markets the sentence says "every
+  simulated program" and the left-out programs are still listed under it,
+  each with why. A program where no path fails reads "Nothing in the
+  simulations". When the balance hides open losses, the table repeats that
+  its figures are optimistic; and since each row carries its own rules, a
+  row whose own total loss limit (the smallest of its phases) the
+  platform's drawdown with open trades already reaches says so under the
+  program's name, with the same comparison as the chosen program's
+  open-loss line (`_row_open_loss`). On the public sample (-8.76 % with
+  open trades) that marks The5ers Hyper Growth (6 %), FundedNext Stellar
+  1-Step (6 %), Stellar Lite (8 %) and The5ers Bootcamp (5 %).
+  MEASURED under the simulator's assumptions; it compares rules and never
+  recommends buying a challenge. No class change.
+  Each row carries `rules` (one entry per phase: target, daily loss and its
+  basis, total loss and its type, minimum days, time limit, best-day rule,
+  copied from `prop_presets`) and the report folds them under the program's
+  name with "rules read on {as_of}" and a link to `source_url`; a field a
+  program does not have is left out. The `<details>` is served open (a
+  print, a saved page and a browser without script keep the rules) and
+  `static/app.js` folds it on screen and opens it again before printing,
+  as it does for the report's technical details. `ChallengeRules.markets` lists what a
+  program lets the trader trade only when a page of the firm says so
+  (`markets_source`, `markets_as_of`): Topstep is futures only ("Topstep is a
+  Futures-only program", help article 8284206), The5ers High Stakes and Hyper
+  Growth list their assets on their own pages; FTMO, FundedNext and Bootcamp
+  pages read say nothing, so they are never restricted. What each symbol
+  can be traded as comes from `crises.symbol_market` and
+  `firmfit.symbol_venues` (`SYMBOL_MARKETS`: a pair against a currency,
+  `EURUSD`, `XAUUSD` or `BTCUSD`, is spot or CFD and never a future, so
+  gold and bitcoin pairs are treated alike; an index name, a bare coin root
+  such as `BTC` or a perpetual can be either). When every symbol is known
+  and a program does not take one of them, the program is not simulated
+  and goes last with `market`: what the page allows and only the symbols
+  (the most traded first, four at most, then "…") and markets it does not
+  take, with `spot` when they are all spot or CFD pairs ("Only futures: the
+  history trades spot or CFD forex (EURUSD, AUDUSD), which this program does
+  not take according to its page; not simulated"); a forex and index
+  history names the forex only. With symbols the audit cannot place,
+  nothing is restricted. The chosen program is never left out: its section
+  was simulated, so its row keeps its figures (the ladder's own) and says
+  "it is simulated because you chose it, but its figures are those of rules
+  that would not apply to this history" instead of "not simulated";
+  `challenge.market` carries the same fit, and the challenge section, the
+  ladder, the size table and the line under the verdict repeat it. `firmfit.scenario_columns`
+  repeats the ladder's `out_of_sample` and `reference_cost` rungs for every
+  program, named as the ladder names them: the chosen program's figures are
+  the ladder's own, every other program runs `program_pass` on the same
+  series at 2,000 paths per phase. A rung the ladder could not measure is
+  one NOT_MEASURED line under the table with the ladder's reason. The note
+  above the table says that "Passes" uses the full history with the costs
+  the file already carries, without the declared or reference cost. Time
+  measured with `time.perf_counter` at the production paths: about 0.8 s
+  extra on the sample report and 0.6 s with FTMO 2-Step chosen (the three
+  Topstep programs left out for a forex history are not simulated), under
+  2 s, so the columns keep the firm table's 2,000 paths.
 - `challenge.scenarios`, the challenge ladder ("¿Cuánto cambia con lo que
   encontró este informe?"): the chosen program (all its phases, through
   `firmfit.program_pass`; the generic preset is one phase) run again with
@@ -1165,7 +1454,11 @@ and report wire them in during the integration step):
   out-of-sample start, NOT_MEASURED with the holdout's own
   reason when it was not measured (no date declared, a date outside the
   series, a side too short); `reference_cost`, the curve with the cost
-  section's reference cost per side (`costs.round_trip_cost`) taken off the
+  section's reference cost per side (`costs.reference_bps`: the client's
+  declared cost when one above zero was declared, and the row's name then
+  reads "With the declared cost (N bps per side)" with a DECLARED badge;
+  otherwise the assumed reference, named "With the reference cost"),
+  charged with `costs.round_trip_cost` and taken off the
   balance from each trade's exit on, NOT_MEASURED without trades, when the
   curve is not money (deposits or withdrawals inside the history make it an
   index; otherwise the curve and the trades must reconcile, or the balance
@@ -1186,8 +1479,10 @@ and report wire them in during the integration step):
   measure (too few daily returns) says why. The rows are scenarios of the
   same history, not predictions; the ladder is MEASURED, informational and
   changes neither the class, the dimensions, the challenge's own figures
-  nor the firm table, which now says that its figures come from the full
-  history without the reference cost. When the client chose the challenge,
+  nor the firm table's full-history column; the firm table repeats the
+  `out_of_sample` and `reference_cost` rungs for every program. The target
+  column reads "Reaches the target" for a one-phase program and "Reaches the
+  target in every phase" with more. When the client chose the challenge,
   one line under the verdict gives the full-history figure next to the
   lowest measured row and links to the section; when the section warns that
   the balance hides open losses (the platform's drawdown with open trades
@@ -1196,6 +1491,84 @@ and report wire them in during the integration step):
   `/v`, the badge or the card. Every preset has `time_limit_days=None`, so
   "unfinished" reads as not reaching the target within the simulator's
   250 business days, the cap, never as a deadline the rules set.
+- `challenge.sizing`, the size table ("¿A qué tamaño? El reto a 0.5x, 1x,
+  1.5x y 2x", under the ladder): the ladder's `full` row again with every
+  daily return of the history multiplied by 0.5, 1, 1.5 and 2
+  (`SIZING_MULTIPLIERS`), through `firmfit.program_outcomes`, which is
+  `program_pass` (same simulator, seed, paths per phase and rules, all the
+  program's phases) plus how the program ends when it is not passed. JSON:
+  `{"status", "program", "note", "starting_balance", "size_per_trade",
+  "account_size", "rows"}`;
+  each row is `{"key": "0.5x" | "1x" | "1.5x" | "2x", "multiplier", "days",
+  "pass", "main_risk", "pass_within_best_day" (when the program has a
+  best-day rule), "fail_daily_loss", "fail_total_loss", "unfinished"}`, all
+  MEASURED. `pass` is the chance of passing every phase (the product, as in
+  the firm table); the three failures count a phase's outcome weighted by
+  the chance of reaching that phase (fresh starts, The5ers Bootcamp three
+  times), so the four figures of a row sum to one. The 1x row is the ladder's
+  `full` row itself (same `days`, `pass`, `main_risk` and
+  `pass_within_best_day`). The `note` says the assumption: changing the size
+  scales every daily return in the same proportion, as linear leverage does
+  when the costs grow in proportion to the size (the same cost per lot) and
+  the execution does not worsen with more volume. `starting_balance` is the
+  balance the daily shares at 1x are measured on, as the capital section
+  names it: DECLARED for a report's curve rebuilt from its trades (the
+  report's balance, or the one declared on the form), MEASURED for a curve
+  the client uploaded or built from chosen columns (its first value), and
+  NOT_MEASURED with the value kept when the reader assumed 10,000 because the
+  file states none (the importer's or the column mapping's "does not state a
+  starting balance" warning on a curve built from it); the report then says
+  the balance was assumed and that 1x scales with it. `size_per_trade`
+  is the average lot per trade at 1x (MEASURED) when the costs section
+  measured `break_even_per_lot` (MetaTrader lots that can be added): every
+  trade's lots added and divided by the number of trades, which is half the
+  "lots traded" the cost section divides by (it counts entries and exits);
+  each row then has `average_lot`, that average times the size. Those lots
+  are the balance's the shares at 1x are measured on (`starting_balance`),
+  and the report says so ("0.50 lots on a 10,000 balance"): the same shares
+  on another balance take the lots times that balance over this one. When
+  the program names an account (`ACCOUNT_SIZES`) and the balance was not
+  assumed, `size_per_trade_account` and each row's `average_lot_account`
+  give the lots on that account (0.50 × 100,000 / 10,000 = 5.00 on Topstep
+  100K for the sample) in a column of their own. Otherwise
+  NOT_MEASURED, with the cost section's reason for mixed lots or with
+  `SIZING_NO_SIZE` (lots are read only from MetaTrader 4 and 5 reports). No
+  stop loss is read, so no risk per trade is given; 1x is "the size of the
+  history you uploaded" (each simulated day gains or loses the same share of
+  the balance as a day of the file). `account_size` is DECLARED only when
+  the preset's program names one (`prop_presets.ACCOUNT_SIZES`: Topstep
+  50K/100K/150K, whose dollar limits are shares of that account); otherwise
+  NOT_MEASURED, and the report says the simulated rules fix no account size
+  (they are shares of the starting balance or of the day's), so the table's
+  shares do not depend on the account size, and, with the lots given, that
+  the lots do (`SIZING_NO_ACCOUNT`). Results stored before the average lot
+  keep the old `SIZING_NO_SIZE` and `SIZING_NO_ACCOUNT` sentences
+  (`SIZING_NO_SIZE_BEFORE`, `SIZING_NO_ACCOUNT_BEFORE`): their translation
+  rules stay, and the old reason keeps its old name ("Lot or risk per trade
+  at 1x"). The intro counts every phase only for a program of several
+  (`ch_size_intro_one` otherwise). The whole block is
+  NOT_MEASURED, with the same reason, when the challenge or the ladder's
+  `full` row is not measured, and with "uploaded returns are not money"
+  (`RETURNS_NOT_MONEY`, the reconciliation's own reason) for a returns
+  upload. The report shows one row per size with the chance of reaching the
+  target in every phase, within the best-day rule when the program has one,
+  of breaking the daily limit ("no rule" for programs without one), of
+  breaking the total limit and of not reaching the target within the
+  simulator's cap (the ladder's `unfinished_cap` words; "per phase" for a
+  program of several phases, since each phase has 250 business days of its
+  own), in the ladder's formats (`_firm_pct`). Without a deadline in the
+  rules the intro adds that "reaches the target" counts only what gets there
+  within that cap, so a smaller size moving simulations to "does not reach"
+  is read as days running out, not as broken limits. It repeats the
+  open-loss warning ("cifras optimistas") under the same condition as the
+  ladder (`_challenge_optimistic`). It shows what changes with the size and
+  advises none. In the locked preview its title is listed after the
+  challenge simulator. Time measured with `time.perf_counter` at the
+  production 5,000 paths: about 0.17 s extra on the sample report (generic
+  preset) and 0.30 s with FTMO 2-Step (two phases), under 1 s, so every
+  size keeps the ladder's paths. Informational: no class, dimension,
+  challenge figure, ladder row or firm-table change, and nothing reaches
+  `/v`, the badge or the card.
 - `vendor_questions`: neutral questions for the seller of a robot, driven by
   the red flags and the missing inputs, in Spanish and English. It never
   says whether to buy.
@@ -1827,6 +2200,56 @@ download lands, or with `AUDIT_PUBLIC_DATA=false`, it is the offline sample.
 Each version is built once per language and set of series in memory and
 kept. The public series move no figure of the sample, only add their lines.
 
+The second sample, for whoever is about to copy a signal (`/ejemplo-senal`,
+`/en/sample-signal`, `/pt/exemplo-sinal` and the same addresses with `.pdf`),
+goes through the same route code, cache, notice, sign-up band and PDF record
+(`/comprobar` answers it is the sample). Its input is the Myfxbook export of a
+made-up account (`sample.synthetic_signal_statement`, seed `SIGNAL_SEED`):
+twelve months of a grid robot on EURUSD and GBPUSD that adds 1.5 times the
+lots every 20 pips against the basket (six entries at most), closes the
+basket 10 pips past its average or 30 pips past its sixth entry, and doubles
+the next basket after a loss. The market ranges most of the year and trends
+against the open basket on the dates in `SIGNAL_TRENDS`; the last trend
+leaves a full basket open in "Open Trades". A 1 000 deposit, a 4 000 top-up
+the business day after the first losing basket and a 600 withdrawal complete
+it. It is uploaded as a copier would (trials, cost and out-of-sample blank,
+ownership `buyer`), and the current engine raises MARTINGALE_SIZING,
+GRID_AVERAGING, DEPOSIT_DURING_DRAWDOWN, FLOATING_LOSS_AT_END and
+GAIN_INFLATED_BY_FLOWS on it, all at WARN; `tests/test_audit_signal_sample.py`
+checks each one and notes why none reaches FAIL and why the win-rate and
+no-stop flags do not come out. The signal-copiers page opens it with its main
+button, the Myfxbook, MQL5 and FX Blue guides link it under "What you get",
+the first sample links it from its band, and the sitemap lists it with its
+own date (`seo.SIGNAL_SAMPLE_PUBLISHED`).
+
+Each sample also has the public page a publication of its report would get
+(`audit/sample_publication.py`): `/v/ejemplo` (the backtest) and
+`/v/ejemplo-senal` (the signal), with their `badge.svg`, `card.svg` and
+`card.png`. They go through the `/v/{public_id}` routes, functions and caching
+(`pages.verification_page`, badge, cards; `?lang=` and `noindex` as any `/v`),
+from the view a retention purge keeps (`store.public_view`) of the sample's
+Spanish report, built in memory once per set of public series from the same
+run as the sample's report page and PDF, with the synthetic-data notice and a
+link to the full sample on top. A publication has one hash, so the page shows
+the Spanish report's in every language: its notice links that report, and in
+English and Portuguese (whose reports are other results with other hashes) the
+notice and the sample band say the page is made from the Spanish version.
+Nothing is read from or written to the database. The two ids cannot be real
+ones: a real id is `secrets.token_urlsafe(9)`, always 12 characters, and `/v`
+answers the reserved ids before any lookup. Only what would pass a sample off
+as someone's audit is said its own way (`sample_publication.sample_page`): the
+tab title and link preview start with "Sample", the share text says what the
+page is (never "I audited my...") under its own funnel tag (`v-ejemplo`, not
+`share`), the badge code is shown as the sample's without a copy button, and
+"Published" is the day the pages came out (`SAMPLE_PAGES_PUBLISHED`, a bare
+date), never the audit's date. The report's publish block links the closest
+sample (an account history or a fund's track record the signal's), the FAQ's
+publishing and badge answers and the page for funds and signal providers link
+both, and each sample links its own from its band. `/comprobar` answers a
+sample's PDF as before. `tests/test_audit_sample_publication.py` compares each
+page, badge and card with those of a real publication of the same report,
+before and after a purge, with only those words different.
+
 Sharpe after the cash rate (`audit/cashrate.py`). With public data on, the
 report adds one line under the key figures: the Sharpe ratio of the returns
 after subtracting what the 3-month US Treasury bill paid over the same days
@@ -2375,10 +2798,11 @@ Routes:
 | Route | What it does |
 |---|---|
 | `GET /` | Landing (how it works, prices, FAQ, link to the sample); `?lang=en`. `GET /en` is the English landing, a short address to share. Its closing call keeps `id='subir'`, and every start button links to the upload page; old `?extras=1` links redirect there. |
-| `GET /auditar` | The upload form on its own page (`/en/audit`, `/pt/auditar`; `?extras=1` opens the extra files). Outside free mode a visitor without an account gets a 303 to sign-up with `next` back here (`/registro?next=/auditar`, `/signup?next=/en/audit`, `/pt/cadastro?next=/pt/auditar`), so nobody fills the form and loses it. A visitor who came with `?extras=1` keeps it (`next=/auditar%3Fextras%3D1`) and lands on the form with the extra files open after signing up or in; the language switch of the form and the "account first" answer to an upload that used an extra box keep it too. |
+| `GET /auditar` | The upload form on its own page (`/en/audit`, `/pt/auditar`; `?extras=1` opens the extra files). Outside free mode a visitor without an account gets a 303 to sign-up with `next` back here (`/registro?next=/auditar`, `/signup?next=/en/audit`, `/pt/cadastro?next=/pt/auditar`), so nobody fills the form and loses it. A visitor who came with `?extras=1` keeps it (`next=/auditar%3Fextras%3D1`) and lands on the form with the extra files open after signing up or in; the language switch of the form and the "account first" answer to an upload that used an extra box keep it too. With `AUDIT_ANON_PREVIEW=true` there is no redirect: the form is served, and its note says that without an account the file's A to D class and red flags are shown, and that with an e-mail the first full report is free (`pages._COPY[...]["anon_preview_note"]`); under the paid offer (`AUDIT_WELCOME_FULL_REPORT=false`) the notes say instead the free preview, the price and the 7-day refund (`paid_offer.paid_text`); see "Preview without an account" and "Paid offer" below. |
 | `GET /precios` | 301 to the landing's prices (`/#pricing`); `/pricing` and `/en/pricing` go to `/en#pricing`, `/pt/precos` to `/pt#pricing`. |
 | `GET /contacto` | Contact page (`/en/contact`, `/pt/contato`; `/soporte`, `/contact`, `/support`, `/en/support`, `/pt/suporte` redirect there), linked from every footer. It shows only what the operator set: `AUDIT_OPERATOR_CONTACT` as a mail link and `AUDIT_CONTACT_URL` as the chat link; with neither it says no channel is published yet. It also says never to send a password, recovery key or card details. |
-| `POST /audits` | Upload. An optional `access_code` field redeems a code (paid mode with codes on). |
+| `GET /acerca` | Who is behind Rigor (`/en/about`, `/pt/sobre`; `/about` and `/pt/about` redirect there; `about.py`). It shows only what the terms and the landing already publish, each from its setting: `AUDIT_OPERATOR_NAME`, the country (`AUDIT_OPERATOR_ADDRESS`, `_EN`, `_PT`), `AUDIT_OPERATOR_CONTACT` and `AUDIT_CONTACT_URL`; no photo. With none set it says the operator has not published them. `/sample-signal`, `/en/compare`, `/en/signup`, `/register` and `/pt-br` answer 301 to the page that exists. |
+| `POST /audits` | Upload. An optional `access_code` field redeems a code (paid mode with codes on). With `AUDIT_ANON_PREVIEW=true`, an upload without an account and without a working code is stored as a locked preview and answers 303 to `/audits/{id}?token=…&acct=anon_preview` (201 with that `location` for JSON). |
 | `GET /audits/{id}?token=…` | The report, in the language chosen at upload; `&lang=en` or `&lang=es` shows it in the other one. `GET /audits/{id}.json?token=…` the record (402 while locked). |
 | `POST /audits/{id}/checkout?token=…` | Stripe Checkout (503 without Stripe). Form field `plan=single` (default) or `plan=pack`; the return link `?session_id=…` is confirmed with Stripe before anything unlocks. Needs a signed-in account: a visitor is sent to sign in and back to the report, a report on another account is refused (403), and the order is recorded on the buyer's account (`tests/test_audit_card_payments.py::test_checkout_needs_the_signed_in_account_that_owns_the_report`). |
 | `POST /cuenta/comprar` (`/account/comprar`, `/pt/conta/comprar`) | Buy credits by card from "My account": `plan=single` (1 credit, the report price) or `plan=pack` (3 credits, the pack price), with `billing_country` from `AUDIT_APPROVED_MARKETS` and the required `final_sale=yes` box. Live Stripe only (no button and `?error=buy_off` in test mode, without markets or while new checkouts are paused). The order is a `checkout_orders` row whose `audit_id` is `account:<account id>`; the signed webhook puts the credits on an access code linked to the account and unlocks no report. A test-mode payment, another account, amount, plan or billing country grants nothing (`tests/test_audit_account_credit_purchase.py`). |
@@ -2386,8 +2810,10 @@ Routes:
 | `POST /audits/{id}/account?token=…` | The account box of a report opened by its link, for a visitor without a session. Form field `go=signup` or `go=signin`; 404 without a valid token, 403 to a post from another site. It keeps the report's key in the cookie `rigor_report` (1 hour) and answers 303 to sign-up or sign-in with a `next` that names the report without its token. |
 | `POST /audits/{id}/publish?token=…` | Create (or return) the public verification page. Paid audits, or any audit in free mode; 402 otherwise. |
 | `POST /audits/{id}/unpublish?token=…` | Remove the public page. |
-| `GET /v/{public_id}` | Public verification page. `GET /v/{public_id}/badge.svg` its badge. Survives the retention purge (only the shown fields are kept); 404 once unpublished. |
+| `GET /v/{public_id}` | Public verification page. `GET /v/{public_id}/badge.svg` its badge. Survives the retention purge (only the shown fields are kept); 404 once unpublished. Without `?lang=` it is the Spanish page with its usual canonical, except for a browser whose `Accept-Language` asks for English or Portuguese: that one gets a 302 to `?lang=en` or `?lang=pt` (`Vary: Accept-Language`, the rest of the query such as `?ref=` kept). The language switch links Spanish as `?lang=es`, so the visitor's choice wins. |
+| `GET /v/ejemplo`, `GET /v/ejemplo-senal` | The public page each sample's report would get, with the synthetic-data notice on top, and the same `badge.svg`, `card.svg` and `card.png`; built in memory, never stored. |
 | `GET /ejemplo`, `GET /sample` | A full report of synthetic data, Spanish and English. |
+| `GET /ejemplo-senal`, `/en/sample-signal`, `/pt/exemplo-sinal` | The signal sample: a full report of a made-up Myfxbook account, for a copier; each with its `.pdf`. |
 | `GET /terminos`, `GET /terms` | Terms of service (`audit/legal.py`), Spanish and English; either answers `?lang=`. |
 | `GET /privacidad`, `GET /privacy` | Privacy policy, Spanish and English. |
 | `GET /en/terms`, `/en/privacy`, `/pt/terms`, `/pt/privacy` | 301 to the legal page in that language (guessed addresses). |
@@ -2432,6 +2858,8 @@ with an empty value):
 | `AUDIT_ACCESS_CODES` | `false` | Offer manual access-code sales and typed-code redemption. With `AUDIT_FREE_MODE=false` it turns on paid mode without Stripe. Credits already on an account remain spendable when this is `false`. |
 | `AUDIT_REFERRAL_REWARDS` | `true` | Set `false` to stop new invite rewards and hide the reward promise during an incident. Previously granted credits remain usable. |
 | `AUDIT_REFERRAL_GLOBAL_MONTHLY_CAP` | `100` | Maximum rewarded invites across the whole service per UTC month, reserved transactionally in `referral_global_slots`. At one credit per invite this caps the new monthly credit obligation. `0` stops new rewards. |
+| `AUDIT_ANON_PREVIEW` | `false` | Paid mode only. `true` lets a visitor without an account upload and see the file's class and red flags (a locked preview, `accounts.ANON_PREVIEWS_PER_NETWORK_PER_DAY = 2` per IPv6 /64 and `ANON_PREVIEWS_PER_IPV4_PER_DAY = 6` per IPv4 address a UTC day); signing up or in from that report puts it on the account and opens it as the free first full report under the usual limits (with `AUDIT_WELCOME_FULL_REPORT=false` it stays locked on the account, with the usual purchase). `false` keeps "account first": every page and route answers exactly as before. It changes the free tier's rule, so only the owner turns it on. |
+| `AUDIT_WELCOME_FULL_REPORT` | `true` | Paid mode only (`AuditSettings.welcome_full_report`, default `accounts.WELCOME_FULL_REPORT`). `true`: a new account's first upload is a free full report under the usual limits. `false` (the paid offer, `audit/paid_offer.py`): every full report is paid from the first one; no path grants one free (upload, confirmed e-mail, card check, invite), access codes and credits work as always, and the pages say the free preview, the price from the settings and the terms' 7-day refund. Planned for production with `AUDIT_ANON_PREVIEW=true`. |
 | `AUDIT_EMAIL_VERIFICATION_REQUIRED` | `false` | Migration default. When `true`, both addresses must be confirmed before an invite reward and a buyer's address before a new Checkout. Sign-up still works; the free first full report waits until the address is confirmed (earlier uploads are previews with reason `unverified`). **Public paid launch requires `true` and e-mail delivery (Resend's API or SMTP, see the next two rows) verified end to end.** |
 | `AUDIT_EMAIL_TOKEN_SECRET`, `AUDIT_SMTP_HOST`, `AUDIT_SMTP_PORT`, `AUDIT_SMTP_USERNAME`, `AUDIT_SMTP_PASSWORD`, `AUDIT_SMTP_FROM`, `AUDIT_SMTP_SECURITY` | empty / `587` / `starttls` | Stable secret of at least 32 characters shared by replicas and encrypted SMTP transport. SMTP is one of two transports: when `AUDIT_RESEND_API_KEY` is set (next row but one) the mail goes through Resend's HTTPS API and the `AUDIT_SMTP_HOST`, port, user, password and security variables are not used; the sender is `AUDIT_EMAIL_FROM`, or `AUDIT_SMTP_FROM` when that is empty. `/ready` fails when verification is required but delivery is not configured. Test real delivery, retries and legacy account confirmation before launch. No usable token or link is stored in the outbox. |
 | `AUDIT_SKIP_EMAIL_DNS` | `false` | `true` stops the sign-up DNS check that refuses domains taking no mail (for a staging copy without DNS). |
@@ -2830,7 +3258,163 @@ an account never changes what a report says.
   someone can open several accounts with made-up addresses; the per-network
   cap and the 5 sign-ups per hour per network only slow that down. Enabling
   SMTP and verified-email gating closes the reward and new-Checkout paths.
-- **Free first full report** (`accounts.WELCOME_FULL_REPORT = True`,
+- **Preview without an account** (`AUDIT_ANON_PREVIEW`, off by default; not
+  in free mode). With the switch off, everything above holds unchanged:
+  `/auditar` sends a visitor without an account to sign-up and an anonymous
+  upload gets the 401 sign-in page. With it on, the free tier's rule becomes
+  "see the class first, create the account to open it":
+  - `/auditar` serves the form; its note says what is shown without an
+    account and that the first full report is free with an e-mail.
+  - `POST /audits` without a session and without a working code (a working
+    code still asks for the account) keeps the cross-site check, the consent
+    and the hourly limit, then takes one of the network's previews of the
+    UTC day after parsing (`free_claims` keys
+    `anon:ip:<network hash>:<day>:<n>`; `accounts.ANON_PREVIEWS_PER_NETWORK_PER_DAY
+    = 2` per IPv6 /64, `ANON_PREVIEWS_PER_IPV4_PER_DAY = 6` per IPv4 address,
+    `accounts.network_cap`). Past it the answer is the 401 sign-in page (JSON
+    `free_tier_signin`) and nothing is stored. Otherwise the report is stored
+    locked (`paid=False`), a `welcome_pending` row with `account_id = ""`
+    keeps the upload's browser mark, file fingerprint and network, an
+    `anon_previews` row counts it for `/panel`, and the answer goes to
+    `/audits/{id}?token=…&acct=anon_preview` (the device cookie is set as for
+    any upload). The in-page upload follows the same `location`.
+  - The report says it is a preview without an account. While the account
+    would open it (this same browser uploaded it, its device cookie hashing to
+    the upload's mark; uploaded in the last `WELCOME_PENDING_DAYS` days;
+    neither its browser, file nor network had their free report meanwhile;
+    and, when confirmation is required, a confirmation e-mail can be sent),
+    a visitor without a session sees `anon_preview` ("the full report and the
+    PDF open with an account") and the box reads `anon_preview_box` with
+    "Abrir mi informe completo gratis" (sign-up) and "Ya tengo cuenta".
+    Otherwise (another browser with the link, a file or network that already
+    had its free report, a signed-in visitor, no mail transport) the notice
+    is `anon_preview_link`, without that promise, and the box is the usual
+    `anon_box`. It stays `noindex`, opened only by its key.
+  - Signing up or in (password, two-step code or passkey) with `next` on that
+    report and its key in `REPORT_KEY_COOKIE` (checked as `_load` checks it),
+    or "Guardar en mi cuenta" on it from an account made another way (the
+    menu, the form's "Crear cuenta gratis"), runs `_anon_to_account`. Only the
+    browser that uploaded it takes it: another browser with the link links
+    nothing on signing up or in, and its "save" is the usual saved link,
+    without the pending row, so it never gets the uploader's free report nor
+    their network address or marks in "Descargar mis datos"; the uploader can
+    still take it afterwards while no account holds it. For the uploader the
+    report goes on the account as its own upload and the pending row is
+    attached (`store.welcome_pending_attach`, only a row with
+    `account_id = ""`). With no confirmation required, or an address already
+    confirmed, `_grant_pending_welcome` opens it at once (`acct=welcome`);
+    otherwise confirming the address opens it, as for any pending preview
+    (the report shows `welcome_refused_unverified`). When the account,
+    browser, file, inbox or network rule refuses the free report, the report
+    counts as one of the month's free previews of the account and of the
+    network (the same `preview:account:` and `preview:ip:` claims and
+    `free_previews` row as an upload made signed in); past either cap it goes
+    on the account as saved, not as its own upload. It stays locked, with the
+    usual credit, code or card offer. No limit is relaxed: the free full
+    report is still one per account, inbox, browser, file and card, and a few
+    per network a month, and an account's own uploads still count against
+    its 3 previews a month. One case is left as it is: a preview waiting for
+    the address to be confirmed is not counted (confirming opens it as the
+    free report, and a counted preview given back by `delete_free_preview`
+    keeps its claim), so an account that never confirms can hold such
+    previews as its own uploads, locked.
+  - Retention: the locked preview follows the usual purge; its
+    `welcome_pending` and `anon_previews` rows and the day's network claims go
+    at the same cutoff, and with `delete_audit`.
+  - `/panel` adds "Vistas previas sin cuenta" by tag: how many previews were
+    uploaded without an account and how many went on an account afterwards
+    (`funnel.STAGES` `anon_previews` and `anon_linked`).
+  - **The terms and privacy pages** (2026-10-09, `LEGAL_UPDATED`; they were
+    left open by the branch that added the switch). With the switch on,
+    "Tu cuenta" (`legal._account_terms`) says that with an account there are
+    3 free previews a calendar month, also counted per network; that without
+    an account each network can see the class and red flags of
+    `ANON_PREVIEWS_PER_NETWORK_PER_DAY` (2) files a day
+    (`ANON_PREVIEWS_PER_IPV4_PER_DAY`, 6, from an IPv4 address, often shared);
+    that the full report needs an account; and what moving one of those
+    previews to an account does: with the free first report on, it can open
+    as that report under the same limits, otherwise it takes one of the
+    month's previews while any are left (the code counts it with
+    `_claim_month_preview`, so the earlier proposal "those previews do not
+    count among your account's 3" was not what the code does). The privacy
+    policy (`legal._anon_keeps`) lists what such an upload keeps: the
+    language, the link tag (`rigor_ref`), the date and when it moved to an
+    account; the browser's identifier (hash only) and the network address
+    and, only with the free first report on, the file's SHA-256 (under the
+    paid offer `welcome_pending.file_sha256` is stored empty: nothing would
+    ever check it); and a hash of the network per day for the daily count.
+    All of it goes with the report or at the retention purge, except the
+    network's daily count (`free_claims` `anon:ip:*`), which only the purge
+    removes (`Store.delete_audit` leaves it, so deleting a report does not
+    give its network a preview back); the policy says so.
+    - The welcome box's promise (`anon_preview_box`) cannot know whether the
+      inbox already had its free report: the address is only known on
+      signing up, and the notice afterwards (`welcome_refused_email`) says
+      why it stayed a preview. Under the paid offer the box never promises a
+      free report (see "Paid offer" below).
+- **Paid offer** (`AUDIT_WELCOME_FULL_REPORT=false`,
+  `AuditSettings.welcome_full_report`; `audit/paid_offer.py`). Decided by the
+  owner on 2026-10-09 and planned for production together with
+  `AUDIT_ANON_PREVIEW=true` (the session that runs Railway sets both). The
+  free tier's rule becomes "see the class first, pay for the full report":
+  - Without an account (switch on), each network sees the class and red
+    flags of 2 files a day (6 per IPv4 address); with a free account, 3
+    previews a month as before. Every full report costs the price from the
+    settings (`price_usd_cents`, the pack `pack_price_usd_cents`), from the
+    first one, and the terms refund it on request within
+    `paid_offer.REFUND_DAYS` (7) days of the payment (see "Terms and privacy").
+  - No path grants a free full report: `_first_look` answers `off` (the
+    upload is a preview, with no `acct=preview_*` notice), `_grantable_pending`
+    finds nothing on confirming the e-mail, `_referrals_on` is off (no invite
+    link, no reward), `_card_offer` is off (`off` is not a card refusal), and
+    `_anon_to_account` puts a preview made without an account on the account
+    as one of the month's previews (saved, past the cap), locked, with the
+    usual purchase, never attaching its pending row. Access codes and credits
+    open reports as always.
+  - Every page says it with the same words (`paid_offer.COPY`, es/en/pt): free,
+    without an account, the class and the red flags; the full report, with
+    every figure and the PDF, costs USD 29; if it is no use, the money back
+    when asked within 7 days of paying. The pages built around the offer take
+    it as a parameter (`Offer`, from `paid_offer.offer_of(settings)`):
+    `/precios` (a "Vista previa" card, the full report's and the pack's cards
+    with their refund line next to the button, the closing call and the
+    JSON-LD), the landing (the hero's line, "Cómo funciona", the price cards
+    and the question «¿Y si el informe no me sirve?»), `/preguntas` (the
+    price question and the refund question after it), `/auditar` (the notes),
+    sign-up (the lead and "Así sigue"), the sample's band, the guides' "Lo
+    que recibes" and the report's box. The box of a preview its own browser
+    made without an account says «Crea tu cuenta y ábrelo completo por USD
+    29» with the refund (`paid_offer.anon_box_text`); another browser with
+    the link gets the usual box. The notice after signing up with a
+    confirmation pending is `welcome_confirm_paid` (the link, and that
+    confirming is needed to pay; nothing opens). "My account" takes the offer
+    too (`account_page(offer=...)`): its e-mail card says confirming unlocks
+    the purchases (`email_unverified_status_paid`,
+    `email_delivery_unavailable_paid`), the confirmed notice names no rewards
+    (`email_verified_paid`) and "What we keep" is `stores_paid`; a payment
+    tried before confirming answers `email_checkout_required_paid`. The other
+    public pages (articles and their closing calls, the
+    audience pages, the examples, the tools, the calculators and the figure
+    reader) keep their copy and are served through `web._offered`, which
+    swaps each sentence that promised the free first report
+    (`paid_offer.PROMISES`, regular expressions over the text, the
+    descriptions and the JSON-LD) for the paid one. With the free first
+    report on, nothing is rewritten: a test renders every sitemap page with
+    it on and checks that each pattern still finds its sentence, and another
+    renders every page, sign-up, the form, both kinds of report, "My account"
+    before and after confirming and the refused payment with the paid offer
+    and finds no promise of a free full report
+    (`tests/test_audit_oferta_pago.py`).
+  - The privacy policy and "What we keep" say what the free first report,
+    its card check and the invites kept only of the accounts that had them,
+    in the past ("cuando lo ofrecíamos", "when we offered it", "quando o
+    oferecíamos"; "cuando había invitaciones"): their hashes stay. The
+    browser mark (`rigor_device`) is described by what it does now: the
+    browser that uploaded a preview without an account, and the notice of
+    visits to "My account" (`legal._device_cookie_use`). The test allows a
+    free report only in a sentence that carries that past marker.
+- **Free first full report** (`AUDIT_WELCOME_FULL_REPORT=true`, the default
+  `accounts.WELCOME_FULL_REPORT = True`;
   `WELCOME_REPORTS_PER_IP_PER_MONTH = 3` per IPv6 /64,
   `WELCOME_REPORTS_PER_IPV4_PER_MONTH = 10` per IPv4 address; not in free
   mode). Why IPv4 gets more (`accounts.network_cap`): mobile carriers in
@@ -3120,14 +3704,15 @@ an account never changes what a report says.
   one day are told apart (the strategies form shows the same id); on a phone
   the line wraps under the date. The "¿Necesitas créditos?" box shows the
   single and pack prices from the settings and a WhatsApp link with the
-  request typed, and says that the credit is delivered at once and the
-  purchase is not refundable (`buy_final_sale_note`), as the card form's box
-  does.
+  request typed, and says that the credit is delivered at once and that a
+  refund can be asked within 7 days under the terms (`buy_final_sale_note`),
+  as the card form's box does.
 - **Comparing**: with two or more full reports, "Mis informes" lets the
-  customer tick two and open `/cuenta/comparar` (`/account/comparar`), the
-  same side-by-side view as `/comparar` without pasting private links. It is
-  a read-only GET; both reports must be on the signed-in account's list, not
-  purged and unlocked (or free mode); anything else goes back to the list.
+  customer tick two or three and open `/cuenta/comparar` (`/account/comparar`),
+  the same side-by-side view as `/comparar` without pasting private links. It
+  is a read-only GET; every report must be on the signed-in account's list,
+  not purged and unlocked (or free mode), and appear once; anything else goes
+  back to the list.
 - **Opening a report**: the owner opens `/audits/{id}` without the token; any
   other visitor still needs the token (a wrong one is a 404).
 - **Security**: scrypt password hashes (N=2^14, r=8, p=1, 16-byte salt);
@@ -3627,24 +4212,38 @@ the new page up with no further change.
 
 ### Terms and privacy
 
-No refunds (sergio's decision, 2026-09-28, replacing the 2026-09-24 refund
-promise): the terms and the buy box say all sales are final (the landing and
-audience pages lose their refund line in the redesign). Before Checkout the
-buyer must tick "the report is delivered at once and the purchase is not
-refundable" (`final_sale=yes`, ES/EN/PT); the acceptance and the terms
-version (`legal.LEGAL_UPDATED`) are kept per order in the additive table
-`checkout_order_terms`, as evidence for a chargeback. A full report that misreads the file (trades,
-balance or dates that do not match the platform) is fixed or replaced by a
-new credit (`quant-trade audit codes create --credits 1`). Only a duplicate
-charge or a charge that delivered no report (the `duplicate` and
-`paid_review` rows in the owner panel) is refunded, by hand from the Stripe
-dashboard; the terms keep one sentence that statutory rights are not
-limited. The refund webhook handling stays so those manual refunds are
-recorded.
+A 7-day refund (Sergio's decision, 2026-10-09, replacing "all sales are
+final" of 2026-09-28; `legal._refund`, ES/EN/PT): if a paid report, or a
+single credit bought from "My account", is no use,
+the buyer writes to the support contact within `paid_offer.REFUND_DAYS` (7)
+days of the payment, with the report's or the purchase's id, and gets the
+full amount back. A pack with no credit used in those 7 days is refunded in
+full; with some used, the part of the unused credits (a pack bought by card
+from a report has already used one: that report's). A duplicate charge or a
+charge that delivered no report is always refunded. The operator refunds a
+card payment by hand from the Stripe dashboard, to the same payment method
+in the bank's times; a code paid outside the site, through the method it was
+paid with. The terms keep the sentence that statutory rights are not
+limited. Before Checkout the buyer must tick "the report opens at once and I
+can ask for a refund within 7 days under the terms" (`final_sale=yes`,
+ES/EN/PT; same field and logic as before, only the words changed); the
+acceptance and the terms version (`legal.LEGAL_UPDATED`) are kept per order
+in the additive table `checkout_order_terms`, as evidence for a chargeback.
+A full report that misreads the file (trades, balance or dates that do not
+match the platform) is fixed or replaced by a new credit (`quant-trade audit
+codes create --credits 1`). What a refund does in the code: `refund.created`
+(and `refund.updated`, `refund.failed`) is recorded with
+`store.record_stripe_refund` for the owner panel; nothing locks the report
+again and nothing removes credits, so the terms promise neither. After
+refunding a pack or credits, disable the code by hand (below) so its unused
+credits go too. `/precios` (next to the full report's and the pack's
+buttons), `/preguntas` and the landing («¿Y si el informe no me sirve?»)
+repeat it under the paid offer (`paid_offer.refund_text`,
+`paid_offer.pack_refund_text`, `paid_offer.refund_question`).
 
 Credits bought from "My account" follow the same rules: the same required
-box (worded for a credit), stored in `checkout_order_terms`, and sales are
-final. The credits sit on a code derived from the Stripe session with the
+box (worded for a credit), stored in `checkout_order_terms`, and the same
+7-day refund. The credits sit on a code derived from the Stripe session with the
 webhook secret (`payments.credit_code`), linked to the buyer's account, so a
 Stripe retry never grants twice and the buyer never has to type a code. A
 paid session held for review (billing country) blocks a second purchase
@@ -3731,10 +4330,11 @@ e-mails and reports print neither (`tests/test_audit_customer_audit_fixes.py`).
 
 **Have a lawyer in the jurisdiction where the service is sold review both
 texts before charging anyone.** They are an honest description of what the
-code does, not legal advice. Points to check in particular: the no-refund
-policy (sales are final; a misread report gets a fix or a new credit; only
-a duplicate charge or one that delivered no report is refunded; statutory
-rights are not limited), the 30-day answer to privacy requests, the liability cap,
+code does, not legal advice. Points to check in particular: the 7-day
+refund policy (a paid report on request within 7 days, a pack's unused
+credits, always a duplicate charge or one that delivered no report; a
+misread report gets a fix or a new credit; statutory rights are not
+limited), the 30-day answer to privacy requests, the liability cap,
 international hosting, and whether consumer or data-protection law in the
 client's country requires more (for example a data-processing register or a
 named representative).
@@ -4032,7 +4632,7 @@ Redesign pass 54 walks the free tier's path on a phone first: upload without an 
 
 Redesign pass 55 makes each locked figure in a preview's summary a link to the unlock box (`a.kpi.locked`, `href='#unlock'`, labelled with the figure's name and "Desbloquear"), so tapping what someone wants to see takes them to how to see it. The tile looks the same; on hover or focus its border darkens.
 
-Redesign pass 56 opens the PDF on a one-page summary (`_pdf_cover` in `report.py`, print only, hidden on screen): the class in an SVG ring, the verdict's first sentence, each dimension with its badge, the first four key figures and up to three "what to do now" steps, then the evidence legend. It reuses the report's own labels and figures; nothing on it is new. A page notice (the sample's "synthetic data") repeats on the cover so the first page never passes for a real account, and a locked preview gets no cover. The class ring in the verdict also gets an SVG copy for print (`ring_svg` in `theme.py`), since WeasyPrint draws no conic gradient.
+Redesign pass 56 opens the PDF on a one-page summary (`_pdf_cover` in `report.py`, print only, hidden on screen): the class in an SVG ring, the verdict's first sentence, each dimension with its badge, the first four key figures (when the platform's drawdown with open trades shows, it takes the resampled p95's place, not the Sharpe's: `_cover_kpis`, so the sample's cover keeps the 1.79 Sharpe the landing quotes) and up to three "what to do now" steps, then the evidence legend. It reuses the report's own labels and figures; nothing on it is new. A page notice (the sample's "synthetic data") repeats on the cover so the first page never passes for a real account, and a locked preview gets no cover. The class ring in the verdict also gets an SVG copy for print (`ring_svg` in `theme.py`), since WeasyPrint draws no conic gradient.
 
 Redesign pass 58 styles "Mis estrategias". On the account page each strategy is a card with its latest class, name and version count; on a phone the count goes under the name and "Ver estrategia" spans the card. On a strategy's page the version table uses tabular figures, its "Quitar de la estrategia" buttons sit quietly at the right, and on a phone each version becomes a card with every figure under its column name (`data-label`). In "Qué cambió" each line ends in a chip coloured by its meaning only: green for "mejor", red for "peor", grey for "cambió", "igual" or "sin cambio claro". The wording and the rules behind each word are unchanged.
 
@@ -4696,7 +5296,8 @@ URL's `options`. See
   fund's sharing text keeps its report kind after purge, without retaining
   fund figures. Previously purged views without that flag cannot recover it
   from deleted data and retain the existing fallback classification.
-- **Attribution.** `share` and `ejemplos` are named tags in `funnel.REF_TAGS`.
+- **Attribution.** `share` and `ejemplos` are named tags in `funnel.REF_TAGS`
+  (`vendedor` too: the link in the buyer's message for the seller).
   Adding these bare names requires this deploy: there is no runtime setting
   for arbitrary tags. Existing campaign-shaped names, such as `x-es-103`,
   already work without another deploy. Active `/v/<id>` HTML and the examples
@@ -4926,7 +5527,13 @@ language links, canonical URLs and sitemap entries through `PUBLIC_PAGES`.
 Navigation and footer prices links lead there; the landing retains `#pricing`
 and adds a detail link. Both report columns describe the same six dimensions,
 evidence labels, PDF, optional public page/card, comparison and contact channel.
-Comparison requires two full reports; payment does not create missing evidence.
+Comparison requires two full reports and takes up to three ("Comparación de
+hasta tres informes"); payment does not create missing evidence. The pack card
+(`PRICING_COPY[*]['pack_text']`) says "Audita 3 robots y compáralos lado a
+lado antes de comprar uno, o sigue tu cuenta 3 meses" (es/en/pt) while
+`settings.PACK_CREDITS <= compare.MAX_COMPARED`; a larger pack would fall back
+to `pack_text_plain`, the sentence without the comparison. Prices, credits and
+the pack's content are unchanged.
 The existing landing limitations text is reused without rewriting it.
 
 Prices (including cents), discounted-pack availability and quantity come from
@@ -5056,12 +5663,15 @@ account, payment, credit, e-mail, legal or engine rule changed.
   is a text link. With `AUDIT_EMAIL_VERIFICATION_REQUIRED` the existing
   e-mail note is added. In free mode the text says every full report is free
   and only the file is needed (the form asks for no account there). Without
-  the free first report (`accounts.WELCOME_FULL_REPORT = False`) the page
-  keeps the articles' call.
+  the free first report (`AUDIT_WELCOME_FULL_REPORT=false`, the paid offer)
+  it reads "Empieza por la vista previa gratis": the free preview, the price
+  and the 7-day refund (`paid_offer.paid_text`), with "Subir mi archivo".
 - **Sample report** (`report.render(sample_cta=True, sample_offer=...)`, only
   from `web._sample_html`). Under the synthetic-data notice, a `no-print` band
   says the first report with one's own file is free with an account (free
-  mode: every full report is free; `paid`: no free wording), with a button to
+  mode: every full report is free; `paid`: "Audita tu propio archivo de la
+  misma forma." followed, with its price, by the paid offer's three
+  sentences), with a button to
   the form and "¿Qué archivo produce un informe así?" linking the MT5 and MT5
   optimisation guides. The toolbar shows "Crear cuenta"
   (`/registro?next=/auditar`, `/signup?next=/en/audit`,

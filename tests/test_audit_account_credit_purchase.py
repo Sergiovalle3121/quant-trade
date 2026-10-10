@@ -165,7 +165,7 @@ def test_buying_needs_the_box_a_country_and_a_session(tmp_path: Path) -> None:
     assert "error=buy_market" in no_country.headers["location"]
     assert calls == []
     assert (
-        "Marca la casilla de compra no reembolsable"
+        "Marca la casilla de los términos de compra"
         in client.get("/cuenta?error=buy_final_sale_needed").text
     )
     # A stranger's form without the session's CSRF token buys nothing.

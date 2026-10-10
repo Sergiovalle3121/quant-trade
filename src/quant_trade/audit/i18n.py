@@ -139,10 +139,11 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
     ),
     # Institutional intake: the same notices also have native ES/PT page copy.
     (
-        "These details are DECLARED: supplied by the person requesting the review. "
-        "This form has no attachments; upload the series later through the usual flow.",
-        "Los datos son DECLARED: los aporta quien solicita la revisión. "
-        "Aquí no se adjuntan archivos; la serie se sube después por el flujo habitual.",
+        "These details carry the DECLARED label: they are supplied by the person requesting "
+        "the review. This form has no attachments; upload the series later through the usual "
+        "flow.",
+        "Estos datos llevan la etiqueta «DECLARED»: los aporta quien solicita la "
+        "revisión. Aquí no se adjuntan archivos; la serie se sube después por el flujo habitual.",
     ),
     (
         "Check the fields. Use text without HTML and a valid email address.",
@@ -1016,7 +1017,20 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
         "the platform's own summary at the time of the statement",
         "resumen de la propia plataforma al momento del historial",
     ),
-    ("floating result / balance", "resultado flotante / balance"),
+    (
+        "floating result / balance the file states",
+        "resultado flotante / balance que indica el archivo",
+    ),
+    (
+        "floating result / (equity the file states - floating result)",
+        "resultado flotante / (equity que indica el archivo - resultado flotante)",
+    ),
+    (
+        "floating result / balance rebuilt from the file's deposits, withdrawals "
+        "and closed trades (the file prints no balance)",
+        "resultado flotante / balance que Rigor reconstruye con los depósitos, retiros y "
+        "operaciones cerradas del archivo (el archivo no imprime un balance)",
+    ),
     (
         "the file does not state the floating result",
         "el archivo no indica el resultado flotante",
@@ -1252,6 +1266,101 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
         "proporción de todos los recorridos remuestreados que llegan al objetivo con el mejor "
         "día dentro de la regla del mejor día de la firma; la regla se comprueba al pasar, con "
         "cierres diarios",
+    ),
+    (
+        "the ladder's full-history row with every daily return multiplied by the size; it "
+        "assumes that changing the size scales every daily return in the same proportion, as "
+        "linear leverage does when the costs grow in proportion to the size (the same cost per "
+        "lot) and the execution does not worsen with more volume",
+        "la fila de historia completa de la escalera con cada retorno diario multiplicado por "
+        "el tamaño; supone que cambiar el tamaño escala cada retorno diario en la misma "
+        "proporción, como hace el apalancamiento lineal cuando los costos crecen en proporción "
+        "al tamaño (el mismo costo por lote) y la ejecución no empeora con más volumen",
+    ),
+    (
+        "the lots of each trade are read only from MetaTrader 4 and 5 reports, whose volume "
+        "column is the platform's lots, so the average lot at 1x is not known; 1x is still the "
+        "size the history traded at",
+        "los lotes de cada operación solo se leen de los informes de MetaTrader 4 y 5, cuya "
+        "columna de volumen son los lotes de la plataforma, así que no se conoce el lote medio "
+        "a 1x; 1x sigue siendo el tamaño con el que operó el historial",
+    ),
+    # Results stored before the average lot (2026-10-09) keep this reason.
+    (
+        "the audit keeps neither the lot nor the stop loss of each trade, so the lot or risk "
+        "per trade at 1x is not known",
+        "la auditoría no guarda el lote ni el stop loss de cada operación, así que no se "
+        "conoce el lote ni el riesgo por operación a 1x",
+    ),
+    (
+        "lots per trade on average at the history's own size: the {lots} lots of the {count} "
+        "trades divided by their number; the cost section counts {traded} lots traded because "
+        "it adds entries and exits",
+        "lotes por operación de media al tamaño del propio historial: los {lots} lotes de las "
+        "{count} operaciones divididos entre su número; la sección de costos cuenta {traded} "
+        "lotes negociados porque suma entradas y salidas",
+    ),
+    (
+        "the average lot per trade at 1x multiplied by the size",
+        "el lote medio por operación a 1x multiplicado por el tamaño",
+    ),
+    (
+        "the average lot per trade at 1x on the program's {account} account: the lots at 1x "
+        "times the account over the {balance} balance the shares at 1x are measured on",
+        "el lote medio por operación a 1x en la cuenta de {account} del programa: los lotes a "
+        "1x por la cuenta entre el balance de {balance} sobre el que se miden los porcentajes "
+        "de 1x",
+    ),
+    (
+        "the average lot per trade at 1x on the program's account multiplied by the size",
+        "el lote medio por operación a 1x en la cuenta del programa multiplicado por el tamaño",
+    ),
+    (
+        "the ladder's rung for every program: the same series, simulator, seed and rules; the "
+        "chosen program's figure is the ladder's own",
+        "el escenario de la escalera con cada programa: la misma serie, simulador, semilla y "
+        "reglas; la cifra del programa elegido es la de la escalera",
+    ),
+    (
+        "account size in US dollars that the program names; its limits are shares of it",
+        "tamaño de cuenta en dólares estadounidenses que nombra el programa; sus límites son "
+        "porcentajes de ella",
+    ),
+    (
+        "the simulated rules fix no account size: they are shares (of the starting balance or "
+        "of the day's), so the table's shares do not depend on the account size; its lots, when "
+        "the report gives them, are those of the starting balance",
+        "las reglas que se simulan no fijan un tamaño de cuenta: son porcentajes (del balance "
+        "inicial o del día), así que los porcentajes de la tabla no dependen del tamaño de la "
+        "cuenta; sus lotes, cuando el informe los da, son los del balance inicial",
+    ),
+    # Results stored before the average lot (2026-10-09) keep this note.
+    (
+        "the simulated rules fix no account size: they are shares (of the starting balance or "
+        "of the day's), so the table does not depend on the account size",
+        "las reglas que se simulan no fijan un tamaño de cuenta: son porcentajes (del balance "
+        "inicial o del día), así que la tabla no depende del tamaño de la cuenta",
+    ),
+    (
+        "starting balance of the history; the daily shares at 1x are measured on it",
+        "balance inicial del historial; los porcentajes diarios a 1x se miden sobre él",
+    ),
+    (
+        "first value of the file's balance curve; the daily shares at 1x are measured on it",
+        "primer valor de la curva de balance del archivo; los porcentajes diarios a 1x se miden "
+        "sobre él",
+    ),
+    (
+        "assumed because the file does not state a starting balance; the daily shares at 1x "
+        "are measured on it, so 1x scales with it",
+        "supuesto porque el archivo no indica un balance inicial; los porcentajes diarios a 1x "
+        "se miden sobre él, así que 1x escala con él",
+    ),
+    (
+        "share of the resampled paths that end the program this way: each phase is a fresh "
+        "start reached only by passing the phases before it",
+        "proporción de los recorridos remuestreados que terminan el programa así: cada fase es "
+        "un comienzo nuevo al que solo se llega pasando las anteriores",
     ),
     (
         "the curve covers none of the dated market falls in full",
@@ -2083,6 +2192,72 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
         "cost per side at which the ledger nets to zero",
         "costo por lado con el que el resultado queda en cero",
     ),
+    (
+        "the whole history's break-even and reference costs per side, converted to pips at "
+        "each symbol's median entry price; not a break-even computed from that symbol's "
+        "trades alone",
+        "los costos de equilibrio y de referencia por lado de todo el historial, pasados a "
+        "pips con el precio de entrada mediano de cada símbolo; no es un equilibrio calculado "
+        "solo con las operaciones de ese símbolo",
+    ),
+    (
+        "no pip size is defined for metals; this symbol's cost stays in bps",
+        "no hay un tamaño de pip definido para los metales; el costo de este símbolo queda en pb",
+    ),
+    (
+        "other symbols traded ({symbols}) stay in bps: the audit defines no pip size for them",
+        "los otros símbolos operados ({symbols}) quedan en pb: la auditoría no define un "
+        "tamaño de pip para ellos",
+    ),
+    (
+        "cost per lot and side at which the ledger nets to zero: the net the file prints, "
+        "{net} {currency}, over {lots} lots traded counting entries and exits",
+        "costo por lote y lado con el que el resultado queda en cero: el neto que imprime el "
+        "archivo, {net} {currency}, dividido entre {lots} lotes negociados contando entradas "
+        "y salidas",
+    ),
+    (
+        "extra cost per lot and side, on top of the report's fees, at which the ledger nets "
+        "to zero: the net the file prints after those fees, {net} {currency}, over {lots} lots "
+        "traded counting entries and exits",
+        "costo extra por lote y lado, además de los costos del informe, con el que el "
+        "resultado queda en cero: el neto que imprime el archivo después de esos costos, "
+        "{net} {currency}, dividido entre {lots} lotes negociados contando entradas y salidas",
+    ),
+    (
+        "cost per lot and side at which the ledger nets to zero: the net the file prints, "
+        "{net} {currency}, over {lots} lots traded counting entries and exits; the lots of "
+        "the {count} currency pairs are added as the platform prints them",
+        "costo por lote y lado con el que el resultado queda en cero: el neto que imprime el "
+        "archivo, {net} {currency}, dividido entre {lots} lotes negociados contando entradas "
+        "y salidas; se suman los lotes de los {count} pares de divisas tal como los imprime "
+        "la plataforma",
+    ),
+    (
+        "extra cost per lot and side, on top of the report's fees, at which the ledger nets "
+        "to zero: the net the file prints after those fees, {net} {currency}, over {lots} lots "
+        "traded counting entries and exits; the lots of the {count} currency pairs are added "
+        "as the platform prints them",
+        "costo extra por lote y lado, además de los costos del informe, con el que el "
+        "resultado queda en cero: el neto que imprime el archivo después de esos costos, "
+        "{net} {currency}, dividido entre {lots} lotes negociados contando entradas y "
+        "salidas; se suman los lotes de los {count} pares de divisas tal como los imprime la "
+        "plataforma",
+    ),
+    (
+        "the money per lot is given only for MetaTrader 4 and 5 reports, whose volume column "
+        "is the platform's lots",
+        "el dinero por lote solo se da para los informes de MetaTrader 4 y 5, cuya columna "
+        "de volumen son los lotes de la plataforma",
+    ),
+    (
+        "the trades are on several symbols and not all are pairs of USD, EUR, GBP, JPY, CHF, "
+        "AUD, NZD or CAD: a lot of one instrument is not the same size as a lot of another (a "
+        "lot of gold is not a lot of EURUSD), so their lots are not added together",
+        "las operaciones son de varios símbolos y no todos son pares de USD, EUR, GBP, JPY, "
+        "CHF, AUD, NZD o CAD: un lote de un instrumento no tiene el mismo tamaño que un lote "
+        "de otro (un lote de oro no es un lote de EURUSD), así que sus lotes no se suman",
+    ),
     ("no traded notional", "no hay volumen operado"),
     ("undefined", "no definido"),
     (
@@ -2096,6 +2271,13 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
         "costos que desglosa el informe",
     ),
     ("assumed: client declared zero cost", "supuesto: el cliente declaró costo cero"),
+    (
+        "assumed slippage: no cost was declared; charged on top of the fees the report itemises",
+        "deslizamiento supuesto: no se declaró un costo; se cobra además de los costos que "
+        "desglosa el informe",
+    ),
+    ("assumed: no cost declared", "supuesto: no se declaró un costo"),
+    ("default value, not declared", "valor por defecto, no declarado"),
     (
         "assumed slippage: an account history's prices are the broker's fills, so the spread "
         "is already in each result; charged on top",

@@ -843,6 +843,20 @@ class Store(OpsStoreMixin):
             sa.Column("client_ip", sa.String(64), nullable=False, default=""),
             sa.Column("created_at", sa.String(40), nullable=False),
         )
+        #: A preview uploaded without an account (``AUDIT_ANON_PREVIEW``), for
+        #: the owner's funnel: the report's language, the link tag the browser
+        #: came with and when, and when the report was put on an account. No
+        #: address, browser mark or e-mail. Additive: older databases need no
+        #: ALTER TABLE. Rows go with the report and the retention purge.
+        self.anon_previews = sa.Table(
+            "anon_previews",
+            self.metadata,
+            sa.Column("audit_id", sa.String(32), primary_key=True),
+            sa.Column("locale", sa.String(8), nullable=False, default=""),
+            sa.Column("ref", sa.String(32), nullable=False, default=""),
+            sa.Column("created_at", sa.String(40), nullable=False, index=True),
+            sa.Column("linked_at", sa.String(40), nullable=False, default=""),
+        )
         #: A card an account verified with Stripe at no charge (Checkout in
         #: setup mode) so its free full report passes the browser and network
         #: limits. Only a SHA-256 of Stripe's card fingerprint, never a card
@@ -2778,6 +2792,10 @@ class Store(OpsStoreMixin):
         existing = self.publication_for_audit(audit_id)
         if existing is not None:
             return existing
+        # Always 12 characters of A-Z a-z 0-9 _ - (9 random bytes in base64url), so
+        # never one of the public samples' reserved ids, "ejemplo" (7) and
+        # "ejemplo-senal" (13): /v answers those before any lookup
+        # (sample_publication.SAMPLE_PUBLIC_IDS).
         public_id = secrets.token_urlsafe(9)
         try:
             with self.engine.begin() as conn:
@@ -2973,6 +2991,9 @@ class Store(OpsStoreMixin):
             )
             conn.execute(
                 self.welcome_pending.delete().where(self.welcome_pending.c.audit_id == audit_id)
+            )
+            conn.execute(
+                self.anon_previews.delete().where(self.anon_previews.c.audit_id == audit_id)
             )
             store_hooks.on_delete_audit(self, conn, audit_id)
             deleted = conn.execute(self.audits.delete().where(self.audits.c.id == audit_id))
@@ -5420,9 +5441,91 @@ class Store(OpsStoreMixin):
 
     def clear_welcome_pending(self, account_id: str) -> None:
         """Forget every pending preview of the account."""
+        if not account_id:
+            return  # never the previews uploaded without an account
         table = self.welcome_pending
         with self.engine.begin() as conn:
             conn.execute(table.delete().where(table.c.account_id == account_id))
+
+    def anon_pending(self, audit_id: str) -> WelcomePending | None:
+        """The pending row of a preview uploaded without an account, or ``None``.
+
+        Only a row no account holds yet (``account_id == ""``).
+        """
+        if not _usable_key(audit_id):
+            return None
+        sa = self._sa
+        table = self.welcome_pending
+        with self.engine.connect() as conn:
+            row = (
+                conn.execute(
+                    sa.select(table)
+                    .where(table.c.audit_id == audit_id)
+                    .where(table.c.account_id == "")
+                )
+                .mappings()
+                .first()
+            )
+        if row is None:
+            return None
+        return WelcomePending(
+            audit_id=str(row["audit_id"]),
+            account_id="",
+            device_sha256=str(row["device_sha256"] or ""),
+            file_sha256=str(row["file_sha256"] or ""),
+            client_ip=str(row["client_ip"] or ""),
+            created_at=str(row["created_at"]),
+        )
+
+    def welcome_pending_attach(self, audit_id: str, account_id: str) -> bool:
+        """Give an account the pending row of a preview uploaded without one.
+
+        Only a row no account holds yet changes, so two sign-ups from the same
+        link cannot both take it. ``True`` when this call took it.
+        """
+        if not account_id or not _usable_key(audit_id):
+            return False
+        table = self.welcome_pending
+        with self.engine.begin() as conn:
+            result = conn.execute(
+                table.update()
+                .where(table.c.audit_id == audit_id)
+                .where(table.c.account_id == "")
+                .values(account_id=account_id)
+            )
+        return bool(result.rowcount)
+
+    # -- previews uploaded without an account (the owner's funnel) ----------
+    def record_anon_preview(self, audit_id: str, *, locale: str, ref: str, at: datetime) -> None:
+        """Count a preview uploaded without an account."""
+        sa = self._sa
+        try:
+            with self.engine.begin() as conn:
+                conn.execute(
+                    self.anon_previews.insert().values(
+                        audit_id=audit_id,
+                        locale=locale[:8],
+                        ref=ref[:32],
+                        created_at=_iso(at),
+                        linked_at="",
+                    )
+                )
+        except sa.exc.IntegrityError:  # pragma: no cover - one row per report
+            return
+
+    def note_anon_linked(self, audit_id: str, *, at: datetime) -> bool:
+        """Note that a preview uploaded without an account went on one; once."""
+        if not _usable_key(audit_id):
+            return False
+        table = self.anon_previews
+        with self.engine.begin() as conn:
+            result = conn.execute(
+                table.update()
+                .where(table.c.audit_id == audit_id)
+                .where(table.c.linked_at == "")
+                .values(linked_at=_iso(at))
+            )
+        return bool(result.rowcount)
 
     def free_previews_since(
         self, since: datetime, *, account_id: str = "", client_ip: str = ""
@@ -5953,6 +6056,23 @@ class Store(OpsStoreMixin):
             out["welcome"] = [(str(r[0])[:10], str(r[1] or "-"), str(r[2] or ""), 1) for r in rows]
             previews = self.free_previews
             by_account("previews", previews.c.created_at, previews.c.account_id, previews)
+            anon = self.anon_previews
+            out["anon_previews"] = [
+                (str(when)[:10], str(locale or "-"), str(ref or ""), 1)
+                for when, locale, ref in conn.execute(
+                    sa.select(anon.c.created_at, anon.c.locale, anon.c.ref).where(
+                        anon.c.created_at >= since_day
+                    )
+                ).all()
+            ]
+            out["anon_linked"] = [
+                (str(when)[:10], str(locale or "-"), str(ref or ""), 1)
+                for when, locale, ref in conn.execute(
+                    sa.select(anon.c.linked_at, anon.c.locale, anon.c.ref)
+                    .where(anon.c.linked_at != "")
+                    .where(anon.c.linked_at >= since_day)
+                ).all()
+            ]
             redeemed = conn.execute(
                 sa.select(audits.c.paid_at, acc.c.locale, refs.c.ref)
                 .select_from(
@@ -6168,6 +6288,9 @@ class Store(OpsStoreMixin):
             # window nothing of it is kept, its address included.
             conn.execute(
                 self.welcome_pending.delete().where(self.welcome_pending.c.created_at < cutoff)
+            )
+            conn.execute(
+                self.anon_previews.delete().where(self.anon_previews.c.created_at < cutoff)
             )
             if count == 0:
                 return count

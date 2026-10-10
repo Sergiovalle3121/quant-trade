@@ -10,6 +10,7 @@ src/quant_trade/audit/engine.py
 src/quant_trade/audit/errors_pt.py
 src/quant_trade/audit/examples.py
 src/quant_trade/audit/funnel.py
+src/quant_trade/audit/guide_capabilities.py
 src/quant_trade/audit/guides.py
 src/quant_trade/audit/i18n.py
 src/quant_trade/audit/importers.py
@@ -28,6 +29,7 @@ src/quant_trade/audit/report.py
 src/quant_trade/audit/report_pt.py
 src/quant_trade/audit/sample.py
 src/quant_trade/audit/schema.py
+src/quant_trade/audit/seller_message.py
 src/quant_trade/audit/settings.py
 src/quant_trade/audit/sharing.py
 src/quant_trade/audit/store.py
@@ -41,6 +43,7 @@ tests/test_audit_account_upload_honesty.py
 tests/test_audit_articles.py
 tests/test_audit_card_payments.py
 tests/test_audit_challenge_ladder.py
+tests/test_audit_challenge_sizing.py
 tests/test_audit_checkout_language.py
 tests/test_audit_completed_count.py
 tests/test_audit_email_delivery.py
@@ -48,8 +51,11 @@ tests/test_audit_email_pages.py
 tests/test_audit_email_routes_ui.py
 tests/test_audit_examples.py
 tests/test_audit_funnel.py
+tests/test_audit_gate_code_copy.py
+tests/test_audit_guide_entry.py
 tests/test_audit_importers.py
 tests/test_audit_indexnow.py
+tests/test_audit_informe_claro.py
 tests/test_audit_landing_trust.py
 tests/test_audit_launch_journey.py
 tests/test_audit_launch_playbook.py
@@ -71,6 +77,7 @@ tests/test_audit_reading_rules.py
 tests/test_audit_refunds.py
 tests/test_audit_report.py
 tests/test_audit_schema.py
+tests/test_audit_seller_message.py
 tests/test_audit_settings.py
 tests/test_audit_share_funnel.py
 tests/test_audit_sharing.py

@@ -1,8 +1,10 @@
 """Anonymous public declarations, using the card and calculator's own arithmetic.
 
 These are illustrative readings of public figures, not uploaded files or audits.
-Nine weeks is converted using an explicit 52-week year; a development period is
-never substituted for a backtest's missing history.
+Nine weeks is converted using an explicit 52-week year, and shown rounded to two
+decimals as the site writes figures; the calculator link carries that same rounded
+figure, the approximate conversion the page states. A development period is never
+substituted for a backtest's missing history.
 """
 
 from __future__ import annotations
@@ -189,7 +191,10 @@ def example_calculator_url(example: PublicExample, locale: str) -> str:
     values = example.calculator_input()
     params: dict[str, str | float | int] = {"ref": "ejemplos"}
     if values is not None:
-        params.update(sharpe=values.sharpe, years=values.years, trials=values.trials)
+        # The years as the page shows them (9 weeks ≈ 0.17 years), never a 17-digit
+        # float in the calculator's field and its share link.
+        years = round(values.years, 2) or values.years
+        params.update(sharpe=values.sharpe, years=years, trials=values.trials)
     return calculator_url(locale) + "?" + urlencode(params)
 
 
@@ -213,7 +218,7 @@ def examples_content(locale: str = "es") -> str:
         if example.key == "short-history":
             values = {
                 "weeks": SHORT_HISTORY_WEEKS,
-                "years": _num(SHORT_HISTORY_WEEKS / WEEKS_PER_YEAR, lang, 6),
+                "years": _num(SHORT_HISTORY_WEEKS / WEEKS_PER_YEAR, lang, 2),
                 "weeks_per_year": WEEKS_PER_YEAR,
             }
         elif example.key == "many-trials":

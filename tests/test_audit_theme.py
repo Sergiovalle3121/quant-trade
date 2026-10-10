@@ -57,9 +57,24 @@ def test_static_route_serves_only_the_allow_list(tmp_path: Path) -> None:
 
 
 def test_script_never_sends_anything_anywhere() -> None:
+    """The script contacts no one: its only request is the upload form posting
+    to its own action on this origin (the in-place upload, PR 469), which the
+    CSP's ``connect-src 'self'`` also enforces. The HTML it inserts is the
+    server's own escaped answer to that post, nothing else."""
+    from quant_trade.audit.web import CONTENT_SECURITY_POLICY
+
     script = (STATIC_DIR / "app.js").read_text()
-    for word in ("fetch(", "XMLHttpRequest", "sendBeacon", "WebSocket", "eval(", "innerHTML"):
+    for word in ("XMLHttpRequest", "sendBeacon", "WebSocket", "eval(", "new Function"):
         assert word not in script, word
+    assert script.count("fetch(") == 1
+    assert "fetch(form.action, {" in script and 'credentials: "same-origin"' in script
+    assert "connect-src 'self'" in CONTENT_SECURITY_POLICY
+    assert "script-src 'self'" in CONTENT_SECURITY_POLICY
+    assert "'unsafe-inline'" not in CONTENT_SECURITY_POLICY.split("script-src", 1)[1].split(";")[0]
+    # HTML goes into the page only from that answer's two server-built fields.
+    assert script.count("innerHTML") == 1 and "fields.innerHTML = json.fields_html;" in script
+    assert script.count("insertAdjacentHTML") == 1
+    assert 'alertBox.insertAdjacentHTML("beforeend", guidance)' in script
 
 
 def test_pages_use_self_hosted_fonts_and_no_third_party() -> None:
@@ -428,8 +443,11 @@ def test_prop_simulator_ranges_are_cards_and_open_losses_a_callout() -> None:
         facts = challenge.split("<div class='facts'>", 1)[1].split("</div></div>", 1)[0]
         assert facts.count("<div class='fact'>") == 2 and " – " in facts and " / " in facts
         assert facts.count('class="badge MEASURED"') == 2
-        # The break-even tile keeps one short number; the pips go in its label.
-        assert re.search(r"<b>[\d.,]+</b><span>[^<]*pips\)</span>", page)
+        # The break-even tile keeps one short number; the pips (and, from an MT5
+        # file, the money per lot and side) go in its label.
+        assert re.search(
+            r"<b>[\d.,]+</b><span>[^<]*pips; [^<]*(?:per lot|por lote)[^<]*\)</span>", page
+        )
         assert find_claims(page) == []
 
 
@@ -1241,7 +1259,8 @@ def test_both_drawdown_tiles_carry_the_same_sign() -> None:
     data = sample_result("es", bootstrap_samples=60).model_dump(mode="json")
     tiles = {label: shown for label, shown, _ in _kpi_list(data, LABELS["es"])}
     falls = [shown for label, shown in tiles.items() if label.startswith("Drawdown")]
-    assert len(falls) == 2 and all(shown.startswith("-") for shown in falls)
+    # Closed trades, the platform's with open trades (the sample's MT5 header) and p95.
+    assert len(falls) == 3 and all(shown.startswith("-") for shown in falls)
 
 
 def test_strategy_pages_read_as_cards_with_coloured_change_words(tmp_path: Path) -> None:

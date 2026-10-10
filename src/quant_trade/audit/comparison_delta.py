@@ -25,6 +25,11 @@ COPY = {
         "delta": "Diferencia medida · informe 2 menos informe 1",
         "why": "Por qué no se calculan algunas diferencias",
         "report": "Informe {n}",
+        # With three reports side by side, each consecutive pair is named.
+        "title_pair": "Qué cambió del informe {a} al {b}",
+        "added_pair": "Banderas que aparecen en el informe {b}",
+        "removed_pair": "Banderas del informe {a} ausentes en el informe {b}",
+        "delta_pair": "Diferencia medida · informe {b} menos informe {a}",
         "compatible": (
             "Mismas fechas, frecuencia y tipo de curva. Las diferencias son aritméticas, "
             "sin prueba de significancia."
@@ -50,6 +55,10 @@ COPY = {
         "delta": "Measured difference · report 2 minus report 1",
         "why": "Why some differences are not calculated",
         "report": "Report {n}",
+        "title_pair": "What changed from report {a} to report {b}",
+        "added_pair": "Flags appearing in report {b}",
+        "removed_pair": "Flags from report {a} absent in report {b}",
+        "delta_pair": "Measured difference · report {b} minus report {a}",
         "compatible": (
             "Same dates, frequency and curve type. Differences are arithmetic, without a "
             "significance test."
@@ -74,6 +83,10 @@ COPY = {
         "delta": "Diferença medida · relatório 2 menos relatório 1",
         "why": "Por que algumas diferenças não são calculadas",
         "report": "Relatório {n}",
+        "title_pair": "O que mudou do relatório {a} para o relatório {b}",
+        "added_pair": "Alertas que aparecem no relatório {b}",
+        "removed_pair": "Alertas do relatório {a} ausentes no relatório {b}",
+        "delta_pair": "Diferença medida · relatório {b} menos relatório {a}",
         "compatible": (
             "Mesmas datas, frequência e tipo de curva. As diferenças são aritméticas, "
             "sem teste de significância."
@@ -526,7 +539,12 @@ def comparable_window(a: dict[str, Any], b: dict[str, Any]) -> bool:
     return comparability_diagnostic(a, b).window_comparable
 
 
-def _evidence_actions(diagnostic: ComparabilityDiagnostic, a: dict[str, Any], locale: str) -> str:
+def _evidence_actions(
+    diagnostic: ComparabilityDiagnostic,
+    a: dict[str, Any],
+    locale: str,
+    numbers: tuple[int, int] | None = None,
+) -> str:
     steps = []
     seen = set()
     for issue in diagnostic.issues:
@@ -536,7 +554,8 @@ def _evidence_actions(diagnostic: ComparabilityDiagnostic, a: dict[str, Any], lo
         seen.add(key)
         text = EVIDENCE_STEPS[locale][issue.code]
         if issue.report is not None:
-            text = f"{COPY[locale]['report'].format(n=issue.report)}: {text}"
+            shown = numbers[issue.report - 1] if numbers else issue.report
+            text = f"{COPY[locale]['report'].format(n=shown)}: {text}"
         if issue.metric is not None:
             closed = _mapping(a.get("inputs")).get("balance_only") is True
             label = (
@@ -551,9 +570,10 @@ def _evidence_actions(diagnostic: ComparabilityDiagnostic, a: dict[str, Any], lo
     if not steps:
         return ""
     copy = ACTION_COPY[locale]
+    suffix = f"-{numbers[0]}-{numbers[1]}" if numbers else ""
     return (
-        "<section class='cmp-actions' aria-labelledby='comparison-evidence-actions'>"
-        f"<h4 id='comparison-evidence-actions'>{html.escape(copy['title'])}</h4>"
+        f"<section class='cmp-actions' aria-labelledby='comparison-evidence-actions{suffix}'>"
+        f"<h4 id='comparison-evidence-actions{suffix}'>{html.escape(copy['title'])}</h4>"
         f"<p class='muted'>{html.escape(copy['notice'])}</p><ol>"
         + "".join(steps)
         + f"</ol><p><a href='{guides_index_url(locale)}'>{html.escape(copy['guides'])}</a></p>"
@@ -561,10 +581,28 @@ def _evidence_actions(diagnostic: ComparabilityDiagnostic, a: dict[str, Any], lo
     )
 
 
-def change_summary(a: dict[str, Any], b: dict[str, Any], locale: str) -> str:
-    """Read stored results only; all text is escaped, no account/credit writes."""
+def change_summary(
+    a: dict[str, Any],
+    b: dict[str, Any],
+    locale: str,
+    *,
+    numbers: tuple[int, int] | None = None,
+) -> str:
+    """Read stored results only; all text is escaped, no account/credit writes.
+
+    Always between two reports. ``numbers`` are their column numbers when a
+    page shows three (``(2, 3)``: what changed from report 2 to report 3):
+    the headings name both and the section ids stay unique on the page.
+    Without it the summary is the two-report one, unchanged.
+    """
     locale = locale if locale in COPY else "es"
-    copy, labels = COPY[locale], LABELS[locale]
+    copy, labels = dict(COPY[locale]), LABELS[locale]
+    suffix = ""
+    if numbers is not None:
+        pair = {"a": numbers[0], "b": numbers[1]}
+        for key in ("title", "added", "removed", "delta"):
+            copy[key] = copy[f"{key}_pair"].format(**pair)
+        suffix = f"-{numbers[0]}-{numbers[1]}"
     e = lambda value: html.escape(str(value), quote=True)  # noqa: E731
     before, after = a["verdict"], b["verdict"]
     dims_a = {item["name"]: item["status"] for item in before["dimensions"]}
@@ -613,7 +651,8 @@ def change_summary(a: dict[str, Any], b: dict[str, Any], locale: str) -> str:
     for issue in diagnostic.issues:
         text = REASONS[locale][issue.code]
         if issue.report is not None:
-            text = f"{copy['report'].format(n=issue.report)}: {text}"
+            number = numbers[issue.report - 1] if numbers else issue.report
+            text = f"{copy['report'].format(n=number)}: {text}"
         if issue.metric is not None:
             closed = _mapping(a.get("inputs")).get("balance_only") is True
             label = (
@@ -626,8 +665,8 @@ def change_summary(a: dict[str, Any], b: dict[str, Any], locale: str) -> str:
             text = f"{labels[label]} · {text}"
         reasons.append(f"<li>{e(text)} · NOT_MEASURED</li>")
     return (
-        "<section class='cmp-summary' aria-labelledby='comparison-changes'>"
-        f"<h2 id='comparison-changes'>{e(copy['title'])}</h2>"
+        f"<section class='cmp-summary' aria-labelledby='comparison-changes{suffix}'>"
+        f"<h2 id='comparison-changes{suffix}'>{e(copy['title'])}</h2>"
         + "".join(f"<p>{line} · MEASURED</p>" for line in lines)
         + flags
         + f"<h3>{e(copy['delta'])}</h3>"
@@ -637,7 +676,7 @@ def change_summary(a: dict[str, Any], b: dict[str, Any], locale: str) -> str:
             if reasons
             else ""
         )
-        + _evidence_actions(diagnostic, a, locale)
+        + _evidence_actions(diagnostic, a, locale, numbers)
         + (
             "<ul>" + "".join(deltas) + "</ul>"
             if deltas
