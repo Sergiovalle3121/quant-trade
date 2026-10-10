@@ -721,8 +721,8 @@ AUDIENCE_PAGES: tuple[Audience, ...] = (
                     "Tu estrategia puede ser buena y aun así no encajar en las reglas de "
                     "pérdida diaria, pérdida total y plazo de un reto concreto.",
                     "Cada firma cambia sus reglas, y no siempre es fácil compararlas.",
-                    "Puedes pasar el reto y que el retiro se frene por la regla del mejor día "
-                    "(consistencia) de la firma.",
+                    "Puedes alcanzar el objetivo del reto y que el retiro se frene por la regla "
+                    "del mejor día (consistencia) de la firma.",
                 ),
                 uploads=(
                     ("Tu informe de MetaTrader 5 o 4.", "mt5"),
@@ -750,8 +750,8 @@ AUDIENCE_PAGES: tuple[Audience, ...] = (
                     (
                         "¿Con qué firma encaja tu historial?",
                         "Tu mismo historial con las reglas publicadas de cada firma, de más a "
-                        "menos probabilidad de pasar, y si la regla del mejor día frenaría el "
-                        "retiro. Compara reglas; no recomienda comprar ningún reto.",
+                        "menos probabilidad de alcanzar el objetivo, y si la regla del mejor día "
+                        "frenaría el retiro. Compara reglas; no recomienda comprar ningún reto.",
                     ),
                     (
                         "Reglas con fuente y fecha",
@@ -811,8 +811,8 @@ AUDIENCE_PAGES: tuple[Audience, ...] = (
                     "Your strategy can be sound and still not fit a given challenge's daily "
                     "loss, total loss and time rules.",
                     "Every firm changes its rules, and comparing them is not easy.",
-                    "You can pass the challenge and still have the payout held up by the "
-                    "firm's best-day (consistency) rule.",
+                    "You can reach the challenge's target and still have the payout held up by "
+                    "the firm's best-day (consistency) rule.",
                 ),
                 uploads=(
                     ("Your MetaTrader 5 or 4 report.", "mt5"),
@@ -840,8 +840,9 @@ AUDIENCE_PAGES: tuple[Audience, ...] = (
                     (
                         "Which firm does your history fit?",
                         "Your same history under each firm's published rules, from most to "
-                        "least likely to pass, and whether the best-day rule would hold up the "
-                        "payout. It compares rules; it does not recommend buying a challenge.",
+                        "least likely to reach the target, and whether the best-day rule would "
+                        "hold up the payout. It compares rules; it does not recommend buying a "
+                        "challenge.",
                     ),
                     (
                         "Rules with source and date",
