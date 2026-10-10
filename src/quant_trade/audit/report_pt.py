@@ -5463,8 +5463,26 @@ RULES: tuple[tuple[str, str], ...] = (
         "Sem limite de tempo para atingir as metas.",
     ),
     (
-        "News trading is unrestricted during the evaluation phases.",
-        "Operar notícias não tem restrições durante as fases de avaliação.",
+        (
+            "The news trading article says trading is free during the evaluation phases and "
+            "the 5-minute window applies to Qualified Analyst accounts ({url}); the plan page "
+            "states the window without that distinction; not simulated."
+        ),
+        (
+            "O artigo sobre notícias diz que nas fases de avaliação se opera livremente e que "
+            "a janela de 5 minutos se aplica às contas Qualified Analyst ({url}); a página do "
+            "plano indica a janela sem essa distinção; não é simulado."
+        ),
+    ),
+    (
+        (
+            "Expert advisors that open trades on their own are prohibited; only "
+            "trade-management EAs are allowed ({url})."
+        ),
+        (
+            "São proibidos os robôs (expert advisors, EA) que abrem operações sozinhos; só "
+            "são permitidos os que gerenciam operações ({url})."
+        ),
     ),
     (
         (
@@ -5492,13 +5510,14 @@ RULES: tuple[tuple[str, str], ...] = (
     ),
     (
         (
-            "Minimum trading days: the 2 Phase Static page says 4, the general assessment "
-            "rules say 5 for all accounts ({url}); the simulator uses 5 (stricter)."
+            "Minimum trading days: the 2 Phase Static (Two Phase Classic) account page says "
+            "4, the general assessment rules say 5 for all accounts ({url}); the simulator "
+            "uses 5 (stricter)."
         ),
         (
-            "Dias operados mínimos: a página da conta 2 Phase Static diz 4 e as regras "
-            "gerais de avaliação dizem 5 para todas as contas ({url}); o simulador usa 5 "
-            "(mais rigoroso)."
+            "Dias operados mínimos: a página da conta 2 Phase Static (Two Phase Classic) diz "
+            "4 e as regras gerais de avaliação dizem 5 para todas as contas ({url}); o "
+            "simulador usa 5 (mais rigoroso)."
         ),
     ),
     (
@@ -5549,8 +5568,22 @@ RULES: tuple[tuple[str, str], ...] = (
         ),
     ),
     (
-        "No minimum trading days; no time limit stated on the pages read.",
-        "Sem mínimo de dias operados; as páginas lidas não indicam limite de tempo.",
+        (
+            "No minimum trading days and no time limit; at least one trade must be placed "
+            "and closed every 60 days."
+        ),
+        (
+            "Sem mínimo de dias operados e sem limite de tempo; é preciso abrir e fechar ao "
+            "menos uma operação a cada 60 dias."
+        ),
+    ),
+    (
+        "Expert advisors are allowed on Classic Markets and not on Futures ({url}).",
+        "Robôs (expert advisors, EA) são permitidos em Classic Markets e não em Futures ({url}).",
+    ),
+    (
+        "Expert advisors are not allowed ({url}).",
+        "Robôs (expert advisors, EA) não são permitidos ({url}).",
     ),
     (
         "No daily loss limit ({url}).",
@@ -5623,6 +5656,17 @@ RULES: tuple[tuple[str, str], ...] = (
         (
             "Nenhuma operação pode ser aberta ou fechada de 2 minutos antes até 2 minutos "
             "depois de uma notícia «red folder»; não é simulado."
+        ),
+    ),
+    (
+        (
+            "A single trade without a stop-loss, or risking more than 2 % (the 3-Step "
+            "drawdown limit), counts as prohibited all-in trading ({url}); not simulated."
+        ),
+        (
+            "Uma única operação sem stop-loss, ou que arrisque mais de 2 % (o limite de "
+            "drawdown do 3-Step), conta como «all in», que é proibido ({url}); não é "
+            "simulado."
         ),
     ),
     (

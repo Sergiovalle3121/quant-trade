@@ -2546,8 +2546,27 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
         "Sin límite de tiempo para alcanzar los objetivos.",
     ),
     (
-        "News trading is unrestricted during the evaluation phases.",
-        "Operar noticias no tiene restricciones durante las fases de evaluación.",
+        (
+            "The news trading article says trading is free during the evaluation phases and "
+            "the 5-minute window applies to Qualified Analyst accounts ({url}); the plan page "
+            "states the window without that distinction; not simulated."
+        ),
+        (
+            "El artículo sobre noticias dice que en las fases de evaluación se opera "
+            "libremente y que la ventana de 5 minutos se aplica a las cuentas Qualified "
+            "Analyst ({url}); la página del plan indica la ventana sin esa distinción; no se "
+            "simula."
+        ),
+    ),
+    (
+        (
+            "Expert advisors that open trades on their own are prohibited; only "
+            "trade-management EAs are allowed ({url})."
+        ),
+        (
+            "Están prohibidos los asesores expertos (EA) que abren operaciones por su "
+            "cuenta; solo se permiten los que gestionan operaciones ({url})."
+        ),
     ),
     (
         (
@@ -2575,13 +2594,14 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
     ),
     (
         (
-            "Minimum trading days: the 2 Phase Static page says 4, the general assessment "
-            "rules say 5 for all accounts ({url}); the simulator uses 5 (stricter)."
+            "Minimum trading days: the 2 Phase Static (Two Phase Classic) account page says "
+            "4, the general assessment rules say 5 for all accounts ({url}); the simulator "
+            "uses 5 (stricter)."
         ),
         (
-            "Días operados mínimos: la página de la cuenta 2 Phase Static dice 4 y las "
-            "reglas generales de evaluación dicen 5 para todas las cuentas ({url}); el "
-            "simulador usa 5 (más estricto)."
+            "Días operados mínimos: la página de la cuenta 2 Phase Static (Two Phase "
+            "Classic) dice 4 y las reglas generales de evaluación dicen 5 para todas las "
+            "cuentas ({url}); el simulador usa 5 (más estricto)."
         ),
     ),
     (
@@ -2632,8 +2652,22 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
         ),
     ),
     (
-        "No minimum trading days; no time limit stated on the pages read.",
-        "Sin mínimo de días operados; las páginas leídas no indican límite de tiempo.",
+        (
+            "No minimum trading days and no time limit; at least one trade must be placed "
+            "and closed every 60 days."
+        ),
+        (
+            "Sin mínimo de días operados y sin límite de tiempo; hay que abrir y cerrar al "
+            "menos una operación cada 60 días."
+        ),
+    ),
+    (
+        "Expert advisors are allowed on Classic Markets and not on Futures ({url}).",
+        "Se permiten asesores expertos (EA) en Classic Markets y no en Futures ({url}).",
+    ),
+    (
+        "Expert advisors are not allowed ({url}).",
+        "No se permiten asesores expertos (EA) ({url}).",
     ),
     (
         "No daily loss limit ({url}).",
@@ -2703,6 +2737,17 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
         (
             "No se puede abrir ni cerrar ninguna operación desde 2 minutos antes hasta 2 "
             "minutos después de una noticia «red folder»; no se simula."
+        ),
+    ),
+    (
+        (
+            "A single trade without a stop-loss, or risking more than 2 % (the 3-Step "
+            "drawdown limit), counts as prohibited all-in trading ({url}); not simulated."
+        ),
+        (
+            "Una sola operación sin stop-loss, o que arriesgue más del 2 % (el límite de "
+            "drawdown del 3-Step), cuenta como «all in», que está prohibido ({url}); no se "
+            "simula."
         ),
     ),
     # audit/luck.py

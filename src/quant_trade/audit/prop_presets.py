@@ -231,8 +231,8 @@ FUNDINGPIPS_LEGACY_URL = (
     "https://help.fundingpips.com/hc/en-us/articles/51307058233361-FundingPips-Legacy-Rules"
 )
 #: "41 instruments across 5 asset classes": "Forex, Metals, Indices, Energies,
-#: and Crypto" (2-Step Standard page; the other programs' pages read do not say).
-FUNDINGPIPS_STANDARD_MARKETS: tuple[str, ...] = ("fx", "metals", "indices", "energy", "crypto")
+#: and Crypto" (the Instruments section of each of the four programs' pages read).
+FUNDINGPIPS_MARKETS: tuple[str, ...] = ("fx", "metals", "indices", "energy", "crypto")
 
 ALPHA_PRO_URL = "https://help.alphacapitalgroup.uk/en/articles/8420429-alpha-pro-8-10"
 ALPHA_PRO_6_URL = "https://help.alphacapitalgroup.uk/en/articles/11378706-alpha-pro-6"
@@ -240,6 +240,14 @@ ALPHA_SWING_URL = "https://help.alphacapitalgroup.uk/en/articles/9789907-alpha-s
 ALPHA_DAILY_URL = (
     "https://help.alphacapitalgroup.uk/en/articles/"
     "6934210-what-are-the-daily-risk-limits-and-how-do-they-work"
+)
+#: "During the evaluation phases, you can trade freely during all news releases";
+#: the 5-minute window is for the Qualified Analyst accounts (dated 2026-08-25).
+ALPHA_NEWS_URL = "https://help.alphacapitalgroup.uk/en/articles/9293522-can-i-trade-news"
+#: "Automated EAs that execute trades independently ... are strictly prohibited";
+#: trade-management EAs are approved.
+ALPHA_EA_URL = (
+    "https://help.alphacapitalgroup.uk/en/articles/6934236-can-i-use-an-expert-advisor-ea"
 )
 #: "The following assets are tradeable with Alpha Capital Group": forex pairs,
 #: index and oil CFDs (UKOIL, USOIL), gold and silver; no crypto.
@@ -249,7 +257,8 @@ ALPHA_MARKETS: tuple[str, ...] = ("fx", "metals", "indices", "energy")
 E8_SIGNATURE_URL = "https://help.e8markets.com/en/articles/11755943-e8-signature"
 E8_ZERO_URL = "https://helpfutures.e8markets.com/en/articles/15935817-e8-zero-starter-and-max"
 E8_EOD_URL = "https://help.e8markets.com/en/articles/11864596-eod-dynamic-drawdown"
-#: The product overview: "Daily limits | No" and "Markets | Futures" for E8 Zero.
+#: The product overview: "Daily limits | No", "Markets | Futures" and "Expert
+#: Advisors | No" for E8 Zero; "Futures- No" expert advisors for E8 Signature.
 E8_OVERVIEW_URL = (
     "https://help.e8markets.com/en/articles/"
     "13106558-all-product-overviews-e8-one-vs-e8-zero-vs-e8-pro-vs-e8-signature"
@@ -327,7 +336,6 @@ def _fundingpips(
 ) -> ChallengeRules:
     """A FundingPips phase: the daily limit is a share of the higher of the
     day's opening balance or equity, the maximum loss a static floor."""
-    markets = FUNDINGPIPS_STANDARD_MARKETS if program == "2-Step Standard" else None
     return ChallengeRules(
         key=key,
         firm="FundingPips",
@@ -343,9 +351,9 @@ def _fundingpips(
         notes=_FUNDINGPIPS_NOTES[program],
         source_url=_FUNDINGPIPS_SOURCES[program],
         as_of=NEW_FIRMS_AS_OF,
-        markets=markets,
-        markets_source=FUNDINGPIPS_STANDARD_URL if markets else None,
-        markets_as_of=NEW_FIRMS_AS_OF if markets else None,
+        markets=FUNDINGPIPS_MARKETS,
+        markets_source=_FUNDINGPIPS_SOURCES[program],
+        markets_as_of=NEW_FIRMS_AS_OF,
     )
 
 
@@ -357,7 +365,15 @@ _ALPHA_DURATION = (
     "The average duration of all trades must be greater than 2 minutes; not simulated."
 )
 _ALPHA_TIME = "No time limit to reach the targets."
-_ALPHA_NEWS_FREE = "News trading is unrestricted during the evaluation phases."
+_ALPHA_NEWS = (
+    "The news trading article says trading is free during the evaluation phases and the "
+    "5-minute window applies to Qualified Analyst accounts (" + ALPHA_NEWS_URL + "); the "
+    "plan page states the window without that distinction; not simulated."
+)
+_ALPHA_EA = (
+    "Expert advisors that open trades on their own are prohibited; only trade-management "
+    "EAs are allowed (" + ALPHA_EA_URL + ")."
+)
 
 
 def _alpha_balance_daily(value: str) -> str:
@@ -373,14 +389,16 @@ _ALPHA_NOTES: dict[str, tuple[str, ...]] = {
         _alpha_balance_daily("4"),
         _ALPHA_DAY,
         _ALPHA_DURATION,
-        _ALPHA_NEWS_FREE,
+        _ALPHA_NEWS,
+        _ALPHA_EA,
         _ALPHA_TIME,
     ),
     "Alpha Pro 10%": (
         _alpha_balance_daily("5"),
         _ALPHA_DAY,
         _ALPHA_DURATION,
-        _ALPHA_NEWS_FREE,
+        _ALPHA_NEWS,
+        _ALPHA_EA,
         _ALPHA_TIME,
     ),
     "Alpha Pro 6%": (
@@ -388,7 +406,8 @@ _ALPHA_NOTES: dict[str, tuple[str, ...]] = {
         f"(00:00 GMT+3); the breach is measured on current equity ({ALPHA_DAILY_URL}).",
         _ALPHA_DAY,
         _ALPHA_DURATION,
-        _ALPHA_NEWS_FREE,
+        _ALPHA_NEWS,
+        _ALPHA_EA,
         _ALPHA_TIME,
     ),
     "Alpha Swing": (
@@ -397,6 +416,7 @@ _ALPHA_NOTES: dict[str, tuple[str, ...]] = {
         "more than 2 minutes to be valid; not simulated.",
         _ALPHA_DAY,
         _ALPHA_DURATION,
+        _ALPHA_EA,
         _ALPHA_TIME,
     ),
 }
@@ -443,8 +463,9 @@ def _fxify_daily(value: str) -> str:
 _FXIFY_CLASSIC_NOTES = (
     _fxify_daily("4"),
     "Static maximum loss: 10 % of the initial balance for the life of the account.",
-    "Minimum trading days: the 2 Phase Static page says 4, the general assessment rules say "
-    "5 for all accounts (" + FXIFY_ASSESSMENT_URL + "); the simulator uses 5 (stricter).",
+    "Minimum trading days: the 2 Phase Static (Two Phase Classic) account page says 4, the "
+    "general assessment rules say 5 for all accounts (" + FXIFY_ASSESSMENT_URL + "); the "
+    "simulator uses 5 (stricter).",
     "No consistency rule in the evaluation phases; no maximum number of trading days.",
 )
 
@@ -511,7 +532,11 @@ _NEW_FIRM_PRESETS: tuple[ChallengeRules, ...] = (
             "All positions are closed by 23:00 server time: no overnight or weekend holding.",
             "No best-day rule in the challenge; the 35 % best-day rule applies to the "
             "Performance account's payouts.",
-            "No minimum trading days; no time limit stated on the pages read.",
+            "No minimum trading days and no time limit; at least one trade must be placed and "
+            "closed every 60 days.",
+            "Expert advisors are allowed on Classic Markets and not on Futures ("
+            + E8_OVERVIEW_URL
+            + ").",
         ),
         source_url=E8_SIGNATURE_URL,
         as_of=NEW_FIRMS_AS_OF,
@@ -539,6 +564,7 @@ _NEW_FIRM_PRESETS: tuple[ChallengeRules, ...] = (
             "profit target when a path reaches it, on daily closes, which is stricter.",
             "All open positions are closed every day at 15:10 CT: no overnight holding.",
             "No minimum trading days; at least one trade must be placed and closed every 7 days.",
+            "Expert advisors are not allowed (" + E8_OVERVIEW_URL + ").",
         ),
         source_url=E8_ZERO_URL,
         as_of=NEW_FIRMS_AS_OF,
@@ -590,6 +616,9 @@ _NEW_FIRM_PRESETS: tuple[ChallengeRules, ...] = (
             "No trade may be opened or closed from 2 minutes before to 2 minutes after a "
             "red-folder news release; not simulated.",
             "Expert advisors are not allowed on this model.",
+            "A single trade without a stop-loss, or risking more than 2 % (the 3-Step "
+            "drawdown limit), counts as prohibited all-in trading (" + MAVEN_FAQ_URL + "); not "
+            "simulated.",
         ),
         source_url=MAVEN_3STEP_URL,
         as_of=NEW_FIRMS_AS_OF,

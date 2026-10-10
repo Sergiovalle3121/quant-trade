@@ -338,7 +338,7 @@ def _share(value: calc.ChallengeInput, locale: str, firm: str, base_url: str) ->
 def _daily_rule(rules: ChallengeRules, locale: str) -> str:
     words = calc.COPY[locale]
     if rules.max_daily_loss is None:
-        return words["daily_none"]
+        return words["daily_no_limit" if rules.key in calc.NO_DAILY_LIMIT else "daily_none"]
     basis = "daily_day" if rules.daily_loss_basis == "start_of_day" else "daily_initial"
     return words[basis].format(value=calc._pct(rules.max_daily_loss, locale))
 

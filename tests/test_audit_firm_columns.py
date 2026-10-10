@@ -22,6 +22,7 @@ from quant_trade.audit.i18n import localize, untranslated
 from quant_trade.audit.prop_presets import (
     ALPHA_ASSETS_URL,
     E8_OVERVIEW_URL,
+    FUNDINGPIPS_PRO_URL,
     FUNDINGPIPS_STANDARD_URL,
     MARKETS,
     MAVEN_FAQ_URL,
@@ -304,17 +305,25 @@ def test_the_rules_line_shows_what_each_program_has(
 def test_only_programs_whose_pages_name_their_markets_have_them() -> None:
     named = {key for key, rules in PRESETS.items() if rules.markets is not None}
     alpha = {key for key, rules in PRESETS.items() if rules.firm == "Alpha Capital Group"}
+    fundingpips = {key for key, rules in PRESETS.items() if rules.firm == "FundingPips"}
     assert named == {
         *TOPSTEP,
         "the5ers-high-stakes-step1",
         "the5ers-high-stakes-step2",
         "the5ers-hyper-growth",
-        "fundingpips-2step-standard-phase1",
-        "fundingpips-2step-standard-phase2",
+        *fundingpips,
         *alpha,
         "e8-zero-100k",
         "maven-3step-step",
     }
+    # Each FundingPips program's own page has the Instruments section ("41
+    # instruments across 5 asset classes"): its markets come from that page.
+    assert len(fundingpips) == 7
+    for key in fundingpips:
+        rules = PRESETS[key]
+        assert rules.markets_source == rules.source_url
+        assert rules.markets == ("fx", "metals", "indices", "energy", "crypto")
+    assert PRESETS["fundingpips-2step-pro-phase1"].markets_source == FUNDINGPIPS_PRO_URL
     # Each from the page that says so: Alpha's assets list has no crypto.
     for key in alpha:
         assert PRESETS[key].markets_source == ALPHA_ASSETS_URL
@@ -377,7 +386,8 @@ def test_topstep_goes_last_and_marked_with_a_forex_history() -> None:
     head = rows[: -len(FUTURES_ONLY)]
     assert all(row.get("pass") and not row.get("market") for row in head)
     figures = [(row.get("pass_within_best_day") or row["pass"])["value"] for row in head]
-    assert figures == sorted(figures, reverse=True)
+    shown = [firmfit.shown_share(value) for value in figures]
+    assert shown == sorted(shown, reverse=True)
     # A metal pair is no futures contract either; a symbol the audit cannot place restricts nothing.
     gold = firmfit.firm_fit(_daily(), samples=100, seed=7, symbols=["XAUUSD"])
     assert all(_row(gold, [key]).get("market") for key in TOPSTEP)
@@ -397,7 +407,8 @@ def test_topstep_keeps_its_place_with_a_futures_history() -> None:
         assert row["pass"]["evidence"] == "MEASURED" and "market" not in row
     # The ranking puts Topstep among the others by its figure, not at the end.
     figures = [(row.get("pass_within_best_day") or row["pass"])["value"] for row in plain["firms"]]
-    assert figures == sorted(figures, reverse=True)
+    shown = [firmfit.shown_share(value) for value in figures]
+    assert shown == sorted(shown, reverse=True)
 
 
 @pytest.mark.parametrize("locale", LOCALES)

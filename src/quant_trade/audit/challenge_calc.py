@@ -126,6 +126,51 @@ PROGRAMS: tuple[str, ...] = tuple(
 )
 
 
+#: Every firm with published rules, in the order the presets list them (the
+#: order of ``FIRMS``, the pages' own), for every list of firms on the site
+#: (``firm_names``): the price card, the prop-firm page and the article.
+FIRM_NAMES: tuple[str, ...] = tuple(
+    dict.fromkeys(rules.firm for rules in PRESETS.values() if _published(rules))
+)
+#: A list's last joiner, by language: "and" for "A, B y C", "or" for "A, B o C".
+_JOINERS: dict[str, dict[str, str]] = {
+    "and": {"es": " y ", "en": " and ", "pt": " e "},
+    "or": {"es": " o ", "en": " or ", "pt": " ou "},
+}
+#: The firms a description too short for the whole list names; the others are
+#: counted (``firms_short``), so a short line never reads as the complete list.
+NAMED_FIRMS: tuple[str, ...] = ("FTMO", "FundingPips", "Topstep")
+OTHER_FIRMS = len(FIRM_NAMES) - len(NAMED_FIRMS)
+
+
+def firm_names(locale: str, conjunction: str = "and") -> str:
+    """Every firm with published rules, as "A, B y C" (``conjunction`` "and") or
+    "A, B o C" ("or") in ``locale``."""
+    joiner = _JOINERS[conjunction][_locale(locale)]
+    names = list(FIRM_NAMES)
+    return names[0] if len(names) == 1 else ", ".join(names[:-1]) + joiner + names[-1]
+
+
+def firms_short(locale: str) -> str:
+    """Three firms by name and how many others: "FTMO, FundingPips, Topstep y otras 6
+    firmas", for a description with a length limit."""
+    template = {
+        "es": "{names} y otras {n} firmas",
+        "en": "{names} and {n} other firms",
+        "pt": "{names} e outras {n} empresas",
+    }[_locale(locale)]
+    return template.format(names=", ".join(NAMED_FIRMS), n=OTHER_FIRMS)
+
+
+#: Programs whose pages say there is no daily loss limit in the evaluation: their
+#: rules say "no daily loss limit", where a program with a limit the simulator
+#: does not apply (Topstep's optional one, Hyper Growth's daily pause) says
+#: "not simulated". The preset fields are the same (``max_daily_loss=None``).
+NO_DAILY_LIMIT: frozenset[str] = frozenset(
+    {"e8-signature-100k", "e8-zero-100k", "the5ers-bootcamp-step"}
+)
+
+
 def firm_programs(firm: str = "") -> tuple[str, ...]:
     """The programs offered on a firm's page, or every program on the main page."""
     if not firm:
@@ -537,8 +582,8 @@ COPY: dict[str, dict[str, Any]] = {
         "title": "¿Con qué frecuencia alcanzarías el objetivo de un reto de prop firm?",
         "seo_title": "Calculadora de reto de prop firm: objetivo y límites",
         "summary": (
-            "Calculadora gratis e independiente, no afiliada a ninguna firma: frecuencia de "
-            "alcanzar el objetivo de FTMO, FundedNext, The5ers o Topstep o de tocar límites."
+            "Calculadora gratis, no afiliada a ninguna firma: frecuencia de alcanzar el "
+            f"objetivo de {firms_short('es')} o de tocar límites."
         ),
         "lead": (
             "Escribe tu % de aciertos, tu ganancia y tu pérdida medias y cuántas operaciones "
@@ -689,6 +734,7 @@ COPY: dict[str, dict[str, Any]] = {
         "daily_initial": "{value} del balance inicial",
         "daily_day": "{value} del balance al empezar el día",
         "daily_none": "no se simula (ver notas)",
+        "daily_no_limit": "sin límite en el reto",
         "total_static": "{value}, fija",
         "total_trailing": "{value}, sigue al mayor cierre diario",
         "total_lock": "{value}, sigue al mayor cierre diario hasta el balance inicial",
@@ -745,8 +791,8 @@ COPY: dict[str, dict[str, Any]] = {
         "title": "How often would you reach a prop firm challenge target?",
         "seo_title": "Prop firm challenge calculator: target and limits",
         "summary": (
-            "Free, independent calculator, not affiliated with any firm: how often you would reach "
-            "the FTMO, FundedNext, The5ers or Topstep target or hit a loss limit."
+            "Free calculator, not affiliated with any firm: how often you would reach the "
+            f"target of {firms_short('en')} or hit a loss limit."
         ),
         "lead": (
             "Enter your win rate, your average win and loss and how many trades you take a "
@@ -888,6 +934,7 @@ COPY: dict[str, dict[str, Any]] = {
         "daily_initial": "{value} of the initial balance",
         "daily_day": "{value} of the balance at the start of the day",
         "daily_none": "not simulated (see the notes)",
+        "daily_no_limit": "none in the challenge",
         "total_static": "{value}, static",
         "total_trailing": "{value}, trailing the highest daily close",
         "total_lock": "{value}, trailing the highest daily close up to the initial balance",
@@ -941,8 +988,8 @@ COPY: dict[str, dict[str, Any]] = {
         "title": "Com que frequência você atingiria a meta de um desafio de prop firm?",
         "seo_title": "Calculadora de desafio de prop firm: meta e limites",
         "summary": (
-            "Calculadora grátis e independente, não afiliada a nenhuma empresa: frequência de "
-            "atingir a meta da FTMO, FundedNext, The5ers ou Topstep ou de tocar os limites."
+            "Calculadora grátis, não afiliada a nenhuma empresa: frequência de atingir a meta "
+            f"da {firms_short('pt')} ou de tocar os limites."
         ),
         "lead": (
             "Digite a sua taxa de acerto, o seu ganho e a sua perda médios e quantas operações "
@@ -1095,6 +1142,7 @@ COPY: dict[str, dict[str, Any]] = {
         "daily_initial": "{value} do saldo inicial",
         "daily_day": "{value} do saldo no início do dia",
         "daily_none": "não simulado (veja as notas)",
+        "daily_no_limit": "sem limite no desafio",
         "total_static": "{value}, fixa",
         "total_trailing": "{value}, acompanha o maior fechamento diário",
         "total_lock": "{value}, acompanha o maior fechamento diário até o saldo inicial",
@@ -1421,7 +1469,7 @@ FIRM_COPY: dict[str, dict[str, dict[str, Any]]] = {
                     "{rules[the5ers-high-stakes-step1]}.",
                 ),
                 (
-                    "¿Y Hyper Growth y Bootcamp?",
+                    "¿Qué reglas tienen Hyper Growth y Bootcamp de The5ers?",
                     "Según la página de The5ers leída el {as_of}, Hyper Growth: "
                     "{rules[the5ers-hyper-growth]}; la página indica además un límite diario del 3 "
                     "% que suspende la operativa del día en lugar de cerrar la cuenta, y la "
@@ -1463,7 +1511,7 @@ FIRM_COPY: dict[str, dict[str, dict[str, Any]]] = {
                     "{rules[the5ers-high-stakes-step1]}.",
                 ),
                 (
-                    "What about Hyper Growth and Bootcamp?",
+                    "What rules do The5ers Hyper Growth and Bootcamp have?",
                     "According to The5ers' page read on {as_of}, Hyper Growth: "
                     "{rules[the5ers-hyper-growth]}; the page also states a 3 % daily limit that "
                     "suspends trading for the day instead of ending the account, and the "
@@ -1505,7 +1553,7 @@ FIRM_COPY: dict[str, dict[str, dict[str, Any]]] = {
                     "{rules[the5ers-high-stakes-step1]}.",
                 ),
                 (
-                    "E o Hyper Growth e o Bootcamp?",
+                    "Que regras têm o Hyper Growth e o Bootcamp da The5ers?",
                     "Segundo a página da The5ers lida em {as_of}, Hyper Growth: "
                     "{rules[the5ers-hyper-growth]}; a página indica ainda um limite diário de 3 % "
                     "que suspende as operações do dia em vez de encerrar a conta, e a calculadora "
@@ -1819,7 +1867,7 @@ FIRM_COPY: dict[str, dict[str, dict[str, Any]]] = {
                     "{rules[alpha-pro-10-phase1]}. Alpha Pro 6%: {rules[alpha-pro-6-phase1]}.",
                 ),
                 (
-                    "¿Y Alpha Swing?",
+                    "¿Qué objetivo y qué límites tiene Alpha Swing?",
                     "Según el centro de ayuda de Alpha Capital Group leído el {as_of}: "
                     "{rules[alpha-swing-phase1]}. Además, una operación abierta desde 2 minutos "
                     "antes hasta 2 minutos después de una noticia debe durar más de 2 minutos "
@@ -1838,8 +1886,9 @@ FIRM_COPY: dict[str, dict[str, dict[str, Any]]] = {
                     "¿Qué cuenta Alpha Capital Group como día de trading?",
                     "Según el centro de ayuda de Alpha Capital Group leído el {as_of}, un día en "
                     "que se abre y se cierra una operación, y cada fase pide "
-                    "{field[alpha-pro-8-phase1.min_trading_days]} días. La calculadora cuenta "
-                    "todo día con un retorno distinto de cero, así que puede contar más días "
+                    "{field[alpha-pro-8-phase1.min_trading_days]} días. La calculadora cuenta como "
+                    "día de trading todo día con operaciones; con tu historial real, el informe "
+                    "cuenta todo día con un retorno distinto de cero y puede contar más días "
                     "que la firma.",
                 ),
             ),
@@ -1864,7 +1913,7 @@ FIRM_COPY: dict[str, dict[str, dict[str, Any]]] = {
                     "{rules[alpha-pro-10-phase1]}. Alpha Pro 6%: {rules[alpha-pro-6-phase1]}.",
                 ),
                 (
-                    "And Alpha Swing?",
+                    "What target and limits does Alpha Swing have?",
                     "According to the Alpha Capital Group help center read on {as_of}: "
                     "{rules[alpha-swing-phase1]}. A trade opened from 2 minutes before to 2 "
                     "minutes after a news release must also last more than 2 minutes to be "
@@ -1884,7 +1933,9 @@ FIRM_COPY: dict[str, dict[str, dict[str, Any]]] = {
                     "According to the Alpha Capital Group help center read on {as_of}, a day on "
                     "which a trade is opened and closed, and each phase asks for "
                     "{field[alpha-pro-8-phase1.min_trading_days]} days. The calculator counts "
-                    "every day with a non-zero return, so it may count more days than the firm.",
+                    "every day with trades as a trading day; with your real history, the report "
+                    "counts every day with a non-zero return and may count more days than the "
+                    "firm.",
                 ),
             ),
         },
@@ -1909,7 +1960,7 @@ FIRM_COPY: dict[str, dict[str, dict[str, Any]]] = {
                     "{rules[alpha-pro-10-phase1]}. Alpha Pro 6%: {rules[alpha-pro-6-phase1]}.",
                 ),
                 (
-                    "E o Alpha Swing?",
+                    "Que meta e que limites tem o Alpha Swing?",
                     "Segundo a central de ajuda da Alpha Capital Group lida em {as_of}: "
                     "{rules[alpha-swing-phase1]}. Além disso, uma operação aberta de 2 minutos "
                     "antes até 2 minutos depois de uma notícia deve durar mais de 2 minutos "
@@ -1929,8 +1980,9 @@ FIRM_COPY: dict[str, dict[str, dict[str, Any]]] = {
                     "Segundo a central de ajuda da Alpha Capital Group lida em {as_of}, um dia "
                     "em que se abre e se fecha uma operação, e cada fase pede "
                     "{field[alpha-pro-8-phase1.min_trading_days]} dias. A calculadora conta "
-                    "todo dia com retorno diferente de zero, então pode contar mais dias que a "
-                    "firma.",
+                    "como dia de trading todo dia com operações; com o seu histórico real, o "
+                    "relatório conta todo dia com retorno diferente de zero e pode contar mais "
+                    "dias que a firma.",
                 ),
             ),
         },
@@ -2086,12 +2138,13 @@ FIRM_COPY: dict[str, dict[str, dict[str, Any]]] = {
                 (
                     "¿Qué objetivo y qué límites tiene Two Phase Classic?",
                     "Según las páginas de FXIFY leídas el {as_of}: "
-                    "{rules[fxify-2phase-classic-phase1]}. La página de esa cuenta pide 4 días "
+                    "{rules[fxify-2phase-classic-phase1]}. La página de esa cuenta (2 Phase "
+                    "Static) pide 4 días "
                     "mínimos y las reglas generales piden 5 en todas las cuentas; la "
                     "calculadora usa 5, lo más estricto.",
                 ),
                 (
-                    "¿Y Three Phase?",
+                    "¿Qué objetivo y qué límites tiene el Three Phase de FXIFY?",
                     "Según las páginas de FXIFY leídas el {as_of}: {rules[fxify-3phase-step]}. "
                     "Cada fase empieza de cero y solo se llega a ella alcanzando el objetivo de "
                     "la anterior.",
@@ -2130,12 +2183,13 @@ FIRM_COPY: dict[str, dict[str, dict[str, Any]]] = {
                 (
                     "What target and limits does Two Phase Classic have?",
                     "According to the FXIFY pages read on {as_of}: "
-                    "{rules[fxify-2phase-classic-phase1]}. That account's page asks for 4 "
+                    "{rules[fxify-2phase-classic-phase1]}. That account's page (2 Phase Static) "
+                    "asks for 4 "
                     "minimum days and the general rules ask for 5 on every account; the "
                     "calculator uses 5, the stricter reading.",
                 ),
                 (
-                    "And Three Phase?",
+                    "What target and limits does the FXIFY Three Phase have?",
                     "According to the FXIFY pages read on {as_of}: {rules[fxify-3phase-step]}. "
                     "Each phase starts afresh and is reached only by reaching the previous "
                     "phase's target.",
@@ -2174,12 +2228,13 @@ FIRM_COPY: dict[str, dict[str, dict[str, Any]]] = {
                 (
                     "Que meta e que limites tem o Two Phase Classic?",
                     "Segundo as páginas da FXIFY lidas em {as_of}: "
-                    "{rules[fxify-2phase-classic-phase1]}. A página dessa conta pede 4 dias "
+                    "{rules[fxify-2phase-classic-phase1]}. A página dessa conta (2 Phase Static) "
+                    "pede 4 dias "
                     "mínimos e as regras gerais pedem 5 em todas as contas; a calculadora usa "
                     "5, a leitura mais estrita.",
                 ),
                 (
-                    "E o Three Phase?",
+                    "Que meta e que limites tem o Three Phase da FXIFY?",
                     "Segundo as páginas da FXIFY lidas em {as_of}: {rules[fxify-3phase-step]}. "
                     "Cada fase começa do zero e só se chega a ela atingindo a meta da anterior.",
                 ),
@@ -2226,10 +2281,13 @@ FIRM_COPY: dict[str, dict[str, dict[str, Any]]] = {
                 (
                     "¿Por qué no están el 1-Step y el 2-Step de Maven Trading?",
                     "Según las páginas de Maven Trading leídas el {as_of}, el 2-Step pide un "
-                    "mínimo de días que cierren con una ganancia dada y el 1-Step tiene una "
-                    "pérdida máxima que sigue al máximo de equity dentro del día. Con cifras "
-                    "diarias ninguna de las dos reglas se puede simular sin ser optimista, así "
-                    "que la calculadora no los incluye.",
+                    "mínimo de días que cierren con una ganancia dada, una regla que el "
+                    "simulador no tiene (cuenta cualquier día con operaciones), y el 1-Step "
+                    "tiene una pérdida máxima que sigue al máximo de equity dentro del día, que "
+                    "una cifra diaria no ve. Aproximar cualquiera de las dos sería optimista, "
+                    "así que la calculadora no los incluye: de las firmas leídas el {as_of} "
+                    "solo entran los programas cuya aproximación es igual de estricta que la "
+                    "regla o más.",
                 ),
                 (
                     "¿Cómo cuenta la calculadora la pérdida diaria de Maven Trading?",
@@ -2270,10 +2328,12 @@ FIRM_COPY: dict[str, dict[str, dict[str, Any]]] = {
                 (
                     "Why are the Maven Trading 1-Step and 2-Step not here?",
                     "According to the Maven Trading pages read on {as_of}, the 2-Step asks for a "
-                    "minimum of days that each close with a set gain and the 1-Step has a "
-                    "maximum loss that trails the intraday equity high. With daily figures "
-                    "neither rule can be simulated without being optimistic, so the calculator "
-                    "leaves them out.",
+                    "minimum of days that each close with a set gain, a rule the simulator does "
+                    "not have (it counts any day with trades), and the 1-Step has a maximum "
+                    "loss that trails the intraday equity high, which a daily figure cannot "
+                    "see. Approximating either would be optimistic, so the calculator leaves "
+                    "them out: of the firms read on {as_of}, only programs whose approximation "
+                    "is as strict as the rule or stricter are in.",
                 ),
                 (
                     "How does the calculator count Maven Trading's daily loss?",
@@ -2314,10 +2374,12 @@ FIRM_COPY: dict[str, dict[str, dict[str, Any]]] = {
                 (
                     "Por que o 1-Step e o 2-Step da Maven Trading não estão aqui?",
                     "Segundo as páginas da Maven Trading lidas em {as_of}, o 2-Step pede um "
-                    "mínimo de dias que fechem com um ganho dado e o 1-Step tem uma perda máxima "
-                    "que acompanha o máximo do patrimônio dentro do dia. Com números diários "
-                    "nenhuma das duas regras pode ser simulada sem ser otimista, então a "
-                    "calculadora os deixa de fora.",
+                    "mínimo de dias que fechem com um ganho dado, uma regra que o simulador não "
+                    "tem (ele conta qualquer dia com operações), e o 1-Step tem uma perda máxima "
+                    "que acompanha o máximo do patrimônio dentro do dia, que um número diário "
+                    "não vê. Aproximar qualquer uma das duas seria otimista, então a calculadora "
+                    "os deixa de fora: das empresas lidas em {as_of}, só entram os programas "
+                    "cuja aproximação é tão estrita quanto a regra ou mais.",
                 ),
                 (
                     "Como a calculadora conta a perda diária da Maven Trading?",
@@ -2362,6 +2424,7 @@ _RULE_WORDS: dict[str, dict[str, str]] = {
         "daily_initial": "pérdida diaria máxima de {value} del balance inicial",
         "daily_day": "pérdida diaria máxima de {value} del balance al empezar el día",
         "daily_none": "límite de pérdida diaria no simulado",
+        "daily_no_limit": "sin límite de pérdida diaria",
         "total_static": "pérdida total máxima de {value}, fija",
         "total_trailing": "pérdida total máxima de {value}, que sigue al mayor cierre diario",
         "total_lock": (
@@ -2385,6 +2448,7 @@ _RULE_WORDS: dict[str, dict[str, str]] = {
         "daily_initial": "a maximum daily loss of {value} of the initial balance",
         "daily_day": "a maximum daily loss of {value} of the start-of-day balance",
         "daily_none": "daily loss limit not simulated",
+        "daily_no_limit": "no daily loss limit",
         "total_static": "a maximum total loss of {value}, static",
         "total_trailing": "a maximum total loss of {value} trailing the highest daily close",
         "total_lock": (
@@ -2408,6 +2472,7 @@ _RULE_WORDS: dict[str, dict[str, str]] = {
         "daily_initial": "perda diária máxima de {value} do saldo inicial",
         "daily_day": "perda diária máxima de {value} do saldo no início do dia",
         "daily_none": "limite de perda diária não simulado",
+        "daily_no_limit": "sem limite de perda diária",
         "total_static": "perda total máxima de {value}, fixa",
         "total_trailing": "perda total máxima de {value}, que acompanha o maior fechamento diário",
         "total_lock": (
@@ -2429,13 +2494,14 @@ _RULE_WORDS: dict[str, dict[str, str]] = {
 def daily_clause(key: str, locale: str) -> str:
     """The daily loss rule of ``key`` as the simulator applies it, from its preset.
 
-    A preset without one says it is not simulated, which is all the calculator
-    knows: the firm's page may still have a limit that pauses the day (its notes)."""
+    A preset without one says it is not simulated, since the firm's page may
+    still have a limit that pauses the day (its notes), unless the page says the
+    program has none (``NO_DAILY_LIMIT``)."""
     locale = _locale(locale)
     words = _RULE_WORDS[locale]
     rules = PRESETS[key]
     if rules.max_daily_loss is None:
-        return words["daily_none"]
+        return words["daily_no_limit" if key in NO_DAILY_LIMIT else "daily_none"]
     basis = "daily_day" if rules.daily_loss_basis == "start_of_day" else "daily_initial"
     return words[basis].format(value=_pct(rules.max_daily_loss, locale))
 
@@ -2449,7 +2515,8 @@ def rules_sentence(key: str, locale: str) -> str:
     first = phases[0]
     targets = [_pct(rules.profit_target, locale) for rules in phases]
     repeats = phase_count(key)
-    if repeats > 1 and len(phases) == 1:
+    if repeats > 1 and len(set(targets)) == 1:
+        # One rule set repeated (Bootcamp) or phases with the same target (Alpha Pro 6%).
         target = words["target_phases"].format(
             values=words["each"].format(value=targets[0], n=repeats)
         )
@@ -2557,6 +2624,10 @@ __all__ = [
     "FIELDS",
     "FIRMS",
     "FIRM_COPY",
+    "FIRM_NAMES",
+    "NAMED_FIRMS",
+    "NO_DAILY_LIMIT",
+    "OTHER_FIRMS",
     "PAGES",
     "PROGRAMS",
     "REQUESTS_PER_HOUR",
@@ -2577,7 +2648,9 @@ __all__ = [
     "daily_clause",
     "firm_copy",
     "firm_faq",
+    "firm_names",
     "firm_programs",
+    "firms_short",
     "horizon",
     "page_paths",
     "parse",

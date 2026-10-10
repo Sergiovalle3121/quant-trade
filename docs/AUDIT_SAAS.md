@@ -144,8 +144,19 @@ too. A declared fee keeps its cents. The rules table shows each phase; under it
 one source line per page read, naming the programs it covers, with its `as_of`
 date, "Rigor is not affiliated with any firm", and the preset's notes under one
 heading per program, with any web address in a note as a short link. A program
-without a daily limit in its preset reads "not simulated (see the notes)", never
-"no daily limit": the firm's page may still have one that pauses the day. Each
+without a daily limit in its preset reads "not simulated (see the notes)": the
+firm's page may still have one that pauses the day (Topstep's optional limit,
+Hyper Growth's daily pause). Only the programs whose pages say there is none in
+the evaluation (`challenge_calc.NO_DAILY_LIMIT`: E8 Markets Signature 100K and
+Zero 100K, The5ers Bootcamp) read "no daily loss limit" ("none in the
+challenge" in the table). Several phases with the same target read "a target of
+6 % in each of the 2 phases" (Alpha Pro 6%, FundingPips 2-Step Pro), as a
+repeated rule set does. The main page's description names three firms and
+counts the others (`challenge_calc.firms_short`: "FTMO, FundingPips, Topstep and
+6 other firms"), so it fits 160 characters and never reads as the whole list;
+every full list of firms on the site comes from `challenge_calc.firm_names`
+(in the presets' order, the order of `FIRMS`, closed with "and" or "or"), and a
+test walks every public page for a list that ends in The5ers and Topstep. Each
 firm page has its own title and a description that says the tool is
 independent and not affiliated with the firm, all of the firm's programs and
 four questions whose figures are filled from the presets
@@ -172,11 +183,16 @@ simulator's types exactly or by an approximation stricter than the firm's:
 - **FundingPips** (help center): 2-Step Standard (5 % daily configuration),
   2-Step Pro, 2-Step Flex (80 % split, 1 minimum day) and 1-Step Flex (3 %
   daily configuration); daily loss on the higher of the day's opening balance
-  or equity (`start_of_day`), static maximum loss. Left out: Zero (no
+  or equity (`start_of_day`), static maximum loss; markets from the
+  Instruments section of each program's own page. Left out: Zero (no
   evaluation), the 1 Step Model (no longer offered) and the Legacy Rules.
 - **Alpha Capital Group** (help center and product pages): Alpha Pro 8 %,
   10 % and 6 %, Alpha Swing; static maximum loss, 3 days per phase; markets
-  from its tradeable-assets list (no crypto). Left out: Alpha One (its
+  from its tradeable-assets list (no crypto). The plan pages state a 5-minute
+  news window and the news article (9293522) says trading is free in the
+  evaluation and the window is for Qualified Analyst accounts: the note says
+  both. Its EA article (6934236) prohibits expert advisors that open trades on
+  their own, and every Alpha preset says so. Left out: Alpha One (its
   maximum loss trails the highest balance reached, updated at every close
   within the day), Alpha Direct (no evaluation) and Alpha Three (not on the
   current product pages).
@@ -185,7 +201,9 @@ simulator's types exactly or by an approximation stricter than the firm's:
   pages disagree on whether its end-of-day trailing locks in the challenge,
   so it trails without locking, the stricter reading; its 40 % best-day rule
   of the total profit is checked against the target, never larger at the
-  pass). Both state dollars at 100K, so they are in `ACCOUNT_SIZES`. Left
+  pass). Both state dollars at 100K, so they are in `ACCOUNT_SIZES`. The
+  product overview says expert advisors are not allowed on Zero, nor on
+  Signature's futures; Signature asks for one closed trade every 60 days. Left
   out: E8 One (trails closed profits within the day) and E8 Pro (a 2 % daily
   profit cap the simulator does not apply).
 - **FXIFY** (FAQ and program pages): Two Phase Classic (static; its page says
@@ -195,7 +213,10 @@ simulator's types exactly or by an approximation stricter than the firm's:
   closed-balance high within the day) and Two Phase Pro (a USD 4,000 daily
   profit cap and days that must each close with a set gain).
 - **Maven Trading** (challenge pages and FAQ): 3-Step (one rule set for each
-  of its three steps). Left out: 2-Step (3 days that each close at least
+  of its three steps). Its FAQ counts a trade without a stop-loss, or risking
+  more than 2 % (the 3-Step drawdown limit), as prohibited "all in" trading:
+  the calculator takes the risk per trade as declared, so the note says it.
+  Left out: 2-Step (3 days that each close at least
   0.5 % in gain, which the simulator's count of trading days cannot see) and
   1-Step (maximum loss trailing the intraday equity high, as a share of it).
 
@@ -1485,7 +1506,9 @@ and report wire them in during the integration step):
   Bootcamp counts its preset three times), with the same product within the
   best-day rule when a phase has one, and the weakest phase's main failure.
   Ranked by the figure that matters for a payout (within the best-day rule
-  where the firm has one), ties by name. Figures read "≥99%" at the top.
+  where the firm has one) as the table shows it (`firmfit.shown_share`: a
+  whole percent, "≥99%" and "≤1%" at the ends), ties by name, so two rows that
+  read 88% go by name. Figures read "≥99%" at the top.
   When every program is at or above 99 % or at or below 1 %, the table
   gives way to one sentence (and, for all failing, the most common reason);
   with programs left out for their markets the sentence says "every
@@ -1515,10 +1538,12 @@ and report wire them in during the integration step):
   program lets the trader trade only when a page of the firm says so
   (`markets_source`, `markets_as_of`): Topstep is futures only ("Topstep is a
   Futures-only program", help article 8284206), The5ers High Stakes and Hyper
-  Growth list their assets on their own pages; so do FundingPips 2-Step
-  Standard, Alpha Capital Group (its tradeable-assets article, no crypto),
-  E8 Markets Zero (futures only) and Maven Trading (its FAQ); FTMO,
-  FundedNext, Bootcamp and the other new programs' pages read say nothing,
+  Growth list their assets on their own pages; so do the four FundingPips
+  programs (each page's Instruments section), Alpha Capital Group (its
+  tradeable-assets article, no crypto), E8 Markets Zero (futures only) and
+  Maven Trading (its FAQ). E8 Markets Signature names "Classic Markets,
+  Futures", which is no list of the simulator's market classes, so it is not
+  restricted; FTMO, FundedNext, Bootcamp and FXIFY pages read say nothing,
   so they are never restricted. What each symbol
   can be traded as comes from `crises.symbol_market` and
   `firmfit.symbol_venues` (`SYMBOL_MARKETS`: a pair against a currency,

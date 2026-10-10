@@ -708,13 +708,12 @@ AUDIENCE_PAGES: tuple[Audience, ...] = (
                 seo_title="Antes de pagar un reto de prop firm, simúlalo",
                 seo_description=(
                     "Sube backtest o historial: remuestrea operaciones y mide la frecuencia de "
-                    "tocar límites de pérdida diaria o total en FTMO, FundedNext, The5ers y "
-                    "Topstep."
+                    "tocar la pérdida diaria o la total en {firms_short}."
                 ),
                 summary=(
                     "Sube tu backtest o tu historial y mira con qué frecuencia tocarías la "
-                    "pérdida diaria o la total en retos de FTMO, FundedNext, The5ers y "
-                    "Topstep, remuestreando tus propias operaciones."
+                    "pérdida diaria o la total en retos de {firms_short}, remuestreando tus "
+                    "propias operaciones."
                 ),
                 pains=(
                     "Pagas el reto, una mala racha toca la pérdida diaria y vuelves a pagar.",
@@ -798,12 +797,12 @@ AUDIENCE_PAGES: tuple[Audience, ...] = (
                 seo_title="Before you pay for a prop-firm challenge, simulate it",
                 seo_description=(
                     "Upload your backtest or history: resample trades to measure how often daily "
-                    "or total loss limits are hit in FTMO, FundedNext, The5ers and Topstep."
+                    "or total loss limits are hit at {firms_short}."
                 ),
                 summary=(
                     "Upload your backtest or history and see how often you would hit the daily "
-                    "or total loss limit in FTMO, FundedNext, The5ers and Topstep challenges, "
-                    "resampling your own trades."
+                    "or total loss limit in the challenges of {firms_short}, resampling your "
+                    "own trades."
                 ),
                 pains=(
                     "You pay for the challenge, one bad streak hits the daily loss limit and "
@@ -887,12 +886,12 @@ AUDIENCE_PAGES: tuple[Audience, ...] = (
                 seo_title="Antes de pagar um desafio de prop firm, simule-o",
                 seo_description=(
                     "Envie backtest ou histórico: reamostre operações e meça a frequência de tocar "
-                    "limites de perda diária ou total em FTMO, FundedNext, The5ers e Topstep."
+                    "a perda diária ou a total em {firms_short}."
                 ),
                 summary=(
                     "Envie o seu backtest ou histórico e veja com que frequência você "
-                    "tocaria o limite de perda diária ou total nos desafios da FTMO, "
-                    "FundedNext, The5ers e Topstep, reamostrando as suas próprias operações."
+                    "tocaria o limite de perda diária ou total nos desafios da "
+                    "{firms_short}, reamostrando as suas próprias operações."
                 ),
                 pains=(
                     "Você paga o desafio, uma sequência ruim toca a perda diária e você paga de "

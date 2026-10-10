@@ -632,8 +632,8 @@ AUDIENCES_PT: dict[str, Any] = {
             "Você vai pagar um desafio de prop firm",
             "Uma sequência ruim pode derrubar a conta mesmo que a estratégia funcione.",
             "o seu backtest ou histórico e o desafio que quer simular.",
-            "com que frequência você tocaria a perda diária ou a total em {presets} desafios da "
-            "FTMO, FundedNext, The5ers e Topstep, reamostrando o seu próprio histórico.",
+            "com que frequência você tocaria a perda diária ou a total nos desafios das "
+            "empresas que o simulador traz, reamostrando o seu próprio histórico.",
             "",
         ),
         (
