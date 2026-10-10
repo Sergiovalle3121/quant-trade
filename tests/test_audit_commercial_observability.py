@@ -548,39 +548,33 @@ def test_x_cohort_uses_account_creation_first_touch_and_delivered_repeats(tmp_pa
     assert "example.test" not in str(counts)
 
 
-def test_email_confirmation_note_is_localized_and_conditional() -> None:
+def test_the_first_screen_no_longer_carries_the_confirmation_and_card_note() -> None:
+    # The landing's first screen names the price, never a card; the e-mail rule is
+    # stated on /precios and in the account steps, where it applies.
     english = (
         "Confirm your email to receive the first full report free. "
         "If required, you verify a card without a charge."
     )
-    expected = {
-        "es": spanish(english),
-        "en": english,
-        "pt": (
-            "Confirme seu e-mail para receber o primeiro relatório completo grátis. "
-            "Se necessário, valide um cartão sem cobrança."
-        ),
-    }
-    for locale, note in expected.items():
-        assert note is not None
-        page = landing(locale=locale, free_mode=False, email_confirmation=True)
-        assert note in page and "welcome-confirmation" in page
-        assert find_claims(page) == []
-        assert "welcome-confirmation" not in landing(
-            locale=locale, free_mode=False, email_confirmation=False
-        )
-        # Free mode has no free first report waiting for a confirmed address.
-        free = landing(locale=locale, free_mode=True, email_confirmation=True)
-        assert "welcome-confirmation" not in free and note not in free
+    for locale in ("es", "en", "pt"):
+        for free_mode in (True, False):
+            page = landing(locale=locale, free_mode=free_mode, email_confirmation=True)
+            assert "welcome-confirmation" not in page
+            assert english not in page and spanish(english) not in page
+            assert find_claims(page) == []
 
 
 @pytest.mark.parametrize("free_mode", [True, False])
-def test_landing_shows_the_confirmation_note_only_when_it_applies(
+def test_pricing_states_the_confirmation_rule_only_when_it_applies(
     tmp_path: Path, free_mode: bool
 ) -> None:
+    from quant_trade.audit.pricing import PRICING_COPY, PRICING_PATH
+
     app = _app(tmp_path, free_mode=free_mode, email_verification_required=True)
     with TestClient(app) as client:
-        for home in ("/", "/en", "/pt"):
+        for locale, home in (("es", "/"), ("en", "/en"), ("pt", "/pt")):
             page = client.get(home)
             assert page.status_code == 200
-            assert ("welcome-confirmation" in page.text) is not free_mode, home
+            assert "welcome-confirmation" not in page.text, home
+            pricing = client.get(PRICING_PATH[locale]).text
+            note = PRICING_COPY[locale]["email_note"]
+            assert (note in pricing) is not free_mode, locale

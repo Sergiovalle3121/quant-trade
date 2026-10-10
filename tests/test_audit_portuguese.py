@@ -78,7 +78,7 @@ def test_portuguese_landing_passes_the_guard_and_is_marked_portuguese() -> None:
     text = _text(page)
     assert "não prevemos resultados" in text
     assert "não nos conectamos a nenhuma corretora" in text
-    assert "não é uma promessa de resultados" in text
+    assert "com as suposições escritas, não previsões" in text
 
 
 def test_portuguese_landing_has_no_spanish_left() -> None:
@@ -112,7 +112,8 @@ def test_every_link_on_the_portuguese_landing_opens(tmp_path: Path) -> None:
         for href in HREF.findall(page.text)
         if href.startswith("/") and not href.startswith("//")
     }
-    assert "/pt" in links and "/pt/exemplo" in links and "/pt/cadastro" in links
+    # The start buttons open the Portuguese upload page (sign-up first without an account).
+    assert "/pt" in links and "/pt/exemplo" in links and "/pt/auditar" in links
     for href in sorted(links - {""}):
         response = client.get(href, follow_redirects=False)
         assert response.status_code < 400, (href, response.status_code)
@@ -139,6 +140,34 @@ def test_the_portuguese_newsletter_form_comes_back_to_the_portuguese_page(
     assert "Esse endereço de e-mail não parece válido." in client.get("/pt?error=email").text
 
 
+def test_the_portuguese_sample_previews_the_portuguese_card_once_it_exists(
+    tmp_path: Path,
+) -> None:
+    """Like /ejemplo and /sample, /pt/exemplo shows its own card when static/ has it.
+
+    og-sample-pt.png is not rendered yet (tools/make_og_images.py has its copy), so the
+    page keeps the English sample card the repository chose as a fallback, never a
+    missing file. Rendering the Portuguese PNG makes this test ask for it."""
+    from quant_trade.audit.seo import og_image_name
+    from quant_trade.audit.theme import STATIC_DIR
+
+    base = "https://audit.example"
+    settings = AuditSettings(database_url=f"sqlite:///{tmp_path}/audit.db", base_url=base)
+    client = TestClient(create_app(settings, make_store(settings.database_url)))
+    page = client.get("/pt/exemplo").text
+    portuguese = (Path(STATIC_DIR) / "og-sample-pt.png").is_file()
+    name = "og-sample-pt.png" if portuguese else "og-sample-en.png"
+    assert og_image_name("sample", "pt") == name
+    assert f"<meta property='og:image' content='{base}/static/{name}'>" in page
+    assert f"<meta name='twitter:image' content='{base}/static/{name}'>" in page
+    image = client.get(f"/static/{name}")
+    assert image.status_code == 200
+    assert image.headers["content-type"] == "image/png"
+    for locale, path in (("es", "/ejemplo"), ("en", "/sample")):
+        own = client.get(path).text
+        assert f"content='{base}/static/og-sample-{locale}.png'" in own, path
+
+
 def test_search_engines_see_the_portuguese_landing(tmp_path: Path) -> None:
     client = _client(tmp_path)
     home = client.get("/").text
@@ -162,7 +191,7 @@ def test_every_case_page_exists_in_portuguese(tmp_path: Path, page) -> None:
     text = _text(response.text)
     assert find_claims(text) == []
     assert page.text["pt"].title in text
-    for spanish in ("Qué subes", "Qué no hace", "Empezar gratis", "Otros casos", "archivo"):
+    for spanish in ("Qué subes", "Qué no hace", "Auditar mi archivo", "Otros casos", "archivo"):
         assert spanish not in text, spanish
     # The other languages, the start button and every link open.
     for lang in ("es", "en"):

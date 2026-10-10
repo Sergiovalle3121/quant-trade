@@ -14,9 +14,12 @@
   }
 
   ready(function () {
-    // Reports ship with their technical details open so a saved page, a PDF,
-    // and a no-JavaScript browser never lose evidence. Fold them only on screen.
-    var reportDetails = Array.prototype.slice.call(d.querySelectorAll("details.report-detail"));
+    // Reports ship with their technical details (and each firm's rules, source
+    // and date) open so a saved page, a PDF, and a no-JavaScript browser never
+    // lose evidence. Fold them only on screen; printing opens them again.
+    var reportDetails = Array.prototype.slice.call(
+      d.querySelectorAll("details.report-detail, details.ff-rules")
+    );
     if (reportDetails.length) {
       var target = window.location.hash.slice(1);
       reportDetails.forEach(function (item) { item.open = !!target && item.id === target; });
@@ -138,6 +141,89 @@
     window.addEventListener("pageshow", function () {
       d.querySelectorAll(".busy.on").forEach(function (o) { o.classList.remove("on"); });
       d.querySelectorAll("[aria-busy=true]").forEach(function (b) { b.removeAttribute("aria-busy"); });
+    });
+
+    // The upload answers in place: unknown columns show their menus on this
+    // same page and a refusal is said above the fields, so the file stays
+    // chosen and is not picked again. Only two server keys ever go in as
+    // markup (fields_html, guidance_html); anything else falls back to the
+    // ordinary post and its page.
+    d.querySelectorAll("form[data-inplace]").forEach(function (form) {
+      if (!window.fetch || !window.FormData) return;
+      var alertBox = d.getElementById("upload-alert");
+      var fields = d.getElementById("map-fields");
+      var sending = false;
+      function idle() {
+        var overlay = d.getElementById(form.getAttribute("data-busy"));
+        if (overlay) overlay.classList.remove("on");
+        var button = form.querySelector("button[type=submit]");
+        if (button) button.removeAttribute("aria-busy");
+        sending = false;
+      }
+      function native() {
+        form.removeAttribute("data-inplace");
+        HTMLFormElement.prototype.submit.call(form);
+      }
+      function show(el) {
+        try {
+          el.scrollIntoView({ block: "center" });
+          if (el.focus) el.focus({ preventScroll: true });
+        } catch (_) { /* an older browser: the content is there all the same */ }
+      }
+      function say(problem, guidance) {
+        if (!alertBox) return;
+        while (alertBox.firstChild) alertBox.removeChild(alertBox.firstChild);
+        var line = d.createElement("p");
+        line.className = "error";
+        line.textContent = problem || "";
+        alertBox.appendChild(line);
+        if (typeof guidance === "string") alertBox.insertAdjacentHTML("beforeend", guidance);
+        alertBox.hidden = false;
+      }
+      form.addEventListener("submit", function (ev) {
+        if (!form.hasAttribute("data-inplace") || !alertBox || !fields) return;
+        ev.preventDefault();
+        if (sending) return;
+        sending = true;
+        fetch(form.action, {
+          method: "POST",
+          body: new FormData(form),
+          headers: { Accept: "application/json" },
+          credentials: "same-origin"
+        }).then(function (response) {
+          return response.json().then(function (json) {
+            return { status: response.status, json: json || {} };
+          });
+        }).then(function (answer) {
+          var status = answer.status, json = answer.json;
+          if (status === 201 && typeof json.location === "string" && json.location.charAt(0) === "/") {
+            window.location.assign(json.location);
+            return;
+          }
+          if (status === 422 && typeof json.fields_html === "string" && json.fields_html) {
+            fields.innerHTML = json.fields_html;
+            fields.hidden = false;
+            // The menus now name the columns: the free-text boxes would send
+            // the same names, so they stay out of the next post.
+            form.querySelectorAll(".map-columns input[name^='col_']").forEach(function (box) {
+              box.disabled = true;
+            });
+            say(json.problem || json.error, json.guidance_html);
+            idle();
+            var first = fields.querySelector("select");
+            if (first) show(first);
+            return;
+          }
+          if ([400, 413, 429, 503].indexOf(status) !== -1 && typeof json.error === "string") {
+            say(json.error, json.guidance_html);
+            idle();
+            show(alertBox);
+            return;
+          }
+          // 401/402 (sign in, free tier), anything unexpected: the page of always.
+          native();
+        }).catch(native);
+      });
     });
 
     // Long pages: the index marks the section being read.
@@ -276,7 +362,7 @@
   });
 
   // Passkeys: the page carries the options; the device's answer goes back in
-  // an ordinary form post (no fetch, so the CSP keeps connect-src 'none').
+  // an ordinary form post (no fetch needed).
   function fromB64(text) {
     var s = text.replace(/-/g, "+").replace(/_/g, "/");
     while (s.length % 4) s += "=";

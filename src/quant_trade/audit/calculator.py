@@ -17,8 +17,10 @@ the upload form, where the same figures come from the real returns.
 from __future__ import annotations
 
 import math
+import re
 from dataclasses import dataclass
 from typing import Any
+from urllib.parse import urlencode
 
 from quant_trade.audit.engine import sharpe_sampling_variance
 from quant_trade.audit.luck import luck_review
@@ -43,6 +45,12 @@ SHARPE_RANGE = (0.05, 10.0)
 YEARS_RANGE = (0.1, 50.0)
 TRIALS_RANGE = (1, 10_000_000)
 
+#: The query fields that determine a result's share card, in cache-key order.
+CARD_FIELDS = ("sharpe", "years", "trials", "periods_per_year")
+#: Card renders per address and sliding hour, the reader's own limit. The page
+#: itself is never refused: past the limit it keeps the static preview.
+CARD_REQUESTS_PER_HOUR = 60
+
 
 def calculator_url(locale: str) -> str:
     return CALCULATOR_PATH.get(locale, CALCULATOR_PATH["es"])
@@ -54,6 +62,31 @@ class CalculatorInput:
     years: float
     trials: int
     periods_per_year: float = PERIODS_PER_YEAR
+
+
+#: Digit groups of three after a dot or a comma: "1.000" and "12.500" as typed
+#: in Spanish or Portuguese, "1,000" in English. Trials count whole
+#: configurations, so such a separator is never a decimal point here.
+_THOUSANDS = re.compile(r"\d{1,3}(?:[.,]\d{3})+")
+_SPACES = (" ", "\u00a0", "\u202f")  # space, no-break space, narrow no-break
+
+
+def _trial_count(raw: Any) -> int:
+    """A whole number of trials from what someone typed.
+
+    "1.000", "1,000" and "1 000" are a thousand (before, "1.000" read as 1 and
+    "1,5" as 15). A count with a fraction ("1,5", "12.5") is not a number of
+    configurations: ``ValueError``. Past float's range ``int`` raises
+    ``OverflowError``, which :func:`read_input` turns into ``error_number``."""
+    text = str(raw).strip()
+    for space in _SPACES:
+        text = text.replace(space, "")
+    if _THOUSANDS.fullmatch(text):
+        return int(re.sub(r"[.,]", "", text))
+    value = float(text.replace(",", "."))
+    if math.isfinite(value) and not value.is_integer():
+        raise ValueError("a trial count is a whole number")
+    return int(value)
 
 
 def parse_input(
@@ -69,7 +102,7 @@ def parse_input(
     try:
         sr = float(str(sharpe).replace(",", "."))
         yrs = float(str(years).replace(",", "."))
-        n = int(float(str(trials).replace(",", "").replace(" ", "")))
+        n = _trial_count(trials)
     except (TypeError, ValueError):
         return "error_number"
     if not all(math.isfinite(v) for v in (sr, yrs)):
@@ -87,6 +120,43 @@ def parse_input(
     if frequency not in SUPPORTED_PERIODS_PER_YEAR:
         return "error_frequency"
     return CalculatorInput(sharpe=sr, years=yrs, trials=n, periods_per_year=frequency)
+
+
+def read_input(
+    sharpe: str | None,
+    years: str | None,
+    trials: str | None,
+    periods_per_year: str | None = None,
+) -> CalculatorInput | str | None:
+    """``parse_input`` for values anyone can type into the address bar.
+
+    A trial count past float's range (``inf``, ``1e999``, hundreds of digits)
+    overflows ``int``: it is a bad number like any other, so the page shows
+    ``error_number`` and ``card.png`` answers 404 instead of a 500.
+    """
+    try:
+        return parse_input(sharpe, years, trials, periods_per_year)
+    except OverflowError:
+        return "error_number"
+
+
+def share_values(value: CalculatorInput) -> dict[str, str]:
+    """The validated inputs as query strings that parse back to the same numbers.
+
+    ``repr`` of a float round-trips exactly, so a shared link reproduces the
+    validated input, and "1.8" and "1.80" share one card in the cache.
+    """
+    return {
+        "sharpe": repr(value.sharpe),
+        "years": repr(value.years),
+        "trials": str(value.trials),
+        "periods_per_year": str(int(value.periods_per_year)),
+    }
+
+
+def share_url(locale: str, value: CalculatorInput) -> str:
+    """The page's own address for a result, tagged so /panel counts the shares."""
+    return calculator_url(locale) + "?" + urlencode({**share_values(value), "ref": "calculadora"})
 
 
 def compute(value: CalculatorInput) -> dict[str, Any]:
@@ -117,9 +187,9 @@ COPY: dict[str, dict[str, Any]] = {
         ),
         "form_title": "Tus números",
         "sharpe": "Sharpe anual del backtest",
-        "sharpe_help": "El que muestra tu plataforma, anualizado. Por ejemplo 1.8.",
+        "sharpe_help": "El que muestra tu plataforma, anualizado. Por ejemplo 1,8.",
         "years": "Años de historial",
-        "years_help": "Del primer al último día del backtest. Por ejemplo 3 o 0.5.",
+        "years_help": "Del primer al último día del backtest. Por ejemplo 3 o 0,5.",
         "frequency": "Frecuencia de los rendimientos",
         "frequency_help": "Usa la frecuencia de tu serie. Es una declaración, no una medición.",
         "frequency_options": {
@@ -166,9 +236,9 @@ COPY: dict[str, dict[str, Any]] = {
         "col_years": "Años necesarios",
         "not_measured": "No se puede calcular con estos números: {reason}.",
         "error_number": "Escribe los tres campos con números.",
-        "error_sharpe": "El Sharpe debe estar entre 0.05 y 10.",
-        "error_years": "Los años deben estar entre 0.1 y 50.",
-        "error_trials": "Las configuraciones deben estar entre 1 y 10,000,000.",
+        "error_sharpe": "El Sharpe debe estar entre 0,05 y 10.",
+        "error_years": "Los años deben estar entre 0,1 y 50.",
+        "error_trials": "Las configuraciones deben estar entre 1 y 10.000.000.",
         "error_frequency": "Elige una frecuencia diaria, semanal o mensual.",
         "cta_title": "Con tu archivo, las cifras son medidas",
         "cta": (
@@ -182,6 +252,21 @@ COPY: dict[str, dict[str, Any]] = {
         "sample_link": "Ver un informe de ejemplo",
         "read_more": "Lee también:",
         "reader_link": "Crear una tarjeta de cifras para compartir",
+        "share_title": "Compartir este resultado",
+        "share_text": (
+            "Mi Sharpe declarado frente a la suerte de las configuraciones probadas, calculado "
+            "con Rigor. Esta tarjeta no es una auditoría. {url}"
+        ),
+        "card_title": "Rigor · calculadora de suerte",
+        "card_limited": (
+            "Demasiadas tarjetas de la calculadora desde esta dirección. "
+            "Inténtalo de nuevo más tarde."
+        ),
+        # The reader's own notice, word for word: the link carries the figures.
+        "card_public": (
+            "El enlace compartido contiene las cifras que escribes; "
+            "cualquiera con el enlace puede leerlas."
+        ),
         "why_title": "Por qué la búsqueda importa",
         "why": [
             "Si pruebas 100 configuraciones sin ninguna ventaja real, la mejor de ellas casi "
@@ -199,8 +284,8 @@ COPY: dict[str, dict[str, Any]] = {
             "dispersión que la de tu Sharpe.",
             "Descuento de Harvey y Liu con corrección de Bonferroni; suerte esperada de Bailey "
             "y López de Prado; longitud mínima de Bailey, Borwein, López de Prado y Zhu.",
-            "No guardamos lo que escribes. Es la misma cuenta que la sección de suerte del "
-            "informe, sin tu archivo.",
+            "No guardamos lo que escribes. Es la misma fórmula que la sección de suerte del "
+            "informe; el informe usa la frecuencia real de tu archivo.",
             "Describe el pasado que declaras; no dice nada del futuro.",
         ],
     },
@@ -278,6 +363,16 @@ COPY: dict[str, dict[str, Any]] = {
         "sample_link": "See a sample report",
         "read_more": "Read next:",
         "reader_link": "Create a shareable figures card",
+        "share_title": "Share this result",
+        "share_text": (
+            "My declared Sharpe against the luck of the configurations tried, computed with "
+            "Rigor. This card is not an audit. {url}"
+        ),
+        "card_title": "Rigor · luck calculator",
+        "card_limited": "Too many calculator cards from this address. Try again later.",
+        "card_public": (
+            "The shared link contains the figures you enter; anyone with the link can read them."
+        ),
         "why_title": "Why the search matters",
         "why": [
             "Try 100 configurations with no real edge and the best of them almost always shows "
@@ -294,8 +389,8 @@ COPY: dict[str, dict[str, Any]] = {
             "Configurations are treated as independent tries with the same spread as your Sharpe.",
             "Harvey and Liu haircut with the Bonferroni correction; expected luck from Bailey "
             "and López de Prado; minimum length from Bailey, Borwein, López de Prado and Zhu.",
-            "We do not store what you type. It is the same arithmetic as the report's luck "
-            "section, without your file.",
+            "We do not store what you type. It is the same formula as the report's luck "
+            "section; the report uses your file's actual frequency.",
             "It describes the past you declare; it says nothing about the future.",
         ],
     },
@@ -309,9 +404,9 @@ COPY: dict[str, dict[str, Any]] = {
         ),
         "form_title": "Seus números",
         "sharpe": "Sharpe anual do backtest",
-        "sharpe_help": "O que a sua plataforma mostra, anualizado. Por exemplo 1.8.",
+        "sharpe_help": "O que a sua plataforma mostra, anualizado. Por exemplo 1,8.",
         "years": "Anos de histórico",
-        "years_help": "Do primeiro ao último dia do backtest. Por exemplo 3 ou 0.5.",
+        "years_help": "Do primeiro ao último dia do backtest. Por exemplo 3 ou 0,5.",
         "frequency": "Frequência dos retornos",
         "frequency_help": "Use a frequência da sua série. É uma declaração, não uma medição.",
         "frequency_options": {
@@ -358,8 +453,8 @@ COPY: dict[str, dict[str, Any]] = {
         "col_years": "Anos necessários",
         "not_measured": "Não é possível calcular com esses números: {reason}.",
         "error_number": "Preencha os três campos com números.",
-        "error_sharpe": "O Sharpe deve estar entre 0.05 e 10.",
-        "error_years": "Os anos devem estar entre 0.1 e 50.",
+        "error_sharpe": "O Sharpe deve estar entre 0,05 e 10.",
+        "error_years": "Os anos devem estar entre 0,1 e 50.",
         "error_trials": "As configurações devem estar entre 1 e 10.000.000.",
         "error_frequency": "Escolha uma frequência diária, semanal ou mensal.",
         "cta_title": "Com o seu arquivo, os números são medidos",
@@ -374,6 +469,19 @@ COPY: dict[str, dict[str, Any]] = {
         "sample_link": "Ver um relatório de exemplo",
         "read_more": "Leia também:",
         "reader_link": "Criar um cartão de números para compartilhar",
+        "share_title": "Compartilhar este resultado",
+        "share_text": (
+            "Meu Sharpe declarado contra a sorte das configurações testadas, calculado com o "
+            "Rigor. Este cartão não é uma auditoria. {url}"
+        ),
+        "card_title": "Rigor · calculadora de sorte",
+        "card_limited": (
+            "Cartões da calculadora demais a partir deste endereço. Tente novamente mais tarde."
+        ),
+        "card_public": (
+            "O link compartilhado contém os números que você informa; "
+            "qualquer pessoa com o link pode lê-los."
+        ),
         "why_title": "Por que a busca importa",
         "why": [
             "Teste 100 configurações sem nenhuma vantagem real e a melhor delas quase sempre "
@@ -391,8 +499,8 @@ COPY: dict[str, dict[str, Any]] = {
             "dispersão do seu Sharpe.",
             "Desconto de Harvey e Liu com a correção de Bonferroni; sorte esperada de Bailey "
             "e López de Prado; comprimento mínimo de Bailey, Borwein, López de Prado e Zhu.",
-            "Não guardamos o que você digita. É a mesma conta da seção de sorte do relatório, "
-            "sem o seu arquivo.",
+            "Não guardamos o que você digita. É a mesma fórmula da seção de sorte do "
+            "relatório; o relatório usa a frequência real do seu arquivo.",
             "Descreve o passado que você declara; não diz nada sobre o futuro.",
         ],
     },
@@ -424,10 +532,15 @@ def calculator_copy(locale: str, periods_per_year: float = PERIODS_PER_YEAR) -> 
 
 __all__ = [
     "CALCULATOR_PATH",
+    "CARD_FIELDS",
+    "CARD_REQUESTS_PER_HOUR",
     "COPY",
     "CalculatorInput",
     "calculator_copy",
     "calculator_url",
     "compute",
     "parse_input",
+    "read_input",
+    "share_url",
+    "share_values",
 ]

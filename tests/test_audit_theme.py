@@ -57,9 +57,24 @@ def test_static_route_serves_only_the_allow_list(tmp_path: Path) -> None:
 
 
 def test_script_never_sends_anything_anywhere() -> None:
+    """The script contacts no one: its only request is the upload form posting
+    to its own action on this origin (the in-place upload, PR 469), which the
+    CSP's ``connect-src 'self'`` also enforces. The HTML it inserts is the
+    server's own escaped answer to that post, nothing else."""
+    from quant_trade.audit.web import CONTENT_SECURITY_POLICY
+
     script = (STATIC_DIR / "app.js").read_text()
-    for word in ("fetch(", "XMLHttpRequest", "sendBeacon", "WebSocket", "eval(", "innerHTML"):
+    for word in ("XMLHttpRequest", "sendBeacon", "WebSocket", "eval(", "new Function"):
         assert word not in script, word
+    assert script.count("fetch(") == 1
+    assert "fetch(form.action, {" in script and 'credentials: "same-origin"' in script
+    assert "connect-src 'self'" in CONTENT_SECURITY_POLICY
+    assert "script-src 'self'" in CONTENT_SECURITY_POLICY
+    assert "'unsafe-inline'" not in CONTENT_SECURITY_POLICY.split("script-src", 1)[1].split(";")[0]
+    # HTML goes into the page only from that answer's two server-built fields.
+    assert script.count("innerHTML") == 1 and "fields.innerHTML = json.fields_html;" in script
+    assert script.count("insertAdjacentHTML") == 1
+    assert 'alertBox.insertAdjacentHTML("beforeend", guidance)' in script
 
 
 def test_pages_use_self_hosted_fonts_and_no_third_party() -> None:
@@ -305,16 +320,18 @@ def test_report_navigation_compacts_only_its_upload_and_document_actions() -> No
 
 def test_landing_leads_with_the_product_and_real_key_figures() -> None:
     from quant_trade.audit.audiences import RECOGNISED_PLATFORMS
-    from quant_trade.audit.pages import PLATFORMS
+    from quant_trade.audit.pages import PLATFORMS, _specs
     from quant_trade.audit.prop_presets import PRESETS
     from quant_trade.audit.redflags import FLAG_TITLES
 
     for locale in ("es", "en"):
         page = landing(locale=locale)
-        # The illustration sits under the headline and says it is synthetic.
-        assert page.index("<h1") < page.index("class='stage") < page.index("class='specs'")
+        # The illustration sits under the headline and says it is synthetic; the
+        # sample's finding comes next (the key figures left the short landing).
+        assert page.index("<h1") < page.index("class='stage") < page.index("id='ejemplo'")
         assert ("sintéticos" if locale == "es" else "synthetic") in page
-        specs = page.split("class='specs'", 1)[1].split("</div></div>", 1)[0]
+        assert "class='specs'" not in page
+        specs = _specs(locale).split("class='specs'", 1)[1].split("</div></div>", 1)[0]
         platforms = len({*PLATFORMS, *RECOGNISED_PLATFORMS} - {"CSV"})
         firm_challenges = sum(1 for rules in PRESETS.values() if rules.firm != "Generic")
         assert firm_challenges == len(PRESETS) - 1
@@ -341,8 +358,10 @@ def test_long_pages_have_an_index_that_links_every_section(tmp_path: Path) -> No
 
 
 def test_the_class_range_never_breaks_across_lines() -> None:
-    assert "A a D." in landing(locale="es")
-    assert "A to D." in landing(locale="en")
+    # The first screen's lead keeps the class range on one line too.
+    assert "A a D con" in landing(locale="es")
+    assert "A to D class" in landing(locale="en")
+    assert "A a D com" in landing(locale="pt")
     assert "@media (max-width:620px){.statement{" in STYLE
 
 
@@ -424,8 +443,11 @@ def test_prop_simulator_ranges_are_cards_and_open_losses_a_callout() -> None:
         facts = challenge.split("<div class='facts'>", 1)[1].split("</div></div>", 1)[0]
         assert facts.count("<div class='fact'>") == 2 and " – " in facts and " / " in facts
         assert facts.count('class="badge MEASURED"') == 2
-        # The break-even tile keeps one short number; the pips go in its label.
-        assert re.search(r"<b>[\d.,]+</b><span>[^<]*pips\)</span>", page)
+        # The break-even tile keeps one short number; the pips (and, from an MT5
+        # file, the money per lot and side) go in its label.
+        assert re.search(
+            r"<b>[\d.,]+</b><span>[^<]*pips; [^<]*(?:per lot|por lote)[^<]*\)</span>", page
+        )
         assert find_claims(page) == []
 
 
@@ -1237,7 +1259,8 @@ def test_both_drawdown_tiles_carry_the_same_sign() -> None:
     data = sample_result("es", bootstrap_samples=60).model_dump(mode="json")
     tiles = {label: shown for label, shown, _ in _kpi_list(data, LABELS["es"])}
     falls = [shown for label, shown in tiles.items() if label.startswith("Drawdown")]
-    assert len(falls) == 2 and all(shown.startswith("-") for shown in falls)
+    # Closed trades, the platform's with open trades (the sample's MT5 header) and p95.
+    assert len(falls) == 3 and all(shown.startswith("-") for shown in falls)
 
 
 def test_strategy_pages_read_as_cards_with_coloured_change_words(tmp_path: Path) -> None:

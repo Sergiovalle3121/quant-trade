@@ -76,6 +76,23 @@ GUIDES_COPY: dict[str, dict[str, str]] = {
         "form": "Ir al formulario",
         "back": "Volver al inicio",
         "articles": "Artículos sobre backtests",
+        "does": "Qué hace el informe con este archivo",
+        "get": "Lo que recibes",
+        "upload_this": "Subir este archivo",
+        "tool": "Herramienta gratis, sin registro:",
+        "free_terms": (
+            "Es uno por persona: si tu correo, tu navegador o tu archivo ya lo tuvieron en otra "
+            "cuenta, o si tu red agotó los del mes, la subida puede quedar en vista previa."
+        ),
+        "paid_terms": (
+            "Con una cuenta tienes hasta {n} vistas previas gratis al mes, con la clase, las "
+            "gráficas y las banderas rojas. El informe completo, con cada cifra y el PDF, es de "
+            "pago."
+        ),
+        "optimization_with_report": (
+            "Este XML no se audita solo: el informe sale del informe HTML de la prueba con la "
+            "configuración elegida, y el XML se sube junto a él (ver «{upload}»)."
+        ),
     },
     "en": {
         "title": "Guides to export your file",
@@ -94,6 +111,23 @@ GUIDES_COPY: dict[str, dict[str, str]] = {
         "form": "Go to the form",
         "back": "Back to the home page",
         "articles": "Articles about backtests",
+        "does": "What the report does with this file",
+        "get": "What you get",
+        "upload_this": "Upload this file",
+        "tool": "Free tool, no sign-up:",
+        "free_terms": (
+            "It is one per person: if your e-mail, your browser or your file already had it on "
+            "another account, or if your network has used up this month's, the upload may stay "
+            "a preview."
+        ),
+        "paid_terms": (
+            "With an account you get up to {n} free previews a month, with the class, the "
+            "charts and the red flags. The full report, with every figure and the PDF, is paid."
+        ),
+        "optimization_with_report": (
+            "This XML is not audited on its own: the report comes from the HTML report of the "
+            "test with the chosen settings, and the XML is uploaded with it (see '{upload}')."
+        ),
     },
     "pt": {
         "title": "Guias para exportar o seu arquivo",
@@ -112,6 +146,22 @@ GUIDES_COPY: dict[str, dict[str, str]] = {
         "form": "Ir ao formulário",
         "back": "Voltar ao início",
         "articles": "Artigos sobre backtests",
+        "does": "O que o relatório faz com este arquivo",
+        "get": "O que você recebe",
+        "upload_this": "Enviar este arquivo",
+        "tool": "Ferramenta grátis, sem cadastro:",
+        "free_terms": (
+            "É um por pessoa: se o seu e-mail, o seu navegador ou o seu arquivo já o tiveram em "
+            "outra conta, ou se a sua rede esgotou os do mês, o envio pode ficar como prévia."
+        ),
+        "paid_terms": (
+            "Com uma conta você tem até {n} prévias grátis por mês, com a classe, os gráficos e "
+            "os alertas. O relatório completo, com cada número e o PDF, é pago."
+        ),
+        "optimization_with_report": (
+            "Este XML não é auditado sozinho: o relatório sai do relatório HTML do teste com a "
+            "configuração escolhida, e o XML é enviado junto com ele (veja '{upload}')."
+        ),
     },
 }
 
@@ -138,6 +188,19 @@ _FLOATING_EN = (
 _FLOATING_PT = (
     "O arquivo só traz operações fechadas: o drawdown flutuante dentro de cada operação fica "
     "como NOT_MEASURED."
+)
+#: Myfxbook lists the positions still open after its closed trades.
+_FLOATING_MYFXBOOK_ES = (
+    "Salvo el bloque «Open Trades», el archivo solo trae operaciones cerradas: el drawdown "
+    "flotante dentro de cada operación queda como NOT_MEASURED."
+)
+_FLOATING_MYFXBOOK_EN = (
+    "Apart from the 'Open Trades' block, the file only holds closed trades: the floating "
+    "drawdown inside each trade is reported as NOT_MEASURED."
+)
+_FLOATING_MYFXBOOK_PT = (
+    "Fora o bloco 'Open Trades', o arquivo só traz operações fechadas: o drawdown flutuante "
+    "dentro de cada operação fica como NOT_MEASURED."
 )
 _OPT_ES = (
     "Si optimizaste parámetros, sube también el XML de optimización de MT5: el número de "
@@ -890,8 +953,9 @@ GUIDES: tuple[Guide, ...] = (
                     "Si el Portfolio tiene varias columnas (variantes de parámetros), solo se "
                     "importa la primera. Exporta la que quieres auditar, por ejemplo "
                     "pf[columna].trades.records_readable.",
-                    "Para que cuenten todas las variantes, declara el número de intentos o sube "
-                    "la matriz de variantes.",
+                    "Si el CSV trae varias variantes, todas cuentan como intentos aunque solo se "
+                    "audite la primera; si exportas una sola, declara el número de intentos. La "
+                    "matriz de variantes añade además la probabilidad de sobreajuste (PBO).",
                     _BALANCE_ES,
                     _FLOATING_ES,
                 ),
@@ -915,8 +979,10 @@ GUIDES: tuple[Guide, ...] = (
                     "If the Portfolio has several columns (parameter variants), only the first "
                     "is imported. Export the one you want audited, for example "
                     "pf[column].trades.records_readable.",
-                    "For every variant to count, declare the number of trials or upload the "
-                    "variants matrix.",
+                    "If the CSV holds several variants, they all count as trials even though "
+                    "only the first is audited; if you export just one, declare the number of "
+                    "trials. The variants matrix also adds the probability of backtest "
+                    "overfitting (PBO).",
                     _BALANCE_EN,
                     _FLOATING_EN,
                 ),
@@ -940,8 +1006,10 @@ GUIDES: tuple[Guide, ...] = (
                     "Se o Portfolio tiver várias colunas (variantes de parâmetros), só a "
                     "primeira é importada. Exporte a que você quer auditar, por exemplo "
                     "pf[column].trades.records_readable.",
-                    "Para que cada variante conte, declare o número de tentativas ou envie a "
-                    "matriz de variantes.",
+                    "Se o CSV tiver várias variantes, todas contam como tentativas, mesmo que só "
+                    "a primeira seja auditada; se você exportar só uma, declare o número de "
+                    "tentativas. A matriz de variantes acrescenta ainda a probabilidade de "
+                    "sobreajuste (PBO).",
                     _BALANCE_PT,
                     _FLOATING_PT,
                 ),
@@ -955,9 +1023,11 @@ GUIDES: tuple[Guide, ...] = (
         text={
             "es": GuideText(
                 title="Cómo exportar el historial de una cuenta de Myfxbook",
+                # The same as its steps: the holder exports it; anyone else asks for it.
                 summary=(
-                    "Descarga en CSV el historial de una cuenta de Myfxbook y súbelo para ver "
-                    "sus operaciones, depósitos y retiros con las mismas pruebas que un backtest."
+                    "Exporta en CSV el historial de una cuenta de Myfxbook (si no es tuya, "
+                    "pídeselo a su dueño) y revisa operaciones, depósitos y retiros como en un "
+                    "backtest."
                 ),
                 file=(
                     "Un .csv con las columnas Open Date, Close Date, Symbol, Action, Units/Lots, "
@@ -977,16 +1047,19 @@ GUIDES: tuple[Guide, ...] = (
                 tips=(
                     "Los depósitos y retiros del archivo se leen como movimientos de dinero: el "
                     "informe separa lo que hizo la operativa de lo que se ingresó o retiró.",
-                    "Las operaciones que siguen abiertas al final del archivo no se cuentan.",
+                    "Las posiciones que siguen abiertas al final del archivo (bloque «Open "
+                    "Trades») no se cuentan como operaciones, pero su resultado flotante sí se "
+                    "lee.",
                     "El archivo no dice la zona horaria: las horas se leen tal cual.",
-                    _FLOATING_ES,
+                    _FLOATING_MYFXBOOK_ES,
                 ),
             ),
             "en": GuideText(
                 title="How to export a Myfxbook account's history",
                 summary=(
-                    "Download a Myfxbook account's history as CSV and upload it to see its "
-                    "trades, deposits and withdrawals under the same tests as a backtest."
+                    "Export a Myfxbook account's history as CSV (if it is not yours, ask its "
+                    "owner for it) and check its trades, deposits and withdrawals as in a "
+                    "backtest."
                 ),
                 file=(
                     "A .csv with the columns Open Date, Close Date, Symbol, Action, Units/Lots, "
@@ -1006,17 +1079,17 @@ GUIDES: tuple[Guide, ...] = (
                 tips=(
                     "The file's deposits and withdrawals are read as money movements: the "
                     "report separates what the trading did from what was paid in or out.",
-                    "Trades still open at the end of the file are not counted.",
+                    "Positions still open at the end of the file (the 'Open Trades' block) are "
+                    "not counted as trades, but their floating result is read.",
                     "The file states no time zone: times are read as they are.",
-                    _FLOATING_EN,
+                    _FLOATING_MYFXBOOK_EN,
                 ),
             ),
             "pt": GuideText(
                 title="Como exportar o histórico de uma conta do Myfxbook",
                 summary=(
-                    "Baixe o histórico de uma conta do Myfxbook em CSV e envie para ver as "
-                    "operações, depósitos e saques dela sob os mesmos testes de um "
-                    "backtest."
+                    "Exporte em CSV o histórico de uma conta do Myfxbook (se não for sua, peça "
+                    "ao titular) e revise operações, depósitos e saques como num backtest."
                 ),
                 file=(
                     "Um .csv com as colunas Open Date, Close Date, Symbol, Action, "
@@ -1036,9 +1109,10 @@ GUIDES: tuple[Guide, ...] = (
                 tips=(
                     "Os depósitos e saques do arquivo são lidos como movimentos de dinheiro: o "
                     "relatório separa o que as operações fizeram do que entrou ou saiu.",
-                    "Operações ainda abertas no final do arquivo não são contadas.",
+                    "Posições ainda abertas no final do arquivo (bloco 'Open Trades') não são "
+                    "contadas como operações, mas o resultado flutuante delas é lido.",
                     "O arquivo não informa fuso horário: os horários são lidos como estão.",
-                    _FLOATING_PT,
+                    _FLOATING_MYFXBOOK_PT,
                 ),
             ),
         },

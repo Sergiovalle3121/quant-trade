@@ -14,7 +14,36 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
+from urllib.parse import urlencode
 
+from quant_trade.audit import winrate
+from quant_trade.audit.analytics import DEFAULT_BLOCK_SIZE, DRAWDOWN_THRESHOLDS
+from quant_trade.audit.article_numbers import (
+    MC_DEEP_THRESHOLD,
+    MC_REFERENCE_DAYS,
+    MC_REFERENCE_RISK,
+    MC_REFERENCE_SEED,
+    MC_RISK,
+    MC_RISK_SEED,
+    MC_SEARCH_DAYS,
+    MC_SEARCH_RISK,
+    MC_SEARCH_SEED,
+    MC_SEARCH_SERIES,
+    MC_SERIES_DAYS,
+    MC_SERIES_MEAN,
+    MC_SERIES_SD,
+    MC_SERIES_SEED,
+    MC_SHUFFLE,
+    MC_SHUFFLE_SEED,
+    MC_THRESHOLD,
+    STREAK_EXAMPLE,
+    STREAK_MEDIAN,
+    STREAK_RARE,
+    STREAK_RISKS,
+    STREAK_TRADE_COUNTS,
+    STREAK_WIN_RATES,
+    streak_for,
+)
 from quant_trade.audit.audiences import AUDIENCE_PAGES, audience_url
 from quant_trade.audit.calculator import CALCULATOR_PATH, PERIODS_PER_YEAR, CalculatorInput, compute
 from quant_trade.audit.calculator import COPY as CALCULATOR_COPY
@@ -23,7 +52,7 @@ from quant_trade.audit.examples import EXAMPLES_COPY, EXAMPLES_PATH
 from quant_trade.audit.guides import GUIDES_BY_SLUG, guide_url
 from quant_trade.audit.method import COPY as METHOD_COPY
 from quant_trade.audit.method import METHOD_PATH
-from quant_trade.audit.public_card import _wilson
+from quant_trade.audit.public_card import _num, _pct, _wilson
 from quant_trade.audit.reading import COPY as READING_COPY
 from quant_trade.audit.reading import READING_PATH, reading_url
 from quant_trade.audit.retail_numbers import (
@@ -38,25 +67,30 @@ from quant_trade.audit.retail_numbers import (
     PROP_WIN_RATES,
     SIGNAL_DECLARED_WIN_RATE,
 )
+from quant_trade.audit.streaks import CLUSTERED, EXACT_MAX_TRADES, MIN_TRADES
 from quant_trade.core.models import Trade
 
 LOCALES: tuple[str, ...] = ("es", "en", "pt")
 
 #: The pages an article may point to: the free calculator, an export guide
 #: (by its Spanish slug), an audience page (by its Spanish slug), another article
-#: (by its stable key) or the method.
+#: (by its stable key), the method, the win-rate calculator or the sample report
+#: (``sample``, the full report on synthetic data; ``samples`` is the page of
+#: public figures).
 RELATED_KINDS: frozenset[str] = frozenset(
-    {"calculator", "guide", "audience", "method", "contact", "samples", "reading", "article"}
+    {
+        "calculator",
+        "guide",
+        "audience",
+        "method",
+        "contact",
+        "samples",
+        "sample",
+        "reading",
+        "article",
+        "winrate",
+    }
 )
-
-
-_SWAP_SEPARATORS = str.maketrans({",": ".", ".": ","})
-
-
-def _num(value: float, locale: str, decimals: int) -> str:
-    """An editorial number with the language's separators: 1,000.5 in en, 1.000,5 in es/pt."""
-    formatted = f"{value:,.{decimals}f}"
-    return formatted if locale == "en" else formatted.translate(_SWAP_SEPARATORS)
 
 
 #: Illustrative declarations, never measurements of a client's file. The same
@@ -70,7 +104,7 @@ LUCK_TABLE_INPUTS = tuple(
 _EXAMPLE_LUCK = compute(LUCK_EXAMPLE_INPUT)["luck_sharpe"]["value"]
 INDEPENDENT_LUCK_EXAMPLE = {
     "es": (
-        f"DECLARED · Supongamos {LUCK_EXAMPLE_INPUT.trials} variantes independientes y "
+        f"Supongamos {LUCK_EXAMPLE_INPUT.trials} variantes independientes y "
         f"{LUCK_EXAMPLE_INPUT.years:g} años de rendimientos diarios, con "
         f"{PERIODS_PER_YEAR:g} periodos al año y un Sharpe anual declarado de "
         f"{_num(LUCK_EXAMPLE_INPUT.sharpe, 'es', 1)}. La calculadora sitúa el Sharpe esperado "
@@ -79,7 +113,7 @@ INDEPENDENT_LUCK_EXAMPLE = {
         "asimetría nula y colas normales, no una medición de una cartera."
     ),
     "en": (
-        f"DECLARED · Assume {LUCK_EXAMPLE_INPUT.trials} independent variants and "
+        f"Assume {LUCK_EXAMPLE_INPUT.trials} independent variants and "
         f"{LUCK_EXAMPLE_INPUT.years:g} years of daily returns, with "
         f"{PERIODS_PER_YEAR:g} periods per year and a declared annual Sharpe of "
         f"{_num(LUCK_EXAMPLE_INPUT.sharpe, 'en', 1)}. The calculator puts the expected Sharpe "
@@ -88,7 +122,7 @@ INDEPENDENT_LUCK_EXAMPLE = {
         "normal tails; it is not a measurement of a portfolio."
     ),
     "pt": (
-        f"DECLARED · Suponha {LUCK_EXAMPLE_INPUT.trials} variantes independentes e "
+        f"Suponha {LUCK_EXAMPLE_INPUT.trials} variantes independentes e "
         f"{LUCK_EXAMPLE_INPUT.years:g} anos de retornos diários, com "
         f"{PERIODS_PER_YEAR:g} períodos por ano e Sharpe anual declarado de "
         f"{_num(LUCK_EXAMPLE_INPUT.sharpe, 'pt', 1)}. A calculadora situa o Sharpe esperado "
@@ -178,6 +212,376 @@ _COST_EXAMPLE_BPS = break_even_bps([COST_EXAMPLE_TRADE], ["long"], reported_cost
 assert _COST_EXAMPLE_BPS is not None
 
 
+def _whole_pct(value: float, locale: str) -> str:
+    """A declared rate written as a whole percentage: 45 %."""
+    return f"{_num(value * 100, locale, 0)} %"
+
+
+def _stake_pct(value: float, locale: str) -> str:
+    """A declared stake or its sum with one decimal: 0,5 % in es and pt, 0.5 % in en."""
+    return f"{_num(value * 100, locale, 1)} %"
+
+
+#: The Monte Carlo article's worked figures. Every number is computed in
+#: ``article_numbers`` with ``analytics.shuffled_drawdown`` and
+#: ``analytics.drawdown_risk`` on synthetic series fixed by their seeds.
+MONTE_CARLO_ARTICLE_KEY = "monte-carlo-backtest"
+_MC_DAYS = {locale: _num(MC_SERIES_DAYS, locale, 0) for locale in LOCALES}
+_MC_MEAN = {locale: _num(MC_SERIES_MEAN * 100, locale, 2) for locale in LOCALES}
+_MC_SD = {locale: _num(MC_SERIES_SD * 100, locale, 0) for locale in LOCALES}
+_MC_LEVEL = {locale: _whole_pct(MC_THRESHOLD, locale) for locale in LOCALES}
+_MC_DEEP = {locale: _whole_pct(MC_DEEP_THRESHOLD, locale) for locale in LOCALES}
+
+
+def _mc(locale: str, value: float) -> str:
+    return _pct(value, locale)
+
+
+MONTE_CARLO_EXAMPLE: dict[str, tuple[str, str, str]] = {
+    "es": (
+        f"Una serie sintética de {_MC_DAYS['es']} rendimientos diarios, generada con "
+        f"NumPy con semilla {MC_SERIES_SEED}, media de {_MC_MEAN['es']} % y desviación de "
+        f"{_MC_SD['es']} % al día. En el orden generado, su caída máxima es de "
+        f"{_mc('es', MC_SHUFFLE.observed)}. Con shuffled_drawdown, "
+        f"{_num(MC_SHUFFLE.samples, 'es', 0)} órdenes al azar de los mismos rendimientos con "
+        f"semilla {MC_SHUFFLE_SEED}, la peor caída va de {_mc('es', MC_SHUFFLE.low)} a "
+        f"{_mc('es', MC_SHUFFLE.high)} en 9 de cada 10 órdenes, con una mediana de "
+        f"{_mc('es', MC_SHUFFLE.median)}.",
+        f"Con drawdown_risk, el bootstrap estacionario del informe "
+        f"({_num(MC_RISK.samples, 'es', 0)} historias de {_num(MC_RISK.horizon, 'es', 0)} días, "
+        f"bloque esperado de {_num(MC_RISK.block, 'es', 0)} días y semilla {MC_RISK_SEED}), la "
+        f"caída máxima a un año tiene una mediana de {_mc('es', MC_RISK.median)} y llega a "
+        f"{_mc('es', MC_RISK.p95)} en 1 de cada 20 historias. El "
+        f"{_mc('es', MC_RISK.at_least)} de las historias cae al menos un {_MC_LEVEL['es']} y el "
+        f"{_mc('es', MC_RISK.at_least_deep)}, al menos un {_MC_DEEP['es']}.",
+        f"Las dos cifras miden cosas distintas: la primera recorre los {_MC_DAYS['es']} días de "
+        "la serie; la segunda, un año. Ninguna es una medición de una estrategia ni una "
+        "previsión. El código del artículo fija la semilla y los parámetros, así que el mismo "
+        "cálculo da siempre estas cifras.",
+    ),
+    "en": (
+        f"A synthetic series of {_MC_DAYS['en']} daily returns, drawn with NumPy from "
+        f"seed {MC_SERIES_SEED}, with a mean of {_MC_MEAN['en']} % and a standard deviation of "
+        f"{_MC_SD['en']} % a day. In the order drawn, its maximum drawdown is "
+        f"{_mc('en', MC_SHUFFLE.observed)}. With shuffled_drawdown, "
+        f"{_num(MC_SHUFFLE.samples, 'en', 0)} random orders of the same returns from seed "
+        f"{MC_SHUFFLE_SEED}, the worst fall runs from {_mc('en', MC_SHUFFLE.low)} to "
+        f"{_mc('en', MC_SHUFFLE.high)} in 9 orders out of 10, with a median of "
+        f"{_mc('en', MC_SHUFFLE.median)}.",
+        f"With drawdown_risk, the report's stationary bootstrap "
+        f"({_num(MC_RISK.samples, 'en', 0)} histories of {_num(MC_RISK.horizon, 'en', 0)} days, "
+        f"an expected block of {_num(MC_RISK.block, 'en', 0)} days and seed {MC_RISK_SEED}), the "
+        f"one-year maximum drawdown has a median of {_mc('en', MC_RISK.median)} and reaches "
+        f"{_mc('en', MC_RISK.p95)} in 1 history in 20. In all, "
+        f"{_mc('en', MC_RISK.at_least)} of the histories fall at least {_MC_LEVEL['en']} and "
+        f"{_mc('en', MC_RISK.at_least_deep)} at least {_MC_DEEP['en']}.",
+        f"The two figures measure different things: the first covers the series' "
+        f"{_MC_DAYS['en']} days; the second, one year. Neither is a measurement of a strategy "
+        "or a forecast. The article's code fixes the seed and the parameters, so the same "
+        "calculation always gives these figures.",
+    ),
+    "pt": (
+        f"Uma série sintética de {_MC_DAYS['pt']} retornos diários, gerada com NumPy "
+        f"com semente {MC_SERIES_SEED}, média de {_MC_MEAN['pt']} % e desvio de "
+        f"{_MC_SD['pt']} % ao dia. Na ordem gerada, sua queda máxima é de "
+        f"{_mc('pt', MC_SHUFFLE.observed)}. Com shuffled_drawdown, "
+        f"{_num(MC_SHUFFLE.samples, 'pt', 0)} ordens aleatórias dos mesmos retornos com "
+        f"semente {MC_SHUFFLE_SEED}, a pior queda vai de {_mc('pt', MC_SHUFFLE.low)} a "
+        f"{_mc('pt', MC_SHUFFLE.high)} em 9 de cada 10 ordens, com mediana de "
+        f"{_mc('pt', MC_SHUFFLE.median)}.",
+        f"Com drawdown_risk, o bootstrap estacionário do relatório "
+        f"({_num(MC_RISK.samples, 'pt', 0)} históricos de {_num(MC_RISK.horizon, 'pt', 0)} "
+        f"dias, bloco esperado de {_num(MC_RISK.block, 'pt', 0)} dias e semente "
+        f"{MC_RISK_SEED}), a queda máxima em um ano tem mediana de {_mc('pt', MC_RISK.median)} "
+        f"e chega a {_mc('pt', MC_RISK.p95)} em 1 em cada 20 históricos. Ao todo, "
+        f"{_mc('pt', MC_RISK.at_least)} dos históricos caem pelo menos {_MC_LEVEL['pt']} e "
+        f"{_mc('pt', MC_RISK.at_least_deep)}, pelo menos {_MC_DEEP['pt']}.",
+        f"Os dois números medem coisas diferentes: o primeiro percorre os {_MC_DAYS['pt']} dias "
+        "da série; o segundo, um ano. Nenhum é uma medição de uma estratégia nem uma previsão. "
+        "O código do artigo fixa a semente e os parâmetros, então o mesmo cálculo sempre dá "
+        "esses números.",
+    ),
+}
+
+MONTE_CARLO_SEARCH_EXAMPLE: dict[str, str] = {
+    "es": (
+        f"Generamos {MC_SEARCH_SERIES} series sintéticas de {MC_SEARCH_DAYS} "
+        f"rendimientos diarios con media cero y desviación de {_MC_SD['es']} % (semilla "
+        f"{MC_SEARCH_SEED}) y nos quedamos con la de mayor resultado final. Con drawdown_risk y "
+        "los mismos parámetros, su caída máxima a un año tiene una mediana de "
+        f"{_mc('es', MC_SEARCH_RISK.median)} y el {_mc('es', MC_SEARCH_RISK.at_least)} de las "
+        f"historias cae al menos un {_MC_LEVEL['es']}. Otros "
+        f"{_num(MC_REFERENCE_DAYS, 'es', 0)} días del mismo generador (semilla "
+        f"{MC_REFERENCE_SEED}) dan una mediana de {_mc('es', MC_REFERENCE_RISK.median)} y un "
+        f"{_mc('es', MC_REFERENCE_RISK.at_least)} de historias con una caída de al menos un "
+        f"{_MC_LEVEL['es']}. Ninguna serie tenía ventaja: la diferencia la pone la selección."
+    ),
+    "en": (
+        f"We drew {MC_SEARCH_SERIES} synthetic series of {MC_SEARCH_DAYS} daily "
+        f"returns with zero mean and a standard deviation of {_MC_SD['en']} % (seed "
+        f"{MC_SEARCH_SEED}) and kept the one with the highest final result. With drawdown_risk "
+        "and the same parameters, its one-year maximum drawdown has a median of "
+        f"{_mc('en', MC_SEARCH_RISK.median)}, and {_mc('en', MC_SEARCH_RISK.at_least)} of the "
+        f"histories fall at least {_MC_LEVEL['en']}. Another "
+        f"{_num(MC_REFERENCE_DAYS, 'en', 0)} days from the same generator (seed "
+        f"{MC_REFERENCE_SEED}) give a median of {_mc('en', MC_REFERENCE_RISK.median)}, with "
+        f"{_mc('en', MC_REFERENCE_RISK.at_least)} of histories falling at least "
+        f"{_MC_LEVEL['en']}. No series had an edge: the difference comes from the selection."
+    ),
+    "pt": (
+        f"Geramos {MC_SEARCH_SERIES} séries sintéticas de {MC_SEARCH_DAYS} retornos "
+        f"diários com média zero e desvio de {_MC_SD['pt']} % (semente {MC_SEARCH_SEED}) e "
+        "ficamos com a de maior resultado final. Com drawdown_risk e os mesmos parâmetros, sua "
+        f"queda máxima em um ano tem mediana de {_mc('pt', MC_SEARCH_RISK.median)}, e "
+        f"{_mc('pt', MC_SEARCH_RISK.at_least)} dos históricos caem pelo menos "
+        f"{_MC_LEVEL['pt']}. Outros {_num(MC_REFERENCE_DAYS, 'pt', 0)} dias do mesmo gerador "
+        f"(semente {MC_REFERENCE_SEED}) dão mediana de {_mc('pt', MC_REFERENCE_RISK.median)}, "
+        f"com {_mc('pt', MC_REFERENCE_RISK.at_least)} dos históricos caindo pelo menos "
+        f"{_MC_LEVEL['pt']}. Nenhuma série tinha vantagem: a diferença vem da seleção."
+    ),
+}
+
+
+def _threshold_list(locale: str) -> str:
+    """The report's drawdown thresholds as a phrase: 10, 20, 30 o 50 %."""
+    values = [_num(t * 100, locale, 0) for t in DRAWDOWN_THRESHOLDS]
+    word = {"es": "o", "en": "or", "pt": "ou"}[locale]
+    return f"{', '.join(values[:-1])} {word} {values[-1]} %"
+
+
+_BLOCK = {locale: _num(DEFAULT_BLOCK_SIZE, locale, 0) for locale in LOCALES}
+
+#: What the report computes, named after the engine's functions.
+MONTE_CARLO_REPORT: dict[str, str] = {
+    "es": (
+        "El informe llama a esto riesgo remuestreado a un año. La función drawdown_risk arma "
+        "miles de historias de un año con bloques de los rendimientos de tu archivo, con un "
+        f"bootstrap estacionario cuyo bloque esperado parte de {_BLOCK['es']} periodos y se "
+        "alarga cuando los rendimientos se agrupan. Muestra la caída máxima mediana, la de 1 de "
+        "cada 20 y la de 1 de cada 100, la probabilidad de caer al menos un "
+        f"{_threshold_list('es')} y los periodos seguidos bajo el máximo. La semilla es fija y "
+        "el informe la imprime."
+    ),
+    "en": (
+        "The report calls this resampled one-year risk. The drawdown_risk function builds "
+        "thousands of one-year histories from blocks of your file's returns, with a stationary "
+        f"bootstrap whose expected block starts at {_BLOCK['en']} periods and grows when "
+        "returns cluster. It shows the median maximum drawdown, the one reached 1 time in 20 "
+        f"and 1 time in 100, the probability of falling at least {_threshold_list('en')} and "
+        "the consecutive periods below the peak. The seed is fixed and the report prints it."
+    ),
+    "pt": (
+        "O relatório chama isso de risco reamostrado em um ano. A função drawdown_risk monta "
+        "milhares de históricos de um ano com blocos dos retornos do seu arquivo, com um "
+        f"bootstrap estacionário cujo bloco esperado parte de {_BLOCK['pt']} períodos e aumenta "
+        "quando os retornos se agrupam. Mostra a queda máxima mediana, a de 1 em cada 20 e a "
+        f"de 1 em cada 100, a probabilidade de cair pelo menos {_threshold_list('pt')} e os "
+        "períodos seguidos abaixo do máximo. A semente é fixa e o relatório a imprime."
+    ),
+}
+
+#: The losing-streak article: the table's words, the section it follows (by its
+#: title in each language) and the paragraphs that read figures out of it.
+#: Every number comes from ``article_numbers`` (``streaks.longest_run_tail``).
+STREAK_ARTICLE_KEY = "rachas-perdedoras"
+STREAK_TABLE_AFTER: dict[str, str] = {
+    "es": "Cómo se calculó la tabla",
+    "en": "How the table was calculated",
+    "pt": "Como a tabela foi calculada",
+}
+_ONE_IN = round(1 / STREAK_RARE)
+_CLUSTERED_ONE_IN = round(1 / CLUSTERED)
+STREAK_TABLE_COPY: dict[str, tuple[str, str, str, str, str, str]] = {
+    "es": (
+        "Tabla: racha perdedora más larga por azar",
+        "Aciertos",
+        "Operaciones",
+        "Racha mediana",
+        f"Racha de 1 de cada {_ONE_IN}",
+        "DECLARED · Calculado con longest_run_tail del motor de Rigor: operaciones "
+        "independientes y la misma probabilidad de perder en cada una. Entradas ilustrativas; "
+        "no son mediciones de un archivo.",
+    ),
+    "en": (
+        "Table: longest losing streak from chance",
+        "Win rate",
+        "Trades",
+        "Median streak",
+        f"1-in-{_ONE_IN} streak",
+        "DECLARED · Calculated with longest_run_tail from Rigor's engine: independent trades "
+        "with the same probability of losing on each. Illustrative inputs; these are not file "
+        "measurements.",
+    ),
+    "pt": (
+        "Tabela: maior sequência de perdas por acaso",
+        "Acerto",
+        "Operações",
+        "Sequência mediana",
+        f"Sequência de 1 em cada {_ONE_IN}",
+        "DECLARED · Calculado com longest_run_tail do motor do Rigor: operações independentes "
+        "e a mesma probabilidade de perder em cada uma. Entradas ilustrativas; não são "
+        "medições de um arquivo.",
+    ),
+}
+
+_STREAK = streak_for(*STREAK_EXAMPLE)
+_STREAK_HIGH = streak_for(STREAK_WIN_RATES[-1], STREAK_EXAMPLE[1])
+_STREAK_LOW = streak_for(STREAK_WIN_RATES[0], STREAK_EXAMPLE[1])
+_STREAK_SHORT = streak_for(STREAK_EXAMPLE[0], STREAK_TRADE_COUNTS[0])
+_STREAK_LONG = streak_for(STREAK_EXAMPLE[0], STREAK_TRADE_COUNTS[-1])
+
+
+def _rate(row_rate: float, locale: str) -> str:
+    return _whole_pct(row_rate, locale)
+
+
+STREAK_METHOD: dict[str, str] = {
+    "es": (
+        "Supuesto: operaciones independientes y la misma probabilidad de perder en "
+        "cada una, igual a uno menos el porcentaje de aciertos. La función longest_run_tail del "
+        "motor de Rigor calcula de forma exacta, con la recurrencia de Feller, la probabilidad "
+        "de que la racha perdedora más larga llegue al menos a cada longitud. La racha mediana "
+        "es la mayor longitud con probabilidad de al menos "
+        f"{_num(STREAK_MEDIAN, 'es', 1)}; la de 1 de cada {_ONE_IN}, la mayor con probabilidad "
+        f"de al menos {_num(STREAK_RARE, 'es', 2)}."
+    ),
+    "en": (
+        "Assumption: independent trades with the same probability of losing on "
+        "each, equal to one minus the win rate. The longest_run_tail function in Rigor's "
+        "engine computes exactly, with Feller's recurrence, the probability that the longest "
+        "losing streak reaches at least each length. The median streak is the longest length "
+        f"with a probability of at least {_num(STREAK_MEDIAN, 'en', 1)}; the 1-in-{_ONE_IN} "
+        f"streak, the longest with a probability of at least {_num(STREAK_RARE, 'en', 2)}."
+    ),
+    "pt": (
+        "Suposição: operações independentes e a mesma probabilidade de perder em "
+        "cada uma, igual a um menos a taxa de acerto. A função longest_run_tail do motor do "
+        "Rigor calcula de forma exata, com a recorrência de Feller, a probabilidade de a maior "
+        "sequência de perdas chegar pelo menos a cada comprimento. A sequência mediana é o "
+        f"maior comprimento com probabilidade de pelo menos {_num(STREAK_MEDIAN, 'pt', 1)}; a "
+        f"de 1 em cada {_ONE_IN}, o maior com probabilidade de pelo menos "
+        f"{_num(STREAK_RARE, 'pt', 2)}."
+    ),
+}
+
+STREAK_READING: dict[str, str] = {
+    "es": (
+        f"Con {_rate(_STREAK.win_rate, 'es')} de aciertos y {_STREAK.trades} "
+        f"operaciones, la racha más larga llega a {_STREAK.median_run} pérdidas en al menos la "
+        f"mitad de los historiales y a {_STREAK.rare_run} en al menos 1 de cada {_ONE_IN}: en "
+        f"el {_pct(_STREAK.rare_chance, 'es')} de ellos. Con "
+        f"{_rate(_STREAK_HIGH.win_rate, 'es')} de aciertos y las mismas operaciones, las cifras "
+        f"son {_STREAK_HIGH.median_run} y {_STREAK_HIGH.rare_run}; con "
+        f"{_rate(_STREAK_LOW.win_rate, 'es')}, {_STREAK_LOW.median_run} y "
+        f"{_STREAK_LOW.rare_run}. Con {_rate(_STREAK.win_rate, 'es')} de aciertos, pasar de "
+        f"{_STREAK_SHORT.trades} a {_STREAK_LONG.trades} operaciones lleva la racha mediana de "
+        f"{_STREAK_SHORT.median_run} a {_STREAK_LONG.median_run}."
+    ),
+    "en": (
+        f"At a {_rate(_STREAK.win_rate, 'en')} win rate and {_STREAK.trades} "
+        f"trades, the longest streak reaches {_STREAK.median_run} losses in at least half of "
+        f"the histories and {_STREAK.rare_run} in at least 1 history in {_ONE_IN}: in "
+        f"{_pct(_STREAK.rare_chance, 'en')} of them. At "
+        f"{_rate(_STREAK_HIGH.win_rate, 'en')} and the same trades, the figures are "
+        f"{_STREAK_HIGH.median_run} and {_STREAK_HIGH.rare_run}; at "
+        f"{_rate(_STREAK_LOW.win_rate, 'en')}, {_STREAK_LOW.median_run} and "
+        f"{_STREAK_LOW.rare_run}. At a {_rate(_STREAK.win_rate, 'en')} win rate, going from "
+        f"{_STREAK_SHORT.trades} to {_STREAK_LONG.trades} trades moves the median streak from "
+        f"{_STREAK_SHORT.median_run} to {_STREAK_LONG.median_run}."
+    ),
+    "pt": (
+        f"Com {_rate(_STREAK.win_rate, 'pt')} de acerto e {_STREAK.trades} "
+        f"operações, a maior sequência chega a {_STREAK.median_run} perdas em pelo menos "
+        f"metade dos históricos e a {_STREAK.rare_run} em pelo menos 1 em cada {_ONE_IN}: em "
+        f"{_pct(_STREAK.rare_chance, 'pt')} deles. Com "
+        f"{_rate(_STREAK_HIGH.win_rate, 'pt')} de acerto e as mesmas operações, os números são "
+        f"{_STREAK_HIGH.median_run} e {_STREAK_HIGH.rare_run}; com "
+        f"{_rate(_STREAK_LOW.win_rate, 'pt')}, {_STREAK_LOW.median_run} e "
+        f"{_STREAK_LOW.rare_run}. Com {_rate(_STREAK.win_rate, 'pt')} de acerto, passar de "
+        f"{_STREAK_SHORT.trades} para {_STREAK_LONG.trades} operações leva a sequência mediana "
+        f"de {_STREAK_SHORT.median_run} para {_STREAK_LONG.median_run}."
+    ),
+}
+
+#: A fixed loss per trade against the initial balance: k losses take k stakes.
+_SMALL, _LARGE = sorted(STREAK_RISKS)
+STREAK_STAKES: dict[str, str] = {
+    "es": (
+        f"Con un riesgo de {_stake_pct(_LARGE, 'es')} por operación, la racha de 1 "
+        f"de cada {_ONE_IN} de la fila de {_rate(_STREAK.win_rate, 'es')} y {_STREAK.trades} "
+        f"operaciones resta {_stake_pct(_STREAK.rare_run * _LARGE, 'es')} del saldo inicial; "
+        f"con {_stake_pct(_SMALL, 'es')}, resta {_stake_pct(_STREAK.rare_run * _SMALL, 'es')}. "
+        "Si el límite total de tu reto queda por debajo de esa cifra, una racha que el azar da "
+        f"en el {_pct(_STREAK.rare_chance, 'es')} de los historiales termina el intento."
+    ),
+    "en": (
+        f"At a risk of {_stake_pct(_LARGE, 'en')} per trade, the 1-in-{_ONE_IN} "
+        f"streak of the {_rate(_STREAK.win_rate, 'en')} and {_STREAK.trades}-trade row takes "
+        f"{_stake_pct(_STREAK.rare_run * _LARGE, 'en')} of the initial balance; at "
+        f"{_stake_pct(_SMALL, 'en')}, it takes {_stake_pct(_STREAK.rare_run * _SMALL, 'en')}. "
+        "If your challenge's total limit is below that figure, a streak that chance gives in "
+        f"{_pct(_STREAK.rare_chance, 'en')} of histories ends the attempt."
+    ),
+    "pt": (
+        f"Com risco de {_stake_pct(_LARGE, 'pt')} por operação, a sequência de 1 em "
+        f"cada {_ONE_IN} da linha de {_rate(_STREAK.win_rate, 'pt')} e {_STREAK.trades} "
+        f"operações tira {_stake_pct(_STREAK.rare_run * _LARGE, 'pt')} do saldo inicial; com "
+        f"{_stake_pct(_SMALL, 'pt')}, tira {_stake_pct(_STREAK.rare_run * _SMALL, 'pt')}. Se o "
+        "limite total do seu desafio fica abaixo desse número, uma sequência que o acaso dá em "
+        f"{_pct(_STREAK.rare_chance, 'pt')} dos históricos encerra a tentativa."
+    ),
+}
+
+#: What ``streaks.loss_streak_review`` reports, with its own limits.
+STREAK_REPORT: dict[str, tuple[str, str]] = {
+    "es": (
+        "Con un historial de operaciones cerradas, el informe compara tu racha perdedora más "
+        "larga con la que da el azar con tu propia proporción de pérdidas. Hasta "
+        f"{_num(EXACT_MAX_TRADES, 'es', 0)} operaciones, la función loss_streak_review usa de "
+        "forma exacta tus mismas operaciones en orden al azar: reparte tus pérdidas entre todas "
+        "las posiciones posibles. Por encima, usa la recurrencia de la tabla. Muestra la racha "
+        f"máxima normal por azar, la de 1 de cada {_ONE_IN} y la probabilidad de una racha al "
+        "menos tan larga como la tuya.",
+        f"Si esa probabilidad queda por debajo de 1 de cada {_CLUSTERED_ONE_IN}, el informe "
+        "avisa de que las perdedoras llegaron más juntas de lo que explica el azar, algo que "
+        "suele indicar pérdidas que dependen del tipo de mercado o posiciones abiertas a la "
+        f"vez. Hacen falta al menos {MIN_TRADES} operaciones cerradas, con perdedoras y no "
+        "perdedoras; si no, la cifra queda como NOT_MEASURED. Nada de esto cambia la clase ni "
+        "anticipa la próxima racha.",
+    ),
+    "en": (
+        "With a history of closed trades, the report compares your longest losing streak with "
+        "the one chance gives at your own share of losses. Up to "
+        f"{_num(EXACT_MAX_TRADES, 'en', 0)} trades, the loss_streak_review function uses your "
+        "same trades in random order, exactly: it spreads your losses over every possible "
+        "position. Above that, it uses the table's recurrence. It shows the typical longest "
+        f"losing run by chance, the 1-in-{_ONE_IN} one and the chance of a streak at least as "
+        "long as yours.",
+        f"If that chance falls below 1 in {_CLUSTERED_ONE_IN}, the report notes that the "
+        "losing trades came closer together than chance explains, which often points to "
+        "losses that depend on the type of market or to positions open at the same time. It "
+        f"needs at least {MIN_TRADES} closed trades, with losing and non-losing ones; "
+        "otherwise the figure stays NOT_MEASURED. None of this changes the class or "
+        "anticipates the next streak.",
+    ),
+    "pt": (
+        "Com um histórico de operações fechadas, o relatório compara a sua maior sequência de "
+        "perdas com a que o acaso dá com a sua própria proporção de perdas. Até "
+        f"{_num(EXACT_MAX_TRADES, 'pt', 0)} operações, a função loss_streak_review usa de "
+        "forma exata as suas mesmas operações em ordem aleatória: distribui as suas perdas "
+        "entre todas as posições possíveis. Acima disso, usa a recorrência da tabela. Mostra a "
+        f"maior sequência normal por acaso, a de 1 em cada {_ONE_IN} e a probabilidade de uma "
+        "sequência pelo menos tão longa quanto a sua.",
+        f"Se essa probabilidade fica abaixo de 1 em cada {_CLUSTERED_ONE_IN}, o relatório avisa "
+        "que as perdedoras chegaram mais juntas do que o acaso explica, o que costuma indicar "
+        "perdas que dependem do tipo de mercado ou posições abertas ao mesmo tempo. São "
+        f"necessárias pelo menos {MIN_TRADES} operações fechadas, com perdedoras e não "
+        "perdedoras; senão, o número fica como NOT_MEASURED. Nada disso muda a classe nem "
+        "antecipa a próxima sequência.",
+    ),
+}
+
+
 #: Editorial dates, not generated at request time. Existing prose was published
 #: on 2026-10-05; the institutional articles are dated to this brief.
 ARTICLE_PUBLICATION_DATES = {
@@ -193,6 +597,8 @@ ARTICLE_PUBLICATION_DATES = {
     "que-hacer-despues-del-backtest": "2026-10-08",
     "cuantas-operaciones-porcentaje-aciertos": "2026-10-08",
     "lo-eligio-el-optimizador": "2026-10-08",
+    "monte-carlo-backtest": "2026-10-08",
+    "rachas-perdedoras": "2026-10-08",
 }
 
 
@@ -225,6 +631,8 @@ class Article:
     text: dict[str, ArticleText]
     #: Links shown under the article, see ``RELATED_KINDS``.
     related: tuple[dict[str, str], ...]
+    #: The article's own next step, see ``ARTICLE_NEXT_STEPS``.
+    next_step: tuple[dict[str, str], ...] = ()
 
     def slug_for(self, locale: str) -> str:
         return self.slug.get(locale, self.slug["es"])
@@ -263,25 +671,41 @@ class Article:
                 raise ValueError(f"article {data['key']}: unknown audience page {link!r}")
             if link["kind"] == "article" and link.get("key") not in article_keys:
                 raise ValueError(f"article {data['key']}: unknown article {link!r}")
+        next_step = tuple(
+            {str(k): str(v) for k, v in step.items()}
+            for step in ARTICLE_NEXT_STEPS.get(str(data["key"]), DEFAULT_NEXT_STEP)
+        )
+        for step in next_step:
+            kind = step.get("kind")
+            if kind not in NEXT_STEP_KINDS:
+                raise ValueError(f"article {data['key']}: unknown next step {step!r}")
+            if kind == "guide" and step.get("slug") not in GUIDES_BY_SLUG:
+                raise ValueError(f"article {data['key']}: unknown guide {step!r}")
+            if kind == "audience" and step.get("slug") not in audience_slugs:
+                raise ValueError(f"article {data['key']}: unknown audience page {step!r}")
+            if "example" in step and step["example"] != NEXT_STEP_EXAMPLES.get(str(kind)):
+                raise ValueError(f"article {data['key']}: unknown example {step!r}")
         return cls(
             key=str(data["key"]),
             slug={locale: str(data["slug"][locale]) for locale in LOCALES},
             text=text,
             related=related,
+            next_step=next_step,
         )
 
 
 #: Index and page paths per language. An article lives at ``<index>/<slug>``.
 ARTICLES_PATH: dict[str, str] = {"es": "/articulos", "en": "/articles", "pt": "/pt/artigos"}
 
-#: The words the index and every article page share.
+#: The words the index and every article page share. ``summary`` is the index's meta
+#: description: keep it naming the topics the articles cover, without a promise.
 ARTICLES_COPY: dict[str, dict[str, str]] = {
     "es": {
         "eyebrow": "Artículos",
         "title": "Artículos sobre backtests",
         "summary": (
-            "Artículos cortos sobre backtests: sobreoptimización, costos reales y cómo leer "
-            "el informe del probador de estrategias. Sin registro."
+            "Artículos sobre backtests: costos, MT5, Sharpe deflactado, Monte Carlo, rachas, prop "
+            "firms, señales, bots con IA, % de aciertos y optimizador."
         ),
         "intro": "Lecturas cortas sobre qué mirar en un backtest antes de confiar en él.",
         "related": "Relacionado",
@@ -300,8 +724,8 @@ ARTICLES_COPY: dict[str, dict[str, str]] = {
         "eyebrow": "Articles",
         "title": "Articles about backtests",
         "summary": (
-            "Short articles about backtests: overfitting, real costs and how to read the strategy "
-            "tester report. No sign-up needed to read them."
+            "Articles about backtests: costs, MT5, deflated Sharpe, Monte Carlo, losing streaks, "
+            "prop firms, signals, AI bots, win rate and the optimiser."
         ),
         "intro": "Short reads on what to look at in a backtest before you trust it.",
         "related": "Related",
@@ -320,8 +744,8 @@ ARTICLES_COPY: dict[str, dict[str, str]] = {
         "eyebrow": "Artigos",
         "title": "Artigos sobre backtests",
         "summary": (
-            "Artigos curtos sobre backtests: sobreajuste, custos reais e como ler o relatório "
-            "do testador de estratégias. Sem cadastro."
+            "Artigos sobre backtests: custos, MT5, Sharpe deflacionado, Monte Carlo, sequências "
+            "de perdas, prop firms, sinais, robôs com IA, acerto e otimizador."
         ),
         "intro": "Leituras curtas sobre o que observar num backtest antes de confiar nele.",
         "related": "Relacionado",
@@ -335,6 +759,155 @@ ARTICLES_COPY: dict[str, dict[str, str]] = {
         ),
         "all": "Todos os artigos",
         "back": "Voltar ao início",
+    },
+}
+
+#: The kinds of next step: the upload form (``audit``), an export guide by its
+#: Spanish slug (``guide``), the sample report (``sample``), an audience page by
+#: its Spanish slug (``audience``) and the two free calculators (``calculator``,
+#: ``winrate``), which open with the article's declared example when the step
+#: names it (``NEXT_STEP_EXAMPLES``).
+NEXT_STEP_KINDS: frozenset[str] = frozenset(
+    {"audit", "guide", "sample", "audience", "calculator", "winrate"}
+)
+NEXT_STEP_EXAMPLES: dict[str, str] = {"calculator": "luck", "winrate": "win-rate"}
+
+#: Each article's own next step, chosen for whoever reads it: the first entry is
+#: the side button and the closing call's button, the others are links of the
+#: closing call. A reader with a file goes to the form and the guide for that
+#: file; a reader without one, to the calculator the article uses.
+ARTICLE_NEXT_STEPS: dict[str, tuple[dict[str, str], ...]] = {
+    "leer-informe-probador-mt5": ({"kind": "audit"}, {"kind": "guide", "slug": "mt5"}),
+    "ea-sobreoptimizado": ({"kind": "audit"}, {"kind": "guide", "slug": "mt5-optimization"}),
+    "lo-eligio-el-optimizador": (
+        {"kind": "audit"},
+        {"kind": "guide", "slug": "mt5-optimization"},
+    ),
+    "backtest-costos-reales": ({"kind": "audit"},),
+    "copiar-senales-mql5-myfxbook": ({"kind": "guide", "slug": "myfxbook"}, {"kind": "audit"}),
+    "cuantas-operaciones-porcentaje-aciertos": ({"kind": "winrate", "example": "win-rate"},),
+    "cuantos-intentos-reto-prop-firm": ({"kind": "audience", "slug": "retos-prop-firm"},),
+    "sharpe-deflactado-track-record": ({"kind": "calculator", "example": "luck"},),
+    "bot-ia-backtest-suerte": ({"kind": "calculator", "example": "luck"},),
+    "auditoria-independiente-backtest": ({"kind": "audit"}, {"kind": "sample"}),
+    "que-hacer-despues-del-backtest": ({"kind": "audit"}, {"kind": "sample"}),
+    "auditar-cartera-modelo-senales": ({"kind": "audit"}, {"kind": "sample"}),
+    # What the report measures with the trades, and a sample of it.
+    "monte-carlo-backtest": ({"kind": "audit"}, {"kind": "sample"}),
+    # Streaks follow from the win rate: its free calculator comes first.
+    "rachas-perdedoras": ({"kind": "winrate", "example": "win-rate"},),
+}
+#: An article missing from the table keeps the old closing call.
+DEFAULT_NEXT_STEP: tuple[dict[str, str], ...] = ({"kind": "calculator"}, {"kind": "audit"})
+
+#: The words of the next steps. ``title_<kind>`` and ``text_<kind>`` head the
+#: closing call after the kind of its first step (``_example`` when it opens the
+#: article's example); ``audience:<slug>`` is that page's button.
+NEXT_STEP_COPY: dict[str, dict[str, str]] = {
+    "es": {
+        "sample": "Ver un informe de ejemplo",
+        "guide": "Guía de exportación: {platform}",
+        "calculator_example": "Abrir la calculadora de suerte con este ejemplo",
+        "winrate_example": "Abrir la calculadora de % de aciertos con este ejemplo",
+        "audience:retos-prop-firm": "Simular un reto con mi historial",
+        "title_audit": "Ponlo a prueba con tu archivo",
+        "text_audit": (
+            "Sube el archivo que ya exporta tu plataforma, sin convertirlo. Con tu cuenta, el "
+            "primer informe completo es gratis, con PDF."
+        ),
+        "title_guide": "Empieza por el archivo",
+        "text_guide": (
+            "La guía explica qué archivo exportar y dónde subirlo. Con tu cuenta, el primer "
+            "informe completo es gratis, con PDF."
+        ),
+        "title_calculator_example": "Ponlo a prueba con tus cifras",
+        "text_calculator_example": (
+            "La calculadora de suerte abre con las cifras declaradas de este artículo; cámbialas "
+            "por las tuyas. Es gratis y no pide registro. Con tu cuenta, el primer informe "
+            "completo también es gratis."
+        ),
+        "title_winrate_example": "Ponlo a prueba con tus cifras",
+        "text_winrate_example": (
+            "La calculadora de % de aciertos abre con el ejemplo declarado de este artículo; "
+            "cámbialo por tus cifras. Es gratis y no pide registro. Con tu cuenta, el primer "
+            "informe completo también es gratis."
+        ),
+        "title_audience": "Simula el reto con tu historial",
+        "text_audience": (
+            "La página sobre retos de prop firms explica qué subir para ver con qué frecuencia "
+            "tocarías la pérdida diaria o la total con tus propias operaciones. Con tu cuenta, "
+            "el primer informe completo es gratis, con PDF."
+        ),
+    },
+    "en": {
+        "sample": "See a sample report",
+        "guide": "Export guide: {platform}",
+        "calculator_example": "Open the luck calculator with this example",
+        "winrate_example": "Open the win rate calculator with this example",
+        "audience:retos-prop-firm": "Simulate a challenge with my history",
+        "title_audit": "Put it to the test with your file",
+        "text_audit": (
+            "Upload the file your platform already exports, without converting it. With an "
+            "account, your first full report is free, with the PDF."
+        ),
+        "title_guide": "Start with the file",
+        "text_guide": (
+            "The guide explains which file to export and where to upload it. With an account, "
+            "your first full report is free, with the PDF."
+        ),
+        "title_calculator_example": "Put it to the test with your figures",
+        "text_calculator_example": (
+            "The luck calculator opens with this article's declared figures; replace them with "
+            "yours. It is free and needs no sign-up. With an account, your first full report is "
+            "free too."
+        ),
+        "title_winrate_example": "Put it to the test with your figures",
+        "text_winrate_example": (
+            "The win rate calculator opens with this article's declared example; replace it "
+            "with your figures. It is free and needs no sign-up. With an account, your first "
+            "full report is free too."
+        ),
+        "title_audience": "Simulate the challenge with your history",
+        "text_audience": (
+            "The prop-firm challenge page explains what to upload to see how often you would "
+            "hit the daily or total loss limit with your own trades. With an account, your "
+            "first full report is free, with the PDF."
+        ),
+    },
+    "pt": {
+        "sample": "Ver um relatório de exemplo",
+        "guide": "Guia de exportação: {platform}",
+        "calculator_example": "Abrir a calculadora de sorte com este exemplo",
+        "winrate_example": "Abrir a calculadora de taxa de acerto com este exemplo",
+        "audience:retos-prop-firm": "Simular um desafio com o meu histórico",
+        "title_audit": "Coloque à prova com o seu arquivo",
+        "text_audit": (
+            "Envie o arquivo que a sua plataforma já exporta, sem convertê-lo. Com a sua conta, "
+            "o primeiro relatório completo é grátis, com o PDF."
+        ),
+        "title_guide": "Comece pelo arquivo",
+        "text_guide": (
+            "O guia explica que arquivo exportar e onde enviá-lo. Com a sua conta, o primeiro "
+            "relatório completo é grátis, com o PDF."
+        ),
+        "title_calculator_example": "Coloque à prova com os seus números",
+        "text_calculator_example": (
+            "A calculadora de sorte abre com os números declarados deste artigo; troque-os "
+            "pelos seus. É grátis e não pede cadastro. Com a sua conta, o primeiro relatório "
+            "completo também é grátis."
+        ),
+        "title_winrate_example": "Coloque à prova com os seus números",
+        "text_winrate_example": (
+            "A calculadora de taxa de acerto abre com o exemplo declarado deste artigo; "
+            "troque-o pelos seus números. É grátis e não pede cadastro. Com a sua conta, o "
+            "primeiro relatório completo também é grátis."
+        ),
+        "title_audience": "Simule o desafio com o seu histórico",
+        "text_audience": (
+            "A página sobre desafios de prop firms explica o que enviar para ver com que "
+            "frequência você tocaria o limite de perda diária ou total com as suas próprias "
+            "operações. Com a sua conta, o primeiro relatório completo é grátis, com o PDF."
+        ),
     },
 }
 
@@ -3712,23 +4285,24 @@ ARTICLES_DATA: tuple[dict[str, Any], ...] = (
                     "heading": "Empieza por las reglas y su fecha",
                     "paragraphs": [
                         (
-                            "DECLARED · El preset genérico del repositorio fija un objetivo de "
-                            f"{PROP_RULES.profit_target:.0%}, una pérdida total máxima de "
-                            f"{PROP_RULES.max_total_loss:.0%}, un límite diario de "
+                            "Las reglas genéricas de este ejemplo son reglas de referencia "
+                            "típicas de las evaluaciones en dos fases, no las de ninguna firma: "
+                            f"un objetivo de {PROP_RULES.profit_target:.0%}, una pérdida total "
+                            f"máxima de {PROP_RULES.max_total_loss:.0%}, un límite diario de "
                             f"{PROP_RULES.max_daily_loss:.0%} y un mínimo de "
-                            f"{PROP_RULES.min_trading_days} días con actividad. No tiene plazo "
-                            f"máximo. Su fecha es {PROP_RULES.as_of} y su fuente es "
-                            f"{PROP_RULES.source_url}. Es una referencia didáctica, no las "
-                            "condiciones actuales de una firma. El suelo de pérdida total es "
-                            "estático y se refiere al saldo inicial."
+                            f"{PROP_RULES.min_trading_days} días con actividad, sin plazo "
+                            f"máximo. Están fechadas el {PROP_RULES.as_of} y sirven como "
+                            "referencia didáctica. El suelo de pérdida total es estático y se "
+                            "refiere al saldo inicial."
                         ),
                         (
                             "Las reglas de un contrato pueden definir el día de otra manera, "
                             "incluir posiciones abiertas o mover el suelo cuando sube el saldo. "
                             "Antes de interpretar cualquier cifra, identifica exactamente qué "
                             "saldo, horario y fase describe. Cambiar una de esas definiciones "
-                            "cambia la pregunta. Un preset fechado ayuda a reconocer el supuesto "
-                            "utilizado; no sustituye la lectura de las condiciones vigentes."
+                            "cambia la pregunta. Un conjunto de reglas fechado ayuda a reconocer "
+                            "el supuesto utilizado; no sustituye la lectura de las condiciones "
+                            "vigentes."
                         ),
                     ],
                 },
@@ -3736,7 +4310,7 @@ ARTICLES_DATA: tuple[dict[str, Any], ...] = (
                     "heading": "Una cuenta sencilla, separada del simulador",
                     "paragraphs": [
                         (
-                            "DECLARED · El ejemplo supone una operación independiente por día, con "
+                            "El ejemplo supone una operación independiente por día, con "
                             "pérdidas y ganancias del mismo tamaño respecto al saldo inicial, sin "
                             "costos y sin límite temporal. Cada intento comienza de nuevo con "
                             "idénticas condiciones. Se detiene al tocar el objetivo o el suelo de "
@@ -3759,7 +4333,7 @@ ARTICLES_DATA: tuple[dict[str, Any], ...] = (
                     "heading": "Dos tasas de acierto y dos tamaños de riesgo",
                     "paragraphs": [
                         (
-                            f"DECLARED · Con acierto de {PROP_WIN_RATES[0]:.0%}, el riesgo de "
+                            f"Con acierto de {PROP_WIN_RATES[0]:.0%}, el riesgo de "
                             f"{PROP_RISKS[0]:.1%} por operación produce una media de "
                             f"{PROP_ATTEMPT_EXAMPLES[0].expected_attempts:.2f} intentos; con "
                             f"riesgo de {PROP_RISKS[1]:.1%}, la media es "
@@ -3787,7 +4361,7 @@ ARTICLES_DATA: tuple[dict[str, Any], ...] = (
                     "heading": "La racha que suele quedar fuera de la captura",
                     "paragraphs": [
                         (
-                            f"DECLARED · Una racha ilustrativa de {PROP_STREAK_LENGTH} pérdidas "
+                            f"Una racha ilustrativa de {PROP_STREAK_LENGTH} pérdidas "
                             f"consume {PROP_STREAK_LENGTH * PROP_RISKS[0]:.1%} o "
                             f"{PROP_STREAK_LENGTH * PROP_RISKS[1]:.1%} del saldo inicial con los "
                             "riesgos anteriores. Son operaciones en días distintos. Para una "
@@ -3859,13 +4433,13 @@ ARTICLES_DATA: tuple[dict[str, Any], ...] = (
                     "heading": "Start with the rules and their date",
                     "paragraphs": [
                         (
-                            "DECLARED · The repository's generic preset sets a target of "
+                            "The generic rules in this example are reference rules typical of "
+                            "two-step evaluations, not any one firm's terms: a target of "
                             f"{PROP_RULES.profit_target:.0%}, maximum total loss of "
-                            f"{PROP_RULES.max_total_loss:.0%}, daily loss limit of "
-                            f"{PROP_RULES.max_daily_loss:.0%}, and at least "
-                            f"{PROP_RULES.min_trading_days} active days. It has no deadline. Its "
-                            f"date is {PROP_RULES.as_of} and its source is {PROP_RULES.source_url}"
-                            ". This is a teaching reference, not any firm's current terms. The "
+                            f"{PROP_RULES.max_total_loss:.0%}, a daily loss limit of "
+                            f"{PROP_RULES.max_daily_loss:.0%} and at least "
+                            f"{PROP_RULES.min_trading_days} active days, with no deadline. They "
+                            f"are dated {PROP_RULES.as_of} and serve as a teaching reference. The "
                             "total loss floor is static and relates to the initial balance."
                         ),
                         (
@@ -3873,8 +4447,9 @@ ARTICLES_DATA: tuple[dict[str, Any], ...] = (
                             "positions or move the floor as the balance rises. Before interpreting "
                             "a number, identify exactly which balance, time zone and phase it "
                             "describes. Changing any of those definitions changes the question. A "
-                            "dated preset makes the assumption traceable; it does not replace "
-                            "reading the current contract or checking how its limits are applied."
+                            "dated set of rules makes the assumption traceable; it does not "
+                            "replace reading the current contract or checking how its limits are "
+                            "applied."
                         ),
                     ],
                 },
@@ -3882,7 +4457,7 @@ ARTICLES_DATA: tuple[dict[str, Any], ...] = (
                     "heading": "A simple calculation, separate from the simulator",
                     "paragraphs": [
                         (
-                            "DECLARED · This example assumes an independent trade each day, equal "
+                            "This example assumes an independent trade each day, equal "
                             "win and loss amounts relative to the initial balance, no costs and "
                             "unlimited time. Each attempt restarts under identical conditions. It "
                             "stops upon touching either the target or loss floor; ending a path at "
@@ -3906,7 +4481,7 @@ ARTICLES_DATA: tuple[dict[str, Any], ...] = (
                     "heading": "Two win rates and two risk sizes",
                     "paragraphs": [
                         (
-                            f"DECLARED · At a {PROP_WIN_RATES[0]:.0%} win rate, risk of "
+                            f"At a {PROP_WIN_RATES[0]:.0%} win rate, risk of "
                             f"{PROP_RISKS[0]:.1%} per trade gives a mean of "
                             f"{PROP_ATTEMPT_EXAMPLES[0].expected_attempts:.2f} attempts; at "
                             f"{PROP_RISKS[1]:.1%} risk, the mean is "
@@ -3934,7 +4509,7 @@ ARTICLES_DATA: tuple[dict[str, Any], ...] = (
                     "heading": "The losing streak a screenshot leaves out",
                     "paragraphs": [
                         (
-                            f"DECLARED · An illustrative streak of {PROP_STREAK_LENGTH} losses "
+                            f"An illustrative streak of {PROP_STREAK_LENGTH} losses "
                             f"consumes {PROP_STREAK_LENGTH * PROP_RISKS[0]:.1%} or "
                             f"{PROP_STREAK_LENGTH * PROP_RISKS[1]:.1%} of initial balance at the "
                             "risk sizes above. Those trades occur on separate days. In a window "
@@ -4005,22 +4580,23 @@ ARTICLES_DATA: tuple[dict[str, Any], ...] = (
                     "heading": "Comece pelas regras e sua data",
                     "paragraphs": [
                         (
-                            "DECLARED · O preset genérico do repositório fixa um objetivo de "
-                            f"{PROP_RULES.profit_target:.0%}, perda total máxima de "
+                            "As regras genéricas deste exemplo são regras de referência típicas "
+                            "das avaliações em duas fases, não as de nenhuma empresa: objetivo "
+                            f"de {PROP_RULES.profit_target:.0%}, perda total máxima de "
                             f"{PROP_RULES.max_total_loss:.0%}, limite diário de "
                             f"{PROP_RULES.max_daily_loss:.0%} e mínimo de "
-                            f"{PROP_RULES.min_trading_days} dias com atividade. Não há prazo "
-                            f"máximo. Sua data é {PROP_RULES.as_of} e sua fonte é "
-                            f"{PROP_RULES.source_url}. É uma referência didática, não as "
-                            "condições atuais de uma empresa. O piso de perda total é estático e "
-                            "se refere ao saldo inicial."
+                            f"{PROP_RULES.min_trading_days} dias com atividade, sem prazo "
+                            f"máximo. Estão datadas de {PROP_RULES.as_of} e servem como "
+                            "referência didática. O piso de perda total é estático e se refere "
+                            "ao saldo inicial."
                         ),
                         (
                             "As regras de um contrato podem definir o dia de outra forma, incluir "
                             "posições abertas ou mover o piso quando o saldo sobe. Antes de "
                             "interpretar qualquer número, identifique exatamente qual saldo, "
                             "horário e fase ele descreve. Mudar uma dessas definições muda a "
-                            "pergunta. Um preset datado ajuda a reconhecer a hipótese utilizada; "
+                            "pergunta. Um conjunto de regras datado ajuda a reconhecer a hipótese "
+                            "utilizada; "
                             "não substitui a leitura das condições vigentes nem o exame de sua "
                             "aplicação."
                         ),
@@ -4030,7 +4606,7 @@ ARTICLES_DATA: tuple[dict[str, Any], ...] = (
                     "heading": "Uma conta simples, separada do simulador",
                     "paragraphs": [
                         (
-                            "DECLARED · O exemplo supõe uma operação independente por dia, perdas "
+                            "O exemplo supõe uma operação independente por dia, perdas "
                             "e ganhos do mesmo tamanho em relação ao saldo inicial, sem custos e "
                             "sem limite de tempo. Cada tentativa recomeça em condições idênticas. "
                             "Ela termina ao tocar o objetivo ou o piso de perda; encerrar no "
@@ -4053,7 +4629,7 @@ ARTICLES_DATA: tuple[dict[str, Any], ...] = (
                     "heading": "Duas taxas de acerto e dois tamanhos de risco",
                     "paragraphs": [
                         (
-                            f"DECLARED · Com acerto de {PROP_WIN_RATES[0]:.0%}, o risco de "
+                            f"Com acerto de {PROP_WIN_RATES[0]:.0%}, o risco de "
                             f"{PROP_RISKS[0]:.1%} por operação produz uma média de "
                             f"{PROP_ATTEMPT_EXAMPLES[0].expected_attempts:.2f} tentativas; com "
                             f"risco de {PROP_RISKS[1]:.1%}, a média é "
@@ -4081,7 +4657,7 @@ ARTICLES_DATA: tuple[dict[str, Any], ...] = (
                     "heading": "A sequência de perdas ausente na captura",
                     "paragraphs": [
                         (
-                            f"DECLARED · Uma sequência ilustrativa de {PROP_STREAK_LENGTH} perdas "
+                            f"Uma sequência ilustrativa de {PROP_STREAK_LENGTH} perdas "
                             f"consome {PROP_STREAK_LENGTH * PROP_RISKS[0]:.1%} ou "
                             f"{PROP_STREAK_LENGTH * PROP_RISKS[1]:.1%} do saldo inicial com os "
                             "riscos anteriores. São operações em dias diferentes. Para uma "
@@ -4182,6 +4758,7 @@ ARTICLES_DATA: tuple[dict[str, Any], ...] = (
             ],
         },
         "related": [
+            {"kind": "winrate"},
             {"kind": "calculator"},
             {"kind": "method"},
             {"kind": "samples"},
@@ -4255,7 +4832,7 @@ ARTICLES_DATA: tuple[dict[str, Any], ...] = (
                     "heading": "Una tasa de acierto no describe el tamaño de las pérdidas",
                     "paragraphs": [
                         (
-                            "DECLARED · Imagina una señal que anuncia "
+                            "Imagina una señal que anuncia "
                             f"{SIGNAL_DECLARED_WIN_RATE:.0%} "
                             "de aciertos y poco drawdown. Es un ejemplo declarado, no una medición "
                             "de MQL5, Myfxbook ni una cuenta concreta. El porcentaje cuenta "
@@ -4280,7 +4857,7 @@ ARTICLES_DATA: tuple[dict[str, Any], ...] = (
                     "heading": "La moneda: una referencia pequeña y explícita",
                     "paragraphs": [
                         (
-                            f"DECLARED · Supón {COIN_TRADE_COUNT} operaciones independientes, cada "
+                            f"Supón {COIN_TRADE_COUNT} operaciones independientes, cada "
                             f"una con probabilidad de acierto {COIN_NULL_WIN_RATE:.0%}, como una "
                             f"moneda equilibrada. Alcanzar al menos {COIN_THRESHOLD_WIN_RATE:.0%} "
                             "de aciertos tiene una probabilidad aproximada de "
@@ -4387,7 +4964,7 @@ ARTICLES_DATA: tuple[dict[str, Any], ...] = (
                     "heading": "A win rate does not describe the size of losses",
                     "paragraphs": [
                         (
-                            "DECLARED · Imagine a signal advertising a "
+                            "Imagine a signal advertising a "
                             f"{SIGNAL_DECLARED_WIN_RATE:.0%} "
                             "win rate and little drawdown. This is a declared example, not a "
                             "measurement of MQL5, Myfxbook or any particular account. The "
@@ -4411,7 +4988,7 @@ ARTICLES_DATA: tuple[dict[str, Any], ...] = (
                     "heading": "The coin: a small, explicit reference model",
                     "paragraphs": [
                         (
-                            f"DECLARED · Assume {COIN_TRADE_COUNT} independent trades, each with "
+                            f"Assume {COIN_TRADE_COUNT} independent trades, each with "
                             f"a {COIN_NULL_WIN_RATE:.0%} chance of a win, like a fair coin. "
                             f"Reaching a win rate of at least {COIN_THRESHOLD_WIN_RATE:.0%} has an "
                             f"approximate probability of {COIN_NORMAL_TAIL:.2%}, rounded to "
@@ -4520,7 +5097,7 @@ ARTICLES_DATA: tuple[dict[str, Any], ...] = (
                     "heading": "A taxa de acerto não descreve o tamanho das perdas",
                     "paragraphs": [
                         (
-                            "DECLARED · Imagine um sinal anunciando "
+                            "Imagine um sinal anunciando "
                             f"{SIGNAL_DECLARED_WIN_RATE:.0%} "
                             "de acertos e pouco drawdown. É um exemplo declarado, não uma "
                             "medição da MQL5, do Myfxbook ou de alguma conta específica. A "
@@ -4545,7 +5122,7 @@ ARTICLES_DATA: tuple[dict[str, Any], ...] = (
                     "heading": "A moeda: uma referência pequena e explícita",
                     "paragraphs": [
                         (
-                            f"DECLARED · Suponha {COIN_TRADE_COUNT} operações independentes, cada "
+                            f"Suponha {COIN_TRADE_COUNT} operações independentes, cada "
                             f"uma com probabilidade de acerto de {COIN_NULL_WIN_RATE:.0%}, como "
                             "uma "
                             f"moeda equilibrada. Alcançar pelo menos {COIN_THRESHOLD_WIN_RATE:.0%} "
@@ -4751,7 +5328,7 @@ ARTICLES_DATA: tuple[dict[str, Any], ...] = (
         },
         "intro": {
             "es": (
-                "DECLARED · Los treinta minutos del título describen una situación ilustrativa, no "
+                "Los treinta minutos del título describen una situación ilustrativa, no "
                 "un"
                 " desarrollo cronometrado por Rigor. Un hilo viral muestra el mensaje enviado a un "
                 "agente, el código y una curva ascendente. Lo que suele faltar es el recorrido "
@@ -4764,7 +5341,7 @@ ARTICLES_DATA: tuple[dict[str, Any], ...] = (
                 "de encontrar una coincidencia favorable en el mismo pasado."
             ),
             "en": (
-                "DECLARED · The thirty minutes in the title describe an illustrative situation, "
+                "The thirty minutes in the title describe an illustrative situation, "
                 "not "
                 "development timed by Rigor. A viral thread shows a prompt, generated code and an "
                 "upward curve. What often disappears is the path between those images: discarded "
@@ -4776,7 +5353,7 @@ ARTICLES_DATA: tuple[dict[str, Any], ...] = (
                 "for you."
             ),
             "pt": (
-                "DECLARED · Os trinta minutos do título descrevem uma situação ilustrativa, não um "
+                "Os trinta minutos do título descrevem uma situação ilustrativa, não um "
                 "desenvolvimento cronometrado pelo Rigor. Um tópico viral mostra a instrução "
                 "enviada "
                 "ao agente, o código e uma curva ascendente. O que costuma desaparecer é o caminho "
@@ -4866,7 +5443,7 @@ ARTICLES_DATA: tuple[dict[str, Any], ...] = (
                     "heading": "Somete los costos al doble",
                     "paragraphs": [
                         (
-                            "DECLARED · La prueba a 2x es un escenario: duplica los supuestos de "
+                            "La prueba a 2x es un escenario: duplica los supuestos de "
                             "costos y compara el resultado con la ejecución base. Documenta "
                             "comisión,"
                             " spread, deslizamiento y financiación cuando correspondan. Evita "
@@ -5003,7 +5580,7 @@ ARTICLES_DATA: tuple[dict[str, Any], ...] = (
                     "heading": "Stress costs at twice the baseline",
                     "paragraphs": [
                         (
-                            "DECLARED · The 2x cost test is a scenario: double the cost "
+                            "The 2x cost test is a scenario: double the cost "
                             "assumptions "
                             "and compare with the baseline calculation. Record commission, spread, "
                             "slippage and financing where relevant. Avoid subtracting a cost again "
@@ -5146,7 +5723,7 @@ ARTICLES_DATA: tuple[dict[str, Any], ...] = (
                     "heading": "Examine os custos em dobro",
                     "paragraphs": [
                         (
-                            "DECLARED · O teste a 2x é um cenário: dobre as suposições de custos e "
+                            "O teste a 2x é um cenário: dobre as suposições de custos e "
                             "compare com o cálculo base. Documente comissão, spread, deslizamento "
                             "e "
                             "financiamento quando aplicáveis. Evite descontar novamente um custo "
@@ -5342,7 +5919,7 @@ ARTICLES_DATA += (
                             "sale mal."
                         ),
                         (
-                            "DECLARED · Ejemplo ilustrativo: 45 operaciones y 71 % de aciertos"
+                            "Ejemplo ilustrativo: 45 operaciones y 71 % de aciertos"
                             " declarado, quizá redondeado. La función Wilson del lector de "
                             "Rigor calcula un intervalo al 95 % de "
                             f"{win_rate_interval(0.71, 45, 'es')}. No procede de un archivo de "
@@ -5389,7 +5966,7 @@ ARTICLES_DATA += (
                             "pregunta."
                         ),
                         (
-                            "DECLARED · Ejemplo sintético separado: una compra de 1 unidad a "
+                            "Ejemplo sintético separado: una compra de 1 unidad a "
                             "100 y cierre a 101, sin comisiones reportadas. La función "
                             "break_even_bps de Rigor calcula "
                             f"{_num(_COST_EXAMPLE_BPS, 'es', 2)} puntos básicos por lado de "
@@ -5516,7 +6093,7 @@ ARTICLES_DATA += (
                             "goes wrong."
                         ),
                         (
-                            "DECLARED · Illustrative example: 45 trades and a declared, "
+                            "Illustrative example: 45 trades and a declared, "
                             "possibly rounded, 71 % win rate. Rigor's reader Wilson function "
                             f"calculates a 95 % interval of {win_rate_interval(0.71, 45, 'en')}"
                             ". This does not come from a client file. It is not a significance"
@@ -5561,7 +6138,7 @@ ARTICLES_DATA += (
                             "already deducted changes the question."
                         ),
                         (
-                            "DECLARED · Separate synthetic example: buy 1 unit at 100 and "
+                            "Separate synthetic example: buy 1 unit at 100 and "
                             "close at 101, with no reported commissions. Rigor's "
                             "break_even_bps function calculates "
                             f"{_num(_COST_EXAMPLE_BPS, 'en', 2)} basis points per side of "
@@ -5684,7 +6261,7 @@ ARTICLES_DATA += (
                             "descreve quanto se perde quando a operação dá errado."
                         ),
                         (
-                            "DECLARED · Exemplo ilustrativo: 45 operações e taxa de acerto "
+                            "Exemplo ilustrativo: 45 operações e taxa de acerto "
                             "declarada de 71 %, talvez arredondada. A função Wilson do leitor "
                             "do Rigor calcula um intervalo de 95 % de "
                             f"{win_rate_interval(0.71, 45, 'pt')}. Isso não vem de um arquivo "
@@ -5730,7 +6307,7 @@ ARTICLES_DATA += (
                             "novamente uma comissão já descontada muda a pergunta."
                         ),
                         (
-                            "DECLARED · Exemplo sintético separado: compra de 1 unidade a 100 "
+                            "Exemplo sintético separado: compra de 1 unidade a 100 "
                             "e fechamento a 101, sem comissões reportadas. A função "
                             f"break_even_bps do Rigor calcula {_num(_COST_EXAMPLE_BPS, 'pt', 2)} "
                             "pontos-base por lado de custo adicional até o equilíbrio. Isso se"
@@ -5960,7 +6537,7 @@ ARTICLES_DATA += (
                             "mismo margen al porcentaje publicado."
                         ),
                         (
-                            "DECLARED · La tabla usa un nivel de confianza del 95 %. Bajo el "
+                            "La tabla usa un nivel de confianza del 95 %. Bajo el "
                             "modelo de operaciones independientes con una probabilidad de "
                             "acierto estable, el procedimiento cubriría esa probabilidad en "
                             "aproximadamente el 95 % de muchas muestras repetidas. No atribuye"
@@ -5973,7 +6550,7 @@ ARTICLES_DATA += (
                     "heading": "Cómo se calculó la tabla",
                     "paragraphs": [
                         (
-                            "DECLARED · Todas las celdas se calculan al generar el artículo "
+                            "Todas las celdas se calculan al generar el artículo "
                             "con la misma función Wilson del lector de cifras de Rigor: 20, "
                             "45, 100, 300 y 1.000 operaciones, con tasas declaradas de 55 %, "
                             "60 % y 71 %. Son ejemplos matemáticos, no mediciones de un "
@@ -5993,7 +6570,7 @@ ARTICLES_DATA += (
                     "heading": "Cómo leer una fila sin convertirla en una meta",
                     "paragraphs": [
                         (
-                            "DECLARED · Con 45 operaciones al 71 %, el intervalo calculado es "
+                            "Con 45 operaciones al 71 %, el intervalo calculado es "
                             f"{win_rate_interval(0.71, 45, 'es')}. Con 1.000 operaciones al "
                             f"mismo porcentaje es {win_rate_interval(0.71, 1000, 'es')}. El "
                             "intervalo se estrecha bajo los mismos supuestos; no demuestra que"
@@ -6013,7 +6590,7 @@ ARTICLES_DATA += (
                     "heading": "La mejor de muchas configuraciones cambia la lectura",
                     "paragraphs": [
                         (
-                            "DECLARED · Supón que publicas la mejor de 100 configuraciones "
+                            "Supón que publicas la mejor de 100 configuraciones "
                             "probadas sobre el mismo historial. La elección favorece "
                             "porcentajes que recibieron una desviación favorable por azar. Es "
                             "un supuesto de búsqueda, no una medición de cuántas variantes se "
@@ -6059,7 +6636,7 @@ ARTICLES_DATA += (
                     "heading": "Reproduce el ejemplo en el lector",
                     "paragraphs": [
                         (
-                            "DECLARED · El enlace de ejemplo abre el lector con 45 "
+                            "El enlace de ejemplo abre el lector con 45 "
                             "operaciones, 71 % de aciertos, Sharpe anual de "
                             f"{_num(LUCK_EXAMPLE_INPUT.sharpe, 'es', 1)}, 3 años y 100 "
                             "configuraciones. Los campos de Sharpe, años e intentos sirven "
@@ -6086,7 +6663,7 @@ ARTICLES_DATA += (
                             "same margin from the published percentage."
                         ),
                         (
-                            "DECLARED · The table uses a 95 % confidence level. Under a model "
+                            "The table uses a 95 % confidence level. Under a model "
                             "of independent trades with a stable win probability, the "
                             "procedure would cover that probability in approximately 95 % of "
                             "many repeated samples. It does not assign that probability to a "
@@ -6098,7 +6675,7 @@ ARTICLES_DATA += (
                     "heading": "How the table was calculated",
                     "paragraphs": [
                         (
-                            "DECLARED · Every cell is calculated when generating the article "
+                            "Every cell is calculated when generating the article "
                             "with the same Wilson function used by Rigor's figure reader: 20, "
                             "45, 100, 300 and 1,000 trades, with declared rates of 55 %, 60 % "
                             "and 71 %. These are mathematical examples, not measurements of a "
@@ -6117,7 +6694,7 @@ ARTICLES_DATA += (
                     "heading": "How to read a row without turning it into a target",
                     "paragraphs": [
                         (
-                            "DECLARED · With 45 trades at 71 %, the calculated interval is "
+                            "With 45 trades at 71 %, the calculated interval is "
                             f"{win_rate_interval(0.71, 45, 'en')}. With 1,000 trades at the "
                             f"same percentage it is {win_rate_interval(0.71, 1000, 'en')}. The "
                             "interval narrows under the same assumptions; it does not "
@@ -6137,7 +6714,7 @@ ARTICLES_DATA += (
                     "heading": "The best of many configurations changes the reading",
                     "paragraphs": [
                         (
-                            "DECLARED · Suppose you publish the best of 100 configurations "
+                            "Suppose you publish the best of 100 configurations "
                             "tried on the same history. Selection favours percentages that "
                             "received a favourable random deviation. This is a search "
                             "assumption, not a measurement of how many variants were actually "
@@ -6180,7 +6757,7 @@ ARTICLES_DATA += (
                     "heading": "Reproduce the example in the reader",
                     "paragraphs": [
                         (
-                            "DECLARED · The example link opens the reader with 45 trades, a 71"
+                            "The example link opens the reader with 45 trades, a 71"
                             " % win rate, annual Sharpe of "
                             f"{_num(LUCK_EXAMPLE_INPUT.sharpe, 'en', 1)}, 3 years and 100 "
                             "configurations. Sharpe, years and trial count feed the luck "
@@ -6207,7 +6784,7 @@ ARTICLES_DATA += (
                             "margem da porcentagem publicada."
                         ),
                         (
-                            "DECLARED · A tabela usa um nível de confiança de 95 %. Sob um "
+                            "A tabela usa um nível de confiança de 95 %. Sob um "
                             "modelo de operações independentes com probabilidade de acerto "
                             "estável, o procedimento cobriria essa probabilidade em "
                             "aproximadamente 95 % de muitas amostras repetidas. Ele não "
@@ -6220,7 +6797,7 @@ ARTICLES_DATA += (
                     "heading": "Como a tabela foi calculada",
                     "paragraphs": [
                         (
-                            "DECLARED · Todas as células são calculadas ao gerar o artigo com "
+                            "Todas as células são calculadas ao gerar o artigo com "
                             "a mesma função Wilson do leitor de números do Rigor: 20, 45, 100,"
                             " 300 e 1.000 operações, com taxas declaradas de 55 %, 60 % e 71 "
                             "%. São exemplos matemáticos, não medições de um histórico."
@@ -6239,7 +6816,7 @@ ARTICLES_DATA += (
                     "heading": "Como ler uma linha sem transformá-la em meta",
                     "paragraphs": [
                         (
-                            "DECLARED · Com 45 operações a 71 %, o intervalo calculado é "
+                            "Com 45 operações a 71 %, o intervalo calculado é "
                             f"{win_rate_interval(0.71, 45, 'pt')}. Com 1.000 operações à mesma "
                             f"porcentagem, ele é {win_rate_interval(0.71, 1000, 'pt')}. O "
                             "intervalo fica mais estreito sob as mesmas suposições; isso não "
@@ -6259,7 +6836,7 @@ ARTICLES_DATA += (
                     "heading": "A melhor de muitas configurações muda a leitura",
                     "paragraphs": [
                         (
-                            "DECLARED · Suponha que você publique a melhor de 100 "
+                            "Suponha que você publique a melhor de 100 "
                             "configurações testadas no mesmo histórico. A escolha favorece "
                             "porcentagens que receberam um desvio favorável por acaso. É uma "
                             "suposição de busca, não uma medição de quantas variantes foram "
@@ -6305,7 +6882,7 @@ ARTICLES_DATA += (
                     "heading": "Reproduza o exemplo no leitor",
                     "paragraphs": [
                         (
-                            "DECLARED · O link de exemplo abre o leitor com 45 operações, 71 %"
+                            "O link de exemplo abre o leitor com 45 operações, 71 %"
                             " de acertos, Sharpe anual de "
                             f"{_num(LUCK_EXAMPLE_INPUT.sharpe, 'pt', 1)}, 3 anos e 100 "
                             "configurações. Os "
@@ -6356,6 +6933,7 @@ ARTICLES_DATA += (
             ],
         },
         "related": [
+            {"kind": "winrate"},
             {"kind": "reading"},
             {"kind": "reading", "example": "win-rate"},
             {"kind": "calculator"},
@@ -6830,6 +7408,876 @@ ARTICLES_DATA += (
     },
 )
 
+ARTICLES_DATA += (
+    {
+        "key": MONTE_CARLO_ARTICLE_KEY,
+        "slug": {
+            "es": "monte-carlo-backtest",
+            "en": "monte-carlo-backtest-what-it-shows",
+            "pt": "monte-carlo-backtest-o-que-mostra",
+        },
+        "title": {
+            "es": "Monte Carlo de un backtest: qué te dice y qué no",
+            "en": "Monte Carlo on a backtest: what it can and cannot tell you",
+            "pt": "Monte Carlo de um backtest: o que mostra e o que não mostra",
+        },
+        "seo_title": {
+            "en": "Backtest Monte Carlo: what it can and cannot tell",
+            "pt": "Monte Carlo do backtest: o que mostra e o que não",
+        },
+        "summary": {
+            "es": (
+                "Qué responde un Monte Carlo de un backtest, por qué no corrige el sobreajuste y "
+                "qué muestra el informe como riesgo remuestreado, con un ejemplo calculado."
+            ),
+            "en": (
+                "What a Monte Carlo of a backtest answers, why it does not correct overfitting "
+                "and what the report shows as resampled risk, with a computed example."
+            ),
+            "pt": (
+                "O que um Monte Carlo de backtest responde, por que não corrige o sobreajuste e "
+                "o que o relatório mostra como risco reamostrado, com um exemplo calculado."
+            ),
+        },
+        "intro": {
+            "es": (
+                "Un Monte Carlo de un backtest reordena o remuestrea los resultados del "
+                "historial miles de veces y mira cuánto cambian las caídas. Sirve para ver la "
+                "dispersión del riesgo que un solo orden de operaciones esconde. No es una "
+                "segunda prueba de la estrategia: trabaja con los mismos datos, con su suerte y "
+                "con sus sesgos. Aquí ves qué responde, qué no responde y qué calcula el informe "
+                "de Rigor, con un ejemplo sintético que se reproduce con su semilla."
+            ),
+            "en": (
+                "A Monte Carlo of a backtest reorders or resamples the history's results "
+                "thousands of times and looks at how much the falls change. It shows the spread "
+                "of risk that a single order of trades hides. It is not a second test of the "
+                "strategy: it works with the same data, with its luck and with its biases. Here "
+                "is what it answers, what it does not answer and what Rigor's report computes, "
+                "with a synthetic example you can reproduce from its seed."
+            ),
+            "pt": (
+                "Um Monte Carlo de um backtest reordena ou reamostra os resultados do histórico "
+                "milhares de vezes e observa quanto mudam as quedas. Serve para ver a dispersão "
+                "do risco que uma única ordem de operações esconde. Não é um segundo teste da "
+                "estratégia: trabalha com os mesmos dados, com a sua sorte e com os seus vieses. "
+                "Aqui você vê o que ele responde, o que não responde e o que o relatório do "
+                "Rigor calcula, com um exemplo sintético que se reproduz com a sua semente."
+            ),
+        },
+        "sections": {
+            "es": [
+                {
+                    "heading": "Qué es remuestrear operaciones o una curva",
+                    "paragraphs": [
+                        (
+                            "Un backtest entrega una secuencia: operaciones cerradas o "
+                            "rendimientos por periodo de la curva de capital. Remuestrear es "
+                            "construir historias nuevas con esas mismas piezas. Barajar cambia "
+                            "solo el orden y conserva cada resultado. El bootstrap sortea piezas "
+                            "con reemplazo, así que una historia puede repetir unas y omitir "
+                            "otras. El bootstrap estacionario sortea bloques de periodos "
+                            "consecutivos, de longitud aleatoria, para conservar parte de la "
+                            "dependencia entre días cercanos."
+                        ),
+                        (
+                            "Cada método repite el sorteo miles de veces y resume lo que sale: la "
+                            "caída máxima mediana, la que aparece en 1 de cada 20 historias o la "
+                            "proporción de historias que cae más de un umbral. El nombre Monte "
+                            "Carlo se refiere a ese uso de sorteos repetidos. No añade "
+                            "información que el historial no tenga; ordena la que ya tiene."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Qué responde: la dispersión si el orden es intercambiable",
+                    "paragraphs": [
+                        (
+                            "La caída máxima de un backtest depende del orden en que llegaron las "
+                            "pérdidas. Con los mismos resultados, otro orden habría dado una "
+                            "caída más leve o más profunda, y una racha perdedora más corta o más "
+                            "larga. Un Monte Carlo responde a esa pregunta concreta: qué rango de "
+                            "caídas y rachas producen estos resultados si el orden es "
+                            "intercambiable, es decir, si cualquier orden era igual de probable."
+                        ),
+                        (
+                            "Ese supuesto marca el límite de la respuesta. Si las pérdidas "
+                            "dependen del régimen de mercado, de posiciones abiertas a la vez o "
+                            "de cambios de tamaño, el orden no es intercambiable y barajar lo "
+                            "disimula. El bootstrap por bloques conserva la dependencia dentro de "
+                            "cada bloque, pero no reconstruye regímenes que el historial no "
+                            "contiene."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Un ejemplo calculado con su semilla",
+                    "paragraphs": list(MONTE_CARLO_EXAMPLE["es"]),
+                },
+                {
+                    "heading": "Qué no responde: el sobreajuste y la búsqueda",
+                    "paragraphs": [
+                        (
+                            "Un Monte Carlo no distingue un resultado con ventaja de uno elegido "
+                            "por suerte entre muchos. Remuestrea lo que hay: si lo que hay es el "
+                            "mejor de cien intentos, remuestrea esa suerte. Tampoco dice cómo se "
+                            "comportaría la estrategia con datos que no vio, ni descuenta los "
+                            "costos que el backtest omitió."
+                        ),
+                        (
+                            "Para la búsqueda de configuraciones existe otra herramienta: el "
+                            "Sharpe deflactado compara el Sharpe observado con el que darían por "
+                            "azar los intentos realizados. Para el ajuste al pasado, un tramo "
+                            "fuera de muestra fijado antes de mirar los resultados. El artículo "
+                            "enlazado sobre el Sharpe deflactado y el de qué hacer después del "
+                            "backtest explican las dos; la calculadora de suerte enlazada hace "
+                            "la primera cuenta con cifras declaradas."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Por qué el Monte Carlo de un backtest optimizado hereda su sesgo",
+                    "paragraphs": [
+                        (
+                            "El optimizador elige la configuración cuyo historial salió mejor. "
+                            "Por esa misma selección, el historial tiene más rachas favorables y "
+                            "caídas más leves que las del proceso que lo generó. El remuestreo "
+                            "parte de esos mismos rendimientos, así que sus historias heredan la "
+                            "media inflada y las caídas suavizadas. Un abanico de curvas "
+                            "estrecho y ascendente puede ser solo la huella de la elección."
+                        ),
+                        MONTE_CARLO_SEARCH_EXAMPLE["es"],
+                    ],
+                },
+                {
+                    "heading": "Qué calcula el informe de Rigor",
+                    "paragraphs": [
+                        MONTE_CARLO_REPORT["es"],
+                        (
+                            "Al lado, shuffled_drawdown compara la peor caída del archivo con la "
+                            "de los mismos rendimientos en órdenes al azar, que conservan el "
+                            "Sharpe, la volatilidad y el resultado final. Si la caída del "
+                            "archivo es más leve que en casi todos los órdenes, las pérdidas se "
+                            "siguieron menos de lo que daría el azar, como en una curva "
+                            "suavizada; si es más profunda, llegaron en rachas. Con operaciones "
+                            "cerradas, loss_streak_review hace la misma comparación con la racha "
+                            "perdedora más larga, y el simulador de retos recorre historias "
+                            "remuestreadas igual con las reglas de cada reto."
+                        ),
+                        (
+                            "Un remuestreo sí entra en la clase: el percentil 5 del Sharpe en un "
+                            "bootstrap estacionario forma parte de la prueba de azar. El riesgo "
+                            "remuestreado, los órdenes al azar y las rachas son informativos y no "
+                            "cambian la clase. Todos describen el historial aportado; ninguno es "
+                            "una predicción."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Míralo en el informe de ejemplo",
+                    "paragraphs": [
+                        (
+                            "Abre el informe de ejemplo enlazado para ver el riesgo remuestreado "
+                            "con datos sintéticos y compáralo después con el de tu propio archivo."
+                        ),
+                    ],
+                },
+            ],
+            "en": [
+                {
+                    "heading": "What resampling trades or a curve means",
+                    "paragraphs": [
+                        (
+                            "A backtest delivers a sequence: closed trades or per-period returns "
+                            "of the equity curve. Resampling builds new histories from those same "
+                            "pieces. Shuffling changes only the order and keeps every result. The "
+                            "bootstrap draws pieces with replacement, so a history can repeat "
+                            "some and leave out others. The stationary bootstrap draws blocks of "
+                            "consecutive periods, of random length, to keep part of the "
+                            "dependence between nearby days."
+                        ),
+                        (
+                            "Each method repeats the draw thousands of times and summarises what "
+                            "comes out: the median maximum drawdown, the one reached in 1 history "
+                            "in 20, or the share of histories that fall further than a threshold. "
+                            "The name Monte Carlo refers to that use of repeated draws. It adds no "
+                            "information the history lacks; it organises what is already there."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "What it answers: the spread if the order is exchangeable",
+                    "paragraphs": [
+                        (
+                            "A backtest's maximum drawdown depends on the order in which the "
+                            "losses arrived. With the same results, another order would have "
+                            "given a milder or a deeper fall, and a shorter or longer losing "
+                            "streak. A Monte Carlo answers that specific question: what range of "
+                            "falls and streaks these results produce if the order is "
+                            "exchangeable, that is, if any order was equally likely."
+                        ),
+                        (
+                            "That assumption is the limit of the answer. If losses depend on the "
+                            "market regime, on positions open at the same time or on changes in "
+                            "size, the order is not exchangeable and shuffling hides it. The "
+                            "block bootstrap keeps the dependence inside each block, but it "
+                            "cannot rebuild regimes the history does not contain."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "A computed example with its seed",
+                    "paragraphs": list(MONTE_CARLO_EXAMPLE["en"]),
+                },
+                {
+                    "heading": "What it does not answer: overfitting and the search",
+                    "paragraphs": [
+                        (
+                            "A Monte Carlo cannot tell a result with an edge from one picked by "
+                            "luck among many. It resamples what is there: if what is there is "
+                            "the best of a hundred attempts, it resamples that luck. Nor does it "
+                            "say how the strategy would behave on data it never saw, or deduct "
+                            "costs the backtest left out."
+                        ),
+                        (
+                            "The search for configurations has another tool: deflated Sharpe "
+                            "compares the observed Sharpe with the one chance would give across "
+                            "the attempts made. Fitting to the past calls for an out-of-sample "
+                            "stretch fixed before looking at the results. The linked articles on "
+                            "deflated Sharpe and on what to do after a backtest explain both; the "
+                            "linked luck calculator does the first calculation with declared "
+                            "figures."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Why the Monte Carlo of an optimised backtest inherits its bias",
+                    "paragraphs": [
+                        (
+                            "The optimiser picks the configuration whose history came out best. "
+                            "Because of that selection, the history has more favourable streaks "
+                            "and milder falls than the process that produced it. Resampling "
+                            "starts from those same returns, so its histories inherit the "
+                            "inflated mean and the smoothed falls. A narrow, rising fan of curves "
+                            "can be nothing more than the trace of the choice."
+                        ),
+                        MONTE_CARLO_SEARCH_EXAMPLE["en"],
+                    ],
+                },
+                {
+                    "heading": "What Rigor's report computes",
+                    "paragraphs": [
+                        MONTE_CARLO_REPORT["en"],
+                        (
+                            "Next to it, shuffled_drawdown compares the file's worst fall with "
+                            "that of the same returns in random orders, which keep the Sharpe, "
+                            "the volatility and the final result. If the file's fall is milder "
+                            "than in nearly every order, losses followed losses less often than "
+                            "chance would give, as in a smoothed curve; if it is deeper, they "
+                            "came in streaks. With closed trades, loss_streak_review makes the "
+                            "same comparison for the longest losing streak, and the challenge "
+                            "simulator walks histories resampled the same way through each "
+                            "challenge's rules."
+                        ),
+                        (
+                            "One resampling does count towards the class: the 5th percentile of "
+                            "the Sharpe in a stationary bootstrap is part of the test against "
+                            "chance. The resampled risk, the random orders and the streaks are "
+                            "informational and do not change the class. All of them describe the "
+                            "supplied history; none is a prediction."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "See it in the sample report",
+                    "paragraphs": [
+                        (
+                            "Open the linked sample report to see resampled risk on synthetic "
+                            "data, then compare it with the one from your own file."
+                        ),
+                    ],
+                },
+            ],
+            "pt": [
+                {
+                    "heading": "O que é reamostrar operações ou uma curva",
+                    "paragraphs": [
+                        (
+                            "Um backtest entrega uma sequência: operações fechadas ou retornos "
+                            "por período da curva de capital. Reamostrar é construir históricos "
+                            "novos com essas mesmas peças. Embaralhar muda apenas a ordem e "
+                            "mantém cada resultado. O bootstrap sorteia peças com reposição, de "
+                            "modo que um histórico pode repetir umas e omitir outras. O "
+                            "bootstrap estacionário sorteia blocos de períodos consecutivos, de "
+                            "comprimento aleatório, para conservar parte da dependência entre "
+                            "dias próximos."
+                        ),
+                        (
+                            "Cada método repete o sorteio milhares de vezes e resume o resultado: "
+                            "a queda máxima mediana, a que aparece em 1 em cada 20 históricos ou "
+                            "a proporção de históricos que cai mais que um limite. O nome Monte "
+                            "Carlo se refere a esse uso de sorteios repetidos. Não acrescenta "
+                            "informação que o histórico não tenha; organiza a que já existe."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "O que responde: a dispersão se a ordem for intercambiável",
+                    "paragraphs": [
+                        (
+                            "A queda máxima de um backtest depende da ordem em que as perdas "
+                            "chegaram. Com os mesmos resultados, outra ordem teria dado uma queda "
+                            "mais leve ou mais profunda, e uma sequência de perdas mais curta ou "
+                            "mais longa. Um Monte Carlo responde a essa pergunta concreta: que "
+                            "faixa de quedas e sequências esses resultados produzem se a ordem "
+                            "for intercambiável, isto é, se qualquer ordem era igualmente "
+                            "provável."
+                        ),
+                        (
+                            "Essa suposição marca o limite da resposta. Se as perdas dependem do "
+                            "regime de mercado, de posições abertas ao mesmo tempo ou de "
+                            "mudanças de tamanho, a ordem não é intercambiável e embaralhar "
+                            "disfarça isso. O bootstrap por blocos conserva a dependência dentro "
+                            "de cada bloco, mas não reconstrói regimes que o histórico não "
+                            "contém."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Um exemplo calculado com a sua semente",
+                    "paragraphs": list(MONTE_CARLO_EXAMPLE["pt"]),
+                },
+                {
+                    "heading": "O que não responde: o sobreajuste e a busca",
+                    "paragraphs": [
+                        (
+                            "Um Monte Carlo não distingue um resultado com vantagem de um "
+                            "escolhido por sorte entre muitos. Reamostra o que existe: se o que "
+                            "existe é o melhor de cem tentativas, reamostra essa sorte. Também "
+                            "não diz como a estratégia se comportaria com dados que não viu, nem "
+                            "desconta os custos que o backtest omitiu."
+                        ),
+                        (
+                            "Para a busca de configurações existe outra ferramenta: o Sharpe "
+                            "deflacionado compara o Sharpe observado com o que as tentativas "
+                            "feitas dariam por acaso. Para o ajuste ao passado, um trecho fora da "
+                            "amostra fixado antes de olhar os resultados. Os artigos vinculados "
+                            "sobre o Sharpe deflacionado e sobre o que fazer depois do backtest "
+                            "explicam os dois; a calculadora de sorte vinculada faz a primeira "
+                            "conta com números declarados."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Por que o Monte Carlo de um backtest otimizado herda o seu viés",
+                    "paragraphs": [
+                        (
+                            "O otimizador escolhe a configuração cujo histórico saiu melhor. Por "
+                            "causa dessa seleção, o histórico tem mais sequências favoráveis e "
+                            "quedas mais leves que as do processo que o gerou. A reamostragem "
+                            "parte desses mesmos retornos, então seus históricos herdam a média "
+                            "inflada e as quedas suavizadas. Um leque de curvas estreito e "
+                            "ascendente pode ser apenas a marca da escolha."
+                        ),
+                        MONTE_CARLO_SEARCH_EXAMPLE["pt"],
+                    ],
+                },
+                {
+                    "heading": "O que o relatório do Rigor calcula",
+                    "paragraphs": [
+                        MONTE_CARLO_REPORT["pt"],
+                        (
+                            "Ao lado, shuffled_drawdown compara a pior queda do arquivo com a dos "
+                            "mesmos retornos em ordens aleatórias, que mantêm o Sharpe, a "
+                            "volatilidade e o resultado final. Se a queda do arquivo é mais leve "
+                            "que em quase todas as ordens, as perdas se seguiram menos do que o "
+                            "acaso daria, como numa curva suavizada; se é mais profunda, "
+                            "chegaram em sequências. Com operações fechadas, loss_streak_review "
+                            "faz a mesma comparação com a maior sequência de perdas, e o "
+                            "simulador de desafios percorre históricos reamostrados da mesma "
+                            "forma com as regras de cada desafio."
+                        ),
+                        (
+                            "Uma reamostragem entra na classe: o percentil 5 do Sharpe num "
+                            "bootstrap estacionário faz parte do teste contra o acaso. O risco "
+                            "reamostrado, as ordens aleatórias e as sequências são informativos "
+                            "e não mudam a classe. Todos descrevem o histórico fornecido; nenhum "
+                            "é uma previsão."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Veja no relatório de exemplo",
+                    "paragraphs": [
+                        (
+                            "Abra o relatório de exemplo vinculado para ver o risco reamostrado "
+                            "com dados sintéticos e depois compare com o do seu próprio arquivo."
+                        ),
+                    ],
+                },
+            ],
+        },
+        "faq": {
+            "es": [
+                {
+                    "q": "¿Un Monte Carlo favorable descarta el sobreajuste?",
+                    "a": (
+                        "No. Remuestrea el historial que ya existe; si ese historial salió de "
+                        "elegir la mejor de muchas configuraciones, el remuestreo conserva el "
+                        "sesgo. Para la búsqueda sirve el Sharpe deflactado y, para el ajuste al "
+                        "pasado, un tramo fuera de muestra fijado antes de mirar."
+                    ),
+                },
+                {
+                    "q": "¿Cuántas simulaciones hacen falta?",
+                    "a": (
+                        "Más simulaciones afinan los percentiles, pero no cambian lo que se "
+                        "remuestrea. El informe usa miles de historias con una semilla fija para "
+                        "que el mismo archivo dé los mismos números. El límite principal es la "
+                        "longitud y la representatividad del historial, no el número de sorteos."
+                    ),
+                },
+            ],
+            "en": [
+                {
+                    "q": "Does a favourable Monte Carlo rule out overfitting?",
+                    "a": (
+                        "No. It resamples the history that already exists; if that history came "
+                        "from picking the best of many configurations, resampling keeps the "
+                        "bias. Deflated Sharpe addresses the search, and an out-of-sample "
+                        "stretch fixed before looking addresses fitting to the past."
+                    ),
+                },
+                {
+                    "q": "How many simulations are needed?",
+                    "a": (
+                        "More simulations sharpen the percentiles but do not change what is "
+                        "resampled. The report uses thousands of histories with a fixed seed so "
+                        "the same file gives the same numbers. The main limit is the length and "
+                        "representativeness of the history, not the number of draws."
+                    ),
+                },
+            ],
+            "pt": [
+                {
+                    "q": "Um Monte Carlo favorável descarta o sobreajuste?",
+                    "a": (
+                        "Não. Reamostra o histórico que já existe; se esse histórico saiu da "
+                        "escolha da melhor de muitas configurações, a reamostragem conserva o "
+                        "viés. Para a busca serve o Sharpe deflacionado e, para o ajuste ao "
+                        "passado, um trecho fora da amostra fixado antes de olhar."
+                    ),
+                },
+                {
+                    "q": "Quantas simulações são necessárias?",
+                    "a": (
+                        "Mais simulações refinam os percentis, mas não mudam o que é "
+                        "reamostrado. O relatório usa milhares de históricos com semente fixa "
+                        "para que o mesmo arquivo dê os mesmos números. O limite principal é a "
+                        "duração e a representatividade do histórico, não o número de sorteios."
+                    ),
+                },
+            ],
+        },
+        "related": [
+            {"kind": "sample"},
+            {"kind": "calculator"},
+            {"kind": "winrate"},
+            {"kind": "article", "key": "sharpe-deflactado-track-record"},
+            {"kind": "article", "key": "que-hacer-despues-del-backtest"},
+            {"kind": "article", "key": STREAK_ARTICLE_KEY},
+            {"kind": "method"},
+        ],
+    },
+    {
+        "key": STREAK_ARTICLE_KEY,
+        "slug": {
+            "es": "rachas-perdedoras",
+            "en": "losing-streaks-how-many-are-normal",
+            "pt": "sequencias-de-perdas",
+        },
+        "title": {
+            "es": "Rachas perdedoras: cuántas pérdidas seguidas son normales",
+            "en": "Losing streaks: how many losses in a row are normal",
+            "pt": "Sequências de perdas: quantas seguidas são normais",
+        },
+        "seo_title": {
+            "es": "Rachas perdedoras: cuántas seguidas son normales",
+        },
+        "summary": {
+            "es": (
+                "Tabla calculada de la racha perdedora más larga según el % de aciertos y las "
+                "operaciones, y por qué un límite de pérdida la vuelve decisiva en un reto."
+            ),
+            "en": (
+                "A computed table of the longest losing streak by win rate and trade count, and "
+                "why a loss limit makes an ordinary streak decisive in a challenge."
+            ),
+            "pt": (
+                "Tabela calculada da maior sequência de perdas por taxa de acerto e número de "
+                "operações, e por que um limite de perda a torna decisiva num desafio."
+            ),
+        },
+        "intro": {
+            "es": (
+                f"{_STREAK.rare_run} pérdidas seguidas parecen la señal de que algo se rompió. A "
+                "veces lo son; a menudo son lo que el azar da a un sistema con un porcentaje de "
+                "aciertos corriente y suficientes operaciones. La pregunta útil no es si una "
+                "racha duele, sino si es más larga de lo que darían tu porcentaje de aciertos y "
+                "tu número de operaciones. Aquí tienes una tabla calculada con la función del "
+                "motor de Rigor, el supuesto que la sostiene y lo que cambia cuando hay un "
+                "límite de pérdida."
+            ),
+            "en": (
+                f"{_STREAK.rare_run} losses in a row look like a sign that something broke. "
+                "Sometimes they are; often they are what chance gives a system with an ordinary "
+                "win rate and enough trades. The useful question is not whether a streak hurts "
+                "but whether it is longer than your win rate and trade count would give. Here is "
+                "a table computed with Rigor's engine function, the assumption behind it and "
+                "what changes when there is a loss limit."
+            ),
+            "pt": (
+                f"{_STREAK.rare_run} perdas seguidas parecem o sinal de que algo quebrou. Às "
+                "vezes são; muitas vezes são o que o acaso dá a um sistema com uma taxa de "
+                "acerto comum e operações suficientes. A pergunta útil não é se uma sequência "
+                "dói, mas se ela é mais longa do que a sua taxa de acerto e o seu número de "
+                "operações dariam. Aqui está uma tabela calculada com a função do motor do "
+                "Rigor, a suposição que a sustenta e o que muda quando há um limite de perda."
+            ),
+        },
+        "sections": {
+            "es": [
+                {
+                    "heading": "Qué cuenta la tabla",
+                    "paragraphs": [
+                        (
+                            "La racha perdedora más larga de un historial es el mayor número de "
+                            "operaciones perdedoras seguidas. Depende de dos cosas: con qué "
+                            "frecuencia pierde cada operación y cuántas operaciones hay. Con más "
+                            "operaciones hay más ocasiones de que varias pérdidas coincidan, así "
+                            "que la racha más larga crece aunque el sistema no cambie."
+                        ),
+                        (
+                            "La tabla da dos cifras por fila. La racha mediana es la más larga "
+                            "que aparece en al menos la mitad de los historiales de ese tamaño. "
+                            f"La racha de 1 de cada {_ONE_IN} es la más larga que aparece en al "
+                            f"menos 1 de cada {_ONE_IN} historiales: menos habitual, pero todavía "
+                            "dentro de lo que da el azar."
+                        ),
+                    ],
+                },
+                {
+                    "heading": STREAK_TABLE_AFTER["es"],
+                    "paragraphs": [
+                        STREAK_METHOD["es"],
+                        (
+                            "No hay sorteos ni semillas: el resultado es exacto para ese "
+                            "supuesto. Si tus pérdidas dependen unas de otras, porque llegan "
+                            "juntas en ciertos mercados o porque abres varias posiciones a la "
+                            "vez, las rachas reales pueden ser más largas que las de la tabla."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Cómo leer la tabla",
+                    "paragraphs": [
+                        STREAK_READING["es"],
+                        (
+                            f"Una racha que no supera la cifra de 1 de cada {_ONE_IN} de tu fila "
+                            "no indica por sí sola un cambio en el sistema. Una racha bastante "
+                            "más larga sí merece una explicación: dependencia entre operaciones, "
+                            "un cambio de régimen o un cambio de reglas. Que tu racha quepa en la "
+                            "tabla tampoco dice que el sistema tenga ventaja: la tabla solo "
+                            "describe el azar con ese porcentaje de aciertos. Si tu porcentaje "
+                            "sale de pocas operaciones, también tiene un margen amplio, y la "
+                            "calculadora de % de aciertos enlazada lo muestra."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Por qué un límite de pérdida vuelve decisiva una racha normal",
+                    "paragraphs": [
+                        (
+                            "En un reto de prop firm la racha no solo se soporta: se mide contra "
+                            "un límite. Si cada pérdida resta un porcentaje fijo del saldo "
+                            "inicial, una racha de k pérdidas resta k veces ese porcentaje, sin "
+                            "contar costos."
+                        ),
+                        STREAK_STAKES["es"],
+                        (
+                            "El límite diario actúa antes: varias pérdidas en la misma sesión "
+                            "pueden tocarlo aunque la racha completa quepa en el límite total. "
+                            "Por eso importa cuántas operaciones abres por día y si varias pueden "
+                            "perder a la vez. Las reglas cambian entre firmas y con el tiempo; "
+                            "léelas en las condiciones vigentes de tu reto y compáralas con las "
+                            "rachas de tu propio historial, no con las de una captura del "
+                            "backtest. La página enlazada para retos de prop firm y el artículo "
+                            "sobre cuántos intentos sugiere tu historial explican el resto de la "
+                            "cuenta."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Qué mide el informe con tus operaciones",
+                    "paragraphs": list(STREAK_REPORT["es"]),
+                },
+                {
+                    "heading": "Busca tu fila",
+                    "paragraphs": [
+                        (
+                            "Abre la calculadora de % de aciertos enlazada para ver el margen de "
+                            "tu porcentaje y busca después tu fila en la tabla."
+                        ),
+                    ],
+                },
+            ],
+            "en": [
+                {
+                    "heading": "What the table counts",
+                    "paragraphs": [
+                        (
+                            "The longest losing streak in a history is the largest number of "
+                            "losing trades in a row. It depends on two things: how often each "
+                            "trade loses and how many trades there are. More trades give more "
+                            "chances for several losses to line up, so the longest streak grows "
+                            "even when the system does not change."
+                        ),
+                        (
+                            "The table gives two figures per row. The median streak is the "
+                            "longest one reached in at least half of the histories of that size. "
+                            f"The 1-in-{_ONE_IN} streak is the longest one reached in at least 1 "
+                            f"history in {_ONE_IN}: less common, but still within what chance "
+                            "gives."
+                        ),
+                    ],
+                },
+                {
+                    "heading": STREAK_TABLE_AFTER["en"],
+                    "paragraphs": [
+                        STREAK_METHOD["en"],
+                        (
+                            "There are no draws and no seeds: the result is exact under that "
+                            "assumption. If your losses depend on each other, because they come "
+                            "together in certain markets or because you open several positions "
+                            "at once, real streaks can be longer than the table's."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "How to read the table",
+                    "paragraphs": [
+                        STREAK_READING["en"],
+                        (
+                            f"A streak that does not exceed your row's 1-in-{_ONE_IN} figure does "
+                            "not, on its own, point to a change in the system. A clearly longer "
+                            "one does deserve an explanation: dependence between trades, a "
+                            "change of regime or a change of rules. A streak that fits the table "
+                            "does not show an edge either: the table only describes chance at "
+                            "that win rate. If your win rate comes from few trades it also has a "
+                            "wide margin, and the linked win-rate calculator shows it."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Why a loss limit makes an ordinary streak decisive",
+                    "paragraphs": [
+                        (
+                            "In a prop-firm challenge a streak is not only endured: it is "
+                            "measured against a limit. If each loss takes a fixed percentage of "
+                            "the initial balance, a streak of k losses takes k times that "
+                            "percentage, before costs."
+                        ),
+                        STREAK_STAKES["en"],
+                        (
+                            "The daily limit acts sooner: several losses in the same session can "
+                            "touch it even when the whole streak fits within the total limit. "
+                            "That is why it matters how many trades you open per day and whether "
+                            "several can lose at once. Rules differ between firms and change over "
+                            "time; read them in your challenge's current terms and compare them "
+                            "with the streaks in your own history, not those in a backtest "
+                            "screenshot. The linked page for prop-firm challenges and the article "
+                            "on how many attempts your history suggests explain the rest of the "
+                            "calculation."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "What the report measures with your trades",
+                    "paragraphs": list(STREAK_REPORT["en"]),
+                },
+                {
+                    "heading": "Find your row",
+                    "paragraphs": [
+                        (
+                            "Open the linked win-rate calculator to see the margin on your win "
+                            "rate, then find your row in the table."
+                        ),
+                    ],
+                },
+            ],
+            "pt": [
+                {
+                    "heading": "O que a tabela conta",
+                    "paragraphs": [
+                        (
+                            "A maior sequência de perdas de um histórico é o maior número de "
+                            "operações perdedoras seguidas. Depende de duas coisas: com que "
+                            "frequência cada operação perde e quantas operações existem. Com mais "
+                            "operações há mais ocasiões para várias perdas coincidirem, então a "
+                            "maior sequência cresce mesmo que o sistema não mude."
+                        ),
+                        (
+                            "A tabela dá dois números por linha. A sequência mediana é a mais "
+                            "longa que aparece em pelo menos metade dos históricos desse "
+                            f"tamanho. A sequência de 1 em cada {_ONE_IN} é a mais longa que "
+                            f"aparece em pelo menos 1 em cada {_ONE_IN} históricos: menos comum, "
+                            "mas ainda dentro do que o acaso dá."
+                        ),
+                    ],
+                },
+                {
+                    "heading": STREAK_TABLE_AFTER["pt"],
+                    "paragraphs": [
+                        STREAK_METHOD["pt"],
+                        (
+                            "Não há sorteios nem sementes: o resultado é exato para essa "
+                            "suposição. Se as suas perdas dependem umas das outras, porque chegam "
+                            "juntas em certos mercados ou porque você abre várias posições ao "
+                            "mesmo tempo, as sequências reais podem ser mais longas que as da "
+                            "tabela."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Como ler a tabela",
+                    "paragraphs": [
+                        STREAK_READING["pt"],
+                        (
+                            f"Uma sequência que não passa do número de 1 em cada {_ONE_IN} da sua "
+                            "linha não indica, por si só, uma mudança no sistema. Uma sequência "
+                            "bem mais longa merece uma explicação: dependência entre operações, "
+                            "mudança de regime ou de regras. Que a sua sequência caiba na tabela "
+                            "também não mostra que o sistema tem vantagem: a tabela só descreve "
+                            "o acaso com essa taxa de acerto. Se a sua taxa vem de poucas "
+                            "operações, ela também tem uma margem ampla, e a calculadora de taxa "
+                            "de acerto vinculada mostra isso."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Por que um limite de perda torna decisiva uma sequência normal",
+                    "paragraphs": [
+                        (
+                            "Num desafio de prop firm a sequência não é só suportada: ela é "
+                            "medida contra um limite. Se cada perda tira uma porcentagem fixa do "
+                            "saldo inicial, uma sequência de k perdas tira k vezes essa "
+                            "porcentagem, sem contar custos."
+                        ),
+                        STREAK_STAKES["pt"],
+                        (
+                            "O limite diário age antes: várias perdas na mesma sessão podem "
+                            "tocá-lo mesmo que a sequência inteira caiba no limite total. Por "
+                            "isso importa quantas operações você abre por dia e se várias podem "
+                            "perder ao mesmo tempo. As regras mudam entre empresas e com o tempo; "
+                            "leia-as nas condições vigentes do seu desafio e compare com as "
+                            "sequências do seu próprio histórico, não com as de uma captura do "
+                            "backtest. A página vinculada para desafios de prop firm e o artigo "
+                            "sobre quantas tentativas o seu histórico sugere explicam o resto da "
+                            "conta."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "O que o relatório mede com as suas operações",
+                    "paragraphs": list(STREAK_REPORT["pt"]),
+                },
+                {
+                    "heading": "Encontre a sua linha",
+                    "paragraphs": [
+                        (
+                            "Abra a calculadora de taxa de acerto vinculada para ver a margem da "
+                            "sua taxa e depois encontre a sua linha na tabela."
+                        ),
+                    ],
+                },
+            ],
+        },
+        "faq": {
+            "es": [
+                {
+                    "q": "¿La tabla vale para cualquier estrategia?",
+                    "a": (
+                        "Vale para el supuesto que declara: operaciones independientes con la "
+                        "misma probabilidad de perder. Si tu estrategia cambia el tamaño tras una "
+                        "pérdida, abre varias posiciones correlacionadas o pierde más en ciertos "
+                        "mercados, las rachas reales pueden alargarse. El informe compara tu "
+                        "racha con tus propias operaciones en orden al azar."
+                    ),
+                },
+                {
+                    "q": "¿Una racha más larga que la de la tabla prueba que algo cambió?",
+                    "a": (
+                        "No lo prueba. Es una razón para revisar la dependencia entre "
+                        "operaciones, un cambio de régimen o de reglas. Con pocas operaciones, "
+                        "el porcentaje de aciertos con el que lees la tabla también tiene un "
+                        "margen amplio, y una fila vecina puede describir mejor tu historial."
+                    ),
+                },
+            ],
+            "en": [
+                {
+                    "q": "Does the table apply to any strategy?",
+                    "a": (
+                        "It applies to the assumption it declares: independent trades with the "
+                        "same probability of losing. If your strategy changes size after a loss, "
+                        "opens several correlated positions or loses more in certain markets, "
+                        "real streaks can get longer. The report compares your streak with your "
+                        "own trades in random order."
+                    ),
+                },
+                {
+                    "q": "Does a streak longer than the table's prove that something changed?",
+                    "a": (
+                        "It does not prove it. It is a reason to review dependence between "
+                        "trades, a change of regime or of rules. With few trades, the win rate "
+                        "you read the table with also has a wide margin, and a neighbouring row "
+                        "may describe your history better."
+                    ),
+                },
+            ],
+            "pt": [
+                {
+                    "q": "A tabela vale para qualquer estratégia?",
+                    "a": (
+                        "Vale para a suposição que declara: operações independentes com a mesma "
+                        "probabilidade de perder. Se a sua estratégia muda o tamanho depois de "
+                        "uma perda, abre várias posições correlacionadas ou perde mais em certos "
+                        "mercados, as sequências reais podem ficar mais longas. O relatório "
+                        "compara a sua sequência com as suas próprias operações em ordem "
+                        "aleatória."
+                    ),
+                },
+                {
+                    "q": "Uma sequência mais longa que a da tabela prova que algo mudou?",
+                    "a": (
+                        "Não prova. É um motivo para revisar a dependência entre operações, uma "
+                        "mudança de regime ou de regras. Com poucas operações, a taxa de acerto "
+                        "com que você lê a tabela também tem uma margem ampla, e uma linha "
+                        "vizinha pode descrever melhor o seu histórico."
+                    ),
+                },
+            ],
+        },
+        "related": [
+            {"kind": "audience", "slug": "retos-prop-firm"},
+            {"kind": "article", "key": "cuantos-intentos-reto-prop-firm"},
+            {"kind": "winrate"},
+            {"kind": "article", "key": MONTE_CARLO_ARTICLE_KEY},
+            {"kind": "method"},
+        ],
+    },
+)
+
 ARTICLES: tuple[Article, ...] = tuple(Article.from_dict(data) for data in ARTICLES_DATA)
 ARTICLES_BY_KEY: dict[str, Article] = {article.key: article for article in ARTICLES}
 #: Reuse published answers verbatim; the index renders these same pairs visibly.
@@ -6873,6 +8321,14 @@ def find_article(slug: str, locale: str) -> tuple[Article, str] | None:
     return None
 
 
+#: The label of the ``sample`` related link: the full report built from synthetic data.
+SAMPLE_REPORT_LABEL: dict[str, str] = {
+    "es": "Ver el informe de ejemplo (datos sintéticos)",
+    "en": "See the sample report (synthetic data)",
+    "pt": "Ver o relatório de exemplo (dados sintéticos)",
+}
+
+
 def related_links(article: Article, locale: str) -> tuple[tuple[str, str], ...]:
     """The article's related pages as (title, path) in ``locale``."""
     links: list[tuple[str, str]] = []
@@ -6895,6 +8351,13 @@ def related_links(article: Article, locale: str) -> tuple[tuple[str, str], ...]:
             links.append((CONTACT_COPY[locale]["eyebrow"], CONTACT_PATHS[locale]))
         elif kind == "samples":
             links.append((EXAMPLES_COPY[locale]["title"], EXAMPLES_PATH[locale]))
+        elif kind == "sample":
+            # Imported here to avoid the pages -> articles import cycle.
+            from quant_trade.audit.pages import SAMPLE_PAGE_PATHS
+
+            links.append((SAMPLE_REPORT_LABEL[locale], SAMPLE_PAGE_PATHS[locale]))
+        elif kind == "winrate":
+            links.append((winrate.COPY[locale]["nav"], winrate.WINRATE_PATH[locale]))
         elif kind == "reading":
             if link.get("example") == "win-rate":
                 label = {
@@ -6911,6 +8374,61 @@ def related_links(article: Article, locale: str) -> tuple[tuple[str, str], ...]:
     return tuple(links)
 
 
+def next_step_links(article: Article, locale: str) -> tuple[tuple[str, str], ...]:
+    """The article's next step as (label, path) in ``locale``, the button first."""
+    # Imported here to avoid the pages -> articles import cycle.
+    from quant_trade.audit.pages import SAMPLE_PAGE_PATHS, audit_path
+
+    words = NEXT_STEP_COPY[locale]
+    links: list[tuple[str, str]] = []
+    for step in article.next_step or DEFAULT_NEXT_STEP:
+        kind = step["kind"]
+        example = "example" in step
+        if kind == "audit":
+            links.append((ARTICLES_COPY[locale]["report"], audit_path(locale)))
+        elif kind == "sample":
+            links.append((words["sample"], SAMPLE_PAGE_PATHS[locale]))
+        elif kind == "guide":
+            guide = GUIDES_BY_SLUG[step["slug"]]
+            label = words["guide"].format(platform=guide.platform_for(locale))
+            links.append((label, guide_url(guide.slug, locale)))
+        elif kind == "calculator" and example:
+            # The articles' own declared luck example, through the same calculator.
+            query = urlencode(
+                {
+                    "sharpe": f"{LUCK_EXAMPLE_INPUT.sharpe:g}",
+                    "years": f"{LUCK_EXAMPLE_INPUT.years:g}",
+                    "trials": str(LUCK_EXAMPLE_INPUT.trials),
+                }
+            )
+            links.append((words["calculator_example"], f"{CALCULATOR_PATH[locale]}?{query}"))
+        elif kind == "calculator":
+            links.append((ARTICLES_COPY[locale]["calculator"], CALCULATOR_PATH[locale]))
+        elif kind == "winrate" and example:
+            # The article's worked example: its trade count and declared win rate.
+            query = urlencode(
+                {name: WIN_RATE_EXAMPLE_VALUES[name] for name in ("trades", "win_rate")}
+            )
+            links.append((words["winrate_example"], f"{winrate.WINRATE_PATH[locale]}?{query}"))
+        elif kind == "winrate":
+            links.append((winrate.COPY[locale]["nav"], winrate.WINRATE_PATH[locale]))
+        else:
+            page = next(p for p in AUDIENCE_PAGES if p.slug == step["slug"])
+            label = words.get(f"audience:{page.slug}", page.text[locale].title)
+            links.append((label, audience_url(page.slug, locale)))
+    return tuple(links)
+
+
+def next_step_call(article: Article, locale: str) -> tuple[str, str]:
+    """The closing call's heading and text, after the kind of the article's first step."""
+    first = (article.next_step or DEFAULT_NEXT_STEP)[0]
+    kind = first["kind"] + ("_example" if "example" in first else "")
+    words = NEXT_STEP_COPY[locale]
+    if f"title_{kind}" in words:
+        return words[f"title_{kind}"], words[f"text_{kind}"]
+    return ARTICLES_COPY[locale]["cta_title"], ARTICLES_COPY[locale]["cta_text"]
+
+
 __all__ = [
     "ARTICLES",
     "ARTICLES_BY_KEY",
@@ -6918,6 +8436,10 @@ __all__ = [
     "ARTICLES_COPY",
     "ARTICLES_DATA",
     "ARTICLES_PATH",
+    "ARTICLE_NEXT_STEPS",
+    "DEFAULT_NEXT_STEP",
+    "NEXT_STEP_COPY",
+    "NEXT_STEP_KINDS",
     "RELATED_KINDS",
     "Article",
     "ArticleSection",
@@ -6925,5 +8447,7 @@ __all__ = [
     "article_url",
     "articles_index_url",
     "find_article",
+    "next_step_call",
+    "next_step_links",
     "related_links",
 ]

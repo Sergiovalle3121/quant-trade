@@ -75,33 +75,58 @@ COPY = {
 }
 
 
-def _share_url(public_id: str, locale: str) -> str:
-    url = f"https://rigorscore.com/v/{quote(public_id, safe='')}?ref=share"
+def public_report_url(public_id: str, locale: str, *, ref: str = "share") -> str:
+    """The public page of a published report, tagged with ``ref`` (``funnel.REF_TAGS``)."""
+    url = f"https://rigorscore.com/v/{quote(public_id, safe='')}?ref={ref}"
     if locale != "es":
         url += f"&lang={locale}"
     return url
 
 
-def share_text(*, overall: str, public_id: str, locale: str = "es", kind: str = "backtest") -> str:
-    """No result object or private report URL crosses this boundary."""
+def share_text(
+    *,
+    overall: str,
+    public_id: str,
+    locale: str = "es",
+    kind: str = "backtest",
+    template: str | None = None,
+    ref: str = "share",
+) -> str:
+    """No result object or private report URL crosses this boundary.
+
+    ``template`` and ``ref`` replace the owner's words and the "share" tag only on a
+    public sample's page (``sample_publication.sample_page``), which is nobody's
+    audit."""
     locale = locale if locale in COPY else "es"
     if overall not in ("A", "B", "C", "D") or not public_id:
         return ""
-    key = {"account": "text_account", "fund": "text_fund"}.get(kind, "text")
-    return COPY[locale][key].format(overall=overall, url=_share_url(public_id, locale))
+    if template is None:
+        template = COPY[locale][{"account": "text_account", "fund": "text_fund"}.get(kind, "text")]
+    return template.format(overall=overall, url=public_report_url(public_id, locale, ref=ref))
 
 
-def share_block(*, overall: str, public_id: str, locale: str = "es", kind: str = "backtest") -> str:
-    """Call only after the store confirms an active publication."""
+def share_block(
+    *,
+    overall: str,
+    public_id: str,
+    locale: str = "es",
+    kind: str = "backtest",
+    template: str | None = None,
+    ref: str = "share",
+) -> str:
+    """Call only after the store confirms an active publication, or for a public
+    sample's page with its own ``template`` and ``ref`` (``share_text``)."""
     locale = locale if locale in COPY else "es"
-    text = share_text(overall=overall, public_id=public_id, locale=locale, kind=kind)
+    text = share_text(
+        overall=overall, public_id=public_id, locale=locale, kind=kind, template=template, ref=ref
+    )
     if not text:
         return ""
     words = COPY[locale]
     escape = html.escape
     intent = "https://x.com/intent/post?" + urlencode({"text": text})
     whatsapp = "https://wa.me/?text=" + quote(text, safe="")
-    url = _share_url(public_id, locale)
+    url = public_report_url(public_id, locale, ref=ref)
     text_without_url = text.removesuffix(url).rstrip()
     telegram = (
         "https://t.me/share/url?url="

@@ -43,6 +43,14 @@ REPORT: dict[str, Any] = {
         ),
         "generated": "Gerado",
         "audit_id": "Identificador",
+        "data_period": "Dados",
+        "data_age": "{days} dias entre o último dado e esta auditoria",
+        "data_age_one": "1 dia entre o último dado e esta auditoria",
+        "data_age_account": "O que aconteceu depois do último dado não está neste arquivo.",
+        "seal_scope": (
+            "O selo prova que a declaração do trecho não mudou depois dessa data, não que o "
+            "trecho fosse desconhecido ao otimizar."
+        ),
         "inputs": "Arquivos auditados (sha256)",
         "verdict": "Veredito",
         "dimensions": "Dimensões",
@@ -110,11 +118,12 @@ REPORT: dict[str, Any] = {
         "pay_pack": "Comprar o pacote de 3 (USD {price:.0f})",
         "pay_secure": (
             "Pagamento seguro com Stripe. Você vê o relatório completo assim que o pagamento é "
-            "confirmado; nós nunca vemos nem guardamos os dados do seu cartão. Todas as vendas "
-            "são finais."
+            "confirmado; nós nunca vemos nem guardamos os dados do seu cartão. Se não servir "
+            "para você, pode pedir a devolução em 7 dias conforme os termos."
         ),
         "final_sale": (
-            "Entendo que o relatório é entregue na hora e que a compra não é reembolsável."
+            "Entendo que o relatório abre na hora e que posso pedir a devolução em 7 dias "
+            "conforme os termos."
         ),
         "pay_links_note": (
             "O pagamento abre em outra aba. Quando terminar, volte aqui: o relatório é "
@@ -347,7 +356,7 @@ REPORT: dict[str, Any] = {
         "luck_narrow": (
             "O Sharpe de {sharpe} supera o {luck} que {n} configurações sem habilidade dariam, "
             "mas não com a margem que exigimos: a confiança de que não seja sorte (DSR) é de "
-            "{dsr}, e para cumprir esta dimensão exigimos {need}."
+            "{dsr}, e para superar esta dimensão exigimos {need}."
         ),
         "luck_beats": (
             "O Sharpe de {sharpe} supera o {luck} que {n} configurações sem habilidade dariam."
@@ -607,6 +616,22 @@ REPORT: dict[str, Any] = {
         ),
         "crises_subject": "Estratégia",
         "crises_no_trades": "nenhuma operação fechada na janela",
+        "crises_not_applicable": (
+            "Não se aplica a este histórico: as crises que a curva cobre são {falls}, e nenhum "
+            "dos símbolos operados ({symbols}) é {that}."
+        ),
+        "crises_not_covered": (
+            "Não se aplica a este histórico: as crises que a curva cobre são {falls}; os "
+            "símbolos operados ({symbols}) incluem {traded}, mas a curva não cobre nenhuma das "
+            "crises desse mercado."
+        ),
+        "crises_falls_us_equity": "quedas de ações dos EUA",
+        "crises_falls_crypto": "quedas do bitcoin",
+        "crises_falls_both": "quedas de ações dos EUA e do bitcoin",
+        "crises_traded_us_equity": "ações dos EUA",
+        "crises_traded_crypto": "bitcoin",
+        "crises_that_market": "desse mercado",
+        "crises_those_markets": "desses mercados",
         "crises_worse": (
             "Em {worse} de {n} crises caiu mais que seu índice. Pergunte ao vendedor o que a "
             "protege quando o mercado cai."
@@ -655,6 +680,10 @@ REPORT: dict[str, Any] = {
             "Quase todo o resultado vem de {best} ({share}). Pergunte o que os demais acrescentam."
         ),
         "ins_best_over": (
+            "Mais do que o resultado líquido vem de {best}: os demais juntos subtraem {rest} "
+            "({rest_share})"
+        ),
+        "ins_best_over_plain": (
             "Mais do que o resultado líquido vem de {best}: os demais juntos subtraem"
         ),
         "ins_most_lose": (
@@ -704,6 +733,22 @@ REPORT: dict[str, Any] = {
         ),
         "timing_best_day": "{share:.0%} do resultado líquido sai das operações de {day}.",
         "timing_best_block": "{share:.0%} do resultado líquido sai da faixa {block}.",
+        "timing_best_day_over": (
+            "As operações de {day} somam {share} do resultado líquido: os demais dias, juntos, "
+            "subtraem {rest} ({rest_share})."
+        ),
+        "timing_best_day_over_plain": (
+            "As operações de {day} somam mais que todo o resultado líquido: os demais dias, "
+            "juntos, subtraem uma parte."
+        ),
+        "timing_best_block_over": (
+            "A faixa {block} soma {share} do resultado líquido: as demais faixas, juntas, "
+            "subtraem {rest} ({rest_share})."
+        ),
+        "timing_best_block_over_plain": (
+            "A faixa {block} soma mais que todo o resultado líquido: as demais faixas, juntas, "
+            "subtraem uma parte."
+        ),
         "timing_day": "Dia de entrada",
         "timing_block": "Horário de entrada",
         "timing_trades": "Operações",
@@ -736,6 +781,18 @@ REPORT: dict[str, Any] = {
         "hero_live": "Conta real: {badge}.",
         "hero_live_money": "Resultado das operações: {result} sobre {deposits} depositados.",
         "hero_live_link": "Ver a comparação com o backtest",
+        "hero_challenge": (
+            "Desafio escolhido, {program}: atinge a meta em {full} das simulações com o "
+            "histórico completo e em {low} {low_label}."
+        ),
+        "hero_challenge_full": (
+            "Desafio escolhido, {program}: atinge a meta em {full} das simulações com o "
+            "histórico completo."
+        ),
+        "hero_challenge_link": "Ver a escada",
+        "hero_challenge_optimistic": (
+            "São números otimistas: o saldo das operações fechadas não vê as perdas abertas."
+        ),
         "live_badge_CONSISTENT": "Coerente",
         "live_badge_EDGE": "No limite",
         "live_badge_INCONSISTENT": "Não coerente",
@@ -834,8 +891,9 @@ REPORT: dict[str, Any] = {
         ),
         "publish": "Publicar verificação pública",
         "publish_help": (
-            "Cria uma página pública com a classe, as dimensões e os hashes, e um selo para o "
-            "seu site. Nunca mostra seus arquivos, operações nem descrição."
+            "Cria uma página pública com a classe, as dimensões, os hashes, o que foi auditado e "
+            "o período dos seus dados (datas e frequência), e um selo para o seu site. Nunca "
+            "mostra seus arquivos, operações nem descrição."
         ),
         "evidence_legend": (
             "Cada número leva sua etiqueta: «Medido» quando calculado a partir dos seus "
@@ -922,7 +980,15 @@ REPORT: dict[str, Any] = {
         "risk": "Risco reamostrado em um ano",
         "risk_dd": "Drawdown máximo em um ano",
         "risk_prob": "Probabilidade de uma queda de pelo menos",
-        "risk_underwater": "Períodos seguidos abaixo do topo, nas simulações",
+        "risk_underwater": "Tempo seguido abaixo do topo nas simulações, contado em {unit}",
+        "unit_daily_trading": "dias úteis",
+        "unit_daily_calendar": "dias",
+        "unit_weekly": "semanas",
+        "unit_monthly": "meses",
+        "unit_hourly": "horas",
+        "unit_periods": "períodos da curva",
+        "unit_periods_days": "períodos da curva (em média, {n} dias corridos cada um)",
+        "unit_periods_hours": "períodos da curva (em média, {n} horas corridas cada um)",
         "risk_under_median": "mediana",
         "risk_under_p95": "em 1 de cada 20",
         "challenge": "Simulador de desafio de mesa proprietária (prop firm)",
@@ -946,6 +1012,9 @@ REPORT: dict[str, Any] = {
         "fail_daily_loss": "Rompe a perda diária",
         "fail_total_loss": "Rompe a perda total",
         "unfinished": "Não termina a tempo",
+        "unfinished_cap": (
+            "Não atinge a meta em {days} dias úteis (limite da simulação; as regras não têm prazo)"
+        ),
         "ci95": "Intervalo de 95 % de atingir a meta",
         "days_to_target": "Dias úteis até a meta (p25 / p50 / p75)",
         "best_day_line": (
@@ -959,6 +1028,10 @@ REPORT: dict[str, Any] = {
             "dentro da regra do melhor dia, se a firma a tiver; em caso de empate, por nome. "
             "Compara regras; não recomenda comprar nenhum desafio."
         ),
+        "ff_basis": (
+            "Números com o histórico completo e sem o custo de referência; a escada acima "
+            "mostra quanto mudam."
+        ),
         "ff_program": "Desafio",
         "ff_pass": "Passa",
         "ff_clean": "Passa dentro da regra do melhor dia",
@@ -967,7 +1040,7 @@ REPORT: dict[str, Any] = {
         "ff_risk_none": "Nada nas simulações",
         "ff_risk_fail_daily_loss": "romper a perda diária",
         "ff_risk_fail_total_loss": "romper a perda total",
-        "ff_risk_unfinished": "não atingir a meta a tempo",
+        "ff_risk_unfinished": "não atingir a meta dentro do limite da simulação",
         "ff_optimistic": (
             "Os mesmos números otimistas de cima se aplicam a esta tabela: o saldo esconde "
             "perdas abertas."
@@ -977,10 +1050,167 @@ REPORT: dict[str, Any] = {
             "suas regras não os distinguem."
         ),
         "ff_all_fail": (
-            "Com este histórico nenhum programa passa nas simulações; o que mais impede é {risk}."
+            "Com este histórico quase nenhum programa passa (1 % das simulações ou menos); o que "
+            "mais impede é {risk}."
         ),
         "ff_phases": "{n} fases",
         "ff_phase": "1 fase",
+        "ff_basis_columns": (
+            "«Passa» usa o histórico completo com os custos que o arquivo já traz, sem o custo "
+            "declarado ou de referência. As colunas de fora da amostra e com custo são os mesmos "
+            "cenários da escada acima, com cada programa."
+        ),
+        "ff_clean_short": "dentro da regra do melhor dia",
+        "ff_rules": "Regras, fonte e data",
+        "ff_rule_target": "meta {value}",
+        "ff_rule_each": "{value} em cada fase",
+        "ff_rule_in_phase": "{value} na fase {n}",
+        "ff_rule_daily_initial": "perda diária {value} do saldo inicial",
+        "ff_rule_daily_day": "perda diária {value} do saldo no início do dia",
+        "ff_rule_total_static": "perda total {value}, fixa",
+        "ff_rule_total_trailing": (
+            "perda total {value}, trailing sobre o maior saldo de fechamento diário"
+        ),
+        "ff_rule_total_lock": (
+            "perda total {value}, trailing sobre o maior saldo de fechamento diário até chegar ao "
+            "saldo inicial"
+        ),
+        "ff_rule_days": "mínimo de {n} dias de trading",
+        "ff_rule_time": "prazo de {n} dias",
+        "ff_rule_best_target": "melhor dia no máximo {value} da meta",
+        "ff_rule_best_positive": "melhor dia no máximo {value} do ganho dos dias positivos",
+        "ff_rule_markets": "mercados: {markets}, lidos em {date}",
+        "ff_rule_read": "Regras lidas em {date}",
+        "ff_source_link": "fonte",
+        "ff_market_only": "Só {markets}",
+        "ff_market_skip": "não é simulado",
+        "ff_mk_fx": "forex",
+        "ff_mk_metals": "metais",
+        "ff_mk_indices": "índices",
+        "ff_mk_energy": "energia",
+        "ff_mk_crypto": "cripto",
+        "ff_mk_futures": "futuros",
+        "ff_hist_fx": "forex",
+        "ff_hist_metal": "metais",
+        "ff_hist_us_equity": "índices dos EUA",
+        "ff_hist_crypto": "cripto",
+        "ff_and": "e",
+        "ch_ladder_pass_one": "Atinge a meta",
+        "ch_size_lots": "{lots} lotes",
+        "ch_size_lot_col": "Lote médio por operação",
+        "ch_size_lot_col_on": "Lote médio sobre um saldo de {balance}",
+        "ch_size_lot_col_account": "Lote médio na conta de {size}",
+        "ch_size_lots_on": "{lots} sobre um saldo de {balance}",
+        "ch_size_lot_account": (
+            "Nessa conta, 1x são {lots} lotes por operação em média ({base} × {size} / {balance})."
+        ),
+        "ch_size_no_account_lots": (
+            "As regras simuladas não fixam um tamanho de conta: são porcentagens (do saldo "
+            "inicial ou do dia), então as porcentagens da tabela não dependem do tamanho da "
+            "conta. Os lotes sim: são os do saldo de {balance}, e numa conta de outro tamanho 1x "
+            "são esses lotes × conta / {balance}."
+        ),
+        # A result stored before the average lot gives the old reason under the old name.
+        "ch_size_lot_before": "Lote ou risco por operação a 1x",
+        "ch_size_intro_one": (
+            "O mesmo programa da escada ({program}), com outro tamanho. Em cada linha, atingir "
+            "a meta, romper uma perda e não atingir a meta dentro do limite repartem todas as "
+            "simulações. A tabela mostra o que muda com o tamanho; não aconselha nenhum."
+        ),
+        "ff_market_why_spot": (
+            "o histórico opera {history} à vista ou CFD ({symbols}), que segundo sua página "
+            "este programa não admite"
+        ),
+        "ff_market_why": (
+            "o histórico opera {history} ({symbols}), que segundo sua página este programa não "
+            "admite"
+        ),
+        "ff_market_chosen": (
+            "é simulado porque você o escolheu, mas seus números são os de regras que não se "
+            "aplicariam a este histórico"
+        ),
+        "hero_challenge_market": (
+            "Segundo sua página, este programa não admite o que este histórico opera: seus "
+            "números são os de regras que não se aplicariam a ele."
+        ),
+        "ff_open_loss": (
+            "Sua plataforma imprime um drawdown de {dd} com as operações abertas, maior que sua "
+            "perda total ({limit}): com elas a conta pode ter tocado o limite, e estes números "
+            "são otimistas."
+        ),
+        "ff_all_pass_simulated": (
+            "Com este histórico todos os programas simulados passam em pelo menos 99 % das "
+            "simulações: suas regras não os distinguem."
+        ),
+        "ff_all_fail_simulated": (
+            "Com este histórico quase nenhum programa simulado passa (1 % das simulações ou "
+            "menos); o que mais impede é {risk}."
+        ),
+        "ch_ladder_title": "Quanto muda com o que este relatório encontrou?",
+        "ch_ladder_intro": (
+            "O mesmo programa ({program}), reamostrado da mesma forma, com trechos "
+            "diferentes do histórico ou com o que o relatório desconta. São cenários do mesmo "
+            "histórico, não previsões: se o número cai muito fora da amostra ou com custos, o "
+            "do histórico completo é otimista."
+        ),
+        "ch_ladder_scenario": "Cenário",
+        "ch_ladder_days": "Dias de dados",
+        "ch_ladder_pass": "Atinge a meta em todas as fases",
+        "ch_ladder_full": "Histórico completo (o número acima)",
+        "ch_ladder_full_program": "Histórico completo (o número da tabela de firmas)",
+        "ch_ladder_in_sample": "Só dentro da amostra (até {date})",
+        "ch_ladder_out_of_sample": "Só fora da amostra (a partir de {date})",
+        "ch_ladder_cost": "Com o custo de referência ({bps} pb por lado)",
+        "ch_ladder_cost_declared": "Com o custo declarado ({bps} pb por lado)",
+        "ch_ladder_haircut": (
+            "Com a sorte de {trials} tentativas descontada (Sharpe {before} → {after}, Harvey "
+            "e Liu)"
+        ),
+        "ch_ladder_low_in_sample": "só dentro da amostra",
+        "ch_ladder_low_out_of_sample": "só fora da amostra",
+        "ch_ladder_low_reference_cost": "com o custo de referência",
+        "ch_ladder_low_luck_haircut": "com a sorte descontada",
+        "ch_size_title": "Em que tamanho? O desafio a 0.5x, 1x, 1.5x e 2x",
+        "ch_size_intro": (
+            "O mesmo programa da escada ({program}), com outro tamanho. Em cada linha, atingir "
+            "a meta, romper uma perda e não atingir a meta dentro do limite repartem todas as "
+            "simulações, contando todas as fases. A tabela mostra o que muda com o tamanho; não "
+            "aconselha nenhum."
+        ),
+        "ch_size_cap": (
+            "«Atinge a meta» conta só o que chega dentro desse limite, que a simulação põe e as "
+            "regras não. Com menos tamanho a meta demora mais: as simulações que passam a «não "
+            "atinge» ficaram sem dias; não romperam uma perda, que tem suas próprias colunas."
+        ),
+        "ch_size_one": (
+            "1x é o tamanho do histórico que você enviou: cada dia simulado ganha ou perde a "
+            "mesma porcentagem do saldo que um dia do arquivo. 0.5x é a metade desse tamanho e "
+            "2x, o dobro."
+        ),
+        "ch_size_balance": (
+            "As porcentagens de 1x são medidas sobre o saldo inicial do arquivo ({balance})."
+        ),
+        "ch_size_balance_assumed": (
+            "As porcentagens de 1x são medidas sobre um saldo inicial de {balance} que foi suposto "
+            "porque o arquivo não o indica: 1x escala com ele, e sobre um saldo maior as mesmas "
+            "operações seriam menos de 1x."
+        ),
+        "ch_size_lot": "Lote médio por operação a 1x",
+        "ch_size_account": (
+            "Conta que o programa nomeia: {size} USD. Os seus limites em dólares são simulados "
+            "como porcentagens dessa conta."
+        ),
+        "ch_size_no_account": (
+            "As regras simuladas não fixam um tamanho de conta: são porcentagens (do saldo "
+            "inicial ou do dia), então as porcentagens da tabela não dependem do tamanho da "
+            "conta."
+        ),
+        "ch_size_size": "Tamanho",
+        "ch_size_unfinished_phase": (
+            "Não atinge a meta em {days} dias úteis por fase (limite da simulação; as regras não "
+            "têm prazo)"
+        ),
+        "ch_size_assumption": "Método e premissa: {note}.",
         "assumptions": "Premissas",
         "source": "Fonte",
         "as_of": "lida em",
@@ -988,6 +1218,7 @@ REPORT: dict[str, Any] = {
         "flags_free": "Bandeiras vermelhas detectadas",
         "report_source": "Formato do arquivo",
         "platform": "Dados que a plataforma declara",
+        "platform_checked": "O que a Rigor conferiu no arquivo",
         "colmap": "Como cada coluna do seu arquivo foi lida",
         "optimization": "Exportação de otimização",
         "passes": "configurações testadas",
@@ -1021,6 +1252,12 @@ REPORT: dict[str, Any] = {
         "kpi_trades": "Operações · % de acerto",
         "kpi_breakeven": "Custo extra que o leva a zero",
         "kpi_breakeven_negative": "já perde sem custo extra",
+        "kpi_pips_on": "{pips} pips em {symbol}",
+        "kpi_per_lot": "{value} {currency} por lote e lado",
+        "kpi_per_lot_units": "{value} por lote e lado, em unidades do arquivo",
+        "cost_pips_title": "Em pips, por símbolo",
+        "cost_symbol": "Símbolo",
+        "cost_median_entry": "Preço de entrada mediano",
         "kpi_stress": "Sem as 5 melhores operações",
         "kpi_stress_curve": "Sem os 5 melhores períodos",
         "kpi_hint_return": "quanto a conta mudou em todo o histórico",
@@ -1438,6 +1675,35 @@ REPORT: dict[str, Any] = {
             ],
         ],
         "flags_title": "Os sinais de alerta que revisamos",
+        "resampling_title": "Reamostragem e Monte Carlo",
+        "resampling": [
+            (
+                "Vários números do relatório saem de simulações de Monte Carlo: milhares de "
+                "sorteios sobre o histórico que você envia, resumidos em percentis e "
+                "probabilidades."
+            ),
+            (
+                "Teste contra o acaso: um bootstrap estacionário por blocos dos retornos dá o "
+                "percentil 5 do Sharpe que a primeira pergunta exige."
+            ),
+            (
+                "Risco reamostrado em um ano: históricos de um ano montados com blocos dos "
+                "retornos (bootstrap estacionário) dão a queda máxima mediana, a de 1 em cada 20 "
+                "e a probabilidade de cada queda."
+            ),
+            (
+                "Ordens aleatórias: os mesmos retornos embaralhados, com o mesmo Sharpe e o mesmo "
+                "resultado final, mostram se a pior queda do arquivo é habitual para eles. Com "
+                "operações, a maior sequência de perdas é comparada com a das mesmas operações "
+                "em ordem aleatória, calculada de forma exata."
+            ),
+            (
+                "Um Monte Carlo supõe que a ordem do histórico é intercambiável e reamostra o que "
+                "ele contém: não corrige o sobreajuste nem a busca de configurações, que o Sharpe "
+                "deflacionado, o PBO e o trecho fora da amostra medem. O risco reamostrado, as "
+                "ordens aleatórias e as sequências não mudam a classe."
+            ),
+        ],
         "repro_title": "Reproduzível",
         "repro": [
             "Cada arquivo é identificado no relatório pela sua impressão digital SHA-256.",
@@ -1531,6 +1797,10 @@ REPORT: dict[str, Any] = {
         "challenge": (
             "Com que frequência tocaria os limites de um desafio de mesa proprietária (prop firm)"
         ),
+        "ch_size_title": (
+            "Em que tamanho? O desafio a 0.5x, 1x, 1.5x e 2x o tamanho do histórico, com a "
+            "probabilidade de atingir a meta e de romper cada perda"
+        ),
         "questions": "O que perguntar ao vendedor ou ao gestor",
         "performance": "Rentabilidade anual, volatilidade e drawdown máximo medidos",
         "significance": "Se o resultado se distingue da sorte",
@@ -1572,7 +1842,7 @@ REPORT: dict[str, Any] = {
         "selection_end": "Fim da seleção",
         "holdout_start": "Início do trecho reservado",
         "holdout_end": "Fim do trecho reservado",
-        "sealed_at_utc": "Selado em (UTC)",
+        "sealed_at_utc": "Data em que o Rigor selou a declaração do trecho (UTC)",
         "seal": "Selo (sha256)",
         "total_return": "Retorno total",
         "cagr": "Retorno anual composto",
@@ -1632,6 +1902,7 @@ REPORT: dict[str, Any] = {
         "cost_bps_per_side": "Custo por lado (pb)",
         "oos_start": "Início fora da amostra",
         "benchmark_applicable": "Benchmark se aplica",
+        "ownership": "De quem é a estratégia",
         "overlap_share": "Datas em comum com o benchmark",
         "strategy_total_return": "Retorno total da estratégia",
         "benchmark_total_return": "Retorno total do benchmark",
@@ -1646,6 +1917,7 @@ REPORT: dict[str, Any] = {
         "initial_balance": "Saldo inicial",
         "dsr_at_declared": "DSR com as tentativas declaradas",
         "dsr_at_trials_used": "DSR com as tentativas usadas",
+        "dsr_at_declared_used": "DSR com as tentativas declaradas, que são as mesmas usadas",
         "trials_to_half": "Tentativas que levam o DSR a 0.5",
         "trials_used": "Tentativas usadas",
         "trials": "Tentativas",
@@ -1664,6 +1936,7 @@ REPORT: dict[str, Any] = {
         "break_even_bps": "Custo de equilíbrio (pb por lado)",
         "break_even_pips": "Custo de equilíbrio (pips por lado)",
         "reference_pips": "Custo de referência (pips por lado)",
+        "break_even_per_lot": "Custo de equilíbrio (por lote e lado)",
         "platform_equity_drawdown": "Drawdown com operações abertas (sua plataforma)",
         "commission": "Comissão",
         "swap": "Swap",
@@ -2002,6 +2275,10 @@ VERDICT: dict[str, Any] = {
             "Com o custo de referência, as operações perdem dinheiro no líquido. O resultado do "
             "backtest depende de não pagar custos."
         ),
+        "costs.FAIL.account": (
+            "Com o custo de referência, as operações desta conta perdem dinheiro no líquido. Os "
+            "preços já são os da corretora, então a margem sobre os custos é nula ou negativa."
+        ),
         "costs.NOT_MEASURED": (
             "Sem a lista de operações não é possível reaplicar os custos. Envie o relatório da "
             "plataforma para medi-los."
@@ -2037,8 +2314,8 @@ VERDICT: dict[str, Any] = {
             "descarta erros que os arquivos não mostrem."
         ),
         "data_quality.WEAK": (
-            "Há avisos nos dados que convém esclarecer antes de confiar nos números. Revise a "
-            "lista de sinais de alerta e as perguntas para o vendedor."
+            "Há avisos nos dados que convém esclarecer antes de confiar nos números. O relatório "
+            "completo lista cada aviso com sua explicação."
         ),
         "data_quality.FAIL": (
             "Há problemas graves nos dados ou na forma de operar. Os números principais não "
@@ -3534,8 +3811,18 @@ RULES: tuple[tuple[str, str], ...] = (
         "resumo da própria plataforma no momento do extrato",
     ),
     (
-        "floating result / balance",
-        "resultado flutuante / saldo",
+        "floating result / balance the file states",
+        "resultado flutuante / saldo que o arquivo indica",
+    ),
+    (
+        "floating result / (equity the file states - floating result)",
+        "resultado flutuante / (equity que o arquivo indica - resultado flutuante)",
+    ),
+    (
+        "floating result / balance rebuilt from the file's deposits, withdrawals "
+        "and closed trades (the file prints no balance)",
+        "resultado flutuante / saldo que a Rigor reconstrói com os depósitos, saques e "
+        "operações fechadas do arquivo (o arquivo não imprime um saldo)",
     ),
     (
         "the file does not state the floating result",
@@ -3814,6 +4101,37 @@ RULES: tuple[tuple[str, str], ...] = (
         ),
     ),
     (
+        "scenarios of the same history under the same simulator, seed and rules; "
+        "they are not predictions",
+        "cenários do mesmo histórico com o mesmo simulador, semente e regras; não são previsões",
+    ),
+    (
+        "fewer than 2 trials: there is no search to discount",
+        "menos de 2 tentativas: não há busca a descontar",
+    ),
+    (
+        "trial count not declared: the haircut needs to know how many configurations were tried",
+        "o número de tentativas não foi declarado: o desconto precisa saber quantas "
+        "configurações foram testadas",
+    ),
+    (
+        "deposits or withdrawals inside the history: the curve is an index, not money",
+        "depósitos ou saques dentro do histórico: a curva é um índice, não dinheiro",
+    ),
+    (
+        "the curve and the trades do not reconcile in money",
+        "a curva e as operações não batem em dinheiro",
+    ),
+    ("the curve was not shown to be money", "não foi possível comprovar que a curva é dinheiro"),
+    (
+        "the curve was not shown to be money: {why}",
+        "não foi possível comprovar que a curva é dinheiro: {why}",
+    ),
+    (
+        "with the reference cost the balance reaches zero inside the history",
+        "com o custo de referência o saldo chega a zero dentro do histórico",
+    ),
+    (
         (
             "share of the resampled passes whose best day breaks the firm's best-day rule, "
             "checked at the pass on daily closes"
@@ -3833,6 +4151,108 @@ RULES: tuple[tuple[str, str], ...] = (
             "proporção de todos os percursos reamostrados que chegam ao objetivo com o melhor "
             "dia dentro da regra do melhor dia da firma; a regra é conferida ao atingir o "
             "objetivo, com fechamentos diários"
+        ),
+    ),
+    (
+        (
+            "the ladder's full-history row with every daily return multiplied by the size; it "
+            "assumes that changing the size scales every daily return in the same proportion, "
+            "as linear leverage does when the costs grow in proportion to the size (the same "
+            "cost per lot) and the execution does not worsen with more volume"
+        ),
+        (
+            "a linha do histórico completo da escada com cada retorno diário multiplicado pelo "
+            "tamanho; supõe que mudar o tamanho escala cada retorno diário na mesma proporção, "
+            "como faz a alavancagem linear quando os custos crescem na proporção do tamanho (o "
+            "mesmo custo por lote) e a execução não piora com mais volume"
+        ),
+    ),
+    (
+        "the lots of each trade are read only from MetaTrader 4 and 5 reports, whose volume "
+        "column is the platform's lots, so the average lot at 1x is not known; 1x is still the "
+        "size the history traded at",
+        "os lotes de cada operação só são lidos dos relatórios do MetaTrader 4 e 5, cuja coluna "
+        "de volume são os lotes da plataforma, então o lote médio a 1x não é conhecido; 1x "
+        "continua sendo o tamanho com que o histórico operou",
+    ),
+    # Results stored before the average lot (2026-10-09) keep this reason.
+    (
+        "the audit keeps neither the lot nor the stop loss of each trade, so the lot or risk "
+        "per trade at 1x is not known",
+        "a auditoria não guarda o lote nem o stop loss de cada operação, então o lote ou o "
+        "risco por operação a 1x não é conhecido",
+    ),
+    (
+        "lots per trade on average at the history's own size: the {lots} lots of the {count} "
+        "trades divided by their number; the cost section counts {traded} lots traded because "
+        "it adds entries and exits",
+        "lotes por operação em média no tamanho do próprio histórico: os {lots} lotes das "
+        "{count} operações divididos pelo seu número; a seção de custos conta {traded} lotes "
+        "negociados porque soma entradas e saídas",
+    ),
+    (
+        "the average lot per trade at 1x multiplied by the size",
+        "o lote médio por operação a 1x multiplicado pelo tamanho",
+    ),
+    (
+        "the average lot per trade at 1x on the program's {account} account: the lots at 1x "
+        "times the account over the {balance} balance the shares at 1x are measured on",
+        "o lote médio por operação a 1x na conta de {account} do programa: os lotes a 1x vezes "
+        "a conta dividida pelo saldo de {balance} sobre o qual se medem as porcentagens de 1x",
+    ),
+    (
+        "the average lot per trade at 1x on the program's account multiplied by the size",
+        "o lote médio por operação a 1x na conta do programa multiplicado pelo tamanho",
+    ),
+    (
+        "the ladder's rung for every program: the same series, simulator, seed and rules; the "
+        "chosen program's figure is the ladder's own",
+        "o cenário da escada com cada programa: a mesma série, simulador, semente e regras; o "
+        "número do programa escolhido é o da escada",
+    ),
+    (
+        "account size in US dollars that the program names; its limits are shares of it",
+        "tamanho de conta em dólares americanos que o programa nomeia; seus limites são "
+        "porcentagens dela",
+    ),
+    (
+        "the simulated rules fix no account size: they are shares (of the starting balance or "
+        "of the day's), so the table's shares do not depend on the account size; its lots, when "
+        "the report gives them, are those of the starting balance",
+        "as regras simuladas não fixam um tamanho de conta: são porcentagens (do saldo inicial "
+        "ou do dia), então as porcentagens da tabela não dependem do tamanho da conta; seus "
+        "lotes, quando o relatório os dá, são os do saldo inicial",
+    ),
+    # Results stored before the average lot (2026-10-09) keep this note.
+    (
+        "the simulated rules fix no account size: they are shares (of the starting balance or "
+        "of the day's), so the table does not depend on the account size",
+        "as regras simuladas não fixam um tamanho de conta: são porcentagens (do saldo inicial "
+        "ou do dia), então a tabela não depende do tamanho da conta",
+    ),
+    (
+        "starting balance of the history; the daily shares at 1x are measured on it",
+        "saldo inicial do histórico; as porcentagens diárias a 1x são medidas sobre ele",
+    ),
+    (
+        "first value of the file's balance curve; the daily shares at 1x are measured on it",
+        "primeiro valor da curva de saldo do arquivo; as porcentagens diárias a 1x são medidas "
+        "sobre ele",
+    ),
+    (
+        "assumed because the file does not state a starting balance; the daily shares at 1x "
+        "are measured on it, so 1x scales with it",
+        "suposto porque o arquivo não indica um saldo inicial; as porcentagens diárias a 1x "
+        "são medidas sobre ele, então 1x escala com ele",
+    ),
+    (
+        (
+            "share of the resampled paths that end the program this way: each phase is a fresh "
+            "start reached only by passing the phases before it"
+        ),
+        (
+            "proporção dos percursos reamostrados que terminam o programa assim: cada fase é um "
+            "recomeço ao qual só se chega passando pelas anteriores"
         ),
     ),
     (
@@ -4437,6 +4857,71 @@ RULES: tuple[tuple[str, str], ...] = (
         "custo por lado com o qual o resultado fica em zero",
     ),
     (
+        "the whole history's break-even and reference costs per side, converted to pips at "
+        "each symbol's median entry price; not a break-even computed from that symbol's "
+        "trades alone",
+        "os custos de equilíbrio e de referência por lado de todo o histórico, convertidos "
+        "em pips com o preço de entrada mediano de cada símbolo; não é um equilíbrio "
+        "calculado só com as operações desse símbolo",
+    ),
+    (
+        "no pip size is defined for metals; this symbol's cost stays in bps",
+        "não há um tamanho de pip definido para os metais; o custo deste símbolo fica em pb",
+    ),
+    (
+        "other symbols traded ({symbols}) stay in bps: the audit defines no pip size for them",
+        "os outros símbolos operados ({symbols}) ficam em pb: a auditoria não define um "
+        "tamanho de pip para eles",
+    ),
+    (
+        "cost per lot and side at which the ledger nets to zero: the net the file prints, "
+        "{net} {currency}, over {lots} lots traded counting entries and exits",
+        "custo por lote e lado com o qual o resultado fica em zero: o líquido que o arquivo "
+        "imprime, {net} {currency}, dividido por {lots} lotes negociados contando entradas e "
+        "saídas",
+    ),
+    (
+        "extra cost per lot and side, on top of the report's fees, at which the ledger nets "
+        "to zero: the net the file prints after those fees, {net} {currency}, over {lots} lots "
+        "traded counting entries and exits",
+        "custo extra por lote e lado, além dos custos do relatório, com o qual o resultado "
+        "fica em zero: o líquido que o arquivo imprime depois desses custos, {net} "
+        "{currency}, dividido por {lots} lotes negociados contando entradas e saídas",
+    ),
+    (
+        "cost per lot and side at which the ledger nets to zero: the net the file prints, "
+        "{net} {currency}, over {lots} lots traded counting entries and exits; the lots of "
+        "the {count} currency pairs are added as the platform prints them",
+        "custo por lote e lado com o qual o resultado fica em zero: o líquido que o arquivo "
+        "imprime, {net} {currency}, dividido por {lots} lotes negociados contando entradas e "
+        "saídas; os lotes dos {count} pares de moedas são somados como a plataforma os imprime",
+    ),
+    (
+        "extra cost per lot and side, on top of the report's fees, at which the ledger nets "
+        "to zero: the net the file prints after those fees, {net} {currency}, over {lots} lots "
+        "traded counting entries and exits; the lots of the {count} currency pairs are added "
+        "as the platform prints them",
+        "custo extra por lote e lado, além dos custos do relatório, com o qual o resultado "
+        "fica em zero: o líquido que o arquivo imprime depois desses custos, {net} "
+        "{currency}, dividido por {lots} lotes negociados contando entradas e saídas; os "
+        "lotes dos {count} pares de moedas são somados como a plataforma os imprime",
+    ),
+    (
+        "the money per lot is given only for MetaTrader 4 and 5 reports, whose volume column "
+        "is the platform's lots",
+        "o dinheiro por lote só é dado para os relatórios do MetaTrader 4 e 5, cuja coluna "
+        "de volume são os lotes da plataforma",
+    ),
+    (
+        "the trades are on several symbols and not all are pairs of USD, EUR, GBP, JPY, CHF, "
+        "AUD, NZD or CAD: a lot of one instrument is not the same size as a lot of another (a "
+        "lot of gold is not a lot of EURUSD), so their lots are not added together",
+        "as operações são de vários símbolos e nem todos são pares de USD, EUR, GBP, JPY, "
+        "CHF, AUD, NZD ou CAD: um lote de um instrumento não tem o mesmo tamanho que um lote "
+        "de outro (um lote de ouro não é um lote de EURUSD), então os seus lotes não são "
+        "somados",
+    ),
+    (
         "no traded notional",
         "não há volume operado",
     ),
@@ -4461,6 +4946,21 @@ RULES: tuple[tuple[str, str], ...] = (
     (
         "assumed: client declared zero cost",
         "suposto: o cliente declarou custo zero",
+    ),
+    (
+        ("assumed slippage: no cost was declared; charged on top of the fees the report itemises"),
+        (
+            "slippage suposto: nenhum custo foi declarado; é cobrado além dos custos que o "
+            "relatório detalha"
+        ),
+    ),
+    (
+        "assumed: no cost declared",
+        "suposto: nenhum custo declarado",
+    ),
+    (
+        "default value, not declared",
+        "valor padrão, não declarado",
     ),
     (
         (
@@ -5817,6 +6317,11 @@ RULES: tuple[tuple[str, str], ...] = (
     (
         "flows, currency conversion or open positions could explain the difference",
         "fluxos, conversão cambial ou posições abertas podem explicar a diferença",
+    ),
+    (
+        "the file prints no running balance of its own to compare with",
+        "o arquivo não imprime um saldo próprio para comparar, então não há nada "
+        "independente para conciliar",
     ),
     (
         "a calibrated heuristic found balance-chain inconsistencies; this alone does not "

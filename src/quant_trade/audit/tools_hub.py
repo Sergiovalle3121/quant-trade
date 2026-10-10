@@ -17,7 +17,7 @@ from typing import Any
 TOOLS_PATH: dict[str, str] = {"es": "/herramientas", "en": "/en/tools", "pt": "/pt/ferramentas"}
 
 #: The tools, in the order the page and the landing show them.
-TOOL_KEYS: tuple[str, ...] = ("calculator", "reading", "check")
+TOOL_KEYS: tuple[str, ...] = ("calculator", "winrate", "reading", "check")
 
 
 def tools_url(locale: str) -> str:
@@ -31,8 +31,8 @@ COPY: dict[str, dict[str, Any]] = {
         "title": "Herramientas gratis para revisar un backtest",
         "seo_title": "Herramientas gratis para backtests e historiales",
         "summary": (
-            "Calculadora de suerte, tarjeta de cifras y comprobación de informes: gratis y sin "
-            "registro. Cifras declaradas y supuestos visibles."
+            "Calculadoras de suerte y de % de aciertos, tarjeta de cifras y comprobación de "
+            "informes: gratis y sin registro. Cifras declaradas y supuestos visibles."
         ),
         "intro": (
             "Todas usan cifras que tú declaras y muestran sus supuestos. No son una auditoría: "
@@ -56,6 +56,17 @@ COPY: dict[str, dict[str, Any]] = {
                 "historial necesarios."
             ),
         },
+        "winrate": {
+            "question": (
+                "¿Tu % de aciertos es real o es la muestra? ¿Qué % necesitas con tu objetivo y "
+                "tu stop?"
+            ),
+            "inputs": "Operaciones, % de aciertos, objetivo y stop en R.",
+            "returns": (
+                "Intervalo de confianza al 95 %, % de aciertos de equilibrio y cuántas "
+                "operaciones hacen falta."
+            ),
+        },
         "reading": {
             "question": "¿Qué dicen en contexto las cifras que publica alguien, o las tuyas?",
             "inputs": (
@@ -76,7 +87,7 @@ COPY: dict[str, dict[str, Any]] = {
         "report_title": "¿Tienes el archivo?",
         "report_text": (
             "Con el archivo que exporta tu plataforma, el informe mide en lugar de suponer: "
-            "significancia, configuraciones probadas, coste de equilibrio, dentro y fuera de "
+            "significancia, configuraciones probadas, costo de equilibrio, dentro y fuera de "
             "muestra, calidad de datos y referencia. El primer informe completo es gratis con "
             "cuenta."
         ),
@@ -94,8 +105,8 @@ COPY: dict[str, dict[str, Any]] = {
         "title": "Free tools to check a backtest",
         "seo_title": "Free tools for backtests and track records",
         "summary": (
-            "Luck calculator, figures card and report check: free and no signup. Declared "
-            "figures and visible assumptions; none of them is an audit."
+            "Luck and win rate calculators, figures card and report check: free and no "
+            "signup. Declared figures and visible assumptions; none of them is an audit."
         ),
         "intro": (
             "Each one uses figures you declare and shows its assumptions. They are not an "
@@ -113,6 +124,16 @@ COPY: dict[str, dict[str, Any]] = {
             "returns": (
                 "The Sharpe luck would show, the Sharpe left after the haircut and the years of "
                 "history needed."
+            ),
+        },
+        "winrate": {
+            "question": (
+                "Is your win rate real, or just the sample? What win rate do you need with your "
+                "target and stop?"
+            ),
+            "inputs": "Trades, win rate, target and stop in R.",
+            "returns": (
+                "95 % confidence interval, break-even win rate and how many trades are needed."
             ),
         },
         "reading": {
@@ -152,8 +173,8 @@ COPY: dict[str, dict[str, Any]] = {
         "title": "Ferramentas grátis para revisar um backtest",
         "seo_title": "Ferramentas grátis para backtests e históricos",
         "summary": (
-            "Calculadora de sorte, cartão de números e conferência de relatórios: grátis e sem "
-            "cadastro. Números declarados e suposições visíveis."
+            "Calculadoras de sorte e de taxa de acerto, cartão de números e conferência de "
+            "relatórios: grátis e sem cadastro. Números declarados e suposições visíveis."
         ),
         "intro": (
             "Todas usam números que você declara e mostram as suas suposições. Não são uma "
@@ -173,6 +194,17 @@ COPY: dict[str, dict[str, Any]] = {
             "returns": (
                 "O Sharpe que a sorte mostraria, o que sobra depois do desconto e os anos de "
                 "histórico necessários."
+            ),
+        },
+        "winrate": {
+            "question": (
+                "Sua taxa de acerto é real ou é a amostra? De que taxa de acerto você "
+                "precisa com o seu alvo e o seu stop?"
+            ),
+            "inputs": "Operações, taxa de acerto, alvo e stop em R.",
+            "returns": (
+                "Intervalo de confiança de 95 %, taxa de acerto de equilíbrio e quantas "
+                "operações são necessárias."
             ),
         },
         "reading": {

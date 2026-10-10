@@ -69,9 +69,23 @@ def test_myfxbook_export() -> None:
     assert report.initial_balance == 1000.0
     assert report.fees == {"commission": pytest.approx(-2.8), "swap": pytest.approx(-0.3)}
     assert report.source_format in ACCOUNT_FORMATS
-    # The open trade's result is kept as the file's floating result.
+    # The open trade's result is kept as the file's floating result. Myfxbook
+    # prints no balance: the one it is compared with is rebuilt by the account
+    # review, never listed among what the platform declares.
     assert report.metadata["declared_floating_pnl"] == "-55.00"
-    assert report.metadata["declared_balance"] == "826.90"
+    assert "declared_balance" not in report.metadata
+    from quant_trade.audit.account import account_review
+
+    review, _ = account_review(
+        source_format=report.source_format,
+        cash_flows=report.cash_flows,
+        trades=trades,
+        frame=parse_equity_csv(report.equity_csv).frame,
+        metadata=dict(report.metadata),
+    )
+    share = review["floating_share"]
+    assert share["value"] == pytest.approx(-55.0 / 826.9)
+    assert "rebuilt" in share["note"] and "prints no balance" in share["note"]
 
 
 MQL5_HISTORY = "\n".join(
@@ -291,6 +305,7 @@ def test_backtest_questions_are_unchanged() -> None:
 
 @pytest.mark.parametrize("locale", ["es", "en"])
 def test_an_account_is_not_asked_for_an_optimisation_date(locale: str) -> None:
+    from quant_trade.audit import ownership
     from quant_trade.audit.engine import run_audit
     from quant_trade.audit.plan import ACCOUNT_TITLES, improvement_plan
     from quant_trade.audit.report import render_html
@@ -298,8 +313,13 @@ def test_an_account_is_not_asked_for_an_optimisation_date(locale: str) -> None:
     from quant_trade.audit.verdict import MEANING, OUT_OF_SAMPLE
 
     data = _myfxbook_without_fee_columns()
+    # Declared as bought: the account wording that asks the provider for the date
+    # (``audit/ownership.py``); with no answer the report speaks neutrally.
     inputs = build_inputs(
-        None, DeclaredMetadata(), report_bytes=data, report_filename="statement.csv"
+        None,
+        DeclaredMetadata(ownership="buyer"),
+        report_bytes=data,
+        report_filename="statement.csv",
     )
     result = run_audit(inputs, bootstrap_samples=50, risk_samples=50, challenge_samples=50)
     out = result.model_dump(mode="json")
@@ -309,6 +329,17 @@ def test_an_account_is_not_asked_for_an_optimisation_date(locale: str) -> None:
     page = render_html(result, watermark=False, locale=locale)
     assert html.escape(MEANING[locale][f"{OUT_OF_SAMPLE}.NOT_MEASURED.account"]) in page
     assert html.escape(MEANING[locale][f"{OUT_OF_SAMPLE}.NOT_MEASURED"]) not in page
+    # No answer: the same account, in the neutral voice, still not about an optimisation.
+    declared = {k: v for k, v in result.declared.items() if k != "ownership"}
+    neutral = render_html(
+        result.model_copy(update={"declared": declared}), watermark=False, locale=locale
+    )
+    voiced = ownership.meaning(
+        OUT_OF_SAMPLE, "NOT_MEASURED", locale, ownership.NEUTRAL, account=True
+    )
+    assert voiced and html.escape(voiced) in neutral
+    assert html.escape(MEANING[locale][f"{OUT_OF_SAMPLE}.NOT_MEASURED"]) not in neutral
+    assert "optimi" not in voiced.lower()
 
 
 def test_a_backtest_keeps_the_optimisation_wording() -> None:

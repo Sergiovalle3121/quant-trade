@@ -196,21 +196,21 @@ def test_legal_copy_matches_once_per_file_and_purchase_notice_rules() -> None:
             "una vez por cuenta, navegador y archivo",
             "el mismo navegador, archivo o buzón lo reciba una sola vez",
             "avisos de compra",
-            "Todas las ventas son finales",
+            "Devolución en 7 días",
         ),
         (
             "en",
             "once per account, browser and file",
             "the same browser, file or inbox gets it only once",
             "purchase or additional-charge",
-            "All sales are final",
+            "7-day refund",
         ),
         (
             "pt",
             "uma vez por conta, navegador e arquivo",
             "o mesmo navegador, arquivo ou caixa de entrada o receba uma só vez",
             "avisos de compra",
-            "Todas as vendas são finais",
+            "Devolução em 7 dias",
         ),
     ):
         terms = re.sub(r"\s+", " ", legal_page(terms_text(ctx, locale), locale=locale))

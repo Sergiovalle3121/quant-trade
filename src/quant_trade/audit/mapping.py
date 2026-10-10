@@ -91,6 +91,7 @@ CARRIED_FIELDS: tuple[str, ...] = (
     "net_of_fees",
     "return_frequency",
     "return_unit",
+    "ownership",
 )
 
 COPY: dict[str, dict[str, str]] = {
@@ -130,6 +131,9 @@ COPY: dict[str, dict[str, str]] = {
             "formulario para añadirlos."
         ),
         "submit": "Auditar con estas columnas",
+        "human": (
+            "¿No sabes cuál es cuál? Escríbenos con el nombre de tu plataforma y lo leemos contigo."
+        ),
         "back": "Volver al formulario",
         "unnamed": "(sin nombre)",
         "unknown": (
@@ -207,6 +211,10 @@ COPY: dict[str, dict[str, str]] = {
             "to add them."
         ),
         "submit": "Audit with these columns",
+        "human": (
+            "Not sure which is which? Write to us with your platform's name and we will read "
+            "it with you."
+        ),
         "back": "Back to the form",
         "unnamed": "(no name)",
         "unknown": (
@@ -282,6 +290,10 @@ COPY: dict[str, dict[str, str]] = {
             "formulário para adicioná-los."
         ),
         "submit": "Auditar com estas colunas",
+        "human": (
+            "Não sabe qual é qual? Escreva para nós com o nome da sua plataforma e nós lemos "
+            "com você."
+        ),
         "back": "Voltar ao formulário",
         "unnamed": "(sem nome)",
         "unknown": (
@@ -856,21 +868,33 @@ def _preview(table: Table, words: Mapping[str, str]) -> str:
     )
 
 
-def mapping_page(
+def _human_line(words: Mapping[str, str], contact_url: str) -> str:
+    """A way to a person when the columns stay unclear; nothing without a contact."""
+    if not contact_url:
+        return ""
+    # The question stays plain text; the offer to write is the link.
+    question, mark, offer = words["human"].partition("? ")
+    if not offer:
+        question, mark, offer = "", "", words["human"]
+    return (
+        f"<p class='muted'>{_e(question + mark)}<a href='{_e(contact_url)}' rel='noopener'>"
+        f"{_e(offer)}</a></p>"
+    )
+
+
+def mapping_fields(
     table: Table,
-    problem: str,
     *,
     locale: str = "es",
-    carried: Mapping[str, str] | None = None,
     chosen: Mapping[str, str] | None = None,
-    guidance_html: str = "",
+    contact_url: str = "",
 ) -> str:
-    """The page that shows the file's columns and asks which is which.
+    """Only the menus that name the columns (``col_*``), grouped, with no form
+    and no file field: the mapping page wraps them, and the upload form shows
+    them in place so the file already chosen is sent again as it is.
 
-    ``problem`` is the refusal in the customer's language, ``carried`` the
-    first upload's other form fields (sent again unchanged), ``chosen`` the
-    columns to preselect (the customer's own choice, else the reader's guess).
-    ``guidance_html`` is trusted, localized rejection guidance with export links.
+    Every column name is escaped in ``_select``; ``contact_url`` adds a line
+    with a way to write to a person.
     """
     locale = _locale(locale)
     words = COPY[locale]
@@ -895,6 +919,30 @@ def mapping_page(
         + "</div></fieldset>"
     )
     groups = curve_group + trade_groups if simple else trade_groups + curve_group
+    return groups + _human_line(words, contact_url)
+
+
+def mapping_page(
+    table: Table,
+    problem: str,
+    *,
+    locale: str = "es",
+    carried: Mapping[str, str] | None = None,
+    chosen: Mapping[str, str] | None = None,
+    guidance_html: str = "",
+    contact_url: str = "",
+) -> str:
+    """The page that shows the file's columns and asks which is which.
+
+    ``problem`` is the refusal in the customer's language, ``carried`` the
+    first upload's other form fields (sent again unchanged), ``chosen`` the
+    columns to preselect (the customer's own choice, else the reader's guess).
+    ``guidance_html`` is trusted, localized rejection guidance with export links;
+    ``contact_url`` adds a way to write to a person under the menus.
+    """
+    locale = _locale(locale)
+    words = COPY[locale]
+    groups = mapping_fields(table, locale=locale, chosen=chosen, contact_url=contact_url)
     hidden = "".join(
         f"<input type='hidden' name='{name}' value='{_e(value)}'>"
         for name, value in (carried or {}).items()

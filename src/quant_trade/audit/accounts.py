@@ -5,7 +5,8 @@ reports they uploaded or saved, the access codes they redeemed or added,
 and what they paid for. It never changes what a report says or how a
 report is unlocked; a report link keeps working without an account. The free
 preview needs one: :data:`FREE_PREVIEWS_PER_MONTH` a month per account, after a
-first full report that is free once (:data:`WELCOME_FULL_REPORT`).
+first full report that is free once while ``AUDIT_WELCOME_FULL_REPORT`` is on
+(``AuditSettings.welcome_full_report``, default :data:`WELCOME_FULL_REPORT`).
 
 Design choices, all standard library:
 
@@ -80,7 +81,9 @@ FREE_PREVIEWS_PER_IPV4_PER_MONTH = 30
 
 #: A new account's first upload comes out as a free full report, once. The
 #: same browser (``DEVICE_COOKIE``) or the same file never gets a second one
-#: on another account, and each network address gets a few a month.
+#: on another account, and each network address gets a few a month. This is
+#: the default of ``AuditSettings.welcome_full_report``, which the service
+#: reads (``AUDIT_WELCOME_FULL_REPORT=false`` sells every full report).
 WELCOME_FULL_REPORT = True
 WELCOME_REPORTS_PER_IP_PER_MONTH = 3
 #: The same for an IPv4 address: a new customer on a phone in Mexico or
@@ -89,6 +92,16 @@ WELCOME_REPORTS_PER_IPV4_PER_MONTH = 10
 #: While e-mail confirmation is off nothing else tells made-up accounts on
 #: one connection apart, so the IPv4 cap stays at the IPv6 one.
 WELCOME_REPORTS_PER_IPV4_UNVERIFIED = 3
+#: Days a preview uploaded before the e-mail was confirmed can still become the
+#: free full report when the address is confirmed (the most recent one only).
+WELCOME_PENDING_DAYS = 7
+#: With ``AUDIT_ANON_PREVIEW`` on, a visitor without an account sees the class
+#: and red flags of a file (a locked preview) this many times a UTC day per
+#: network: an IPv6 /64, or an IPv4 address, which a mobile carrier often
+#: shares among many strangers (CGNAT) and so gets the larger cap
+#: (``network_cap``). Past it, the upload asks for the account.
+ANON_PREVIEWS_PER_NETWORK_PER_DAY = 2
+ANON_PREVIEWS_PER_IPV4_PER_DAY = 6
 #: "Invita a un colega": an account whose invite link brings a new account
 #: gets this many full-report credits once the new account's free first
 #: report exists (so the free tier's browser, file and address limits
@@ -620,6 +633,8 @@ def join_report_key(next_path: str, cookie: str | None) -> str:
 
 
 __all__ = [
+    "ANON_PREVIEWS_PER_IPV4_PER_DAY",
+    "ANON_PREVIEWS_PER_NETWORK_PER_DAY",
     "CSRF_COOKIE",
     "DEVICE_COOKIE",
     "EMAIL_HOOKS",
@@ -649,6 +664,7 @@ __all__ = [
     "WELCOME_REPORTS_PER_IP_PER_MONTH",
     "burn_time",
     "common_password",
+    "claim_day",
     "claim_month",
     "content_fingerprint",
     "hash_password",
@@ -687,6 +703,11 @@ def content_fingerprint(frame: Any) -> str:
 
 def claim_month(at: datetime) -> str:
     return at.strftime("%Y-%m")
+
+
+def claim_day(at: datetime) -> str:
+    """The UTC day the anonymous previews are counted in."""
+    return at.astimezone(UTC).strftime("%Y-%m-%d")
 
 
 def network_address(client_ip: str) -> str:

@@ -182,19 +182,19 @@ def trials_phrase(trials: int, evidence: str, locale: str) -> str:
             "DECLARED": "declarado" if one else "declarados",
             "MEASURED": "contado en los archivos" if one else "contados en los archivos",
         }.get(evidence, TRIAL_SOURCE["es"]["NOT_MEASURED"])
-        return f"{trials} {noun} {source}"
+        return f"{trials:,} {noun} {source}"
     if locale == "pt":
         noun = "tentativa" if one else "tentativas"
         source = {
             "DECLARED": "declarada" if one else "declaradas",
             "MEASURED": "contada nos arquivos" if one else "contadas nos arquivos",
         }.get(evidence, TRIAL_SOURCE["pt"]["NOT_MEASURED"])
-        return f"{trials} {noun} {source}"
+        return f"{trials:,} {noun} {source}"
     noun = "trial" if one else "trials"
     if evidence == "DECLARED":
-        return f"{trials} declared {noun}"
+        return f"{trials:,} declared {noun}"
     source = TRIAL_SOURCE["en"].get(evidence, "declared")
-    return f"{trials} {noun} {source}"
+    return f"{trials:,} {noun} {source}"
 
 
 def assess_multiplicity(
@@ -283,6 +283,7 @@ def assess_costs(
     reference_is_assumption: bool,
     fees_reported: bool = False,
     real_fills: bool = False,
+    cost_declared: bool = True,
     thresholds: Thresholds = DEFAULT_THRESHOLDS,
 ) -> Dimension:
     if not rows:
@@ -296,10 +297,13 @@ def assess_costs(
     at_pass = _row_at(rows, thresholds.cost_pass_multiplier)
     multiple = f"{thresholds.cost_pass_multiplier:g}x"
     inputs: dict[str, Any] = {
+        # A reference the audit assumed is not the client's figure: never DECLARED.
         "reference_bps_per_side": {
             "value": reference_bps,
-            "evidence": "DECLARED",
-            "note": reference_note(reference_is_assumption, fees_reported, real_fills),
+            "evidence": "NOT_MEASURED" if reference_is_assumption else "DECLARED",
+            "note": reference_note(
+                reference_is_assumption, fees_reported, real_fills, cost_declared=cost_declared
+            ),
         },
         "net_pnl_at_1x": measured(at_one.net_pnl) if at_one else not_measured("no 1x row"),
         f"net_pnl_at_{multiple}": (
@@ -824,6 +828,11 @@ MEANING: dict[str, dict[str, str]] = {
             "Con el costo de referencia, las operaciones pierden dinero en neto. "
             "El resultado del backtest depende de no pagar costos."
         ),
+        f"{COSTS}.FAIL.account": (
+            "Con el costo de referencia, las operaciones de esta cuenta pierden dinero en neto. "
+            "Sus precios ya son los del bróker, así que el margen sobre los costos es nulo o "
+            "negativo."
+        ),
         f"{COSTS}.NOT_MEASURED": (
             "Sin la lista de operaciones no se pueden volver a aplicar los costos. "
             "Sube el informe de la plataforma para medirlos."
@@ -860,7 +869,7 @@ MEANING: dict[str, dict[str, str]] = {
         ),
         f"{DATA_QUALITY}.WEAK": (
             "Hay avisos en los datos que conviene aclarar antes de confiar en las cifras. "
-            "Revisa la lista de banderas rojas y las preguntas para el vendedor."
+            "El informe completo enumera cada aviso con su explicación."
         ),
         f"{DATA_QUALITY}.FAIL": (
             "Hay problemas graves en los datos o en la forma de operar. "
@@ -951,6 +960,11 @@ MEANING: dict[str, dict[str, str]] = {
             "At the reference cost, the trades lose money net. "
             "The backtest result depends on paying no costs."
         ),
+        f"{COSTS}.FAIL.account": (
+            "At the reference cost, this account's trades lose money net. "
+            "Its prices are already the broker's fills, so the margin over costs is nil or "
+            "negative."
+        ),
         f"{COSTS}.NOT_MEASURED": (
             "Without the list of trades the costs cannot be re-applied. "
             "Upload the platform report to measure them."
@@ -987,7 +1001,7 @@ MEANING: dict[str, dict[str, str]] = {
         ),
         f"{DATA_QUALITY}.WEAK": (
             "There are warnings in the data worth clearing up before trusting the figures. "
-            "Check the red flags and the questions for the vendor."
+            "The full report lists each warning with its explanation."
         ),
         f"{DATA_QUALITY}.FAIL": (
             "There are serious problems in the data or in the way it trades. "
@@ -1017,9 +1031,15 @@ MEANING: dict[str, dict[str, str]] = {
 }
 
 
-def class_text(overall: str, locale: str = "es") -> str:
-    """The fixed one-line explanation of a class (A to D)."""
+def class_text(overall: str, locale: str = "es", *, kind: str = "backtest") -> str:
+    """The fixed one-line explanation of a class (A to D).
+
+    ``kind`` is ``report.report_kind`` of the upload: an ``"account"`` history
+    or a ``"fund"``'s track record reads its own wording where one exists (C
+    and D), so a public page never calls an account a backtest."""
     texts = _TEXT.get(locale, _TEXT["es"])
+    if kind in ("account", "fund"):
+        return texts.get(f"{overall}.{kind}", texts.get(overall, ""))
     return texts.get(overall, "")
 
 

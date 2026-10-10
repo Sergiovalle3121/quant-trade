@@ -30,9 +30,93 @@ REFERENCES: tuple[str, ...] = (
     "Management 40(5).",
     "Bailey, D. H., Borwein, J., López de Prado, M. y Zhu, Q. J. (2017). The Probability "
     "of Backtest Overfitting. Journal of Computational Finance 20(4).",
+    # The haircut after the search (luck.py), the Sharpe corrected for autocorrelation
+    # (engine.autocorrelation_adjusted_sharpe) and the test for a change in the mean
+    # (breaks.py): the report names all three next to their figures.
+    "Harvey, C. R. y Liu, Y. (2015). Backtesting. Journal of Portfolio Management 42(1).",
+    "Lo, A. W. (2002). The Statistics of Sharpe Ratios. Financial Analysts Journal 58(4).",
+    "Ploberger, W. y Krämer, W. (1992). The CUSUM Test with OLS Residuals. Econometrica 60(2).",
     "Politis, D. N. y Romano, J. P. (1994). The Stationary Bootstrap. Journal of the "
     "American Statistical Association 89(428).",
 )
+
+
+#: The prop-firm challenge simulator's section of the page, from
+#: ``analytics.simulate_challenge`` and its ``CHALLENGE_ASSUMPTIONS`` and the
+#: report's own notes beside the simulator (source, date, open losses). It has
+#: no new figure. Its own table, not ``COPY``: ``report_pt`` installs the
+#: Portuguese ``COPY`` over the English one, which would show this in English.
+CHALLENGE_SECTION: dict[str, tuple[str, list[str]]] = {
+    "es": (
+        "Simulador de retos de prop firm",
+        [
+            "Remuestrea tu historial en bloques de días consecutivos (bootstrap "
+            "estacionario) y recorre miles de caminos diarios por las reglas de una fase "
+            "del reto.",
+            "Cada camino se revisa en cada cierre diario, en este orden: la pérdida diaria, "
+            "la pérdida total y el objetivo, que solo cuenta con los días mínimos operados. "
+            "Cada día con retorno distinto de cero cuenta como día operado.",
+            "Las reglas de cada firma son las publicadas en su web oficial: el informe cita "
+            "la fuente y la fecha en que se leyeron, y pueden haber cambiado después. Las "
+            "reglas genéricas son una referencia típica de las evaluaciones en dos fases, "
+            "no las de ninguna firma.",
+            "Con cierres diarios no se ve el drawdown flotante dentro del día, y un balance "
+            "de operaciones cerradas no ve las pérdidas de las operaciones abiertas: una "
+            "firma que cuenta la pérdida diaria con posiciones abiertas puede cortar un "
+            "camino que aquí sigue en marcha. Por eso la estimación es optimista frente a "
+            "los límites diarios y totales; si tu plataforma imprime un drawdown con "
+            "operaciones abiertas mayor que el límite total, el informe lo avisa junto al "
+            "simulador.",
+            "Es una estimación remuestreada del historial aportado, no una predicción, y "
+            "supone que el futuro se parece al historial. No cambia la clase.",
+        ],
+    ),
+    "en": (
+        "Prop-firm challenge simulator",
+        [
+            "It resamples your history in blocks of consecutive days (stationary bootstrap) "
+            "and walks thousands of daily paths through the rules of one challenge phase.",
+            "Each path is checked at every daily close, in this order: the daily loss, the "
+            "total loss and the target, which only counts once the minimum trading days are "
+            "reached. Every day with a non-zero return counts as a trading day.",
+            "Each firm's rules are those posted on its official website: the report cites "
+            "the source and the date they were read, and they may have changed since. The "
+            "generic rules are a reference typical of two-step evaluations, not any one "
+            "firm's terms.",
+            "Daily closes cannot see floating drawdown within the day, and a closed-trade "
+            "balance cannot see the losses of open trades: a firm that counts the daily loss "
+            "with open positions can stop a path that is still running here. That is why the "
+            "estimate is optimistic against the daily and total limits; when your platform "
+            "prints an open-trade drawdown beyond the total limit, the report says so next "
+            "to the simulator.",
+            "It is a resampled estimate from the supplied history, not a prediction, and it "
+            "assumes the future resembles the history. It does not change the class.",
+        ],
+    ),
+    "pt": (
+        "Simulador de desafios de prop firm",
+        [
+            "Reamostra o seu histórico em blocos de dias consecutivos (bootstrap "
+            "estacionário) e percorre milhares de caminhos diários pelas regras de uma fase "
+            "do desafio.",
+            "Cada caminho é revisado em cada fechamento diário, nesta ordem: a perda "
+            "diária, a perda total e o objetivo, que só conta depois dos dias mínimos "
+            "operados. Cada dia com retorno diferente de zero conta como dia operado.",
+            "As regras de cada mesa são as publicadas no site oficial dela: o relatório cita "
+            "a fonte e a data em que foram lidas, e elas podem ter mudado depois. As regras "
+            "genéricas são uma referência típica das avaliações em duas fases, não as de "
+            "nenhuma mesa.",
+            "Com fechamentos diários não se vê o drawdown flutuante dentro do dia, e um saldo "
+            "de operações fechadas não vê as perdas das operações abertas: uma mesa que conta "
+            "a perda diária com posições abertas pode encerrar um caminho que aqui continua. "
+            "Por isso a estimativa é otimista frente aos limites diários e totais; quando a "
+            "sua plataforma imprime um drawdown com operações abertas além do limite total, "
+            "o relatório avisa junto ao simulador.",
+            "É uma estimativa reamostrada do histórico fornecido, não uma previsão, e supõe "
+            "que o futuro se parece com o histórico. Não muda a classe.",
+        ],
+    ),
+}
 
 
 #: The references join their authors with the Spanish "y"; each page uses its own word.
@@ -208,6 +292,24 @@ COPY: dict[str, dict[str, object]] = {
             ("NOT_MEASURED", "Faltaban datos para medirlo, y el informe dice cuáles."),
         ],
         "flags_title": "Las banderas rojas que revisamos",
+        "resampling_title": "Remuestreo y Monte Carlo",
+        "resampling": [
+            "Varias cifras del informe salen de simulaciones de Monte Carlo: miles de sorteos "
+            "sobre el historial que subes, resumidos en percentiles y probabilidades.",
+            "Prueba de azar: un bootstrap estacionario por bloques de los retornos da el "
+            "percentil 5 del Sharpe que pide la primera pregunta.",
+            "Riesgo remuestreado a un año: historias de un año armadas con bloques de los "
+            "retornos (bootstrap estacionario) dan la caída máxima mediana, la de 1 de cada 20 "
+            "y la probabilidad de cada caída.",
+            "Órdenes al azar: los mismos retornos barajados, con el mismo Sharpe y el mismo "
+            "resultado final, dicen si la peor caída del archivo es habitual para ellos. Con "
+            "operaciones, la racha perdedora más larga se compara con la de las mismas "
+            "operaciones en orden al azar, calculada de forma exacta.",
+            "Un Monte Carlo supone que el orden del historial es intercambiable y remuestrea lo "
+            "que este contiene: no corrige el sobreajuste ni la búsqueda de configuraciones, que "
+            "miden el Sharpe deflactado, el PBO y el tramo fuera de muestra. El riesgo "
+            "remuestreado, los órdenes al azar y las rachas no cambian la clase.",
+        ],
         "repro_title": "Reproducible",
         "repro": [
             "Cada archivo queda identificado por su huella SHA-256 en el informe.",
@@ -285,6 +387,24 @@ COPY: dict[str, dict[str, object]] = {
             ("NOT_MEASURED", "Data to measure it was missing, and the report says which."),
         ],
         "flags_title": "The red flags we check",
+        "resampling_title": "Resampling and Monte Carlo",
+        "resampling": [
+            "Several figures in the report come from Monte Carlo simulations: thousands of draws "
+            "on the history you upload, summarised as percentiles and probabilities.",
+            "Test against chance: a stationary block bootstrap of the returns gives the 5th "
+            "percentile Sharpe the first question requires.",
+            "Resampled one-year risk: one-year histories built from blocks of the returns "
+            "(stationary bootstrap) give the median maximum drawdown, the 1-in-20 one and the "
+            "probability of each fall.",
+            "Random orders: the same returns shuffled, with the same Sharpe and final result, "
+            "show whether the file's worst fall is usual for them. With trades, the longest "
+            "losing streak is compared with that of the same trades in random order, computed "
+            "exactly.",
+            "A Monte Carlo assumes the history's order is exchangeable and resamples what the "
+            "history contains: it does not correct overfitting or the search for configurations, "
+            "which deflated Sharpe, PBO and the out-of-sample stretch measure. The resampled "
+            "risk, the random orders and the streaks do not change the class.",
+        ],
         "repro_title": "Reproducible",
         "repro": [
             "Every file is identified in the report by its SHA-256 fingerprint.",
@@ -366,6 +486,24 @@ COPY: dict[str, dict[str, object]] = {
             ("NOT_MEASURED", "Faltavam dados para medir, e o relatório diz quais."),
         ],
         "flags_title": "As bandeiras vermelhas que revisamos",
+        "resampling_title": "Reamostragem e Monte Carlo",
+        "resampling": [
+            "Vários números do relatório saem de simulações de Monte Carlo: milhares de sorteios "
+            "sobre o histórico que você envia, resumidos em percentis e probabilidades.",
+            "Teste contra o acaso: um bootstrap estacionário por blocos dos retornos dá o "
+            "percentil 5 do Sharpe que a primeira pergunta exige.",
+            "Risco reamostrado em um ano: históricos de um ano montados com blocos dos retornos "
+            "(bootstrap estacionário) dão a queda máxima mediana, a de 1 em cada 20 e a "
+            "probabilidade de cada queda.",
+            "Ordens aleatórias: os mesmos retornos embaralhados, com o mesmo Sharpe e o mesmo "
+            "resultado final, mostram se a pior queda do arquivo é habitual para eles. Com "
+            "operações, a maior sequência de perdas é comparada com a das mesmas operações em "
+            "ordem aleatória, calculada de forma exata.",
+            "Um Monte Carlo supõe que a ordem do histórico é intercambiável e reamostra o que "
+            "ele contém: não corrige o sobreajuste nem a busca de configurações, que o Sharpe "
+            "deflacionado, o PBO e o trecho fora da amostra medem. O risco reamostrado, as "
+            "ordens aleatórias e as sequências não mudam a classe.",
+        ],
         "repro_title": "Reproduzível",
         "repro": [
             "Cada arquivo fica identificado no relatório pela sua impressão digital SHA-256.",
@@ -420,4 +558,12 @@ COPY: dict[str, dict[str, object]] = {
 }
 
 
-__all__ = ["COPY", "METHOD_PATH", "REFERENCES", "dimension_rows", "method_url", "references"]
+__all__ = [
+    "CHALLENGE_SECTION",
+    "COPY",
+    "METHOD_PATH",
+    "REFERENCES",
+    "dimension_rows",
+    "method_url",
+    "references",
+]

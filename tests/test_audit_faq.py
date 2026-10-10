@@ -16,9 +16,20 @@ pytest.importorskip("sqlalchemy")
 
 from fastapi.testclient import TestClient  # noqa: E402
 
-from quant_trade.audit.faq import FAQ_COPY, FAQ_PATH, faq_items, faq_page  # noqa: E402
+from quant_trade.audit.faq import (  # noqa: E402
+    FAQ_COPY,
+    FAQ_PATH,
+    faq_items,
+    faq_page,
+    landing_only_questions,
+)
 from quant_trade.audit.guard import find_claims  # noqa: E402
-from quant_trade.audit.pages import CONTACT_COPY, card_markets_line  # noqa: E402
+from quant_trade.audit.pages import (  # noqa: E402
+    _COPY,
+    _LANDING_FAQ,
+    CONTACT_COPY,
+    card_markets_line,
+)
 from quant_trade.audit.report import evidence_label  # noqa: E402
 from quant_trade.audit.seo import PUBLIC_PAGES  # noqa: E402
 from quant_trade.audit.settings import AuditSettings  # noqa: E402
@@ -27,6 +38,9 @@ from quant_trade.audit.web import create_app  # noqa: E402
 
 BASE = "https://audit.example"
 LOCALES = ("es", "en", "pt")
+#: Eleven questions of this page, plus the landing's questions it does not show
+#: (five; six in Portuguese, which also answers the report's language).
+COUNT = {"es": 16, "en": 16, "pt": 17}
 
 
 def _settings(**environ: str) -> AuditSettings:
@@ -51,7 +65,7 @@ def _card_settings(**environ: str) -> AuditSettings:
 
 
 @pytest.mark.parametrize("locale", LOCALES)
-def test_ten_localized_questions_and_all_copy_pass_the_guard(locale: str) -> None:
+def test_every_localized_question_and_all_copy_pass_the_guard(locale: str) -> None:
     configurations = (
         AuditSettings(),
         _settings(AUDIT_EMAIL_VERIFICATION_REQUIRED="true"),
@@ -59,8 +73,8 @@ def test_ten_localized_questions_and_all_copy_pass_the_guard(locale: str) -> Non
     )
     for settings in configurations:
         pairs = faq_items(settings, locale)
-        assert len(pairs) == 10
-        assert len({question for question, _ in pairs}) == 10
+        assert len(pairs) == COUNT[locale]
+        assert len({question for question, _ in pairs}) == COUNT[locale]
         for question, answer in pairs:
             assert question and answer
             assert find_claims(question) == []
@@ -78,7 +92,8 @@ def test_ten_localized_questions_and_all_copy_pass_the_guard(locale: str) -> Non
 def test_prices_follow_settings_and_free_mode(locale: str) -> None:
     first = _settings(AUDIT_PRICE_USD_CENTS="1735")
     second = _settings(AUDIT_PRICE_USD_CENTS="4860")
-    assert evidence_label("DECLARED", locale) + " · " in faq_items(first, locale)[0][1]
+    # The price is the operator's own setting, said plainly: no evidence label.
+    assert evidence_label("DECLARED", locale) not in faq_items(first, locale)[0][1]
     assert f"USD {first.price_usd:.2f}" in faq_items(first, locale)[0][1]
     assert f"USD {second.price_usd:.2f}" in faq_items(second, locale)[0][1]
     assert f"USD {first.price_usd:.2f}" not in faq_items(second, locale)[0][1]
@@ -94,7 +109,8 @@ def test_card_countries_come_only_from_active_runtime_markets(locale: str) -> No
         assert settings.card_public
         answer = faq_items(settings, locale)[1][1]
         expected = card_markets_line(tuple(settings.approved_markets), locale)
-        assert answer.startswith(evidence_label("DECLARED", locale) + " · " + expected)
+        assert answer.startswith(expected)
+        assert evidence_label("DECLARED", locale) not in answer
         assert find_claims(answer) == []
     active = _card_settings(AUDIT_APPROVED_MARKETS="MX")
     empty = _card_settings(AUDIT_APPROVED_MARKETS="")
@@ -119,19 +135,28 @@ def test_retention_upload_limit_and_contact_follow_configuration(locale: str) ->
     )
     pairs = faq_items(settings, locale)
     declared = evidence_label("DECLARED", locale)
-    assert declared in pairs[2][1] and "7 MB" in pairs[2][1]
-    assert declared in pairs[7][1] and str(settings.retention_days) in pairs[7][1]
-    assert "30" not in pairs[7][1]
+    # 7 MiB is more than the readers take: a curve or a trade list stops at their
+    # 5 MB, a platform report at the importers' 10 MB (upload_limits), so 7.3 MB is
+    # never promised. The operator's limits carry no evidence label.
+    seven = "7.3 MB" if locale == "en" else "7,3 MB"
+    assert declared not in pairs[2][1] and seven not in pairs[2][1]
+    assert "5 MB" in pairs[2][1] and "10 MB" in pairs[2][1]
+    # A smaller setting is said as it is: 3 MiB a trade list, twice that a report.
+    smaller = faq_items(replace(settings, max_upload_bytes=3 * 1024 * 1024), locale)
+    three, six = ("3.1 MB", "6.3 MB") if locale == "en" else ("3,1 MB", "6,3 MB")
+    assert three in smaller[2][1] and six in smaller[2][1]
+    assert declared not in pairs[8][1] and str(settings.retention_days) in pairs[8][1]
+    assert "30" not in pairs[8][1]
     # The FAQ must preserve legal.py's exception for the first free full report.
     first_free = {
         "es": "primer informe completo gratis",
         "en": "first free full report",
         "pt": "primeiro relatório completo grátis",
     }
-    assert first_free[locale] in pairs[7][1]
-    assert settings.operator_contact in pairs[9][1]
-    assert settings.contact_url in pairs[9][1]
-    assert CONTACT_COPY[locale]["none"] in faq_items(AuditSettings(), locale)[9][1]
+    assert first_free[locale] in pairs[8][1]
+    assert settings.operator_contact in pairs[-1][1]
+    assert settings.contact_url in pairs[-1][1]
+    assert CONTACT_COPY[locale]["none"] in faq_items(AuditSettings(), locale)[-1][1]
 
 
 @pytest.mark.parametrize("locale", LOCALES)
@@ -143,7 +168,7 @@ def test_faq_json_is_valid_and_matches_every_visible_answer(locale: str) -> None
     data = json.loads(blocks[0])
     assert data["@context"] == "https://schema.org"
     assert data["@type"] == "FAQPage"
-    assert len(data["mainEntity"]) == 10
+    assert len(data["mainEntity"]) == COUNT[locale]
     for entry, (question, answer) in zip(
         data["mainEntity"], faq_items(settings, locale), strict=True
     ):
@@ -154,6 +179,36 @@ def test_faq_json_is_valid_and_matches_every_visible_answer(locale: str) -> None
         }
         assert f"<summary>{html.escape(question, quote=True)}</summary>" in page
         assert f"<p>{html.escape(answer, quote=True)}</p>" in page
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+def test_the_landing_questions_it_does_not_show_are_answered_here(locale: str) -> None:
+    # The landing shows six questions and links this page for the rest: each of
+    # those answers is public here, worded as on the landing, before the contact one.
+    rest = landing_only_questions(locale)
+    shown = set(_LANDING_FAQ[locale])
+    assert rest == tuple(
+        pair for index, pair in enumerate(_COPY[locale]["faq"]) if index not in shown
+    )
+    assert len(rest) == COUNT[locale] - 11
+    pairs = faq_items(AuditSettings(), locale)
+    assert pairs[10 : 10 + len(rest)] == rest
+    contact = {"es": "contacto", "en": "contact", "pt": "contato"}[locale]
+    assert contact in pairs[-1][0]
+    page = faq_page(AuditSettings(), locale=locale)
+    for question, answer in rest:
+        assert find_claims(question) == [] and find_claims(answer) == []
+        assert f"<summary>{html.escape(question, quote=True)}</summary>" in page
+        assert f"<p>{html.escape(answer, quote=True)}</p>" in page
+    # A forgotten password, how an account is protected and the badge, by name.
+    topics = {
+        "es": ("contraseña", "protegida", "sello"),
+        "en": ("password", "protected", "badge"),
+        "pt": ("senha", "protegida", "selo"),
+    }[locale]
+    questions = " ".join(question for question, _ in rest)
+    assert all(topic in questions for topic in topics)
+    assert landing_only_questions("xx") == landing_only_questions("es")
 
 
 def test_dynamic_contact_is_escaped_in_visible_copy_and_json() -> None:

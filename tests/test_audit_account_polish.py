@@ -639,16 +639,16 @@ def test_a_new_password_that_is_refused_says_why(tmp_path: Path, locale: str) ->
     )
 
 
-# -- C12: buying by WhatsApp says the sale is final -----------------------------------
+# -- C12: buying by WhatsApp says the 7-day refund of the terms ----------------------
 @pytest.mark.parametrize(
     ("locale", "words"),
     [
-        ("es", "la compra no es reembolsable"),
-        ("en", "the purchase is not refundable"),
-        ("pt", "a compra não é reembolsável"),
+        ("es", "devolución en 7 días según los términos"),
+        ("en", "refund within 7 days under the terms"),
+        ("pt", "devolução em 7 dias conforme os termos"),
     ],
 )
-def test_buying_by_whatsapp_says_the_sale_is_final(locale: str, words: str) -> None:
+def test_buying_by_whatsapp_says_the_refund(locale: str, words: str) -> None:
     copy = account_pages.COPY[locale]
     assert words in copy["buy_final_sale_note"] and words in copy["buy_final_sale"]
     page = _page(locale)

@@ -97,9 +97,15 @@ def test_trader_pages_link_the_universal_csv_guide(tmp_path: Path) -> None:
     client = _client(tmp_path)
     assert "/guias/csv-universal" in client.get("/para/traders-acciones-futuros-cripto").text
     assert "/guides/universal-csv" in client.get("/for/stock-futures-crypto-traders").text
-    # The landing names the formats it recognises and links the same guide.
-    assert "/guias/csv-universal" in client.get("/").text
-    assert "/guides/universal-csv" in client.get("/en").text
+    # The short landing links the export guides, whose index lists the same guide.
+    from quant_trade.audit.guides import guides_index_url
+
+    for locale, home, guide in (
+        ("es", "/", "/guias/csv-universal"),
+        ("en", "/en", "/guides/universal-csv"),
+    ):
+        assert f"href='{guides_index_url(locale)}'" in client.get(home).text
+        assert guide in client.get(guides_index_url(locale)).text
 
 
 def test_named_platforms_match_the_universal_guide_and_show_on_the_pages(tmp_path: Path) -> None:
@@ -206,11 +212,18 @@ def test_prop_page_counts_firm_challenges_apart_from_the_generic_one(tmp_path: P
     from quant_trade.audit.prop_presets import PRESETS
 
     firms = sum(1 for rules in PRESETS.values() if rules.firm != "Generic")
+    programs = len({(r.firm, r.program) for r in PRESETS.values() if r.firm != "Generic"})
     assert firms == len(PRESETS) - 1
+    # Each preset is one rule set of a firm's program (The5ers' Bootcamp one holds
+    # for each of its three steps): the page counts rule sets and programs.
+    assert programs < firms
     client = _client(tmp_path)
     es = client.get("/para/retos-prop-firm").text
     en = client.get("/for/prop-firm-challenges").text
     pt = client.get(audience_url("retos-prop-firm", "pt")).text
-    assert f"{firms} retos de FTMO" in es and "más un reto genérico" in es
-    assert f"{firms} FTMO, FundedNext" in en
-    assert f"{firms} desafios da FTMO" in pt
+    assert f"{firms} juegos de reglas de {programs} programas de FTMO" in es
+    assert "más la fase 1 de un reto genérico de dos fases" in es
+    assert f"{firms} rule sets from {programs} FTMO, FundedNext" in en
+    assert f"{firms} conjuntos de regras de {programs} programas da FTMO" in pt
+    assert f"{firms} fases de" not in es and f"{firms} phases of" not in en
+    assert f"{firms} retos de FTMO" not in es and f"{firms} desafios da FTMO" not in pt

@@ -28,9 +28,10 @@ from quant_trade.audit.articles import (  # noqa: E402
     article_url,
     articles_index_url,
     find_article,
+    next_step_links,
     related_links,
 )
-from quant_trade.audit.calculator import CalculatorInput, calculator_url, compute  # noqa: E402
+from quant_trade.audit.calculator import CalculatorInput, compute  # noqa: E402
 from quant_trade.audit.guard import find_claims  # noqa: E402
 from quant_trade.audit.guides import GUIDES_COPY, guides_index_url  # noqa: E402
 from quant_trade.audit.pages import CONTACT_PATHS, article_page, audit_path  # noqa: E402
@@ -98,6 +99,8 @@ def test_the_data_has_the_shape_the_writer_pastes() -> None:
         "que-hacer-despues-del-backtest",
         "cuantas-operaciones-porcentaje-aciertos",
         "lo-eligio-el-optimizador",
+        "monte-carlo-backtest",
+        "rachas-perdedoras",
     ]
     for entry in ARTICLES_DATA:
         assert DATA_KEYS <= set(entry) <= DATA_KEYS | {"seo_title"}, entry["key"]
@@ -117,8 +120,10 @@ def test_the_data_has_the_shape_the_writer_pastes() -> None:
                 "method",
                 "contact",
                 "samples",
+                "sample",
                 "reading",
                 "article",
+                "winrate",
             }
             assert ("slug" in link) == (link["kind"] in {"guide", "audience"})
             assert ("key" in link) == (link["kind"] == "article")
@@ -187,6 +192,16 @@ def test_every_article_exists_in_every_language_and_passes_the_guard() -> None:
             "es": "lo-eligio-el-optimizador",
             "en": "did-the-optimizer-pick-your-result",
             "pt": "o-otimizador-escolheu-o-resultado",
+        },
+        "monte-carlo-backtest": {
+            "es": "monte-carlo-backtest",
+            "en": "monte-carlo-backtest-what-it-shows",
+            "pt": "monte-carlo-backtest-o-que-mostra",
+        },
+        "rachas-perdedoras": {
+            "es": "rachas-perdedoras",
+            "en": "losing-streaks-how-many-are-normal",
+            "pt": "sequencias-de-perdas",
         },
     }
     for article in ARTICLES:
@@ -281,10 +296,11 @@ def test_article_pages_render_with_metadata_and_a_language_switch(tmp_path: Path
                     locale,
                     href,
                 )
-            # The closing call: the free calculator and the form, no promise.
-            assert f"href='{calculator_url(locale)}'" in text
+            # The closing call: the article's own next step and the form, no promise.
+            for label, href in next_step_links(article, locale):
+                assert f"href='{html.escape(href, quote=True)}'" in text, (article.key, href)
+                assert html.escape(label, quote=True) in text, (article.key, label)
             assert f"href='{audit_path(locale)}'" in text
-            assert html.escape(ARTICLES_COPY[locale]["calculator"], quote=True) in text
             assert html.escape(ARTICLES_COPY[locale]["report"], quote=True) in text
             assert "<section class='article-cta'><h2>" in text
             assert find_claims(text) == []
@@ -340,6 +356,48 @@ def test_the_sitemap_and_the_route_tables_list_every_article(tmp_path: Path) -> 
             assert BASE + article_url(article.key, locale) in locs, (article.key, locale)
 
 
+def test_the_sitemap_dates_each_article_with_its_publication_date(tmp_path: Path) -> None:
+    from datetime import date
+
+    from quant_trade.audit.articles import ARTICLE_PUBLICATION_DATES
+
+    client = _client(tmp_path)
+    root = ElementTree.fromstring(client.get("/sitemap.xml").content)
+    dated = {
+        url.findtext("s:loc", namespaces=SITEMAP_NS): url.findtext(
+            "s:lastmod", namespaces=SITEMAP_NS
+        )
+        for url in root.findall("s:url", SITEMAP_NS)
+    }
+    for locale in LOCALES:
+        for article in ARTICLES:
+            lastmod = dated[BASE + article_url(article.key, locale)]
+            assert lastmod is not None, (article.key, locale)
+            assert re.fullmatch(r"\d{4}-\d{2}-\d{2}", lastmod), lastmod
+            assert date.fromisoformat(lastmod).isoformat() == lastmod
+            assert lastmod == ARTICLE_PUBLICATION_DATES[article.key]
+            # The page's own structured data gives the same date.
+            page = client.get(article_url(article.key, locale)).text
+            assert f'"dateModified": "{lastmod}"' in page
+        # The index changes with its newest article.
+        newest = max(ARTICLE_PUBLICATION_DATES.values())
+        assert dated[BASE + articles_index_url(locale)] == newest
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+def test_the_index_description_names_the_current_topics_within_limits(
+    tmp_path: Path, locale: str
+) -> None:
+    page = _client(tmp_path).get(articles_index_url(locale)).text
+    description = _meta(page, "description")
+    assert description == ARTICLES_COPY[locale]["summary"]
+    assert 50 <= len(description) <= 160, len(description)
+    assert find_claims(description) == []
+    # The topics of the current articles, not only the first three.
+    for topic in ("backtests", "MT5", "Sharpe", "prop firms"):
+        assert topic in description, topic
+
+
 def test_the_guides_index_links_the_articles(tmp_path: Path) -> None:
     client = _client(tmp_path)
     for locale in LOCALES:
@@ -375,7 +433,7 @@ def test_institutional_articles_length_and_calculator_evidence(locale: str) -> N
         assert 700 <= len(_text(prose.group(1)).split()) <= 1100, (article.key, locale)
 
     example = INDEPENDENT_LUCK_EXAMPLE[locale]
-    assert example.startswith("DECLARED ·")
+    assert not example.startswith("DECLARED")
     expected = compute(LUCK_EXAMPLE_INPUT)["luck_sharpe"]["value"]
     expected_text = f"{expected:.2f}"
     assert (expected_text if locale == "en" else expected_text.replace(".", ",")) in example

@@ -223,6 +223,8 @@ def test_accounts_reports_and_payments_follow_their_tag(tmp_path: Path) -> None:
         "uploads": 2,
         "welcome": 1,
         "previews": 1,
+        "anon_previews": 0,
+        "anon_linked": 0,
         "referrals_accepted": 0,
         "checkout_started": 0,
         "credit_used": 1,

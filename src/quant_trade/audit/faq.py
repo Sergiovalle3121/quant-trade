@@ -6,7 +6,9 @@ payments nor performs retention, publication, account or contact operations.
 
 from __future__ import annotations
 
+from quant_trade.audit import paid_offer
 from quant_trade.audit.settings import AuditSettings
+from quant_trade.audit.upload_limits import upload_limit_text
 
 FAQ_PATH: dict[str, str] = {"es": "/preguntas", "en": "/en/faq", "pt": "/pt/perguntas"}
 FAQ_COPY: dict[str, dict[str, str]] = {
@@ -52,6 +54,46 @@ FAQ_COPY: dict[str, dict[str, str]] = {
     },
 }
 
+# Sources: web.publish/publish_locked, legal.terms_text badge section,
+# legal.privacy_text publication retention and pages.verification_page allow-list.
+# Its answer on the page ends with a link to both samples' public pages
+# (sample_publication).
+_PUBLICATION: dict[str, tuple[str, str]] = {
+    "es": (
+        "¿Cómo se publica una página de verificación?",
+        "Desde tu informe completo puedes elegir publicar su página de verificación "
+        "y retirarla después. Muestra la clase, las dimensiones, qué se auditó, el "
+        "periodo de los datos, las huellas de los archivos, las fechas y un aviso fijo; "
+        "nunca tus archivos, operaciones, descripción ni enlace privado. El sello "
+        "enlaza a esa página y no es una promesa de resultados.",
+    ),
+    "en": (
+        "How do I publish a verification page?",
+        "From your full report you can choose to publish its verification page and "
+        "withdraw it later. It shows the class, dimensions, what was audited, the "
+        "data period, file hashes, dates and a fixed notice; never your files, "
+        "trades, description or private link. The badge links to that page and is "
+        "not a promise of results.",
+    ),
+    "pt": (
+        "Como publico uma página de verificação?",
+        "No relatório completo você pode escolher publicar a página de verificação "
+        "e retirá-la depois. Ela mostra a classe, as dimensões, o que foi auditado, o "
+        "período dos dados, as impressões digitais dos arquivos, as datas e um aviso "
+        "fixo; nunca arquivos, operações, descrição ou link privado. O selo aponta "
+        "para essa página e não é uma promessa de resultados.",
+    ),
+}
+
+#: The landing's question on the badge (``pages._COPY[locale]['faq']``), answered on
+#: this page (``landing_only_questions``): its answer also ends with both samples'
+#: public pages, where the badge can be seen before publishing.
+BADGE_QUESTION: dict[str, str] = {
+    "es": "¿Cómo se usa el sello?",
+    "en": "How is the badge used?",
+    "pt": "Como se usa o selo?",
+}
+
 # Every answer cites the existing source of its behavior. Placeholders are
 # resolved at request time, so prices, countries and retention cannot go stale.
 _QUESTIONS: tuple[dict[str, tuple[str, str]], ...] = (
@@ -88,33 +130,34 @@ _QUESTIONS: tuple[dict[str, tuple[str, str]], ...] = (
         "pt": ("De quais países é possível pagar com cartão?", "{markets}"),
     },
     # Sources: pages._COPY['report_short'/'report_help'/'faq'], portuguese.COPY_PT;
-    # settings.AuditSettings.max_upload_bytes controls the configured size limit.
+    # upload_limits.upload_limit_text words each field's limit from
+    # settings.AuditSettings.max_upload_bytes and the readers' own ceilings, as the
+    # upload form does.
     {
         "es": (
             "¿Qué formatos acepta Rigor?",
             "Informes HTML de MetaTrader, listas de operaciones CSV o XLSX de TradingView, "
             "historiales CSV o Excel de cuentas y series de equity o retornos. También "
             "estados de cuenta PDF con tabla de operaciones: revisas sus columnas antes "
-            "de medir. DECLARED · Límite por archivo: {upload_mb} MB. Las guías explican "
-            "cómo exportar desde cada plataforma.",
+            "de medir. {upload_limit} Las guías explican cómo exportar desde cada "
+            "plataforma.",
         ),
         "en": (
             "Which file formats does Rigor accept?",
             "MetaTrader HTML reports, TradingView CSV or XLSX trade lists, CSV or Excel "
             "account histories, and equity or return series. PDF statements with a trade "
-            "table also work: you review their columns before measuring. DECLARED · "
-            "Limit per file: {upload_mb} MB. The guides explain how to export from each platform.",
+            "table also work: you review their columns before measuring. {upload_limit} "
+            "The guides explain how to export from each platform.",
         ),
         "pt": (
             "Quais formatos a Rigor aceita?",
             "Relatórios HTML do MetaTrader, listas de operações CSV ou XLSX do TradingView, "
             "históricos de contas em CSV ou Excel e séries de equity ou retornos. Também "
             "extratos PDF com tabela de operações: você revisa as colunas antes de medir. "
-            "DECLARED · Limite por arquivo: {upload_mb} MB. Os guias explicam como "
-            "exportar de cada plataforma.",
+            "{upload_limit} Os guias explicam como exportar de cada plataforma.",
         ),
     },
-    # Sources: legal.terms_text service scope and pages.TRUST_COPY: no broker access,
+    # Sources: legal.terms_text service scope and pages._COPY['not']: no broker access,
     # execution, strategies or signals; pages._COPY['faq'] rules out forecasts.
     {
         "es": (
@@ -215,12 +258,44 @@ _QUESTIONS: tuple[dict[str, tuple[str, str]], ...] = (
             "seleção entre muitas tentativas; não reconstrói buscas que você não enviou.",
         ),
     },
+    # Sources: engine._risk (analytics.drawdown_risk, shuffled_drawdown) with the
+    # seed run_audit records, engine._bootstrap feeding verdict's bootstrap p5 Sharpe,
+    # and method.COPY['resampling']. Resampled risk does not enter the verdict.
+    {
+        "es": (
+            "¿Hace Rigor una simulación de Monte Carlo?",
+            "Sí, sobre el historial que aportas. El riesgo remuestreado arma miles de "
+            "historias de un año con bloques de tus retornos (bootstrap estacionario) y el "
+            "bootstrap del Sharpe alimenta la prueba de azar, con una semilla fija que el "
+            "informe imprime. Describen la dispersión si el orden fuera intercambiable; no son "
+            "una predicción ni corrigen el sobreajuste, que miden el Sharpe deflactado y el "
+            "tramo fuera de muestra.",
+        ),
+        "en": (
+            "Does Rigor run a Monte Carlo simulation?",
+            "Yes, on the history you supply. Resampled risk builds thousands of one-year "
+            "histories from blocks of your returns (stationary bootstrap) and the Sharpe "
+            "bootstrap feeds the test against chance, with a fixed seed the report prints. "
+            "They describe the spread if the order were exchangeable; they are not a "
+            "prediction and do not correct overfitting, which deflated Sharpe and the "
+            "out-of-sample stretch measure.",
+        ),
+        "pt": (
+            "A Rigor faz uma simulação de Monte Carlo?",
+            "Sim, sobre o histórico que você envia. O risco reamostrado monta milhares de "
+            "históricos de um ano com blocos dos seus retornos (bootstrap estacionário) e o "
+            "bootstrap do Sharpe alimenta o teste contra o acaso, com uma semente fixa que o "
+            "relatório imprime. Descrevem a dispersão se a ordem fosse intercambiável; não são "
+            "uma previsão nem corrigem o sobreajuste, que o Sharpe deflacionado e o trecho fora "
+            "da amostra medem.",
+        ),
+    },
     # Sources: legal.privacy_text retention sections, including the first-free-report
     # exception and the public allow-list retained after a purge, in every language.
     {
         "es": (
             "¿Qué ocurre con mis archivos y cuánto tiempo se guardan?",
-            "Tus archivos no se publican. DECLARED · Las auditorías no pagadas se "
+            "Tus archivos no se publican. Las auditorías no pagadas se "
             "eliminan a los {retention} días; quedan datos mínimos del registro. Las "
             "pagadas y el primer informe completo gratis se conservan hasta que los "
             "borres con tu cuenta o solicites su borrado. Una página de verificación "
@@ -229,7 +304,7 @@ _QUESTIONS: tuple[dict[str, tuple[str, str]], ...] = (
         ),
         "en": (
             "What happens to my files and how long are they kept?",
-            "Your files are not published. DECLARED · Unpaid audits are deleted after "
+            "Your files are not published. Unpaid audits are deleted after "
             "{retention} days; minimal registry data remains. Paid audits and the first "
             "free full report are kept until you delete them with your account or "
             "request deletion. A verification page you published keeps only its public "
@@ -238,7 +313,7 @@ _QUESTIONS: tuple[dict[str, tuple[str, str]], ...] = (
         ),
         "pt": (
             "O que acontece com meus arquivos e por quanto tempo são guardados?",
-            "Seus arquivos não são publicados. DECLARED · Auditorias não pagas são "
+            "Seus arquivos não são publicados. Auditorias não pagas são "
             "excluídas após {retention} dias; restam dados mínimos do registro. As pagas "
             "e o primeiro relatório completo grátis ficam até você excluí-los com a "
             "conta ou pedir sua exclusão. Uma página de verificação que você publicou "
@@ -246,32 +321,8 @@ _QUESTIONS: tuple[dict[str, tuple[str, str]], ...] = (
             "privacidade detalha os dados e os prazos.",
         ),
     },
-    # Sources: web.publish/publish_locked, legal.terms_text badge section,
-    # legal.privacy_text publication retention and pages.verification_page allow-list.
-    {
-        "es": (
-            "¿Cómo se publica una página de verificación?",
-            "Desde tu informe completo puedes elegir publicar su página de verificación "
-            "y retirarla después. Muestra la clase, las dimensiones, las huellas de los "
-            "archivos, las fechas y un aviso fijo; nunca tus archivos, operaciones, "
-            "descripción ni enlace privado. El sello enlaza a esa página y no es una "
-            "promesa de resultados.",
-        ),
-        "en": (
-            "How do I publish a verification page?",
-            "From your full report you can choose to publish its verification page and "
-            "withdraw it later. It shows the class, dimensions, file hashes, dates and "
-            "a fixed notice; never your files, trades, description or private link. "
-            "The badge links to that page and is not a promise of results.",
-        ),
-        "pt": (
-            "Como publico uma página de verificação?",
-            "No relatório completo você pode escolher publicar a página de verificação "
-            "e retirá-la depois. Ela mostra a classe, as dimensões, as impressões digitais "
-            "dos arquivos, as datas e um aviso fixo; nunca arquivos, operações, descrição "
-            "ou link privado. O selo aponta para essa página e não é uma promessa de resultados.",
-        ),
-    },
+    # Sources: see _PUBLICATION.
+    _PUBLICATION,
     # Source: pages.CONTACT_COPY and contact_page, whose public channels come
     # from settings.operator_contact/contact_url and have no invented default.
     {
@@ -297,8 +348,37 @@ _QUESTIONS: tuple[dict[str, tuple[str, str]], ...] = (
 )
 
 
+def landing_only_questions(locale: str = "es") -> tuple[tuple[str, str], ...]:
+    """The landing's questions it does not show itself, in their order there.
+
+    The landing shows a few of ``pages._COPY[locale]['faq']`` (``pages._LANDING_FAQ``)
+    and links here for the rest, so each of those answers stays public on this page:
+    the markets, the MT5 optimisation XML, a forgotten password, how an account is
+    protected, the badge and, in Portuguese, the report's language. Their wording
+    lives in one place, the landing's copy."""
+    from quant_trade.audit.pages import _COPY, _LANDING_FAQ
+
+    locale = locale if locale in FAQ_PATH else "es"
+    shown = set(_LANDING_FAQ[locale])
+    return tuple(
+        (question, answer)
+        for index, (question, answer) in enumerate(_COPY[locale]["faq"])
+        if index not in shown
+    )
+
+
 def faq_items(settings: AuditSettings, locale: str = "es") -> tuple[tuple[str, str], ...]:
-    """The same localized answers feed the visible page and FAQPage JSON-LD."""
+    """The same localized answers feed the visible page and FAQPage JSON-LD.
+
+    ``_QUESTIONS`` first, then the landing's questions it does not show
+    (``landing_only_questions``), and the contact question last. The price, the
+    countries, the retention and the size limits are the operator's own settings,
+    said as plain facts: no evidence label, which is for what a file or a client says.
+    Under the paid
+    offer (``AUDIT_WELCOME_FULL_REPORT=false``) the first question is the full
+    report's price, «¿Y si el informe no me sirve?» follows it with the terms'
+    7-day refund, and no answer names a free first report
+    (``paid_offer.rewrite_text``)."""
     # Lazy imports keep FAQ_PATH usable by seo without a pages/seo cycle.
     from quant_trade.audit.pages import CONTACT_COPY, card_markets_line
     from quant_trade.audit.report import localize_tags
@@ -312,19 +392,20 @@ def faq_items(settings: AuditSettings, locale: str = "es") -> tuple[tuple[str, s
         }[locale]
     else:
         price = {
-            "es": "DECLARED · Un informe completo adicional cuesta USD {amount:.2f}.",
-            "en": "DECLARED · An additional full report costs USD {amount:.2f}.",
-            "pt": "DECLARED · Um relatório completo adicional custa USD {amount:.2f}.",
+            "es": "Un informe completo adicional cuesta USD {amount:.2f}.",
+            "en": "An additional full report costs USD {amount:.2f}.",
+            "pt": "Um relatório completo adicional custa USD {amount:.2f}.",
         }[locale].format(amount=settings.price_usd)
+    offer = paid_offer.offer_of(settings)
     email = ""
-    if settings.email_verification_required and not settings.free_mode:
+    if settings.email_verification_required and offer.kind == "welcome":
         email = {
             "es": " Para el primer informe gratis debes confirmar el correo de tu cuenta.",
             "en": " For the first free report, you must confirm your account e-mail.",
             "pt": " Para o primeiro relatório grátis, é preciso confirmar o e-mail da conta.",
         }[locale]
     if settings.card_public:
-        markets = "DECLARED · " + card_markets_line(tuple(settings.approved_markets), locale)
+        markets = card_markets_line(tuple(settings.approved_markets), locale)
         markets += {
             "es": " Se usa el país de facturación, no tu idioma ni tu dirección de red.",
             "en": " This uses the billing country, not your language or network address.",
@@ -350,15 +431,24 @@ def faq_items(settings: AuditSettings, locale: str = "es") -> tuple[tuple[str, s
         "price": price,
         "email": email,
         "markets": markets,
-        "upload_mb": f"{settings.max_upload_bytes / (1024 * 1024):g}",
+        "upload_limit": upload_limit_text(settings.max_upload_bytes, locale),
         "retention": settings.retention_days,
         "contact": contact,
     }
+    pairs = [item[locale] for item in _QUESTIONS]
+    pairs[-1:-1] = landing_only_questions(locale)
+    if offer.paid:
+        support = settings.operator_contact if "@" in settings.operator_contact else ""
+        pairs[0] = paid_offer.price_question(locale, offer)
+        pairs.insert(1, paid_offer.refund_question(locale, support))
     # _page localizes evidence tags in text nodes. Apply that same transformation
-    # here so the structured answers are exactly the wording a reader sees.
+    # here so the structured questions and answers are exactly the wording a reader sees.
     return tuple(
-        (item[locale][0], localize_tags(item[locale][1].format(**values), locale))
-        for item in _QUESTIONS
+        (
+            localize_tags(question, locale),
+            localize_tags(paid_offer.rewrite_text(answer.format(**values), locale, offer), locale),
+        )
+        for question, answer in pairs
     )
 
 
@@ -375,15 +465,18 @@ def faq_page(settings: AuditSettings, *, locale: str = "es", base_url: str | Non
         _page_hero,
         _public_meta,
     )
+    from quant_trade.audit.report import localize_tags
+    from quant_trade.audit.sample_publication import public_pages_line
     from quant_trade.audit.seo import BRAND, faq_structured_data
 
     locale = locale if locale in FAQ_PATH else "es"
     words = FAQ_COPY[locale]
     title = f"{words['title']} · {BRAND}"
     pairs = faq_items(settings, locale)
+    offer = paid_offer.offer_of(settings)
     meta = _public_meta(
         title,
-        words["summary"],
+        paid_offer.rewrite_text(words["summary"], locale, offer),
         locale,
         FAQ_PATH[locale],
         settings.base_url if base_url is None else base_url,
@@ -392,8 +485,17 @@ def faq_page(settings: AuditSettings, *, locale: str = "es", base_url: str | Non
     crumbs = f"<a href='{_home(locale)}'>{_e(words['back'])}</a>" + _language_crumbs(
         FAQ_PATH, locale
     )
+    # The publishing and badge answers end with both samples' public pages; the
+    # structured data keeps the answers' own words.
+    with_example = {
+        localize_tags(_PUBLICATION[locale][0], locale),
+        localize_tags(BADGE_QUESTION[locale], locale),
+    }
+    example = public_pages_line(locale, css="faq-example")
     answers = "".join(
-        f"<details><summary>{_e(question)}</summary><p>{_e(answer)}</p></details>"
+        f"<details><summary>{_e(question)}</summary><p>{_e(answer)}</p>"
+        + (example if question in with_example else "")
+        + "</details>"
         for question, answer in pairs
     )
     body = (
@@ -405,4 +507,6 @@ def faq_page(settings: AuditSettings, *, locale: str = "es", base_url: str | Non
         + _articles_cta(locale)
         + "</div></div>"
     )
-    return _page(title, locale, body, meta_html=meta, alternates=FAQ_PATH, solid_nav=True)
+    page = _page(title, locale, body, meta_html=meta, alternates=FAQ_PATH, solid_nav=True)
+    # The closing call's "my free first report" button, under the paid offer.
+    return paid_offer.rewrite_html(page, locale, offer)

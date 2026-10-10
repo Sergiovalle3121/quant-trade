@@ -722,15 +722,15 @@ def test_sign_ups_stop_at_the_limit_exactly(tmp_path: Path) -> None:
 def test_the_landing_says_the_free_preview_comes_with_an_account(tmp_path: Path) -> None:
     client, _, _ = _client(tmp_path)
     es = client.get("/").text
-    assert "Tu primer informe completo, gratis al crear tu cuenta" in es
-    assert "después, 3 vistas previas gratis al mes. A veces pedimos validar" in es
+    assert "Completo y con PDF al crear tu cuenta. Después, 3 vistas previas gratis al mes" in es
     assert "Primer informe completo gratis con tu cuenta" in es
-    assert "tu primer informe completo; después, 3 vistas previas al mes" in es
+    # The card check is offered on the report where it applies, not on the landing.
+    assert "A veces pedimos validar" not in es
     assert "cuenta opcional" not in es and "cuenta es opcional" not in es
     assert "sin crear cuenta" not in es and "Cuenta gratis opcional" not in es
     en = client.get("/en").text
-    assert "Your first full report, free when you create your account" in en
-    assert "then 3 free previews a month. Sometimes we ask to verify" in en
+    assert "Full and with the PDF when you create your account. After that, 3 free" in en
+    assert "Sometimes we ask to verify" not in en
     assert "account optional" not in en and "account is optional" not in en
     assert "Optional free account" not in en
 
@@ -774,7 +774,7 @@ def test_two_full_reports_on_the_account_compare_without_pasting_links(tmp_path:
     assert refused(f"id={ids[0]}")  # one report
     assert refused(f"id={ids[0]}&id={ids[0]}")  # the same report twice
     assert refused(f"id={ids[0]}&id={ids[2]}")  # a locked preview
-    assert refused(f"id={ids[0]}&id={ids[1]}&id={ids[2]}")  # three
+    assert refused(f"id={ids[0]}&id={ids[1]}&id={ids[2]}")  # three, one a preview
     assert refused(f"id={ids[0]}&id=nope", "/account")
 
     # Someone else's reports never compare, even with the right ids.
@@ -1529,8 +1529,11 @@ def test_the_account_screens_exist_in_portuguese(tmp_path: Path) -> None:
     assert not find_claims(re.sub(r"<[^>]+>", " ", page))
     # ?lang=pt on a Spanish path reads in Portuguese too.
     assert "Crie sua conta" in client.get("/registro?lang=pt").text
-    # The Portuguese landing sends its visitors to the Portuguese sign-up.
-    assert "/pt/cadastro" in client.get("/pt").text
+    # The Portuguese landing's buttons open the upload page, which sends a visitor
+    # without an account to the Portuguese sign-up.
+    assert "href='/pt/auditar'" in client.get("/pt").text
+    start = client.get("/pt/auditar", follow_redirects=False)
+    assert start.headers["location"].startswith("/pt/cadastro")
     csrf = _csrf(page)
     answer = client.post(
         "/pt/cadastro",

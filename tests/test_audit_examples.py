@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import html
 import re
+from dataclasses import replace
 from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 from xml.etree import ElementTree as ET
@@ -31,6 +32,7 @@ from quant_trade.audit.examples import (  # noqa: E402
 )
 from quant_trade.audit.guard import find_claims  # noqa: E402
 from quant_trade.audit.pages import audit_path  # noqa: E402
+from quant_trade.audit.public_card import _num  # noqa: E402
 from quant_trade.audit.seo import PUBLIC_PAGES, sitemap_xml  # noqa: E402
 from quant_trade.audit.settings import AuditSettings  # noqa: E402
 from quant_trade.audit.store import make_store  # noqa: E402
@@ -119,8 +121,12 @@ def test_calculator_links_use_the_card_inputs_and_never_fill_missing_figures(
             assert query == {}
             continue
         parsed = parse_input(*(query[name][0] for name in ("sharpe", "years", "trials")))
-        assert parsed == example.calculator_input()
+        declared = example.calculator_input()
+        assert declared is not None
+        # The years travel as the page shows them: two decimals (9 weeks ≈ 0.17).
+        assert parsed == replace(declared, years=round(declared.years, 2))
         assert isinstance(parsed, CalculatorInput)
+        assert "17307" not in href and "17307" not in response.text
         result = compute(parsed)
         assert result["status"] == "MEASURED"
         if not result["counted"]:
@@ -128,13 +134,48 @@ def test_calculator_links_use_the_card_inputs_and_never_fill_missing_figures(
             continue
         luck_text = f"{result['luck_sharpe']['value']:.2f}"
         after_text = f"{result['sharpe_after']['value']:.2f}"
+        # The card, its reading lines and the calculator page they link to use the page's
+        # decimal mark: a comma in es and pt, a point in en.
+        luck_shown = _num(result["luck_sharpe"]["value"], locale, 2)
+        after_shown = _num(result["sharpe_after"]["value"], locale, 2)
+        assert luck_shown == (luck_text if locale == "en" else luck_text.replace(".", ","))
         card = _cards(body)[index]
         luck = card.find(".//s:g[@data-reading='luck']", SVG_NS)
         assert luck is not None
-        assert f"≈ {luck_text}" in " ".join(luck.itertext())
-        assert luck_text in body and after_text in body
-        assert f"<b>{luck_text}</b>" in response.text
-        assert f"<b>{after_text}</b>" in response.text
+        assert f"≈ {luck_shown}" in " ".join(luck.itertext())
+        assert luck_shown in body and after_shown in body
+        assert f"<b>{luck_shown}</b>" in response.text
+        assert f"<b>{after_shown}</b>" in response.text
+        if locale != "en":
+            assert f"<b>{luck_text}</b>" not in response.text
+            assert f"<b>{after_text}</b>" not in response.text
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+def test_cards_and_reading_lines_use_the_pages_decimal_mark(
+    locale: str, client: TestClient
+) -> None:
+    """A decimal comma in es and pt, a point in en: in each card and in the lines below it."""
+    page = client.get(examples_url(locale)).text
+    mark, other = (".", ",") if locale == "en" else (",", ".")
+    pattern = r"<svg\b[^>]*xml:lang=.*?</svg>"
+    cards = [ET.fromstring(svg) for svg in re.findall(pattern, page, re.S)]
+    assert len(cards) == 3
+    first = " ".join(cards[0].itertext())
+    assert f"71{mark}0 %" in first and f"3{mark}24" in first
+    assert f"56{mark}5 % – 82{mark}2 %" in first
+    assert f"56{other}5 %" not in first and f"3{other}24" not in first
+    lines = _visible(" ".join(re.findall(r"<p class='example-reading'>.*?</p>", page, re.S)))
+    # Nine weeks are 0.17 years in the site's format, never the raw 0.173077.
+    years = f"{SHORT_HISTORY_WEEKS / WEEKS_PER_YEAR:.2f}"
+    assert years.replace(".", mark) in lines
+    raw = f"{SHORT_HISTORY_WEEKS / WEEKS_PER_YEAR:.6f}"
+    assert raw not in page and raw.replace(".", mark) not in page
+    many = compute(CalculatorInput(1.8, 3, 1000))
+    luck = f"{many['luck_sharpe']['value']:.2f}"
+    assert luck.replace(".", mark) in lines
+    if locale != "en":
+        assert years not in lines and luck not in lines
 
 
 @pytest.mark.parametrize("locale", LOCALES)

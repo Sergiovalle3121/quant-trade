@@ -481,9 +481,9 @@ UNLOCKS = {
     "pt": "Confirme-o para liberar seu primeiro relatório completo gratuito",
 }
 SENT = {
-    "es": ("Te enviamos un enlace de confirmación a tu correo", "spam"),
-    "en": ("We sent a confirmation link to your e-mail", "spam"),
-    "pt": ("Enviamos um link de confirmação para o seu e-mail", "spam"),
+    "es": ("el enlace que te enviamos por correo", "spam"),
+    "en": ("the link we e-mailed you", "spam"),
+    "pt": ("o link que enviamos por e-mail", "spam"),
 }
 
 

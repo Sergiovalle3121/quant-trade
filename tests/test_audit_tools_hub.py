@@ -25,8 +25,9 @@ from quant_trade.audit.guides import guides_index_url  # noqa: E402
 from quant_trade.audit.pages import _sample_url, audit_path, landing  # noqa: E402
 from quant_trade.audit.settings import AuditSettings  # noqa: E402
 from quant_trade.audit.store import make_store  # noqa: E402
-from quant_trade.audit.tools_hub import COPY, TOOLS_PATH, tools_url  # noqa: E402
+from quant_trade.audit.tools_hub import COPY, TOOL_KEYS, TOOLS_PATH, tools_url  # noqa: E402
 from quant_trade.audit.web import create_app  # noqa: E402
+from quant_trade.audit.winrate import WINRATE_PATH  # noqa: E402
 
 BASE = "https://audit.example"
 LOCALES = ("es", "en", "pt")
@@ -72,6 +73,10 @@ def _main(page: str) -> str:
     return page.split("<main", 1)[1].split("</main>", 1)[0]
 
 
+def _visible_text(page: str) -> str:
+    return html.unescape(re.sub(r"<[^>]+>", " ", page))
+
+
 def _texts(value: object) -> Iterator[str]:
     """Every string in a copy entry, however it is nested."""
     if isinstance(value, str):
@@ -103,7 +108,9 @@ def test_tools_hub_is_public_in_every_language(client: TestClient, locale: str) 
     data = [json.loads(block) for block in blocks]
     tools = next(item for item in data if item.get("@type") == "ItemList")
     apps = [element["item"] for element in tools["itemListElement"]]
-    assert len(apps) == 3
+    # One entry per tool on the page: the luck calculator, the win-rate calculator
+    # (added after this page shipped), the figure reader and the report check.
+    assert len(apps) == len(TOOL_KEYS) == 4
     for app in apps:
         assert app["@type"] == "WebApplication"
         assert app["isAccessibleForFree"] is True
@@ -121,6 +128,7 @@ def test_tools_hub_is_public_in_every_language(client: TestClient, locale: str) 
 def test_tools_hub_links_every_free_tool(client: TestClient, locale: str) -> None:
     hrefs = _hrefs(_main(client.get(TOOLS_PATH[locale]).text))
     assert calculator_url(locale) in hrefs
+    assert WINRATE_PATH[locale] in hrefs
     assert reading.READING_PATH[locale] in hrefs
     assert seo.CHECK_PATH[locale] in hrefs
     assert audit_path(locale) in hrefs
@@ -144,14 +152,16 @@ def test_tools_hub_metadata_is_unique_and_in_bounds() -> None:
     assert len(titles) == 3
 
 
-def test_landing_shows_the_free_tools_band() -> None:
+def test_landing_links_the_free_tools_from_its_closing_call() -> None:
+    # The tools band left the short landing; one line under the closing call leads
+    # to the hub, and the menu and the footer keep their links.
     for locale in LOCALES:
-        main = _main(landing(locale=locale))
-        hrefs = _hrefs(main)
-        assert calculator_url(locale) in hrefs
-        assert reading.READING_PATH[locale] in hrefs
-        assert tools_url(locale) in hrefs
-        assert COPY[locale]["band_lead"] in html.unescape(main)
+        page = landing(locale=locale)
+        main = _main(page)
+        closing = main.split("id='subir'", 1)[1]
+        assert tools_url(locale) in _hrefs(closing)
+        assert tools_url(locale) in _hrefs(page.split("</main>", 1)[1])
+        assert COPY[locale]["band_lead"] not in html.unescape(main)
         assert find_claims(html.unescape(main)) == []
 
 
@@ -202,6 +212,21 @@ def test_reader_has_content_links_and_the_report_step(client: TestClient, locale
     beyond = html.escape(words["beyond_title"], quote=True)
     assert text.index(beyond) > text.index("data-public-share")
     assert find_claims(html.unescape(text)) == []
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+def test_sample_report_footer_links_the_free_tools(client: TestClient, locale: str) -> None:
+    response = client.get(_sample_url(locale))
+    assert response.status_code == 200
+    page = response.text
+    foot = page[page.index("<div class='report-foot'>") :]
+    links = foot[foot.index("<nav class='rf-links'>") : foot.index("</nav>")]
+    # A link, so hidden when the report is printed, in the report's own language.
+    link = f"<a class='no-print' href='{tools_url(locale)}'>{html.escape(COPY[locale]['nav'])}</a>"
+    assert link in links
+    assert page.count(f"href='{tools_url(locale)}'") >= 1
+    assert client.get(tools_url(locale)).status_code == 200
+    assert find_claims(_visible_text(links)) == []
 
 
 @pytest.mark.parametrize("locale", LOCALES)

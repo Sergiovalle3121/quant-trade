@@ -153,8 +153,9 @@ def test_the_public_page_and_badge_read_in_portuguese(tmp_path: Path) -> None:
     # The badge, its snippet and the check link follow the page's language.
     assert f"/v/{public_id}/badge.svg?lang=pt" in page
     assert "href='/pt/comprovar'" in page
-    # The language bar offers the same page in the three languages.
-    assert f"href='/v/{public_id}' hreflang='es'" in page
+    # The language bar offers the same page in the three languages; Spanish with
+    # ?lang=es, so the choice wins over the browser's language at /v/{id}.
+    assert f"href='/v/{public_id}?lang=es' hreflang='es'" in page
     assert f"href='/v/{public_id}?lang=en' hreflang='en'" in page
     spanish = client.get(f"/v/{public_id}").text
     assert f"href='/v/{public_id}?lang=pt' hreflang='pt'" in spanish
@@ -245,6 +246,9 @@ def test_a_purged_published_audit_keeps_only_its_public_page(tmp_path: Path) -> 
         "multiplicity",
     }
     assert view["fund"] == {"track_record": False}
+    # The page's data period keeps dates and frequency only: the privacy policy
+    # lists what the purge keeps, and no count of observations or trades is on it.
+    assert "observations" not in view["inputs"]
     assert set(view["declared"]) == {"trials"}
 
     # The owner can still withdraw it with the private link.

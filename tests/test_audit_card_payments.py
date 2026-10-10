@@ -1299,13 +1299,13 @@ def test_paying_needs_the_final_sale_box_and_keeps_its_acceptance(tmp_path: Path
     client = _client(tmp_path)
     audit_id, token = _upload(client)
     page = client.get(f"/audits/{audit_id}?token={token}").text
-    assert "name='final_sale'" in page and "la compra no es reembolsable" in page
-    assert "Todas las ventas son finales" in page
+    assert "name='final_sale'" in page and "devolución en 7 días según los términos" in page
+    assert "Todas las ventas son finales" not in page
     client.app.state.checkout_factory = lambda *_args, **_kwargs: "https://checkout.stripe.test/s"
     url = f"/audits/{audit_id}/checkout?token={token}&lang=es"
 
     unticked = client.post(url, data={"billing_country": "MX"}, follow_redirects=False)
-    assert unticked.status_code == 400 and "no reembolsable" in unticked.text
+    assert unticked.status_code == 400 and "términos de compra" in unticked.text
     assert client.app.state.store.list_checkout_orders() == []
 
     ticked = client.post(
@@ -1315,5 +1315,5 @@ def test_paying_needs_the_final_sale_box_and_keeps_its_acceptance(tmp_path: Path
     (order,) = client.app.state.store.list_checkout_orders()
     version, accepted_at = client.app.state.store.final_sale_acceptance(order.id)
     assert version == LEGAL_UPDATED and accepted_at.endswith("Z")
-    for lang, words in (("en", "not refundable"), ("pt", "não é reembolsável")):
+    for lang, words in (("en", "refund within 7 days"), ("pt", "devolução em 7 dias")):
         assert words in client.get(f"/audits/{audit_id}?token={token}&lang={lang}").text

@@ -34,8 +34,9 @@ def test_pdf_origin_survives_report_public_allowlist_and_comparison() -> None:
             base_url="https://example.test",
             locale=locale,
         )
-        compared = comparison_body(
-            data, data, href_a="/audits/a", href_b="/audits/b", locale=locale
+        compared = comparison_body([data, data], hrefs=["/audits/a", "/audits/b"], locale=locale)
+        three = comparison_body(
+            [data, data, data], hrefs=["/audits/a", "/audits/b", "/audits/c"], locale=locale
         )
         assert f"{LABELS[locale]['report_source']}: PDF</p>" in report
         assert "CSV / Excel" not in report
@@ -43,3 +44,5 @@ def test_pdf_origin_survives_report_public_allowlist_and_comparison() -> None:
         assert "CSV / Excel" not in verified
         assert compared.count(": PDF</p>") == 2
         assert "CSV / Excel" not in compared
+        assert three.count(": PDF</p>") == 3
+        assert "CSV / Excel" not in three

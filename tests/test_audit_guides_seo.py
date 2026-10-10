@@ -231,6 +231,46 @@ def test_sitemap_lists_only_the_public_pages_in_each_language(tmp_path: Path) ->
     assert "hreflang='en'" in response.text
 
 
+def test_every_sitemap_url_has_an_iso_lastmod_from_the_code(tmp_path: Path) -> None:
+    from datetime import date
+
+    from quant_trade.audit.articles import ARTICLE_PUBLICATION_DATES
+    from quant_trade.audit.legal import LEGAL_PATHS, LEGAL_UPDATED
+    from quant_trade.audit.seo import (
+        PAGE_DATES,
+        SIGNAL_SAMPLE_PUBLISHED,
+        SITE_UPDATED,
+        page_lastmod,
+    )
+
+    response = _client(tmp_path).get("/sitemap.xml")
+    assert response.status_code == 200
+    root = ElementTree.fromstring(response.content)
+    known = {
+        SITE_UPDATED,
+        LEGAL_UPDATED,
+        SIGNAL_SAMPLE_PUBLISHED,
+        *ARTICLE_PUBLICATION_DATES.values(),
+    }
+    for url in root.findall("s:url", SITEMAP_NS):
+        children = [child.tag.rsplit("}", 1)[-1] for child in url]
+        # The schema's order: <loc>, then <lastmod>, then the xhtml alternates.
+        assert children[:2] == ["loc", "lastmod"], children
+        assert set(children[2:]) == {"link"}, children
+        loc = url.findtext("s:loc", namespaces=SITEMAP_NS) or ""
+        lastmod = url.findtext("s:lastmod", namespaces=SITEMAP_NS) or ""
+        assert re.fullmatch(r"\d{4}-\d{2}-\d{2}", lastmod), (loc, lastmod)
+        assert date.fromisoformat(lastmod).isoformat() == lastmod
+        assert lastmod in known, (loc, lastmod)
+        assert lastmod == page_lastmod(loc.removeprefix(BASE)), loc
+    for paths in LEGAL_PATHS.values():
+        for path in paths.values():
+            assert page_lastmod(path) == LEGAL_UPDATED, path
+    # Pages without a date of their own share the site's date; none is made up.
+    assert page_lastmod("/guias") == page_lastmod("/") == SITE_UPDATED
+    assert set(PAGE_DATES) <= {path for pair in PUBLIC_PAGES for path in pair.values()}
+
+
 def test_verification_page_previews_class_and_date_and_nothing_private(tmp_path: Path) -> None:
     client = _client(tmp_path)
     audit_id, token = _upload(client)
