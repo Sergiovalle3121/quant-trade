@@ -44,9 +44,28 @@ from quant_trade.audit.schema import AuditResult, DeclaredMetadata, build_inputs
 NOW = datetime(2026, 10, 1, tzinfo=UTC)
 LOCALES = ("es", "en", "pt")
 TOPSTEP = ("topstep-50k-combine", "topstep-100k-combine", "topstep-150k-combine")
-#: Every program whose page says it is futures only: Topstep's and E8 Markets' Zero,
-#: in the order the presets list them (the order the left-out rows keep).
-FUTURES_ONLY = (*TOPSTEP, "e8-zero-100k")
+#: The futures firms read on 2026-10-10 (Take Profit Trader, MyFundedFutures,
+#: Tradeify, Bulenox, Earn2Trade, Alpha Futures, Lucid Trading): futures only too.
+FUTURES_FIRM_KEYS = (
+    "take-profit-trader-test-50k",
+    "myfundedfutures-rapid-eod-50k",
+    "myfundedfutures-rapid-50k",
+    "myfundedfutures-pro-50k",
+    "myfundedfutures-builder-50k",
+    "tradeify-select-50k",
+    "tradeify-growth-50k",
+    "bulenox-qualification-eod-50k",
+    "bulenox-momentum-eod-50k",
+    "earn2trade-tcp-25k",
+    "earn2trade-gauntlet-mini-50k",
+    "alpha-futures-zero-50k",
+    "alpha-futures-standard-50k",
+    "alpha-futures-advanced-50k",
+    "lucid-pro-50k",
+)
+#: Every program whose page says it is futures only: Topstep's, E8 Markets' Zero and
+#: the futures firms', in the order the presets list them (the order the left-out rows keep).
+FUTURES_ONLY = (*TOPSTEP, "e8-zero-100k", *FUTURES_FIRM_KEYS)
 #: Advice the new texts must never give, in any of its languages.
 ADVICE = (
     "aprobar",
@@ -103,6 +122,21 @@ NUMERIC = {
     "fxify-2phase-classic-phase2": (0.10, 0.04, 0.10, 5, None),
     "fxify-3phase-step": (0.05, 0.05, 0.05, 5, None),
     "maven-3step-step": (0.03, 0.02, 0.03, 0, None),
+    "take-profit-trader-test-50k": (0.06, None, 0.04, 3, 0.50),
+    "myfundedfutures-rapid-eod-50k": (0.06, None, 0.04, 4, 0.30),
+    "myfundedfutures-rapid-50k": (0.06, None, 0.04, 2, 0.50),
+    "myfundedfutures-pro-50k": (0.06, None, 0.04, 2, 0.50),
+    "myfundedfutures-builder-50k": (0.06, 0.02, 0.04, 1, None),
+    "tradeify-select-50k": (0.06, None, 0.04, 3, 0.40),
+    "tradeify-growth-50k": (0.06, 0.025, 0.04, 1, None),
+    "bulenox-qualification-eod-50k": (0.06, 0.022, 0.05, 0, None),
+    "bulenox-momentum-eod-50k": (0.06, 0.024, 0.045, 0, None),
+    "earn2trade-tcp-25k": (0.07, 0.022, 0.06, 0, 0.30),
+    "earn2trade-gauntlet-mini-50k": (0.06, 0.022, 0.04, 0, 0.30),
+    "alpha-futures-zero-50k": (0.06, 0.02, 0.04, 1, None),
+    "alpha-futures-standard-50k": (0.06, None, 0.04, 2, 0.50),
+    "alpha-futures-advanced-50k": (0.08, None, 0.035, 3, 0.40),
+    "lucid-pro-50k": (0.06, None, 0.04, 1, None),
 }
 
 
@@ -315,6 +349,7 @@ def test_only_programs_whose_pages_name_their_markets_have_them() -> None:
         *alpha,
         "e8-zero-100k",
         "maven-3step-step",
+        *FUTURES_FIRM_KEYS,
     }
     # Each FundingPips program's own page has the Instruments section ("41
     # instruments across 5 asset classes"): its markets come from that page.

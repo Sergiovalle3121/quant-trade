@@ -36,7 +36,7 @@ from quant_trade.audit.engine import (
 )
 from quant_trade.audit.guard import find_claims
 from quant_trade.audit.i18n import localize, untranslated
-from quant_trade.audit.prop_presets import ACCOUNT_SIZES, PRESETS, get_preset
+from quant_trade.audit.prop_presets import ACCOUNT_SIZES, FUTURES_AS_OF, PRESETS, get_preset
 from quant_trade.audit.report import (
     LABELS,
     LOCKED_GAINS,
@@ -292,12 +292,19 @@ def test_lot_and_account_are_never_invented(no_balance: AuditResult) -> None:
 
 
 def test_account_sizes_are_the_presets_own_dollar_conversions() -> None:
-    # Topstep and E8 Markets state their limits in dollars at the size the program names.
+    # Topstep, E8 Markets and the futures firms read on 2026-10-10 state their limits in
+    # dollars at the size the program names.
     named = {k for k in PRESETS if k.startswith(("topstep-", "e8-"))}
+    futures = {k for k, rules in PRESETS.items() if rules.markets == ("futures",)} - named
+    assert futures and all(PRESETS[k].as_of == FUTURES_AS_OF for k in futures)
+    named |= futures
     assert set(ACCOUNT_SIZES) == named
     dollars = {"topstep-50k-combine": 2_000, "topstep-100k-combine": 3_000}
     dollars["topstep-150k-combine"] = 4_500
     dollars |= {"e8-signature-100k": 3_000, "e8-zero-100k": 3_000}
+    dollars |= dict.fromkeys(futures, 2_000)
+    dollars |= {"bulenox-qualification-eod-50k": 2_500, "bulenox-momentum-eod-50k": 2_250}
+    dollars |= {"earn2trade-tcp-25k": 1_500, "alpha-futures-advanced-50k": 1_750}
     for key, account in ACCOUNT_SIZES.items():
         assert get_preset(key).max_total_loss * account == pytest.approx(dollars[key])
         assert get_preset(key).program.endswith(f"{int(account) // 1000}K")

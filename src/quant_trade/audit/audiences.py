@@ -780,9 +780,9 @@ AUDIENCE_PAGES: tuple[Audience, ...] = (
                 faq=(
                     (
                         "¿Qué firmas y retos incluye?",
-                        "{presets} juegos de reglas de {programs} programas de {firms}, más la "
-                        "fase 1 de un reto genérico de dos fases. El formulario muestra cuándo se "
-                        "leyeron las reglas.",
+                        "{presets} juegos de reglas de {programs} programas de {firm_count} "
+                        "firmas, más la fase 1 de un reto genérico de dos fases. Las firmas: "
+                        "{firms}. El formulario muestra cuándo se leyeron las reglas.",
                     ),
                     (
                         "¿Me dice si conseguiré la cuenta?",
@@ -870,8 +870,9 @@ AUDIENCE_PAGES: tuple[Audience, ...] = (
                 faq=(
                     (
                         "Which firms and challenges are included?",
-                        "{presets} rule sets from {programs} {firms} programs, plus phase 1 of "
-                        "a generic two-phase challenge. The form shows when the rules were read.",
+                        "{presets} rule sets from {programs} programs of {firm_count} firms, plus "
+                        "phase 1 of a generic two-phase challenge. The firms: {firms}. The form "
+                        "shows when the rules were read.",
                     ),
                     (
                         "Does it tell me whether I will get the account?",
@@ -959,9 +960,9 @@ AUDIENCE_PAGES: tuple[Audience, ...] = (
                 faq=(
                     (
                         "Quais firmas e desafios estão incluídos?",
-                        "{presets} conjuntos de regras de {programs} programas da {firms}, mais "
-                        "a fase 1 de um desafio genérico de duas fases. O formulário mostra "
-                        "quando as regras foram lidas.",
+                        "{presets} conjuntos de regras de {programs} programas de {firm_count} "
+                        "firmas, mais a fase 1 de um desafio genérico de duas fases. As firmas: "
+                        "{firms}. O formulário mostra quando as regras foram lidas.",
                     ),
                     (
                         "Ele me diz se vou conseguir a conta?",

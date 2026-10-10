@@ -629,6 +629,651 @@ _NEW_FIRM_PRESETS: tuple[ChallengeRules, ...] = (
 )
 
 
+# ---------------------------------------------------------------------------
+# Futures firms read on 2026-10-10: Take Profit Trader, MyFundedFutures,
+# Tradeify, Bulenox, Earn2Trade, Alpha Futures and Lucid Trading. Each states
+# its limits in dollars at one account size (``_FUTURES_DOLLARS``), converted
+# to shares of that account as Topstep's are. Only evaluations whose maximum
+# loss moves at the day's close are here, and only where the simulator's types
+# fit exactly or by an approximation stricter than the firm's rule; the
+# programs left out and why are in docs/AUDIT_SAAS.md.
+# ---------------------------------------------------------------------------
+
+#: The day the rules of these seven futures firms, and the markets they name, were read.
+FUTURES_AS_OF = "2026-10-10"
+
+_TPT_HELP = "https://takeprofittraderhelp.zendesk.com/hc/en-us/articles/"
+TPT_DRAWDOWN_URL = (
+    _TPT_HELP + "15170265979165-Rule-3-Do-Not-Hit-End-Of-Day-EOD-Maximum-Trailing-Drawdown"
+)
+#: Rule 4, "You may trade most futures products listed on: CME CBOT NYMEX COMEX",
+#: by its article number: the help center opens it from the number alone, and its
+#: titled address carries a word the claims guard refuses on any page.
+TPT_PRODUCTS_URL = _TPT_HELP + "15170347090461"
+TPT_CONSISTENCY_URL = _TPT_HELP + "15170316538013-Rule-5-Be-Consistent"
+TPT_SUBSCRIPTIONS_URL = _TPT_HELP + "15141145057053-Test-Subscriptions"
+TPT_POLICIES_URL = _TPT_HELP + "34431153546397-TakeProfitTrader-Universal-Trading-Policies-UTP"
+
+_MFF_HELP = "https://help.myfundedfutures.com/en/articles/"
+MFF_RAPID_EOD_URL = _MFF_HELP + "16158363-rapid-eod-50k-a-comprehensive-look"
+MFF_RAPID_URL = _MFF_HELP + "13134709-rapid-plan-50k-a-comprehensive-look"
+#: The evaluation table of every plan, Pro's among them.
+MFF_EVALUATION_URL = _MFF_HELP + "11802636-traders-evaluation-simplified"
+MFF_BUILDER_URL = _MFF_HELP + "14290805-builder-plan-50k-a-comprehensive-guide"
+MFF_CONSISTENCY_URL = _MFF_HELP + "11994562-consistency-rule-at-my-fundedfutures"
+MFF_EOD_URL = _MFF_HELP + "8348565-end-of-day-eod-drawdown-explained"
+MFF_SIM_FUNDED_URL = _MFF_HELP + "16498635-moving-from-evaluation-to-sim-funded-account"
+MFF_INTRADAY_URL = _MFF_HELP + "12802721-intraday-drawdown-explained"
+MFF_INACTIVITY_URL = _MFF_HELP + "16596524-inactivity-rule-one-time-payment-model"
+MFF_TIMES_URL = _MFF_HELP + "9558251-permitted-times-to-trade"
+MFF_NEWS_URL = _MFF_HELP + "8230009-news-trading-policy"
+MFF_ONE_DAY_URL = _MFF_HELP + "12879226-pro-plan-1day-addon"
+#: "standardized futures contracts listed on regulated U.S. exchanges, including
+#: those operated by CME Group" (the plan page's footer).
+MFF_MARKETS_URL = "https://myfundedfutures.com/plans/rapid-eod"
+
+_TRADEIFY_HELP = "https://help.tradeify.co/en/articles/"
+TRADEIFY_SELECT_URL = _TRADEIFY_HELP + "12853921-select-evaluation-accounts"
+TRADEIFY_GROWTH_URL = _TRADEIFY_HELP + "10495915-growth-evaluation-accounts"
+TRADEIFY_DRAWDOWN_URL = _TRADEIFY_HELP + "10495897-rules-trailing-max-drawdowns"
+TRADEIFY_DAILY_URL = _TRADEIFY_HELP + "10468321-rules-daily-loss-limit"
+#: "Growth Sim Funded Accounts must follow a 35% Consistency Rule", measured up to
+#: the payout request; the Growth evaluation has none.
+TRADEIFY_CONSISTENCY_URL = _TRADEIFY_HELP + "10468320-rules-consistency-rule"
+TRADEIFY_ESSENTIAL_URL = _TRADEIFY_HELP + "12268167-essential-trading-rules-overview"
+TRADEIFY_HOURS_URL = _TRADEIFY_HELP + "10495876-rules-permitted-times-to-trade"
+TRADEIFY_NEWS_URL = _TRADEIFY_HELP + "10495874-rules-news-trading"
+#: "We support instruments from the following exchanges: CME, COMEX, NYMEX, and CBOT."
+TRADEIFY_PRODUCTS_URL = _TRADEIFY_HELP + "10468222-rules-supported-trading-products-assets"
+
+BULENOX_PRICING_URL = "https://bulenox.com/accounts-pricing"
+BULENOX_QUALIFICATION_URL = "https://bulenox.com/help-center/qualification#option-2"
+BULENOX_MOMENTUM_URL = "https://bulenox.com/help-center/momentum"
+#: "A reset does not extend your 30-day access period" (Qualification > Reset).
+BULENOX_RESET_URL = "https://bulenox.com/help-center/qualification#reset"
+#: "41 futures contracts on all four CME Group exchanges — CME, CBOT, NYMEX and COMEX."
+BULENOX_FAQ_URL = "https://bulenox.com/faq"
+
+E2T_TCP_URL = "https://www.earn2trade.com/trader-career-path"
+E2T_GAUNTLET_URL = "https://www.earn2trade.com/gauntlet-mini"
+_E2T_HELP = "https://help.earn2trade.com/en/articles/"
+E2T_DAILY_URL = _E2T_HELP + "3395926-how-is-my-daily-loss-calculated"
+E2T_EOD_URL = _E2T_HELP + "5372687-how-does-end-of-day-drawdown-work"
+E2T_CONSISTENCY_URL = _E2T_HELP + "3849975-what-is-the-maintain-consistency-rule"
+E2T_HOURS_URL = (
+    _E2T_HELP + "3224526-are-there-any-restrictions-on-when-i-can-trade-in-my-evaluation-account"
+)
+E2T_TCP_LADDER_URL = _E2T_HELP + "5922873-what-is-the-progression-ladder-on-the-trader-career-path"
+E2T_GAUNTLET_LADDER_URL = _E2T_HELP + "3292351-what-is-the-progression-ladder-in-the-gauntlet-mini"
+
+ALPHA_FUTURES_ZERO_URL = "https://alpha-futures.com/product/zero"
+ALPHA_FUTURES_STANDARD_URL = "https://alpha-futures.com/product/standard"
+ALPHA_FUTURES_ADVANCED_URL = "https://alpha-futures.com/product/advanced"
+_ALPHA_FUTURES_HELP = "https://help.alpha-futures.com/en/articles/"
+ALPHA_FUTURES_STANDARD_HELP_URL = _ALPHA_FUTURES_HELP + "11632512-standard-account-overview"
+ALPHA_FUTURES_ADVANCED_HELP_URL = _ALPHA_FUTURES_HELP + "11634907-advanced-account-overview"
+ALPHA_FUTURES_DAILY_URL = _ALPHA_FUTURES_HELP + "9492014-daily-loss-guard"
+ALPHA_FUTURES_MLL_URL = _ALPHA_FUTURES_HELP + "9491999-maximum-loss-limit-mll"
+#: "all trades must be closed before 4:20PM EST every day"; "The CME Group
+#: Products are available to trade here at Alpha Futures."
+ALPHA_FUTURES_TRADE_URL = _ALPHA_FUTURES_HELP + "9492096-what-and-when-you-can-trade"
+ALPHA_FUTURES_NEWS_URL = _ALPHA_FUTURES_HELP + "9492063-news-trading-policy"
+ALPHA_FUTURES_SUBSCRIPTION_URL = _ALPHA_FUTURES_HELP + "9492068-monthly-subscription"
+#: "you must place a trade at least once every 10 trading days".
+ALPHA_FUTURES_INACTIVITY_URL = _ALPHA_FUTURES_HELP + "12757982-inactivity-rule"
+ALPHA_FUTURES_PROHIBITED_URL = _ALPHA_FUTURES_HELP + "9508585-prohibited-trading-practices"
+
+_LUCID_HELP = "https://support.lucidtrading.com/en/articles/"
+LUCID_PRO_URL = _LUCID_HELP + "12890029-lucidpro-evaluation-account"
+LUCID_DRAWDOWN_URL = _LUCID_HELP + "12890136-lucidpro-drawdown"
+LUCID_DAILY_URL = _LUCID_HELP + "12890122-lucidpro-daily-loss-limit"
+LUCID_CONSISTENCY_URL = _LUCID_HELP + "12890109-lucidpro-consistency-percentage"
+LUCID_TIMES_URL = _LUCID_HELP + "11404729-allowed-trading-times"
+#: "Daily Loss Limit: On or Off", chosen at purchase.
+LUCID_CUSTOMIZATION_URL = _LUCID_HELP + "16226068-lucidpro-customization"
+#: News trading allowed on Pro; "Automated trading systems and trade copiers are
+#: permitted".
+LUCID_OTHER_URL = _LUCID_HELP + "11404728-other-trading-activities"
+LUCID_MICROSCALPING_URL = _LUCID_HELP + "11404742-prohibited-microscalping"
+LUCID_HFT_URL = _LUCID_HELP + "11404736-prohibited-high-frequency-trading"
+LUCID_HEDGING_URL = _LUCID_HELP + "11404734-prohibited-hedging"
+#: The futures products Lucid Trading lets its accounts trade, by article number
+#: (the help center opens it from the number; its titled address carries a word the
+#: claims guard refuses).
+LUCID_PRODUCTS_URL = _LUCID_HELP + "11508978"
+
+#: Each futures program's account, profit target, daily loss limit (``None``
+#: when the evaluation simulated has none) and maximum loss, in US dollars, as
+#: its page states them; the preset's shares are these over the account.
+_FUTURES_DOLLARS: dict[str, tuple[int, int, int | None, int]] = {
+    "take-profit-trader-test-50k": (50_000, 3_000, None, 2_000),
+    "myfundedfutures-rapid-eod-50k": (50_000, 3_000, None, 2_000),
+    "myfundedfutures-rapid-50k": (50_000, 3_000, None, 2_000),
+    "myfundedfutures-pro-50k": (50_000, 3_000, None, 2_000),
+    "myfundedfutures-builder-50k": (50_000, 3_000, 1_000, 2_000),
+    "tradeify-select-50k": (50_000, 3_000, None, 2_000),
+    "tradeify-growth-50k": (50_000, 3_000, 1_250, 2_000),
+    "bulenox-qualification-eod-50k": (50_000, 3_000, 1_100, 2_500),
+    "bulenox-momentum-eod-50k": (50_000, 3_000, 1_200, 2_250),
+    "earn2trade-tcp-25k": (25_000, 1_750, 550, 1_500),
+    "earn2trade-gauntlet-mini-50k": (50_000, 3_000, 1_100, 2_000),
+    "alpha-futures-zero-50k": (50_000, 3_000, 1_000, 2_000),
+    "alpha-futures-standard-50k": (50_000, 3_000, None, 2_000),
+    "alpha-futures-advanced-50k": (50_000, 4_000, None, 1_750),
+    "lucid-pro-50k": (50_000, 3_000, None, 2_000),
+}
+
+
+def _dollars_note(key: str) -> str:
+    """The program's limits in the dollars its page states."""
+    account, target, daily, loss = _FUTURES_DOLLARS[key]
+    if daily is None:
+        return (
+            f"In US dollars, on the USD {account:,} account: a USD {target:,} profit target and "
+            f"a USD {loss:,} maximum loss."
+        )
+    return (
+        f"In US dollars, on the USD {account:,} account: a USD {target:,} profit target, a "
+        f"USD {daily:,} daily loss limit and a USD {loss:,} maximum loss."
+    )
+
+
+def _open_loss(url: str) -> str:
+    return (
+        "The maximum-loss floor moves only at the day's close, but a breach counts at any "
+        f"moment, open losses included ({url}); daily closes cannot see it, so the figures are "
+        "optimistic here."
+    )
+
+
+def _best_day(value: int) -> str:
+    return (
+        f"Best-day rule: no day may exceed {value} % of the total profit; checked against the "
+        "profit target when a path reaches it, on daily closes, which is stricter."
+    )
+
+
+def _more_days(url: str) -> str:
+    return (
+        "Breaking the consistency rule does not end the account: it asks for more trading "
+        f"days ({url})."
+    )
+
+
+def _intraday_only(time: str, url: str) -> str:
+    return (
+        "Intraday only: no position may be held overnight; every position is closed by "
+        f"{time} ({url})."
+    )
+
+
+def _contracts(minis: int) -> str:
+    return f"At most {minis} minis or {minis * 10} micros at a time."
+
+
+def _news_allowed(url: str) -> str:
+    return f"News trading is allowed in the evaluation ({url})."
+
+
+def _lock_plus_100(url: str) -> str:
+    return (
+        "The maximum loss trails the highest end-of-day balance and locks at the starting "
+        "balance plus USD 100; the simulator lets it trail without locking, which is stricter "
+        f"({url})."
+    )
+
+
+_SOFT_DAILY = (
+    "The daily loss limit pauses trading for the rest of the day without ending the account; "
+    "the simulator ends the path when a daily close breaks it, which is stricter."
+)
+_UNSTATED_INTRADAY = (
+    "The pages read do not say whether the floors are also checked within the day; the "
+    "simulator checks daily closes only."
+)
+#: The same for a program whose daily limit the pages do describe, or that is
+#: simulated without one: only the maximum-loss floor is left unstated.
+_UNSTATED_INTRADAY_FLOOR = (
+    "The pages read do not say whether the maximum-loss floor is also checked within the "
+    "day; the simulator checks daily closes only."
+)
+
+_TPT_NOTES = (
+    _dollars_note("take-profit-trader-test-50k"),
+    _open_loss(TPT_DRAWDOWN_URL),
+    "The Test rules (Rules 1 to 6) list no daily loss limit.",
+    _best_day(50),
+    "Breaking the consistency rule raises the profit target instead of ending the Test "
+    f"({TPT_CONSISTENCY_URL}).",
+    f"No time limit while the monthly subscription is active ({TPT_SUBSCRIPTIONS_URL}).",
+    _intraday_only("4:55 PM ET", TPT_PRODUCTS_URL),
+    "Trading bots, algorithms and automated execution are prohibited, Test accounts included "
+    f"({TPT_POLICIES_URL}).",
+    _contracts(6),
+)
+
+_MFF_LOCK = (
+    "The maximum loss trails the highest end-of-day balance and locks at the starting balance "
+    f"plus USD 100 ({MFF_EOD_URL}); another page puts that lock in the Sim Funded stage "
+    f"({MFF_SIM_FUNDED_URL}), and the simulator lets it trail without locking, the stricter "
+    "reading of both."
+)
+_MFF_INACTIVITY = (
+    "No time limit is stated (one-time payment); an account with no trade for 7 consecutive "
+    f"calendar days may be closed ({MFF_INACTIVITY_URL})."
+)
+_MFF_NEWS = (
+    "T1 news trading is permitted in every evaluation, while the same policy page also asks for "
+    "no open positions or orders from 2 minutes before to 2 minutes after a data release; the "
+    f"two statements conflict; not simulated ({MFF_NEWS_URL})."
+)
+
+
+def _mff_notes(key: str, best: int, minis: int, extra: tuple[str, ...] = ()) -> tuple[str, ...]:
+    return (
+        _dollars_note(key),
+        _MFF_LOCK,
+        _open_loss(MFF_EOD_URL),
+        _best_day(best),
+        _more_days(MFF_CONSISTENCY_URL),
+        _intraday_only("4:10 PM EST", MFF_TIMES_URL),
+        _MFF_INACTIVITY,
+        _contracts(minis),
+        _MFF_NEWS,
+        *extra,
+    )
+
+
+_TRADEIFY_LOCK = (
+    "The maximum loss trails the highest end-of-day balance and does not lock in the evaluation "
+    f"({TRADEIFY_DRAWDOWN_URL}); a rules overview shows a lock at USD 50,100 under evaluation "
+    "accounts, and the simulator follows the drawdown article, which is stricter "
+    f"({TRADEIFY_ESSENTIAL_URL})."
+)
+_TRADEIFY_WEEKLY = (
+    f"At least 1 trade per week, Monday to Friday, is needed ({TRADEIFY_ESSENTIAL_URL})."
+)
+
+
+def _bulenox_overnight(url: str) -> str:
+    return f"Overnight and weekend positions are prohibited ({url})."
+
+
+_E2T_DAILY = (
+    "Daily loss: counted from the balance the day starts with, over the 5:00 PM to 5:00 PM CT "
+    f"day, with open and closed trades and commissions ({E2T_DAILY_URL})."
+)
+_E2T_FOUR_DAYS = (
+    "No minimum trading days, but with the 30 % rule at least 4 days must close with a gain."
+)
+
+
+def _e2t_notes(key: str, ladder: str) -> tuple[str, ...]:
+    return (
+        _dollars_note(key),
+        _E2T_DAILY,
+        _open_loss(E2T_EOD_URL),
+        _best_day(30),
+        _more_days(E2T_CONSISTENCY_URL),
+        _E2T_FOUR_DAYS,
+        _intraday_only("3:50 PM CT", E2T_HOURS_URL),
+        f"Going over the contract limit of the progression ladder ends the account ({ladder}).",
+        _news_allowed(E2T_HOURS_URL),
+    )
+
+
+_ALPHA_FUTURES_BANNED = (
+    "AI, bots and other automated trading are prohibited on every account type, as are "
+    "high-frequency trading, tick scalping and hedging between accounts "
+    f"({ALPHA_FUTURES_PROHIBITED_URL})."
+)
+_ALPHA_FUTURES_TIME = (
+    "No time limit is stated: the monthly fee rebills until the evaluation ends "
+    f"({ALPHA_FUTURES_SUBSCRIPTION_URL}), and at least one trade is needed every 10 trading "
+    f"days ({ALPHA_FUTURES_INACTIVITY_URL})."
+)
+
+
+def _alpha_futures_complete(url: str) -> str:
+    return (
+        "The evaluation is complete only once the target is reached and kept and the "
+        f"consistency rule holds ({url})."
+    )
+
+
+def _alpha_futures_notes(key: str, minis: int, rules: tuple[str, ...]) -> tuple[str, ...]:
+    return (
+        _dollars_note(key),
+        *rules,
+        _open_loss(ALPHA_FUTURES_MLL_URL),
+        _intraday_only("4:20 PM ET", ALPHA_FUTURES_TRADE_URL),
+        _ALPHA_FUTURES_BANNED,
+        _ALPHA_FUTURES_TIME,
+        _news_allowed(ALPHA_FUTURES_NEWS_URL),
+        _contracts(minis),
+    )
+
+
+def _futures(
+    key: str,
+    firm: str,
+    program: str,
+    *,
+    total: TotalLossType,
+    days: int,
+    notes: tuple[str, ...],
+    source: str,
+    markets_source: str,
+    time: int | None = None,
+    best: float | None = None,
+) -> ChallengeRules:
+    """A single-phase futures evaluation: its dollars over its account."""
+    account, target, daily, loss = _FUTURES_DOLLARS[key]
+    return ChallengeRules(
+        key=key,
+        firm=firm,
+        program=program,
+        phase="1",
+        profit_target=target / account,
+        max_daily_loss=None if daily is None else daily / account,
+        daily_loss_basis="none" if daily is None else "initial_balance",
+        max_total_loss=loss / account,
+        total_loss_type=total,
+        min_trading_days=days,
+        time_limit_days=time,
+        notes=notes,
+        source_url=source,
+        as_of=FUTURES_AS_OF,
+        best_day_limit=best,
+        best_day_basis=None if best is None else "profit_target",
+        markets=("futures",),
+        markets_source=markets_source,
+        markets_as_of=FUTURES_AS_OF,
+    )
+
+
+_FUTURES_PRESETS: tuple[ChallengeRules, ...] = (
+    _futures(
+        "take-profit-trader-test-50k",
+        "Take Profit Trader",
+        "Trading Test 50K",
+        total="trailing_eod_lock",
+        days=3,
+        best=0.50,
+        notes=_TPT_NOTES,
+        source=TPT_DRAWDOWN_URL,
+        markets_source=TPT_PRODUCTS_URL,
+    ),
+    _futures(
+        "myfundedfutures-rapid-eod-50k",
+        "MyFundedFutures",
+        "Rapid EOD 50K",
+        total="trailing_eod",
+        days=4,
+        best=0.30,
+        notes=_mff_notes("myfundedfutures-rapid-eod-50k", 30, 3),
+        source=MFF_RAPID_EOD_URL,
+        markets_source=MFF_MARKETS_URL,
+    ),
+    _futures(
+        "myfundedfutures-rapid-50k",
+        "MyFundedFutures",
+        "Rapid 50K",
+        total="trailing_eod",
+        days=2,
+        best=0.50,
+        notes=_mff_notes(
+            "myfundedfutures-rapid-50k",
+            50,
+            5,
+            (
+                "Only the evaluation is simulated; in the Sim Funded stage the maximum loss "
+                f"trails the intraday high ({MFF_INTRADAY_URL}).",
+            ),
+        ),
+        source=MFF_RAPID_URL,
+        markets_source=MFF_MARKETS_URL,
+    ),
+    _futures(
+        "myfundedfutures-pro-50k",
+        "MyFundedFutures",
+        "Pro 50K",
+        total="trailing_eod",
+        days=2,
+        best=0.50,
+        notes=_mff_notes(
+            "myfundedfutures-pro-50k",
+            50,
+            3,
+            (
+                "Simulated without the optional One-Day add-on, a USD 4,000 target in one day "
+                f"with no consistency rule ({MFF_ONE_DAY_URL}).",
+            ),
+        ),
+        source=MFF_EVALUATION_URL,
+        markets_source=MFF_MARKETS_URL,
+    ),
+    _futures(
+        "myfundedfutures-builder-50k",
+        "MyFundedFutures",
+        "Builder 50K",
+        total="trailing_eod",
+        days=1,
+        notes=(
+            _dollars_note("myfundedfutures-builder-50k"),
+            _SOFT_DAILY,
+            _lock_plus_100(MFF_BUILDER_URL),
+            _open_loss(MFF_EOD_URL),
+            "No consistency rule in the evaluation; the 50 % rule applies to Sim Funded payouts.",
+            "Intraday only: all positions must be closed before the end of the trading session.",
+            _MFF_INACTIVITY,
+            _contracts(4),
+            _news_allowed(MFF_BUILDER_URL),
+            "Simulated with the default maximum loss; the Add-On option has a USD 1,500 one and "
+            "is otherwise the same.",
+        ),
+        source=MFF_BUILDER_URL,
+        markets_source=MFF_MARKETS_URL,
+    ),
+    _futures(
+        "tradeify-select-50k",
+        "Tradeify",
+        "Select 50K",
+        total="trailing_eod",
+        days=3,
+        best=0.40,
+        notes=(
+            _dollars_note("tradeify-select-50k"),
+            _TRADEIFY_LOCK,
+            _open_loss(TRADEIFY_DRAWDOWN_URL),
+            _best_day(40),
+            "The 3 minimum days come from the 40 % consistency rule (2 with the 50 % add-on, "
+            "not simulated); the simulator counts every day with a non-zero return.",
+            _intraday_only("4:45 PM ET", TRADEIFY_HOURS_URL),
+            _TRADEIFY_WEEKLY,
+            _news_allowed(TRADEIFY_NEWS_URL),
+            _contracts(4),
+            "50K accounts bought before the new dashboard keep a USD 2,500 target.",
+        ),
+        source=TRADEIFY_SELECT_URL,
+        markets_source=TRADEIFY_PRODUCTS_URL,
+    ),
+    _futures(
+        "tradeify-growth-50k",
+        "Tradeify",
+        "Growth 50K",
+        total="trailing_eod",
+        days=1,
+        notes=(
+            _dollars_note("tradeify-growth-50k"),
+            _TRADEIFY_LOCK,
+            _open_loss(TRADEIFY_DRAWDOWN_URL),
+            _SOFT_DAILY,
+            "The daily loss limit resets at the start of each session (6:00 PM ET) and rises to "
+            "the size of the drawdown at 6 % profit, which in the evaluation is the target "
+            f"({TRADEIFY_DAILY_URL}).",
+            "No consistency rule in the evaluation; the 35 % rule applies to Growth Sim Funded "
+            f"payouts ({TRADEIFY_CONSISTENCY_URL}).",
+            _intraday_only("4:45 PM ET", TRADEIFY_HOURS_URL),
+            _TRADEIFY_WEEKLY,
+            _news_allowed(TRADEIFY_NEWS_URL),
+            _contracts(4),
+        ),
+        source=TRADEIFY_GROWTH_URL,
+        markets_source=TRADEIFY_PRODUCTS_URL,
+    ),
+    _futures(
+        "bulenox-qualification-eod-50k",
+        "Bulenox",
+        "Qualification EOD 50K",
+        total="trailing_eod",
+        days=0,
+        time=30,
+        notes=(
+            _dollars_note("bulenox-qualification-eod-50k"),
+            "The profit target, the USD 2,500 drawdown and the 30-day access come from the "
+            f"pricing page ({BULENOX_PRICING_URL}); the help center says a reset does not "
+            f"extend the 30 days ({BULENOX_RESET_URL}), while the FAQ says there is no maximum "
+            f"number of trading days ({BULENOX_FAQ_URL}), so the simulator uses the 30 days, "
+            "which is stricter.",
+            "The end-of-day drawdown is updated once a day after the close and does not lock in "
+            "the Qualification; the lock at the starting balance plus USD 100 applies to the "
+            "Master Account.",
+            "The daily loss limit counts realized and unrealized P&L with commissions over the "
+            "5:00 PM to 4:00 PM CT session, which daily closes cannot see.",
+            _SOFT_DAILY,
+            _UNSTATED_INTRADAY_FLOOR,
+            "Contracts scale with the profit: 2 up to USD 1,500, 4 up to USD 4,000 and 7 after; "
+            "not simulated.",
+            _bulenox_overnight(BULENOX_QUALIFICATION_URL),
+            _news_allowed(BULENOX_FAQ_URL),
+        ),
+        source=BULENOX_QUALIFICATION_URL,
+        markets_source=BULENOX_FAQ_URL,
+    ),
+    _futures(
+        "bulenox-momentum-eod-50k",
+        "Bulenox",
+        "Momentum EOD 50K",
+        total="trailing_eod",
+        days=0,
+        time=30,
+        notes=(
+            _dollars_note("bulenox-momentum-eod-50k"),
+            "The end-of-day drawdown is recalculated at each day's close; the Momentum page "
+            "names no lock in the qualification stage, and the simulator lets it trail without "
+            "locking, which is stricter.",
+            _SOFT_DAILY,
+            _UNSTATED_INTRADAY,
+            _bulenox_overnight(BULENOX_MOMENTUM_URL),
+            _news_allowed(BULENOX_MOMENTUM_URL),
+            _contracts(4),
+        ),
+        source=BULENOX_MOMENTUM_URL,
+        markets_source=BULENOX_FAQ_URL,
+    ),
+    _futures(
+        "earn2trade-tcp-25k",
+        "Earn2Trade",
+        "Trader Career Path 25K",
+        total="trailing_eod_lock",
+        days=0,
+        best=0.30,
+        notes=_e2t_notes("earn2trade-tcp-25k", E2T_TCP_LADDER_URL),
+        source=E2T_TCP_URL,
+        markets_source=E2T_TCP_URL,
+    ),
+    _futures(
+        "earn2trade-gauntlet-mini-50k",
+        "Earn2Trade",
+        "Gauntlet Mini 50K",
+        total="trailing_eod_lock",
+        days=0,
+        best=0.30,
+        notes=_e2t_notes("earn2trade-gauntlet-mini-50k", E2T_GAUNTLET_LADDER_URL),
+        source=E2T_GAUNTLET_URL,
+        markets_source=E2T_GAUNTLET_URL,
+    ),
+    _futures(
+        "alpha-futures-zero-50k",
+        "Alpha Futures",
+        "Zero 50K",
+        total="trailing_eod_lock",
+        days=1,
+        notes=_alpha_futures_notes(
+            "alpha-futures-zero-50k",
+            3,
+            (
+                "The Daily Loss Guard is 2 % of the starting balance on the day's open and "
+                "closed P&L; reaching it flattens the positions and locks the account until the "
+                "next trading day (6 PM ET) without ending it; the simulator ends the path there, "
+                "which is stricter, but it checks daily closes only and does not see a touch on "
+                f"open P&L within the day, which is optimistic ({ALPHA_FUTURES_DAILY_URL}).",
+                "No consistency rule in the evaluation; the 40 % rule applies to Qualified "
+                "accounts.",
+            ),
+        ),
+        source=ALPHA_FUTURES_ZERO_URL,
+        markets_source=ALPHA_FUTURES_TRADE_URL,
+    ),
+    _futures(
+        "alpha-futures-standard-50k",
+        "Alpha Futures",
+        "Standard 50K",
+        total="trailing_eod_lock",
+        days=2,
+        best=0.50,
+        notes=_alpha_futures_notes(
+            "alpha-futures-standard-50k",
+            5,
+            (_best_day(50), _alpha_futures_complete(ALPHA_FUTURES_STANDARD_HELP_URL)),
+        ),
+        source=ALPHA_FUTURES_STANDARD_URL,
+        markets_source=ALPHA_FUTURES_TRADE_URL,
+    ),
+    _futures(
+        "alpha-futures-advanced-50k",
+        "Alpha Futures",
+        "Advanced 50K",
+        total="trailing_eod_lock",
+        days=3,
+        best=0.40,
+        notes=_alpha_futures_notes(
+            "alpha-futures-advanced-50k",
+            5,
+            (_best_day(40), _alpha_futures_complete(ALPHA_FUTURES_ADVANCED_HELP_URL)),
+        ),
+        source=ALPHA_FUTURES_ADVANCED_URL,
+        markets_source=ALPHA_FUTURES_TRADE_URL,
+    ),
+    _futures(
+        "lucid-pro-50k",
+        "Lucid Trading",
+        "LucidPro 50K",
+        total="trailing_eod",
+        days=1,
+        notes=(
+            _dollars_note("lucid-pro-50k"),
+            "Simulated with the daily loss limit off, an option chosen at purchase "
+            f"({LUCID_CUSTOMIZATION_URL}); with it on, a fixed USD 1,200 limit pauses the day "
+            f"without ending the account; not simulated ({LUCID_DAILY_URL}).",
+            _lock_plus_100(LUCID_DRAWDOWN_URL),
+            _UNSTATED_INTRADAY_FLOOR,
+            "No minimum number of days is published; the target can be reached in one trading day.",
+            "No consistency rule in the evaluation; the 40 % one applies to the funded account "
+            f"({LUCID_CONSISTENCY_URL}).",
+            _intraday_only("4:45 PM EST", LUCID_TIMES_URL),
+            f"Microscalping ({LUCID_MICROSCALPING_URL}), high-frequency trading ({LUCID_HFT_URL}) "
+            f"and hedging ({LUCID_HEDGING_URL}) are prohibited; news trading, automated trading "
+            f"systems and trade copiers are allowed ({LUCID_OTHER_URL}).",
+            _contracts(4),
+        ),
+        source=LUCID_PRO_URL,
+        markets_source=LUCID_PRODUCTS_URL,
+    ),
+)
+
+
 _PRESET_LIST: tuple[ChallengeRules, ...] = (
     ChallengeRules(
         key="generic-2step-phase1",
@@ -869,6 +1514,7 @@ _PRESET_LIST: tuple[ChallengeRules, ...] = (
     ),
     *(_topstep(size, loss / account) for size, account, loss in _TOPSTEP_ACCOUNTS),
     *_NEW_FIRM_PRESETS,
+    *_FUTURES_PRESETS,
 )
 
 PRESETS: dict[str, ChallengeRules] = {rules.key: rules for rules in _PRESET_LIST}
@@ -879,6 +1525,7 @@ PRESETS: dict[str, ChallengeRules] = {rules.key: rules for rules in _PRESET_LIST
 ACCOUNT_SIZES: dict[str, float] = {
     **{f"topstep-{size.lower()}-combine": float(account) for size, account, _ in _TOPSTEP_ACCOUNTS},
     **{key: float(account) for key, account in _E8_ACCOUNTS.items()},
+    **{key: float(dollars[0]) for key, dollars in _FUTURES_DOLLARS.items()},
 }
 
 
@@ -919,6 +1566,7 @@ __all__ = [
     "MARKETS",
     "MARKETS_AS_OF",
     "NEW_FIRMS_AS_OF",
+    "FUTURES_AS_OF",
     "PRESETS",
     "TOTAL_LOSS_TYPES",
     "ChallengeRules",
