@@ -31,6 +31,8 @@ from quant_trade.audit.articles import (
 )
 from quant_trade.audit.audiences import AUDIENCE_PAGES, audience_url
 from quant_trade.audit.calculator import CALCULATOR_PATH
+from quant_trade.audit.challenge_calc import FIRMS as CHALLENGE_FIRMS
+from quant_trade.audit.challenge_calc import page_paths as challenge_paths
 from quant_trade.audit.examples import EXAMPLES_PATH
 from quant_trade.audit.faq import FAQ_PATH
 from quant_trade.audit.guides import GUIDES, guide_url, guides_index_url
@@ -71,6 +73,8 @@ SIGNAL_SAMPLE_PATHS: dict[str, str] = {
     "pt": "/pt/exemplo-sinal",
 }
 SIGNAL_SAMPLE_PUBLISHED = "2026-10-09"
+#: The day the challenge calculator and its firm pages were published.
+CHALLENGE_PUBLISHED = "2026-10-10"
 
 #: Each public page as its path per language. The sitemap lists exactly these.
 #: Spanish and English exist for every page; Portuguese only where translated.
@@ -87,6 +91,9 @@ PUBLIC_PAGES: tuple[dict[str, str], ...] = (
     dict(CALCULATOR_PATH),
     dict(READING_PATH),
     dict(WINRATE_PATH),
+    # The challenge calculator and one page per firm with a published preset.
+    challenge_paths(),
+    *(challenge_paths(firm) for firm in CHALLENGE_FIRMS),
     dict(TOOLS_PATH),
     dict(FAQ_PATH),
     dict(PRICING_PATH),
@@ -123,6 +130,13 @@ def _page_dates() -> dict[str, str]:
     dates.update({articles_index_url(lang): newest for lang in LOCALES})
     dates.update({path: LEGAL_UPDATED for pages in LEGAL_PATHS.values() for path in pages.values()})
     dates.update({path: SIGNAL_SAMPLE_PUBLISHED for path in SIGNAL_SAMPLE_PATHS.values()})
+    dates.update(
+        {
+            path: CHALLENGE_PUBLISHED
+            for firm in ("", *CHALLENGE_FIRMS)
+            for path in challenge_paths(firm).values()
+        }
+    )
     # The institutional review's offer and its sample review changed together.
     institutional = (*REVIEW_PATHS.values(), *SAMPLE_PATHS.values())
     dates.update({path: OFFER_UPDATED for path in institutional})
@@ -298,7 +312,10 @@ def article_structured_data(article: Article, locale: str, base_url: str) -> str
 
 
 def _web_application(name: str, description: str, url: str, locale: str) -> dict[str, Any]:
-    """A free tool that runs in the browser; ``url`` is absolute."""
+    """A free tool that runs in the browser; ``url`` is absolute.
+
+    The publisher is Rigor: a tool named after a prop firm must not read as the
+    firm's own in a search result."""
     return {
         "@type": "WebApplication",
         "name": name,
@@ -309,6 +326,7 @@ def _web_application(name: str, description: str, url: str, locale: str) -> dict
         "isAccessibleForFree": True,
         "inLanguage": locale,
         "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"},
+        "publisher": {"@type": "Organization", "name": BRAND},
     }
 
 
@@ -476,6 +494,7 @@ def sitemap_xml(base_url: str) -> str:
 
 __all__ = [
     "BRAND",
+    "CHALLENGE_PUBLISHED",
     "DISALLOWED_PATHS",
     "NOINDEX",
     "NOINDEX_PATHS",

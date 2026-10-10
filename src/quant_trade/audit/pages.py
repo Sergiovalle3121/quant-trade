@@ -19,6 +19,7 @@ from typing import Any
 from urllib.parse import quote, urlencode
 
 from quant_trade.audit import accounts, institutional, paid_offer, reading, winrate
+from quant_trade.audit import challenge_calc as challenge
 from quant_trade.audit.accounts import FREE_PREVIEWS_PER_MONTH as _FREE
 from quant_trade.audit.article_numbers import STREAK_ROWS
 from quant_trade.audit.articles import (
@@ -2064,6 +2065,8 @@ def _tool_name(key: str, locale: str) -> str:
         return str(CALCULATOR_COPY[locale]["nav"])
     if key == "winrate":
         return str(winrate.COPY[locale]["nav"])
+    if key == "challenge":
+        return str(challenge.COPY[locale]["nav"])
     if key == "reading":
         return reading.COPY[locale]["title"]
     return str(_UI[locale]["footer_check"])
@@ -2074,6 +2077,8 @@ def _tool_url(key: str, locale: str) -> str:
         return calculator_url(locale)
     if key == "winrate":
         return winrate.WINRATE_PATH[locale]
+    if key == "challenge":
+        return challenge.challenge_url(locale)
     if key == "reading":
         return reading.reading_url(locale)
     return _check_url(locale)
@@ -4934,6 +4939,14 @@ def article_page(article: Article, *, locale: str = "es", base_url: str = "") ->
             f"<tbody>{rows}</tbody></table>"
         )
         sections.insert(2, (heading, table))
+    if article.key == CHALLENGE_ARTICLE_KEY:
+        heading, text_, label = CHALLENGE_ARTICLE_COPY[locale]
+        link = (
+            f"<p><a class='link-more' href='{_e(challenge.challenge_url(locale))}' "
+            f"data-challenge-calculator>{_e(label)}{icon('arrow')}</a></p>"
+        )
+        after = min(3, len(sections))
+        sections.insert(after, (heading, f"<p>{_e(text_)}</p>{link}"))
     if article.key == STREAK_ARTICLE_KEY:
         heading, rate, trades, median, rare, note = STREAK_TABLE_COPY[locale]
         rows = "".join(
@@ -4997,6 +5010,39 @@ def article_page(article: Article, *, locale: str = "es", base_url: str = "") ->
     )
     return _page(title, locale, body, meta_html=meta, alternates=alternates, solid_nav=True)
 
+
+#: The prop-firm article opens the challenge calculator with its own section,
+#: after the worked example: (heading, text, link label).
+CHALLENGE_ARTICLE_KEY = "cuantos-intentos-reto-prop-firm"
+CHALLENGE_ARTICLE_COPY: dict[str, tuple[str, str, str]] = {
+    "es": (
+        "La misma cuenta con las reglas de una firma",
+        "La calculadora de reto hace esta cuenta con tus cifras declaradas (% de aciertos, "
+        "ganancia y pérdida medias y operaciones por día) y las reglas publicadas de FTMO, "
+        "FundedNext, The5ers y Topstep, con el mismo simulador del informe. Es gratis y no pide "
+        "registro ni archivo.",
+        "Abrir la calculadora de reto",
+    ),
+    "en": (
+        "The same calculation with a firm's rules",
+        "The challenge calculator runs this calculation with your declared figures (win rate, "
+        "average win and loss and trades per day) and the published rules of FTMO, FundedNext, "
+        "The5ers and Topstep, with the report's own simulator. It is free and needs no signup "
+        "or file.",
+        "Open the challenge calculator",
+    ),
+    "pt": (
+        "A mesma conta com as regras de uma empresa",
+        "A calculadora de desafio faz esta conta com os seus números declarados (taxa de "
+        "acerto, ganho e perda médios e operações por dia) e as regras publicadas da FTMO, "
+        "FundedNext, The5ers e Topstep, com o mesmo simulador do relatório. É grátis e não pede "
+        "cadastro nem arquivo.",
+        "Abrir a calculadora de desafio",
+    ),
+}
+#: The free tool a case page offers under its first buttons, for a visitor without
+#: the file at hand (a ``tools_hub.TOOL_KEYS`` key).
+AUDIENCE_TOOLS: dict[str, str] = {"retos-prop-firm": "challenge"}
 
 #: Articles each case page lists before the other cases (article keys, in order).
 AUDIENCE_ARTICLES: dict[str, tuple[str, ...]] = {
@@ -5095,6 +5141,13 @@ def audience_page(
     if audience.public_example:
         # What the provider's clients would see, before uploading anything.
         lead += public_pages_line(locale, css="aud-example")
+    tool = AUDIENCE_TOOLS.get(audience.slug)
+    if tool:
+        # Without the file at hand, the free tool for the same question.
+        lead += (
+            f"<p class='muted' data-audience-tool>{_e(TOOLS_COPY[locale][tool]['question'])} "
+            f"<a href='{_e(_tool_url(tool, locale))}'>{_e(_tool_name(tool, locale))}</a></p>"
+        )
     alternates = {lang: audience_url(audience.slug, lang) for lang in ("es", "en", "pt")}
     crumbs = f"<a href='{_e(_home(locale))}'>{_e(words['home'])}</a>" + _language_crumbs(
         alternates, locale

@@ -43,6 +43,7 @@ from pydantic import ValidationError
 
 from quant_trade.audit import (
     account_pages,
+    challenge_calc,
     forensics_web,
     funnel,
     inbox,
@@ -83,6 +84,7 @@ from quant_trade.audit.calculator import (
     share_values,
 )
 from quant_trade.audit.calculator_card import calculator_card_svg
+from quant_trade.audit.challenge_pages import challenge_page
 from quant_trade.audit.compare import (
     COMPARE_PATH,
     MAX_COMPARED,
@@ -1292,6 +1294,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     reading_images = reading_png.ReadingPNGCache()
     reading_png_paths = {path + "/card.png" for path in reading.READING_PATH.values()}
     calculator_attempts = AttemptLog()
+    challenge_attempts = AttemptLog()
     calculator_images = reading_png.ReadingPNGCache(fields=CARD_FIELDS)
     calculator_png_paths = {path + "/card.png" for path in CALCULATOR_PATH.values()}
     card_lookups = AttemptLog()
@@ -1429,6 +1432,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     visit_paths.update({path: loc for loc, path in reading.READING_PATH.items()})
     visit_paths.update({path: loc for loc, path in TOOLS_PATH.items()})
     visit_paths.update({path: loc for loc, path in winrate.WINRATE_PATH.items()})
+    # The challenge calculator and its firm pages, like the other free tools.
+    visit_paths.update({path: loc for path, (loc, _firm) in challenge_calc.PAGES.items()})
 
     def _funnel_visit(request: Request, response: Any) -> None:
         """Count a person's visit to the landing or a case page; remember its tag.
@@ -7229,6 +7234,46 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     for winrate_path in winrate.WINRATE_PATH.values():
         app.add_api_route(
             winrate_path, public_winrate, methods=["GET"], response_class=HTMLResponse
+        )
+
+    def public_challenge(request: Request) -> Response:
+        """The challenge calculator and its firm pages: the report's simulator on
+        synthetic days from the declared figures. Nothing is stored; each address
+        gets ``REQUESTS_PER_HOUR`` computations a sliding hour, past which the
+        page keeps the form and says so (the result is cached per input)."""
+        locale, firm = challenge_calc.PAGES[request.url.path]
+        query = request.query_params
+        duplicate = any(len(query.getlist(name)) > 1 for name in challenge_calc.FIELDS)
+        values = {name: query.get(name, "") for name in challenge_calc.FIELDS}
+        status, limited = 200, False
+        if duplicate:
+            status = 400
+        elif challenge_calc.submitted(values):
+            parsed = challenge_calc.parse(values, firm)
+            if parsed.errors:
+                status = 400
+            else:
+                ip = _client_ip(request, cfg.trusted_proxy_hops)
+                seen = challenge_attempts.hit(ip, datetime.now(UTC))
+                if seen >= challenge_calc.REQUESTS_PER_HOUR:
+                    status, limited = 429, True
+        page = challenge_page(
+            locale=locale,
+            firm=firm,
+            base_url=_site_url(request),
+            values=values,
+            duplicate=duplicate,
+            limited=limited,
+        )
+        return HTMLResponse(
+            guard_page(_offered(page, locale)),
+            status_code=status,
+            headers={"Retry-After": "3600"} if limited else None,
+        )
+
+    for challenge_path in challenge_calc.PAGES:
+        app.add_api_route(
+            challenge_path, public_challenge, methods=["GET"], response_class=HTMLResponse
         )
 
     def public_faq(request: Request) -> str:
