@@ -1278,16 +1278,63 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
         "al tamaño (el mismo costo por lote) y la ejecución no empeora con más volumen",
     ),
     (
+        "the lots of each trade are read only from MetaTrader 4 and 5 reports, whose volume "
+        "column is the platform's lots, so the average lot at 1x is not known; 1x is still the "
+        "size the history traded at",
+        "los lotes de cada operación solo se leen de los informes de MetaTrader 4 y 5, cuya "
+        "columna de volumen son los lotes de la plataforma, así que no se conoce el lote medio "
+        "a 1x; 1x sigue siendo el tamaño con el que operó el historial",
+    ),
+    # Results stored before the average lot (2026-10-09) keep this reason.
+    (
         "the audit keeps neither the lot nor the stop loss of each trade, so the lot or risk "
         "per trade at 1x is not known",
         "la auditoría no guarda el lote ni el stop loss de cada operación, así que no se "
         "conoce el lote ni el riesgo por operación a 1x",
     ),
     (
+        "lots per trade on average at the history's own size: the {lots} lots of the {count} "
+        "trades divided by their number; the cost section counts {traded} lots traded because "
+        "it adds entries and exits",
+        "lotes por operación de media al tamaño del propio historial: los {lots} lotes de las "
+        "{count} operaciones divididos entre su número; la sección de costos cuenta {traded} "
+        "lotes negociados porque suma entradas y salidas",
+    ),
+    (
+        "the average lot per trade at 1x multiplied by the size",
+        "el lote medio por operación a 1x multiplicado por el tamaño",
+    ),
+    (
+        "the average lot per trade at 1x on the program's {account} account: the lots at 1x "
+        "times the account over the {balance} balance the shares at 1x are measured on",
+        "el lote medio por operación a 1x en la cuenta de {account} del programa: los lotes a "
+        "1x por la cuenta entre el balance de {balance} sobre el que se miden los porcentajes "
+        "de 1x",
+    ),
+    (
+        "the average lot per trade at 1x on the program's account multiplied by the size",
+        "el lote medio por operación a 1x en la cuenta del programa multiplicado por el tamaño",
+    ),
+    (
+        "the ladder's rung for every program: the same series, simulator, seed and rules; the "
+        "chosen program's figure is the ladder's own",
+        "el escenario de la escalera con cada programa: la misma serie, simulador, semilla y "
+        "reglas; la cifra del programa elegido es la de la escalera",
+    ),
+    (
         "account size in US dollars that the program names; its limits are shares of it",
         "tamaño de cuenta en dólares estadounidenses que nombra el programa; sus límites son "
         "porcentajes de ella",
     ),
+    (
+        "the simulated rules fix no account size: they are shares (of the starting balance or "
+        "of the day's), so the table's shares do not depend on the account size; its lots, when "
+        "the report gives them, are those of the starting balance",
+        "las reglas que se simulan no fijan un tamaño de cuenta: son porcentajes (del balance "
+        "inicial o del día), así que los porcentajes de la tabla no dependen del tamaño de la "
+        "cuenta; sus lotes, cuando el informe los da, son los del balance inicial",
+    ),
+    # Results stored before the average lot (2026-10-09) keep this note.
     (
         "the simulated rules fix no account size: they are shares (of the starting balance or "
         "of the day's), so the table does not depend on the account size",

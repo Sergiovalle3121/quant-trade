@@ -1259,7 +1259,8 @@ def test_both_drawdown_tiles_carry_the_same_sign() -> None:
     data = sample_result("es", bootstrap_samples=60).model_dump(mode="json")
     tiles = {label: shown for label, shown, _ in _kpi_list(data, LABELS["es"])}
     falls = [shown for label, shown in tiles.items() if label.startswith("Drawdown")]
-    assert len(falls) == 2 and all(shown.startswith("-") for shown in falls)
+    # Closed trades, the platform's with open trades (the sample's MT5 header) and p95.
+    assert len(falls) == 3 and all(shown.startswith("-") for shown in falls)
 
 
 def test_strategy_pages_read_as_cards_with_coloured_change_words(tmp_path: Path) -> None:
