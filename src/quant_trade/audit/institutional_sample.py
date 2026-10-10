@@ -44,7 +44,13 @@ import pandas as pd
 from quant_trade.audit import institutional
 from quant_trade.audit.engine import run_audit
 from quant_trade.audit.guard import assert_report_clean
-from quant_trade.audit.report import DIMENSION_TITLES, STATUS_TEXT, evidence_label
+from quant_trade.audit.report import (
+    DIMENSION_TITLES,
+    DIMENSION_TITLES_FUND,
+    STATUS_TEXT,
+    evidence_label,
+    report_kind,
+)
 from quant_trade.audit.schema import AuditResult, DeclaredMetadata, build_inputs
 from quant_trade.audit.verdict import DIMENSION_ORDER, class_text
 
@@ -308,9 +314,9 @@ COPY: dict[str, dict[str, Any]] = {
                 "fracción."
             ),
             "variants": (
-                "Las variantes: las {variants} carteras por decil, una columna cada una, "
-                "declaradas como los intentos de los que salió la serie. Rigor contó {trials} "
-                "columnas."
+                "Las variantes: las {variants} carteras por decil, una columna de retornos cada "
+                "una (la matriz de variantes), declaradas como las carteras, estrategias o "
+                "variantes evaluadas antes de elegir la serie. Rigor contó {trials} columnas."
             ),
             "benchmark": "El benchmark: el mercado, con la tasa de caja sumada (retorno total).",
             "role": (
@@ -369,26 +375,27 @@ COPY: dict[str, dict[str, Any]] = {
                 "{psr_pass} o más.",
             ),
             "dsr": (
-                "Sharpe deflactado (DSR) con {trials} intentos",
+                "Sharpe deflactado (DSR) con {trials} intentos (las carteras, estrategias o "
+                "variantes evaluadas)",
                 "La misma probabilidad, exigiendo superar al mejor de {trials} intentos sin "
                 "habilidad. Con {dsr_pass} o más supera; entre {dsr_weak} y {dsr_pass} queda "
                 "débil.",
             ),
             "luck_sharpe": (
-                "Sharpe que darían {trials} intentos sin habilidad",
-                "El mejor Sharpe esperable por pura suerte entre {trials} intentos con esta "
-                "longitud de historial.",
+                "Sharpe que darían {trials} carteras, estrategias o variantes sin habilidad",
+                "El mejor Sharpe esperable por pura suerte entre {trials} carteras, estrategias "
+                "o variantes con esta longitud de historial.",
             ),
             "years_needed": (
                 "Años de historial para dejar atrás esa suerte",
-                "Con menos años, un Sharpe como este podría venir de elegir el mejor de "
-                "{trials} intentos.",
+                "Con menos años, un Sharpe como este podría venir de elegir la mejor de "
+                "{trials} carteras, estrategias o variantes.",
             ),
             "pbo": (
                 "Probabilidad de sobreajuste (PBO, CSCV)",
-                "En qué parte de las divisiones de los datos la mejor variante dentro de la "
-                "muestra queda por debajo de la mediana fuera de ella. Por encima de {pbo_max} "
-                "es mala señal.",
+                "En qué parte de las divisiones de los datos la mejor de las carteras, "
+                "estrategias o variantes dentro de la muestra queda por debajo de la mediana "
+                "fuera de ella. Por encima de {pbo_max} es mala señal.",
             ),
             "index_cagr": (
                 "Rentabilidad anual compuesta del benchmark",
@@ -412,7 +419,10 @@ COPY: dict[str, dict[str, Any]] = {
         "dim_cols": ("Pregunta", "Qué mide", "Resultado"),
         "questions": {
             "statistical_significance": "¿El resultado se distingue del azar como una sola prueba?",
-            "multiplicity": "¿Sigue en pie después de contar los intentos de los que salió?",
+            "multiplicity": (
+                "¿Sigue en pie después de contar las carteras, estrategias o variantes "
+                "evaluadas antes de elegirla?"
+            ),
             "costs": "¿Aguanta los costos de operar?",
             "out_of_sample": "¿Se sostiene en datos que no se usaron para elegirla?",
             "data_quality": "¿Los datos tienen huecos, saltos o patrones sospechosos?",
@@ -525,8 +535,9 @@ COPY: dict[str, dict[str, Any]] = {
                 "as fractions."
             ),
             "variants": (
-                "The variants: the {variants} decile portfolios, one column each, declared as "
-                "the attempts the series was chosen from. Rigor counted {trials} columns."
+                "The variants: the {variants} decile portfolios, one return column each (the "
+                "variants matrix), declared as the portfolios, strategies or variants evaluated "
+                "before the series was chosen. Rigor counted {trials} columns."
             ),
             "benchmark": "The benchmark: the market, with the cash rate added (total return).",
             "role": (
@@ -583,25 +594,27 @@ COPY: dict[str, dict[str, Any]] = {
                 "between months: the figure the class uses. Passing needs {psr_pass} or more.",
             ),
             "dsr": (
-                "Deflated Sharpe (DSR) with {trials} trials",
+                "Deflated Sharpe (DSR) with {trials} trials (the portfolios, strategies or "
+                "variants evaluated)",
                 "The same probability, asking it to beat the best of {trials} trials with no "
                 "skill. With {dsr_pass} or more it passes; between {dsr_weak} and {dsr_pass} it "
                 "is weak.",
             ),
             "luck_sharpe": (
-                "Sharpe {trials} trials with no skill would show",
-                "The best Sharpe to expect from pure luck among {trials} trials with this "
-                "length of history.",
+                "Sharpe {trials} portfolios, strategies or variants with no skill would show",
+                "The best Sharpe to expect from pure luck among {trials} portfolios, strategies "
+                "or variants with this length of history.",
             ),
             "years_needed": (
                 "Years of history to leave that luck behind",
                 "With fewer years, a Sharpe like this one could come from picking the best of "
-                "{trials} trials.",
+                "{trials} portfolios, strategies or variants.",
             ),
             "pbo": (
                 "Probability of overfitting (PBO, CSCV)",
-                "In what share of the data's splits the best variant in sample falls below the "
-                "median out of sample. Above {pbo_max} is a bad sign.",
+                "In what share of the data's splits the best of the portfolios, strategies or "
+                "variants in sample falls below the median out of sample. Above {pbo_max} is a "
+                "bad sign.",
             ),
             "index_cagr": (
                 "Benchmark's compound annual return",
@@ -625,7 +638,10 @@ COPY: dict[str, dict[str, Any]] = {
         "dim_cols": ("Question", "What it measures", "Result"),
         "questions": {
             "statistical_significance": "Does the result stand out from chance as a single test?",
-            "multiplicity": "Does it still stand after counting the attempts it came from?",
+            "multiplicity": (
+                "Does it still stand after counting the portfolios, strategies or variants "
+                "evaluated before it was chosen?"
+            ),
             "costs": "Does it hold up against trading costs?",
             "out_of_sample": "Does it hold on data not used to choose it?",
             "data_quality": "Does the data have gaps, jumps or suspicious patterns?",
@@ -737,8 +753,9 @@ COPY: dict[str, dict[str, Any]] = {
                 "último), como um vendedor de sinais a ofereceria. Retornos mensais, em fração."
             ),
             "variants": (
-                "As variantes: as {variants} carteiras por decil, uma coluna cada, declaradas "
-                "como as tentativas de onde saiu a série. O Rigor contou {trials} colunas."
+                "As variantes: as {variants} carteiras por decil, uma coluna de retornos cada "
+                "(a matriz de variantes), declaradas como as carteiras, estratégias ou variantes "
+                "avaliadas antes de escolher a série. O Rigor contou {trials} colunas."
             ),
             "benchmark": "O benchmark: o mercado, com a taxa de caixa somada (retorno total).",
             "role": (
@@ -797,25 +814,27 @@ COPY: dict[str, dict[str, Any]] = {
                 "{psr_pass} ou mais.",
             ),
             "dsr": (
-                "Sharpe deflacionado (DSR) com {trials} tentativas",
+                "Sharpe deflacionado (DSR) com {trials} tentativas (as carteiras, estratégias ou "
+                "variantes avaliadas)",
                 "A mesma probabilidade, exigindo superar a melhor de {trials} tentativas sem "
                 "habilidade. Com {dsr_pass} ou mais passa; entre {dsr_weak} e {dsr_pass} fica "
                 "fraca.",
             ),
             "luck_sharpe": (
-                "Sharpe que {trials} tentativas sem habilidade dariam",
-                "O melhor Sharpe esperado por pura sorte entre {trials} tentativas com este "
-                "tamanho de histórico.",
+                "Sharpe que {trials} carteiras, estratégias ou variantes sem habilidade dariam",
+                "O melhor Sharpe esperado por pura sorte entre {trials} carteiras, estratégias "
+                "ou variantes com este tamanho de histórico.",
             ),
             "years_needed": (
                 "Anos de histórico para deixar essa sorte para trás",
                 "Com menos anos, um Sharpe como este poderia vir de escolher a melhor de "
-                "{trials} tentativas.",
+                "{trials} carteiras, estratégias ou variantes.",
             ),
             "pbo": (
                 "Probabilidade de sobreajuste (PBO, CSCV)",
-                "Em que parte das divisões dos dados a melhor variante dentro da amostra fica "
-                "abaixo da mediana fora dela. Acima de {pbo_max} é mau sinal.",
+                "Em que parte das divisões dos dados a melhor das carteiras, estratégias ou "
+                "variantes dentro da amostra fica abaixo da mediana fora dela. Acima de "
+                "{pbo_max} é mau sinal.",
             ),
             "index_cagr": (
                 "Retorno anual composto do benchmark",
@@ -839,7 +858,10 @@ COPY: dict[str, dict[str, Any]] = {
         "dim_cols": ("Pergunta", "O que mede", "Resultado"),
         "questions": {
             "statistical_significance": "O resultado se distingue do acaso como um único teste?",
-            "multiplicity": "Continua de pé depois de contar as tentativas de onde saiu?",
+            "multiplicity": (
+                "Continua de pé depois de contar as carteiras, estratégias ou variantes "
+                "avaliadas antes de escolhê-la?"
+            ),
             "costs": "Aguenta os custos de operar?",
             "out_of_sample": "Se sustenta em dados que não foram usados para escolhê-la?",
             "data_quality": "Os dados têm buracos, saltos ou padrões suspeitos?",
@@ -931,13 +953,21 @@ def _locale(locale: str) -> str:
     return locale if locale in COPY else "es"
 
 
-def _dimension_words(locale: str) -> tuple[dict[str, str], dict[str, str]]:
-    """The report's own dimension titles and status words in ``locale``."""
+def _dimension_words(
+    locale: str, data: dict[str, Any] | None = None
+) -> tuple[dict[str, str], dict[str, str]]:
+    """The report's own dimension titles and status words in ``locale``: on a fund's
+    track record (``report_kind``, the sample's template) the names its report gives
+    them (``DIMENSION_TITLES_FUND``), so the notes and the report name each the same."""
     if locale == "pt":
         from quant_trade.audit.portuguese import DIMENSION_TITLES_PT, STATUS_TEXT_PT
 
-        return DIMENSION_TITLES_PT, STATUS_TEXT_PT
-    return DIMENSION_TITLES[locale], STATUS_TEXT[locale]
+        titles, statuses = DIMENSION_TITLES_PT, STATUS_TEXT_PT
+    else:
+        titles, statuses = DIMENSION_TITLES[locale], STATUS_TEXT[locale]
+    if data is not None and report_kind(data) == "fund":
+        titles = {**titles, **DIMENSION_TITLES_FUND.get(locale, {})}
+    return titles, statuses
 
 
 def _badge(tag: str, locale: str) -> str:
@@ -1040,7 +1070,7 @@ def notes_sections(result: AuditResult, locale: str) -> list[tuple[str, str]]:
     figures = note_figures(data)
     values = _values(data, figures)
     dims = {str(item["name"]): str(item["status"]) for item in data["verdict"]["dimensions"]}
-    titles, statuses = _dimension_words(locale)
+    titles, statuses = _dimension_words(locale, data)
 
     source = "".join(f"<p>{_e(line.format(**values))}</p>" for line in words["data"]) + (
         f"<p><a href='{_e(SOURCE_URL)}' rel='noopener'>{_e(words['source_link'])}</a></p>"

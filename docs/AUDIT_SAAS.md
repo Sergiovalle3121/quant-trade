@@ -2068,8 +2068,9 @@ dimension card, the summary and the plan ask the manager since when the
 process has been unchanged and whether any stretch is simulated (pro forma),
 not for an optimisation date or an unchanged robot. The costs step asks
 whether the figures are net of the management and performance fees, instead
-of a platform report. Undeclared trials read as how many funds or strategies
-the same manager runs. The caps do not change: out of sample and costs stay
+of a platform report. A fund's trials are the portfolios, strategies or
+variants evaluated before this one was chosen (see "Fund and portfolio reports
+in a fund's words" below). The caps do not change: out of sample and costs stay
 NOT_MEASURED, and the best class without them is B.
 
 Against its benchmark. Factsheets print the benchmark's months next to the
@@ -6080,3 +6081,81 @@ new result stores beyond its texts is listed under the fourth pass.
     word as before this branch (e1df258).
   - Nothing stored changes: the samples' JSON and its sha256 are those of the
     fourth pass.
+
+## Fund and portfolio reports in a fund's words (10 October 2026)
+
+The account or signal report lost its robot words on 9 October; a fund or
+portfolio's report (`report.report_kind` "fund": a monthly track record) still
+read as a backtest's. Emerging managers read it, and so do the clients of the
+institutional review, who receive the sample at `/revision-institucional/ejemplo`.
+No figure, threshold, class, evidence tag, simulator result, price or credit
+changed; the only stored text that changes is a new fund result's verdict
+summary (`tests/test_audit_informe_fondo_coherente.py`, es/en/pt, every voice).
+
+- **What a fund counts.** A fund's trials are the portfolios, strategies or
+  variants evaluated before this one was chosen (the funds the manager runs or
+  has closed among them), a number declared at upload or measured from the
+  variants matrix, that is, the variants' return columns. Never an
+  optimisation XML or a robot.
+- **The dimension** is "Number of portfolios, strategies or variants
+  evaluated" (`report.DIMENSION_TITLES_FUND`, es/en/pt) in "What it means for
+  you", the reasons table, the PDF cover, the message for the manager, the
+  public page and a comparison of funds; a fund beside a backtest or an
+  account reads "Number of trials" (`DIMENSION_TITLES_MIXED`). Its meaning in
+  every voice (`verdict.MEANING["multiplicity.*.fund"]`,
+  `ownership.MEANING["multiplicity.WEAK.fund"]`, `["...WEAK.undeclared.fund"]`)
+  and the verdict summary (`verdict._TEXT["multiplicity.WEAK.fund"]` and the
+  `.undeclared.fund` templates) count the same.
+- **The luck section** (`report._luck_html(fund=True)`): introduction, lines,
+  table header and the sources' note count the portfolios, strategies or
+  variants and the history's length (`luck_*_fund`, `luck_note_account`);
+  with nothing counted it says the number is declared at upload or measured
+  from the variants matrix, voice by voice (`luck_uncounted_fund`).
+- **The plan** (`plan._multiplicity_step`): title, finding and actions ask for
+  the portfolios, strategies or variants evaluated, declared or as the
+  variants matrix (`ownership.PLAN["fund_trials"]`, `["fund_trials_undeclared"]`,
+  `["title_fund_multiplicity"]`). The actions follow whether the matrix was
+  uploaded (`plan._variants_matrix`: its file's digest or a CSCV measured on
+  it), not where the count came from, so the plan keeps no copy of the
+  engine's note: a count read from the matrix says so and asks whether every
+  one evaluated is in it (`["fund_trials_counted"]`); a declared count above
+  the matrix's columns says the DSR already discounts the declared count and
+  the PBO only the matrix's columns, and asks for the returns of the rest,
+  never to upload the matrix again (`["fund_trials_beyond_matrix"]`, with the
+  columns the CSCV read, or "fewer than" the declared count when it was not
+  measured).
+- **One name per count.** The deflated Sharpe's count is "trials" wherever it
+  shows (the reasons table, the plan's finding, the technical detail, the
+  summary); on a fund the plan's "512 or more" names them the same way, glossed
+  once: "512 or more trials (portfolios, strategies or variants evaluated)".
+  The luck section keeps the fund's noun, as its table counts it.
+- **The red flag** `TRIALS_BELOW_VARIANTS` on a fund reads "5 portfolios,
+  strategies or variants evaluated were declared, but the variants matrix
+  holds 12 return columns" (`LABELS["flag_trials_below_variants_fund"]`, and
+  `_one` for a single one), never optimisation passes
+  (`report._flag_detail`). The stored detail is the engine's.
+- **The technical detail**: the variance row is "Observed across the
+  portfolios, strategies or variants evaluated", measured or not
+  (`observed_across_fund_variants`, `report._fund_multiplicity_rows`); with no
+  matrix its note and the CSCV say their returns were not uploaded
+  (`no_variants_fund`, `report._fund_cscv`); the variance policy is
+  `variance_policy_fund`. A measured CSCV lists its counts by what they count,
+  in the report's language ("variants matrix columns: 10, distinct columns:
+  10, history blocks: 8, combinations: 70, observations used: 240",
+  `report.CSCV_COUNTS_FUND`, `report._cscv_counts`), not as
+  `parameter_variants=10`; a backtest keeps the stored keys. The stored rows
+  are unchanged.
+- **The paid preview** lists the multiplicity and CSCV sections in the fund's
+  words (`report.LOCKED_GAINS_FUND`).
+- **The sample institutional review.** Its notes name the dimension as its
+  fund report does, call the variants file the variants matrix (one return
+  column each, the portfolios, strategies or variants evaluated before the
+  series was chosen), and name the luck and the years needed after the same
+  ten portfolios, strategies or variants as the luck section, with the
+  report's figures (`institutional_sample._dimension_words`). The deflated
+  Sharpe is the one at "10 trials (the portfolios, strategies or variants
+  evaluated)", the name its report's reasons, plan and technical detail give
+  that count.
+- **Unchanged.** A backtest, `/ejemplo`, `/sample` and `/pt/exemplo` included,
+  and an account or signal read word for word as before this branch: their
+  served pages and every voice of both samples are byte-identical.

@@ -112,7 +112,7 @@ def test_a_fund_record_reads_as_a_fund_in_the_verdict_and_the_plan(locale: str) 
     assert escape(MEANING[locale]["out_of_sample.NOT_MEASURED.fund"]) in html
     summary = result.verdict.summary  # type: ignore[attr-defined]
     if locale == "es":
-        assert "fondos o estrategias" in summary and "configuraciones" not in summary
+        assert "carteras, estrategias o variantes" in summary and "configuraciones" not in summary
     assert untranslated(data) == []
 
 

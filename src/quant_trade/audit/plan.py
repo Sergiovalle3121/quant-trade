@@ -161,13 +161,13 @@ FUND_TITLES: dict[str, dict[str, str]] = {
     "es": {
         OUT_OF_SAMPLE: "Averigua desde cuándo el gestor no cambia de proceso",
         COSTS: "Confirma si las cifras son netas de comisiones",
-        MULTIPLICITY: "Pregunta cuántos fondos lleva el gestor",
+        MULTIPLICITY: "Pregunta cuántas carteras, estrategias o variantes se evaluaron",
         BENCHMARK: "Compara con el índice del fondo",
     },
     "en": {
         OUT_OF_SAMPLE: "Find out since when the manager's process is unchanged",
         COSTS: "Confirm whether the figures are net of fees",
-        MULTIPLICITY: "Ask how many funds the manager runs",
+        MULTIPLICITY: "Ask how many portfolios, strategies or variants were evaluated",
         BENCHMARK: "Compare with the fund's index",
     },
 }
@@ -176,6 +176,20 @@ FUND_TITLES: dict[str, dict[str, str]] = {
 def _fund_record(data: dict[str, Any]) -> bool:
     """True when a stored audit result was run on a fund's track record."""
     return bool((data.get("fund") or {}).get("track_record"))
+
+
+def _variants_matrix(data: dict[str, Any]) -> tuple[bool, int | None]:
+    """Whether a variants matrix was uploaded (its file's digest, or a CSCV
+    measured on it), and its return columns when the CSCV read them. A fund's
+    plan picks its words by this, not by where the trial count came from: a
+    declared count above the matrix's columns still had the matrix uploaded."""
+    cscv = data.get("cscv") or {}
+    digests = (data.get("inputs") or {}).get("digests") or {}
+    measured = cscv.get("status") == "MEASURED"
+    columns = cscv.get("parameter_variants") if measured else None
+    if isinstance(columns, bool) or not isinstance(columns, int):
+        columns = None
+    return measured or "variants.csv" in digests, columns
 
 
 #: What the audit would need to see for each red flag, in both languages.
@@ -453,6 +467,26 @@ FLAG_HINTS: dict[str, dict[str, str]] = {
     },
 }
 
+#: The hints that read differently on a fund or portfolio's track record: its
+#: trials are the portfolios, strategies or variants evaluated before this one
+#: was chosen, whose return columns make the variants matrix. Every voice.
+FUND_FLAG_HINTS: dict[str, dict[str, str]] = {
+    "TRIALS_BELOW_VARIANTS": {
+        "es": (
+            "Declara el número real de carteras, estrategias o variantes evaluadas; la matriz "
+            "de variantes muestra más."
+        ),
+        "en": (
+            "Declare the real number of portfolios, strategies or variants evaluated; the "
+            "variants matrix shows more."
+        ),
+        "pt": (
+            "Declare o número real de carteiras, estratégias ou variantes avaliadas; a matriz "
+            "de variantes mostra mais."
+        ),
+    },
+}
+
 #: The hints a builder follows with a backtest (``FLAG_HINTS``) as whoever holds
 #: or copies an account or signal can act on them: ask its provider for the
 #: sizes, the positions and the curve, and compare with a history at a fixed
@@ -680,30 +714,39 @@ def _multiplicity_step(data: dict[str, Any], status: str, locale: str) -> tuple[
         # The deflated Sharpe was computed and cleared the bar at 1 trial: what
         # is missing is the declaration, not more history.
         if _fund_record(data):
+            # A fund's trials are the portfolios, strategies or variants evaluated
+            # before this one was chosen: declared, or measured from the variants matrix.
             return _say(
                 locale,
-                "No se declaró cuántos fondos o estrategias lleva el mismo gestor; por eso la "
-                "clase no puede pasar de B.",
-                "How many funds or strategies the same manager runs was not declared; that is "
-                "why the class cannot go above B.",
-                "Não foi declarado quantos fundos ou estratégias o mesmo gestor administra; por "
-                "isso a classe não pode passar de B.",
+                "No se declaró cuántas carteras, estrategias o variantes se evaluaron antes de "
+                "elegir esta; por eso la clase no puede pasar de B.",
+                "How many portfolios, strategies or variants were evaluated before this one was "
+                "chosen was not declared; that is why the class cannot go above B.",
+                "Não foi declarado quantas carteiras, estratégias ou variantes foram avaliadas "
+                "antes de escolher esta; por isso a classe não pode passar de B.",
             ), _voiced(
                 _say(
                     locale,
                     [
-                        "Pregunta al gestor cuántos fondos o estrategias lleva o ha cerrado y "
-                        "decláralo (aunque sea 1) al subir el historial: Rigor lo descuenta.",
+                        "Pregunta al gestor cuántas carteras, estrategias o variantes evaluó "
+                        "antes de elegir esta, contando los fondos que lleva o ha cerrado, y "
+                        "decláralo (aunque sea 1) al subir el historial, o pídele la matriz de "
+                        "variantes, es decir, las columnas de retornos de las variantes: Rigor "
+                        "lo descuenta.",
                     ],
                     [
-                        "Ask the manager how many funds or strategies they run or have closed and "
-                        "declare it (even if it is 1) when you upload the record: Rigor discounts "
-                        "it.",
+                        "Ask the manager how many portfolios, strategies or variants they "
+                        "evaluated before choosing this one, counting the funds they run or have "
+                        "closed, and declare it (even if it is 1) when you upload the record, or "
+                        "ask them for the variants matrix, that is, the variants' return "
+                        "columns: Rigor discounts it.",
                     ],
                     [
-                        "Pergunte ao gestor quantos fundos ou estratégias administra ou já "
-                        "encerrou e declare esse número (mesmo que seja 1) ao enviar o "
-                        "histórico: o Rigor o desconta.",
+                        "Pergunte ao gestor quantas carteiras, estratégias ou variantes avaliou "
+                        "antes de escolher esta, contando os fundos que administra ou já "
+                        "encerrou, e declare esse número (mesmo que seja 1) ao enviar o "
+                        "histórico, ou peça a ele a matriz de variantes, ou seja, as colunas de "
+                        "retornos das variantes: o Rigor o desconta.",
                     ],
                 ),
                 ("fund_trials_undeclared",),
@@ -771,9 +814,9 @@ def _multiplicity_step(data: dict[str, Any], status: str, locale: str) -> tuple[
         fund = _fund_record(data)
         one = _say(
             locale,
-            "fondo" if fund else "cuenta" if account else "configuración",
-            "fund" if fund else "account" if account else "configuration",
-            "fundo" if fund else "conta" if account else "configuração",
+            "cartera" if fund else "cuenta" if account else "configuración",
+            "portfolio" if fund else "account" if account else "configuration",
+            "carteira" if fund else "conta" if account else "configuração",
         )
         parts.append(
             _say(
@@ -790,11 +833,12 @@ def _multiplicity_step(data: dict[str, Any], status: str, locale: str) -> tuple[
         parts.append(
             _say(
                 locale,
-                f"Con {half:,.0f} o más fondos o estrategias del mismo gestor cae por debajo "
-                "de 0.5.",
-                f"With {half:,.0f} or more funds or strategies from the same manager it falls "
-                "below 0.5.",
-                f"Com {half:,.0f} ou mais fundos ou estratégias do mesmo gestor cai abaixo de 0.5.",
+                f"Con {half:,.0f} o más intentos (carteras, estrategias o variantes "
+                "evaluadas) cae por debajo de 0.5.",
+                f"With {half:,.0f} or more trials (portfolios, strategies or variants "
+                "evaluated) it falls below 0.5.",
+                f"Com {half:,.0f} ou mais tentativas (carteiras, estratégias ou variantes "
+                "avaliadas) cai abaixo de 0.5.",
             )
         )
     elif half is not None and account:
@@ -818,7 +862,19 @@ def _multiplicity_step(data: dict[str, Any], status: str, locale: str) -> tuple[
                 f"Com {half:,.0f} ou mais configurações testadas cai abaixo de 0.5.",
             )
         )
-    if pbo is not None and pbo >= 0.5:
+    if pbo is not None and pbo >= 0.5 and _fund_record(data):
+        parts.append(
+            _say(
+                locale,
+                f"PBO {_fmt(pbo, 2)}: la mejor de las carteras, estrategias o variantes dentro "
+                "de muestra suele quedar por debajo de la mediana fuera de muestra.",
+                f"PBO {_fmt(pbo, 2)}: the best in-sample portfolio, strategy or variant tends to "
+                "land below the median out of sample.",
+                f"PBO {_fmt(pbo, 2)}: a melhor das carteiras, estratégias ou variantes dentro da "
+                "amostra costuma ficar abaixo da mediana fora da amostra.",
+            )
+        )
+    elif pbo is not None and pbo >= 0.5:
         parts.append(
             _say(
                 locale,
@@ -837,16 +893,19 @@ def _multiplicity_step(data: dict[str, Any], status: str, locale: str) -> tuple[
             return " ".join(parts), _say(
                 locale,
                 [
-                    "Aquí no decide cuántos fondos lleva el gestor: ya con 1 queda por debajo "
-                    "de 0.5. Lo que cuenta es más historial del mismo fondo.",
+                    "Aquí no decide cuántas carteras, estrategias o variantes se evaluaron: ya "
+                    "con 1 queda por debajo de 0.5. Lo que cuenta es más historial del mismo "
+                    "fondo.",
                 ],
                 [
-                    "How many funds the manager runs does not decide here: even at 1 it is "
-                    "below 0.5. What counts is more history of the same fund.",
+                    "How many portfolios, strategies or variants were evaluated does not decide "
+                    "here: even at 1 it is below 0.5. What counts is more history of the same "
+                    "fund.",
                 ],
                 [
-                    "Aqui não decide quantos fundos o gestor administra: já com 1 fica abaixo "
-                    "de 0.5. O que conta é mais histórico do mesmo fundo.",
+                    "Aqui não decide quantas carteiras, estratégias ou variantes foram "
+                    "avaliadas: já com 1 fica abaixo de 0.5. O que conta é mais histórico do "
+                    "mesmo fundo.",
                 ],
             )
         if account:
@@ -891,27 +950,105 @@ def _multiplicity_step(data: dict[str, Any], status: str, locale: str) -> tuple[
         )
     counted = (mult.get("trials_used") or {}).get("evidence") == "MEASURED"
     if _fund_record(data):
-        # A fund has no optimisation to export: its trials are the other funds
-        # and strategies the same manager runs or has closed.
+        # A fund has no optimisation to export: its trials are the portfolios,
+        # strategies or variants evaluated before this one was chosen (the funds
+        # the same manager runs or has closed among them), declared at upload or
+        # measured from the variants matrix, one return column each. The words
+        # follow whether the matrix was uploaded, not where the count came from.
+        uploaded, columns = _variants_matrix(data)
+        if uploaded and not counted:
+            # More declared than the matrix holds: the DSR discounts the declared
+            # count, the PBO only the matrix's columns. Never "upload the matrix".
+            declared_count = f"{trials:,.0f}"
+            shown = (
+                f"{columns:,}"
+                if columns is not None
+                else _say(
+                    locale,
+                    f"menos de {declared_count}",
+                    f"fewer than {declared_count}",
+                    f"menos de {declared_count}",
+                )
+            )
+            texts = _voiced(
+                _say(
+                    locale,
+                    [
+                        "La matriz de variantes subida trae {m} columnas de retornos y se "
+                        "declararon {n} carteras, estrategias o variantes evaluadas: el DSR ya "
+                        "descuenta las {n}, pero la probabilidad de sobreajuste (PBO) solo mide "
+                        "las columnas de la matriz. Pide al gestor los retornos de todas, "
+                        "contando los fondos que lleva o ha cerrado.",
+                    ],
+                    [
+                        "The uploaded variants matrix holds {m} return columns and {n} "
+                        "portfolios, strategies or variants evaluated were declared: the DSR "
+                        "already discounts the {n}, but the probability of overfitting (PBO) "
+                        "only measures the matrix's columns. Ask the manager for the returns "
+                        "of all of them, counting the funds they run or have closed.",
+                    ],
+                    [
+                        "A matriz de variantes enviada traz {m} colunas de retornos e foram "
+                        "declaradas {n} carteiras, estratégias ou variantes avaliadas: o DSR já "
+                        "desconta as {n}, mas a probabilidade de sobreajuste (PBO) só mede as "
+                        "colunas da matriz. Peça ao gestor os retornos de todas, contando os "
+                        "fundos que administra ou já encerrou.",
+                    ],
+                ),
+                ("fund_trials_beyond_matrix",),
+                locale,
+                ownership.role_of(data),
+            )
+            return " ".join(parts), [text.format(n=declared_count, m=shown) for text in texts]
+        from_matrix = uploaded and counted
         return " ".join(parts), _voiced(
             _say(
                 locale,
                 [
-                    "Pregunta al gestor cuántos fondos o estrategias lleva o ha cerrado y "
-                    "decláralo como número de intentos: un buen historial entre muchos pesa "
+                    "El número de intentos ya sale de la matriz de variantes subida, una "
+                    "columna de retornos por cartera, estrategia o variante. Pregunta al gestor "
+                    "si evaluó más de las que trae, contando los fondos que lleva o ha "
+                    "cerrado: un buen historial entre muchos pesa menos.",
+                ],
+                [
+                    "The trial count already comes from the uploaded variants matrix, one "
+                    "return column per portfolio, strategy or variant. Ask the manager whether "
+                    "they evaluated more than it holds, counting the funds they run or have "
+                    "closed: one good record among many weighs less.",
+                ],
+                [
+                    "O número de tentativas já sai da matriz de variantes enviada, uma coluna "
+                    "de retornos por carteira, estratégia ou variante. Pergunte ao gestor se "
+                    "avaliou mais do que as que ela traz, contando os fundos que administra ou "
+                    "já encerrou: um bom histórico entre muitos pesa menos.",
+                ],
+            )
+            if from_matrix
+            else _say(
+                locale,
+                [
+                    "Pregunta al gestor cuántas carteras, estrategias o variantes evaluó antes "
+                    "de elegir esta, contando los fondos que lleva o ha cerrado, y decláralo "
+                    "como número de intentos, o pídele la matriz de variantes, es decir, las "
+                    "columnas de retornos de las variantes: un buen historial entre muchos pesa "
                     "menos.",
                 ],
                 [
-                    "Ask the manager how many funds or strategies they run or have closed and "
-                    "declare it as the number of trials: one good record among many weighs less.",
+                    "Ask the manager how many portfolios, strategies or variants they evaluated "
+                    "before choosing this one, counting the funds they run or have closed, and "
+                    "declare it as the number of trials, or ask them for the variants matrix, "
+                    "that is, the variants' return columns: one good record among many weighs "
+                    "less.",
                 ],
                 [
-                    "Pergunte ao gestor quantos fundos ou estratégias administra ou já encerrou e "
-                    "declare isso como número de tentativas: um bom histórico entre muitos pesa "
-                    "menos.",
+                    "Pergunte ao gestor quantas carteiras, estratégias ou variantes avaliou "
+                    "antes de escolher esta, contando os fundos que administra ou já encerrou, "
+                    "e declare isso como número de tentativas, ou peça a ele a matriz de "
+                    "variantes, ou seja, as colunas de retornos das variantes: um bom histórico "
+                    "entre muitos pesa menos.",
                 ],
             ),
-            ("fund_trials",),
+            ("fund_trials_counted" if from_matrix else "fund_trials",),
             locale,
             ownership.role_of(data),
         )
@@ -1555,6 +1692,8 @@ def _data_quality_step(data: dict[str, Any], status: str, locale: str) -> tuple[
                 or ACCOUNT_FLAG_HINTS[code][locale]
             )
             if account and code in ACCOUNT_FLAG_HINTS
+            else FUND_FLAG_HINTS[code][locale]
+            if _fund_record(data) and code in FUND_FLAG_HINTS
             else ownership.plan_text(f"flag_{code}", locale, role)
             or FLAG_HINTS.get(code, GENERIC_FLAG_HINT)[locale]
         )
@@ -1637,6 +1776,7 @@ report_pt.install(globals(), report_pt.PLAN)
 __all__ = [
     "ACCOUNT_FLAG_HINTS",
     "FLAG_HINTS",
+    "FUND_FLAG_HINTS",
     "PLAN_ORDER",
     "PlanStep",
     "TITLES",
