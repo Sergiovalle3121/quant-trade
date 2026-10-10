@@ -287,12 +287,14 @@ def test_png_and_preview_generation_do_not_use_database_network_or_files(
     monkeypatch.chdir(tmp_path)
 
     def forbidden(*args: object, **kwargs: object) -> None:
-        pytest.fail("Reader PNG must not use the database, network, files or stored visits")
+        pytest.fail("Reader PNG must not use the database, network or files")
 
     store = client.app.state.store
     monkeypatch.setattr(store.engine, "begin", forbidden)
     monkeypatch.setattr(store.engine, "connect", forbidden)
-    monkeypatch.setattr(client.app.state.visits, "add", forbidden)
+    # A visit to a free tool is counted in memory (privacy policy): day, language and tag only.
+    counted: list[dict[str, str]] = []
+    monkeypatch.setattr(client.app.state.visits, "add", lambda **kw: counted.append(kw))
     monkeypatch.setattr(socket, "create_connection", forbidden)
     before = {
         path.relative_to(tmp_path): path.read_bytes()
@@ -310,6 +312,8 @@ def test_png_and_preview_generation_do_not_use_database_network_or_files(
         if path.is_file()
     }
     assert after == before
+    assert all(set(visit) == {"day", "locale", "ref"} for visit in counted)
+    assert not {value for visit in counted for value in visit.values()} & set(FIGURES.values())
 
 
 @pytest.mark.parametrize("locale", LOCALES)
