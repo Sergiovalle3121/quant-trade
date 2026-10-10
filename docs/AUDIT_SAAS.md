@@ -180,6 +180,36 @@ free tools page and is linked from the prop-firm case page and the article
 no costs, slippage or intraday floating loss, and independent trades, and says
 so on the page. Tests: `tests/test_audit_challenge_calculator.py`.
 
+The public table of prop-firm rules (`audit/rules_table.py`, rendered by
+`challenge_pages.rules_table_page`) lives at `/reglas-prop-firm`,
+`/en/prop-firm-rules` and `/pt/regras-prop-firm`, in the sitemap with the date
+`rules_table.RULES_TABLE_PUBLISHED`. One row per published preset (every
+program, phase by phase, in `PRESETS` order; the generic reference is not one):
+firm, program and phase, target, daily loss with its basis, total loss with its
+type (static, trailing the highest daily close, or trailing and locking at the
+initial balance), minimum days, time limit, best-day rule, the markets when a
+page states them (`markets`, linked to `markets_source`), the source page and
+its `as_of`. Every cell is read from the preset with the calculator's own
+words; no figure is typed into a text, and the counts the texts name (firms,
+programs, how many use each basis or type) are counted from the presets. The
+filters are links with a query, no JavaScript: `?firma=<FIRMS key>`,
+`?perdida=<TOTAL_LOSS_TYPES value>` and `?mercado=fx|futures`, combined, each
+chip keeping the other two; a value that names nothing is ignored (the whole
+table, a 200, never a 400), a market filter says that programs whose pages
+state no markets are not shown, and the canonical and hreflang links never
+carry the query. Below the table, one block per firm with two sentences of
+fact from its presets (its programs and reading date, then its first program's
+first note) and the links to its calculator page and to its rows, then the
+fixed "not affiliated; rules change, check the official page" line, a "what
+this table does not see" list (intraday trailing, news, payout rules, account
+sizes, fees) that recommends buying nothing, and four questions of fact (what
+trailing EOD is, what the best-day rule is, which basis the daily loss uses,
+why some programs are left out) that are also the page's `FAQPage` JSON-LD; a
+`Dataset` block carries `dateModified` = the most recent `as_of`. The page is
+linked from the tools page (under the challenge calculator), from the
+calculator and every firm page, and from the prop-firm case page; it uses the
+site's share card. Tests: `tests/test_audit_prop_rules_table.py`.
+
 Five firms were added on 2026-10-10 (`prop_presets.NEW_FIRMS_AS_OF`), each
 from its official site and only with the programs whose rules fit the
 simulator's types exactly or by an approximation stricter than the firm's:
@@ -3042,6 +3072,7 @@ Routes:
 | `GET /en/terms`, `/en/privacy`, `/pt/terms`, `/pt/privacy` | 301 to the legal page in that language (guessed addresses). |
 | `GET /herramientas` | The free tools page (`/en/tools`, `/pt/ferramentas`; `/tools` and `/pt/tools` redirect there): luck calculator, win-rate calculator, challenge calculator, figure reader and report check. |
 | `GET /calculadora-reto`, `/en/challenge-calculator`, `/pt/calculadora-desafio` | The free prop-firm challenge calculator, and its firm pages under each (`/ftmo`, `/fundednext`, `/the5ers`, `/topstep`, `/fundingpips`, `/alpha-capital-group`, `/e8-markets`, `/fxify`, `/maven-trading`, `/take-profit-trader`, `/myfundedfutures`, `/tradeify`, `/bulenox`, `/earn2trade`, `/alpha-futures`, `/lucid-trading`). |
+| `GET /reglas-prop-firm`, `/en/prop-firm-rules`, `/pt/regras-prop-firm` | The public table of every published prop-firm preset with source and date (`audit/rules_table.py`); `?firma=`, `?perdida=` and `?mercado=` filter it by links, an unknown value shows the whole table. |
 | `GET /en/calculator`, `/reading`, `/en/methodology`, `/en/articles`, `/en/guides`, `/en/sample`, `/en/check`, `/faq`, `/examples` | 301 to the page people meant (`/calculator`, `/en/reading`, `/methodology`, `/articles`, `/guides`, `/sample`, `/check`, `/en/faq`, `/en/examples`). The first two keep the query string. |
 | `POST /webhooks/stripe`, `POST /waitlist`, `GET /health` | Payment confirmation, waiting list, health check. |
 

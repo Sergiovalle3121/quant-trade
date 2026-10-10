@@ -121,6 +121,8 @@ from quant_trade.audit.report import (
     source_name,
 )
 from quant_trade.audit.report import LABELS as REPORT_LABELS
+from quant_trade.audit.rules_table import COPY as RULES_COPY
+from quant_trade.audit.rules_table import rules_table_url
 from quant_trade.audit.sample_publication import SamplePage, public_pages_line
 from quant_trade.audit.schema import MAX_UPLOAD_BYTES
 from quant_trade.audit.seo import (
@@ -4843,13 +4845,20 @@ def tools_page(*, locale: str = "es", base_url: str = "") -> str:
                 _e(words["no_account"]),
             )
         )
+        more = ""
+        if key == "challenge":
+            # The rules the calculator uses, every firm on one page with source and date.
+            more = (
+                f"<a class='link-more' href='{_e(rules_table_url(locale))}' data-rules-table>"
+                f"{_e(RULES_COPY[locale]['nav'])}{icon('arrow')}</a>"
+            )
         tools += (
             f"<section class='article-cta'><h2 id='tool-{key}'>{_e(_tool_name(key, locale))}</h2>"
             f"<p>{_e(tool['question'])}</p>"
             f"<ul class='checks' style='margin-top:16px'>{points}</ul>"
             f"<div class='back-row'><a class='btn btn-dark' href='{_e(_tool_url(key, locale))}' "
             f"aria-describedby='tool-{key}'>{_e(words['open'])}"
-            f"<span class='go'>{icon('arrow')}</span></a></div></section>"
+            f"<span class='go'>{icon('arrow')}</span></a>{more}</div></section>"
         )
     report = (
         f"<section class='article-cta'><h2>{_e(words['report_title'])}</h2>"
@@ -5175,6 +5184,12 @@ def audience_page(
         lead += (
             f"<p class='muted' data-audience-tool>{_e(TOOLS_COPY[locale][tool]['question'])} "
             f"<a href='{_e(_tool_url(tool, locale))}'>{_e(_tool_name(tool, locale))}</a></p>"
+        )
+    if tool == "challenge":
+        # The rules behind that tool, every firm on one page with source and date.
+        lead += (
+            f"<p class='muted' data-audience-rules>{_e(RULES_COPY[locale]['audience_line'])} "
+            f"<a href='{_e(rules_table_url(locale))}'>{_e(RULES_COPY[locale]['nav'])}</a></p>"
         )
     alternates = {lang: audience_url(audience.slug, lang) for lang in ("es", "en", "pt")}
     crumbs = f"<a href='{_e(_home(locale))}'>{_e(words['home'])}</a>" + _language_crumbs(

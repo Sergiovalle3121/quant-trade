@@ -41,6 +41,7 @@ from quant_trade.audit.legal import LEGAL_PATHS, LEGAL_UPDATED
 from quant_trade.audit.method import METHOD_PATH
 from quant_trade.audit.pricing import PRICING_PATH
 from quant_trade.audit.reading import READING_PATH
+from quant_trade.audit.rules_table import RULES_TABLE_PUBLISHED, rules_table_paths
 from quant_trade.audit.tools_hub import TOOLS_PATH
 from quant_trade.audit.winrate import WINRATE_PATH
 
@@ -94,6 +95,8 @@ PUBLIC_PAGES: tuple[dict[str, str], ...] = (
     # The challenge calculator and one page per firm with a published preset.
     challenge_paths(),
     *(challenge_paths(firm) for firm in CHALLENGE_FIRMS),
+    # The public table of every firm's rules, from the same presets (``rules_table``).
+    rules_table_paths(),
     dict(TOOLS_PATH),
     dict(FAQ_PATH),
     dict(PRICING_PATH),
@@ -137,6 +140,7 @@ def _page_dates() -> dict[str, str]:
             for path in challenge_paths(firm).values()
         }
     )
+    dates.update({path: RULES_TABLE_PUBLISHED for path in rules_table_paths().values()})
     # The institutional review's offer and its sample review changed together.
     institutional = (*REVIEW_PATHS.values(), *SAMPLE_PATHS.values())
     dates.update({path: OFFER_UPDATED for path in institutional})
@@ -358,6 +362,28 @@ def tools_structured_data(items: Sequence[tuple[str, str, str]], locale: str) ->
     )
 
 
+def dataset_structured_data(
+    name: str, description: str, url: str, locale: str, *, modified: str
+) -> str:
+    """A table of transcribed rules as a ``Dataset``: only the texts its page
+    shows and the date of its most recent reading; the publisher is Rigor, never
+    one of the firms."""
+    return _json_ld(
+        {
+            "@context": "https://schema.org",
+            "@type": "Dataset",
+            "name": name,
+            "description": description,
+            "url": url,
+            "inLanguage": locale,
+            "dateModified": modified,
+            "isAccessibleForFree": True,
+            "creator": {"@type": "Organization", "name": BRAND},
+            "publisher": {"@type": "Organization", "name": BRAND},
+        }
+    )
+
+
 def articles_faq_structured_data(locale: str) -> str:
     return faq_structured_data(articles_index_faq(locale))
 
@@ -502,12 +528,14 @@ __all__ = [
     "OG_LOCALE",
     "PAGE_DATES",
     "PUBLIC_PAGES",
+    "RULES_TABLE_PUBLISHED",
     "SITE_NAME",
     "SIGNAL_SAMPLE_PATHS",
     "SIGNAL_SAMPLE_PUBLISHED",
     "SITE_UPDATED",
     "TAGLINE",
     "PageMeta",
+    "dataset_structured_data",
     "head_meta",
     "is_private_path",
     "page_lastmod",

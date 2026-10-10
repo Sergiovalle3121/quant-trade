@@ -84,7 +84,7 @@ from quant_trade.audit.calculator import (
     share_values,
 )
 from quant_trade.audit.calculator_card import calculator_card_svg
-from quant_trade.audit.challenge_pages import challenge_page
+from quant_trade.audit.challenge_pages import challenge_page, rules_table_page
 from quant_trade.audit.compare import (
     COMPARE_PATH,
     MAX_COMPARED,
@@ -167,6 +167,8 @@ from quant_trade.audit.public_card import public_card_svg
 from quant_trade.audit.report import render, report_kind, result_sha256
 from quant_trade.audit.retention import RetentionWorker
 from quant_trade.audit.return_series import is_return_series
+from quant_trade.audit.rules_table import FILTER_FIELDS as RULES_TABLE_FIELDS
+from quant_trade.audit.rules_table import RULES_TABLE_PATH
 from quant_trade.audit.sample import sample_result, signal_sample_result
 from quant_trade.audit.sample_publication import (
     SAMPLE_KIND_BY_PUBLIC_ID,
@@ -1434,6 +1436,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     visit_paths.update({path: loc for loc, path in winrate.WINRATE_PATH.items()})
     # The challenge calculator and its firm pages, like the other free tools.
     visit_paths.update({path: loc for path, (loc, _firm) in challenge_calc.PAGES.items()})
+    # The public table of every firm's rules, built from the same presets.
+    visit_paths.update({path: loc for loc, path in RULES_TABLE_PATH.items()})
 
     def _funnel_visit(request: Request, response: Any) -> None:
         """Count a person's visit to the landing or a case page; remember its tag.
@@ -7274,6 +7278,20 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     for challenge_path in challenge_calc.PAGES:
         app.add_api_route(
             challenge_path, public_challenge, methods=["GET"], response_class=HTMLResponse
+        )
+
+    def public_rules_table(request: Request) -> str:
+        """The public table of prop-firm rules. Its filters are query fields that
+        the page's own links set; a value that names nothing shows the whole
+        table, never an error, and the canonical is the address without a query."""
+        locale = next(lang for lang, path in RULES_TABLE_PATH.items() if path == request.url.path)
+        values = {name: request.query_params.get(name, "") for name in RULES_TABLE_FIELDS}
+        page = rules_table_page(locale=locale, base_url=_site_url(request), values=values)
+        return guard_page(_offered(page, locale))
+
+    for rules_path in RULES_TABLE_PATH.values():
+        app.add_api_route(
+            rules_path, public_rules_table, methods=["GET"], response_class=HTMLResponse
         )
 
     def public_faq(request: Request) -> str:

@@ -13,7 +13,7 @@ from typing import Any
 from urllib.parse import urlencode, urlsplit
 
 from quant_trade.audit import challenge_calc as calc
-from quant_trade.audit import firmfit, reading, winrate
+from quant_trade.audit import firmfit, reading, rules_table, winrate
 from quant_trade.audit.articles import ARTICLES_BY_KEY, _num, article_url
 from quant_trade.audit.audiences import AUDIENCE_PAGES, audience_url
 from quant_trade.audit.guides import GUIDES_COPY
@@ -30,9 +30,12 @@ from quant_trade.audit.pages import (
     audit_path,
 )
 from quant_trade.audit.prop_presets import PRESETS, ChallengeRules
+from quant_trade.audit.rules_table import COPY as RULES_COPY
+from quant_trade.audit.rules_table import Filters, Row, rules_table_url
 from quant_trade.audit.seo import (
     BRAND,
     PageMeta,
+    dataset_structured_data,
     faq_structured_data,
     head_meta,
     web_application_structured_data,
@@ -542,6 +545,8 @@ def _further(locale: str, firm: str) -> str:
         if slug != firm
     ]
     links += [
+        # Every firm's rules on one page, from the same presets.
+        (str(RULES_COPY[locale]["nav"]), rules_table_url(locale)),
         (str(winrate.COPY[locale]["nav"]), winrate.WINRATE_PATH[locale]),
         (title, article_url(ARTICLE_KEY, locale)),
         (audience.text[locale].title, audience_url(audience.slug, locale)),
@@ -663,4 +668,240 @@ def challenge_page(
     return _page(title, locale, body, meta_html=meta, alternates=paths, solid_nav=True)
 
 
-__all__ = ["ARTICLE_KEY", "AUDIENCE_SLUG", "challenge_page"]
+# ---------------------------------------------------------------------------
+# The public table of every firm's rules (``rules_table``), rendered from the
+# same presets and with the calculator's own words for each rule.
+# ---------------------------------------------------------------------------
+
+
+def _table_daily(rules: ChallengeRules, locale: str) -> str:
+    """The daily loss rule for the table: a preset without a figure says whether
+    the page has no limit or whether its limit was not transcribed."""
+    if rules.max_daily_loss is None:
+        if rules.key in calc.NO_DAILY_LIMIT:
+            return str(calc.COPY[locale]["daily_no_limit"])
+        return str(RULES_COPY[locale]["daily_untranscribed"])
+    return _daily_rule(rules, locale)
+
+
+def _row_label(row: Row, locale: str) -> str:
+    """The program, with its phase when the program has several or a named one."""
+    label = localize(row.rules.program, locale)
+    if row.siblings > 1 or not row.rules.phase.isdigit():
+        label += f" · {_phase_name(row.rules, locale)}"
+    return label
+
+
+def _filter_links(filters: Filters, locale: str) -> str:
+    """Three rows of links, one per filter; each keeps the other two filters."""
+    words = RULES_COPY[locale]
+    path = rules_table_url(locale)
+
+    def chips(label: str, field: str, options: Sequence[tuple[str, str]], current: str) -> str:
+        items = ""
+        for value, name in options:
+            href = path + filters.with_(**{field: value}).query()
+            on = " aria-current='true'" if value == current else ""
+            items += (
+                f"<li><a href='{_e(href)}'{on} data-filter='{_e(field)}' "
+                f"data-value='{_e(value)}'>{_e(name)}</a></li>"
+            )
+        return f"<p class='help'><b>{_e(label)}</b></p><ul class='chips rules-filters'>{items}</ul>"
+
+    firms: list[tuple[str, str]] = [("", str(words["all"])), *calc.FIRMS.items()]
+    losses: list[tuple[str, str]] = [("", str(words["all"]))] + [
+        (kind, str(words["loss_names"][kind])) for kind in words["loss_names"]
+    ]
+    markets: list[tuple[str, str]] = [("", str(words["all_markets"]))] + [
+        (market, rules_table.MARKET_WORDS[locale][market]) for market in rules_table.MARKET_FILTERS
+    ]
+    out = (
+        f"<p>{_e(words['filters_help'])}</p>"
+        + chips(str(words["filter_firm"]), "firm", firms, filters.firm)
+        + chips(str(words["filter_loss"]), "loss", losses, filters.loss)
+        + chips(str(words["filter_market"]), "market", markets, filters.market)
+    )
+    if filters.active:
+        shown = len(rules_table.filtered_rows(filters))
+        showing = words["showing"].format(n=shown, total=len(rules_table.ROWS))
+        out += (
+            f"<p data-rules-showing>{_e(showing)} "
+            f"<a href='{_e(path)}'>{_e(words['show_all'])}</a></p>"
+        )
+        if filters.market:
+            out += f"<p class='help' data-rules-market-note>{_e(words['market_note'])}</p>"
+    return out
+
+
+def _rules_table(rows: Sequence[Row], filters: Filters, locale: str) -> str:
+    """The table itself: one row per preset, every cell from that preset."""
+    words = RULES_COPY[locale]
+    cwords = calc.COPY[locale]
+    if not rows:
+        return (
+            f"<p data-rules-empty>{_e(words['empty'])} "
+            f"<a href='{_e(rules_table_url(locale))}'>{_e(words['show_all'])}</a></p>"
+        )
+    body = ""
+    for row in rows:
+        rules = row.rules
+        time = (
+            cwords["time_days"].format(n=rules.time_limit_days)
+            if rules.time_limit_days
+            else cwords["time_none"]
+        )
+        markets = rules_table.market_words(rules.markets, locale)
+        if markets:
+            markets_cell = (
+                f"<a href='{_e(rules.markets_source or '')}' rel='noopener nofollow'>"
+                f"{_e(markets)}</a>"
+            )
+        else:
+            markets_cell = f"<span class='muted'>{_e(words['markets_unknown'])}</span>"
+        source = (
+            f"<a href='{_e(rules.source_url)}' rel='noopener nofollow'>"
+            f"{_e(words['source_link'].format(firm=rules.firm))}</a>"
+        )
+        body += (
+            f"<tr data-rule-row='{_e(rules.key)}'>"
+            f"<th scope='row'><a href='{_e(calc.challenge_url(locale, row.firm))}'>"
+            f"{_e(rules.firm)}</a></th>"
+            f"<td>{_e(_row_label(row, locale))}</td>"
+            f"<td>{_e(calc._pct(rules.profit_target, locale))}</td>"
+            f"<td>{_e(_table_daily(rules, locale))}</td>"
+            f"<td>{_e(_total_rule(rules, locale))}</td>"
+            f"<td>{rules.min_trading_days}</td>"
+            f"<td>{_e(time)}</td>"
+            f"<td>{_e(_best_rule(rules, locale))}</td>"
+            f"<td>{markets_cell}</td>"
+            f"<td>{source}</td>"
+            f"<td><time datetime='{_e(rules.as_of)}'>{_e(rules.as_of)}</time></td></tr>"
+        )
+    head = "".join(
+        f"<th scope='col'>{_e(words[name])}</th>"
+        for name in (
+            "col_firm",
+            "col_program",
+            "col_target",
+            "col_daily",
+            "col_total",
+            "col_days",
+            "col_time",
+            "col_best",
+            "col_markets",
+            "col_source",
+            "col_as_of",
+        )
+    )
+    return (
+        "<div class='tscroll'><table class='challenge-rules rules-table' data-rules-table>"
+        f"<thead><tr>{head}</tr></thead><tbody>{body}</tbody></table></div>"
+        f"<p class='help'>{_e(words['table_note'])}</p>"
+    )
+
+
+def _firm_blocks(locale: str) -> str:
+    """Two sentences of fact per firm, from its presets and their notes, and the
+    links to its calculator and to its rows of the table."""
+    words = RULES_COPY[locale]
+    path = rules_table_url(locale)
+    out = ""
+    for slug, name in calc.FIRMS.items():
+        programs = rules_table.firm_programs(slug)
+        names = [localize(PRESETS[key].program, locale) for key in programs]
+        dates = sorted({row.rules.as_of for row in rules_table.firm_rows(slug)})
+        template = words["firm_programs_one"] if len(programs) == 1 else words["firm_programs"]
+        facts = template.format(
+            n=len(programs), firm=name, date=_join(dates, locale), programs=_join(names, locale)
+        )
+        note = localize(PRESETS[programs[0]].notes[0], locale)
+        rows_href = path + Filters(firm=slug).query()
+        out += (
+            f"<div class='rules-firm' id='firma-{_e(slug)}' data-rules-firm='{_e(slug)}'>"
+            f"<h3>{_e(name)}</h3><p>{_e(facts)}</p>"
+            f"<p data-firm-note>{_note_html(note, locale)}</p>"
+            f"<p><a href='{_e(calc.challenge_url(locale, slug))}' data-firm-calculator>"
+            f"{_e(words['firm_calculator'].format(firm=name))}</a> · "
+            f"<a href='{_e(rows_href)}'>{_e(words['firm_rows'])}</a></p></div>"
+        )
+    return out + f"<p class='flash' data-rules-affiliation>{_e(words['not_affiliated'])}</p>"
+
+
+def _rules_further(locale: str) -> str:
+    words = calc.COPY[locale]
+    title = ARTICLES_BY_KEY[ARTICLE_KEY].text[locale].title
+    audience = next(page for page in AUDIENCE_PAGES if page.slug == AUDIENCE_SLUG)
+    links = [
+        (str(words["nav"]), calc.challenge_url(locale)),
+        (title, article_url(ARTICLE_KEY, locale)),
+        (audience.text[locale].title, audience_url(audience.slug, locale)),
+        (str(TOOLS_COPY[locale]["nav"]), tools_url(locale)),
+    ]
+    return (
+        "<ul class='aud-others'>"
+        + "".join(
+            f"<li><a href='{_e(href)}'><span>{_e(label)}</span>{icon('arrow')}</a></li>"
+            for label, href in links
+        )
+        + "</ul>"
+    )
+
+
+def rules_table_page(
+    *, locale: str = "es", base_url: str = "", values: Mapping[str, str] | None = None
+) -> str:
+    """The public table of prop-firm rules, filtered by the query's links.
+
+    ``values`` are the query's fields; a value that names nothing is ignored, so
+    the page is always a 200 and its canonical is the address without a query."""
+    locale = calc._locale(locale)
+    words = RULES_COPY[locale]
+    filters = rules_table.parse_filters(values or {})
+    rows = rules_table.filtered_rows(filters)
+    faq = rules_table.faq(locale)
+    blind = "".join(f"<li>{icon('minus')}<span>{_e(item)}</span></li>" for item in words["blind"])
+    sections: list[tuple[str, str]] = [
+        (words["filters_title"], _filter_links(filters, locale)),
+        (words["table_title"], _rules_table(rows, filters, locale)),
+        (words["firms_title"], _firm_blocks(locale)),
+        (
+            words["blind_title"],
+            f"<ul class='checks nots'>{blind}</ul><p data-rules-no-buy>{_e(words['no_buy'])}</p>",
+        ),
+        (words["faq_title"], "".join(f"<h3>{_e(q)}</h3><p>{_e(a)}</p>" for q, a in faq)),
+        (words["read_title"], _rules_further(locale)),
+    ]
+    title = f"{words['seo_title']} · {BRAND}"
+    description = rules_table.summary(locale)
+    paths = rules_table.rules_table_paths()
+    base = base_url.rstrip("/")
+    meta = head_meta(
+        PageMeta(title=title, description=description, locale=locale, paths=paths, image_alt=title),
+        base_url=base_url,
+    )
+    meta += dataset_structured_data(
+        str(words["title"]),
+        description,
+        base + rules_table_url(locale),
+        locale,
+        modified=rules_table.latest_as_of(),
+    )
+    meta += faq_structured_data(faq)
+    crumbs = f"<a href='{_e(_home(locale))}'>{_e(GUIDES_COPY[locale]['back'])}</a>" + (
+        _language_crumbs(paths, locale)
+    )
+    body = (
+        _page_hero(words["eyebrow"], words["title"], words["lead"], crumbs)
+        + "<div class='paper page-main'><div class='wrap'>"
+        + _doc(
+            sections,
+            locale,
+            aside=f"<a class='btn btn-dark btn-sm toc-cta' href='{_e(calc.challenge_url(locale))}'>"
+            f"{_e(calc.COPY[locale]['nav'])}<span class='go'>{icon('arrow')}</span></a>",
+        )
+        + "</div></div>"
+    )
+    return _page(title, locale, body, meta_html=meta, alternates=paths, solid_nav=True)
+
+
+__all__ = ["ARTICLE_KEY", "AUDIENCE_SLUG", "challenge_page", "rules_table_page"]
