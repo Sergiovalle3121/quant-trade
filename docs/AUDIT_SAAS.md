@@ -5829,12 +5829,10 @@ new result stores beyond its texts is listed under the fourth pass.
   The backtest's answer says "if it has one" once. A backtest keeps its
   robot, configuration and optimiser wording; what does change on its page
   comes from the points above that apply to every report (the PSR names,
-  "net" or "gross", "Curve data", the drawdown's sign and the size table's
-  tag of the starting balance).
+  "net" or "gross", "Curve data" and the drawdown's sign).
 - **One reading per figure.** The challenge callout tags the open loss
-  "(Declared)" as the account section does; the starting balance has one
-  tag in the reconciliation and the size table (see the fourth pass); the
-  dependence sentence rounds the variance
+  "(Declared)" as the account section does; each starting balance shows the
+  tag it stores (fifth pass); the dependence sentence rounds the variance
   ratio as the multiplicity table does; the resampled one-year drawdowns carry
   the minus sign of the summary's tile; the mean-shift sentence says when its
   annual rates come from stretches under a year, and how long each lasts
@@ -5850,14 +5848,9 @@ new result stores beyond its texts is listed under the fourth pass.
   - The reconciliation keeps the starting capital's stored tag, Measured:
     the engine rebuilds it from the file (the deposits it lists before the
     first trade, a Myfxbook statement's 1,000.00 among them), and the
-    downloadable JSON's `reconciliation.initial_capital` says so. The size
-    table stores the same figure as Declared; its 1x line now shows the
-    reconciliation's tag (`report.reconciled_starting_balance`), unless the
-    balance was assumed or is the one the client declared on the form. On
-    the signal sample the starting capital, the size table's balance and the
-    money deposited that holds it all read Measured, and on the backtest
-    sample the starting capital and the size table's balance do; the stored
-    tags are unchanged.
+    downloadable JSON's `reconciliation.initial_capital` says so. (This pass
+    also showed the size table's balance with the reconciliation's tag; the
+    fifth pass takes that back.)
   - The multiplicity detail and the CSCV row of an account or signal with no
     matrix uploaded speak of the histories of the other accounts or signals
     behind it, not "the variants you uploaded" (`variance_policy_account`,
@@ -5894,3 +5887,31 @@ new result stores beyond its texts is listed under the fourth pass.
     changes once with this release; no test, cache or `/comprobar` record
     pins the earlier one, and a PDF downloaded before keeps the record it was
     issued with.
+- **Fifth pass (the paid preview and the stored tags).**
+  - The paid preview of an account or signal, what whoever copies it reads
+    before paying USD 29 (an anonymous upload with `anon_preview=True` and
+    `welcome_full_report=False` shows it too), lists the multiplicity section
+    as "What is left after discounting the accounts or signals behind it"
+    (`report.LOCKED_GAINS_ACCOUNT`, es/en/pt, every voice), the accounts or
+    signals its dimension ("Number of accounts or signals behind it") and
+    the plan's step count, not "the configurations tried". No other line of
+    that preview speaks of configurations, robots or optimisers (the
+    singular "configuración" and "configuração" of the Spanish and Portuguese "keep
+    this report" line is the signal's settings). A backtest's preview keeps
+    its line.
+  - Each starting balance shows the tag it stores, as the downloadable JSON
+    gives it: the reconciliation's starting capital Measured (the first
+    point of the curve the engine rebuilds from the deposits the file
+    lists), the size table's balance Declared
+    (`challenge.sizing.starting_balance`). The display tag of the earlier
+    passes is gone (`report.reconciled_starting_balance`, and before it
+    `declared_initial_value`). On an account or signal the 1x line says in
+    a few words where its figure comes from: "the starting balance the file
+    declares (1,000)" (`ch_size_balance_declared`,
+    `report.file_declares_balance`), so Declared there and Measured in the
+    reconciliation read without contradiction. A balance the client declared
+    on the form, an assumed one or a curve's first value keeps its own line.
+    A backtest, `/ejemplo` and `/sample` included, reads both lines word for
+    word as before this branch (e1df258).
+  - Nothing stored changes: the samples' JSON and its sha256 are those of the
+    fourth pass.

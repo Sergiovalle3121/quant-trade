@@ -1284,6 +1284,10 @@ REPORT: dict[str, Any] = {
         "ch_size_balance": (
             "As porcentagens de 1x são medidas sobre o saldo inicial do arquivo ({balance})."
         ),
+        "ch_size_balance_declared": (
+            "As porcentagens de 1x são medidas sobre o saldo inicial que o arquivo declara "
+            "({balance})."
+        ),
         "ch_size_balance_assumed": (
             "As porcentagens de 1x são medidas sobre um saldo inicial de {balance} que foi suposto "
             "porque o arquivo não o indica: 1x escala com ele, e sobre um saldo maior as mesmas "

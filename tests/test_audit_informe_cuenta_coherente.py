@@ -30,13 +30,19 @@ when both files itemise them.
 The fourth pass (review of the third) adds: the recent stretch's question asks
 whether the account or signal's settings changed or it was restarted, never
 whether a system was reoptimised; the reconciliation keeps its stored tag for
-the starting capital, and the size table's balance takes it (one figure, one
-tag, as the money deposited); the multiplicity detail and CSCV of an account
+the starting capital; the multiplicity detail and CSCV of an account
 name the other accounts or signals, not variants; a comparison names the
 dimension by the kinds of report it shows; a stretch under a year never reads
 "12.0 months" or "1.0 months"; Portuguese says "fornecedor"; the extreme jumps
 hint asks the provider in the buyer's voice; Start and End taken from the
 trades say so.
+
+The fifth pass adds: the paid preview of an account or signal (an anonymous
+upload with the production settings) lists what the multiplicity section tells
+in the account's words, not "the configurations tried"; each starting balance
+shows the tag the downloadable JSON stores (the reconciliation's Measured, the
+size table's Declared, on the samples and on an uploaded account), and on an
+account or signal the size table's 1x line says the file declares it.
 
 No figure, class or tag changes: every test reads the stored result as the
 engine wrote it. Nothing reaches the network.
@@ -47,8 +53,10 @@ from __future__ import annotations
 import copy
 import html
 import re
+from collections.abc import Iterator
 from datetime import UTC, datetime, timedelta
 from functools import cache
+from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -1274,70 +1282,125 @@ def test_the_seller_message_lists_weak_dimensions_apart_from_those_that_fail(
     assert find_claims(line) == []
 
 
-# 10 · one tag for the starting balance ------------------------------------------------------
+# 10 · each starting balance with the tag its JSON stores -----------------------------------
+
+#: How an account or signal's 1x line says where its balance comes from.
+FILE_DECLARES = {
+    "es": "balance inicial que declara el archivo",
+    "en": "starting balance the file declares",
+    "pt": "saldo inicial que o arquivo declara",
+}
+#: The backtest sample's two lines as e1df258 (before this branch) shows them.
+BACKTEST_BALANCE_LINES = {
+    "es": (
+        "Capital inicial 10,000.00 Medido",
+        "Los porcentajes de 1x se miden sobre el balance inicial del archivo (10,000). Declarado",
+    ),
+    "en": (
+        "Starting capital 10,000.00 Measured",
+        "The shares at 1x are measured on the file's starting balance (10,000). Declared",
+    ),
+    "pt": (
+        "Capital inicial 10,000.00 Medido",
+        "As porcentagens de 1x são medidas sobre o saldo inicial do arquivo (10,000). Declarado",
+    ),
+}
+
+
+def _balance_lines(text: str, data: dict[str, Any], locale: str, *, account: bool) -> None:
+    """``text`` shows the reconciliation's starting capital and the size table's
+    balance each with the tag ``data`` (the downloadable JSON) stores, and the 1x
+    line of an account or signal says the file declares it."""
+    recon = data["reconciliation"]["initial_capital"]
+    sizing = data["challenge"]["sizing"]["starting_balance"]
+    tags = {key: evidence_label(key, locale) for key in ("MEASURED", "DECLARED")}
+    initial = INTEGRITY_TEXT[locale]["recon_initial"]
+    amount = report._table_money(recon["value"])
+    for key, tag in tags.items():
+        assert (f"{initial} {amount} {tag}" in text) is (key == recon["evidence"]), key
+    labels = LABELS[locale]
+    balance = report._fmt(float(sizing["value"]), key="starting_balance")
+    said, other = ("ch_size_balance_declared", "ch_size_balance")
+    if not account:
+        said, other = other, said
+    line = labels[said].format(balance=balance)
+    for key, tag in tags.items():
+        assert (f"{line} {tag}" in text) is (key == sizing["evidence"]), key
+    assert labels[other].format(balance=balance) not in text
+    assert (FILE_DECLARES[locale] in line) is account
+    assert f"({balance})" in line
 
 
 @pytest.mark.parametrize("locale", LOCALES)
 @pytest.mark.parametrize("kind", ["signal", "backtest"])
-def test_the_starting_balance_has_one_tag_in_the_reconciliation_and_the_sizes(
-    locale: str, kind: str
-) -> None:
+def test_each_starting_balance_shows_the_tag_its_json_stores(locale: str, kind: str) -> None:
     signal = kind == "signal"
     data = _signal(locale) if signal else _backtest_result(locale).model_dump(mode="json")
     recon = data["reconciliation"]["initial_capital"]
     sizing = data["challenge"]["sizing"]["starting_balance"]
-    # The same figure: the deposits the file lists before the first trade, which
-    # the reconciliation stores Measured and the size table Declared.
+    # The same figure stored twice: Measured by the reconciliation (the first point of
+    # the curve the engine rebuilds from the deposits the file lists, or its balance)
+    # and Declared by the size table (the balance the file declares).
     assert data["inputs"]["initial_balance"]["value"] == recon["value"] == sizing["value"]
     assert recon["evidence"] == "MEASURED" and sizing["evidence"] == "DECLARED"
-    copy_ = INTEGRITY_TEXT[locale]
-    tag = evidence_label("MEASURED", locale)
-    declared_tag = evidence_label("DECLARED", locale)
-    amount = report._table_money(recon["value"])
+    assert report.file_declares_balance(data)
     text = _visible(_signal_page(locale) if signal else _backtest_page(locale))
-    # The reconciliation keeps the tag it stores (and the downloadable JSON gives) ...
-    assert f"{copy_['recon_initial']} {amount} {tag}" in text
-    assert f"{copy_['recon_initial']} {amount} {declared_tag}" not in text
-    # ... and the size table's balance, the same figure, carries it too.
-    balance = report._fmt(float(sizing["value"]), key="starting_balance")
-    line = LABELS[locale]["ch_size_balance"].format(balance=balance)
-    assert f"{line} {tag}" in text and f"{line} {declared_tag}" not in text
-    assert report.reconciled_starting_balance(data) == recon
+    _balance_lines(text, data, locale, account=signal)
     if signal:
-        # The money deposited, which holds that starting balance, reads the same.
+        # The money deposited, which holds that starting balance, keeps its own tag.
         deposited = data["account"]["deposits"]["total"]
-        assert deposited["evidence"] == recon["evidence"]
+        assert deposited["evidence"] == "MEASURED"
         money = report._fmt(deposited["value"], key="deposits_total")
+        tag = evidence_label("MEASURED", locale)
         assert f"{KEY_LABELS[locale]['deposits_total']} {money} {tag}" in text
+    else:
+        # A backtest reads both lines word for word as before this branch.
+        for line in BACKTEST_BALANCE_LINES[locale]:
+            assert line in text, line
     # The stored result is untouched.
     assert data["reconciliation"]["initial_capital"]["evidence"] == "MEASURED"
     assert data["challenge"]["sizing"]["starting_balance"]["evidence"] == "DECLARED"
 
 
-def test_a_starting_balance_the_client_declared_or_assumed_keeps_its_own_tag() -> None:
+def test_only_the_files_own_declared_balance_says_the_file_declares_it() -> None:
     data = _signal("es")
     sizing = data["challenge"]["sizing"]
     value = sizing["starting_balance"]["value"]
-    # The client declared the same balance on the form: the size table keeps Declared.
+    labels = LABELS["es"]
+    balance = report._fmt(float(value), key="starting_balance")
+    assert report.file_declares_balance(data)
+    # The client declared that balance on the form: it may stand in for the file's.
     client = copy.deepcopy(data)
     client["declared"]["initial_balance"] = declared(value)
-    assert report.reconciled_starting_balance(client) is None
-    # An assumed balance keeps its own wording.
+    assert not report.file_declares_balance(client)
+    page = _page_of(client, "es")
+    plain = labels["ch_size_balance"].format(balance=balance)
+    assert f"{plain} {evidence_label('DECLARED', 'es')}" in page
+    assert FILE_DECLARES["es"] not in page
+    # Another balance on the form: the file's own one was used.
+    other = copy.deepcopy(data)
+    other["declared"]["initial_balance"] = declared(value + 500)
+    assert report.file_declares_balance(other)
+    # An assumed balance, a curve's first value or no balance never say so.
     assumed = copy.deepcopy(data)
     assumed["inputs"]["parse_warnings"].append(
-        f"report: {report.ASSUMED_BALANCE_WARNING} 10,000 was assumed"
+        f"report: {report.ASSUMED_BALANCE_WARNING}; 10,000 was assumed"
     )
-    assert report.reconciled_starting_balance(assumed) is None
-    # Another figure, or a size table with no balance, keeps the stored tag.
-    other = copy.deepcopy(data)
-    other["challenge"]["sizing"]["starting_balance"]["value"] = value + 1
-    assert report.reconciled_starting_balance(other) is None
-    plain = report._sizing_balance_html(sizing, LABELS["es"])
-    assert plain.endswith(report._badge("DECLARED"))
-    shown = report._sizing_balance_html(
-        sizing, LABELS["es"], data["reconciliation"]["initial_capital"]
-    )
-    assert shown.endswith(report._badge("MEASURED"))
+    assert not report.file_declares_balance(assumed)
+    curve = copy.deepcopy(data)
+    curve["challenge"]["sizing"]["starting_balance"]["evidence"] = "MEASURED"
+    assert not report.file_declares_balance(curve)
+    empty = copy.deepcopy(data)
+    empty["challenge"] = None
+    assert not report.file_declares_balance(empty)
+    # The line keeps the stored tag whatever it says.
+    said = report._sizing_balance_html(sizing, labels, file_balance=True)
+    assert labels["ch_size_balance_declared"].format(balance=balance) in html.unescape(said)
+    assert said.endswith(report._badge("DECLARED"))
+    kept = report._sizing_balance_html(sizing, labels)
+    assert plain in html.unescape(kept) and kept.endswith(report._badge("DECLARED"))
+    first = report._sizing_balance_html(curve["challenge"]["sizing"], labels, file_balance=True)
+    assert plain in html.unescape(first) and first.endswith(report._badge("MEASURED"))
 
 
 # 11 · four sentences --------------------------------------------------------------------------
@@ -1626,3 +1689,245 @@ def test_every_fourth_pass_text_exists_in_three_languages_and_passes_the_guard()
         assert not [word for word in BANNED if word in text.lower()], text
         assert not ROBOT_WORD.search(text) and not ROBOT_ANYWHERE.search(text), text
         assert not CONFIGURATIONS.search(text), text
+
+
+# Fifth pass -------------------------------------------------------------------------------
+# What a copier reads before paying: the preview of an anonymous upload, with the
+# production settings, listed "the configurations tried" for an account; and the
+# starting balance read Measured twice on the page while the JSON stores it Declared in
+# the size table.
+
+#: The accounts or signals an account's trials count, as its dimension and plan name them.
+ACCOUNTS_OR_SIGNALS = {
+    "es": "cuentas o señales",
+    "en": "accounts or signals",
+    "pt": "contas ou sinais",
+}
+#: Configurations, robots and optimisers: none of them on an account's preview.
+NOT_AN_ACCOUNT = re.compile(
+    r"configuraciones|configurations|configurações|\b(robot|robots|robô|robôs)\b", re.I
+)
+
+
+def _lockbox(page: str) -> list[str]:
+    """The lines the preview's lockbox lists, as the reader gets them."""
+    box = page.split("<div class='lockbox'", 1)[1].split("</ul>", 1)[0]
+    return [_visible(item) for item in re.findall(r"<li>(.*?)</li>", box, re.S)]
+
+
+def _production_app(tmp_path: Path) -> Any:
+    """The service as production runs it since 9 Oct: paid mode, the preview with no
+    account (``anon_preview``) and no free first report (``welcome_full_report``).
+    Stripe and mail are configured but never reached."""
+    from quant_trade.audit.settings import AuditSettings
+    from quant_trade.audit.store import make_store
+    from quant_trade.audit.web import create_app
+
+    settings = AuditSettings(
+        database_url=f"sqlite:///{tmp_path}/audit.db",
+        bootstrap_samples=100,
+        base_url="https://rigor.example",
+        free_mode=False,
+        email_verification_required=True,
+        email_token_secret="stable secret shared across replicas 1234567890",
+        resend_api_key="re_test_0123456789abcdefghij",
+        smtp_from="Rigor <hola@example.com>",
+        stripe_secret_key="sk_live_x",
+        stripe_webhook_secret="whsec_cuenta",
+        approved_markets=frozenset({"MX"}),
+        operator_contact="soporte@example.com",
+        trusted_proxy_hops=1,
+        anon_preview=True,
+        welcome_full_report=False,
+    )
+    return create_app(settings, make_store(settings.database_url))
+
+
+@pytest.fixture(scope="module")
+def anonymous_previews(tmp_path_factory: pytest.TempPathFactory) -> Iterator[dict[str, str]]:
+    """The Myfxbook statement uploaded with no account, once per language: its preview."""
+    pytest.importorskip("fastapi")
+    pytest.importorskip("sqlalchemy")
+    from fastapi.testclient import TestClient
+
+    app = _production_app(tmp_path_factory.mktemp("vista-previa-cuenta"))
+    client = TestClient(
+        app, base_url="https://rigor.example", headers={"X-Forwarded-For": "203.0.113.7"}
+    )
+    pages: dict[str, str] = {}
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setattr(
+            "quant_trade.audit.market._download",
+            lambda series, *_: (_ for _ in ()).throw(RuntimeError(f"network off ({series})")),
+        )
+        for locale in LOCALES:
+            answer = client.post(
+                "/audits",
+                files={"report": ("statement.csv", synthetic_live_statement(), "text/csv")},
+                data={"consent": "on", "locale": locale},
+                follow_redirects=False,
+            )
+            assert answer.status_code == 303, answer.text[:300]
+            location = answer.headers["location"]
+            assert location.endswith("&acct=anon_preview"), location
+            pages[locale] = client.get(f"{location}&lang={locale}").text
+    yield pages
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+def test_the_paid_preview_of_an_account_counts_accounts_not_configurations(
+    anonymous_previews: dict[str, str], locale: str
+) -> None:
+    page = anonymous_previews[locale]
+    text = _visible(page)
+    # An account's preview, locked, with the full report on sale.
+    assert LABELS[locale]["title_account"] in page
+    assert LABELS[locale]["locked_intro"] in text
+    items = _lockbox(page)
+    gain = report.LOCKED_GAINS_ACCOUNT[locale]["multiplicity"]
+    # The multiplicity line counts what the account's dimension and plan step count.
+    assert gain in items, items
+    assert report.LOCKED_GAINS[locale]["multiplicity"] not in items
+    name = report._dimension_title("multiplicity", locale, account=True)
+    assert ACCOUNTS_OR_SIGNALS[locale] in gain and ACCOUNTS_OR_SIGNALS[locale] in name
+    assert name in text
+    # Nowhere on the preview a configuration tried, a robot or an optimiser.
+    assert not NOT_AN_ACCOUNT.search(text), NOT_AN_ACCOUNT.search(text)
+    assert not ROBOT_ANYWHERE.search(text), ROBOT_ANYWHERE.search(text)
+    assert find_claims(text) == []
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+@pytest.mark.parametrize("role", [*ownership.ROLES, None])
+def test_the_preview_of_an_account_names_its_trials_in_every_voice(
+    locale: str, role: str | None
+) -> None:
+    data = _with_role(_signal(locale), role)
+    page = render_html(
+        AuditResult.model_validate(data), watermark=True, free_mode=False, locale=locale
+    )
+    items = _lockbox(page)
+    gain = report.LOCKED_GAINS_ACCOUNT[locale]["multiplicity"]
+    assert gain in items and report.LOCKED_GAINS[locale]["multiplicity"] not in items
+    # The plan's step names the same accounts or signals, in the declared voice.
+    step = next(s for s in improvement_plan(data, locale) if s.dimension == "multiplicity")
+    text = _visible(page)
+    assert ACCOUNTS_OR_SIGNALS[locale] in step.title and step.title in text
+    # Nowhere on the preview, in any voice, a configuration tried, a robot or an optimiser.
+    assert not NOT_AN_ACCOUNT.search(text), NOT_AN_ACCOUNT.search(text)
+    assert not ROBOT_ANYWHERE.search(text), ROBOT_ANYWHERE.search(text)
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+def test_a_backtests_preview_keeps_the_configurations_tried(locale: str) -> None:
+    page = render_html(_backtest_result(locale), watermark=True, free_mode=False, locale=locale)
+    items = _lockbox(page)
+    assert report.LOCKED_GAINS[locale]["multiplicity"] in items
+    assert report.LOCKED_GAINS_ACCOUNT[locale]["multiplicity"] not in items
+
+
+@pytest.fixture(scope="module")
+def uploaded_account(tmp_path_factory: pytest.TempPathFactory) -> Iterator[tuple[Any, str]]:
+    """The Myfxbook statement uploaded in free mode: its full page and its JSON."""
+    pytest.importorskip("fastapi")
+    pytest.importorskip("sqlalchemy")
+    from fastapi.testclient import TestClient
+
+    from quant_trade.audit.settings import AuditSettings
+    from quant_trade.audit.store import make_store
+    from quant_trade.audit.web import create_app
+
+    path = tmp_path_factory.mktemp("cuenta-json")
+    settings = AuditSettings(
+        database_url=f"sqlite:///{path}/audit.db",
+        bootstrap_samples=100,
+        base_url="https://audit.example",
+    )
+    client = TestClient(create_app(settings, make_store(settings.database_url)))
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setattr(
+            "quant_trade.audit.market._download",
+            lambda series, *_: (_ for _ in ()).throw(RuntimeError(f"network off ({series})")),
+        )
+        answer = client.post(
+            "/audits",
+            files={"report": ("statement.csv", synthetic_live_statement(), "text/csv")},
+            data={"consent": "on", "locale": "es"},
+            follow_redirects=False,
+        )
+        assert answer.status_code == 303, answer.text[:300]
+        yield client, answer.headers["location"]
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+def test_an_uploaded_accounts_page_shows_the_tags_its_json_stores(
+    uploaded_account: tuple[Any, str], locale: str
+) -> None:
+    client, location = uploaded_account
+    audit_id = location.split("/audits/")[1].split("?")[0]
+    token = location.split("token=")[1].split("&")[0]
+    stored = client.get(f"/audits/{audit_id}.json?token={token}")
+    assert stored.status_code == 200
+    data = stored.json()
+    assert data["reconciliation"]["initial_capital"]["evidence"] == "MEASURED"
+    assert data["challenge"]["sizing"]["starting_balance"]["evidence"] == "DECLARED"
+    page = client.get(f"{location}&lang={locale}").text
+    _balance_lines(_visible(page), data, locale, account=True)
+
+
+@pytest.fixture(scope="module")
+def sample_pages(tmp_path_factory: pytest.TempPathFactory) -> Iterator[Any]:
+    """The service's public samples, as /ejemplo, /sample and their signal serve them."""
+    pytest.importorskip("fastapi")
+    pytest.importorskip("sqlalchemy")
+    from fastapi.testclient import TestClient
+
+    from quant_trade.audit.settings import AuditSettings
+    from quant_trade.audit.store import make_store
+    from quant_trade.audit.web import create_app
+
+    path = tmp_path_factory.mktemp("muestras")
+    settings = AuditSettings(
+        database_url=f"sqlite:///{path}/audit.db", base_url="https://audit.example"
+    )
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setattr(
+            "quant_trade.audit.market._download",
+            lambda series, *_: (_ for _ in ()).throw(RuntimeError(f"network off ({series})")),
+        )
+        yield TestClient(create_app(settings, make_store(settings.database_url)))
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+def test_the_served_samples_show_each_starting_balance_as_stored(
+    sample_pages: Any, locale: str
+) -> None:
+    from quant_trade.audit.seo import SIGNAL_SAMPLE_PATHS
+
+    backtest = sample_pages.get(report.SAMPLE_PATHS[locale])
+    assert backtest.status_code == 200
+    text = _visible(backtest.text)
+    # /ejemplo and /sample read as in e1df258, and as their JSON stores them.
+    for line in BACKTEST_BALANCE_LINES[locale]:
+        assert line in text, line
+    _balance_lines(text, _backtest_result(locale).model_dump(mode="json"), locale, account=False)
+    signal = sample_pages.get(SIGNAL_SAMPLE_PATHS[locale])
+    assert signal.status_code == 200
+    _balance_lines(_visible(signal.text), _signal(locale), locale, account=True)
+
+
+def test_every_fifth_pass_text_exists_in_three_languages_and_passes_the_guard() -> None:
+    texts: list[str] = []
+    for locale in LOCALES:
+        gain = report.LOCKED_GAINS_ACCOUNT[locale]["multiplicity"]
+        line = LABELS[locale]["ch_size_balance_declared"]
+        if locale != "en":
+            assert gain != report.LOCKED_GAINS_ACCOUNT["en"]["multiplicity"]
+            assert line != LABELS["en"]["ch_size_balance_declared"]
+        assert set(report.LOCKED_GAINS_ACCOUNT[locale]) <= set(report.LOCKED_GAINS[locale])
+        assert FILE_DECLARES[locale] in line and "{balance}" in line
+        texts += [gain, line]
+    for text in texts:
+        assert find_claims(text) == [], text
+        assert not [word for word in BANNED if word in text.lower()], text
+        assert not NOT_AN_ACCOUNT.search(text) and not ROBOT_ANYWHERE.search(text), text

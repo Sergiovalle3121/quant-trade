@@ -476,6 +476,22 @@ LOCKED_GAINS: dict[str, dict[str, str]] = {
     },
 }
 
+#: The lockbox's lines that read differently on an account or signal's preview:
+#: its trials are the accounts or signals behind it, as its dimension
+#: (``DIMENSION_TITLES_ACCOUNT``) and the plan's step count them, never the
+#: configurations a backtest tried. Every other line is the backtest's.
+LOCKED_GAINS_ACCOUNT: dict[str, dict[str, str]] = {
+    "es": {
+        "multiplicity": "Cuánto queda al descontar las cuentas o señales que hay detrás de esta",
+    },
+    "en": {
+        "multiplicity": "What is left after discounting the accounts or signals behind it",
+    },
+    "pt": {
+        "multiplicity": "Quanto sobra ao descontar as contas ou sinais que há por trás desta",
+    },
+}
+
 LABELS: dict[str, dict[str, str]] = {
     "es": {
         "title": f"{BRAND} · Auditoría de backtest",
@@ -2034,6 +2050,10 @@ LABELS: dict[str, dict[str, str]] = {
         ),
         "ch_size_balance": (
             "Los porcentajes de 1x se miden sobre el balance inicial del archivo ({balance})."
+        ),
+        "ch_size_balance_declared": (
+            "Los porcentajes de 1x se miden sobre el balance inicial que declara el archivo "
+            "({balance})."
         ),
         "ch_size_balance_assumed": (
             "Los porcentajes de 1x se miden sobre un balance inicial de {balance} que se supuso "
@@ -3718,6 +3738,9 @@ LABELS: dict[str, dict[str, str]] = {
         ),
         "ch_size_balance": (
             "The shares at 1x are measured on the file's starting balance ({balance})."
+        ),
+        "ch_size_balance_declared": (
+            "The shares at 1x are measured on the starting balance the file declares ({balance})."
         ),
         "ch_size_balance_assumed": (
             "The shares at 1x are measured on a starting balance of {balance} that was assumed "
@@ -6098,15 +6121,15 @@ def _challenge_html(
     unseen_warning: str = "",
     *,
     account: bool = False,
-    starting_balance: dict[str, Any] | None = None,
+    file_balance: bool = False,
 ) -> str:
     """The prop-firm challenge simulator. ``unseen_warning``
     (``unseen_open_loss_warning``) opens the section when the balance hides an
     open loss: the outcome, the ladder, the sizes and the firms' table then sit
     folded under it, each subsection with its own short warning first.
-    ``starting_balance`` (``reconciled_starting_balance``): the size table's
-    balance as the reconciliation tags it. Nothing the simulator measured
-    changes."""
+    ``file_balance`` (``file_declares_balance`` on an account or signal): the
+    size table's 1x line says its balance is the one the file declares, beside
+    the tag it stores. Nothing the simulator measured changes."""
     if not challenge:
         return f"<p class='muted'>{_e(labels['none'])}</p>"
     fold = bool(unseen_warning) and challenge.get("status") == "MEASURED"
@@ -6207,7 +6230,7 @@ def _challenge_html(
             horizon=horizon,
             optimistic=optimistic,
             market=market_line,
-            starting_balance=starting_balance,
+            file_balance=file_balance,
         )
     if fold:
         short = f"<p><strong>{_e(labels['ch_unseen_sizes'])}</strong></p>"
@@ -6415,12 +6438,12 @@ def _challenge_sizing_html(
     horizon: int | None,
     optimistic: bool = False,
     market: str = "",
-    starting_balance: dict[str, Any] | None = None,
+    file_balance: bool = False,
 ) -> str:
     """The chosen program at 0.5x, 1x, 1.5x and 2x the history's size, under
     the ladder: what changes with the size, never which size to use.
-    ``starting_balance`` (``reconciled_starting_balance``) gives the 1x line's
-    balance the reconciliation's tag.
+    ``file_balance`` (``file_declares_balance``): the 1x line says its balance
+    is the one the file declares.
 
     The lots are those of the balance the shares at 1x are measured on, and
     the table says so; on the account a program names they are scaled to it
@@ -6506,7 +6529,7 @@ def _challenge_sizing_html(
         title
         + f"<p class='muted'>{_e(intro)} {_badge('MEASURED')}</p>{market}"
         + f"<p>{_e(labels['ch_size_one'])}"
-        f"{_sizing_balance_html(sizing, labels, starting_balance)}</p>"
+        f"{_sizing_balance_html(sizing, labels, file_balance=file_balance)}</p>"
     )
     measured_lot = per_trade.get("evidence") == "MEASURED" and per_trade.get("value") is not None
     if per_trade.get("evidence") == "NOT_MEASURED":
@@ -6567,18 +6590,26 @@ def _lot_text(value: Any) -> str:
 
 
 def _sizing_balance_html(
-    sizing: dict[str, Any], labels: dict[str, str], reconciled: dict[str, Any] | None = None
+    sizing: dict[str, Any], labels: dict[str, str], *, file_balance: bool = False
 ) -> str:
     """The balance 1x's daily shares are measured on, as the capital section
-    names it; an assumed one says so. Empty for a result stored without it.
-    ``reconciled`` (``reconciled_starting_balance``) is the same figure as the
-    reconciliation tags it: the line then carries that tag."""
+    names it, with the tag it stores (the downloadable JSON's); an assumed one
+    says so. Empty for a result stored without it. ``file_balance``
+    (``file_declares_balance``): a Declared balance is the one the file
+    declares, and the line says so in those words, so it reads beside the
+    reconciliation's starting capital, the same figure Measured from the
+    deposits the file lists."""
     balance = sizing.get("starting_balance") or {}
     if not balance.get("value"):
         return ""
     shown = _fmt(float(balance["value"]), key="starting_balance")
-    evidence = str((reconciled or balance).get("evidence") or "NOT_MEASURED")
-    key = "ch_size_balance_assumed" if evidence == "NOT_MEASURED" else "ch_size_balance"
+    evidence = str(balance.get("evidence") or "NOT_MEASURED")
+    if evidence == "NOT_MEASURED":
+        key = "ch_size_balance_assumed"
+    elif evidence == "DECLARED" and file_balance:
+        key = "ch_size_balance_declared"
+    else:
+        key = "ch_size_balance"
     return f" {_e(labels[key].format(balance=shown))} {_badge(evidence)}"
 
 
@@ -7375,36 +7406,30 @@ def declared_open_value(data: dict[str, Any]) -> dict[str, Any] | None:
     return {"value": number, "evidence": "DECLARED", "note": ACCOUNT_FLOATING_NOTE}
 
 
-def reconciled_starting_balance(data: dict[str, Any]) -> dict[str, Any] | None:
-    """The size table's starting balance as the reconciliation tags the same
-    figure, so one figure reads with one tag on the page.
+def file_declares_balance(data: dict[str, Any]) -> bool:
+    """Whether the size table's starting balance, stored Declared, is the one
+    the uploaded file declares (the balance its report prints, or the deposits
+    it lists before the first trade): the 1x line then says so beside its tag.
 
-    The reconciliation's starting capital is the first figure of the curve
-    the engine rebuilds from the file (the deposits it lists before the first
-    trade, the balance its report prints when it lists none), stored Measured
-    as the downloadable JSON's reconciliation gives it; the size table stores
-    the same figure as the file's balance, Declared. Both show the
-    reconciliation's tag, which the page keeps as stored. None, and the size
-    table keeps its own tag, when the two are not the same figure, when the
-    balance was assumed because the file states none, or when it is the one
-    the client declared on the form."""
+    The reconciliation stores the same figure Measured, as the first point of
+    the curve the engine rebuilds from the file; each place keeps the tag it
+    stores, the downloadable JSON's. False when the balance is not tagged
+    Declared (a curve's first value, or one assumed because the file states
+    none), when it was assumed in a result stored before the size table said
+    so, or when it is the one the client declared on the form, which stands in
+    for the file's when the file states none."""
     balance = ((data.get("challenge") or {}).get("sizing") or {}).get("starting_balance") or {}
-    start = (data.get("reconciliation") or {}).get("initial_capital") or {}
-    value, used = balance.get("value"), start.get("value")
-    if balance.get("evidence") != "DECLARED" or start.get("evidence") != "MEASURED":
-        return None
-    if not isinstance(value, int | float) or not isinstance(used, int | float):
-        return None
-    if float(value) != float(used):
-        return None
+    value = balance.get("value")
+    if balance.get("evidence") != "DECLARED" or not isinstance(value, int | float):
+        return False
     inputs = data.get("inputs") or {}
     if any(ASSUMED_BALANCE_WARNING in str(w) for w in inputs.get("parse_warnings") or []):
-        return None
+        return False
     client = (data.get("declared") or {}).get("initial_balance") or {}
     stated = client.get("value")
     if client.get("evidence") == "DECLARED" and isinstance(stated, int | float):
-        return None if float(stated) == float(value) else dict(start)
-    return dict(start)
+        return float(stated) != float(value)
+    return True
 
 
 def _reconciliation_html(
@@ -7416,8 +7441,9 @@ def _reconciliation_html(
     floating result the file declares: when the reconciliation has no valuation
     of its own, its row shows that figure as Declared, with its note and why it
     stays out of the expected balance, the same figure the account's section
-    shows. Every figure and tag of the reconciliation stays as stored (the size
-    table's starting balance takes its tag: ``reconciled_starting_balance``)."""
+    shows. Every other figure and tag of the reconciliation stays as stored, as
+    the downloadable JSON gives them: its starting capital is Measured, and the
+    size table keeps its own Declared (``file_declares_balance``)."""
     if not recon:
         return ""
     copy = INTEGRITY_TEXT[locale]
@@ -10144,9 +10170,15 @@ def _ladder_html(current: str, labels: dict[str, str]) -> str:
     )
 
 
-def _locked_gains(titles: list[str], labels: dict[str, str], locale: str) -> list[str]:
-    """Each locked section as what it tells the buyer, in the report's order."""
+def _locked_gains(
+    titles: list[str], labels: dict[str, str], locale: str, *, account: bool = False
+) -> list[str]:
+    """Each locked section as what it tells the buyer, in the report's order.
+    On an account or signal (``account``) the lines of ``LOCKED_GAINS_ACCOUNT``
+    count what its own sections count."""
     gains = ownership.gains_for(LOCKED_GAINS.get(locale, LOCKED_GAINS["es"]), labels)
+    if account:
+        gains.update(LOCKED_GAINS_ACCOUNT.get(locale, LOCKED_GAINS_ACCOUNT["es"]))
     by_title = {labels[key]: text for key, text in gains.items() if key in labels}
     out: list[str] = []
     for title in titles:
@@ -11137,7 +11169,7 @@ def render_html(
                         hidden,
                         unseen_open_loss_warning(data, labels),
                         account=_account_page(data),
-                        starting_balance=reconciled_starting_balance(data),
+                        file_balance=_account_page(data) and file_declares_balance(data),
                     ),
                 )
             ]
@@ -11198,7 +11230,12 @@ def render_html(
             f"<div class='lockbox' id='unlock'><p>{_e(labels['locked_intro'])}:</p><ul>"
             + "".join(
                 f"<li>{_e(gain)}</li>"
-                for gain in _locked_gains(_locked_titles(detail, data, labels), labels, locale)
+                for gain in _locked_gains(
+                    _locked_titles(detail, data, labels),
+                    labels,
+                    locale,
+                    account=_account_page(data),
+                )
             )
             + "</ul>"
             f"<p class='lock-sample'><a href='{sample_href}' target='_blank' rel='noopener'>"
