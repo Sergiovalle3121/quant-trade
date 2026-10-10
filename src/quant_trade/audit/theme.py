@@ -561,6 +561,7 @@ font:600 .8rem var(--mono);color:var(--btn-fg);background:var(--btn-bg)}
 .checks{list-style:none;padding:0;margin:0;display:grid;gap:12px}
 .checks li{display:flex;gap:12px;align-items:flex-start;color:var(--text-2);font-size:.96rem}
 .checks li svg{width:18px;height:18px;flex:none;margin-top:3px;color:var(--text)}
+.checks li span{min-width:0;overflow-wrap:anywhere}
 .prices{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
 .prices-one{grid-template-columns:minmax(0,1fr);max-width:580px}
 @media (max-width:760px){.prices{grid-template-columns:minmax(0,1fr)}}

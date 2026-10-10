@@ -31,8 +31,8 @@ COPY: dict[str, dict[str, Any]] = {
         "title": "Herramientas gratis para revisar un backtest",
         "seo_title": "Herramientas gratis para backtests e historiales",
         "summary": (
-            "Calculadoras de suerte, de % de aciertos y de reto de prop firm, tarjeta de cifras "
-            "y comprobación de informes: gratis y sin registro. Supuestos visibles."
+            "Calculadoras de suerte, aciertos y reto, tarjeta de cifras y comprobación de "
+            "informes: gratis y sin registro. Cifras declaradas; ninguna es una auditoría."
         ),
         "intro": (
             "Todas usan cifras que tú declaras y muestran sus supuestos. No son una auditoría: "
@@ -119,8 +119,8 @@ COPY: dict[str, dict[str, Any]] = {
         "title": "Free tools to check a backtest",
         "seo_title": "Free tools for backtests and track records",
         "summary": (
-            "Luck, win rate and prop firm challenge calculators, figures card and report "
-            "check: free and no signup. Declared figures and visible assumptions."
+            "Luck, win rate and challenge calculators, figures card and report check: free and "
+            "no signup. Declared figures and visible assumptions; none is an audit."
         ),
         "intro": (
             "Each one uses figures you declare and shows its assumptions. They are not an "
@@ -201,8 +201,8 @@ COPY: dict[str, dict[str, Any]] = {
         "title": "Ferramentas grátis para revisar um backtest",
         "seo_title": "Ferramentas grátis para backtests e históricos",
         "summary": (
-            "Calculadoras de sorte, de taxa de acerto e de desafio de prop firm, cartão de "
-            "números e conferência de relatórios: grátis e sem cadastro."
+            "Calculadoras de sorte, acerto e desafio, cartão de números e conferência de "
+            "relatórios: grátis e sem cadastro. Números declarados; nenhuma é uma auditoria."
         ),
         "intro": (
             "Todas usam números que você declara e mostram as suas suposições. Não são uma "

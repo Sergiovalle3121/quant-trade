@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import html
 import json
+import math
 import re
 import socket
 from datetime import UTC, datetime
@@ -20,15 +21,23 @@ pytest.importorskip("sqlalchemy")
 from fastapi.testclient import TestClient  # noqa: E402
 
 from quant_trade.audit import challenge_calc as calc  # noqa: E402
-from quant_trade.audit import firmfit, funnel, seo, winrate  # noqa: E402
+from quant_trade.audit import firmfit, funnel, seo, theme, winrate  # noqa: E402
 from quant_trade.audit.analytics import simulate_challenge  # noqa: E402
 from quant_trade.audit.articles import _num, article_url  # noqa: E402
 from quant_trade.audit.audiences import audience_url  # noqa: E402
+from quant_trade.audit.calculator import CALCULATOR_PATH  # noqa: E402
+from quant_trade.audit.challenge_pages import _phase_name  # noqa: E402
 from quant_trade.audit.guard import find_claims  # noqa: E402
-from quant_trade.audit.prop_presets import PRESETS  # noqa: E402
+from quant_trade.audit.prop_presets import (  # noqa: E402
+    PRESETS,
+    THE5ERS_BOOTCAMP_URL,
+    THE5ERS_HIGH_STAKES_URL,
+    THE5ERS_HYPER_GROWTH_URL,
+)
 from quant_trade.audit.public_card import PublicClaim  # noqa: E402
 from quant_trade.audit.settings import AuditSettings  # noqa: E402
 from quant_trade.audit.store import make_store  # noqa: E402
+from quant_trade.audit.tools_hub import COPY as TOOLS_COPY  # noqa: E402
 from quant_trade.audit.tools_hub import TOOL_KEYS, TOOLS_PATH  # noqa: E402
 from quant_trade.audit.web import create_app  # noqa: E402
 
@@ -52,11 +61,13 @@ PCT = {"win_rate": "52", "avg_win": "0.9", "avg_loss": "0.6", "per_day": "1.5"}
 #: Words the brief keeps off these pages, in the three languages.
 FORBIDDEN = re.compile(
     r"\b(aprobar\w*|aprobad\w*|pasar|pasas?|pass|passed|passes|passing|aprovar\w*|aprovad\w*|"
-    r"verificad\w*|verified|certificad\w*|certified|garantiza\w*|guarantee\w*|garantid\w*|"
+    r"verific\w*|verified|certificad\w*|certified|garantiza\w*|guarantee\w*|garantid\w*|"
     r"rentables?|profitable|lucrativ\w*|approved)\b",
     re.IGNORECASE,
 )
 ALL_PATHS = [pytest.param(path, id=path) for path in calc.PAGES]
+#: How a description says the tool is not the firm's.
+AFFILIATION = {"es": "no afiliada", "en": "not affiliated", "pt": "não afiliada"}
 
 
 @pytest.fixture(scope="module")
@@ -186,6 +197,9 @@ def test_metadata_is_own_and_within_bounds() -> None:
             )
             assert 15 <= len(title) <= 65 and title.endswith(" · Rigor"), title
             assert 50 <= len(description) <= 160, (len(description), description)
+            # A search result shows the description without the page: it says Rigor is
+            # independent and not the firm's, as the lead and the rules table do.
+            assert AFFILIATION[locale] in description, description
             titles.add(title)
             descriptions.add(description)
         assert len(titles) == len(descriptions) == 1 + len(calc.FIRMS)
@@ -202,6 +216,9 @@ def test_structured_data_is_a_free_web_application(site: TestClient, path: str) 
     assert app["inLanguage"] == locale
     assert app["isAccessibleForFree"] is True
     assert app["offers"] == {"@type": "Offer", "price": "0", "priceCurrency": "USD"}
+    # Named after a firm, the tool still reads as Rigor's in a rich result.
+    assert app["publisher"] == {"@type": "Organization", "name": "Rigor"}
+    assert AFFILIATION[locale] in app["description"]
     faq = [item for item in data if item.get("@type") == "FAQPage"]
     if not firm:
         assert faq == []
@@ -284,12 +301,97 @@ def test_synthetic_days_follow_the_declared_figures() -> None:
     daily = calc.synthetic_daily_returns(0.55, 0.01, 0.007, 2.0)
     # Two trades a day: two wins, one of each or two losses, nothing else.
     assert set(np.round(daily, 10)) <= {0.02, 0.003, -0.014}
-    assert np.mean(daily) == pytest.approx(2 * (0.55 * 0.01 - 0.45 * 0.007), abs=1.5e-3)
+    # The mean is the declared one, not the seed's draw of it (that was off by a
+    # third of the edge, always in the trader's favour).
+    assert np.mean(daily) == pytest.approx(2 * (0.55 * 0.01 - 0.45 * 0.007), abs=1e-9)
+    # The binomial mix of a two-trade day, to one day in 10,000.
+    wins = np.round((daily + 0.014) / 0.017).astype(int)
+    for count, share in ((2, 0.55**2), (1, 2 * 0.55 * 0.45), (0, 0.45**2)):
+        assert abs(np.sum(wins == count) - share * calc.SYNTHETIC_DAYS) <= 1, count
     half = calc.synthetic_daily_returns(0.55, 0.01, 0.007, 0.5)
-    assert np.mean(half == 0.0) == pytest.approx(0.5, abs=0.05)
+    assert np.mean(half == 0.0) == 0.5
     # A lower win rate only turns winners into losers, day by day.
     lower = calc.synthetic_daily_returns(0.40, 0.01, 0.007, 2.0)
     assert (lower <= daily + 1e-12).all()
+
+
+def _mix(win_rate: float, per_day: float) -> tuple[np.ndarray, np.ndarray]:
+    """Each synthetic day's trades and winners, read back through the returns."""
+    counts = calc.synthetic_daily_returns(win_rate, 1.0, -1.0, per_day)
+    winners = calc.synthetic_daily_returns(win_rate, 1.0, 0.0, per_day)
+    winners = np.where(winners == calc.TRADED_FLAT_DAY, 0.0, winners)
+    return np.round(counts).astype(int), np.round(winners).astype(int)
+
+
+@pytest.mark.parametrize(
+    ("win_rate", "per_day"),
+    [(0.40, 0.1), (0.55, 0.5), (0.555, 1.0), (0.50, 1.0), (0.70, 1.2345), (0.55, 2.0)]
+    + [(0.45, 2.5), (0.40, 5.0), (0.60, 50.0)],
+)
+def test_synthetic_days_hold_the_declared_trades_and_win_rate(
+    win_rate: float, per_day: float
+) -> None:
+    days = calc.SYNTHETIC_DAYS
+    counts, winners = _mix(win_rate, per_day)
+    whole = math.floor(per_day)
+    total = round(per_day * days)
+    assert int(counts.sum()) == total
+    assert set(counts.tolist()) <= {whole, whole + 1}
+    # The declared win rate to within one trade per day size: the seed's own draw
+    # gave 57.9 % for a declared 55 % at one trade a day, and 46.3 % for 40 %.
+    assert abs(int(winners.sum()) - win_rate * total) <= whole + 1
+    win, loss = 0.008, 0.005
+    daily = calc.synthetic_daily_returns(win_rate, win, loss, per_day)
+    exact = (int(winners.sum()) * win - (total - int(winners.sum())) * loss) / days
+    assert np.mean(daily) == pytest.approx(exact, rel=1e-9, abs=1e-15)
+    declared = per_day * (win_rate * win - (1 - win_rate) * loss)
+    assert abs(float(np.mean(daily)) - declared) <= (whole + 2) * (win + loss) / days
+
+
+def test_the_seed_only_shuffles_the_days(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Edge zero: 50 % at 1 % against 1 %. The seed's own draw had made it +0,05 % a
+    # day, and the page said 58 % for a target that a fair walk reaches about 31 %.
+    value = _parse({"win_rate": "50", "avg_win": "1", "avg_loss": "1", "per_day": "1"})
+    page = calc.run_program(value, value.win_rate)
+    assert np.mean(page.daily) == pytest.approx(0.0, abs=1e-15)
+    chance = float(page.outcome["pass"]["value"])
+    assert chance == pytest.approx(0.31, abs=0.05)
+    for seed in (1, 2, 3):
+        monkeypatch.setattr(calc, "SEED", seed)
+        other = calc.run_program(value, value.win_rate)
+        # The same days in another order, and about the same figure.
+        assert np.array_equal(np.sort(other.daily), np.sort(page.daily))
+        assert float(other.outcome["pass"]["value"]) == pytest.approx(chance, abs=0.05), seed
+
+
+def test_days_that_net_zero_still_count_as_trading_days() -> None:
+    # 1:1 and two trades a day: a win and a loss net exactly zero on about half the days.
+    value = _parse(
+        {
+            "win_rate": "60",
+            "avg_win": "2",
+            "avg_loss": "2",
+            "per_day": "2",
+            "program": "fundednext-stellar-2step-phase1",
+        }
+    )
+    daily = calc.synthetic_daily_returns(value.win_rate, value.win, value.loss, value.per_day)
+    flat = daily == calc.TRADED_FLAT_DAY
+    assert 0.4 < float(np.mean(flat)) < 0.55
+    # Every day had trades, so the simulator (which counts a day with a return that
+    # is not zero) counts every one, at every size of the sizing table.
+    assert np.count_nonzero(daily) == calc.SYNTHETIC_DAYS
+    assert np.count_nonzero(daily * min(calc.SIZES)) == calc.SYNTHETIC_DAYS
+    assert np.all(1.0 + daily[flat] == 1.0)  # and the balance does not move
+    rules = PRESETS[value.program]
+    counted = simulate_challenge(daily, rules, samples=calc.SAMPLES, seed=calc.SEED)
+    uncounted = simulate_challenge(
+        np.where(flat, 0.0, daily), rules, samples=calc.SAMPLES, seed=calc.SEED
+    )
+    days = counted["days_to_target"]
+    assert days["p25"]["value"] >= rules.min_trading_days
+    assert days["p50"]["value"] < uncounted["days_to_target"]["p50"]["value"]
+    assert calc.compute(value).declared.phases[0][1]["days_to_target"] == days
 
 
 def test_the_query_reproduces_the_result(site: TestClient, tmp_path: Path) -> None:
@@ -385,10 +487,11 @@ def test_invalid_inputs_give_a_clear_message_and_never_a_500(site: TestClient, l
 
 
 def test_identical_synthetic_days_are_not_measured(site: TestClient) -> None:
-    # Every trade wins at 99.99 %: every synthetic day is the same and cannot be resampled.
-    params = {"win_rate": "99.99", "avg_win": "0.5", "avg_loss": "0.5", "per_day": "1"}
-    days = calc.synthetic_daily_returns(0.9999, 0.005, 0.005, 1.0)
-    assert float(np.std(days)) == 0.0  # the seed's 1,000 draws are all winners
+    # At 99.999 % not one of the 10,000 trades loses: every synthetic day is the
+    # same and cannot be resampled.
+    params = {"win_rate": "99.999", "avg_win": "0.5", "avg_loss": "0.5", "per_day": "1"}
+    days = calc.synthetic_daily_returns(0.99999, 0.005, 0.005, 1.0)
+    assert float(np.std(days)) == 0.0
     response = site.get(calc.challenge_url("es"), params=params)
     assert response.status_code == 200
     assert calc.COPY["es"]["identical_days"] in _visible(response.text)
@@ -565,3 +668,239 @@ def test_computations_per_address_are_limited(
     # The empty form and an error never compute, so they are never refused.
     assert client.get(path).status_code == 200
     assert client.get(path, params={**PCT, "win_rate": "150"}).status_code == 400
+
+
+# -- what the page says about the rules it shows ----------------------------------
+
+
+def _figures(text: str, locale: str) -> list[float]:
+    """Every number in ``text``, read with the language's marks (2.000 is two thousand in es)."""
+    thousands, decimal = (",", ".") if locale == "en" else (".", ",")
+    text = re.sub(rf"(?<=\d){re.escape(thousands)}(?=\d{{3}}\b)", "", text)
+    return [
+        round(float(found.replace(decimal, ".")), 6)
+        for found in re.findall(rf"\d+(?:{re.escape(decimal)}\d+)?", text)
+    ]
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+@pytest.mark.parametrize("firm", list(calc.FIRMS))
+def test_every_figure_in_an_answer_is_in_the_presets(firm: str, locale: str) -> None:
+    """A figure in an answer is a preset's field, a figure its notes state, the
+    simulator's horizon or a Topstep size: if a preset changes, the answer follows
+    or this fails. Every answer that cites a rule carries the date it was read."""
+    keys = [key for program in calc.firm_programs(firm) for key in firmfit.program_keys(program)]
+    allowed = {float(calc.horizon(key)) for key in keys}
+    for key in keys:
+        rules = PRESETS[key]
+        for name in ("profit_target", "max_daily_loss", "max_total_loss", "best_day_limit"):
+            share = getattr(rules, name)
+            if share is not None:
+                allowed.add(round(share * 100, 6))
+        allowed |= {float(rules.min_trading_days), float(calc.phase_count(key))}
+        account = calc.account_size(key)
+        if account is not None:
+            allowed |= {account, round(account * rules.max_total_loss, 6)}
+        for note in rules.notes:
+            allowed.update(_figures(note, "en"))
+    as_of = PRESETS[keys[0]].as_of
+    names = sorted(
+        {PRESETS[key].program for key in keys} | {PRESETS[key].firm for key in keys},
+        key=len,
+        reverse=True,
+    )
+    for question, answer in calc.firm_faq(firm, locale):
+        text = answer.replace(as_of, " ")
+        for name in names:
+            text = text.replace(name, " ")
+        text = re.sub(r"\b\d-Step\b|\b(?:fase|phase) \d\b", " ", text)
+        figures = _figures(text, locale)
+        assert set(figures) <= allowed, (question, set(figures) - allowed)
+        if figures:
+            assert as_of in answer, question
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+def test_answers_agree_with_the_rules_on_the_same_page(site: TestClient, locale: str) -> None:
+    # FTMO's daily loss: the 2-Step's and the 1-Step's, each from its preset.
+    daily = calc.firm_faq("ftmo", locale)[2][1]
+    for key in ("ftmo-2step-phase1", "ftmo-1step"):
+        assert calc.daily_clause(key, locale) in daily, key
+    # Hyper Growth has a daily limit that pauses the day: the answer says it is not
+    # simulated, and never that the program has none.
+    hyper = calc.firm_faq("the5ers", locale)[1][1]
+    assert calc.rules_sentence("the5ers-hyper-growth", locale) in hyper
+    assert "3 %" in hyper
+    none = {"es": "sin límite", "en": "no daily", "pt": "sem limite"}[locale]
+    assert none not in calc.rules_sentence("the5ers-hyper-growth", locale)
+    # The result row of a program without a simulated daily limit is about the
+    # calculator, never about the firm's rules.
+    words = calc.COPY[locale]
+    for claim in ("no tiene", "have no", "não têm", "has no"):
+        assert claim not in words["no_daily"]
+    page = site.get(
+        calc.challenge_url(locale, "topstep"), params={**PCT, "program": "topstep-50k-combine"}
+    ).text
+    assert words["no_daily"] in _row(page, "daily")
+    # The FAQPage carries the same answers as the page.
+    blocks = re.findall(r"<script type='application/ld\+json'>(.*?)</script>", page, re.S)
+    faq = next(json.loads(b) for b in blocks if json.loads(b).get("@type") == "FAQPage")
+    answers = [entry["acceptedAnswer"]["text"] for entry in faq["mainEntity"]]
+    assert answers == [answer for _, answer in calc.firm_faq("topstep", locale)]
+
+
+def test_the_horizon_is_the_simulators() -> None:
+    for key in ("ftmo-2step-phase1", "fundednext-stellar-2step-phase1", "topstep-50k-combine"):
+        daily = calc.synthetic_daily_returns(0.55, 0.01, 0.008, 1.0)
+        method = simulate_challenge(daily, PRESETS[key], samples=10, seed=1)["method"]
+        assert calc.horizon(key) == method["horizon_business_days"]
+    for locale in LOCALES:
+        deadline = calc.firm_faq("fundednext", locale)[3][1]
+        assert str(calc.horizon("fundednext-stellar-2step-phase1")) in deadline
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+def test_each_source_and_note_names_its_program(site: TestClient, locale: str) -> None:
+    page = site.get(calc.challenge_url(locale, "the5ers")).text
+    sources = re.findall(r"<p class='help' data-challenge-source>(.*?)</p>", page)
+    assert len(sources) == len({_visible(line) for line in sources}) == 3
+    for url, key in (
+        (THE5ERS_HIGH_STAKES_URL, "the5ers-high-stakes-step1"),
+        (THE5ERS_HYPER_GROWTH_URL, "the5ers-hyper-growth"),
+        (THE5ERS_BOOTCAMP_URL, "the5ers-bootcamp-step"),
+    ):
+        line = next(line for line in sources if f"href='{url}'" in line)
+        assert PRESETS[key].program in _visible(line) and PRESETS[key].as_of in line
+    # The notes come under one heading per program, each with its own.
+    groups = re.findall(
+        r"<h3>([^<]*)</h3><ul class='checks nots challenge-notes' data-challenge-notes>(.*?)</ul>",
+        page,
+        re.S,
+    )
+    assert [title for title, _ in groups] == [
+        html.escape(calc.COPY[locale]["notes_title"].format(program=f"The5ers · {name}"))
+        for name in ("High Stakes", "Hyper Growth", "Bootcamp")
+    ]
+    from quant_trade.audit.i18n import localize
+
+    hyper = localize(PRESETS["the5ers-hyper-growth"].notes[0], locale)
+    assert html.escape(hyper) in groups[1][1] and html.escape(hyper) not in groups[0][1]
+    # FTMO's 5 % daily note sits with the 2-Step, not next to the 1-Step's 3 %.
+    ftmo = site.get(calc.challenge_url(locale, "ftmo")).text
+    titles = re.findall(r"<h3>([^<]*)</h3><ul class='checks nots challenge-notes'", ftmo)
+    assert len(titles) == 2 and "2-Step" in titles[0] and "1-Step" in titles[1]
+    daily_note = html.escape(localize(PRESETS["ftmo-2step-phase1"].notes[0], locale))
+    one_step = ftmo.split(titles[1], 1)[1].split("</ul>", 1)[0]
+    assert daily_note in ftmo and daily_note not in one_step
+
+
+@pytest.mark.parametrize("path", ALL_PATHS)
+def test_note_addresses_are_short_links(site: TestClient, path: str) -> None:
+    page = site.get(path).text
+    notes = re.findall(r"<ul class='checks nots challenge-notes'.*?</ul>", page, re.S)
+    assert notes
+    for block in notes:
+        visible = _visible(block)
+        assert "https://" not in visible and ".com/" not in visible, visible
+    if calc.PAGES[path][1] == "topstep":
+        consistency = "https://help.topstep.com/en/articles/8284208-what-is-the-consistency-target"
+        assert consistency in _links(page)
+    # A long word in a note wraps instead of pushing the list past a phone's edge.
+    assert ".checks li span{min-width:0;overflow-wrap:anywhere}" in theme.SECTIONS
+
+
+def test_numbered_phases_are_not_the_firms_english_names(site: TestClient) -> None:
+    assert _phase_name(PRESETS["ftmo-2step-phase2"], "es") == "fase 2"
+    assert _phase_name(PRESETS["ftmo-2step-phase1"], "pt") == "fase 1"
+    assert _phase_name(PRESETS["ftmo-2step-phase1"], "en") == "phase 1"
+    assert _phase_name(PRESETS["the5ers-bootcamp-step"], "es") == "cada una de las fases 1-3"
+    for locale in LOCALES:
+        for firm in ("", "ftmo"):
+            page = site.get(calc.challenge_url(locale, firm), params=FIGURES).text
+            assert "Verification" not in page and "(FTMO Challenge)" not in page
+
+
+# -- the declared figures, as declared ------------------------------------------
+
+
+def test_the_declared_fee_keeps_its_cents(site: TestClient) -> None:
+    for fee, shown in (
+        ("29,99", "USD 29,99"),
+        ("0.01", "USD 0,01"),
+        ("1.5", "USD 1,50"),
+        ("1.080", "USD 1.080"),
+        ("155", "USD 155"),
+    ):
+        page = site.get(calc.challenge_url("es"), params={**PCT, "fee": fee}).text
+        row = _row(page, "fee")
+        assert shown in row and f"{shown}," not in row, (fee, row)
+    value = _parse({**PCT, "fee": "29.99"})
+    reading = calc.compute(value)
+    assert reading.cost is not None
+    page = site.get(calc.challenge_url("en"), params={**PCT, "fee": "29.99"}).text
+    assert "USD 29.99" in _row(page, "fee")
+    assert f"USD {_num(reading.cost, 'en', 2)}" in _row(page, "cost")
+
+
+def test_tiny_figures_round_trip_through_the_link(site: TestClient) -> None:
+    typed = {
+        "win_rate": "55",
+        "avg_win": "0,00005",
+        "avg_loss": "0,00004",
+        "per_day": "2,5",
+        "program": "ftmo-2step-phase1",
+        "fee": "99",
+    }
+    value = _parse(typed)
+    shared = calc.share_values(value)
+    assert shared["avg_win"] == "0.00005" and shared["avg_loss"] == "0.00004"
+    assert _parse(shared) == value
+    for number in (5e-05, 1e-05, 4e-07, 0.1, 1 / 3, 123.456, 1e-20):
+        text = calc._text(number)
+        assert "e" not in text.lower() and float(text) == number, text
+    first = site.get(calc.challenge_url("es"), params=typed)
+    assert first.status_code == 200
+    assert "value='0.00005'" in first.text and "value='5e-05'" not in first.text
+    link = _textarea(first.text, "challenge-share-link")
+    again = site.get(link.removeprefix(BASE))
+    assert again.status_code == 200, _visible(again.text)[:200]
+    assert _result(again.text) == _result(first.text)
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+def test_the_lower_bound_carries_its_label(site: TestClient, locale: str) -> None:
+    page = site.get(calc.challenge_url(locale), params=FIGURES).text
+    interval = winrate.read(PublicClaim(trades=60, win_rate=0.45)).interval
+    assert interval is not None
+    low = html.escape(f"{_num(interval[0] * 100, locale, 1)} %")
+    sentence = re.search(r"<p data-challenge-lower>(.*?)</p>", page, re.S)
+    assert sentence is not None
+    assert f"<b>{low}</b> <span class='badge DECLARED'>" in sentence.group(1)
+    head = re.search(r"<table class='challenge-lower'><thead>(.*?)</thead>", page, re.S)
+    assert head is not None and head.group(1).count("badge DECLARED") == 2
+    assert calc.COPY[locale]["lower_computed"] in _visible(page)
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+def test_what_the_page_keeps_is_said_exactly(site: TestClient, locale: str) -> None:
+    # The figures travel in the GET query, so the access log may hold them: the
+    # page says so instead of "we do not store what you type". The luck
+    # calculator said the same and says this now.
+    log = {"es": "registro de acceso", "en": "access log", "pt": "registro de acesso"}[locale]
+    for path in (calc.challenge_url(locale), CALCULATOR_PATH[locale]):
+        visible = _visible(site.get(path).text)
+        assert log in visible, path
+        for old in ("No guardamos lo que escribes", "We do not store what you type"):
+            assert old not in visible
+        assert "Não guardamos o que você digita" not in visible
+
+
+def test_tools_page_description_keeps_its_warnings() -> None:
+    for locale, words in (
+        ("es", ("Cifras declaradas", "ninguna es una auditoría")),
+        ("en", ("Declared figures", "none is an audit")),
+        ("pt", ("Números declarados", "nenhuma é uma auditoria")),
+    ):
+        summary = TOOLS_COPY[locale]["summary"]
+        assert all(word in summary for word in words), summary
+        assert 50 <= len(summary) <= 160

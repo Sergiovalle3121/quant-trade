@@ -310,7 +310,10 @@ def article_structured_data(article: Article, locale: str, base_url: str) -> str
 
 
 def _web_application(name: str, description: str, url: str, locale: str) -> dict[str, Any]:
-    """A free tool that runs in the browser; ``url`` is absolute."""
+    """A free tool that runs in the browser; ``url`` is absolute.
+
+    The publisher is Rigor: a tool named after a prop firm must not read as the
+    firm's own in a search result."""
     return {
         "@type": "WebApplication",
         "name": name,
@@ -321,6 +324,7 @@ def _web_application(name: str, description: str, url: str, locale: str) -> dict
         "isAccessibleForFree": True,
         "inLanguage": locale,
         "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"},
+        "publisher": {"@type": "Organization", "name": BRAND},
     }
 
 

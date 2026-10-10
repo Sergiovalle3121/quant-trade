@@ -117,9 +117,17 @@ program; a firm page offers only its own) and, optionally, the trades behind
 the win rate and the fee. Decimal commas, spaces and no-break spaces are read;
 a fee or a trade count takes a thousands mark; bad or repeated fields get a
 localized 400, never a 500, and are not echoed back. From those figures it
-builds 1,000 synthetic days with a fixed seed (each trade wins the average win
-or loses the average loss, independently; a fractional trades per day gives
-some days one more trade) and runs the report's own simulator on them:
+builds 10,000 synthetic days (`SYNTHETIC_DAYS`) whose mix is fixed by the
+figures, not drawn: exactly `round(per_day × days)` trades (a fractional trades
+per day gives that many days one more trade), and each day's winners at an even
+quantile of the binomial for its trades, so the win rate and the mean return
+are the declared ones and the seed only shuffles the days (a seed's draw of
+1,000 days had given a declared 55 % as 57.9 % and inflated the headline
+figure). A lower win rate turns some of the same winners into losers, never the
+other way round. A day with trades that nets zero gets `TRADED_FLAT_DAY`, the
+smallest normal float, so the simulator (which counts a day whose return is not
+zero) counts it as a trading day, as a firm does. It then runs the report's own
+simulator on those days:
 `analytics.simulate_challenge` per phase with the preset's rules, 2,000 paths,
 combined by `firmfit.program_outcomes`; neither changes. The page shows the
 chance of reaching every phase's target (and within the best-day rule when the
@@ -130,13 +138,23 @@ with a fee, the expected cost per account (fee ÷ chance), the sizing table at
 with the trades, the same program at the lower end of the win rate's 95 %
 Wilson interval (`winrate.read`), linked to the win-rate calculator. Results
 are labelled DECLARED (computed from declared figures, never MEASURED: no file
-is seen) or NOT_MEASURED with the reason. The rules table shows each phase with
-its source link, its `as_of` date, the preset's notes and "Rigor is not
-affiliated with any firm". Each firm page has its own title and description, all
-of the firm's programs and four questions whose figures are filled from the
-presets (`challenge_calc.firm_faq`, also as `FAQPage` JSON-LD). Every page
-carries a `WebApplication` with price 0. Nothing is stored and nothing touches
-the database, the network or the disk; results are cached in memory per input
+is seen) or NOT_MEASURED with the reason; the lower bound itself is labelled
+too. A declared fee keeps its cents. The rules table shows each phase; under it
+one source line per page read, naming the programs it covers, with its `as_of`
+date, "Rigor is not affiliated with any firm", and the preset's notes under one
+heading per program, with any web address in a note as a short link. A program
+without a daily limit in its preset reads "not simulated (see the notes)", never
+"no daily limit": the firm's page may still have one that pauses the day. Each
+firm page has its own title and a description that says the tool is
+independent and not affiliated with the firm, all of the firm's programs and
+four questions whose figures are filled from the presets
+(`challenge_calc.firm_faq`: `{rules[key]}`, `{daily[key]}`, `{field[key.name]}`,
+`{horizon}`, with the date read in every answer that cites a rule; a test checks
+each figure against the preset's fields and notes), also as `FAQPage` JSON-LD.
+Every page carries a `WebApplication` with price 0 and Rigor as publisher. The
+figures are kept in no database or file and nothing touches the database, the
+network or the disk; since the form is GET, the server's access log may hold
+the address requested, and the page says so. Results are cached in memory per input
 and each address gets `REQUESTS_PER_HOUR` computations a sliding hour (past it,
 a 429 that keeps the form). Visits count in the in-memory funnel counter like
 the other tools; a shared link carries `ref=reto`. It is the third tool on the

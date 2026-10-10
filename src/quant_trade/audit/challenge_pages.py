@@ -7,9 +7,10 @@ from ``pages``; nothing here computes a probability of its own.
 
 from __future__ import annotations
 
+import re
 from collections.abc import Mapping, Sequence
 from typing import Any
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlsplit
 
 from quant_trade.audit import challenge_calc as calc
 from quant_trade.audit import firmfit, reading, winrate
@@ -51,9 +52,11 @@ def _percent(value: float, locale: str) -> str:
 
 
 def _phase_name(rules: ChallengeRules, locale: str) -> str:
-    phase = localize(rules.phase, locale)
+    """The numbered phase as "fase 2", never with the firm's English name for it."""
+    if not rules.phase[:1].isdigit():
+        return localize(rules.phase, locale)
     word = "phase" if locale == "en" else "fase"
-    return f"{word} {phase}" if rules.phase[:1].isdigit() else phase
+    return f"{word} {rules.phase.split(' (', 1)[0]}"
 
 
 def _program_name(key: str, locale: str) -> str:
@@ -68,6 +71,11 @@ def _option_label(key: str, locale: str) -> str:
 
 def _declared(text: str, locale: str) -> str:
     return f"<b>{_e(text)}</b> {_badge('DECLARED', locale)}"
+
+
+def _usd(amount: float, locale: str, *, cents: bool) -> str:
+    """Dollars as declared: with cents when the declared fee has them (29,99, not 30)."""
+    return f"USD {_num(amount, locale, 2 if cents else 0)}"
 
 
 def _missing(reason: str, locale: str) -> str:
@@ -163,12 +171,13 @@ def _result(value: calc.ChallengeInput, reading_: calc.ChallengeReading, locale:
     else:
         attempts = _missing(words["no_target"], locale)
     rows.append(("attempts", words["row_attempts"], attempts))
+    cents = value.fee is not None and not float(value.fee).is_integer()
     if value.fee is not None:
         rows.append(
-            ("fee", words["row_fee"], _declared(f"USD {_num(value.fee, locale, 0)}", locale))
+            ("fee", words["row_fee"], _declared(_usd(value.fee, locale, cents=cents), locale))
         )
     if reading_.cost is not None:
-        cost = _declared(f"USD {_num(reading_.cost, locale, 0)}", locale)
+        cost = _declared(_usd(reading_.cost, locale, cents=cents), locale)
     elif value.fee is None:
         cost = _missing(words["no_fee"], locale)
     else:
@@ -237,13 +246,20 @@ def _lower(value: calc.ChallengeInput, reading_: calc.ChallengeReading, locale: 
     low = reading_.interval[0]
     rate = _percent(value.win_rate, locale)
     lower_rate = _percent(low, locale)
-    text = words["lower_text"].format(n=_num(value.trades, locale, 0), rate=rate, low=lower_rate)
+    # The lower bound is a computed figure too: its first mention carries the label.
+    marker = "\ue000"
+    text = _e(words["lower_text"].format(n=_num(value.trades, locale, 0), rate=rate, low=marker))
+    labelled = f"<b>{_e(lower_rate)}</b> {_badge('DECLARED', locale)}"
+    text = text.replace(marker, labelled, 1).replace(marker, _e(lower_rate))
     link = (
         winrate.WINRATE_PATH[locale]
         + "?"
         + urlencode({"trades": str(value.trades), "win_rate": calc.share_values(value)["win_rate"]})
     )
-    body = f"<p data-challenge-lower>{_e(text)}</p>"
+    body = (
+        f"<p data-challenge-lower>{text}</p>"
+        f"<p class='help'>{_badge('DECLARED', locale)} {_e(words['lower_computed'])}.</p>"
+    )
     declared, lower = reading_.declared, reading_.lower
     if not declared.measured or not lower.measured:
         body += _identical(locale)
@@ -262,7 +278,8 @@ def _lower(value: calc.ChallengeInput, reading_: calc.ChallengeReading, locale: 
         body += (
             "<div class='tscroll'><table class='challenge-lower'><thead><tr>"
             f"<th scope='col'>{_e(words['win_rate'])}</th>"
-            f"<th scope='col'>{_e(rate)}</th><th scope='col'>{_e(lower_rate)}</th></tr></thead>"
+            f"<th scope='col'>{_e(rate)} {_badge('DECLARED', locale)}</th>"
+            f"<th scope='col'>{_e(lower_rate)} {_badge('DECLARED', locale)}</th></tr></thead>"
             f"<tbody>{rows}</tbody></table></div>"
         )
     return (
@@ -347,13 +364,49 @@ def _best_rule(rules: ChallengeRules, locale: str) -> str:
     return words[kind].format(value=calc._pct(rules.best_day_limit, locale))
 
 
+#: A web address inside a preset note: with its scheme, or a bare help-page path.
+_NOTE_URL = re.compile(r"https://[^\s()]+|\b[a-z0-9.-]+\.[a-z]{2,}/[^\s()]*")
+
+
+def _note_html(note: str, locale: str) -> str:
+    """A note, escaped, with each web address as a short link named by its host.
+
+    A raw address is long and cannot wrap: at 375 px it pushed the notes past
+    the screen's edge."""
+    words = calc.COPY[locale]
+    out, last = "", 0
+    for found in _NOTE_URL.finditer(note):
+        url = found.group(0).rstrip(".,;:")
+        href = url if url.startswith("https://") else "https://" + url
+        host = urlsplit(href).hostname or url
+        out += (
+            _e(note[last : found.start()])
+            + f"<a href='{_e(href)}' rel='noopener nofollow'>"
+            + _e(words["note_link"].format(host=host))
+            + "</a>"
+        )
+        last = found.start() + len(url)
+    return out + _e(note[last:])
+
+
+def _join(names: Sequence[str], locale: str) -> str:
+    """Names joined as "A, B y C" in the page's language."""
+    if len(names) < 2:
+        return "".join(names)
+    word = {"es": " y ", "en": " and ", "pt": " e "}[locale]
+    return ", ".join(names[:-1]) + word + names[-1]
+
+
 def _rules(programs: Sequence[str], locale: str, *, firm: str = "") -> str:
-    """The rules table of ``programs``, phase by phase, with sources, dates and notes."""
+    """The rules table of ``programs``, phase by phase, then each source and each
+    program's notes, every one named by the programs it is for."""
     words = calc.COPY[locale]
     rows = ""
-    sources: dict[str, tuple[str, str]] = {}
-    notes: list[str] = []
+    sources: dict[str, tuple[str, str, list[str]]] = {}
+    notes: dict[tuple[str, ...], list[str]] = {}
     for program in programs:
+        name = localize(PRESETS[program].program, locale)
+        own: list[str] = []
         for key in firmfit.program_keys(program):
             rules = PRESETS[key]
             label = _program_name(program, locale)
@@ -373,8 +426,11 @@ def _rules(programs: Sequence[str], locale: str, *, firm: str = "") -> str:
                 f"<td>{_e(_total_rule(rules, locale))}</td><td>{_e(days)}</td>"
                 f"<td>{_e(time)}</td><td>{_e(_best_rule(rules, locale))}</td></tr>"
             )
-            sources.setdefault(rules.source_url, (rules.firm, rules.as_of))
-            notes.extend(localize(note, locale) for note in rules.notes)
+            listed = sources.setdefault(rules.source_url, (rules.firm, rules.as_of, []))[2]
+            if name not in listed:
+                listed.append(name)
+            own.extend(localize(note, locale) for note in rules.notes)
+        notes.setdefault(tuple(dict.fromkeys(own)), []).append(name)
     head = "".join(
         f"<th scope='col'>{_e(words[name])}</th>"
         for name in (
@@ -389,24 +445,30 @@ def _rules(programs: Sequence[str], locale: str, *, firm: str = "") -> str:
     )
     lines = "".join(
         "<p class='help' data-challenge-source>"
-        + words["source"].format(
+        + _e(words["source"]).format(
+            programs=_e(_join(names, locale)),
             link=f"<a href='{_e(url)}' rel='noopener nofollow'>"
-            f"{_e(words['source_link'].format(firm=name))}</a>",
+            f"{_e(words['source_link'].format(firm=owner))}</a>",
             date=_e(as_of),
         )
         + "</p>"
-        for url, (name, as_of) in sources.items()
+        for url, (owner, as_of, names) in sources.items()
     )
-    unique = list(dict.fromkeys(notes))
-    title = words["notes_title"].format(
-        program=calc.FIRMS[firm] if firm else _program_name(programs[0], locale)
+    firm_name = calc.FIRMS[firm] if firm else PRESETS[programs[0]].firm
+    groups = "".join(
+        f"<h3>{_e(words['notes_title'].format(program=f'{firm_name} · {_join(names, locale)}'))}"
+        "</h3><ul class='checks nots challenge-notes' data-challenge-notes>"
+        + "".join(
+            f"<li>{icon('minus')}<span>{_note_html(note, locale)}</span></li>" for note in group
+        )
+        + "</ul>"
+        for group, names in notes.items()
+        if group
     )
-    listed = "".join(f"<li>{icon('minus')}<span>{_e(note)}</span></li>" for note in unique)
     return (
         f"<div class='tscroll'><table class='challenge-rules'><thead><tr>{head}</tr></thead>"
         f"<tbody>{rows}</tbody></table></div>{lines}"
-        f"<p class='flash' data-challenge-affiliation>{_e(words['not_affiliated'])}</p>"
-        f"<h3>{_e(title)}</h3><ul class='checks nots'>{listed}</ul>"
+        f"<p class='flash' data-challenge-affiliation>{_e(words['not_affiliated'])}</p>" + groups
     )
 
 

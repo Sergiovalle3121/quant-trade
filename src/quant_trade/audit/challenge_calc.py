@@ -19,9 +19,10 @@ a 60 % win rate may really be much less.
 
 from __future__ import annotations
 
+import inspect
 import math
 import re
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from functools import lru_cache
 from typing import Any
@@ -30,7 +31,7 @@ from urllib.parse import urlencode
 import numpy as np
 
 from quant_trade.audit import firmfit, winrate
-from quant_trade.audit.analytics import simulate_challenge
+from quant_trade.audit.analytics import _day_limit, simulate_challenge
 from quant_trade.audit.prop_presets import ACCOUNT_SIZES, PRESETS, ChallengeRules
 from quant_trade.audit.public_card import PublicClaim
 
@@ -54,7 +55,10 @@ UNITS = ("pct", "r")
 #: The funnel tag carried by a shared result (``funnel.REF_TAGS``).
 SHARE_REF = "reto"
 #: Synthetic days built from the declared figures; the simulator resamples them.
-SYNTHETIC_DAYS = 1000
+#: Their mix is fixed by the figures (``synthetic_daily_returns``); with this many,
+#: how the seed orders them moves a probability about as much as the paths' own
+#: sampling (about one point), where 1,000 days moved it by several.
+SYNTHETIC_DAYS = 10_000
 #: Paths per phase: ``firmfit.SAMPLES``, the firm table's own precision.
 SAMPLES = firmfit.SAMPLES
 #: One seed for the synthetic days and the resampling: the same link, the same figures.
@@ -128,6 +132,16 @@ def firm_programs(firm: str = "") -> tuple[str, ...]:
 def phase_count(key: str) -> int:
     """How many phases the program of ``key`` asks for (Bootcamp repeats one)."""
     return sum(firmfit.REPEATS.get(phase, 1) for phase in firmfit.program_keys(key))
+
+
+#: The longest a phase runs without a time limit: ``simulate_challenge``'s own
+#: ``max_days``, read from it so the page never states another horizon.
+SIMULATOR_MAX_DAYS: int = inspect.signature(simulate_challenge).parameters["max_days"].default
+
+
+def horizon(key: str) -> int:
+    """Business days the simulator walks a phase of ``key`` (``horizon_business_days``)."""
+    return _day_limit(PRESETS[key], SIMULATOR_MAX_DAYS)
 
 
 @dataclass(frozen=True)
@@ -216,8 +230,13 @@ def _count(raw: str) -> int:
 def _text(value: float) -> str:
     """A validated number as the shared link and the form write it back.
 
-    ``repr`` round-trips a float exactly, so the link parses to the same input."""
-    return str(int(value)) if float(value).is_integer() else repr(float(value))
+    The shortest digits that round-trip the float, never in exponent notation
+    (``repr`` writes ``5e-05``, which ``_number`` refuses), so the link and the
+    form parse back to the same input."""
+    number = float(value)
+    if number.is_integer():
+        return str(int(number))
+    return np.format_float_positional(number, unique=True, trim="-")
 
 
 @dataclass(frozen=True)
@@ -358,24 +377,56 @@ def share_url(locale: str, value: ChallengeInput, firm: str = "") -> str:
     return challenge_url(locale, firm) + "?" + urlencode({**share_values(value), "ref": SHARE_REF})
 
 
+#: The return given to a day whose trades net exactly zero (one win and one loss
+#: of the same size): the simulator counts a day as traded when its return is
+#: not zero, and a firm counts it because there were trades. It moves no
+#: balance, and it is the smallest normal float so the 0.5x size keeps it.
+TRADED_FLAT_DAY = float(np.finfo(float).tiny)
+
+
+def _binomial_cdf(trades: int, win_rate: float) -> np.ndarray:
+    """P(at most j winners among ``trades``), j = 0..trades."""
+    pmf = [
+        math.comb(trades, j) * win_rate**j * (1.0 - win_rate) ** (trades - j)
+        for j in range(trades + 1)
+    ]
+    return np.cumsum(pmf)
+
+
 def synthetic_daily_returns(win_rate: float, win: float, loss: float, per_day: float) -> np.ndarray:
     """``SYNTHETIC_DAYS`` days of trading from the declared figures, seed ``SEED``.
 
-    Each day has ``per_day`` trades (with a fraction, some days have one more
-    so the average is ``per_day``). Each trade wins ``win`` of the balance
-    with probability ``win_rate`` or loses ``loss``; a day's return is their
-    sum. One uniform draw per trade decides it, so a lower win rate turns some
-    of the same winning trades into losers and never the other way round."""
-    rng = np.random.default_rng(SEED)
+    The days hold exactly ``round(per_day × SYNTHETIC_DAYS)`` trades: with a
+    fraction, that many days have one trade more than the rest. Each trade
+    wins ``win`` of the balance with probability ``win_rate`` or loses
+    ``loss``, so the winners of a day with ``n`` trades follow a binomial.
+    Rather than drawing them, which left the seed's 1,000 days with more or
+    fewer winners than declared, each day takes a fixed quantile of that
+    binomial: the days of each size cover its quantiles evenly, so the mix of
+    days, the win rate and the mean return are the declared ones (the winners
+    are off by at most one trade per trade a day holds) and do not depend on
+    the seed, which only shuffles the days. A day's quantile does not depend on the win rate, so a
+    lower win rate turns some of the same winning trades into losers and never
+    the other way round. A day with trades that nets zero gets
+    ``TRADED_FLAT_DAY`` so the simulator counts it as a trading day."""
+    days = SYNTHETIC_DAYS
     whole = math.floor(per_day)
-    fraction = per_day - whole
-    counts = whole + (rng.random(SYNTHETIC_DAYS) < fraction).astype(np.int64)
-    slots = max(1, whole + (1 if fraction > 0 else 0))
-    draws = rng.random((SYNTHETIC_DAYS, slots))
-    traded = np.arange(slots)[None, :] < counts[:, None]
-    wins = ((draws < win_rate) & traded).sum(axis=1)
-    losses = counts - wins
-    return np.asarray(wins * win - losses * loss, dtype=float)
+    longer = min(days, round((per_day - whole) * days))
+    counts = np.full(days, whole, dtype=np.int64)
+    counts[:longer] += 1
+    wins = np.zeros(days, dtype=np.int64)
+    for trades in (whole, whole + 1):
+        group = np.flatnonzero(counts == trades)
+        if trades == 0 or not len(group):
+            continue
+        quantiles = (np.arange(len(group)) + 0.5) / len(group)
+        drawn = np.searchsorted(_binomial_cdf(trades, win_rate), quantiles, side="left")
+        wins[group] = np.minimum(drawn, trades)
+    order = np.random.default_rng(SEED).permutation(days)
+    counts, wins = counts[order], wins[order]
+    daily = np.asarray(wins * win - (counts - wins) * loss, dtype=float)
+    daily[(counts > 0) & (daily == 0.0)] = TRADED_FLAT_DAY
+    return daily
 
 
 @dataclass(frozen=True)
@@ -426,7 +477,11 @@ class ChallengeReading:
     cost: float | None
 
 
-@lru_cache(maxsize=256)
+#: Cached readings; each keeps its synthetic days (two arrays of ``SYNTHETIC_DAYS``).
+CACHE_SIZE = 64
+
+
+@lru_cache(maxsize=CACHE_SIZE)
 def compute(value: ChallengeInput) -> ChallengeReading:
     """The declared program, its sizes and its lower-bound twin. Pure and cached:
     the same input (the same link) gives the same figures."""
@@ -477,8 +532,8 @@ COPY: dict[str, dict[str, Any]] = {
         "title": "¿Con qué frecuencia alcanzarías el objetivo de un reto de prop firm?",
         "seo_title": "Calculadora de reto de prop firm: objetivo y límites",
         "summary": (
-            "Con tu % de aciertos y tu ganancia y pérdida medias: frecuencia de alcanzar el "
-            "objetivo de FTMO, FundedNext, The5ers o Topstep o de tocar sus límites. Gratis."
+            "Calculadora gratis e independiente, no afiliada a ninguna firma: frecuencia de "
+            "alcanzar el objetivo de FTMO, FundedNext, The5ers o Topstep o de tocar límites."
         ),
         "lead": (
             "Escribe tu % de aciertos, tu ganancia y tu pérdida medias y cuántas operaciones "
@@ -564,7 +619,8 @@ COPY: dict[str, dict[str, Any]] = {
         "days_unit": "{n} días",
         "attempts_unit": "{n} intentos",
         "computed": "Calculado a partir de lo declarado",
-        "no_daily": "esta regla no tiene límite diario",
+        "lower_computed": "calculado con tus operaciones y tu % de aciertos declarados (Wilson)",
+        "no_daily": "la calculadora no simula un límite diario en este programa (ver notas)",
         "no_target": "ninguna trayectoria alcanzó el objetivo",
         "no_fee": "escribe la cuota para calcularlo",
         "identical_days": (
@@ -627,7 +683,7 @@ COPY: dict[str, dict[str, Any]] = {
         "col_rule_best": "Mejor día",
         "daily_initial": "{value} del balance inicial",
         "daily_day": "{value} del balance al empezar el día",
-        "daily_none": "sin límite diario",
+        "daily_none": "no se simula (ver notas)",
         "total_static": "{value}, fija",
         "total_trailing": "{value}, sigue al mayor cierre diario",
         "total_lock": "{value}, sigue al mayor cierre diario hasta el balance inicial",
@@ -637,8 +693,9 @@ COPY: dict[str, dict[str, Any]] = {
         "best_target": "como mucho el {value} del objetivo",
         "best_positive": "como mucho el {value} de la ganancia de los días positivos",
         "account": "cuenta de USD {amount}",
-        "source": "Fuente: {link}, leída el {date}.",
+        "source": "Fuente de {programs}: {link}, leída el {date}.",
         "source_link": "página de {firm}",
+        "note_link": "página de {host}",
         "not_affiliated": (
             "Rigor no está afiliado a ninguna firma; las reglas cambian, comprueba la página de "
             "la firma."
@@ -647,19 +704,22 @@ COPY: dict[str, dict[str, Any]] = {
         "faq_title": "Preguntas frecuentes",
         "how_title": "Qué calcula y qué supone",
         "how": [
-            "Cada día sintético tiene tus operaciones por día; cada una gana tu ganancia media "
-            "con tu % de aciertos o pierde tu pérdida media. Con decimales, unos días tienen una "
-            "operación más que otros para que el promedio sea el tuyo.",
-            "El simulador del informe remuestrea esos días y revisa cada cierre diario: primero "
-            "el límite diario, después el total y al final el objetivo con los días mínimos.",
+            "Cada día sintético tiene tus operaciones por día; en conjunto, la parte de ellas que "
+            "gana tu ganancia media es tu % de aciertos y el resto pierde tu pérdida media. Con "
+            "decimales, unos días tienen una operación más que otros para que el promedio sea el "
+            "tuyo.",
+            "El simulador del informe remuestrea esos días y revisa cada cierre diario: primero el "
+            "límite diario, después el total y al final el objetivo con los días mínimos. Todo día "
+            "con operaciones cuenta como día de trading, aunque su resultado neto sea cero.",
             "Todas las ganancias y pérdidas tienen el tamaño medio: sin colas, deslizamiento, "
             "costos ni flotante dentro del día. Las pérdidas reales varían, así que con un "
             "historial real los límites suelen tocarse más a menudo.",
             "Las operaciones son independientes: sin rachas más largas que las del azar.",
             "Las reglas son las publicadas por cada firma en la fecha indicada; pueden haber "
             "cambiado.",
-            "No guardamos lo que escribes. Es un cálculo con cifras declaradas, no una "
-            "auditoría ni una previsión.",
+            "No guardamos tus cifras en ninguna base de datos ni archivo; como van en el enlace, "
+            "el registro de acceso del servidor puede contener la dirección pedida. Es un cálculo "
+            "con cifras declaradas, no una auditoría ni una previsión.",
         ],
         "cta_title": "Con tu historial real",
         "cta": (
@@ -680,8 +740,8 @@ COPY: dict[str, dict[str, Any]] = {
         "title": "How often would you reach a prop firm challenge target?",
         "seo_title": "Prop firm challenge calculator: target and limits",
         "summary": (
-            "From your win rate and average win and loss: how often you would reach the FTMO, "
-            "FundedNext, The5ers or Topstep target or hit a loss limit. Free."
+            "Free, independent calculator, not affiliated with any firm: how often you would reach "
+            "the FTMO, FundedNext, The5ers or Topstep target or hit a loss limit."
         ),
         "lead": (
             "Enter your win rate, your average win and loss and how many trades you take a "
@@ -759,7 +819,8 @@ COPY: dict[str, dict[str, Any]] = {
         "days_unit": "{n} days",
         "attempts_unit": "{n} attempts",
         "computed": "Computed from declared figures",
-        "no_daily": "these rules have no daily limit",
+        "lower_computed": "computed from your declared trades and win rate (Wilson)",
+        "no_daily": "the calculator simulates no daily limit in this program (see the notes)",
         "no_target": "no path reached the target",
         "no_fee": "enter the fee to compute it",
         "identical_days": (
@@ -821,7 +882,7 @@ COPY: dict[str, dict[str, Any]] = {
         "col_rule_best": "Best day",
         "daily_initial": "{value} of the initial balance",
         "daily_day": "{value} of the balance at the start of the day",
-        "daily_none": "no daily limit",
+        "daily_none": "not simulated (see the notes)",
         "total_static": "{value}, static",
         "total_trailing": "{value}, trailing the highest daily close",
         "total_lock": "{value}, trailing the highest daily close up to the initial balance",
@@ -831,8 +892,9 @@ COPY: dict[str, dict[str, Any]] = {
         "best_target": "at most {value} of the target",
         "best_positive": "at most {value} of the positive days' gain",
         "account": "USD {amount} account",
-        "source": "Source: {link}, read on {date}.",
+        "source": "Source for {programs}: {link}, read on {date}.",
         "source_link": "{firm} page",
+        "note_link": "{host} page",
         "not_affiliated": (
             "Rigor is not affiliated with any firm; rules change, so check the firm's own page."
         ),
@@ -840,18 +902,20 @@ COPY: dict[str, dict[str, Any]] = {
         "faq_title": "Frequently asked questions",
         "how_title": "What it computes and assumes",
         "how": [
-            "Each synthetic day has your trades per day; each trade wins your average win at "
-            "your win rate or loses your average loss. With decimals, some days have one more "
-            "trade than others so the average is yours.",
-            "The report's simulator resamples those days and checks every daily close: first "
-            "the daily limit, then the total one and last the target with the minimum days.",
+            "Each synthetic day has your trades per day; across them, the share that wins your "
+            "average win is your win rate and the rest lose your average loss. With decimals, some "
+            "days have one more trade than others so the average is yours.",
+            "The report's simulator resamples those days and checks every daily close: first the "
+            "daily limit, then the total one and last the target with the minimum days. Every day "
+            "with trades counts as a trading day, even when it nets zero.",
             "Every win and loss has the average size: no tails, slippage, costs or intraday "
-            "floating loss. Real losses vary, so with a real history the limits are usually "
-            "hit more often.",
+            "floating loss. Real losses vary, so with a real history the limits are usually hit "
+            "more often.",
             "Trades are independent: no streaks longer than chance.",
             "The rules are those each firm posted on the date shown; they may have changed.",
-            "We do not store what you type. It is a calculation with declared figures, not an "
-            "audit or a forecast.",
+            "We keep your figures in no database or file; since they travel in the link, the "
+            "server's access log may hold the address requested. It is a calculation with declared "
+            "figures, not an audit or a forecast.",
         ],
         "cta_title": "With your real history",
         "cta": (
@@ -872,8 +936,8 @@ COPY: dict[str, dict[str, Any]] = {
         "title": "Com que frequência você atingiria a meta de um desafio de prop firm?",
         "seo_title": "Calculadora de desafio de prop firm: meta e limites",
         "summary": (
-            "Com a sua taxa de acerto e seus ganhos e perdas médios: frequência de atingir a meta "
-            "da FTMO, FundedNext, The5ers ou Topstep ou de tocar os limites. Grátis."
+            "Calculadora grátis e independente, não afiliada a nenhuma empresa: frequência de "
+            "atingir a meta da FTMO, FundedNext, The5ers ou Topstep ou de tocar os limites."
         ),
         "lead": (
             "Digite a sua taxa de acerto, o seu ganho e a sua perda médios e quantas operações "
@@ -960,7 +1024,10 @@ COPY: dict[str, dict[str, Any]] = {
         "days_unit": "{n} dias",
         "attempts_unit": "{n} tentativas",
         "computed": "Calculado a partir do declarado",
-        "no_daily": "estas regras não têm limite diário",
+        "lower_computed": (
+            "calculado com as suas operações e a sua taxa de acerto declaradas (Wilson)"
+        ),
+        "no_daily": "a calculadora não simula um limite diário neste programa (veja as notas)",
         "no_target": "nenhuma trajetória atingiu a meta",
         "no_fee": "digite a taxa para calcular",
         "identical_days": (
@@ -1022,7 +1089,7 @@ COPY: dict[str, dict[str, Any]] = {
         "col_rule_best": "Melhor dia",
         "daily_initial": "{value} do saldo inicial",
         "daily_day": "{value} do saldo no início do dia",
-        "daily_none": "sem limite diário",
+        "daily_none": "não simulado (veja as notas)",
         "total_static": "{value}, fixa",
         "total_trailing": "{value}, acompanha o maior fechamento diário",
         "total_lock": "{value}, acompanha o maior fechamento diário até o saldo inicial",
@@ -1032,8 +1099,9 @@ COPY: dict[str, dict[str, Any]] = {
         "best_target": "no máximo {value} da meta",
         "best_positive": "no máximo {value} do ganho dos dias positivos",
         "account": "conta de USD {amount}",
-        "source": "Fonte: {link}, lida em {date}.",
+        "source": "Fonte de {programs}: {link}, lida em {date}.",
         "source_link": "página da {firm}",
+        "note_link": "página de {host}",
         "not_affiliated": (
             "O Rigor não é afiliado a nenhuma empresa; as regras mudam, confira a página da "
             "empresa."
@@ -1042,18 +1110,20 @@ COPY: dict[str, dict[str, Any]] = {
         "faq_title": "Perguntas frequentes",
         "how_title": "O que calcula e o que supõe",
         "how": [
-            "Cada dia sintético tem as suas operações por dia; cada uma ganha o seu ganho médio "
-            "com a sua taxa de acerto ou perde a sua perda média. Com decimais, alguns dias têm "
-            "uma operação a mais que outros para que a média seja a sua.",
+            "Cada dia sintético tem as suas operações por dia; no conjunto, a parte delas que "
+            "ganha o seu ganho médio é a sua taxa de acerto e o resto perde a sua perda média. Com "
+            "decimais, alguns dias têm uma operação a mais que outros para que a média seja a sua.",
             "O simulador do relatório reamostra esses dias e confere cada fechamento diário: "
-            "primeiro o limite diário, depois o total e por fim a meta com os dias mínimos.",
-            "Todos os ganhos e perdas têm o tamanho médio: sem caudas, slippage, custos nem "
-            "perda flutuante dentro do dia. As perdas reais variam, então com um histórico real "
-            "os limites costumam ser tocados com mais frequência.",
+            "primeiro o limite diário, depois o total e por fim a meta com os dias mínimos. Todo "
+            "dia com operações conta como dia de trading, mesmo que o resultado líquido seja zero.",
+            "Todos os ganhos e perdas têm o tamanho médio: sem caudas, slippage, custos nem perda "
+            "flutuante dentro do dia. As perdas reais variam, então com um histórico real os "
+            "limites costumam ser tocados com mais frequência.",
             "As operações são independentes: sem sequências mais longas que as do acaso.",
             "As regras são as publicadas por cada empresa na data indicada; podem ter mudado.",
-            "Não guardamos o que você digita. É um cálculo com números declarados, não uma "
-            "auditoria nem uma previsão.",
+            "Não guardamos os seus números em nenhum banco de dados nem arquivo; como vão no link, "
+            "o registro de acesso do servidor pode conter o endereço pedido. É um cálculo com "
+            "números declarados, não uma auditoria nem uma previsão.",
         ],
         "cta_title": "Com o seu histórico real",
         "cta": (
@@ -1081,8 +1151,8 @@ FIRM_COPY: dict[str, dict[str, dict[str, Any]]] = {
             "title": "Calculadora del reto FTMO",
             "seo_title": "Calculadora del reto FTMO: objetivo y límites",
             "summary": (
-                "Frecuencia de alcanzar el objetivo del FTMO Challenge 1-Step o 2-Step, o de "
-                "tocar sus límites, con tus cifras y las reglas publicadas con su fecha. Gratis."
+                "Calculadora gratis e independiente, no afiliada a FTMO: frecuencia de alcanzar el "
+                "objetivo del FTMO Challenge 1-Step o 2-Step o de tocar sus límites."
             ),
             "lead": (
                 "La calculadora de reto con las reglas publicadas de FTMO: escribe tu % de "
@@ -1096,15 +1166,17 @@ FIRM_COPY: dict[str, dict[str, dict[str, Any]]] = {
                 ),
                 (
                     "¿Qué cambia en el FTMO Challenge 1-Step?",
-                    "En el 1-Step: {rules[ftmo-1step]}. La calculadora deja que esa pérdida "
-                    "total siga al mayor cierre sin detenerse, que es lo más estricto, porque la "
-                    "página leída no dice si se detiene.",
+                    "Según la página de FTMO leída el {as_of}, en el 1-Step: {rules[ftmo-1step]}. "
+                    "La calculadora deja que esa pérdida total siga al mayor cierre sin detenerse, "
+                    "que es lo más estricto, porque la página leída no dice si se detiene.",
                 ),
                 (
                     "¿Cómo cuenta la calculadora la pérdida diaria de FTMO?",
-                    "La regla es un 5 % del balance inicial por debajo del balance registrado a "
-                    "las 00:00 CE(S)T. La calculadora la revisa en cada cierre diario: no ve el "
-                    "flotante dentro del día, así que frente a los límites es optimista.",
+                    "Según la página de FTMO leída el {as_of}: en el 2-Step, "
+                    "{daily[ftmo-2step-phase1]}, contada desde el balance registrado a las 00:00 "
+                    "CE(S)T; en el 1-Step, {daily[ftmo-1step]}. La calculadora la revisa en cada "
+                    "cierre diario: no ve el flotante dentro del día, así que frente a ese límite "
+                    "es optimista.",
                 ),
                 (
                     "¿La calculadora dice cuántos retos de FTMO comprar?",
@@ -1118,8 +1190,8 @@ FIRM_COPY: dict[str, dict[str, dict[str, Any]]] = {
             "title": "FTMO challenge calculator",
             "seo_title": "FTMO challenge calculator: target and limits",
             "summary": (
-                "How often you would reach the FTMO Challenge 1-Step or 2-Step target or hit a "
-                "limit, from your figures and the dated published rules. Free."
+                "Free, independent calculator, not affiliated with FTMO: how often you would reach "
+                "the FTMO Challenge 1-Step or 2-Step target or hit a limit."
             ),
             "lead": (
                 "The challenge calculator with FTMO's published rules: enter your win rate, "
@@ -1133,21 +1205,24 @@ FIRM_COPY: dict[str, dict[str, dict[str, Any]]] = {
                 ),
                 (
                     "What changes in the FTMO Challenge 1-Step?",
-                    "In the 1-Step: {rules[ftmo-1step]}. The calculator lets that total loss "
-                    "trail without stopping, the stricter reading, because the page read does "
-                    "not say whether it stops.",
+                    "According to the FTMO page read on {as_of}, in the 1-Step: "
+                    "{rules[ftmo-1step]}. The calculator lets that total loss trail without "
+                    "stopping, the stricter reading, because the page read does not say whether it "
+                    "stops.",
                 ),
                 (
                     "How does the calculator count FTMO's daily loss?",
-                    "The rule is 5 % of the initial balance below the balance recorded at 00:00 "
-                    "CE(S)T. The calculator checks it at every daily close: it does not see the "
-                    "intraday floating loss, so it is optimistic against the limits.",
+                    "According to the FTMO page read on {as_of}: in the 2-Step, "
+                    "{daily[ftmo-2step-phase1]}, counted from the balance recorded at 00:00 "
+                    "CE(S)T; in the 1-Step, {daily[ftmo-1step]}. The calculator checks it at every "
+                    "daily close: it does not see the intraday floating loss, so it is optimistic "
+                    "against that limit.",
                 ),
                 (
                     "Does the calculator say how many FTMO challenges to buy?",
                     "No. It divides the fee you declare by the chance of reaching the target in "
-                    "every phase: an average of independent attempts with declared figures, not "
-                    "a budget or a recommendation to buy.",
+                    "every phase: an average of independent attempts with declared figures, not a "
+                    "budget or a recommendation to buy.",
                 ),
             ),
         },
@@ -1155,8 +1230,8 @@ FIRM_COPY: dict[str, dict[str, dict[str, Any]]] = {
             "title": "Calculadora do desafio FTMO",
             "seo_title": "Calculadora do desafio FTMO: meta e limites",
             "summary": (
-                "Frequência de atingir a meta do FTMO Challenge 1-Step ou 2-Step, ou de tocar "
-                "os limites, com os seus números e as regras publicadas com data. Grátis."
+                "Calculadora grátis e independente, não afiliada à FTMO: frequência de atingir a "
+                "meta do FTMO Challenge 1-Step ou 2-Step ou de tocar os limites."
             ),
             "lead": (
                 "A calculadora de desafio com as regras publicadas da FTMO: digite a sua taxa "
@@ -1170,21 +1245,23 @@ FIRM_COPY: dict[str, dict[str, dict[str, Any]]] = {
                 ),
                 (
                     "O que muda no FTMO Challenge 1-Step?",
-                    "No 1-Step: {rules[ftmo-1step]}. A calculadora deixa essa perda total "
-                    "acompanhar o maior fechamento sem parar, a leitura mais estrita, porque a "
-                    "página lida não diz se ela para.",
+                    "Segundo a página da FTMO lida em {as_of}, no 1-Step: {rules[ftmo-1step]}. A "
+                    "calculadora deixa essa perda total acompanhar o maior fechamento sem parar, a "
+                    "leitura mais estrita, porque a página lida não diz se ela para.",
                 ),
                 (
                     "Como a calculadora conta a perda diária da FTMO?",
-                    "A regra é 5 % do saldo inicial abaixo do saldo registrado às 00:00 CE(S)T. "
-                    "A calculadora a confere em cada fechamento diário: não vê a perda "
-                    "flutuante dentro do dia, então é otimista diante dos limites.",
+                    "Segundo a página da FTMO lida em {as_of}: no 2-Step, "
+                    "{daily[ftmo-2step-phase1]}, contada a partir do saldo registrado às 00:00 "
+                    "CE(S)T; no 1-Step, {daily[ftmo-1step]}. A calculadora a confere em cada "
+                    "fechamento diário: não vê a perda flutuante dentro do dia, então é otimista "
+                    "diante desse limite.",
                 ),
                 (
                     "A calculadora diz quantos desafios da FTMO comprar?",
-                    "Não. Ela divide a taxa que você declara pela probabilidade de atingir a "
-                    "meta em todas as fases: é uma média de tentativas independentes com "
-                    "números declarados, não um orçamento nem uma recomendação de compra.",
+                    "Não. Ela divide a taxa que você declara pela probabilidade de atingir a meta "
+                    "em todas as fases: é uma média de tentativas independentes com números "
+                    "declarados, não um orçamento nem uma recomendação de compra.",
                 ),
             ),
         },
@@ -1194,8 +1271,8 @@ FIRM_COPY: dict[str, dict[str, dict[str, Any]]] = {
             "title": "Calculadora del reto FundedNext Stellar",
             "seo_title": "Calculadora del reto FundedNext Stellar",
             "summary": (
-                "Frecuencia de alcanzar el objetivo de FundedNext Stellar 2-Step, 1-Step o Lite, "
-                "o de tocar sus límites, con tus cifras y las reglas publicadas. Gratis."
+                "Calculadora gratis e independiente, no afiliada a FundedNext: frecuencia de "
+                "alcanzar el objetivo de Stellar 2-Step, 1-Step o Lite o de tocar sus límites."
             ),
             "lead": (
                 "La calculadora de reto con las reglas publicadas de FundedNext: escribe tu % "
@@ -1210,21 +1287,26 @@ FIRM_COPY: dict[str, dict[str, dict[str, Any]]] = {
                 ),
                 (
                     "¿En qué se diferencian Stellar 1-Step y Stellar Lite?",
-                    "Stellar 1-Step: {rules[fundednext-stellar-1step]}. Stellar Lite: "
+                    "Según la página de FundedNext leída el {as_of}, Stellar 1-Step: "
+                    "{rules[fundednext-stellar-1step]}. Stellar Lite: "
                     "{rules[fundednext-stellar-lite-phase1]}.",
                 ),
                 (
                     "¿Cómo cuenta la calculadora la pérdida diaria de FundedNext?",
-                    "La regla es un porcentaje del balance inicial por debajo del balance al "
-                    "empezar el día, reiniciado a las 0:00 hora del servidor, y cuenta pérdidas "
-                    "abiertas, swap y comisión. La calculadora revisa cierres diarios sin costos "
-                    "ni flotante, así que frente a ese límite es optimista.",
+                    "Según la página de FundedNext leída el {as_of}, la regla es un porcentaje del "
+                    "balance inicial ({field[fundednext-stellar-2step-phase1.max_daily_loss]} en "
+                    "Stellar 2-Step, {field[fundednext-stellar-1step.max_daily_loss]} en Stellar "
+                    "1-Step y {field[fundednext-stellar-lite-phase1.max_daily_loss]} en Stellar "
+                    "Lite) por debajo del balance al empezar el día, reiniciado a las 0:00 hora "
+                    "del servidor, y cuenta pérdidas abiertas, swap y comisión. La calculadora "
+                    "revisa cierres diarios sin costos ni flotante, así que frente a ese límite es "
+                    "optimista.",
                 ),
                 (
                     "¿Hay plazo para terminar el reto de FundedNext?",
-                    "La página leída no fija plazo, pero desactiva las cuentas sin operaciones "
-                    "durante 60 días. La calculadora simula hasta 250 días hábiles y cuenta lo "
-                    "que queda abierto como sin terminar.",
+                    "Según la página de FundedNext leída el {as_of}, no hay plazo, pero las "
+                    "cuentas sin operaciones durante 60 días se desactivan. La calculadora simula "
+                    "hasta {horizon} días hábiles y cuenta lo que queda abierto como sin terminar.",
                 ),
             ),
         },
@@ -1232,8 +1314,8 @@ FIRM_COPY: dict[str, dict[str, dict[str, Any]]] = {
             "title": "FundedNext Stellar challenge calculator",
             "seo_title": "FundedNext Stellar challenge calculator",
             "summary": (
-                "How often you would reach the FundedNext Stellar 2-Step, 1-Step or Lite target "
-                "or hit a limit, from your figures and the published rules. Free."
+                "Free, independent calculator, not affiliated with FundedNext: how often you would "
+                "reach the Stellar 2-Step, 1-Step or Lite target or hit a limit."
             ),
             "lead": (
                 "The challenge calculator with FundedNext's published rules: enter your win "
@@ -1248,21 +1330,25 @@ FIRM_COPY: dict[str, dict[str, dict[str, Any]]] = {
                 ),
                 (
                     "How do Stellar 1-Step and Stellar Lite differ?",
-                    "Stellar 1-Step: {rules[fundednext-stellar-1step]}. Stellar Lite: "
+                    "According to the FundedNext page read on {as_of}, Stellar 1-Step: "
+                    "{rules[fundednext-stellar-1step]}. Stellar Lite: "
                     "{rules[fundednext-stellar-lite-phase1]}.",
                 ),
                 (
                     "How does the calculator count FundedNext's daily loss?",
-                    "The rule is a share of the initial balance below the start-of-day balance, "
-                    "reset at 0:00 server time, and it counts open losses, swap and commission. "
-                    "The calculator checks daily closes with no costs or floating loss, so it is "
-                    "optimistic against that limit.",
+                    "According to the FundedNext page read on {as_of}, the rule is a share of the "
+                    "initial balance ({field[fundednext-stellar-2step-phase1.max_daily_loss]} on "
+                    "Stellar 2-Step, {field[fundednext-stellar-1step.max_daily_loss]} on Stellar "
+                    "1-Step and {field[fundednext-stellar-lite-phase1.max_daily_loss]} on Stellar "
+                    "Lite) below the start-of-day balance, reset at 0:00 server time, and it "
+                    "counts open losses, swap and commission. The calculator checks daily closes "
+                    "with no costs or floating loss, so it is optimistic against that limit.",
                 ),
                 (
                     "Is there a deadline to finish a FundedNext challenge?",
-                    "The page read sets none, but accounts with no trade for 60 days are "
-                    "deactivated. The calculator simulates up to 250 business days and counts "
-                    "whatever is still open as unfinished.",
+                    "According to the FundedNext page read on {as_of}, there is none, but accounts "
+                    "with no trade for 60 days are deactivated. The calculator simulates up to "
+                    "{horizon} business days and counts whatever is still open as unfinished.",
                 ),
             ),
         },
@@ -1270,8 +1356,8 @@ FIRM_COPY: dict[str, dict[str, dict[str, Any]]] = {
             "title": "Calculadora do desafio FundedNext Stellar",
             "seo_title": "Calculadora do desafio FundedNext Stellar",
             "summary": (
-                "Frequência de atingir a meta do FundedNext Stellar 2-Step, 1-Step ou Lite, ou de "
-                "tocar os limites, com os seus números e as regras publicadas. Grátis."
+                "Calculadora grátis e independente, não afiliada à FundedNext: frequência de "
+                "atingir a meta do Stellar 2-Step, 1-Step ou Lite ou de tocar os limites."
             ),
             "lead": (
                 "A calculadora de desafio com as regras publicadas da FundedNext: digite a sua "
@@ -1286,21 +1372,26 @@ FIRM_COPY: dict[str, dict[str, dict[str, Any]]] = {
                 ),
                 (
                     "Em que o Stellar 1-Step e o Stellar Lite diferem?",
-                    "Stellar 1-Step: {rules[fundednext-stellar-1step]}. Stellar Lite: "
+                    "Segundo a página da FundedNext lida em {as_of}, Stellar 1-Step: "
+                    "{rules[fundednext-stellar-1step]}. Stellar Lite: "
                     "{rules[fundednext-stellar-lite-phase1]}.",
                 ),
                 (
                     "Como a calculadora conta a perda diária da FundedNext?",
-                    "A regra é uma porcentagem do saldo inicial abaixo do saldo no início do "
-                    "dia, reiniciada às 0:00 do horário do servidor, e conta perdas abertas, "
-                    "swap e comissão. A calculadora confere fechamentos diários sem custos nem "
-                    "perda flutuante, então é otimista diante desse limite.",
+                    "Segundo a página da FundedNext lida em {as_of}, a regra é uma porcentagem do "
+                    "saldo inicial ({field[fundednext-stellar-2step-phase1.max_daily_loss]} no "
+                    "Stellar 2-Step, {field[fundednext-stellar-1step.max_daily_loss]} no Stellar "
+                    "1-Step e {field[fundednext-stellar-lite-phase1.max_daily_loss]} no Stellar "
+                    "Lite) abaixo do saldo no início do dia, reiniciada às 0:00 do horário do "
+                    "servidor, e conta perdas abertas, swap e comissão. A calculadora confere "
+                    "fechamentos diários sem custos nem perda flutuante, então é otimista diante "
+                    "desse limite.",
                 ),
                 (
                     "Há prazo para terminar o desafio da FundedNext?",
-                    "A página lida não fixa prazo, mas desativa contas sem operações por 60 "
-                    "dias. A calculadora simula até 250 dias úteis e conta o que fica aberto "
-                    "como sem terminar.",
+                    "Segundo a página da FundedNext lida em {as_of}, não há prazo, mas as contas "
+                    "sem operações por 60 dias são desativadas. A calculadora simula até {horizon} "
+                    "dias úteis e conta o que fica aberto como sem terminar.",
                 ),
             ),
         },
@@ -1310,8 +1401,8 @@ FIRM_COPY: dict[str, dict[str, dict[str, Any]]] = {
             "title": "Calculadora del reto The5ers",
             "seo_title": "Calculadora del reto The5ers: High Stakes y más",
             "summary": (
-                "Frecuencia de alcanzar el objetivo de The5ers High Stakes, Hyper Growth o "
-                "Bootcamp, o de tocar sus límites, con tus cifras y las reglas publicadas."
+                "Calculadora gratis e independiente, no afiliada a The5ers: frecuencia de alcanzar "
+                "el objetivo de High Stakes, Hyper Growth o Bootcamp o de tocar sus límites."
             ),
             "lead": (
                 "La calculadora de reto con las reglas publicadas de The5ers: escribe tu % de "
@@ -1326,20 +1417,25 @@ FIRM_COPY: dict[str, dict[str, dict[str, Any]]] = {
                 ),
                 (
                     "¿Y Hyper Growth y Bootcamp?",
-                    "Hyper Growth: {rules[the5ers-hyper-growth]}. Bootcamp: "
-                    "{rules[the5ers-bootcamp-step]}; la calculadora encadena las tres fases.",
+                    "Según la página de The5ers leída el {as_of}, Hyper Growth: "
+                    "{rules[the5ers-hyper-growth]}; la página indica además un límite diario del 3 "
+                    "% que suspende la operativa del día en lugar de cerrar la cuenta, y la "
+                    "calculadora no lo simula. Bootcamp: {rules[the5ers-bootcamp-step]}; la "
+                    "calculadora encadena las tres fases. La pérdida total de los dos la indica el "
+                    "blog de The5ers.",
                 ),
                 (
                     "¿Cuenta la calculadora los días mínimos como The5ers?",
-                    "No del todo. High Stakes pide 3 días que cierren con al menos un 0,5 % del "
-                    "balance inicial de ganancia; la calculadora cuenta cualquier día con "
-                    "resultado distinto de cero, así que ahí es optimista.",
+                    "No del todo. Según la página de The5ers leída el {as_of}, High Stakes pide "
+                    "{field[the5ers-high-stakes-step1.min_trading_days]} días que cierren con al "
+                    "menos un 0,5 % del balance inicial de ganancia; la calculadora cuenta como "
+                    "día de trading cualquier día con operaciones, así que ahí es optimista.",
                 ),
                 (
                     "¿Aplica la regla de noticias de The5ers?",
-                    "No. High Stakes no permite operar desde 2 minutos antes hasta 2 minutos "
-                    "después de noticias de alto impacto; con cifras diarias declaradas eso no "
-                    "se puede simular.",
+                    "No. Según la página de The5ers leída el {as_of}, High Stakes no permite "
+                    "operar desde 2 minutos antes hasta 2 minutos después de noticias de alto "
+                    "impacto; con cifras diarias declaradas eso no se puede simular.",
                 ),
             ),
         },
@@ -1347,8 +1443,8 @@ FIRM_COPY: dict[str, dict[str, dict[str, Any]]] = {
             "title": "The5ers challenge calculator",
             "seo_title": "The5ers challenge calculator: High Stakes and more",
             "summary": (
-                "How often you would reach The5ers High Stakes, Hyper Growth or Bootcamp target "
-                "or hit a limit, from your figures and the published rules. Free."
+                "Free, independent calculator, not affiliated with The5ers: how often you would "
+                "reach the High Stakes, Hyper Growth or Bootcamp target or hit a limit."
             ),
             "lead": (
                 "The challenge calculator with The5ers' published rules: enter your win rate, "
@@ -1363,19 +1459,25 @@ FIRM_COPY: dict[str, dict[str, dict[str, Any]]] = {
                 ),
                 (
                     "What about Hyper Growth and Bootcamp?",
-                    "Hyper Growth: {rules[the5ers-hyper-growth]}. Bootcamp: "
-                    "{rules[the5ers-bootcamp-step]}; the calculator chains the three steps.",
+                    "According to The5ers' page read on {as_of}, Hyper Growth: "
+                    "{rules[the5ers-hyper-growth]}; the page also states a 3 % daily limit that "
+                    "suspends trading for the day instead of ending the account, and the "
+                    "calculator does not simulate it. Bootcamp: {rules[the5ers-bootcamp-step]}; "
+                    "the calculator chains the three steps. The5ers' blog states the total loss of "
+                    "both.",
                 ),
                 (
                     "Does the calculator count minimum days the way The5ers does?",
-                    "Not quite. High Stakes asks for 3 days that each close at least 0.5 % of "
-                    "the initial balance in gain; the calculator counts any day with a non-zero "
-                    "result, so it is optimistic there.",
+                    "Not quite. According to The5ers' page read on {as_of}, High Stakes asks for "
+                    "{field[the5ers-high-stakes-step1.min_trading_days]} days that each close at "
+                    "least 0.5 % of the initial balance in gain; the calculator counts any day "
+                    "with trades as a trading day, so it is optimistic there.",
                 ),
                 (
                     "Does it apply The5ers' news rule?",
-                    "No. High Stakes allows no trading from 2 minutes before to 2 minutes after "
-                    "high-impact news; declared daily figures cannot simulate that.",
+                    "No. According to The5ers' page read on {as_of}, High Stakes allows no trading "
+                    "from 2 minutes before to 2 minutes after high-impact news; declared daily "
+                    "figures cannot simulate that.",
                 ),
             ),
         },
@@ -1383,8 +1485,8 @@ FIRM_COPY: dict[str, dict[str, dict[str, Any]]] = {
             "title": "Calculadora do desafio The5ers",
             "seo_title": "Calculadora do desafio The5ers: High Stakes e mais",
             "summary": (
-                "Frequência de atingir a meta do The5ers High Stakes, Hyper Growth ou Bootcamp, "
-                "ou de tocar os limites, com os seus números e as regras publicadas."
+                "Calculadora grátis e independente, não afiliada à The5ers: frequência de atingir "
+                "a meta do High Stakes, Hyper Growth ou Bootcamp ou de tocar os limites."
             ),
             "lead": (
                 "A calculadora de desafio com as regras publicadas da The5ers: digite a sua "
@@ -1399,20 +1501,24 @@ FIRM_COPY: dict[str, dict[str, dict[str, Any]]] = {
                 ),
                 (
                     "E o Hyper Growth e o Bootcamp?",
-                    "Hyper Growth: {rules[the5ers-hyper-growth]}. Bootcamp: "
-                    "{rules[the5ers-bootcamp-step]}; a calculadora encadeia as três fases.",
+                    "Segundo a página da The5ers lida em {as_of}, Hyper Growth: "
+                    "{rules[the5ers-hyper-growth]}; a página indica ainda um limite diário de 3 % "
+                    "que suspende as operações do dia em vez de encerrar a conta, e a calculadora "
+                    "não o simula. Bootcamp: {rules[the5ers-bootcamp-step]}; a calculadora "
+                    "encadeia as três fases. A perda total dos dois é indicada no blog da The5ers.",
                 ),
                 (
                     "A calculadora conta os dias mínimos como a The5ers?",
-                    "Não exatamente. O High Stakes pede 3 dias que fechem com pelo menos 0,5 % "
-                    "do saldo inicial de ganho; a calculadora conta qualquer dia com resultado "
-                    "diferente de zero, então ali é otimista.",
+                    "Não exatamente. Segundo a página da The5ers lida em {as_of}, o High Stakes "
+                    "pede {field[the5ers-high-stakes-step1.min_trading_days]} dias que fechem com "
+                    "pelo menos 0,5 % do saldo inicial de ganho; a calculadora conta como dia de "
+                    "trading qualquer dia com operações, então ali é otimista.",
                 ),
                 (
                     "Ela aplica a regra de notícias da The5ers?",
-                    "Não. O High Stakes não permite operar de 2 minutos antes a 2 minutos depois "
-                    "de notícias de alto impacto; com números diários declarados isso não pode "
-                    "ser simulado.",
+                    "Não. Segundo a página da The5ers lida em {as_of}, o High Stakes não permite "
+                    "operar de 2 minutos antes a 2 minutos depois de notícias de alto impacto; com "
+                    "números diários declarados isso não pode ser simulado.",
                 ),
             ),
         },
@@ -1422,8 +1528,8 @@ FIRM_COPY: dict[str, dict[str, dict[str, Any]]] = {
             "title": "Calculadora del Trading Combine de Topstep",
             "seo_title": "Calculadora del Trading Combine de Topstep",
             "summary": (
-                "Frecuencia de alcanzar el objetivo del Trading Combine de Topstep o de tocar su "
-                "pérdida máxima trailing, con tus cifras y las reglas publicadas. Gratis."
+                "Calculadora gratis e independiente, no afiliada a Topstep: frecuencia de alcanzar "
+                "el objetivo del Trading Combine o de tocar su pérdida máxima trailing."
             ),
             "lead": (
                 "La calculadora de reto con las reglas publicadas de Topstep: escribe tu % de "
@@ -1438,20 +1544,23 @@ FIRM_COPY: dict[str, dict[str, dict[str, Any]]] = {
                 ),
                 (
                     "¿Qué es el objetivo de consistencia de Topstep?",
-                    "El mejor día debe quedar en el 55 % del objetivo de ganancia o menos; si no, "
-                    "el objetivo sube. La calculadora lo revisa en cierres diarios cuando una "
-                    "trayectoria alcanza el objetivo y lo muestra como «dentro de la regla del "
-                    "mejor día».",
+                    "Según la página de ayuda de Topstep leída el {as_of}, el mejor día debe "
+                    "quedar en el {field[topstep-50k-combine.best_day_limit]} del objetivo de "
+                    "ganancia o menos; si no, el objetivo sube. La calculadora lo revisa en "
+                    "cierres diarios cuando una trayectoria alcanza el objetivo y lo muestra como "
+                    "«dentro de la regla del mejor día».",
                 ),
                 (
                     "¿Simula la calculadora el límite de pérdida diaria de Topstep?",
-                    "No: en el Trading Combine es opcional y la calculadora no lo simula.",
+                    "No. Según la página de Topstep leída el {as_of}, en el Trading Combine ese "
+                    "límite es opcional, y la calculadora no lo simula.",
                 ),
                 (
                     "¿Por qué la calculadora es optimista con Topstep?",
-                    "Topstep vigila la pérdida máxima en tiempo real, y una cifra por cierre "
-                    "diario no ve lo que ocurre dentro del día. Además, la calculadora usa la "
-                    "pérdida media de tus operaciones, sin colas ni costos.",
+                    "Según la página de Topstep leída el {as_of}, la pérdida máxima se vigila en "
+                    "tiempo real, y una cifra por cierre diario no ve lo que ocurre dentro del "
+                    "día. Además, la calculadora usa la pérdida media de tus operaciones, sin "
+                    "colas ni costos.",
                 ),
             ),
         },
@@ -1459,8 +1568,8 @@ FIRM_COPY: dict[str, dict[str, dict[str, Any]]] = {
             "title": "Topstep Trading Combine calculator",
             "seo_title": "Topstep Trading Combine calculator",
             "summary": (
-                "How often you would reach the Topstep Trading Combine target or hit its "
-                "trailing maximum loss, from your figures and the published rules. Free."
+                "Free, independent calculator, not affiliated with Topstep: how often you would "
+                "reach the Trading Combine target or hit its trailing maximum loss."
             ),
             "lead": (
                 "The challenge calculator with Topstep's published rules: enter your win rate, "
@@ -1475,20 +1584,22 @@ FIRM_COPY: dict[str, dict[str, dict[str, Any]]] = {
                 ),
                 (
                     "What is Topstep's consistency target?",
-                    "The best day must stay at or below 55 % of the profit target; otherwise "
-                    "the target rises. The calculator checks it on daily closes when a path "
-                    "reaches the target and shows it as within the best-day rule.",
+                    "According to Topstep's help page read on {as_of}, the best day must stay at "
+                    "or below {field[topstep-50k-combine.best_day_limit]} of the profit target; "
+                    "otherwise the target rises. The calculator checks it on daily closes when a "
+                    "path reaches the target and shows it as within the best-day rule.",
                 ),
                 (
                     "Does the calculator simulate Topstep's daily loss limit?",
-                    "No: in the Trading Combine it is optional and the calculator does not "
-                    "simulate it.",
+                    "No. According to the Topstep page read on {as_of}, that limit is optional in "
+                    "the Trading Combine, and the calculator does not simulate it.",
                 ),
                 (
                     "Why is the calculator optimistic with Topstep?",
-                    "Topstep monitors the maximum loss in real time, and one figure per daily "
-                    "close cannot see what happens within the day. The calculator also uses "
-                    "your trades' average loss, with no tails or costs.",
+                    "According to the Topstep page read on {as_of}, the maximum loss is monitored "
+                    "in real time, and one figure per daily close cannot see what happens within "
+                    "the day. The calculator also uses your trades' average loss, with no tails or "
+                    "costs.",
                 ),
             ),
         },
@@ -1496,8 +1607,8 @@ FIRM_COPY: dict[str, dict[str, dict[str, Any]]] = {
             "title": "Calculadora do Trading Combine da Topstep",
             "seo_title": "Calculadora do Trading Combine da Topstep",
             "summary": (
-                "Frequência de atingir a meta do Trading Combine da Topstep ou de tocar a perda "
-                "máxima trailing, com os seus números e as regras publicadas. Grátis."
+                "Calculadora grátis e independente, não afiliada à Topstep: frequência de atingir "
+                "a meta do Trading Combine ou de tocar a perda máxima trailing."
             ),
             "lead": (
                 "A calculadora de desafio com as regras publicadas da Topstep: digite a sua "
@@ -1512,19 +1623,22 @@ FIRM_COPY: dict[str, dict[str, dict[str, Any]]] = {
                 ),
                 (
                     "O que é a meta de consistência da Topstep?",
-                    "O melhor dia deve ficar em até 55 % da meta de lucro; senão, a meta sobe. "
-                    "A calculadora confere isso em fechamentos diários quando uma trajetória "
-                    "atinge a meta e mostra como «dentro da regra do melhor dia».",
+                    "Segundo a página de ajuda da Topstep lida em {as_of}, o melhor dia deve ficar "
+                    "em até {field[topstep-50k-combine.best_day_limit]} da meta de lucro; senão, a "
+                    "meta sobe. A calculadora confere isso em fechamentos diários quando uma "
+                    "trajetória atinge a meta e mostra como «dentro da regra do melhor dia».",
                 ),
                 (
                     "A calculadora simula o limite de perda diária da Topstep?",
-                    "Não: no Trading Combine ele é opcional e a calculadora não o simula.",
+                    "Não. Segundo a página da Topstep lida em {as_of}, no Trading Combine esse "
+                    "limite é opcional, e a calculadora não o simula.",
                 ),
                 (
                     "Por que a calculadora é otimista com a Topstep?",
-                    "A Topstep monitora a perda máxima em tempo real, e um número por "
-                    "fechamento diário não vê o que acontece dentro do dia. Além disso, a "
-                    "calculadora usa a perda média das suas operações, sem caudas nem custos.",
+                    "Segundo a página da Topstep lida em {as_of}, a perda máxima é monitorada em "
+                    "tempo real, e um número por fechamento diário não vê o que acontece dentro do "
+                    "dia. Além disso, a calculadora usa a perda média das suas operações, sem "
+                    "caudas nem custos.",
                 ),
             ),
         },
@@ -1553,7 +1667,7 @@ _RULE_WORDS: dict[str, dict[str, str]] = {
         "each": "{value} en cada una de las {n} fases",
         "daily_initial": "pérdida diaria máxima de {value} del balance inicial",
         "daily_day": "pérdida diaria máxima de {value} del balance al empezar el día",
-        "daily_none": "sin límite de pérdida diaria",
+        "daily_none": "límite de pérdida diaria no simulado",
         "total_static": "pérdida total máxima de {value}, fija",
         "total_trailing": "pérdida total máxima de {value}, que sigue al mayor cierre diario",
         "total_lock": (
@@ -1575,7 +1689,7 @@ _RULE_WORDS: dict[str, dict[str, str]] = {
         "each": "{value} in each of the {n} phases",
         "daily_initial": "a maximum daily loss of {value} of the initial balance",
         "daily_day": "a maximum daily loss of {value} of the start-of-day balance",
-        "daily_none": "no daily loss limit",
+        "daily_none": "daily loss limit not simulated",
         "total_static": "a maximum total loss of {value}, static",
         "total_trailing": "a maximum total loss of {value} trailing the highest daily close",
         "total_lock": (
@@ -1597,7 +1711,7 @@ _RULE_WORDS: dict[str, dict[str, str]] = {
         "each": "{value} em cada uma das {n} fases",
         "daily_initial": "perda diária máxima de {value} do saldo inicial",
         "daily_day": "perda diária máxima de {value} do saldo no início do dia",
-        "daily_none": "sem limite de perda diária",
+        "daily_none": "limite de perda diária não simulado",
         "total_static": "perda total máxima de {value}, fixa",
         "total_trailing": "perda total máxima de {value}, que acompanha o maior fechamento diário",
         "total_lock": (
@@ -1613,6 +1727,20 @@ _RULE_WORDS: dict[str, dict[str, str]] = {
         "and": " e ",
     },
 }
+
+
+def daily_clause(key: str, locale: str) -> str:
+    """The daily loss rule of ``key`` as the simulator applies it, from its preset.
+
+    A preset without one says it is not simulated, which is all the calculator
+    knows: the firm's page may still have a limit that pauses the day (its notes)."""
+    locale = _locale(locale)
+    words = _RULE_WORDS[locale]
+    rules = PRESETS[key]
+    if rules.max_daily_loss is None:
+        return words["daily_none"]
+    basis = "daily_day" if rules.daily_loss_basis == "start_of_day" else "daily_initial"
+    return words[basis].format(value=_pct(rules.max_daily_loss, locale))
 
 
 def rules_sentence(key: str, locale: str) -> str:
@@ -1635,12 +1763,7 @@ def rules_sentence(key: str, locale: str) -> str:
         target = words["target_phases"].format(
             values=", ".join(values[:-1]) + words["and"] + values[-1]
         )
-    parts = [target]
-    if first.max_daily_loss is None:
-        parts.append(words["daily_none"])
-    else:
-        basis = "daily_day" if first.daily_loss_basis == "start_of_day" else "daily_initial"
-        parts.append(words[basis].format(value=_pct(first.max_daily_loss, locale)))
+    parts = [target, daily_clause(key, locale)]
     total = {"trailing_eod": "total_trailing", "trailing_eod_lock": "total_lock"}.get(
         first.total_loss_type, "total_static"
     )
@@ -1676,26 +1799,44 @@ def _accounts_sentence(locale: str) -> str:
     return "; ".join(pieces)
 
 
-class _Rules(dict[str, str]):
-    """``{rules[key]}`` in a FAQ template: the rules sentence of that program."""
+class _Lookup(dict[str, str]):
+    """``{name[key]}`` in a FAQ template: ``fill(key)``, worked out from the presets."""
 
-    def __init__(self, locale: str) -> None:
+    def __init__(self, fill: Callable[[str], str]) -> None:
         super().__init__()
-        self.locale = locale
+        self.fill = fill
 
     def __missing__(self, key: str) -> str:
-        return rules_sentence(key, self.locale)
+        return self.fill(key)
+
+
+def _field(spec: str, locale: str) -> str:
+    """``key.attribute`` of a preset as the page writes it: a share as a percentage."""
+    key, _, name = spec.rpartition(".")
+    value = getattr(PRESETS[key], name)
+    if isinstance(value, float):
+        return _pct(value, locale)
+    return str(value)
 
 
 def firm_faq(firm: str, locale: str) -> tuple[tuple[str, str], ...]:
-    """The firm page's questions with their answers filled from the presets."""
+    """The firm page's questions with their answers filled from the presets.
+
+    An answer names its figures through ``{rules[key]}`` (the program's rules
+    sentence), ``{daily[key]}`` (its daily loss rule), ``{field[key.name]}``
+    (one preset field), ``{accounts}`` (Topstep's sizes) and ``{horizon}`` (the
+    simulator's business days), and its date through ``{as_of}``; the few
+    figures that are only in a preset's notes are written out, and a test
+    checks each one against those notes."""
     locale = _locale(locale)
     keys = firm_programs(firm)
-    as_of = PRESETS[keys[0]].as_of
     fill = {
-        "rules": _Rules(locale),
-        "as_of": as_of,
+        "rules": _Lookup(lambda key: rules_sentence(key, locale)),
+        "daily": _Lookup(lambda key: daily_clause(key, locale)),
+        "field": _Lookup(lambda spec: _field(spec, locale)),
+        "as_of": PRESETS[keys[0]].as_of,
         "accounts": _accounts_sentence(locale) if firm == "topstep" else "",
+        "horizon": str(horizon(keys[0])),
     }
     return tuple(
         (question, answer.format(**fill)) for question, answer in FIRM_COPY[firm][locale]["faq"]
@@ -1718,8 +1859,10 @@ __all__ = [
     "SAMPLES",
     "SEED",
     "SHARE_REF",
+    "SIMULATOR_MAX_DAYS",
     "SIZES",
     "SYNTHETIC_DAYS",
+    "TRADED_FLAT_DAY",
     "ChallengeInput",
     "ChallengeReading",
     "Parsed",
@@ -1727,9 +1870,11 @@ __all__ = [
     "account_size",
     "challenge_url",
     "compute",
+    "daily_clause",
     "firm_copy",
     "firm_faq",
     "firm_programs",
+    "horizon",
     "page_paths",
     "parse",
     "phase_count",
