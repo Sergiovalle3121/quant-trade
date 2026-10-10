@@ -375,10 +375,11 @@ COPY: dict[str, dict[str, Any]] = {
                 "{psr_pass} o más.",
             ),
             "dsr": (
-                "Sharpe deflactado (DSR) con {trials} carteras, estrategias o variantes evaluadas",
-                "La misma probabilidad, exigiendo superar a la mejor de {trials} carteras, "
-                "estrategias o variantes sin habilidad. Con {dsr_pass} o más supera; entre "
-                "{dsr_weak} y {dsr_pass} queda débil.",
+                "Sharpe deflactado (DSR) con {trials} intentos (las carteras, estrategias o "
+                "variantes evaluadas)",
+                "La misma probabilidad, exigiendo superar al mejor de {trials} intentos sin "
+                "habilidad. Con {dsr_pass} o más supera; entre {dsr_weak} y {dsr_pass} queda "
+                "débil.",
             ),
             "luck_sharpe": (
                 "Sharpe que darían {trials} carteras, estrategias o variantes sin habilidad",
@@ -593,10 +594,11 @@ COPY: dict[str, dict[str, Any]] = {
                 "between months: the figure the class uses. Passing needs {psr_pass} or more.",
             ),
             "dsr": (
-                "Deflated Sharpe (DSR) with {trials} portfolios, strategies or variants evaluated",
-                "The same probability, asking it to beat the best of {trials} portfolios, "
-                "strategies or variants with no skill. With {dsr_pass} or more it passes; "
-                "between {dsr_weak} and {dsr_pass} it is weak.",
+                "Deflated Sharpe (DSR) with {trials} trials (the portfolios, strategies or "
+                "variants evaluated)",
+                "The same probability, asking it to beat the best of {trials} trials with no "
+                "skill. With {dsr_pass} or more it passes; between {dsr_weak} and {dsr_pass} it "
+                "is weak.",
             ),
             "luck_sharpe": (
                 "Sharpe {trials} portfolios, strategies or variants with no skill would show",
@@ -812,11 +814,11 @@ COPY: dict[str, dict[str, Any]] = {
                 "{psr_pass} ou mais.",
             ),
             "dsr": (
-                "Sharpe deflacionado (DSR) com {trials} carteiras, estratégias ou variantes "
-                "avaliadas",
-                "A mesma probabilidade, exigindo superar a melhor de {trials} carteiras, "
-                "estratégias ou variantes sem habilidade. Com {dsr_pass} ou mais passa; entre "
-                "{dsr_weak} e {dsr_pass} fica fraca.",
+                "Sharpe deflacionado (DSR) com {trials} tentativas (as carteiras, estratégias ou "
+                "variantes avaliadas)",
+                "A mesma probabilidade, exigindo superar a melhor de {trials} tentativas sem "
+                "habilidade. Com {dsr_pass} ou mais passa; entre {dsr_weak} e {dsr_pass} fica "
+                "fraca.",
             ),
             "luck_sharpe": (
                 "Sharpe que {trials} carteiras, estratégias ou variantes sem habilidade dariam",

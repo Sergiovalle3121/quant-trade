@@ -664,6 +664,16 @@ LABELS: dict[str, dict[str, str]] = {
             "no se subieron los retornos de las carteras, estrategias o variantes evaluadas "
             "(la matriz de variantes)"
         ),
+        # A fund that declares fewer than its variants matrix holds: the red flag's
+        # detail counts what was evaluated and the matrix's return columns.
+        "flag_trials_below_variants_fund": (
+            "Se declararon {n} carteras, estrategias o variantes evaluadas, pero la matriz de "
+            "variantes trae {m} columnas de retornos; el número declarado es demasiado bajo"
+        ),
+        "flag_trials_below_variants_fund_one": (
+            "Se declaró 1 cartera, estrategia o variante evaluada, pero la matriz de variantes "
+            "trae {m} columnas de retornos; el número declarado es demasiado bajo"
+        ),
         "pdf_long": "Descargar el informe en PDF",
         "pdf_busy": "Generando tu PDF… (unos segundos)",
         "pdf_wait": "El PDF tarda unos segundos en generarse.",
@@ -2440,6 +2450,14 @@ LABELS: dict[str, dict[str, str]] = {
             "the returns of the portfolios, strategies or variants evaluated (the variants "
             "matrix) were not uploaded"
         ),
+        "flag_trials_below_variants_fund": (
+            "{n} portfolios, strategies or variants evaluated were declared, but the variants "
+            "matrix holds {m} return columns; the declared count is too low"
+        ),
+        "flag_trials_below_variants_fund_one": (
+            "1 portfolio, strategy or variant evaluated was declared, but the variants matrix "
+            "holds {m} return columns; the declared count is too low"
+        ),
         "pdf_long": "Download the report as PDF",
         "pdf_busy": "Preparing your PDF… (a few seconds)",
         "pdf_wait": "The PDF takes a few seconds to prepare.",
@@ -4083,6 +4101,41 @@ DIMENSION_TITLES_FUND: dict[str, dict[str, str]] = {
     "en": {"multiplicity": "Number of portfolios, strategies or variants evaluated"},
     "pt": {"multiplicity": "Número de carteiras, estratégias ou variantes avaliadas"},
 }
+#: The counts a measured CSCV stores, in the order a backtest's report lists them
+#: as ``key=value``.
+CSCV_COUNTS = (
+    "partitions",
+    "combinations",
+    "parameter_variants",
+    "effective_variants",
+    "observations_used",
+)
+#: The same counts on a fund or portfolio's report, named by what they count and
+#: in its language: the variants matrix's return columns first, never a
+#: parameter sweep. The stored keys and figures are as the engine wrote them.
+CSCV_COUNTS_FUND: dict[str, dict[str, str]] = {
+    "es": {
+        "parameter_variants": "columnas de la matriz de variantes",
+        "effective_variants": "columnas distintas",
+        "partitions": "bloques del historial",
+        "combinations": "combinaciones",
+        "observations_used": "observaciones usadas",
+    },
+    "en": {
+        "parameter_variants": "variants matrix columns",
+        "effective_variants": "distinct columns",
+        "partitions": "history blocks",
+        "combinations": "combinations",
+        "observations_used": "observations used",
+    },
+    "pt": {
+        "parameter_variants": "colunas da matriz de variantes",
+        "effective_variants": "colunas distintas",
+        "partitions": "blocos do histórico",
+        "combinations": "combinações",
+        "observations_used": "observações usadas",
+    },
+}
 
 STATUS_TEXT: dict[str, dict[str, str]] = {
     "es": {
@@ -4927,6 +4980,47 @@ def _fund_cscv(cscv: dict[str, Any], labels: dict[str, str]) -> dict[str, Any]:
     if cscv.get("status") == "NOT_MEASURED" and cscv.get("reason") == NO_VARIANTS:
         return {**cscv, "reason": labels["no_variants_fund"]}
     return cscv
+
+
+def _cscv_counts(cscv: dict[str, Any], locale: str, *, fund: bool = False) -> str:
+    """A measured CSCV's counts under its table: ``key=value`` as stored, or on a
+    fund or portfolio (``fund``) named by what they count (``CSCV_COUNTS_FUND``):
+    the variants matrix's return columns, the distinct ones, the history's
+    blocks, their combinations and the observations used."""
+    if fund:
+        names = CSCV_COUNTS_FUND.get(locale, CSCV_COUNTS_FUND["es"])
+        return ", ".join(f"{names[key]}: {cscv[key]}" for key in names if key in cscv)
+    return ", ".join(f"{key}={cscv[key]}" for key in CSCV_COUNTS if key in cscv)
+
+
+def _whole(value: Any) -> int | None:
+    """``value`` as a whole number, or None when it is not one."""
+    if isinstance(value, bool) or not isinstance(value, int | float):
+        return None
+    return int(value) if float(value).is_integer() else None
+
+
+def _flag_detail(
+    flag: Mapping[str, Any],
+    data: Mapping[str, Any],
+    labels: dict[str, str],
+    locale: str,
+    *,
+    fund: bool = False,
+) -> str:
+    """A red flag's detail as the report shows it. On a fund or portfolio
+    (``fund``), fewer trials declared than the variants matrix holds counts the
+    portfolios, strategies or variants evaluated and the matrix's return
+    columns, never optimisation passes. The stored detail stays as written."""
+    if fund and flag.get("code") == "TRIALS_BELOW_VARIANTS":
+        trials = (data.get("declared") or {}).get("trials")
+        declared_count = _whole(trials.get("value")) if isinstance(trials, Mapping) else None
+        columns = _whole(flag.get("value"))
+        if declared_count is not None and columns is not None:
+            key = "flag_trials_below_variants_fund"
+            text = labels[f"{key}_one" if declared_count == 1 else key]
+            return text.format(n=f"{declared_count:,}", m=f"{columns:,}")
+    return localize(str(flag.get("detail", "")), locale)
 
 
 def _status_line(section: dict[str, Any], labels: dict[str, str]) -> str:
@@ -11061,23 +11155,9 @@ def render_html(
     )
     cscv_html = _status_line(cscv, labels) + _evidence_rows(cscv, labels, skip=set())
     if data["cscv"].get("status") == "MEASURED":
-        cscv_html += (
-            "<p class='muted'>"
-            + _e(
-                ", ".join(
-                    f"{k}={data['cscv'][k]}"
-                    for k in (
-                        "partitions",
-                        "combinations",
-                        "parameter_variants",
-                        "effective_variants",
-                        "observations_used",
-                    )
-                    if k in data["cscv"]
-                )
-            )
-            + "</p>"
-        )
+        # A fund names the counts by what they count; every other report as stored.
+        counts = _cscv_counts(data["cscv"], locale, fund=fund_page)
+        cscv_html += f"<p class='muted'>{_e(counts)}</p>"
 
     sub_html = (
         f"<table><tr><th>{_e(labels['year'])}</th><th>{_e(labels['return'])}</th>"
@@ -11112,7 +11192,7 @@ def render_html(
         + "".join(
             f"<li>{_severity_badge(flag['severity'], locale)}"
             f"<div><b>{_e(flag_title(flag['code'], locale))}</b>"
-            f"<p>{_e(_sentence(localize(flag['detail'], locale)))}</p>"
+            f"<p>{_e(_sentence(_flag_detail(flag, data, labels, locale, fund=fund_page)))}</p>"
             f"<p class='flag-code'>{_e(flag['code'])}</p></div></li>"
             for flag in sorted(data["red_flags"], key=lambda f: order.get(f["severity"], 2))
         )

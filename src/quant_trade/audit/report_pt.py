@@ -164,6 +164,14 @@ REPORT: dict[str, Any] = {
             "os retornos das carteiras, estratégias ou variantes avaliadas (a matriz de "
             "variantes) não foram enviados"
         ),
+        "flag_trials_below_variants_fund": (
+            "Foram declaradas {n} carteiras, estratégias ou variantes avaliadas, mas a matriz "
+            "de variantes traz {m} colunas de retornos; o número declarado é baixo demais"
+        ),
+        "flag_trials_below_variants_fund_one": (
+            "Foi declarada 1 carteira, estratégia ou variante avaliada, mas a matriz de "
+            "variantes traz {m} colunas de retornos; o número declarado é baixo demais"
+        ),
         "pdf_long": "Baixar o relatório em PDF",
         "pdf_busy": "Gerando seu PDF… (alguns segundos)",
         "pdf_wait": "O PDF leva alguns segundos para ser gerado.",

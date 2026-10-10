@@ -1606,6 +1606,61 @@ PLAN: dict[str, dict[str, dict[str, str]]] = {
             "enviar os retornos de todas: um bom histórico entre muitos pesa menos.",
         ),
     },
+    # More were declared ({n}) than the uploaded variants matrix holds ({m} return
+    # columns): the DSR discounts the declared count, the PBO only the matrix's
+    # columns, so what is left is the returns of the rest, never the matrix itself.
+    "fund_trials_beyond_matrix": {
+        OWN: _say(
+            "La matriz de variantes que subiste trae {m} columnas de retornos y declaraste {n} "
+            "carteras, estrategias o variantes evaluadas: el DSR ya descuenta las {n}, pero la "
+            "probabilidad de sobreajuste (PBO) solo mide las columnas de la matriz. Si "
+            "evaluaste {n}, contando los fondos que llevas o has cerrado, sube los retornos de "
+            "todas.",
+            "The variants matrix you uploaded holds {m} return columns and you declared {n} "
+            "portfolios, strategies or variants evaluated: the DSR already discounts the {n}, "
+            "but the probability of overfitting (PBO) only measures the matrix's columns. If "
+            "you evaluated {n}, counting the funds you run or have closed, upload the returns "
+            "of all of them.",
+            "A matriz de variantes que você enviou traz {m} colunas de retornos e você declarou "
+            "{n} carteiras, estratégias ou variantes avaliadas: o DSR já desconta as {n}, mas a "
+            "probabilidade de sobreajuste (PBO) só mede as colunas da matriz. Se você avaliou "
+            "{n}, contando os fundos que administra ou já encerrou, envie os retornos de todas.",
+        ),
+        PROVIDER: _say(
+            "La matriz de variantes que subiste trae {m} columnas de retornos y declaraste {n} "
+            "carteras, estrategias o variantes evaluadas: el DSR ya descuenta las {n}, pero la "
+            "probabilidad de sobreajuste (PBO) solo mide las columnas de la matriz. Te van a "
+            "pedir los retornos de todas, contando los fondos que llevas o has cerrado: "
+            "apórtalos.",
+            "The variants matrix you uploaded holds {m} return columns and you declared {n} "
+            "portfolios, strategies or variants evaluated: the DSR already discounts the {n}, "
+            "but the probability of overfitting (PBO) only measures the matrix's columns. You "
+            "will be asked for the returns of all of them, counting the funds you run or have "
+            "closed: provide them.",
+            "A matriz de variantes que você enviou traz {m} colunas de retornos e você declarou "
+            "{n} carteiras, estratégias ou variantes avaliadas: o DSR já desconta as {n}, mas a "
+            "probabilidade de sobreajuste (PBO) só mede as colunas da matriz. Vão pedir a você "
+            "os retornos de todas, contando os fundos que administra ou já encerrou: "
+            "forneça-os.",
+        ),
+        NEUTRAL: _say(
+            "La matriz de variantes subida trae {m} columnas de retornos y se declararon {n} "
+            "carteras, estrategias o variantes evaluadas: el DSR ya descuenta las {n}, pero la "
+            "probabilidad de sobreajuste (PBO) solo mide las columnas de la matriz. Si se "
+            "evaluaron {n}, contando los fondos que el gestor lleva o ha cerrado, conviene "
+            "subir los retornos de todas.",
+            "The uploaded variants matrix holds {m} return columns and {n} portfolios, "
+            "strategies or variants evaluated were declared: the DSR already discounts the "
+            "{n}, but the probability of overfitting (PBO) only measures the matrix's columns. "
+            "If {n} were evaluated, counting the funds the manager runs or has closed, it is "
+            "worth uploading the returns of all of them.",
+            "A matriz de variantes enviada traz {m} colunas de retornos e foram declaradas {n} "
+            "carteiras, estratégias ou variantes avaliadas: o DSR já desconta as {n}, mas a "
+            "probabilidade de sobreajuste (PBO) só mede as colunas da matriz. Se foram "
+            "avaliadas {n}, contando os fundos que o gestor administra ou já encerrou, convém "
+            "enviar os retornos de todas.",
+        ),
+    },
     "fund_oos": {
         OWN: _say(
             "Declara como inicio fuera de muestra la fecha desde la que no cambió tu proceso de "

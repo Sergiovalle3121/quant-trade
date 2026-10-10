@@ -6114,23 +6114,48 @@ summary (`tests/test_audit_informe_fondo_coherente.py`, es/en/pt, every voice).
 - **The plan** (`plan._multiplicity_step`): title, finding and actions ask for
   the portfolios, strategies or variants evaluated, declared or as the
   variants matrix (`ownership.PLAN["fund_trials"]`, `["fund_trials_undeclared"]`,
-  `["title_fund_multiplicity"]`); a count read from an uploaded matrix
-  (`plan.MATRIX_TRIALS`) says so and asks whether every one evaluated is in
-  it (`["fund_trials_counted"]`).
+  `["title_fund_multiplicity"]`). The actions follow whether the matrix was
+  uploaded (`plan._variants_matrix`: its file's digest or a CSCV measured on
+  it), not where the count came from, so the plan keeps no copy of the
+  engine's note: a count read from the matrix says so and asks whether every
+  one evaluated is in it (`["fund_trials_counted"]`); a declared count above
+  the matrix's columns says the DSR already discounts the declared count and
+  the PBO only the matrix's columns, and asks for the returns of the rest,
+  never to upload the matrix again (`["fund_trials_beyond_matrix"]`, with the
+  columns the CSCV read, or "fewer than" the declared count when it was not
+  measured).
+- **One name per count.** The deflated Sharpe's count is "trials" wherever it
+  shows (the reasons table, the plan's finding, the technical detail, the
+  summary); on a fund the plan's "512 or more" names them the same way, glossed
+  once: "512 or more trials (portfolios, strategies or variants evaluated)".
+  The luck section keeps the fund's noun, as its table counts it.
+- **The red flag** `TRIALS_BELOW_VARIANTS` on a fund reads "5 portfolios,
+  strategies or variants evaluated were declared, but the variants matrix
+  holds 12 return columns" (`LABELS["flag_trials_below_variants_fund"]`, and
+  `_one` for a single one), never optimisation passes
+  (`report._flag_detail`). The stored detail is the engine's.
 - **The technical detail**: the variance row is "Observed across the
   portfolios, strategies or variants evaluated", measured or not
   (`observed_across_fund_variants`, `report._fund_multiplicity_rows`); with no
   matrix its note and the CSCV say their returns were not uploaded
   (`no_variants_fund`, `report._fund_cscv`); the variance policy is
-  `variance_policy_fund`. The stored rows are unchanged.
+  `variance_policy_fund`. A measured CSCV lists its counts by what they count,
+  in the report's language ("variants matrix columns: 10, distinct columns:
+  10, history blocks: 8, combinations: 70, observations used: 240",
+  `report.CSCV_COUNTS_FUND`, `report._cscv_counts`), not as
+  `parameter_variants=10`; a backtest keeps the stored keys. The stored rows
+  are unchanged.
 - **The paid preview** lists the multiplicity and CSCV sections in the fund's
   words (`report.LOCKED_GAINS_FUND`).
 - **The sample institutional review.** Its notes name the dimension as its
   fund report does, call the variants file the variants matrix (one return
   column each, the portfolios, strategies or variants evaluated before the
-  series was chosen), and name the deflated Sharpe, the luck and the years
-  needed after the same ten portfolios, strategies or variants, with the
-  report's figures (`institutional_sample._dimension_words`).
+  series was chosen), and name the luck and the years needed after the same
+  ten portfolios, strategies or variants as the luck section, with the
+  report's figures (`institutional_sample._dimension_words`). The deflated
+  Sharpe is the one at "10 trials (the portfolios, strategies or variants
+  evaluated)", the name its report's reasons, plan and technical detail give
+  that count.
 - **Unchanged.** A backtest, `/ejemplo`, `/sample` and `/pt/exemplo` included,
   and an account or signal read word for word as before this branch: their
   served pages and every voice of both samples are byte-identical.

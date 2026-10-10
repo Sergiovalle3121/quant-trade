@@ -43,9 +43,6 @@ from quant_trade.audit.verdict import (
 PLAN_ORDER = (DATA_QUALITY, STATISTICAL, MULTIPLICITY, COSTS, OUT_OF_SAMPLE, BENCHMARK)
 STATUS_RANK = {"FAIL": 0, "WEAK": 1, "NOT_MEASURED": 2}
 CLASS_RANK = {"D": 0, "C": 1, "B": 2, "A": 3}
-#: The engine's note on a trial count read from an uploaded variants matrix
-#: (``engine.trial_count``): a fund's step then says the count is measured.
-MATRIX_TRIALS = "columns of the uploaded variants matrix"
 
 _T = TypeVar("_T")
 
@@ -179,6 +176,20 @@ FUND_TITLES: dict[str, dict[str, str]] = {
 def _fund_record(data: dict[str, Any]) -> bool:
     """True when a stored audit result was run on a fund's track record."""
     return bool((data.get("fund") or {}).get("track_record"))
+
+
+def _variants_matrix(data: dict[str, Any]) -> tuple[bool, int | None]:
+    """Whether a variants matrix was uploaded (its file's digest, or a CSCV
+    measured on it), and its return columns when the CSCV read them. A fund's
+    plan picks its words by this, not by where the trial count came from: a
+    declared count above the matrix's columns still had the matrix uploaded."""
+    cscv = data.get("cscv") or {}
+    digests = (data.get("inputs") or {}).get("digests") or {}
+    measured = cscv.get("status") == "MEASURED"
+    columns = cscv.get("parameter_variants") if measured else None
+    if isinstance(columns, bool) or not isinstance(columns, int):
+        columns = None
+    return measured or "variants.csv" in digests, columns
 
 
 #: What the audit would need to see for each red flag, in both languages.
@@ -822,12 +833,12 @@ def _multiplicity_step(data: dict[str, Any], status: str, locale: str) -> tuple[
         parts.append(
             _say(
                 locale,
-                f"Con {half:,.0f} o más carteras, estrategias o variantes evaluadas cae por "
-                "debajo de 0.5.",
-                f"With {half:,.0f} or more portfolios, strategies or variants evaluated it falls "
-                "below 0.5.",
-                f"Com {half:,.0f} ou mais carteiras, estratégias ou variantes avaliadas cai "
-                "abaixo de 0.5.",
+                f"Con {half:,.0f} o más intentos (carteras, estrategias o variantes "
+                "evaluadas) cae por debajo de 0.5.",
+                f"With {half:,.0f} or more trials (portfolios, strategies or variants "
+                "evaluated) it falls below 0.5.",
+                f"Com {half:,.0f} ou mais tentativas (carteiras, estratégias ou variantes "
+                "avaliadas) cai abaixo de 0.5.",
             )
         )
     elif half is not None and account:
@@ -942,8 +953,54 @@ def _multiplicity_step(data: dict[str, Any], status: str, locale: str) -> tuple[
         # A fund has no optimisation to export: its trials are the portfolios,
         # strategies or variants evaluated before this one was chosen (the funds
         # the same manager runs or has closed among them), declared at upload or
-        # measured from the variants matrix, one return column each.
-        from_matrix = counted and (mult.get("trials_used") or {}).get("note") == MATRIX_TRIALS
+        # measured from the variants matrix, one return column each. The words
+        # follow whether the matrix was uploaded, not where the count came from.
+        uploaded, columns = _variants_matrix(data)
+        if uploaded and not counted:
+            # More declared than the matrix holds: the DSR discounts the declared
+            # count, the PBO only the matrix's columns. Never "upload the matrix".
+            declared_count = f"{trials:,.0f}"
+            shown = (
+                f"{columns:,}"
+                if columns is not None
+                else _say(
+                    locale,
+                    f"menos de {declared_count}",
+                    f"fewer than {declared_count}",
+                    f"menos de {declared_count}",
+                )
+            )
+            texts = _voiced(
+                _say(
+                    locale,
+                    [
+                        "La matriz de variantes subida trae {m} columnas de retornos y se "
+                        "declararon {n} carteras, estrategias o variantes evaluadas: el DSR ya "
+                        "descuenta las {n}, pero la probabilidad de sobreajuste (PBO) solo mide "
+                        "las columnas de la matriz. Pide al gestor los retornos de todas, "
+                        "contando los fondos que lleva o ha cerrado.",
+                    ],
+                    [
+                        "The uploaded variants matrix holds {m} return columns and {n} "
+                        "portfolios, strategies or variants evaluated were declared: the DSR "
+                        "already discounts the {n}, but the probability of overfitting (PBO) "
+                        "only measures the matrix's columns. Ask the manager for the returns "
+                        "of all of them, counting the funds they run or have closed.",
+                    ],
+                    [
+                        "A matriz de variantes enviada traz {m} colunas de retornos e foram "
+                        "declaradas {n} carteiras, estratégias ou variantes avaliadas: o DSR já "
+                        "desconta as {n}, mas a probabilidade de sobreajuste (PBO) só mede as "
+                        "colunas da matriz. Peça ao gestor os retornos de todas, contando os "
+                        "fundos que administra ou já encerrou.",
+                    ],
+                ),
+                ("fund_trials_beyond_matrix",),
+                locale,
+                ownership.role_of(data),
+            )
+            return " ".join(parts), [text.format(n=declared_count, m=shown) for text in texts]
+        from_matrix = uploaded and counted
         return " ".join(parts), _voiced(
             _say(
                 locale,

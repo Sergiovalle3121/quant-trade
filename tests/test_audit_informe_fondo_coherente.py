@@ -40,7 +40,7 @@ import pandas as pd
 import pytest
 from test_audit_fund_verdict import _dated, _pair, _run
 
-from quant_trade.audit import institutional_sample, ownership, report, seller_message
+from quant_trade.audit import engine, institutional_sample, ownership, report, seller_message
 from quant_trade.audit import pdf as pdf_lib
 from quant_trade.audit import plan as plan_lib
 from quant_trade.audit import verdict as verdict_lib
@@ -50,6 +50,7 @@ from quant_trade.audit.i18n import localize
 from quant_trade.audit.luck import NOTE as LUCK_NOTE
 from quant_trade.audit.plan import improvement_plan
 from quant_trade.audit.report import (
+    CSCV_COUNTS_FUND,
     DIMENSION_TITLES,
     DIMENSION_TITLES_ACCOUNT,
     DIMENSION_TITLES_FUND,
@@ -100,6 +101,13 @@ RETURN_COLUMNS = {
 }
 #: The words the brief keeps out of every text.
 BANNED = ("verificado", "certificado", "aprobado", "garantiza", "rentable")
+#: The report's name for the count the deflated Sharpe uses, and "or more".
+TRIAL_WORD = {"es": "intentos", "en": "trials", "pt": "tentativas"}
+OR_MORE = {"es": "o más", "en": "or more", "pt": "ou mais"}
+#: A fund's noun right after a figure ("10 carteras", "512 or more portfolios").
+FUND_NOUN = {"es": "carteras", "en": "portfolios", "pt": "carteiras"}
+#: An optimiser's passes: never on a fund's page.
+PASSES = re.compile(r"optimi|otimiz|pasadas|passagens", re.I)
 #: A backtest's trials, a robot and an optimiser's files: none of them on a fund's page.
 NOT_A_FUND = re.compile(
     r"configuraciones|configurations|configurações|\b(una sola|1) configuración"
@@ -395,7 +403,7 @@ def test_a_count_from_the_variants_matrix_says_so_in_the_funds_plan(
     # The sample review uploads the variants: the count is measured from the matrix.
     data = _with_role(_institutional(locale).model_dump(mode="json"), role)
     assert data["multiplicity"]["trials_used"]["evidence"] == "MEASURED"
-    assert data["multiplicity"]["trials_used"]["note"] == plan_lib.MATRIX_TRIALS
+    assert data["multiplicity"]["trials_used"]["note"] == _matrix_note()
     voice = _voice(role)
     step = next(s for s in improvement_plan(data, locale) if s.dimension == "multiplicity")
     if voice != ownership.BUYER:
@@ -639,9 +647,11 @@ def test_the_institutional_notes_name_the_dimension_and_trials_as_the_fund_repor
     chance = f"{float(luck['luck_sharpe']['value']):.2f}"
     assert figures["luck_sharpe"].shown == chance
     assert f"{in_notes} {chance}" in notes and chance in report_only
-    # The deflated Sharpe is the figure the report quotes, at the same count.
+    # The deflated Sharpe is the figure the report quotes, at the same count and under
+    # the same name: its trials, which are the portfolios, strategies or variants evaluated.
     dsr = words["figures"]["dsr"][0].format(trials=n)
-    assert f"{n} {EVALUATED[locale]}" in dsr and f"{dsr} {figures['dsr'].shown}" in notes
+    assert f"{n} {TRIAL_WORD[locale]} (" in dsr and EVALUATED[locale] in dsr
+    assert f"{dsr} {figures['dsr'].shown}" in notes
     assert f"DSR {figures['dsr'].shown}" in report_only
     # The variants file is the variants matrix, one return column each, as the report's
     # trial count says it ("columns of the uploaded variants matrix").
@@ -649,7 +659,7 @@ def test_the_institutional_notes_name_the_dimension_and_trials_as_the_fund_repor
         variants=institutional_sample.VARIANTS, trials=n
     )
     assert variants in notes and MATRIX[locale] in variants and EVALUATED[locale] in variants
-    assert localize(plan_lib.MATRIX_TRIALS, locale) in report_only
+    assert localize(_matrix_note(), locale) in report_only
     # The notes' question for the dimension counts what the dimension counts.
     assert EVALUATED[locale] in words["questions"]["multiplicity"]
     for text in (notes, report_only):
@@ -752,6 +762,222 @@ def test_the_backtest_and_account_texts_are_the_ones_on_main(locale: str) -> Non
         assert EVALUATED[locale] not in verdict_lib.meaning(name, status, locale, account=True)
 
 
+# 4 · the branch's review: the flag, one name per count, the CSCV, a matrix uploaded ------
+
+
+@cache
+def _matrix_note() -> str:
+    """The engine's note on a trial count read from an uploaded variants matrix."""
+    fund, index = _pair()
+    inputs = build_inputs(
+        _dated(fund, index),
+        DeclaredMetadata(trials_declared=False),
+        variants_bytes=_variants(fund, 12),
+    )
+    count, evidence, note = engine.trial_count(inputs)
+    assert (count, evidence) == (12, "MEASURED")
+    return note
+
+
+@cache
+def _fund_matrix_result(locale: str, trials: int, columns: int = 12) -> AuditResult:
+    """The fixture's fund (its Benchmark column included) with ``trials`` declared and
+    a variants matrix of ``columns`` return columns."""
+    fund, index = _pair()
+    inputs = build_inputs(
+        _dated(fund, index),
+        DeclaredMetadata(locale=locale, trials=trials),
+        variants_bytes=_variants(fund, columns),
+    )
+    return run_audit(inputs, bootstrap_samples=60)
+
+
+def _fund_matrix(locale: str, trials: int, role: str | None) -> dict[str, Any]:
+    return _with_role(_fund_matrix_result(locale, trials).model_dump(mode="json"), role)
+
+
+def _flag_cards(page: str, code: str) -> list[str]:
+    """The visible text of every red flag card ``code`` on ``page`` (the free summary
+    lists the title alone; the full section adds the detail)."""
+    cards = re.findall(r"<li>(?:(?!</li>).)*?</li>", page, re.S)
+    return [_visible(card) for card in cards if f"<p class='flag-code'>{code}</p>" in card]
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+@pytest.mark.parametrize("role", ROLES)
+@pytest.mark.parametrize("trials", [5, 1])
+def test_a_funds_flag_of_fewer_trials_than_its_matrix_counts_what_was_evaluated(
+    locale: str, role: str | None, trials: int
+) -> None:
+    data = _fund_matrix(locale, trials, role)
+    assert report.report_kind(data) == "fund"
+    flag = next(f for f in data["red_flags"] if f["code"] == "TRIALS_BELOW_VARIANTS")
+    # The stored flag is the engine's, as before this branch.
+    assert flag["value"] == 12
+    assert flag["detail"] == (
+        f"{trials} trial(s) declared but the files show 12 variants or optimisation passes; "
+        "the declared count is too low"
+    )
+    labels = LABELS[locale]
+    key = "flag_trials_below_variants_fund" + ("_one" if trials == 1 else "")
+    expected = labels[key].format(n=str(trials), m="12")
+    full = render_html(AuditResult.model_validate(data), watermark=False, locale=locale)
+    for page in (full, pdf_lib._expand_details_for_pdf(full)):
+        cards = _flag_cards(page, "TRIALS_BELOW_VARIANTS")
+        detailed = [card for card in cards if f"{expected}." in card]
+        assert len(detailed) == 1, cards
+        assert EVALUATED_ANY[locale].search(detailed[0]) and MATRIX[locale] in detailed[0]
+        for card in cards:
+            assert not re.search(r"\bpasses\b", card), card
+        text = _visible(page)
+        assert not PASSES.search(text), PASSES.search(text)
+        assert localize(flag["detail"], locale) not in text
+        assert find_claims(text) == []
+    # Off a fund's page the flag keeps the engine's words.
+    shown = report._flag_detail(flag, data, labels, locale)
+    assert shown == localize(flag["detail"], locale)
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+def test_the_notes_and_the_fund_report_name_each_count_alike(locale: str) -> None:
+    result = _institutional(locale)
+    data = result.model_dump(mode="json")
+    labels = ownership.labels_for(LABELS[locale], locale, ownership.role_of(data))
+    words, word, more = institutional_sample.COPY[locale], TRIAL_WORD[locale], OR_MORE[locale]
+    n = institutional_sample.note_figures(data)["trials"].shown
+    half = f"{int(data['multiplicity']['trials_to_half']['value']):,}"
+    assert (n, half) == ("10", "512")
+    # A fund's noun never names the ten or the 512 by itself where the DSR is shown.
+    loose = re.compile(rf"\b(?:{n}|{half})(?: {more})? {FUND_NOUN[locale]}", re.I)
+    # The notes: the deflated Sharpe at the ten trials, glossed as what a fund evaluates.
+    label, description = (part.format(**_note_values(data)) for part in words["figures"]["dsr"])
+    notes = _visible(institutional_sample.sample_page(result, locale=locale))
+    assert f"{n} {word} (" in label and EVALUATED[locale] in label and label in notes
+    assert f"{n} {word}" in description
+    # The reasons table.
+    reasons = _visible(report._reasons_html(data["verdict"], locale, labels, data))
+    row = reasons.split(DIMENSION_TITLES_FUND[locale]["multiplicity"], 1)[1]
+    assert f"{n} {word}" in row.split(report._dimension_title("costs", locale), 1)[0]
+    # The plan: the ten and the 512, both trials.
+    step = next(s for s in improvement_plan(data, locale) if s.dimension == "multiplicity")
+    assert f"{n} {word};" in step.finding and f"{half} {more} {word} (" in step.finding
+    # The technical detail.
+    rows = report._fund_multiplicity_rows(
+        report._one_dsr_row(data["multiplicity"], data["declared"]), labels
+    )
+    detail = _visible(report._evidence_rows(rows, labels, skip={"sensitivity"}))
+    assert f"{KEY_LABELS[locale]['trials_to_half']} {half}" in detail
+    assert word in KEY_LABELS[locale]["trials_to_half"].lower()
+    # The report and the report with the notes on top (the PDF's source), every section open.
+    for with_notes in (False, True):
+        page = (
+            institutional_sample.report_with_notes(result, locale=locale)
+            if with_notes
+            else render_html(result, watermark=False, locale=locale)
+        )
+        text = _visible(pdf_lib._expand_details_for_pdf(page))
+        assert f"{labels['trials_used']}: {n}" in text and step.finding in text
+        assert (label in text) is with_notes
+    for part in (label, description, row, step.finding, detail):
+        assert not loose.search(part), (loose.search(part), part)
+        assert find_claims(part) == []
+
+
+def _note_values(data: dict[str, Any]) -> dict[str, Any]:
+    return institutional_sample._values(data, institutional_sample.note_figures(data))
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+def test_the_cscv_counts_of_a_fund_name_what_they_count(locale: str) -> None:
+    names = CSCV_COUNTS_FUND[locale]
+    for result in (_institutional(locale), _fund_matrix_result(locale, 5)):
+        data = result.model_dump(mode="json")
+        cscv = data["cscv"]
+        assert report.report_kind(data) == "fund" and cscv["status"] == "MEASURED"
+        expected = ", ".join(
+            f"{names[key]}: {cscv[key]}"
+            for key in (
+                "parameter_variants",
+                "effective_variants",
+                "partitions",
+                "combinations",
+                "observations_used",
+            )
+        )
+        assert expected.startswith(f"{names['parameter_variants']}: {cscv['parameter_variants']}")
+        full = render_html(result, watermark=False, locale=locale)
+        pages = [full, pdf_lib._expand_details_for_pdf(full)]
+        if result is _institutional(locale):
+            pages.append(institutional_sample.report_with_notes(result, locale=locale))
+        for page in pages:
+            text = _visible(page)
+            assert expected in text
+            for key in ("parameter_variants", "effective_variants", "observations_used"):
+                assert key not in text, key
+            assert "partitions=" not in text and "combinations=" not in text
+            assert find_claims(text) == []
+    # A backtest keeps the stored keys, as on main.
+    cscv = {"status": "MEASURED", "partitions": 8, "combinations": 70, "parameter_variants": 4}
+    assert report._cscv_counts(cscv, locale) == (
+        "partitions=8, combinations=70, parameter_variants=4"
+    )
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+@pytest.mark.parametrize("role", ROLES)
+def test_a_fund_that_declares_more_than_its_matrix_is_not_asked_to_upload_it(
+    locale: str, role: str | None
+) -> None:
+    data = _fund_matrix(locale, 20, role)
+    trials = data["multiplicity"]["trials_used"]
+    # The declared count is used; the matrix was uploaded and its CSCV measured.
+    assert (trials["value"], trials["evidence"]) == (20, "DECLARED")
+    assert data["cscv"]["status"] == "MEASURED" and data["cscv"]["parameter_variants"] == 12
+    assert "TRIALS_BELOW_VARIANTS" not in {flag["code"] for flag in data["red_flags"]}
+    voice = _voice(role)
+    step = next(s for s in improvement_plan(data, locale) if s.dimension == "multiplicity")
+    if voice != ownership.BUYER:
+        template = ownership.PLAN["fund_trials_beyond_matrix"][voice][locale]
+        assert step.actions == [template.format(n="20", m="12")]
+    actions = " ".join(step.actions)
+    assert MATRIX[locale] in actions and EVALUATED[locale] in actions
+    assert "12" in actions and "20" in actions
+    # Never the texts that ask for the matrix that is already there.
+    for key in ("fund_trials", "fund_trials_counted", "fund_trials_undeclared"):
+        for other in ownership.PLAN[key].values():
+            assert other[locale] not in step.actions
+    upload = re.compile(
+        r"sube la matriz|pídele la matriz|aporta la matriz|upload the variants matrix"
+        r"|ask them for the variants matrix|provide the variants matrix|envie a matriz"
+        r"|peça a ele a matriz|forneça a matriz",
+        re.I,
+    )
+    assert not upload.search(actions), upload.search(actions)
+    assert not NOT_A_FUND.search(actions) and find_claims(actions) == []
+    page = _visible(
+        pdf_lib._expand_details_for_pdf(
+            render_html(AuditResult.model_validate(data), watermark=False, locale=locale)
+        )
+    )
+    assert step.actions[0] in page
+    # A matrix uploaded whose CSCV could not be measured: its columns are not known.
+    unmeasured = copy.deepcopy(data)
+    unmeasured["cscv"] = {"status": "NOT_MEASURED", "reason": "too short"}
+    assert plan_lib._variants_matrix(unmeasured) == (True, None)
+    step = next(s for s in improvement_plan(unmeasured, locale) if s.dimension == "multiplicity")
+    fewer = {"es": "menos de 20", "en": "fewer than 20", "pt": "menos de 20"}[locale]
+    assert fewer in " ".join(step.actions)
+    assert not upload.search(" ".join(step.actions))
+    # No matrix at all: the plan still asks for it.
+    bare = copy.deepcopy(unmeasured)
+    bare["cscv"] = {"status": "NOT_MEASURED", "reason": NO_VARIANTS}
+    bare["inputs"]["digests"].pop("variants.csv")
+    assert plan_lib._variants_matrix(bare) == (False, None)
+    step = next(s for s in improvement_plan(bare, locale) if s.dimension == "multiplicity")
+    if voice != ownership.BUYER:
+        assert step.actions == [ownership.PLAN["fund_trials"][voice][locale]]
+
+
 # every new text: three languages, the guard, no robot ------------------------------------
 
 
@@ -765,6 +991,9 @@ def _new_texts() -> list[tuple[str, str, str]]:
             out.append(("report", locale, LABELS[locale][key]))
         for key in ("luck_sharpe_fund", "luck_after_fund"):
             out.append(("report", locale, LABELS[locale][key]))
+        for key in ("flag_trials_below_variants_fund", "flag_trials_below_variants_fund_one"):
+            out.append(("flag", locale, LABELS[locale][key]))
+        out.append(("cscv", locale, ", ".join(CSCV_COUNTS_FUND[locale].values())))
         out.append(("plan", locale, plan_lib.FUND_TITLES[locale]["multiplicity"]))
         out.append(("hint", locale, plan_lib.FUND_FLAG_HINTS["TRIALS_BELOW_VARIANTS"][locale]))
         for key, text in verdict_lib.MEANING[locale].items():
@@ -790,6 +1019,7 @@ def _new_texts() -> list[tuple[str, str, str]]:
                 "fund_trials_undeclared",
                 "fund_trials",
                 "fund_trials_counted",
+                "fund_trials_beyond_matrix",
                 "title_fund_multiplicity",
             ),
         ),
