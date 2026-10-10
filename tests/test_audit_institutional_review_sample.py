@@ -25,7 +25,7 @@ pytest.importorskip("sqlalchemy")
 
 from fastapi.testclient import TestClient  # noqa: E402
 
-from quant_trade.audit import institutional, institutional_sample  # noqa: E402
+from quant_trade.audit import institutional, institutional_sample, psr_names  # noqa: E402
 from quant_trade.audit import pdf as pdf_lib  # noqa: E402
 from quant_trade.audit.check import SAMPLE_AUDIT_ID  # noqa: E402
 from quant_trade.audit.guard import find_claims  # noqa: E402
@@ -214,7 +214,9 @@ def test_the_sample_runs_the_engine_and_the_notes_quote_the_report(
         assert figure.shown in notes, figure.key
     report = client.get(institutional.SAMPLE_REPORT_PATHS["es"]).text
     body = _visible(report[report.index("id='r-kpis'") :])
-    assert f"PSR {figures['psr'].shown}" in body
+    # The notes quote the probability the class uses, under the report's own name.
+    assert psr_names.class_psr(data)[2] == psr_names.ADJUSTED
+    assert f"{psr_names.psr_name(psr_names.ADJUSTED, 'es')} {figures['psr'].shown}" in body
     assert f"DSR {figures['dsr'].shown}" in body
     # The class the notes give is the report's.
     overall = data["verdict"]["overall"]
