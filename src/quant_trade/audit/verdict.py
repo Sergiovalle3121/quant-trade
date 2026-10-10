@@ -790,6 +790,11 @@ MEANING: dict[str, dict[str, str]] = {
             "Parte del resultado puede venir de elegir la mejor de muchas configuraciones. "
             "Pregunta cuántas se probaron y pide el archivo de optimización."
         ),
+        f"{MULTIPLICITY}.WEAK.account": (
+            "Parte del resultado puede venir de que esta sea la mejor de varias cuentas o "
+            "señales. Pregunta al proveedor cuántas lleva o ha cerrado o reiniciado, y "
+            "decláralo como número de intentos."
+        ),
         f"{MULTIPLICITY}.FAIL": (
             "Probando tantas configuraciones, un resultado así aparece aunque ninguna tenga "
             "ventaja real. Este patrón aparece a menudo cuando se ajustan demasiados parámetros."
@@ -854,9 +859,9 @@ MEANING: dict[str, dict[str, str]] = {
             "Indica la fecha en la que termina la optimización para medirlo."
         ),
         f"{OUT_OF_SAMPLE}.NOT_MEASURED.account": (
-            "El historial no dice desde cuándo el robot opera sin cambios, así que no se sabe "
-            "qué parte es prueba sobre datos nuevos. Pregunta esa fecha al proveedor y "
-            "declárala para medirlo."
+            "El historial no dice desde cuándo opera sin cambios esta cuenta o señal, ni si hubo "
+            "reinicios o cuentas cerradas antes, así que no se sabe qué parte es prueba sobre "
+            "datos nuevos. Pregunta esa fecha al proveedor y declárala para medirlo."
         ),
         f"{OUT_OF_SAMPLE}.NOT_MEASURED.fund": (
             "El historial mensual de un fondo es su historial real, pero no dice desde cuándo "
@@ -920,6 +925,11 @@ MEANING: dict[str, dict[str, str]] = {
         f"{MULTIPLICITY}.WEAK": (
             "Part of the result may come from picking the best of many configurations. "
             "Ask how many were tried and request the optimisation file."
+        ),
+        f"{MULTIPLICITY}.WEAK.account": (
+            "Part of the result may come from this being the best of several accounts or "
+            "signals. Ask the provider how many they run or have closed or reset, and declare "
+            "it as the number of trials."
         ),
         f"{MULTIPLICITY}.FAIL": (
             "Trying this many configurations produces a result like this even when none has "
@@ -986,9 +996,10 @@ MEANING: dict[str, dict[str, str]] = {
             "State the date the optimisation ends to measure it."
         ),
         f"{OUT_OF_SAMPLE}.NOT_MEASURED.account": (
-            "The history does not say since when the robot has run unchanged, so it is not "
-            "known which part is a test on unseen data. Ask the provider for that date and "
-            "declare it to measure it."
+            "The history does not say since when this account or signal has traded unchanged, "
+            "or whether it was reset or earlier accounts were closed, so it is not known which "
+            "part is a test on unseen data. Ask the provider for that date and declare it to "
+            "measure it."
         ),
         f"{OUT_OF_SAMPLE}.NOT_MEASURED.fund": (
             "A fund's monthly record is its real history, but it does not say since when the "

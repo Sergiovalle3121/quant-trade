@@ -5727,3 +5727,56 @@ of the confirmation notice, and, per article and language, that the side
 button and the closing call follow the table above and that every link
 answers 200. Every new text passes `find_claims` and avoids "verificado",
 "certificado", "aprobado", "garantiza", "rentable" and processing times.
+
+## Account and signal reports without contradictions (9 October 2026)
+
+With the paid offer the signal sample is what a copier reads before paying,
+so every figure it shows twice now reads the same both times. Display only:
+no figure, threshold, class, tag, simulator result, price or credit changed
+(`tests/test_audit_informe_cuenta_coherente.py`, es/en/pt).
+
+- **One name per PSR** (`psr_names`). The statistical dimension has always
+  used the lower of the plain PSR and the dependence-adjusted one; the report
+  said "the class uses the plain count" and the plan quoted the plain figure.
+  `class_psr(data)` reads which figure the stored dimension used and its
+  track record; the plan, the technical detail ("PSR adjusted for dependence
+  0.677 < 0.8") and the significance table ("PSR (plain count)", plus a row
+  for the adjusted figure, "the figure the class uses") give each its name.
+  The plain track record rows say "(plain count)".
+- **Declared floating result in the reconciliation.** When the engine values
+  no open position and the file declares a floating result
+  (`report.declared_open_value`: the account review's DECLARED figure, else
+  the platform summary), the "Open-position value" row shows it as Declared,
+  with its note and why it stays out of the expected balance (closed trades
+  only); the coverage line says the same. The expected balance is unchanged.
+- **Under a year is not 12 months.** The luck section gives the history in
+  months with one decimal, or "almost 12 months", never rounded up to 12.
+- **Annual figures below -100 %.** The mean-shift section shows any yearly
+  average or band end below -100 % as "-100.0% or worse"; the stored band is
+  unchanged.
+- **Account wording.** On an account or signal history the out-of-sample
+  meaning and plan step ask since when the account or signal has traded
+  unchanged and whether it was reset or replaced a closed account; the
+  multiplicity step and meaning count the accounts or signals behind it
+  (no optimisation XML); the backtest to compare is "of the same strategy,
+  if it has one"; "keep this report" speaks of the signal's settings or a
+  new account. Every text has its own, provider and neutral voice
+  (`ownership.PLAN["account_trials"]`, `["account_trials_undeclared"]`,
+  `["title_account_multiplicity"]`, `MEANING["multiplicity.WEAK.account"]`,
+  `["multiplicity.WEAK.undeclared.account"]`, `LABELS["next_keep_account"]`).
+- **Challenge with an unseen open loss** (`report.unseen_open_loss`). With
+  HIDDEN_FLOATING_DRAWDOWN, or FLOATING_LOSS_AT_END on a balance-only curve,
+  the challenge section opens with a red callout: the open loss (its declared
+  share of the balance when known) already counts against the daily and
+  total limits of any challenge, and the figures below do not see it. The
+  outcome table, the ladder, the size table and the firms' table sit in
+  `<details class='unseen-open'>` under that callout (the size and firms
+  subsections each repeat a short line first). The simulator is unchanged;
+  the PDF opens the folds (`pdf._expand_details_for_pdf`).
+- **Two periods.** The header says "Curve data"; under the platform's figures
+  a line says Start and End are the platform's period or its first and last
+  trade, while the curve data run from the curve's first point (a deposit
+  or the opening balance) to its last.
+- **Net or gross.** The backtest-against-live table names its averages "net
+  of fees"; the trade table names its own "gross, before fees" when the file
+  itemises fees per trade.

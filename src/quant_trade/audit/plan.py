@@ -23,6 +23,7 @@ from typing import Any, TypeVar
 from quant_trade.audit import ownership, report_pt
 from quant_trade.audit.account import is_account_history
 from quant_trade.audit.engine import HOLDOUT_MIN_OBSERVATIONS
+from quant_trade.audit.psr_names import class_psr, psr_name
 from quant_trade.audit.redflags import OBSERVATIONS_WARN, flag_title
 from quant_trade.audit.schema import MIN_OBSERVATIONS, Dimension
 from quant_trade.audit.verdict import (
@@ -145,8 +146,14 @@ TITLES: dict[str, dict[str, str]] = {
 
 #: Titles that read differently when the upload is an account history.
 ACCOUNT_TITLES: dict[str, dict[str, str]] = {
-    "es": {OUT_OF_SAMPLE: "Averigua desde cuándo opera sin cambios"},
-    "en": {OUT_OF_SAMPLE: "Find out since when it has run unchanged"},
+    "es": {
+        OUT_OF_SAMPLE: "Averigua desde cuándo opera sin cambios",
+        MULTIPLICITY: "Averigua cuántas cuentas o señales hay detrás",
+    },
+    "en": {
+        OUT_OF_SAMPLE: "Find out since when it has run unchanged",
+        MULTIPLICITY: "Find out how many accounts or signals stand behind it",
+    },
 }
 
 #: Titles that read differently when the upload is a fund's track record.
@@ -455,8 +462,10 @@ GENERIC_FLAG_HINT = {
 def _significance_step(data: dict[str, Any], status: str, locale: str) -> tuple[str, list[str]]:
     sig = data.get("significance") or {}
     n = _number(_value(sig.get("observations")))
-    need = _number(_value(sig.get("min_track_record_length")))
-    psr = _number(_value(sig.get("psr")))
+    # The figure the class uses (the one adjusted for dependence whenever it is
+    # measured), under the name the table and the technical detail give it.
+    psr, need, kind = class_psr(data)
+    name = psr_name(kind, locale)
     ppy = _number(_value((data.get("inputs") or {}).get("periods_per_year")))
     if sig.get("status") != "MEASURED" or n is None:
         finding = _say(
@@ -470,15 +479,15 @@ def _significance_step(data: dict[str, Any], status: str, locale: str) -> tuple[
         # Hundreds of years of history is not an ask anyone can meet: say so plainly.
         finding = _say(
             locale,
-            f"PSR {_fmt(psr, 3)} con {n:,.0f} observaciones. Con el mismo comportamiento, ni "
-            f"con {NEED_CAP} veces más historial llegaría a 0.95: con estos datos el resultado "
-            "no se distingue del azar.",
-            f"PSR {_fmt(psr, 3)} with {n:,.0f} observations. With the same behaviour, not even "
-            f"{NEED_CAP} times more history would take it to 0.95: on this data the result "
-            "cannot be told apart from chance.",
-            f"PSR {_fmt(psr, 3)} com {n:,.0f} observações. Com o mesmo comportamento, nem com "
-            f"{NEED_CAP} vezes mais histórico chegaria a 0.95: com estes dados o resultado não "
-            "se distingue do acaso.",
+            f"{name} {_fmt(psr, 3)} con {n:,.0f} observaciones. Con el mismo comportamiento, "
+            f"ni con {NEED_CAP} veces más historial llegaría a 0.95: con estos datos el "
+            "resultado no se distingue del azar.",
+            f"{name} {_fmt(psr, 3)} with {n:,.0f} observations. With the same behaviour, not "
+            f"even {NEED_CAP} times more history would take it to 0.95: on this data the "
+            "result cannot be told apart from chance.",
+            f"{name} {_fmt(psr, 3)} com {n:,.0f} observações. Com o mesmo comportamento, nem "
+            f"com {NEED_CAP} vezes mais histórico chegaria a 0.95: com estes dados o resultado "
+            "não se distingue do acaso.",
         )
     elif psr is not None and need is not None and need > n:
         extra = need - n
@@ -486,13 +495,13 @@ def _significance_step(data: dict[str, Any], status: str, locale: str) -> tuple[
         span_text = f" ({span})" if span else ""
         finding = _say(
             locale,
-            f"PSR {_fmt(psr, 3)} con {n:,.0f} observaciones. Con el mismo comportamiento, "
+            f"{name} {_fmt(psr, 3)} con {n:,.0f} observaciones. Con el mismo comportamiento, "
             f"llegaría a 0.95 con unas {math.ceil(need):,} observaciones: faltan "
             f"{math.ceil(extra):,}{span_text}.",
-            f"PSR {_fmt(psr, 3)} with {n:,.0f} observations. With the same behaviour it "
+            f"{name} {_fmt(psr, 3)} with {n:,.0f} observations. With the same behaviour it "
             f"would reach 0.95 at about {math.ceil(need):,} observations: "
             f"{math.ceil(extra):,} more{span_text}.",
-            f"PSR {_fmt(psr, 3)} com {n:,.0f} observações. Com o mesmo comportamento, "
+            f"{name} {_fmt(psr, 3)} com {n:,.0f} observações. Com o mesmo comportamento, "
             f"chegaria a 0.95 com cerca de {math.ceil(need):,} observações: faltam "
             f"{math.ceil(extra):,}{span_text}.",
         )
@@ -502,11 +511,11 @@ def _significance_step(data: dict[str, Any], status: str, locale: str) -> tuple[
         p5_text = f" ({_fmt(p5, 3)})" if p5 is not None else ""
         finding = _say(
             locale,
-            f"El PSR es {_fmt(psr or 0.0, 3)}, pero el percentil 5 del Sharpe en el bootstrap"
-            f"{p5_text} no queda por encima de cero.",
-            f"PSR is {_fmt(psr or 0.0, 3)}, but the bootstrap's 5th-percentile Sharpe"
+            f"El {name} es {_fmt(psr or 0.0, 3)}, pero el percentil 5 del Sharpe en el "
+            f"bootstrap{p5_text} no queda por encima de cero.",
+            f"{name} is {_fmt(psr or 0.0, 3)}, but the bootstrap's 5th-percentile Sharpe"
             f"{p5_text} is not above zero.",
-            f"O PSR é {_fmt(psr or 0.0, 3)}, mas o percentil 5 do Sharpe no bootstrap"
+            f"O {name} é {_fmt(psr or 0.0, 3)}, mas o percentil 5 do Sharpe no bootstrap"
             f"{p5_text} não fica acima de zero.",
         )
     if (data.get("fund") or {}).get("track_record"):
@@ -611,6 +620,8 @@ def _multiplicity_step(data: dict[str, Any], status: str, locale: str) -> tuple[
                 locale,
                 ownership.role_of(data),
             )
+        if is_account_history(data):
+            return _account_trials_undeclared(locale, ownership.role_of(data))
         return _say(
             locale,
             "No se declaró cuántas configuraciones se probaron; por eso la clase no puede pasar "
@@ -664,21 +675,25 @@ def _multiplicity_step(data: dict[str, Any], status: str, locale: str) -> tuple[
                 "passa com 0.95 ou mais e, abaixo de 0.5, não passa.",
             )
         )
+    account = is_account_history(data) and not _fund_record(data)
     if half is not None and half <= 1:
         # Below 0.5 already at a single trial: the count of trials decides nothing.
         fund = _fund_record(data)
+        one = _say(
+            locale,
+            "fondo" if fund else "cuenta" if account else "configuración",
+            "fund" if fund else "account" if account else "configuration",
+            "fundo" if fund else "conta" if account else "configuração",
+        )
         parts.append(
             _say(
                 locale,
-                f"Ya con 1 {'fondo' if fund else 'configuración'}, el caso más favorable, queda "
-                "por debajo de 0.5: aquí decide la falta de significación, no el número de "
-                "intentos.",
-                f"Even at 1 {'fund' if fund else 'configuration'}, the most favourable case, it "
-                "is below 0.5: what decides here is the lack of significance, not the number "
-                "of trials.",
-                f"Já com 1 {'fundo' if fund else 'configuração'}, o caso mais favorável, fica "
-                "abaixo de 0.5: aqui quem decide é a falta de significância, não o número de "
-                "tentativas.",
+                f"Ya con 1 {one}, el caso más favorable, queda por debajo de 0.5: aquí decide la "
+                "falta de significación, no el número de intentos.",
+                f"Even at 1 {one}, the most favourable case, it is below 0.5: what decides here "
+                "is the lack of significance, not the number of trials.",
+                f"Já com 1 {one}, o caso mais favorável, fica abaixo de 0.5: aqui quem decide é a "
+                "falta de significância, não o número de tentativas.",
             )
         )
     elif half is not None and _fund_record(data):
@@ -690,6 +705,18 @@ def _multiplicity_step(data: dict[str, Any], status: str, locale: str) -> tuple[
                 f"With {half:,.0f} or more funds or strategies from the same manager it falls "
                 "below 0.5.",
                 f"Com {half:,.0f} ou mais fundos ou estratégias do mesmo gestor cai abaixo de 0.5.",
+            )
+        )
+    elif half is not None and account:
+        parts.append(
+            _say(
+                locale,
+                f"Con {half:,.0f} o más cuentas o señales contadas como intentos cae por debajo "
+                "de 0.5.",
+                f"With {half:,.0f} or more accounts or signals counted as trials it falls below "
+                "0.5.",
+                f"Com {half:,.0f} ou mais contas ou sinais contados como tentativas cai abaixo "
+                "de 0.5.",
             )
         )
     elif half is not None:
@@ -730,6 +757,25 @@ def _multiplicity_step(data: dict[str, Any], status: str, locale: str) -> tuple[
                 [
                     "Aqui não decide quantos fundos o gestor administra: já com 1 fica abaixo "
                     "de 0.5. O que conta é mais histórico do mesmo fundo.",
+                ],
+            )
+        if account:
+            return " ".join(parts), _say(
+                locale,
+                [
+                    "Aquí no decide cuántas cuentas o señales hay detrás de esta: ya con 1 "
+                    "queda por debajo de 0.5. Lo que cuenta es más historial de la misma "
+                    "cuenta, sin cambiar la configuración.",
+                ],
+                [
+                    "How many accounts or signals stand behind this one does not decide here: "
+                    "even at 1 it is below 0.5. What counts is more history of the same "
+                    "account, with unchanged settings.",
+                ],
+                [
+                    "Aqui não decide quantas contas ou sinais há por trás desta: já com 1 fica "
+                    "abaixo de 0.5. O que conta é mais histórico da mesma conta, sem mudar a "
+                    "configuração.",
                 ],
             )
         return " ".join(parts), _say(
@@ -779,6 +825,10 @@ def _multiplicity_step(data: dict[str, Any], status: str, locale: str) -> tuple[
             locale,
             ownership.role_of(data),
         )
+    if account and not counted:
+        # An account or signal has no optimisation file to upload: its trials are
+        # the accounts or signals behind it, and the ones closed or reset.
+        return " ".join(parts), _account_trials(locale, ownership.role_of(data))
     if not counted:
         upload = _say(
             locale,
@@ -830,6 +880,57 @@ def _multiplicity_step(data: dict[str, Any], status: str, locale: str) -> tuple[
         ),
     ]
     return " ".join(parts), actions
+
+
+def _account_trials_undeclared(locale: str, role: str) -> tuple[str, list[str]]:
+    """The multiplicity step of an account or signal with no trial count declared."""
+    finding = _say(
+        locale,
+        "No se declaró cuántas cuentas o señales hay detrás de esta ni cuántas se cerraron o "
+        "reiniciaron; por eso la clase no puede pasar de B.",
+        "How many accounts or signals stand behind this one, or were closed or reset, was not "
+        "declared; that is why the class cannot go above B.",
+        "Não foi declarado quantas contas ou sinais há por trás desta nem quantas foram "
+        "encerradas ou reiniciadas; por isso a classe não pode passar de B.",
+    )
+    actions = _say(
+        locale,
+        [
+            "Pregunta al proveedor cuántas cuentas o señales lleva o ha cerrado o reiniciado y "
+            "decláralo (aunque sea 1) al subir el historial: Rigor lo descuenta.",
+        ],
+        [
+            "Ask the provider how many accounts or signals they run or have closed or reset and "
+            "declare it (even if it is 1) when you upload the history: Rigor discounts it.",
+        ],
+        [
+            "Pergunte ao fornecedor quantas contas ou sinais ele opera ou já encerrou ou "
+            "reiniciou e declare esse número (mesmo que seja 1) ao enviar o histórico: o Rigor o "
+            "desconta.",
+        ],
+    )
+    return finding, _voiced(actions, ("account_trials_undeclared",), locale, role)
+
+
+def _account_trials(locale: str, role: str) -> list[str]:
+    """What an account or signal's multiplicity step asks for, in ``role``'s voice."""
+    actions = _say(
+        locale,
+        [
+            "Pregunta al proveedor cuántas cuentas o señales lleva o ha cerrado o reiniciado y "
+            "decláralo como número de intentos: una buena cuenta entre muchas pesa menos.",
+        ],
+        [
+            "Ask the provider how many accounts or signals they run or have closed or reset and "
+            "declare it as the number of trials: one good account among many weighs less.",
+        ],
+        [
+            "Pergunte ao fornecedor quantas contas ou sinais ele opera ou já encerrou ou "
+            "reiniciou e declare isso como número de tentativas: uma boa conta entre muitas "
+            "pesa menos.",
+        ],
+    )
+    return _voiced(actions, ("account_trials",), locale, role)
 
 
 #: Currency pairs the costs step names when the history trades several.
@@ -1028,32 +1129,38 @@ def _account_oos(locale: str, role: str = ownership.BUYER) -> tuple[str, list[st
     """The out-of-sample step for an account history, which has no optimisation date."""
     finding = _say(
         locale,
-        "El historial no dice desde qué fecha el robot opera sin cambios de configuración: "
-        "sin esa fecha la mejor clase posible es B.",
-        "The history does not say since when the robot has run with unchanged "
-        "settings: without that date the best possible class is B.",
-        "O histórico não diz desde que data o robô opera sem mudanças de configuração: "
-        "sem essa data a melhor classe possível é B.",
+        "El historial no dice desde qué fecha opera sin cambios de configuración esta cuenta "
+        "o señal, ni si hubo reinicios o cuentas cerradas antes: sin esa fecha la mejor "
+        "clase posible es B.",
+        "The history does not say since when this account or signal has traded with "
+        "unchanged settings, or whether it was reset or earlier accounts were closed: "
+        "without that date the best possible class is B.",
+        "O histórico não diz desde que data esta conta ou sinal opera sem mudanças de "
+        "configuração, nem se houve reinícios ou contas encerradas antes: sem essa data a "
+        "melhor classe possível é B.",
     )
     actions = _say(
         locale,
         [
-            "Pregunta al proveedor desde qué fecha no cambió la configuración y decláralo como "
-            "inicio fuera de muestra: lo posterior se mide como datos nuevos.",
-            "Pide el backtest del mismo robot y súbelo junto a la cuenta: el informe compara "
-            "las dos operación por operación.",
+            "Pregunta al proveedor desde qué fecha no cambió la configuración y si la cuenta se "
+            "reinició o reemplazó a otra cerrada; declara esa fecha como inicio fuera de "
+            "muestra: lo posterior se mide como datos nuevos.",
+            "Pide el backtest de la misma estrategia, si lo tiene, y súbelo junto a la cuenta: "
+            "el informe compara los dos operación por operación.",
         ],
         [
-            "Ask the provider since when the settings have not changed and declare it as the "
-            "out-of-sample start: what follows is measured as unseen data.",
-            "Ask for the backtest of the same robot and upload it with the account: the "
-            "report compares the two trade by trade.",
+            "Ask the provider since when the settings have not changed and whether the account "
+            "was reset or replaced a closed one; declare that date as the out-of-sample start: "
+            "what follows is measured as unseen data.",
+            "Ask for the backtest of the same strategy, if it has one, and upload it with the "
+            "account: the report compares the two trade by trade.",
         ],
         [
-            "Pergunte ao fornecedor desde que data a configuração não mudou e declare-a como "
-            "início fora da amostra: o que vem depois é medido como dados novos.",
-            "Peça o backtest do mesmo robô e envie-o junto com a conta: o relatório compara "
-            "os dois operação por operação.",
+            "Pergunte ao fornecedor desde que data a configuração não mudou e se a conta foi "
+            "reiniciada ou substituiu outra encerrada; declare essa data como início fora da "
+            "amostra: o que vem depois é medido como dados novos.",
+            "Peça o backtest da mesma estratégia, se ela tiver um, e envie-o junto com a "
+            "conta: o relatório compara os dois operação por operação.",
         ],
     )
     return finding, _voiced(actions, ("account_oos_declare", "account_oos_backtest"), locale, role)

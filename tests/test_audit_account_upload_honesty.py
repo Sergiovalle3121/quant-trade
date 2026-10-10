@@ -38,14 +38,15 @@ from quant_trade.audit.web import create_app  # noqa: E402
 
 NOW = datetime(2026, 10, 8, tzinfo=UTC)
 LOCALES = ("es", "en", "pt")
-#: The plan's new sentence for a DSR already below 0.5 at a single trial.
+#: The plan's sentence for a DSR already below 0.5 at a single trial, on an account:
+#: its trials are the accounts or signals behind it, not configurations.
 ONE_TRIAL = {
-    "es": "Ya con 1 configuración, el caso más favorable, queda por debajo de 0.5: aquí "
-    "decide la falta de significación, no el número de intentos.",
-    "en": "Even at 1 configuration, the most favourable case, it is below 0.5: what decides "
-    "here is the lack of significance, not the number of trials.",
-    "pt": "Já com 1 configuração, o caso mais favorável, fica abaixo de 0.5: aqui quem decide "
-    "é a falta de significância, não o número de tentativas.",
+    "es": "Ya con 1 cuenta, el caso más favorable, queda por debajo de 0.5: aquí decide la "
+    "falta de significación, no el número de intentos.",
+    "en": "Even at 1 account, the most favourable case, it is below 0.5: what decides here "
+    "is the lack of significance, not the number of trials.",
+    "pt": "Já com 1 conta, o caso mais favorável, fica abaixo de 0.5: aqui quem decide é a "
+    "falta de significância, não o número de tentativas.",
 }
 REOPTIMISE = {
     "es": "Los intentos que ya hiciste siguen contando: reoptimizar alrededor de la "

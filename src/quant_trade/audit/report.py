@@ -21,7 +21,8 @@ from datetime import date
 from typing import Any
 from urllib.parse import parse_qsl, quote, urlencode, urlsplit, urlunsplit
 
-from quant_trade.audit import charts, ownership, paid_offer, report_pt, seller_message
+from quant_trade.audit import charts, ownership, paid_offer, psr_names, report_pt, seller_message
+from quant_trade.audit.account import FLOATING_NOTE as ACCOUNT_FLOATING_NOTE
 from quant_trade.audit.account import is_account_history
 from quant_trade.audit.crises import (
     MARKET,
@@ -167,6 +168,12 @@ INTEGRITY_TEXT: dict[str, dict[str, str]] = {
         "recon_outside": "Operaciones fuera del periodo de la curva",
         "recon_flow_coverage": "Depósitos y retiros",
         "recon_open_coverage": "Posiciones abiertas",
+        "recon_open_declared": (
+            "declaradas por la plataforma ({value}), fuera de la suma de operaciones cerradas"
+        ),
+        "recon_open_not_added": (
+            "No se suma al saldo final esperado, que cuenta solo operaciones cerradas."
+        ),
         "recon_currency_coverage": "Moneda",
         "recon_trade_currency": "Moneda indicada en operaciones",
         "recon_curve_currency": "Moneda indicada en la curva",
@@ -242,6 +249,10 @@ INTEGRITY_TEXT: dict[str, dict[str, str]] = {
         "recon_outside": "Trades outside the curve period",
         "recon_flow_coverage": "Deposits and withdrawals",
         "recon_open_coverage": "Open positions",
+        "recon_open_declared": "declared by the platform ({value}), outside the closed-trade sum",
+        "recon_open_not_added": (
+            "It is not added to the expected closing balance, which counts closed trades only."
+        ),
         "recon_currency_coverage": "Currency",
         "recon_trade_currency": "Currency stated by trades",
         "recon_curve_currency": "Currency stated by the curve",
@@ -315,6 +326,12 @@ INTEGRITY_TEXT: dict[str, dict[str, str]] = {
         "recon_outside": "Operações fora do período da curva",
         "recon_flow_coverage": "Depósitos e retiradas",
         "recon_open_coverage": "Posições abertas",
+        "recon_open_declared": (
+            "declaradas pela plataforma ({value}), fora da soma das operações fechadas"
+        ),
+        "recon_open_not_added": (
+            "Não é somado ao saldo final esperado, que conta só operações fechadas."
+        ),
         "recon_currency_coverage": "Moeda",
         "recon_trade_currency": "Moeda informada nas operações",
         "recon_curve_currency": "Moeda informada na curva",
@@ -467,7 +484,7 @@ LABELS: dict[str, dict[str, str]] = {
         ),
         "generated": "Generada",
         "audit_id": "Identificador",
-        "data_period": "Datos",
+        "data_period": "Datos de la curva",
         "data_age": "{days} días entre el último dato y esta auditoría",
         "data_age_one": "1 día entre el último dato y esta auditoría",
         "data_age_account": "Lo que pasó después del último dato no está en este archivo.",
@@ -816,6 +833,7 @@ LABELS: dict[str, dict[str, str]] = {
         "luck_months": "{n} meses",
         "luck_month_one": "1 mes",
         "luck_under_month": "menos de 1 mes",
+        "luck_almost_year": "casi 12 meses",
         "ride": "Cómo se vivió este historial",
         "ride_intro": (
             "Un total y una caída máxima no dicen cómo se vivió el historial: cuánto tiempo pasó "
@@ -913,6 +931,7 @@ LABELS: dict[str, dict[str, str]] = {
         "shift_before": "Rentabilidad media al año antes del {date}",
         "shift_after": "Rentabilidad media al año desde el {date}",
         "shift_band": "banda del 90 %: {low} a {high}",
+        "shift_floor": "{pct} o peor",
         "fund": "Lo que revisaría quien invierte en un fondo",
         "fund_intro": (
             "Las cifras de una ficha de fondo y dos pruebas que usan los analistas de fondos: "
@@ -1050,7 +1069,7 @@ LABELS: dict[str, dict[str, str]] = {
             "Los retornos no dependen de forma apreciable unos de otros: tenerlo en cuenta no "
             "cambia la probabilidad de que el Sharpe real sea mayor que cero."
         ),
-        "dependence_info": "Es informativo: la clase usa la cuenta simple.",
+        "dependence_info": "La clase usa la segunda cifra, el PSR ajustado por dependencia.",
         "lo_not_lower": (
             "Sharpe corregido por autocorrelación (Lo, 2002): no queda apreciablemente por "
             "debajo de {plain}, así que el orden de los retornos no infla el Sharpe simple de "
@@ -1525,8 +1544,8 @@ LABELS: dict[str, dict[str, str]] = {
         "live_win_rate": "Aciertos",
         "live_net": "Resultado neto",
         "live_fall": "Peor caída",
-        "live_avg_win": "Ganancia media",
-        "live_avg_loss": "Pérdida media",
+        "live_avg_win": "Ganancia media (neta de costos)",
+        "live_avg_loss": "Pérdida media (neta de costos)",
         "live_below": "Historias del backtest con un resultado neto igual o peor",
         "live_fall_above": "Historias del backtest con una caída igual o más profunda",
         "live_rescaled": (
@@ -1654,6 +1673,10 @@ LABELS: dict[str, dict[str, str]] = {
             "Guarda este informe y su identificador; si el robot cambia, pide que se audite "
             "de nuevo."
         ),
+        "next_keep_account": (
+            "Guarda este informe y su identificador; si la señal cambia de configuración o pasa "
+            "a otra cuenta, pide que se audite de nuevo."
+        ),
         "next_intro_fund": (
             "Si inviertes o vas a invertir en este fondo, esto es lo que conviene aclarar "
             "primero, según lo que encontró la auditoría."
@@ -1713,6 +1736,25 @@ LABELS: dict[str, dict[str, str]] = {
         "challenge": "Simulador de reto de prop firm",
         "challenge_rules": "Reglas simuladas",
         "open_loss_badge": "Pérdidas abiertas",
+        "ch_unseen_open": (
+            "La pérdida abierta del {share} del balance, que seguía abierta cuando se imprimió el "
+            "historial, ya cuenta contra los límites de pérdida diaria y total de cualquier reto, "
+            "y las cifras de abajo no la ven: el balance solo cuenta operaciones cerradas."
+        ),
+        "ch_unseen_open_any": (
+            "Las pérdidas abiertas que el balance oculta ya cuentan contra los límites de pérdida "
+            "diaria y total de cualquier reto, y las cifras de abajo no las ven: el balance solo "
+            "cuenta operaciones cerradas."
+        ),
+        "ch_unseen_summary": "Cifras que no ven la pérdida abierta (optimistas)",
+        "ch_unseen_sizes": (
+            "En cada tamaño, la misma pérdida abierta ya cuenta contra estos límites y la tabla "
+            "no la ve."
+        ),
+        "ch_unseen_firms": (
+            "La misma pérdida abierta ya cuenta contra las reglas de cada firma, y esta tabla no "
+            "la ve."
+        ),
         "hidden_loss": (
             "El archivo solo muestra el balance y las banderas rojas encontraron pérdidas "
             "abiertas que el balance oculta (Drawdown flotante oculto). Aquí no entran, así "
@@ -1945,6 +1987,12 @@ LABELS: dict[str, dict[str, str]] = {
         "report_source": "Formato del archivo",
         "platform": "Datos que declara la plataforma",
         "platform_checked": "Lo que Rigor comprobó en el archivo",
+        "platform_period_note": (
+            "Inicio y Fin son las fechas que la plataforma da para su periodo o, si no da "
+            "ninguna, las de la primera y la última operación que lista. Los datos de la curva "
+            "({first} → {last}) van del primer punto de la curva al último, que puede ser un "
+            "depósito o el saldo inicial antes de la primera operación."
+        ),
         "colmap": "Cómo se leyó cada columna de tu archivo",
         "optimization": "Exportación de optimización",
         "passes": "configuraciones probadas",
@@ -2080,7 +2128,7 @@ LABELS: dict[str, dict[str, str]] = {
         ),
         "generated": "Generated",
         "audit_id": "Identifier",
-        "data_period": "Data",
+        "data_period": "Curve data",
         "data_age": "{days} days between the last data point and this audit",
         "data_age_one": "1 day between the last data point and this audit",
         "data_age_account": "What happened after the last data point is not in this file.",
@@ -2418,6 +2466,7 @@ LABELS: dict[str, dict[str, str]] = {
         "luck_months": "{n} months",
         "luck_month_one": "1 month",
         "luck_under_month": "under 1 month",
+        "luck_almost_year": "almost 12 months",
         "ride": "What living through this history was like",
         "ride_intro": (
             "A total and a maximum drawdown do not say what the history was like to live "
@@ -2510,6 +2559,7 @@ LABELS: dict[str, dict[str, str]] = {
         "shift_before": "Average return a year before {date}",
         "shift_after": "Average return a year since {date}",
         "shift_band": "90 % band: {low} to {high}",
+        "shift_floor": "{pct} or worse",
         "fund": "What a fund investor would check",
         "fund_intro": (
             "A fund factsheet's figures and two tests fund analysts use: whether the monthly "
@@ -2641,7 +2691,7 @@ LABELS: dict[str, dict[str, str]] = {
             "The returns do not depend on each other appreciably: taking that into account "
             "does not change the probability that the true Sharpe is above zero."
         ),
-        "dependence_info": "It is informational: the class uses the plain count.",
+        "dependence_info": "The class uses the second figure, the PSR adjusted for dependence.",
         "lo_not_lower": (
             "Sharpe corrected for autocorrelation (Lo, 2002): it is not appreciably below "
             "{plain}, so the order of the returns does not inflate the plain Sharpe appreciably. "
@@ -3107,8 +3157,8 @@ LABELS: dict[str, dict[str, str]] = {
         "live_win_rate": "Win rate",
         "live_net": "Net result",
         "live_fall": "Deepest fall",
-        "live_avg_win": "Average win",
-        "live_avg_loss": "Average loss",
+        "live_avg_win": "Average win (net of fees)",
+        "live_avg_loss": "Average loss (net of fees)",
         "live_below": "Backtest histories with a net result as low or lower",
         "live_fall_above": "Backtest histories with a fall as deep or deeper",
         "live_rescaled": (
@@ -3233,6 +3283,10 @@ LABELS: dict[str, dict[str, str]] = {
         "next_keep": (
             "Keep this report and its identifier; if the robot changes, ask for a new audit."
         ),
+        "next_keep_account": (
+            "Keep this report and its identifier; if the signal changes its settings or moves "
+            "to another account, ask for a new audit."
+        ),
         "next_intro_fund": (
             "If you invest or are about to invest in this fund, this is what is worth clearing "
             "up first, going by what the audit found."
@@ -3292,6 +3346,25 @@ LABELS: dict[str, dict[str, str]] = {
         "challenge": "Prop-firm challenge simulator",
         "challenge_rules": "Rules simulated",
         "open_loss_badge": "Open losses",
+        "ch_unseen_open": (
+            "The open loss of {share} of the balance, still open when the history was printed, "
+            "already counts against the daily and total loss limits of any challenge, and the "
+            "figures below do not see it: the balance counts closed trades only."
+        ),
+        "ch_unseen_open_any": (
+            "The open losses the balance hides already count against the daily and total loss "
+            "limits of any challenge, and the figures below do not see them: the balance counts "
+            "closed trades only."
+        ),
+        "ch_unseen_summary": "Figures that do not see the open loss (optimistic)",
+        "ch_unseen_sizes": (
+            "At every size the same open loss already counts against these limits, and the "
+            "table does not see it."
+        ),
+        "ch_unseen_firms": (
+            "The same open loss already counts against every firm's rules, and this table does "
+            "not see it."
+        ),
         "hidden_loss": (
             "The file shows the balance only, and the red flags found open losses the balance "
             "hides (Hidden floating drawdown). They are not counted here, so these figures come "
@@ -3516,6 +3589,12 @@ LABELS: dict[str, dict[str, str]] = {
         "report_source": "File format",
         "platform": "Figures the platform states",
         "platform_checked": "What Rigor checked in the file",
+        "platform_period_note": (
+            "Start and End are the dates the platform gives for its period or, when it gives "
+            "none, those of the first and last trade it lists. The curve data ({first} → "
+            "{last}) run from the curve's first point to its last, which can be a deposit or "
+            "the opening balance before the first trade."
+        ),
         "colmap": "How each column of your file was read",
         "optimization": "Optimisation export",
         "passes": "configurations tried",
@@ -3708,6 +3787,8 @@ KEY_LABELS: dict[str, dict[str, str]] = {
         "expectancy": "Esperanza por operación",
         "average_win": "Ganancia media",
         "average_loss": "Pérdida media",
+        "average_win_gross": "Ganancia media (bruta, antes de costos)",
+        "average_loss_gross": "Pérdida media (bruta, antes de costos)",
         "payoff_ratio": "Ratio ganancia/pérdida media",
         "largest_win_share": "Peso de la mayor ganadora",
         "deposits_count": "Depósitos",
@@ -3747,9 +3828,10 @@ KEY_LABELS: dict[str, dict[str, str]] = {
         "sqn": "SQN",
         "trades_per_month": "Operaciones por mes",
         "observations": "Observaciones",
-        "psr": "Sharpe probabilístico (PSR)",
-        "min_track_record_length": "Historial mínimo necesario",
-        "observations_short_by": "Observaciones que faltan",
+        "psr": "Sharpe probabilístico, PSR (cuenta simple)",
+        "psr_dependence": "Sharpe probabilístico, PSR ajustado por dependencia",
+        "min_track_record_length": "Historial mínimo necesario (cuenta simple)",
+        "observations_short_by": "Observaciones que faltan (cuenta simple)",
         "trials": "Intentos",
         "cost_bps_per_side": "Costo por lado (pb)",
         "oos_start": "Inicio fuera de muestra",
@@ -3818,6 +3900,8 @@ KEY_LABELS: dict[str, dict[str, str]] = {
         "expectancy": "Expectancy per trade",
         "average_win": "Average win",
         "average_loss": "Average loss",
+        "average_win_gross": "Average win (gross, before fees)",
+        "average_loss_gross": "Average loss (gross, before fees)",
         "payoff_ratio": "Average win / average loss",
         "largest_win_share": "Share of the largest win",
         "deposits_count": "Deposits",
@@ -3855,9 +3939,10 @@ KEY_LABELS: dict[str, dict[str, str]] = {
         "mean_holding_hours": "Mean hours per trade",
         "median_holding_hours": "Median hours per trade",
         "trades_per_month": "Trades per month",
-        "psr": "Probabilistic Sharpe (PSR)",
-        "min_track_record_length": "Minimum track record needed",
-        "observations_short_by": "Observations missing",
+        "psr": "Probabilistic Sharpe, PSR (plain count)",
+        "psr_dependence": "Probabilistic Sharpe, PSR adjusted for dependence",
+        "min_track_record_length": "Minimum track record needed (plain count)",
+        "observations_short_by": "Observations missing (plain count)",
         "cost_bps_per_side": "Cost per side (bps)",
         "oos_start": "Out-of-sample start",
         "benchmark_applicable": "Benchmark applies",
@@ -3924,6 +4009,8 @@ MONEY_KEYS = {
     "expectancy",
     "average_win",
     "average_loss",
+    "average_win_gross",
+    "average_loss_gross",
     "commission",
     "swap",
     "deposits_total",
@@ -3968,6 +4055,7 @@ PERCENT_KEYS = {
     "min_drawdown",
     "share_negative",
     "psr",
+    "psr_dependence",
     "dsr",
     "pbo",
     "p5",
@@ -4512,12 +4600,20 @@ def _meaning_html(
     return "<div class='meaning'>" + "".join(items) + "</div>"
 
 
-def _reasons_html(verdict: dict[str, Any], locale: str, labels: dict[str, str]) -> str:
+def _reasons_html(
+    verdict: dict[str, Any],
+    locale: str,
+    labels: dict[str, str],
+    data: dict[str, Any] | None = None,
+) -> str:
     rows = []
     for d in verdict["dimensions"]:
         reasons = d.get("reasons_es") if locale == "es" and d.get("reasons_es") else d["reasons"]
         if locale == "pt":
             reasons = [localize(reason, locale) for reason in d["reasons"]]
+        if d.get("name") == "statistical_significance" and data is not None:
+            # The PSR the class used, under the name the plan and the table give it.
+            reasons = [_class_psr_reason(reason, data, locale) for reason in reasons]
         rows.append(
             f"<tr><td>{_e(_dimension_title(d['name'], locale))}</td>"
             f"<td>{_status_badge(d['status'], locale)}</td><td>{_e('; '.join(reasons))}</td></tr>"
@@ -5151,6 +5247,21 @@ def _streak_html(stats: dict[str, Any], labels: dict[str, str]) -> str:
     return out
 
 
+#: The trade table's averages taken from each trade's result before the fees the
+#: file itemises, named so beside the net averages of the backtest-against-live table.
+_GROSS_AVERAGES = {"average_win": "average_win_gross", "average_loss": "average_loss_gross"}
+
+
+def _gross_named(stats: dict[str, Any]) -> dict[str, Any]:
+    """The trade statistics with the average win and loss named gross when the
+    file itemises fees per trade (``win_rate_gross`` is there only then): those
+    averages are of the result before fees, while the live comparison's are net.
+    Without itemised fees the file's own result is all there is: the names stay."""
+    if "win_rate_gross" not in stats:
+        return stats
+    return {_GROSS_AVERAGES.get(key, key): value for key, value in stats.items()}
+
+
 def _trade_stats_html(stats: dict[str, Any] | None, labels: dict[str, str]) -> str:
     if not stats:
         return f"<p class='muted'>{_e(labels['none'])}</p>"
@@ -5159,7 +5270,7 @@ def _trade_stats_html(stats: dict[str, Any] | None, labels: dict[str, str]) -> s
         return html_text
     html_text += _streak_html(stats, labels)
     html_text += _ranges_html(stats.get("intervals"), labels)
-    html_text += _evidence_rows(stats, labels, skip={"long", "short"})
+    html_text += _evidence_rows(_gross_named(stats), labels, skip={"long", "short"})
     for side in ("long", "short"):
         if isinstance(stats.get(side), dict):
             html_text += f"<h3>{_e(labels[side])}</h3>" + _evidence_rows(
@@ -5238,9 +5349,33 @@ def _lo_html(significance: dict[str, Any], plain: float | None, labels: dict[str
     return f"<p>{_e(out)} {_badge('MEASURED')}</p>"
 
 
+def _significance_rows(significance: dict[str, Any]) -> dict[str, Any]:
+    """The significance table's rows: the stored ones, with the PSR adjusted for
+    dependence beside the plain count when it is measured, since that is the
+    figure the class uses (``psr_names``). Display only: nothing is stored."""
+    adjusted = (significance.get("dependence") or {}).get("psr") or {}
+    if adjusted.get("evidence") != "MEASURED" or "psr" not in significance:
+        return significance
+    shown: dict[str, Any] = {}
+    for key, value in significance.items():
+        shown[key] = value
+        if key == "psr":
+            shown["psr_dependence"] = {**adjusted, "note": psr_names.CLASS_NOTE}
+    return shown
+
+
+def _class_psr_reason(reason: str, data: dict[str, Any], locale: str) -> str:
+    """``PSR 0.677 < 0.8`` as the statistical dimension stored it, with the name
+    of the figure it is (``psr_names``), the one the plan and the table use."""
+    return re.sub(
+        r"^PSR (?=\d)", lambda _: psr_names.class_psr_name(data, locale) + " ", reason, count=1
+    )
+
+
 def _dependence_html(significance: dict[str, Any], labels: dict[str, str]) -> str:
     """The probability of a true Sharpe above zero with dependent returns, beside
-    the plain one; it never feeds the class and never reads higher."""
+    the plain one; it never reads higher, and when it is measured it is the one
+    the class uses (the engine takes the lower of the two)."""
     block = significance.get("dependence") or {}
     ratio = _ev_value(block.get("ratio"))
     psr = _ev_value(block.get("psr"))
@@ -5580,15 +5715,90 @@ def _challenge_optimistic(
     )
 
 
+#: Flags that say the file's balance hides open losses (``redflags``, ``account``).
+UNSEEN_OPEN_LOSS_FLAGS = ("FLOATING_LOSS_AT_END", "HIDDEN_FLOATING_DRAWDOWN")
+
+
+def unseen_open_loss(data: dict[str, Any]) -> tuple[bool, float | None]:
+    """Whether the challenge figures cannot see an open loss the file shows,
+    and that loss as a share of the balance when the file declares it.
+
+    True when the red flags found hidden open losses (a curve of closed trades
+    only), or an open loss at the end on a balance-only curve; the share is the
+    account's declared floating share, else the flag's own figure."""
+    flags = {
+        str(flag.get("code")): flag
+        for flag in data.get("red_flags") or []
+        if flag.get("code") in UNSEEN_OPEN_LOSS_FLAGS
+    }
+    balance_only = bool((data.get("inputs") or {}).get("balance_only"))
+    if "HIDDEN_FLOATING_DRAWDOWN" not in flags and not (
+        "FLOATING_LOSS_AT_END" in flags and balance_only
+    ):
+        return False, None
+    share = _ev_value((data.get("account") or {}).get("floating_share"))
+    if share is None and "FLOATING_LOSS_AT_END" in flags:
+        value = flags["FLOATING_LOSS_AT_END"].get("value")
+        share = float(value) if isinstance(value, int | float) else None
+    if share is not None and (not math.isfinite(share) or share >= 0):
+        share = None
+    return True, share
+
+
+def unseen_open_loss_warning(data: dict[str, Any], labels: dict[str, str]) -> str:
+    """The callout that opens the challenge section when its figures cannot see
+    the open loss: that loss already counts against any challenge's daily and
+    total limits. Empty when the curve sees it or nothing is open."""
+    unseen, share = unseen_open_loss(data)
+    if not unseen:
+        return ""
+    text = (
+        labels["ch_unseen_open"].format(share=f"{abs(share):.0%}")
+        if share is not None
+        else labels["ch_unseen_open_any"]
+    )
+    return (
+        f"<p class='live-verdict lv-FAIL unseen-open-note'><span class='badge FAIL'>"
+        f"{_e(labels['open_loss_badge'])}</span> {_e(text)}</p>"
+    )
+
+
+def _folded(body: str, labels: dict[str, str]) -> str:
+    """Figures that do not see the open loss, behind a summary that says so: the
+    warning above them is what a reader meets first. The PDF opens them."""
+    if not body:
+        return ""
+    return (
+        f"<details class='unseen-open'><summary><strong>{_e(labels['ch_unseen_summary'])}"
+        f"</strong></summary>{body}</details>"
+    )
+
+
+def _folded_subsection(section: str, warning: str, labels: dict[str, str]) -> str:
+    """A subsection (its ``<h3>`` title first) with the warning under its title
+    and the rest folded (``_folded``)."""
+    if not section or "</h3>" not in section:
+        return section
+    title, rest = section.split("</h3>", 1)
+    return f"{title}</h3>{warning}{_folded(rest, labels)}"
+
+
 def _challenge_html(
     challenge: dict[str, Any] | None,
     locale: str,
     labels: dict[str, str],
     platform_dd: float | None = None,
     hidden_note: str = "",
+    unseen_warning: str = "",
 ) -> str:
+    """The prop-firm challenge simulator. ``unseen_warning``
+    (``unseen_open_loss_warning``) opens the section when the balance hides an
+    open loss: the outcome, the ladder, the sizes and the firms' table then sit
+    folded under it, each subsection with its own short warning first. Nothing
+    the simulator measured changes."""
     if not challenge:
         return f"<p class='muted'>{_e(labels['none'])}</p>"
+    fold = bool(unseen_warning) and challenge.get("status") == "MEASURED"
     rules = challenge.get("rules", {})
     html_text = (
         f"<p><strong>{_e(labels['challenge_rules'])}:</strong> "
@@ -5621,9 +5831,15 @@ def _challenge_html(
     )
     html_text += market_line
     open_loss = _open_loss_note(challenge, platform_dd, labels)
-    html_text += open_loss or (hidden_note if challenge.get("status") == "MEASURED" else "")
-    optimistic = _challenge_optimistic(challenge, platform_dd, labels, hidden_note)
+    if fold:
+        # The open loss already counts against the limits: said first, before any figure.
+        html_text += open_loss + unseen_warning
+    else:
+        html_text += open_loss or (hidden_note if challenge.get("status") == "MEASURED" else "")
+    optimistic = _challenge_optimistic(challenge, platform_dd, labels, hidden_note) or fold
     ladder = ""
+    figures = ""
+    sizes = ""
     if challenge.get("status") == "MEASURED":
         probability = challenge["probability"]
         horizon = (challenge.get("method") or {}).get("horizon_business_days")
@@ -5634,7 +5850,7 @@ def _challenge_html(
                 return labels["unfinished_cap"].format(days=horizon)
             return labels[key]
 
-        html_text += (
+        figures += (
             f"<table><tr><th>{_e(labels['outcome'])}</th><th>{_e(labels['probability'])}</th></tr>"
             + "".join(
                 f"<tr><td>{_e(outcome(key))}</td>"
@@ -5645,7 +5861,7 @@ def _challenge_html(
         )
         ci = challenge["pass_probability_ci95"]
         days = challenge["days_to_target"]
-        html_text += (
+        figures += (
             "<div class='facts'>"
             + _range_fact([ci["low"], ci["high"]], " – ", labels["ci95"], lambda v: f"{v:.1%}")
             + _range_fact(
@@ -5659,15 +5875,15 @@ def _challenge_html(
         best_day = challenge.get("best_day") or {}
         if best_day.get("breach_share_of_passes"):
             share = float(best_day["breach_share_of_passes"]["value"])
-            html_text += (
+            figures += (
                 f"<p>{_e(labels['best_day_line'].format(share=_share_pct(share)))} "
                 f"{_badge('MEASURED')}</p>"
             )
         ladder = _challenge_ladder_html(
             challenge.get("scenarios"), locale, labels, optimistic=optimistic, market=market_line
         )
-        html_text += ladder
-        html_text += _challenge_sizing_html(
+        figures += ladder
+        sizes = _challenge_sizing_html(
             challenge.get("sizing"),
             locale,
             labels,
@@ -5676,6 +5892,11 @@ def _challenge_html(
             optimistic=optimistic,
             market=market_line,
         )
+    if fold:
+        short = f"<p><strong>{_e(labels['ch_unseen_sizes'])}</strong></p>"
+        html_text += _folded(figures, labels) + _folded_subsection(sizes, short, labels)
+    else:
+        html_text += figures + sizes
     notes = rules.get("notes") or []
     if notes:
         html_text += (
@@ -5684,7 +5905,7 @@ def _challenge_html(
             + "</ul>"
         )
     html_text += _assumptions(challenge.get("assumptions"), locale, labels)
-    return html_text + _firm_fit_html(
+    firms = _firm_fit_html(
         challenge.get("firm_fit"),
         labels,
         optimistic=optimistic,
@@ -5692,6 +5913,11 @@ def _challenge_html(
         locale=locale,
         platform_dd=platform_dd,
     )
+    if fold:
+        firms = _folded_subsection(
+            firms, f"<p><strong>{_e(labels['ch_unseen_firms'])}</strong></p>", labels
+        )
+    return html_text + firms
 
 
 def _phases(count: int, labels: dict[str, str]) -> str:
@@ -6583,7 +6809,26 @@ def _source_html(data: dict[str, Any], labels: dict[str, str]) -> str:
                 )
                 + "</table>"
             )
+        if rows is metadata:
+            out += _platform_period_note(data, metadata, labels)
     return out
+
+
+def _platform_period_note(
+    data: dict[str, Any], metadata: dict[str, Any], labels: dict[str, str]
+) -> str:
+    """Where each period comes from when the platform's Start and End are not
+    the curve's dates at the top of the report (a deposit days before the first
+    trade): one line under the platform's figures, so the two never read as two
+    histories."""
+    inputs = data.get("inputs") or {}
+    first = str(inputs.get("first_timestamp") or "")[:10]
+    last = str(inputs.get("last_timestamp") or "")[:10]
+    start, end = str(metadata.get("start") or "")[:10], str(metadata.get("end") or "")[:10]
+    if not first or not last or not (start or end) or (start in ("", first) and end in ("", last)):
+        return ""
+    text = labels["platform_period_note"].format(first=first, last=last)
+    return f"<p class='muted platform-period'>{_e(text)}</p>"
 
 
 #: Metadata keys an importer computes from the file's rows (the running
@@ -6734,7 +6979,30 @@ def _recon_text(value: str, locale: str, table: dict[str, tuple[str, str, str]])
     return translated[{"es": 0, "en": 1, "pt": 2}[locale]] if translated else value
 
 
-def _reconciliation_html(recon: dict[str, Any] | None, locale: str) -> str:
+def declared_open_value(data: dict[str, Any]) -> dict[str, Any] | None:
+    """The open positions' floating result the file declares, as the account
+    review reads it (DECLARED, with its note), or straight from the platform's
+    summary when there is no account review. None when the file declares none."""
+    item = (data.get("account") or {}).get("floating_pnl") or {}
+    value = item.get("value")
+    if item.get("evidence") == "DECLARED" and isinstance(value, int | float):
+        return dict(item) if math.isfinite(float(value)) else None
+    meta = (data.get("inputs") or {}).get("report_metadata") or {}
+    raw = meta.get("declared_floating_pnl")
+    number = lead_number(str(raw)) if raw is not None else None
+    if number is None or not math.isfinite(number):
+        return None
+    return {"value": number, "evidence": "DECLARED", "note": ACCOUNT_FLOATING_NOTE}
+
+
+def _reconciliation_html(
+    recon: dict[str, Any] | None, locale: str, open_value: dict[str, Any] | None = None
+) -> str:
+    """The money reconciliation. ``open_value`` (``declared_open_value``) is the
+    floating result the file declares: when the reconciliation has no valuation
+    of its own, its row shows that figure as Declared, with its note and why it
+    stays out of the expected balance, the same figure the account's section
+    shows. Every figure of the reconciliation stays as stored."""
     if not recon:
         return ""
     copy = INTEGRITY_TEXT[locale]
@@ -6763,8 +7031,17 @@ def _reconciliation_html(recon: dict[str, Any] | None, locale: str) -> str:
         if trade_currency and trade_currency not in ("UNKNOWN", "not supplied"):
             currency_label = copy["recon_currency_assumed"].format(currency=trade_currency)
 
+    declared_open = (
+        open_value
+        if open_value is not None
+        and (recon.get("open_position_value") or {}).get("evidence") == "NOT_MEASURED"
+        else None
+    )
+
     def amount(key: str) -> str:
         item = recon.get(key)
+        if key == "open_position_value" and declared_open is not None:
+            item = declared_open
         if not isinstance(item, dict) or item.get("evidence") == "NOT_MEASURED":
             return "—"
         value = item.get("value")
@@ -6786,6 +7063,8 @@ def _reconciliation_html(recon: dict[str, Any] | None, locale: str) -> str:
         ("tolerance", "recon_tolerance"),
     ):
         item = recon.get(key)
+        if key == "open_position_value" and declared_open is not None:
+            item = declared_open
         evidence = (
             str(item.get("evidence", "NOT_MEASURED")) if isinstance(item, dict) else "NOT_MEASURED"
         )
@@ -6810,6 +7089,8 @@ def _reconciliation_html(recon: dict[str, Any] | None, locale: str) -> str:
                 value = str(coverage[key])
                 if key in ("trade_currency", "curve_currency") and value == "not supplied":
                     value = copy["recon_currency_not_supplied"]
+                elif key == "open_positions" and declared_open is not None:
+                    value = copy["recon_open_declared"].format(value=amount("open_position_value"))
                 elif isinstance(coverage[key], int) and not isinstance(coverage[key], bool):
                     # A count reads with the report's thousands separator.
                     value = f"{coverage[key]:,}"
@@ -6831,6 +7112,13 @@ def _reconciliation_html(recon: dict[str, Any] | None, locale: str) -> str:
         "<div class='tscroll'><table class='recon-table'><tbody>"
         + "".join(rows)
         + "</tbody></table></div>"
+        + (
+            f"<p class='muted recon-open-note'>{_e(copy['recon_open'])}: "
+            f"{_e(localize(str(declared_open.get('note') or ''), locale).rstrip('.'))}. "
+            f"{_e(copy['recon_open_not_added'])}</p>"
+            if declared_open is not None
+            else ""
+        )
         + (
             f"<h3>{_e(copy['recon_coverage'])}</h3><ul class='recon-coverage'>"
             + "".join(coverage_items)
@@ -7829,6 +8117,14 @@ def _shift_html(shift: dict[str, Any], locale: str, labels: dict[str, str]) -> s
     p_value = _ev_value(shift.get("p_value"))
     if p_value is None:
         return ""
+
+    def annual(value: float) -> str:
+        # A yearly average below -100 % says nothing a reader can picture: an
+        # account cannot lose more than it holds. The figure as stored is kept.
+        if value < -1:
+            return labels["shift_floor"].format(pct=_pct(-1.0, signed=True))
+        return _pct(value, signed=True)
+
     out = f"<p class='muted'>{_e(labels['shift_intro'])}</p>"
     p = _p_text(p_value)
     before = shift.get("before") or {}
@@ -7842,8 +8138,8 @@ def _shift_html(shift: dict[str, Any], locale: str, labels: dict[str, str]) -> s
             date=date,
             low=_date_text(str(shift["date_low"]), locale),
             high=_date_text(str(shift["date_high"]), locale),
-            before=_pct(before_mean, signed=True),
-            after=_pct(after_mean, signed=True),
+            before=annual(before_mean),
+            after=annual(after_mean),
             p=p,
         )
         out += (
@@ -7857,11 +8153,9 @@ def _shift_html(shift: dict[str, Any], locale: str, labels: dict[str, str]) -> s
             high = _ev_value(side.get("high"))
             if mean is None or low is None or high is None:
                 continue
-            band = labels["shift_band"].format(
-                low=_pct(low, signed=True), high=_pct(high, signed=True)
-            )
+            band = labels["shift_band"].format(low=annual(low), high=annual(high))
             facts += (
-                f"<div class='fact'><b>{_e(_pct(mean, signed=True))}</b>"
+                f"<div class='fact'><b>{_e(annual(mean))}</b>"
                 f"<p>{_e(labels[key].format(date=date))} ({_e(band)}) "
                 f"{_badge('MEASURED')}</p></div>"
             )
@@ -7973,8 +8267,22 @@ def _luck_html(
             return labels["luck_under_month"]
         return labels["luck_month_one" if months == 1 else "luck_months"].format(n=months)
 
+    def history(value: float) -> str:
+        """The history's own length. Under a year it is never rounded up to 12
+        months, which would contradict the "under a year of history" of the
+        annual return: the months with one decimal, or "almost 12 months"."""
+        if value >= 1:
+            return years(value)
+        months = value * 12
+        if months < 1:
+            return labels["luck_under_month"]
+        if round(months, 1) >= 12:
+            return labels["luck_almost_year"]
+        shown = f"{months:.1f}"
+        return labels["luck_month_one" if shown == "1.0" else "luck_months"].format(n=shown)
+
     span_value = float(luck["span_years"]["value"])
-    span = years(span_value)
+    span = history(span_value)
     out = f"<p class='muted'>{_e(labels['luck_intro'])}</p>"
     if luck.get("counted"):
         n = f"{int(luck['trials']):,}"
@@ -10295,6 +10603,7 @@ def render_html(
                         labels,
                         _ev_value((data.get("performance") or {}).get("platform_equity_drawdown")),
                         hidden,
+                        unseen_open_loss_warning(data, labels),
                     ),
                 )
             ]
@@ -10308,7 +10617,7 @@ def render_html(
         ),
         # The dimension reasons repeat the verdict in thresholds, so they open the
         # technical tables instead of sitting between the plan and the findings.
-        (labels["reasons_detail"], _reasons_html(verdict, locale, labels)),
+        (labels["reasons_detail"], _reasons_html(verdict, locale, labels, data)),
         (
             labels["performance"],
             _evidence_rows(
@@ -10325,7 +10634,7 @@ def render_html(
         (
             labels["significance"],
             _status_line(data["significance"], labels)
-            + _evidence_rows(data["significance"], labels, skip=set())
+            + _evidence_rows(_significance_rows(data["significance"]), labels, skip=set())
             + _lo_html(
                 data["significance"],
                 _ev_value((data.get("performance") or {}).get("sharpe")),
@@ -10552,7 +10861,7 @@ def render_html(
     )
     kpis_html = _kpis_html(data, labels, locked=locked)
     reading_html = _reading_html(data, labels)
-    recon_html = _reconciliation_html(data.get("reconciliation"), locale)
+    recon_html = _reconciliation_html(data.get("reconciliation"), locale, declared_open_value(data))
     forensics_html = _forensics_html(data.get("forensics"), locale)
     sections = [
         section(labels["reading"], reading_html, "r-reading") if reading_html else "",
@@ -10743,7 +11052,13 @@ def _pdf_cover(
         f"{_badge(_kpi_evidence(label, labels, data))}</div>"
         for label, shown, tone in _cover_kpis(data, labels)
     )
-    keep = "next_keep_fund" if _fund_record(data) else "next_keep"
+    keep = (
+        "next_keep_fund"
+        if _fund_record(data)
+        else "next_keep_account"
+        if is_account_history(data)
+        else "next_keep"
+    )
     steps = [key for key, _ in _next_steps(data, verdict, labels) if key != keep][:3]
     next_html = "".join(f"<li>{_e(labels[key])}</li>" for key in steps or [keep])
     return (
@@ -10812,7 +11127,8 @@ def _next_steps(
         steps.append((demo, labels["live"] if live else ""))
     if asked:
         steps.append(("next_questions", labels["questions"]))
-    steps.append(("next_keep", ""))
+    # An account or a signal has no robot of its own to change: its settings or its account.
+    steps.append(("next_keep_account" if is_account_history(data) else "next_keep", ""))
     return steps
 
 

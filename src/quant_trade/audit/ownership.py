@@ -398,6 +398,32 @@ LABELS: dict[str, dict[str, dict[str, str]]] = {
             "Guarde este relatório e seu identificador; se o robô mudar, convém auditá-lo de novo.",
         ),
     },
+    "next_keep_account": {
+        OWN: _say(
+            "Guarda este informe y su identificador; si cambias la configuración o pasas a "
+            "otra cuenta, vuelve a auditarla y compara los dos informes.",
+            "Keep this report and its identifier; if you change the settings or move to "
+            "another account, audit it again and compare the two reports.",
+            "Guarde este relatório e seu identificador; se você mudar a configuração ou passar "
+            "para outra conta, audite-a de novo e compare os dois relatórios.",
+        ),
+        PROVIDER: _say(
+            "Guarda este informe y su identificador; si cambias la configuración o pasas a "
+            "otra cuenta, vuelve a auditarla y comparte el informe nuevo.",
+            "Keep this report and its identifier; if you change the settings or move to "
+            "another account, audit it again and share the new report.",
+            "Guarde este relatório e seu identificador; se você mudar a configuração ou passar "
+            "para outra conta, audite-a de novo e compartilhe o relatório novo.",
+        ),
+        NEUTRAL: _say(
+            "Guarda este informe y su identificador; si la cuenta o señal cambia de "
+            "configuración o pasa a otra cuenta, conviene auditarla de nuevo.",
+            "Keep this report and its identifier; if the account or signal changes its "
+            "settings or moves to another account, it is worth auditing it again.",
+            "Guarde este relatório e seu identificador; se a conta ou sinal mudar de "
+            "configuração ou passar para outra conta, convém auditá-la de novo.",
+        ),
+    },
     "next_intro_fund": {
         OWN: _say(
             "Si el fondo es tuyo, esto es lo que conviene resolver primero, según lo que "
@@ -798,39 +824,44 @@ def gains_for(gains: Mapping[str, str], labels: Mapping[str, str]) -> dict[str, 
     return out
 
 
+#: What an account or signal's history does not say, as its out-of-sample
+#: meaning opens in every voice (``verdict.MEANING`` words the buyer's): since
+#: when it has traded unchanged, and whether it was reset or replaced a closed one.
+_ACCOUNT_UNCHANGED: dict[str, str] = _say(
+    "El historial no dice desde cuándo opera sin cambios esta cuenta o señal, ni si hubo "
+    "reinicios o cuentas cerradas antes, así que no se sabe qué parte es prueba sobre datos "
+    "nuevos.",
+    "The history does not say since when this account or signal has traded unchanged, or "
+    "whether it was reset or earlier accounts were closed, so it is not known which part is a "
+    "test on unseen data.",
+    "O histórico não diz desde quando esta conta ou sinal opera sem alterações, nem se houve "
+    "reinícios ou contas encerradas antes, então não se sabe qual parte é teste sobre dados "
+    "novos.",
+)
+
 #: ``verdict.MEANING`` texts that send the reader to a provider or manager.
 MEANING: dict[str, dict[str, dict[str, str]]] = {
     "out_of_sample.NOT_MEASURED.account": {
         OWN: _say(
-            "El historial no dice desde cuándo el robot opera sin cambios, así que no se sabe "
-            "qué parte es prueba sobre datos nuevos. Declara la fecha desde la que no cambiaste "
-            "la configuración para medirlo.",
-            "The history does not say since when the robot has run unchanged, so it is not "
-            "known which part is a test on unseen data. Declare the date since which you have "
-            "not changed the settings to measure it.",
-            "O histórico não diz desde quando o robô opera sem alterações, então não se sabe "
-            "qual parte é teste sobre dados novos. Declare a data desde a qual você não mudou a "
+            f"{_ACCOUNT_UNCHANGED['es']} Declara la fecha desde la que no cambiaste la "
+            "configuración para medirlo.",
+            f"{_ACCOUNT_UNCHANGED['en']} Declare the date since which you have not changed the "
+            "settings to measure it.",
+            f"{_ACCOUNT_UNCHANGED['pt']} Declare a data desde a qual você não mudou a "
             "configuração para medi-lo.",
         ),
         PROVIDER: _say(
-            "El historial no dice desde cuándo el robot opera sin cambios, así que no se sabe "
-            "qué parte es prueba sobre datos nuevos. Te van a preguntar esa fecha: declárala "
-            "para medirlo.",
-            "The history does not say since when the robot has run unchanged, so it is not "
-            "known which part is a test on unseen data. You will be asked for that date: "
-            "declare it to measure it.",
-            "O histórico não diz desde quando o robô opera sem alterações, então não se sabe "
-            "qual parte é teste sobre dados novos. Vão perguntar essa data a você: declare-a "
-            "para medi-lo.",
+            f"{_ACCOUNT_UNCHANGED['es']} Te van a preguntar esa fecha y si hubo reinicios: "
+            "declárala para medirlo.",
+            f"{_ACCOUNT_UNCHANGED['en']} You will be asked for that date and whether there "
+            "were resets: declare it to measure it.",
+            f"{_ACCOUNT_UNCHANGED['pt']} Vão perguntar a você essa data e se houve reinícios: "
+            "declare-a para medi-lo.",
         ),
         NEUTRAL: _say(
-            "El historial no dice desde cuándo el robot opera sin cambios, así que no se sabe "
-            "qué parte es prueba sobre datos nuevos. Declarar esa fecha permite medirlo.",
-            "The history does not say since when the robot has run unchanged, so it is not "
-            "known which part is a test on unseen data. Declaring that date lets it be "
-            "measured.",
-            "O histórico não diz desde quando o robô opera sem alterações, então não se sabe "
-            "qual parte é teste sobre dados novos. Declarar essa data permite medi-lo.",
+            f"{_ACCOUNT_UNCHANGED['es']} Declarar esa fecha permite medirlo.",
+            f"{_ACCOUNT_UNCHANGED['en']} Declaring that date lets it be measured.",
+            f"{_ACCOUNT_UNCHANGED['pt']} Declarar essa data permite medi-lo.",
         ),
     },
     "out_of_sample.NOT_MEASURED.fund": {
@@ -1005,6 +1036,80 @@ MEANING: dict[str, dict[str, dict[str, str]]] = {
             "administra: com mais de um, a conclusão seria mais fraca.",
         ),
     },
+    # An account or signal has no optimisation to export: its trials are the
+    # other accounts or signals behind it, and the ones closed or reset.
+    "multiplicity.WEAK.account": {
+        OWN: _say(
+            "Parte del resultado puede venir de que esta sea la mejor de varias cuentas o "
+            "señales. Declara como intentos todas las que llevas o has cerrado o reiniciado: "
+            "una buena cuenta entre muchas pesa menos.",
+            "Part of the result may come from this being the best of several accounts or "
+            "signals. Declare as trials all the ones you run or have closed or reset: one good "
+            "account among many weighs less.",
+            "Parte do resultado pode vir de esta ser a melhor entre várias contas ou sinais. "
+            "Declare como tentativas todas as que você opera ou já encerrou ou reiniciou: uma "
+            "boa conta entre muitas pesa menos.",
+        ),
+        PROVIDER: _say(
+            "Parte del resultado puede venir de que esta sea la mejor de varias cuentas o "
+            "señales. Te van a preguntar cuántas llevas o has cerrado o reiniciado: decláralo "
+            "como número de intentos.",
+            "Part of the result may come from this being the best of several accounts or "
+            "signals. You will be asked how many you run or have closed or reset: declare it as "
+            "the number of trials.",
+            "Parte do resultado pode vir de esta ser a melhor entre várias contas ou sinais. Vão "
+            "perguntar a você quantas opera ou já encerrou ou reiniciou: declare isso como "
+            "número de tentativas.",
+        ),
+        NEUTRAL: _say(
+            "Parte del resultado puede venir de que esta sea la mejor de varias cuentas o "
+            "señales. Una buena cuenta entre muchas pesa menos.",
+            "Part of the result may come from this being the best of several accounts or "
+            "signals. One good account among many weighs less.",
+            "Parte do resultado pode vir de esta ser a melhor entre várias contas ou sinais. Uma "
+            "boa conta entre muitas pesa menos.",
+        ),
+    },
+    "multiplicity.WEAK.undeclared.account": {
+        OWN: _say(
+            "Aun contando una sola cuenta, el caso más favorable, el resultado no basta para "
+            "descartar la suerte. No declaraste cuántas cuentas o señales llevas o has cerrado "
+            "o reiniciado: declara el número, porque con más de una la conclusión sería más "
+            "débil.",
+            "Even counting a single account, the most favourable case, the result is not "
+            "enough to rule out luck. You did not declare how many accounts or signals you run "
+            "or have closed or reset: declare the number, since with more than one the "
+            "conclusion would be weaker.",
+            "Mesmo contando uma única conta, o caso mais favorável, o resultado não basta para "
+            "descartar a sorte. Você não declarou quantas contas ou sinais opera ou já encerrou "
+            "ou reiniciou: declare o número, porque com mais de uma a conclusão seria mais "
+            "fraca.",
+        ),
+        PROVIDER: _say(
+            "Aun contando una sola cuenta, el caso más favorable, el resultado no basta para "
+            "descartar la suerte. Te van a preguntar cuántas cuentas o señales llevas o has "
+            "cerrado o reiniciado: decláralo.",
+            "Even counting a single account, the most favourable case, the result is not "
+            "enough to rule out luck. You will be asked how many accounts or signals you run or "
+            "have closed or reset: declare it.",
+            "Mesmo contando uma única conta, o caso mais favorável, o resultado não basta para "
+            "descartar a sorte. Vão perguntar a você quantas contas ou sinais opera ou já "
+            "encerrou ou reiniciou: declare isso.",
+        ),
+        NEUTRAL: _say(
+            "Aun contando una sola cuenta, el caso más favorable, el resultado no basta para "
+            "descartar la suerte. No se declaró cuántas cuentas o señales hay detrás ni "
+            "cuántas se cerraron o reiniciaron: con más de una, la conclusión sería más débil.",
+            "Even counting a single account, the most favourable case, the result is not "
+            "enough to rule out luck. How many accounts or signals stand behind it, or were "
+            "closed or reset, was not declared: with more than one, the conclusion would be "
+            "weaker.",
+            "Mesmo contando uma única conta, o caso mais favorável, o resultado não basta para "
+            "descartar a sorte. Não foi declarado quantas contas ou sinais há por trás nem "
+            "quantas foram encerradas ou reiniciadas: com mais de uma, a conclusão seria mais "
+            "fraca.",
+        ),
+    },
 }
 
 
@@ -1012,10 +1117,13 @@ def _meaning_key(
     name: str, status: str, *, account: bool, fund: bool, undeclared: bool
 ) -> str | None:
     """The text ``verdict.meaning`` would pick, in its order, among its own
-    keys and the ones only this module words (``.undeclared`` of a weak result)."""
+    keys and the ones only this module words (``.undeclared`` of a weak result,
+    and of an account's)."""
     candidates = []
     if undeclared and fund:
         candidates.append(f"{name}.{status}.undeclared.fund")
+    if undeclared and account:
+        candidates.append(f"{name}.{status}.undeclared.account")
     if undeclared:
         candidates.append(f"{name}.{status}.undeclared")
     if fund:
@@ -1080,28 +1188,83 @@ PLAN: dict[str, dict[str, dict[str, str]]] = {
     },
     "account_oos_backtest": {
         OWN: _say(
-            "Sube el backtest del mismo robot junto a la cuenta: el informe compara los dos "
-            "operación por operación.",
-            "Upload the backtest of the same robot with the account: the report compares the "
-            "two trade by trade.",
-            "Envie o backtest do mesmo robô junto com a conta: o relatório compara os dois "
-            "operação por operação.",
+            "Sube el backtest de la misma estrategia, si lo tiene, junto a la cuenta: el "
+            "informe compara los dos operación por operación.",
+            "Upload the backtest of the same strategy, if it has one, with the account: the "
+            "report compares the two trade by trade.",
+            "Envie o backtest da mesma estratégia, se ela tiver um, junto com a conta: o "
+            "relatório compara os dois operação por operação.",
         ),
         PROVIDER: _say(
-            "Te van a pedir el backtest del mismo robot: súbelo junto a la cuenta y el informe "
-            "compara los dos operación por operación.",
-            "You will be asked for the backtest of the same robot: upload it with the account "
-            "and the report compares the two trade by trade.",
-            "Vão pedir a você o backtest do mesmo robô: envie-o junto com a conta e o relatório "
-            "compara os dois operação por operação.",
+            "Te van a pedir el backtest de la misma estrategia, si lo tiene: súbelo junto a la "
+            "cuenta y el informe compara los dos operación por operación.",
+            "You will be asked for the backtest of the same strategy, if it has one: upload it "
+            "with the account and the report compares the two trade by trade.",
+            "Vão pedir a você o backtest da mesma estratégia, se ela tiver um: envie-o junto "
+            "com a conta e o relatório compara os dois operação por operação.",
         ),
         NEUTRAL: _say(
-            "Sube el backtest del mismo robot junto a la cuenta: el informe compara los dos "
-            "operación por operación.",
-            "Upload the backtest of the same robot with the account: the report compares the "
-            "two trade by trade.",
-            "Envie o backtest do mesmo robô junto com a conta: o relatório compara os dois "
-            "operação por operação.",
+            "Sube el backtest de la misma estrategia, si lo tiene, junto a la cuenta: el "
+            "informe compara los dos operación por operación.",
+            "Upload the backtest of the same strategy, if it has one, with the account: the "
+            "report compares the two trade by trade.",
+            "Envie o backtest da mesma estratégia, se ela tiver um, junto com a conta: o "
+            "relatório compara os dois operação por operação.",
+        ),
+    },
+    "account_trials_undeclared": {
+        OWN: _say(
+            "Declara cuántas cuentas o señales llevas o has cerrado o reiniciado (aunque sea "
+            "1) al subir el historial: Rigor lo descuenta.",
+            "Declare how many accounts or signals you run or have closed or reset (even if it "
+            "is 1) when you upload the history: Rigor discounts it.",
+            "Declare quantas contas ou sinais você opera ou já encerrou ou reiniciou (mesmo "
+            "que seja 1) ao enviar o histórico: o Rigor o desconta.",
+        ),
+        PROVIDER: _say(
+            "Te van a preguntar cuántas cuentas o señales llevas o has cerrado o reiniciado: "
+            "decláralo (aunque sea 1) al subir el historial y Rigor lo descuenta.",
+            "You will be asked how many accounts or signals you run or have closed or reset: "
+            "declare it (even if it is 1) when you upload the history and Rigor discounts it.",
+            "Vão perguntar a você quantas contas ou sinais opera ou já encerrou ou reiniciou: "
+            "declare esse número (mesmo que seja 1) ao enviar o histórico e o Rigor o desconta.",
+        ),
+        NEUTRAL: _say(
+            "Declara cuántas cuentas o señales hay detrás de esta, o se cerraron o "
+            "reiniciaron (aunque sea 1), al subir el historial: Rigor lo descuenta.",
+            "Declare how many accounts or signals stand behind this one, or were closed or "
+            "reset (even if it is 1), when you upload the history: Rigor discounts it.",
+            "Declare quantas contas ou sinais há por trás desta, ou foram encerradas ou "
+            "reiniciadas (mesmo que seja 1), ao enviar o histórico: o Rigor o desconta.",
+        ),
+    },
+    "account_trials": {
+        OWN: _say(
+            "Declara como número de intentos cuántas cuentas o señales llevas o has cerrado o "
+            "reiniciado: una buena cuenta entre muchas pesa menos.",
+            "Declare how many accounts or signals you run or have closed or reset as the "
+            "number of trials: one good account among many weighs less.",
+            "Declare como número de tentativas quantas contas ou sinais você opera ou já "
+            "encerrou ou reiniciou: uma boa conta entre muitas pesa menos.",
+        ),
+        PROVIDER: _say(
+            "Te van a preguntar cuántas cuentas o señales llevas o has cerrado o reiniciado: "
+            "decláralo como número de intentos, porque una buena cuenta entre muchas pesa "
+            "menos.",
+            "You will be asked how many accounts or signals you run or have closed or reset: "
+            "declare it as the number of trials, since one good account among many weighs "
+            "less.",
+            "Vão perguntar a você quantas contas ou sinais opera ou já encerrou ou reiniciou: "
+            "declare isso como número de tentativas, porque uma boa conta entre muitas pesa "
+            "menos.",
+        ),
+        NEUTRAL: _say(
+            "Declara como número de intentos cuántas cuentas o señales hay detrás de esta, o "
+            "se cerraron o reiniciaron: una buena cuenta entre muchas pesa menos.",
+            "Declare how many accounts or signals stand behind this one, or were closed or "
+            "reset, as the number of trials: one good account among many weighs less.",
+            "Declare como número de tentativas quantas contas ou sinais há por trás desta, ou "
+            "foram encerradas ou reiniciadas: uma boa conta entre muitas pesa menos.",
         ),
     },
     "fund_history": {
@@ -1468,6 +1631,23 @@ PLAN: dict[str, dict[str, dict[str, str]]] = {
             "Declara desde cuándo opera sin cambios",
             "Declare since when it has run unchanged",
             "Declare desde quando opera sem alterações",
+        ),
+    },
+    "title_account_multiplicity": {
+        OWN: _say(
+            "Declara cuántas cuentas o señales llevas",
+            "Declare how many accounts or signals you run",
+            "Declare quantas contas ou sinais você opera",
+        ),
+        PROVIDER: _say(
+            "Declara cuántas cuentas o señales llevas",
+            "Declare how many accounts or signals you run",
+            "Declare quantas contas ou sinais você opera",
+        ),
+        NEUTRAL: _say(
+            "Declara cuántas cuentas o señales hay detrás",
+            "Declare how many accounts or signals stand behind it",
+            "Declare quantas contas ou sinais há por trás",
         ),
     },
     "title_fund_out_of_sample": {

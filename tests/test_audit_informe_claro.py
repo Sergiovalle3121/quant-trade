@@ -60,13 +60,14 @@ from quant_trade.audit.web import create_app  # noqa: E402
 LOCALES = ("es", "en", "pt")
 NOW = datetime(2026, 10, 9, tzinfo=UTC)
 #: The plan's sentence for a DSR already below 0.5 at a single trial (PR 469).
+#: An account's trials are the accounts or signals behind it, not configurations.
 ONE_TRIAL = {
-    "es": "Ya con 1 configuración, el caso más favorable, queda por debajo de 0.5: aquí "
-    "decide la falta de significación, no el número de intentos.",
-    "en": "Even at 1 configuration, the most favourable case, it is below 0.5: what decides "
-    "here is the lack of significance, not the number of trials.",
-    "pt": "Já com 1 configuração, o caso mais favorável, fica abaixo de 0.5: aqui quem decide "
-    "é a falta de significância, não o número de tentativas.",
+    "es": "Ya con 1 cuenta, el caso más favorable, queda por debajo de 0.5: aquí decide la "
+    "falta de significación, no el número de intentos.",
+    "en": "Even at 1 account, the most favourable case, it is below 0.5: what decides here "
+    "is the lack of significance, not the number of trials.",
+    "pt": "Já com 1 conta, o caso mais favorável, fica abaixo de 0.5: aqui quem decide é a "
+    "falta de significância, não o número de tentativas.",
 }
 #: Wording that calls an account history a backtest.
 ACCOUNT_AS_BACKTEST = (
@@ -580,10 +581,11 @@ def test_below_half_at_one_trial_blames_the_signal_not_the_search(
     for wrong in ("intentos pasa a ser medido", "count becomes measured", "passa a ser medido"):
         assert all(wrong not in action for action in step.actions)
     assert all("XML" not in action for action in step.actions)
+    # What counts is the same account's history, not optimising a robot further.
     signal = {
-        "es": "revisa si la idea tiene una ventaja",
-        "en": "check whether the idea has an edge",
-        "pt": "verifique se a ideia tem uma vantagem",
+        "es": "Lo que cuenta es más historial de la misma cuenta",
+        "en": "What counts is more history of the same account",
+        "pt": "O que conta é mais histórico da mesma conta",
     }[locale]
     assert any(signal in action for action in step.actions)
     assert signal in text

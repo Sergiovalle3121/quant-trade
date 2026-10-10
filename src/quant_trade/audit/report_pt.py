@@ -43,7 +43,7 @@ REPORT: dict[str, Any] = {
         ),
         "generated": "Gerado",
         "audit_id": "Identificador",
-        "data_period": "Dados",
+        "data_period": "Dados da curva",
         "data_age": "{days} dias entre o último dado e esta auditoria",
         "data_age_one": "1 dia entre o último dado e esta auditoria",
         "data_age_account": "O que aconteceu depois do último dado não está neste arquivo.",
@@ -392,6 +392,7 @@ REPORT: dict[str, Any] = {
         "luck_months": "{n} meses",
         "luck_month_one": "1 mês",
         "luck_under_month": "menos de 1 mês",
+        "luck_almost_year": "quase 12 meses",
         "ride": "Como foi viver este histórico",
         "ride_intro": (
             "Um total e uma queda máxima não dizem como foi viver o histórico: quanto tempo "
@@ -487,6 +488,7 @@ REPORT: dict[str, Any] = {
         "shift_before": "Rentabilidade média ao ano antes de {date}",
         "shift_after": "Rentabilidade média ao ano desde {date}",
         "shift_band": "banda de 90 %: {low} a {high}",
+        "shift_floor": "{pct} ou pior",
         "recent_year": "Ano de fechamento",
         "fund": "O que quem investe em um fundo revisaria",
         "fund_intro": (
@@ -807,8 +809,8 @@ REPORT: dict[str, Any] = {
         "live_win_rate": "Taxa de acerto",
         "live_net": "Resultado líquido",
         "live_fall": "Pior queda",
-        "live_avg_win": "Ganho médio",
-        "live_avg_loss": "Perda média",
+        "live_avg_win": "Ganho médio (líquido de custos)",
+        "live_avg_loss": "Perda média (líquida de custos)",
         "live_below": "Histórias do backtest com resultado líquido igual ou pior",
         "live_fall_above": "Histórias do backtest com queda igual ou mais profunda",
         "live_rescaled": (
@@ -935,6 +937,10 @@ REPORT: dict[str, Any] = {
         "next_keep": (
             "Guarde este relatório e seu identificador; se o robô mudar, peça uma nova auditoria."
         ),
+        "next_keep_account": (
+            "Guarde este relatório e seu identificador; se o sinal mudar de configuração ou "
+            "passar para outra conta, peça uma nova auditoria."
+        ),
         "next_intro_fund": (
             "Se você investe ou vai investir neste fundo, isto é o que convém esclarecer "
             "primeiro, segundo o que a auditoria encontrou."
@@ -994,6 +1000,24 @@ REPORT: dict[str, Any] = {
         "challenge": "Simulador de desafio de mesa proprietária (prop firm)",
         "challenge_rules": "Regras simuladas",
         "open_loss_badge": "Perdas abertas",
+        "ch_unseen_open": (
+            "A perda aberta de {share} do saldo, que seguia aberta quando o histórico foi "
+            "impresso, já conta contra os limites de perda diária e total de qualquer desafio, e "
+            "os números abaixo não a veem: o saldo conta só operações fechadas."
+        ),
+        "ch_unseen_open_any": (
+            "As perdas abertas que o saldo esconde já contam contra os limites de perda diária e "
+            "total de qualquer desafio, e os números abaixo não as veem: o saldo conta só "
+            "operações fechadas."
+        ),
+        "ch_unseen_summary": "Números que não veem a perda aberta (otimistas)",
+        "ch_unseen_sizes": (
+            "Em cada tamanho, a mesma perda aberta já conta contra esses limites e a tabela não "
+            "a vê."
+        ),
+        "ch_unseen_firms": (
+            "A mesma perda aberta já conta contra as regras de cada firma, e esta tabela não a vê."
+        ),
         "hidden_loss": (
             "O arquivo mostra apenas o saldo, e as bandeiras vermelhas encontraram perdas "
             "abertas que o saldo esconde (Drawdown flutuante oculto). Elas não entram aqui, "
@@ -1219,6 +1243,12 @@ REPORT: dict[str, Any] = {
         "report_source": "Formato do arquivo",
         "platform": "Dados que a plataforma declara",
         "platform_checked": "O que a Rigor conferiu no arquivo",
+        "platform_period_note": (
+            "Início e Fim são as datas que a plataforma dá para o seu período ou, se não der "
+            "nenhuma, as da primeira e da última operação que lista. Os dados da curva "
+            "({first} → {last}) vão do primeiro ponto da curva ao último, que pode ser um "
+            "depósito ou o saldo inicial antes da primeira operação."
+        ),
         "colmap": "Como cada coluna do seu arquivo foi lida",
         "optimization": "Exportação de otimização",
         "passes": "configurações testadas",
@@ -1387,7 +1417,7 @@ REPORT: dict[str, Any] = {
             "Os retornos não dependem de forma apreciável uns dos outros: levar isso em conta "
             "não muda a probabilidade de que o Sharpe real seja maior que zero."
         ),
-        "dependence_info": "É informativo: a classe usa a conta simples.",
+        "dependence_info": "A classe usa o segundo número, o PSR ajustado por dependência.",
         "lo_not_lower": (
             "Sharpe corrigido pela autocorrelação (Lo, 2002): não fica apreciavelmente abaixo de "
             "{plain}, então a ordem dos retornos não infla o Sharpe simples de forma apreciável. "
@@ -1859,6 +1889,8 @@ REPORT: dict[str, Any] = {
         "expectancy": "Expectativa por operação",
         "average_win": "Ganho médio",
         "average_loss": "Perda média",
+        "average_win_gross": "Ganho médio (bruto, antes dos custos)",
+        "average_loss_gross": "Perda média (bruta, antes dos custos)",
         "payoff_ratio": "Razão ganho médio / perda média",
         "largest_win_share": "Peso da maior ganhadora",
         "deposits_count": "Depósitos",
@@ -1896,9 +1928,10 @@ REPORT: dict[str, Any] = {
         "mean_holding_hours": "Horas médias por operação",
         "median_holding_hours": "Horas medianas por operação",
         "trades_per_month": "Operações por mês",
-        "psr": "Sharpe probabilístico (PSR)",
-        "min_track_record_length": "Histórico mínimo necessário",
-        "observations_short_by": "Observações que faltam",
+        "psr": "Sharpe probabilístico, PSR (conta simples)",
+        "psr_dependence": "Sharpe probabilístico, PSR ajustado por dependência",
+        "min_track_record_length": "Histórico mínimo necessário (conta simples)",
+        "observations_short_by": "Observações que faltam (conta simples)",
         "cost_bps_per_side": "Custo por lado (pb)",
         "oos_start": "Início fora da amostra",
         "benchmark_applicable": "Benchmark se aplica",
@@ -2235,6 +2268,11 @@ VERDICT: dict[str, Any] = {
             "Parte do resultado pode vir de escolher a melhor entre muitas configurações. "
             "Pergunte quantas foram testadas e peça o arquivo de otimização."
         ),
+        "multiplicity.WEAK.account": (
+            "Parte do resultado pode vir de esta ser a melhor entre várias contas ou sinais. "
+            "Pergunte ao fornecedor quantas ele opera ou já encerrou ou reiniciou, e declare "
+            "isso como número de tentativas."
+        ),
         "multiplicity.FAIL": (
             "Testando tantas configurações, um resultado assim aparece mesmo que nenhuma tenha "
             "vantagem real. Esse padrão aparece com frequência quando se ajustam parâmetros "
@@ -2300,9 +2338,9 @@ VERDICT: dict[str, Any] = {
             "Informe a data em que a otimização termina para medi-lo."
         ),
         "out_of_sample.NOT_MEASURED.account": (
-            "O histórico não diz desde quando o robô opera sem alterações, então não se sabe "
-            "qual parte é teste sobre dados novos. Pergunte essa data ao fornecedor e declare-a "
-            "para medi-lo."
+            "O histórico não diz desde quando esta conta ou sinal opera sem alterações, nem se "
+            "houve reinícios ou contas encerradas antes, então não se sabe qual parte é teste "
+            "sobre dados novos. Pergunte essa data ao fornecedor e declare-a para medi-lo."
         ),
         "out_of_sample.NOT_MEASURED.fund": (
             "O histórico mensal de um fundo é o seu histórico real, mas não diz desde quando o "
@@ -2397,6 +2435,7 @@ PLAN: dict[str, Any] = {
     },
     "ACCOUNT_TITLES": {
         "out_of_sample": "Descubra desde quando opera sem alterações",
+        "multiplicity": "Descubra quantas contas ou sinais há por trás",
     },
     "FUND_TITLES": {
         "out_of_sample": "Descubra desde quando o processo do gestor não muda",
@@ -4738,6 +4777,10 @@ RULES: tuple[tuple[str, str], ...] = (
     (
         "P[true Sharpe > 0] given length, skew and kurtosis",
         "P[Sharpe real > 0] dados o tamanho, a assimetria e a curtose",
+    ),
+    (
+        "the figure the class uses: the lower of the two, since it never reads higher",
+        "o número que a classe usa: o menor dos dois, porque nunca sai mais alto",
     ),
     (
         "observations needed for PSR to reach 0.95",
