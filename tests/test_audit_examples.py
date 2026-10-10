@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import html
 import re
+from dataclasses import replace
 from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 from xml.etree import ElementTree as ET
@@ -120,8 +121,12 @@ def test_calculator_links_use_the_card_inputs_and_never_fill_missing_figures(
             assert query == {}
             continue
         parsed = parse_input(*(query[name][0] for name in ("sharpe", "years", "trials")))
-        assert parsed == example.calculator_input()
+        declared = example.calculator_input()
+        assert declared is not None
+        # The years travel as the page shows them: two decimals (9 weeks ≈ 0.17).
+        assert parsed == replace(declared, years=round(declared.years, 2))
         assert isinstance(parsed, CalculatorInput)
+        assert "17307" not in href and "17307" not in response.text
         result = compute(parsed)
         assert result["status"] == "MEASURED"
         if not result["counted"]:

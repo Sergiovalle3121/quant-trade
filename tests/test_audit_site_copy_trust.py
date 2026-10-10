@@ -37,9 +37,10 @@ from quant_trade.audit.pages import _UI, AUDIT_PATHS, verification_page  # noqa:
 from quant_trade.audit.pricing import PRICING_COPY, PRICING_PATH  # noqa: E402
 from quant_trade.audit.prop_presets import PRESETS  # noqa: E402
 from quant_trade.audit.reading import READING_PATH  # noqa: E402
-from quant_trade.audit.report import LABELS  # noqa: E402
+from quant_trade.audit.report import KEY_LABELS, LABELS  # noqa: E402
 from quant_trade.audit.sample import sample_result  # noqa: E402
 from quant_trade.audit.sample_publication import (  # noqa: E402
+    SAMPLE_SEAL_NOTE,
     SAMPLE_SHOWN_IDS,
     sample_publication,
 )
@@ -48,11 +49,15 @@ from quant_trade.audit.settings import AuditSettings  # noqa: E402
 from quant_trade.audit.store import make_store  # noqa: E402
 from quant_trade.audit.tools_hub import TOOLS_PATH  # noqa: E402
 from quant_trade.audit.upload_limits import (  # noqa: E402
+    FIELD_LIMITS,
+    UploadLimits,
+    field_limit,
+    guide_limit_text,
     megabytes,
     upload_limit_text,
     upload_limits,
 )
-from quant_trade.audit.web import accept_language_locale, create_app  # noqa: E402
+from quant_trade.audit.web import REPORT_FIELDS, accept_language_locale, create_app  # noqa: E402
 from quant_trade.audit.winrate import WINRATE_PATH  # noqa: E402
 
 BASE = "https://audit.example"
@@ -161,33 +166,64 @@ def test_faq_states_price_countries_retention_and_limit_without_labels(
     assert find_claims(text) == []
 
 
-# -- 2. One limits sentence from the settings, with what to do --------------------
+# -- 2. One limits sentence from the settings, field by field, with what to do -----
+
+#: What to do with a larger file, the only advice the sentence gives.
+SHORTEN = {"es": "recorta el periodo", "en": "shorten the period", "pt": "encurte o período"}
+#: Advice the sentence no longer gives: a CSV to someone who may already upload one,
+#: and an encoding that is MetaTrader 5's, not MetaTrader 4's.
+NOT_SAID = ("exportación CSV", "CSV export", "exportação CSV", "UTF-16")
 
 
-def test_the_limits_come_from_the_settings_and_round() -> None:
-    assert upload_limits(5_000_000) == (5_000_000, 10_000_000)
-    # The importers never read a report past schema.MAX_REPORT_BYTES.
-    assert upload_limits(20_000_000) == (20_000_000, 10_000_000)
+def test_the_limits_come_from_the_settings_and_the_readers() -> None:
+    # Fields that may carry a platform report take twice the setting, and the readers
+    # cap what they read: 10 MB of a report, 5 MB of a curve or any other CSV.
+    assert upload_limits(5_000_000) == UploadLimits(10_000_000, 5_000_000, 5_000_000)
+    assert upload_limits(2_000_000) == UploadLimits(4_000_000, 4_000_000, 2_000_000)
+    # A larger setting never promises what schema._read_csv and the importers refuse.
+    assert upload_limits(20_000_000) == UploadLimits(10_000_000, 5_000_000, 5_000_000)
+    # The fields that take the wider limit are web.REPORT_FIELDS, and no other.
+    assert {name for name, kind in FIELD_LIMITS.items() if kind != "other"} == REPORT_FIELDS
+    assert set(FIELD_LIMITS) == {*REPORT_FIELDS, "trades", "benchmark", "variants"}
     assert megabytes(7 * 1024 * 1024, "en") == "7.3 MB"
     assert megabytes(7 * 1024 * 1024, "es") == megabytes(7 * 1024 * 1024, "pt") == "7,3 MB"
     assert megabytes(10_000_000, "es") == "10 MB"
     for locale in LOCALES:
-        text = upload_limit_text(5_000_000, locale)
-        assert "5 MB" in text and "10 MB" in text and "UTF-16" in text and "CSV" in text
-        assert "4.76837" not in text and "4,76837" not in text
-        assert find_claims(text) == []
+        for size in (5_000_000, 2_000_000, 20_000_000):
+            text = upload_limit_text(size, locale)
+            assert SHORTEN[locale] in text
+            assert not any(words in text for words in NOT_SAID), (locale, size)
+            assert "4.76837" not in text and "4,76837" not in text
+            assert find_claims(text) == []
+        # The default: the report field and its kin up to 10 MB, every other file 5 MB,
+        # said once (the curve and the trade list share the same limit).
+        default = upload_limit_text(5_000_000, locale)
+        assert default.count("10 MB") == 1 and default.count("5 MB") == 1
+        # Two smaller limits are said apart.
+        small = upload_limit_text(2_000_000, locale)
+        assert small.count("4 MB") == 2 and small.count("2 MB") == 1
 
 
 @pytest.mark.parametrize("locale", LOCALES)
-def test_faq_and_mt5_guide_print_the_limits_sentence(site: TestClient, locale: str) -> None:
-    sentence = html.escape(upload_limit_text(5_000_000, locale), quote=True)
+def test_faq_says_the_sentence_and_every_guide_its_fields_limit(
+    site: TestClient, locale: str
+) -> None:
     faq = _get(site, FAQ_PATH[locale])
-    guide = _get(site, guide_url("mt5", locale))
-    assert sentence in faq and sentence in guide
-    what_to_do = {"es": "recorta el periodo", "en": "shorten the period", "pt": "encurte o período"}
-    assert what_to_do[locale] in _visible(guide)
-    for page in (faq, guide):
-        assert "4.76837" not in page and "4,76837" not in page
+    assert html.escape(upload_limit_text(5_000_000, locale), quote=True) in faq
+    assert "4.76837" not in faq and "4,76837" not in faq
+    for guide in GUIDES:
+        page = _get(site, guide_url(guide.slug, locale))
+        line = guide_limit_text(guide.field, 5_000_000, locale)
+        assert html.escape(line, quote=True) in page, guide.slug
+        assert megabytes(field_limit(guide.field), locale) in line
+        # Every guide's file goes in a field that takes a platform report: 10 MB.
+        assert "10 MB" in line and SHORTEN[locale] in line
+        shown = _visible(page)
+        assert not any(words in shown for words in NOT_SAID[:3]), guide.slug
+        assert upload_limit_text(5_000_000, locale) not in shown, guide.slug
+    # The MetaTrader 4 guide never says its HTML is UTF-16: MT4 writes the Windows
+    # code page (importers.py), and the limit does not depend on the encoding.
+    assert "UTF-16" not in _visible(_get(site, guide_url("mt4", locale)))
 
 
 @pytest.mark.parametrize("locale", LOCALES)
@@ -195,11 +231,82 @@ def test_upload_form_prints_the_limits_of_its_own_settings(
     free_site: TestClient, locale: str
 ) -> None:
     page = _get(free_site, AUDIT_PATHS[locale])
-    # AUDIT_MAX_UPLOAD_BYTES=2000000: 2 MB a file and 4 MB a platform report.
-    assert html.escape(upload_limit_text(2_000_000, locale), quote=True) in page
+    # AUDIT_MAX_UPLOAD_BYTES=2000000: 4 MB a platform report or a curve, 2 MB the rest.
+    sentence = html.escape(upload_limit_text(2_000_000, locale), quote=True)
+    # In the main field's own help.
+    report_field = page.split("id='f-report'", 1)[1].split("class='field'", 1)[0]
+    assert sentence in report_field
     shown = _visible(page)
     assert "2 MB" in shown and "4 MB" in shown
     assert find_claims(shown) == []
+
+
+def _trades_csv(rows: int, pad: int) -> bytes:
+    """A broker's generic trade list (``universal_trades_csv``), with a wide note on
+    each row so that a few trades make a file of several MB."""
+    lines = ["entry_time,exit_time,symbol,side,quantity,entry_price,exit_price,pnl,note"]
+    for day in range(rows):
+        date = f"{2022 + day // 336}-{1 + day // 28 % 12:02d}-{1 + day % 28:02d}"
+        pnl = "25.0" if day % 3 else "-40.0"
+        lines.append(f"{date} 09:00,{date} 12:00,EURUSD,buy,1,1.1000,1.1010,{pnl},{'x' * pad}")
+    return ("\n".join(lines) + "\n").encode()
+
+
+def _refusal(page: str) -> str:
+    return _visible(page.split("<p role='alert'>", 1)[1].split("</p>", 1)[0])
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+def test_a_generic_csv_over_5_mb_goes_in_the_report_field_as_the_sentence_says(
+    tmp_path: Path, locale: str
+) -> None:
+    """The sentence gives the report field 10 MB, whatever the export's format, and
+    the closed-trades field 5 MB: the same 6 MB broker CSV is taken by the first and
+    refused by the second."""
+    data = _trades_csv(300, 20_000)
+    limits = upload_limits(5_000_000)
+    assert limits.other < len(data) < limits.report
+    sentence = upload_limit_text(5_000_000, locale)
+    assert megabytes(limits.report, locale) in sentence
+    assert megabytes(limits.other, locale) in sentence
+    # The lifespan is not entered: the upload is taken and queued, never audited here.
+    client = _client(_settings(tmp_path, AUDIT_FREE_MODE="true"))
+    try:
+        form = {"consent": "on", "locale": locale}
+        sent = {"report": ("operaciones.csv", data, "text/csv")}
+        taken = client.post("/audits", files=sent, data=form)
+        assert taken.status_code == 303, taken.text[:2000]
+        assert taken.headers["location"].startswith("/audits/")
+        sent = {"trades": ("operaciones.csv", data, "text/csv")}
+        refused = client.post("/audits", files=sent, data=form)
+        assert refused.status_code == 413
+        assert megabytes(limits.other, locale) in _refusal(refused.text)
+    finally:
+        client.close()
+
+
+def test_a_larger_setting_still_says_and_applies_the_readers_limits(tmp_path: Path) -> None:
+    """With AUDIT_MAX_UPLOAD_BYTES at 20 MB the sentence says 5 MB for a curve, the
+    curve reader's own limit, and 10 MB for a report, the importers'."""
+    settings = _settings(tmp_path, AUDIT_FREE_MODE="true", AUDIT_MAX_UPLOAD_BYTES="20000000")
+    sentence = upload_limit_text(settings.max_upload_bytes, "es")
+    assert "20 MB" not in sentence and "40 MB" not in sentence
+    assert "hasta 10 MB" in sentence and "hasta 5 MB" in sentence
+    line = b"2024-01-02 00:00:00,10000.123456\n"
+    curve = b"timestamp,equity\n" + line * (6_000_000 // len(line))
+    assert 5_000_000 < len(curve) < settings.max_upload_bytes
+    client = _client(settings)
+    try:
+        assert html.escape(sentence, quote=True) in _get(client, AUDIT_PATHS["es"])
+        refused = client.post(
+            "/audits",
+            files={"equity": ("curva.csv", curve, "text/csv")},
+            data={"consent": "on", "locale": "es"},
+        )
+        assert refused.status_code == 400
+        assert "5 MB" in _refusal(refused.text)
+    finally:
+        client.close()
 
 
 # -- 3. No internal path, repository or preset in public text -----------------------
@@ -271,7 +378,6 @@ def test_sample_identifier_is_the_same_on_report_and_public_page(
 ) -> None:
     assert SAMPLE_AUDIT_ID == "sample"  # /comprobar still reads the stored id.
     label = LABELS[locale]["audit_id"]
-    assert _UI[locale]["v_id"] == label
     shown = SAMPLE_SHOWN_IDS[kind][locale]
     report_paths = {
         "backtest": {"es": "/ejemplo", "en": "/sample", "pt": "/pt/exemplo"},
@@ -281,9 +387,83 @@ def test_sample_identifier_is_the_same_on_report_and_public_page(
     report = _get(site, report_paths[kind][locale])
     public = _get(site, f"/v/{public_id}?lang={locale}")
     assert f"<span>{html.escape(label)} {html.escape(shown)}</span>" in report
+    # A sample's page says the report's own word, since it shows the report's value.
     assert f"<b>{html.escape(label)}</b><span>{html.escape(shown)}</span>" in public
+    assert html.escape(_UI[locale]["v_id"]) not in public
     if locale != "en":
         assert f"{label} {SAMPLE_AUDIT_ID}" not in _visible(report)
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+def test_a_publication_never_calls_its_page_code_the_reports_identifier(
+    sample_view: tuple[dict[str, object], str], locale: str
+) -> None:
+    """A publication's page shows its own 12-character code, which is not the
+    report's identifier: it says so in its own words, never the report's."""
+    view, digest = sample_view
+    page = verification_page(
+        view,
+        public_id="AbCdEfGhIjKl",
+        published_at="2026-10-09T00:00:00+00:00",
+        result_sha256=digest,
+        base_url=BASE,
+        locale=locale,
+    )
+    words = {
+        "es": "Código de la página pública",
+        "en": "Public page code",
+        "pt": "Código da página pública",
+    }[locale]
+    assert _UI[locale]["v_id"] == words != LABELS[locale]["audit_id"]
+    assert f"<b>{html.escape(words)}</b><span>AbCdEfGhIjKl</span>" in page
+    assert f"<b>{html.escape(LABELS[locale]['audit_id'])}</b>" not in page
+    assert find_claims(_visible(page)) == []
+
+
+@pytest.mark.parametrize(("locale", "path"), [("es", "/ejemplo"), ("pt", "/pt/exemplo")])
+def test_the_sealed_sample_id_is_explained_where_it_shows(
+    site: TestClient, locale: str, path: str
+) -> None:
+    """The holdout seal keeps the stored id, "sample", since its SHA-256 is computed
+    with it; beside it the report says the rest of the page shows another word."""
+    text = _visible(_get(site, path))
+    shown = SAMPLE_SHOWN_IDS["backtest"][locale]
+    note = SAMPLE_SEAL_NOTE[locale].format(shown=shown)
+    seal = KEY_LABELS[locale]["seal_id"]
+    assert f"{seal} {SAMPLE_AUDIT_ID} ({note})" in text
+    # Every visible "sample" is that one: the stored id beside its note.
+    assert len(re.findall(rf"\b{SAMPLE_AUDIT_ID}\b", text)) == 1
+    assert find_claims(note) == []
+    # The English report shows the stored id itself: no note there.
+    english = _visible(_get(site, "/sample"))
+    assert f"{KEY_LABELS['en']['seal_id']} {SAMPLE_AUDIT_ID} Selection" in english
+    assert "(the identifier this sample" not in english
+
+
+@pytest.mark.parametrize(("locale", "path"), [("es", "/ejemplo.pdf"), ("pt", "/pt/exemplo.pdf")])
+def test_the_sample_pdf_explains_the_sealed_id_too(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, locale: str, path: str
+) -> None:
+    """The PDF is printed from the same HTML: the same identifier and the same note."""
+    from quant_trade.audit import pdf as pdf_lib
+
+    printed: list[str] = []
+
+    def fake_pdf(page: str, **_: object) -> bytes:
+        printed.append(page)
+        return b"%PDF-1.7 test"
+
+    monkeypatch.setattr(pdf_lib, "report_pdf", fake_pdf)
+    client = _client(_settings(tmp_path))
+    try:
+        assert client.get(path).status_code == 200
+    finally:
+        client.close()
+    text = _visible(printed[0])
+    shown = SAMPLE_SHOWN_IDS["backtest"][locale]
+    assert f"{LABELS[locale]['audit_id']} {shown}" in text
+    note = SAMPLE_SEAL_NOTE[locale].format(shown=shown)
+    assert f"{KEY_LABELS[locale]['seal_id']} {SAMPLE_AUDIT_ID} ({note})" in text
 
 
 # -- 6. Pricing: three options, one contact channel ---------------------------------
@@ -318,6 +498,12 @@ def test_examples_round_nine_weeks_to_two_decimals(site: TestClient, locale: str
     card = ">0.17<" if locale == "en" else ">0,17<"
     assert card in page
     assert "173077" not in page
+    # The calculator link carries the same 0.17, never the float's 17 digits.
+    assert "17307" not in page and "years=0.17&" in page
+    link = re.search(r"href='([^']*years=0\.17[^']*)'", page)
+    assert link is not None
+    calculator = _get(site, html.unescape(link.group(1)))
+    assert "17307" not in calculator and "value='0.17'" in calculator
 
 
 # -- 9. The calculator's frequency against the report's ---------------------------
@@ -389,23 +575,43 @@ def test_guides_index_and_myfxbook_guide_agree_on_whose_csv(site: TestClient, lo
     assert "Download a Myfxbook account's history as CSV and upload" not in index
 
 
-# -- 12. Phases and programs, counted from the presets -------------------------------
+# -- 12. Rule sets and programs, counted from the presets ----------------------------
 
 
 @pytest.mark.parametrize("locale", LOCALES)
-def test_prop_page_counts_phases_and_programs_from_the_presets(
+def test_prop_page_counts_rule_sets_and_programs_from_the_presets(
     site: TestClient, locale: str
 ) -> None:
     firms = [rules for rules in PRESETS.values() if rules.firm != "Generic"]
-    phases, programs = len(firms), len({(r.firm, r.program) for r in firms})
+    rule_sets, programs = len(firms), len({(r.firm, r.program) for r in firms})
+    # A rule set is not always one phase: The5ers' Bootcamp preset holds for each of
+    # its three steps, so "phases" would undercount.
+    assert any(not rules.phase[:1].isdigit() for rules in firms)
+    generic = [rules for rules in PRESETS.values() if rules.firm == "Generic"]
+    assert [rules.phase for rules in generic] == ["1"]
     text = _visible(_get(site, audience_url("retos-prop-firm", locale)))
     expected = {
-        "es": f"{phases} fases de {programs} programas",
-        "en": f"{phases} phases of {programs} FTMO",
-        "pt": f"{phases} fases de {programs} programas",
+        "es": f"{rule_sets} juegos de reglas de {programs} programas",
+        "en": f"{rule_sets} rule sets from {programs} FTMO",
+        "pt": f"{rule_sets} conjuntos de regras de {programs} programas",
     }[locale]
     assert expected in text
-    # Every firm phase the form offers cites its official page and the day it was read.
+    generic_words = {
+        "es": "más la fase 1 de un reto genérico de dos fases",
+        "en": "plus phase 1 of a generic two-phase challenge",
+        "pt": "mais a fase 1 de um desafio genérico de duas fases",
+    }[locale]
+    assert generic_words in text
+    assert not re.search(r"\d+ (fases|phases) (de|of) \d+", text)
+    # The key figures' label counts the same unit.
+    unit = {
+        "es": "juegos de reglas de prop firms",
+        "en": "prop-firm rule sets",
+        "pt": "conjuntos de regras de prop firms",
+    }[locale]
+    labels = [label for value, label in _UI[locale]["stats"] if value == "{presets}"]
+    assert len(labels) == 1 and labels[0].startswith(unit)
+    # Every firm rule set the form offers cites its official page and the day it was read.
     assert all(rules.source_url.startswith("https://") and rules.as_of for rules in firms)
 
 
@@ -488,19 +694,30 @@ def test_accept_language_picks_the_first_supported_language() -> None:
 
 @pytest.mark.parametrize(
     ("header", "locale"),
-    [("pt-BR,pt;q=0.9,en;q=0.8", "pt"), ("en-US,en;q=0.9", "en"), ("fr-FR", "es"), ("", "es")],
+    [("pt-BR,pt;q=0.9,en;q=0.8", "pt"), ("en-US,en;q=0.9", "en"), ("de;q=1, en;q=0.5", "en")],
 )
-def test_public_page_without_lang_follows_accept_language(
+def test_public_page_without_lang_sends_the_browser_to_its_language(
     site: TestClient, header: str, locale: str
+) -> None:
+    """/v/{id} keeps one content and one canonical, the Spanish page's; a browser that
+    asks for English or Portuguese is sent to that page's own address, its ?ref= kept."""
+    response = site.get("/v/ejemplo?ref=v-ejemplo", headers={"accept-language": header})
+    assert response.status_code == 302
+    assert response.headers["location"] == f"/v/ejemplo?ref=v-ejemplo&lang={locale}"
+    assert "accept-language" in response.headers.get("vary", "").lower()
+    page = site.get(response.headers["location"], headers={"accept-language": header}).text
+    assert f"<html lang='{locale}'>" in page
+
+
+@pytest.mark.parametrize("header", ["es-MX,es;q=0.9", "fr-FR", "*", "en;q=0", ""])
+def test_public_page_without_lang_is_the_spanish_page_with_its_own_canonical(
+    site: TestClient, header: str
 ) -> None:
     response = site.get("/v/ejemplo", headers={"accept-language": header})
     assert response.status_code == 200
-    assert f"<html lang='{locale}'>" in response.text
+    assert "<html lang='es'>" in response.text
+    assert f"<link rel='canonical' href='{BASE}/v/ejemplo'>" in response.text
     assert "accept-language" in response.headers.get("vary", "").lower()
-    # The canonical is the one the page has in that language, as with ?lang=.
-    explicit = site.get(f"/v/ejemplo?lang={locale}").text
-    canonical = re.search(r"<link rel='canonical' href='[^']*'>", explicit)
-    assert canonical is not None and canonical.group(0) in response.text
 
 
 def test_lang_parameter_wins_and_other_pages_keep_their_address(site: TestClient) -> None:
@@ -508,6 +725,25 @@ def test_lang_parameter_wins_and_other_pages_keep_their_address(site: TestClient
     assert "<html lang='es'>" in site.get("/v/ejemplo?lang=es", headers=portuguese).text
     assert "<html lang='es'>" in site.get(FAQ_PATH["es"], headers=portuguese).text
     assert "<html lang='en'>" in site.get(FAQ_PATH["en"], headers=portuguese).text
+
+
+@pytest.mark.parametrize("header", ["en-US,en;q=0.9", "pt-BR,pt;q=0.9"])
+def test_the_language_switch_reaches_spanish_from_any_browser(
+    site: TestClient, header: str
+) -> None:
+    """The switch's "Español" carries ?lang=es, so the choice beats Accept-Language;
+    the Spanish page's canonical stays /v/{id}."""
+    browser = {"accept-language": header}
+    for public_id in ("ejemplo", "ejemplo-senal"):
+        page = site.get(f"/v/{public_id}?lang=en", headers=browser).text
+        nav = page.split("</header>", 1)[0]
+        links = re.findall(r"<a [^>]*href='([^']*)' hreflang='es'", nav)
+        assert links and set(links) == {f"/v/{public_id}?lang=es"}, links
+        assert f"/v/{public_id}'" not in nav
+        followed = site.get(links[0], headers=browser)
+        assert followed.status_code == 200
+        assert "<html lang='es'>" in followed.text
+        assert f"<link rel='canonical' href='{BASE}/v/{public_id}'>" in followed.text
 
 
 # -- Every page of the sitemap -------------------------------------------------------

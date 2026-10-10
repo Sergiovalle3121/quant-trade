@@ -452,7 +452,7 @@ UI_PT: dict[str, Any] = {
     "stats": [
         ("6", "dimensões auditadas"),
         ("{flags}", "bandeiras vermelhas revisadas em cada arquivo"),
-        ("{presets}", "fases de desafios de prop firms para simular"),
+        ("{presets}", "conjuntos de regras de prop firms para simular"),
         ("{platforms}", "plataformas que reconhece"),
     ],
     "evidence_eyebrow": "Evidência",
@@ -585,7 +585,7 @@ UI_PT: dict[str, Any] = {
     "v_eyebrow": "Verificação pública",
     "v_copy": "Copiar código",
     "v_copied": "Copiado",
-    "v_id": "Identificador",
+    "v_id": "Código da página pública",
     "guides_eyebrow": "Guias de exportação",
     "legal_eyebrow": "Jurídico",
     "error_eyebrow": "Algo não bate",

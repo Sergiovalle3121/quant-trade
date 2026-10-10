@@ -129,8 +129,9 @@ _QUESTIONS: tuple[dict[str, tuple[str, str]], ...] = (
         "pt": ("De quais países é possível pagar com cartão?", "{markets}"),
     },
     # Sources: pages._COPY['report_short'/'report_help'/'faq'], portuguese.COPY_PT;
-    # upload_limits.upload_limit_text words the limits from
-    # settings.AuditSettings.max_upload_bytes, as the form and the MT5 guide do.
+    # upload_limits.upload_limit_text words each field's limit from
+    # settings.AuditSettings.max_upload_bytes and the readers' own ceilings, as the
+    # upload form does.
     {
         "es": (
             "¿Qué formatos acepta Rigor?",

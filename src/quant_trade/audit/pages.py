@@ -117,6 +117,7 @@ from quant_trade.audit.report import (
     report_kind,
     source_name,
 )
+from quant_trade.audit.report import LABELS as REPORT_LABELS
 from quant_trade.audit.sample_publication import SamplePage, public_pages_line
 from quant_trade.audit.schema import MAX_UPLOAD_BYTES
 from quant_trade.audit.seo import (
@@ -150,7 +151,7 @@ from quant_trade.audit.theme import (
 )
 from quant_trade.audit.tools_hub import COPY as TOOLS_COPY
 from quant_trade.audit.tools_hub import TOOL_KEYS, TOOLS_PATH, tools_url
-from quant_trade.audit.upload_limits import upload_limit_text
+from quant_trade.audit.upload_limits import guide_limit_text, upload_limit_text
 from quant_trade.audit.verdict import class_text, meaning, trials_undeclared
 
 #: The fixed wording of the badge and of the verification page's notice. It
@@ -1016,7 +1017,7 @@ _UI: dict[str, dict[str, Any]] = {
         "stats": [
             ("6", "dimensiones auditadas"),
             ("{flags}", "banderas rojas revisadas en cada archivo"),
-            ("{presets}", "fases de retos de prop firms simulables"),
+            ("{presets}", "juegos de reglas de prop firms simulables"),
             ("{platforms}", "plataformas que reconoce"),
         ],
         "evidence_eyebrow": "Evidencia",
@@ -1152,8 +1153,9 @@ _UI: dict[str, dict[str, Any]] = {
         "v_eyebrow": "Verificación pública",
         "v_copy": "Copiar código",
         "v_copied": "Copiado",
-        # The report's own word for its identifier (report.LABELS['audit_id']).
-        "v_id": "Identificador",
+        # What a publication's id is: the code of its public page, never the
+        # report's identifier (a sample's page says that one, report.LABELS).
+        "v_id": "Código de la página pública",
         "guides_eyebrow": "Guías de exportación",
         "legal_eyebrow": "Legal",
         "error_eyebrow": "Algo no cuadra",
@@ -1258,7 +1260,7 @@ _UI: dict[str, dict[str, Any]] = {
         "stats": [
             ("6", "audited dimensions"),
             ("{flags}", "red flags checked on every file"),
-            ("{presets}", "prop-firm challenge phases to simulate"),
+            ("{presets}", "prop-firm rule sets to simulate"),
             ("{platforms}", "platforms it recognises"),
         ],
         "evidence_eyebrow": "Evidence",
@@ -1392,7 +1394,7 @@ _UI: dict[str, dict[str, Any]] = {
         "v_eyebrow": "Public verification",
         "v_copy": "Copy code",
         "v_copied": "Copied",
-        "v_id": "Identifier",
+        "v_id": "Public page code",
         "guides_eyebrow": "Export guides",
         "legal_eyebrow": "Legal",
         "error_eyebrow": "Something is off",
@@ -1841,11 +1843,11 @@ def _hero(locale: str, sample: str, *, price_usd: float = 0.0, free_mode: bool =
     )
 
 
-#: Challenge phases from named firms, one preset each; the generic two-step
-#: reference is not a firm's challenge, so pages that count the firms' phases
-#: leave it out.
+#: The firms' rule sets, one preset each; the generic two-step reference is not
+#: a firm's, so pages that count the firms' rule sets leave it out. A rule set is
+#: not always one phase: The5ers' Bootcamp preset holds for each of its three steps.
 FIRM_CHALLENGES = sum(1 for rules in PRESETS.values() if rules.firm != "Generic")
-#: The firms' programs those phases belong to (a two-step program has two).
+#: The firms' programs those rule sets belong to (a two-step one may have two).
 FIRM_PROGRAMS = len({(r.firm, r.program) for r in PRESETS.values() if r.firm != "Generic"})
 
 
@@ -3152,6 +3154,9 @@ def verification_page(
         description = f"{sample.meta_lead} · {description}"
     alternates = {lang: f"/v/{public_id}?lang={lang}" for lang in CLASS_WORD}
     alternates["es"] = f"/v/{public_id}"
+    # The language switch names Spanish too: without it, /v/{id} follows the
+    # browser's language and would send an English browser back to English.
+    switch = {**alternates, "es": f"/v/{public_id}?lang=es"}
     # Never indexed (an unpublished page should not linger in search), but it
     # previews its class and date when the link is shared.
     meta = head_meta(
@@ -3181,10 +3186,16 @@ def verification_page(
         "<div class='v-facts'>"
         f"<div><b>{_e(copy['v_audited'])}</b><span>{_utc_time(audited, locale)}</span></div>"
         f"<div><b>{_e(copy['v_published'])}</b><span>{_utc_time(published_at, locale)}</span></div>"
-        # A sample's page shows the identifier its report shows; a publication, its id.
-        f"<div><b>{_e(ui['v_id'])}</b>"
-        f"<span>{_e((sample.shown_id if sample is not None else '') or public_id)}</span></div>"
-        "</div></div></div></div></section>"
+        # A sample's page shows the identifier its report shows, under the report's
+        # word; a publication shows the code of its page, under its own words, since
+        # the report's identifier is not kept here.
+        + (
+            f"<div><b>{_e(REPORT_LABELS[locale]['audit_id'])}</b>"
+            f"<span>{_e(sample.shown_id or public_id)}</span></div>"
+            if sample is not None
+            else f"<div><b>{_e(ui['v_id'])}</b><span>{_e(public_id)}</span></div>"
+        )
+        + "</div></div></div></div></section>"
     )
     main = (
         "<div class='paper page-main'><div class='wrap wrap-mid'>"
@@ -3228,7 +3239,7 @@ def verification_page(
         locale,
         hero + main,
         meta_html=meta,
-        alternates=alternates,
+        alternates=switch,
         solid_nav=True,
     )
 
@@ -4550,7 +4561,8 @@ def guide_page(
     the free report as ``offer`` and ``email_verification`` say: the same values
     the sign-up page receives. The title, description, heading, address and
     language links do not depend on them. Where to upload the file ends with the
-    size limits for ``max_upload_bytes``, as the form and the questions page say them.
+    limit of the field it goes in (``guide.field``) for ``max_upload_bytes``, from
+    the same ``upload_limits`` as the form and the questions page.
     """
     locale = _locale(locale)
     ui = _UI[locale]
@@ -4576,7 +4588,8 @@ def guide_page(
         (
             words["upload"],
             f"<p>{_e(text.upload)}</p>"
-            f"<p class='upload-limit'>{_e(upload_limit_text(max_upload_bytes, locale))}</p>",
+            f"<p class='upload-limit'>"
+            f"{_e(guide_limit_text(guide.field, max_upload_bytes, locale))}</p>",
         ),
         (words["tips"], f"<ul class='checks'>{tips}</ul>"),
     ]

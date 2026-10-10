@@ -606,7 +606,8 @@ def accept_language_locale(header: str | None) -> str | None:
     """The report language a browser asks for in ``Accept-Language`` (``pt-BR``
     gives "pt", ``en-US`` "en"), by its own preference order; ``None`` when it
     names none of ``REPORT_LOCALES``. Only a page without its language in the
-    address or in ``?lang=`` reads it: the public page ``/v/{id}``."""
+    address or in ``?lang=`` reads it: the public page ``/v/{id}``, which sends
+    such a browser on to its own language's address."""
     choices: list[tuple[float, int, str]] = []
     for index, part in enumerate((header or "").split(",")):
         tag, _, params = part.strip().partition(";")
@@ -6429,19 +6430,21 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         return static(og_image_name(f"class-{overall}", locale))
 
     @app.get("/v/{public_id}", response_class=HTMLResponse)
-    def verification(
-        request: Request, response: Response, public_id: str, lang: str | None = None
-    ) -> str:
+    def verification(request: Request, public_id: str, lang: str | None = None) -> Response:
         publication, _, data, digest = _published(public_id)
         if lang is None:
-            # No language in the address: the browser's, as a badge's link opens it
-            # (Spanish has no suffix). The canonical and the language links stay the
-            # page's own for the language it shows.
-            locale = accept_language_locale(request.headers.get("accept-language")) or "es"
-            response.headers["Vary"] = "Accept-Language"
-        else:
-            locale = _report_locale(lang)
-        return verification_page(
+            # No language in the address (a badge's link, Spanish's own address): a
+            # browser that asks for English or Portuguese goes on to that page's
+            # address, with the rest of the query (its ?ref=). /v/{id} itself stays
+            # the Spanish page, with the same canonical as always.
+            wanted = accept_language_locale(request.headers.get("accept-language"))
+            if wanted is not None and wanted != "es":
+                query = urlencode([*request.query_params.multi_items(), ("lang", wanted)])
+                moved = RedirectResponse(f"/v/{quote(public_id, safe='')}?{query}", 302)
+                moved.headers["Vary"] = "Accept-Language"
+                return moved
+        locale = _report_locale(lang)
+        page = verification_page(
             data,
             public_id=publication.public_id,
             published_at=publication.created_at,
@@ -6451,6 +6454,10 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             # None for a publication: only a public sample's page has its own words.
             sample=sample_page(public_id, locale),
         )
+        shown = HTMLResponse(page)
+        if lang is None:
+            shown.headers["Vary"] = "Accept-Language"
+        return shown
 
     sample_cache: dict[tuple[str, str, str, tuple[str, ...]], str] = {}
     sample_lock = threading.Lock()

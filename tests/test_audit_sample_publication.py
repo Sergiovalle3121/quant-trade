@@ -44,6 +44,7 @@ from quant_trade.audit.pages import (  # noqa: E402
     _utc_time,
 )
 from quant_trade.audit.report import (  # noqa: E402
+    LABELS,
     render,
     report_kind,
     sample_cta_band,
@@ -219,10 +220,11 @@ def _as_sample(page: str, *, public_id: str, kind: str, locale: str, published: 
     )
     eyebrow = "<div class='eyebrow rise'>"
     page = _swap(page, eyebrow, sample_notice_html(public_id, locale) + eyebrow, 1)
+    # The report's word and value, not the code of a publication's page.
     page = _swap(
         page,
         f"<b>{e(ui['v_id'])}</b><span>{e(public_id)}</span>",
-        f"<b>{e(ui['v_id'])}</b><span>{e(SAMPLE_SHOWN_IDS[kind][locale])}</span>",
+        f"<b>{e(LABELS[locale]['audit_id'])}</b><span>{e(SAMPLE_SHOWN_IDS[kind][locale])}</span>",
         1,
     )
     page = _swap(page, e(copy["v_badge_help"]), e(SAMPLE_BADGE_HELP[locale]), 1)

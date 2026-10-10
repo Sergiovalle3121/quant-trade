@@ -135,10 +135,16 @@ def test_retention_upload_limit_and_contact_follow_configuration(locale: str) ->
     )
     pairs = faq_items(settings, locale)
     declared = evidence_label("DECLARED", locale)
-    # 7 MiB is 7.3 MB, and a platform report may be twice that up to the importers'
-    # own ceiling (upload_limits); the operator's limits carry no evidence label.
+    # 7 MiB is more than the readers take: a curve or a trade list stops at their
+    # 5 MB, a platform report at the importers' 10 MB (upload_limits), so 7.3 MB is
+    # never promised. The operator's limits carry no evidence label.
     seven = "7.3 MB" if locale == "en" else "7,3 MB"
-    assert declared not in pairs[2][1] and seven in pairs[2][1] and "10 MB" in pairs[2][1]
+    assert declared not in pairs[2][1] and seven not in pairs[2][1]
+    assert "5 MB" in pairs[2][1] and "10 MB" in pairs[2][1]
+    # A smaller setting is said as it is: 3 MiB a trade list, twice that a report.
+    smaller = faq_items(replace(settings, max_upload_bytes=3 * 1024 * 1024), locale)
+    three, six = ("3.1 MB", "6.3 MB") if locale == "en" else ("3,1 MB", "6,3 MB")
+    assert three in smaller[2][1] and six in smaller[2][1]
     assert declared not in pairs[8][1] and str(settings.retention_days) in pairs[8][1]
     assert "30" not in pairs[8][1]
     # The FAQ must preserve legal.py's exception for the first free full report.
