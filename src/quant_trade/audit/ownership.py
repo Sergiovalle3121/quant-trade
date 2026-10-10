@@ -706,6 +706,53 @@ LABELS: dict[str, dict[str, dict[str, str]]] = {
             "conforme quantas fossem: o número pode ser declarado ao enviar o histórico.",
         ),
     },
+    # A fund or portfolio: its trials are the portfolios, strategies or variants
+    # evaluated before this one was chosen, with no optimisation file to upload.
+    "luck_uncounted_fund": {
+        OWN: _say(
+            "El historial no dice cuántas carteras, estrategias o variantes evaluaste antes de "
+            "elegir esta. La tabla muestra cuánto historial haría falta según cuántas fueran: "
+            "declara cuántas evaluaste al subir el historial o sube la matriz de variantes, es "
+            "decir, las columnas de retornos de las variantes.",
+            "The history does not say how many portfolios, strategies or variants you evaluated "
+            "before choosing this one. The table shows how much history each count would need: "
+            "declare how many you evaluated when you upload the history or upload the variants "
+            "matrix, that is, the variants' return columns.",
+            "O histórico não diz quantas carteiras, estratégias ou variantes você avaliou antes "
+            "de escolher esta. A tabela mostra quanto histórico seria necessário conforme "
+            "quantas fossem: declare quantas você avaliou ao enviar o histórico ou envie a "
+            "matriz de variantes, ou seja, as colunas de retornos das variantes.",
+        ),
+        PROVIDER: _say(
+            "El historial no dice cuántas carteras, estrategias o variantes evaluaste antes de "
+            "elegir esta. La tabla muestra cuánto historial haría falta según cuántas fueran: "
+            "te lo van a preguntar, así que declara cuántas evaluaste al subir el historial o "
+            "aporta la matriz de variantes, es decir, las columnas de retornos de las variantes.",
+            "The history does not say how many portfolios, strategies or variants you evaluated "
+            "before choosing this one. The table shows how much history each count would need: "
+            "you will be asked, so declare how many you evaluated when you upload the history "
+            "or provide the variants matrix, that is, the variants' return columns.",
+            "O histórico não diz quantas carteiras, estratégias ou variantes você avaliou antes "
+            "de escolher esta. A tabela mostra quanto histórico seria necessário conforme "
+            "quantas fossem: vão perguntar isso a você, então declare quantas avaliou ao enviar "
+            "o histórico ou forneça a matriz de variantes, ou seja, as colunas de retornos das "
+            "variantes.",
+        ),
+        NEUTRAL: _say(
+            "El historial no dice cuántas carteras, estrategias o variantes se evaluaron antes "
+            "de elegir esta. La tabla muestra cuánto historial haría falta según cuántas "
+            "fueran: el número se declara al subir el historial o se mide con la matriz de "
+            "variantes, es decir, las columnas de retornos de las variantes.",
+            "The history does not say how many portfolios, strategies or variants were "
+            "evaluated before this one was chosen. The table shows how much history each count "
+            "would need: the number is declared when the history is uploaded or measured from "
+            "the variants matrix, that is, the variants' return columns.",
+            "O histórico não diz quantas carteiras, estratégias ou variantes foram avaliadas "
+            "antes de escolher esta. A tabela mostra quanto histórico seria necessário conforme "
+            "quantas fossem: o número é declarado ao enviar o histórico ou medido com a matriz "
+            "de variantes, ou seja, as colunas de retornos das variantes.",
+        ),
+    },
     "crises_worse": {
         OWN: _say(
             "En {worse} de {n} crisis cayó más que su índice. Revisa qué la protege cuando el "
@@ -975,36 +1022,41 @@ MEANING: dict[str, dict[str, dict[str, str]]] = {
             "Convém validar a escolhida em dados que não foram usados na otimização.",
         ),
     },
+    # A fund or portfolio: its trials are the portfolios, strategies or variants
+    # evaluated before this one was chosen, and their returns the variants matrix.
     "multiplicity.WEAK.fund": {
         OWN: _say(
-            "Parte del resultado puede venir de que este sea el mejor de varios fondos o "
-            "estrategias. Declara como intentos todos los que llevas o has cerrado: un buen "
-            "historial entre muchos pesa menos.",
-            "Part of the result may come from this being the best of several funds or "
-            "strategies. Declare as trials all the ones you run or have closed: one good record "
-            "among many weighs less.",
-            "Parte do resultado pode vir de este ser o melhor entre vários fundos ou "
-            "estratégias. Declare como tentativas todos os que você administra ou já encerrou: "
-            "um bom histórico entre muitos pesa menos.",
+            "Parte del resultado puede venir de que esta sea la mejor de varias carteras, "
+            "estrategias o variantes evaluadas. Cuenta como intentos todas las que evaluaste "
+            "antes de elegir esta, también las que descartaste: un buen historial entre muchos "
+            "pesa menos.",
+            "Part of the result may come from this being the best of several portfolios, "
+            "strategies or variants evaluated. Count as trials all the ones you evaluated "
+            "before choosing this one, the discarded ones too: one good record among many "
+            "weighs less.",
+            "Parte do resultado pode vir de esta ser a melhor entre várias carteiras, "
+            "estratégias ou variantes avaliadas. Conte como tentativas todas as que você "
+            "avaliou antes de escolher esta, também as que descartou: um bom histórico entre "
+            "muitos pesa menos.",
         ),
         PROVIDER: _say(
-            "Parte del resultado puede venir de que este sea el mejor de varios fondos o "
-            "estrategias. Te van a preguntar cuántos llevas o has cerrado: decláralo como "
-            "número de intentos.",
-            "Part of the result may come from this being the best of several funds or "
-            "strategies. You will be asked how many you run or have closed: declare it as the "
-            "number of trials.",
-            "Parte do resultado pode vir de este ser o melhor entre vários fundos ou "
-            "estratégias. Vão perguntar a você quantos administra ou já encerrou: declare isso "
-            "como número de tentativas.",
+            "Parte del resultado puede venir de que esta sea la mejor de varias carteras, "
+            "estrategias o variantes evaluadas. Te van a preguntar cuántas evaluaste antes de "
+            "elegir esta, contando las que descartaste.",
+            "Part of the result may come from this being the best of several portfolios, "
+            "strategies or variants evaluated. You will be asked how many you evaluated before "
+            "choosing this one, counting the ones you discarded.",
+            "Parte do resultado pode vir de esta ser a melhor entre várias carteiras, "
+            "estratégias ou variantes avaliadas. Vão perguntar a você quantas avaliou antes de "
+            "escolher esta, contando as que descartou.",
         ),
         NEUTRAL: _say(
-            "Parte del resultado puede venir de que este sea el mejor de varios fondos o "
-            "estrategias del mismo gestor. Un buen historial entre muchos pesa menos.",
-            "Part of the result may come from this being the best of several funds or "
-            "strategies from the same manager. One good record among many weighs less.",
-            "Parte do resultado pode vir de este ser o melhor entre vários fundos ou "
-            "estratégias do mesmo gestor. Um bom histórico entre muitos pesa menos.",
+            "Parte del resultado puede venir de que esta sea la mejor de varias carteras, "
+            "estrategias o variantes evaluadas. Un buen historial entre muchos pesa menos.",
+            "Part of the result may come from this being the best of several portfolios, "
+            "strategies or variants evaluated. One good record among many weighs less.",
+            "Parte do resultado pode vir de esta ser a melhor entre várias carteiras, "
+            "estratégias ou variantes avaliadas. Um bom histórico entre muitos pesa menos.",
         ),
     },
     # No trial count declared nor counted: the figure was taken at 1, the most
@@ -1047,37 +1099,44 @@ MEANING: dict[str, dict[str, dict[str, str]]] = {
     },
     "multiplicity.WEAK.undeclared.fund": {
         OWN: _say(
-            "Aun contando un solo fondo, el caso más favorable, el resultado no basta para "
-            "descartar la suerte. No declaraste cuántos fondos o estrategias llevas: declara el "
-            "número, porque con más de uno la conclusión sería más débil.",
-            "Even counting a single fund, the most favourable case, the result is not enough to "
-            "rule out luck. You did not declare how many funds or strategies you run: declare "
-            "the number, since with more than one the conclusion would be weaker.",
-            "Mesmo contando um único fundo, o caso mais favorável, o resultado não basta para "
-            "descartar a sorte. Você não declarou quantos fundos ou estratégias administra: "
-            "declare o número, porque com mais de um a conclusão seria mais fraca.",
+            "Aun contando una sola cartera, el caso más favorable, el resultado no basta para "
+            "descartar la suerte. No declaraste cuántas carteras, estrategias o variantes "
+            "evaluaste antes de elegir esta: declara el número o sube la matriz de variantes, "
+            "porque con más de una la conclusión sería más débil.",
+            "Even counting a single portfolio, the most favourable case, the result is not "
+            "enough to rule out luck. You did not declare how many portfolios, strategies or "
+            "variants you evaluated before choosing this one: declare the number or upload the "
+            "variants matrix, since with more than one the conclusion would be weaker.",
+            "Mesmo contando uma única carteira, o caso mais favorável, o resultado não basta "
+            "para descartar a sorte. Você não declarou quantas carteiras, estratégias ou "
+            "variantes avaliou antes de escolher esta: declare o número ou envie a matriz de "
+            "variantes, porque com mais de uma a conclusão seria mais fraca.",
         ),
         PROVIDER: _say(
-            "Aun contando un solo fondo, el caso más favorable, el resultado no basta para "
-            "descartar la suerte. Te van a preguntar cuántos fondos o estrategias llevas o has "
-            "cerrado: decláralo.",
-            "Even counting a single fund, the most favourable case, the result is not enough to "
-            "rule out luck. You will be asked how many funds or strategies you run or have "
-            "closed: declare it.",
-            "Mesmo contando um único fundo, o caso mais favorável, o resultado não basta para "
-            "descartar a sorte. Vão perguntar a você quantos fundos ou estratégias administra "
-            "ou já encerrou: declare isso.",
+            "Aun contando una sola cartera, el caso más favorable, el resultado no basta para "
+            "descartar la suerte. Te van a preguntar cuántas carteras, estrategias o variantes "
+            "evaluaste antes de elegir esta: decláralo o aporta la matriz de variantes.",
+            "Even counting a single portfolio, the most favourable case, the result is not "
+            "enough to rule out luck. You will be asked how many portfolios, strategies or "
+            "variants you evaluated before choosing this one: declare it or provide the "
+            "variants matrix.",
+            "Mesmo contando uma única carteira, o caso mais favorável, o resultado não basta "
+            "para descartar a sorte. Vão perguntar a você quantas carteiras, estratégias ou "
+            "variantes avaliou antes de escolher esta: declare isso ou forneça a matriz de "
+            "variantes.",
         ),
         NEUTRAL: _say(
-            "Aun contando un solo fondo, el caso más favorable, el resultado no basta para "
-            "descartar la suerte. No se declaró cuántos fondos o estrategias lleva el gestor: "
-            "con más de uno, la conclusión sería más débil.",
-            "Even counting a single fund, the most favourable case, the result is not enough to "
-            "rule out luck. How many funds or strategies the manager runs was not declared: "
-            "with more than one, the conclusion would be weaker.",
-            "Mesmo contando um único fundo, o caso mais favorável, o resultado não basta para "
-            "descartar a sorte. Não foi declarado quantos fundos ou estratégias o gestor "
-            "administra: com mais de um, a conclusão seria mais fraca.",
+            "Aun contando una sola cartera, el caso más favorable, el resultado no basta para "
+            "descartar la suerte. No se declaró cuántas carteras, estrategias o variantes se "
+            "evaluaron antes de elegir esta: con más de una, la conclusión sería más débil.",
+            "Even counting a single portfolio, the most favourable case, the result is not "
+            "enough to rule out luck. How many portfolios, strategies or variants were "
+            "evaluated before this one was chosen was not declared: with more than one, the "
+            "conclusion would be weaker.",
+            "Mesmo contando uma única carteira, o caso mais favorável, o resultado não basta "
+            "para descartar a sorte. Não foi declarado quantas carteiras, estratégias ou "
+            "variantes foram avaliadas antes de escolher esta: com mais de uma, a conclusão "
+            "seria mais fraca.",
         ),
     },
     # An account or signal has no optimisation to export: its trials are the
@@ -1410,57 +1469,141 @@ PLAN: dict[str, dict[str, dict[str, str]]] = {
             "É preciso o histórico completo do fundo desde o início, sem anos cortados.",
         ),
     },
+    # A fund or portfolio: its trials are the portfolios, strategies or variants
+    # evaluated before this one was chosen (the funds the manager runs or has
+    # closed among them), declared at upload or measured from the variants matrix.
     "fund_trials_undeclared": {
         OWN: _say(
-            "Declara cuántos fondos o estrategias llevas o has cerrado (aunque sea 1) al subir "
-            "el historial: Rigor lo descuenta.",
-            "Declare how many funds or strategies you run or have closed (even if it is 1) "
-            "when you upload the record: Rigor discounts it.",
-            "Declare quantos fundos ou estratégias você administra ou já encerrou (mesmo que "
-            "seja 1) ao enviar o histórico: o Rigor o desconta.",
+            "Declara cuántas carteras, estrategias o variantes evaluaste antes de elegir esta, "
+            "contando los fondos que llevas o has cerrado (aunque sea 1), al subir el "
+            "historial, o sube la matriz de variantes, es decir, las columnas de retornos de "
+            "las variantes: Rigor lo descuenta.",
+            "Declare how many portfolios, strategies or variants you evaluated before choosing "
+            "this one, counting the funds you run or have closed (even if it is 1), when you "
+            "upload the record, or upload the variants matrix, that is, the variants' return "
+            "columns: Rigor discounts it.",
+            "Declare quantas carteiras, estratégias ou variantes você avaliou antes de escolher "
+            "esta, contando os fundos que administra ou já encerrou (mesmo que seja 1), ao "
+            "enviar o histórico, ou envie a matriz de variantes, ou seja, as colunas de "
+            "retornos das variantes: o Rigor o desconta.",
         ),
         PROVIDER: _say(
-            "Te van a preguntar cuántos fondos o estrategias llevas o has cerrado: decláralo "
-            "(aunque sea 1) al subir el historial y Rigor lo descuenta.",
-            "You will be asked how many funds or strategies you run or have closed: declare it "
-            "(even if it is 1) when you upload the record and Rigor discounts it.",
-            "Vão perguntar a você quantos fundos ou estratégias administra ou já encerrou: "
-            "declare esse número (mesmo que seja 1) ao enviar o histórico e o Rigor o desconta.",
+            "Te van a preguntar cuántas carteras, estrategias o variantes evaluaste antes de "
+            "elegir esta, contando los fondos que llevas o has cerrado: decláralo (aunque sea "
+            "1) al subir el historial o aporta la matriz de variantes, es decir, las columnas "
+            "de retornos de las variantes, y Rigor lo descuenta.",
+            "You will be asked how many portfolios, strategies or variants you evaluated "
+            "before choosing this one, counting the funds you run or have closed: declare it "
+            "(even if it is 1) when you upload the record or provide the variants matrix, that "
+            "is, the variants' return columns, and Rigor discounts it.",
+            "Vão perguntar a você quantas carteiras, estratégias ou variantes avaliou antes de "
+            "escolher esta, contando os fundos que administra ou já encerrou: declare esse "
+            "número (mesmo que seja 1) ao enviar o histórico ou forneça a matriz de variantes, "
+            "ou seja, as colunas de retornos das variantes, e o Rigor o desconta.",
         ),
         NEUTRAL: _say(
-            "Declara cuántos fondos o estrategias lleva o ha cerrado el gestor (aunque sea 1) "
-            "al subir el historial: Rigor lo descuenta.",
-            "Declare how many funds or strategies the manager runs or has closed (even if it "
-            "is 1) when you upload the record: Rigor discounts it.",
-            "Declare quantos fundos ou estratégias o gestor administra ou já encerrou (mesmo "
-            "que seja 1) ao enviar o histórico: o Rigor o desconta.",
+            "Declara cuántas carteras, estrategias o variantes se evaluaron antes de elegir "
+            "esta, contando los fondos que el gestor lleva o ha cerrado (aunque sea 1), al "
+            "subir el historial, o sube la matriz de variantes, es decir, las columnas de "
+            "retornos de las variantes: Rigor lo descuenta.",
+            "Declare how many portfolios, strategies or variants were evaluated before this "
+            "one was chosen, counting the funds the manager runs or has closed (even if it is "
+            "1), when you upload the record, or upload the variants matrix, that is, the "
+            "variants' return columns: Rigor discounts it.",
+            "Declare quantas carteiras, estratégias ou variantes foram avaliadas antes de "
+            "escolher esta, contando os fundos que o gestor administra ou já encerrou (mesmo "
+            "que seja 1), ao enviar o histórico, ou envie a matriz de variantes, ou seja, as "
+            "colunas de retornos das variantes: o Rigor o desconta.",
         ),
     },
     "fund_trials": {
         OWN: _say(
-            "Declara como número de intentos cuántos fondos o estrategias llevas o has "
-            "cerrado: un buen historial entre muchos pesa menos.",
-            "Declare how many funds or strategies you run or have closed as the number of "
-            "trials: one good record among many weighs less.",
-            "Declare como número de tentativas quantos fundos ou estratégias você administra "
-            "ou já encerrou: um bom histórico entre muitos pesa menos.",
+            "Declara como número de intentos cuántas carteras, estrategias o variantes "
+            "evaluaste antes de elegir esta, contando los fondos que llevas o has cerrado, o "
+            "sube la matriz de variantes, es decir, las columnas de retornos de las variantes: "
+            "un buen historial entre muchos pesa menos.",
+            "Declare as the number of trials how many portfolios, strategies or variants you "
+            "evaluated before choosing this one, counting the funds you run or have closed, or "
+            "upload the variants matrix, that is, the variants' return columns: one good "
+            "record among many weighs less.",
+            "Declare como número de tentativas quantas carteiras, estratégias ou variantes "
+            "você avaliou antes de escolher esta, contando os fundos que administra ou já "
+            "encerrou, ou envie a matriz de variantes, ou seja, as colunas de retornos das "
+            "variantes: um bom histórico entre muitos pesa menos.",
         ),
         PROVIDER: _say(
-            "Te van a preguntar cuántos fondos o estrategias llevas o has cerrado: decláralo "
-            "como número de intentos, porque un buen historial entre muchos pesa menos.",
-            "You will be asked how many funds or strategies you run or have closed: declare it "
-            "as the number of trials, since one good record among many weighs less.",
-            "Vão perguntar a você quantos fundos ou estratégias administra ou já encerrou: "
-            "declare isso como número de tentativas, porque um bom histórico entre muitos pesa "
-            "menos.",
+            "Te van a preguntar cuántas carteras, estrategias o variantes evaluaste antes de "
+            "elegir esta, contando los fondos que llevas o has cerrado: decláralo como número "
+            "de intentos o aporta la matriz de variantes, es decir, las columnas de retornos de "
+            "las variantes, porque un buen historial entre muchos pesa menos.",
+            "You will be asked how many portfolios, strategies or variants you evaluated "
+            "before choosing this one, counting the funds you run or have closed: declare it "
+            "as the number of trials or provide the variants matrix, that is, the variants' "
+            "return columns, since one good record among many weighs less.",
+            "Vão perguntar a você quantas carteiras, estratégias ou variantes avaliou antes de "
+            "escolher esta, contando os fundos que administra ou já encerrou: declare isso como "
+            "número de tentativas ou forneça a matriz de variantes, ou seja, as colunas de "
+            "retornos das variantes, porque um bom histórico entre muitos pesa menos.",
         ),
         NEUTRAL: _say(
-            "Declara como número de intentos cuántos fondos o estrategias lleva o ha cerrado "
-            "el gestor: un buen historial entre muchos pesa menos.",
-            "Declare how many funds or strategies the manager runs or has closed as the number "
-            "of trials: one good record among many weighs less.",
-            "Declare como número de tentativas quantos fundos ou estratégias o gestor "
-            "administra ou já encerrou: um bom histórico entre muitos pesa menos.",
+            "Declara como número de intentos cuántas carteras, estrategias o variantes se "
+            "evaluaron antes de elegir esta, contando los fondos que el gestor lleva o ha "
+            "cerrado, o sube la matriz de variantes, es decir, las columnas de retornos de las "
+            "variantes: un buen historial entre muchos pesa menos.",
+            "Declare as the number of trials how many portfolios, strategies or variants were "
+            "evaluated before this one was chosen, counting the funds the manager runs or has "
+            "closed, or upload the variants matrix, that is, the variants' return columns: one "
+            "good record among many weighs less.",
+            "Declare como número de tentativas quantas carteiras, estratégias ou variantes "
+            "foram avaliadas antes de escolher esta, contando os fundos que o gestor administra "
+            "ou já encerrou, ou envie a matriz de variantes, ou seja, as colunas de retornos "
+            "das variantes: um bom histórico entre muitos pesa menos.",
+        ),
+    },
+    # The count already comes from the variants matrix: what is left to ask is
+    # whether every portfolio, strategy or variant evaluated is in it.
+    "fund_trials_counted": {
+        OWN: _say(
+            "El número de intentos ya sale de la matriz de variantes que subiste, una columna "
+            "de retornos por cartera, estrategia o variante. Si evaluaste más de las que trae, "
+            "contando los fondos que llevas o has cerrado, sube los retornos de todas: un buen "
+            "historial entre muchos pesa menos.",
+            "The trial count already comes from the variants matrix you uploaded, one return "
+            "column per portfolio, strategy or variant. If you evaluated more than it holds, "
+            "counting the funds you run or have closed, upload the returns of all of them: one "
+            "good record among many weighs less.",
+            "O número de tentativas já sai da matriz de variantes que você enviou, uma coluna "
+            "de retornos por carteira, estratégia ou variante. Se você avaliou mais do que as "
+            "que ela traz, contando os fundos que administra ou já encerrou, envie os retornos "
+            "de todas: um bom histórico entre muitos pesa menos.",
+        ),
+        PROVIDER: _say(
+            "El número de intentos ya sale de la matriz de variantes que subiste, una columna "
+            "de retornos por cartera, estrategia o variante. Te van a preguntar si evaluaste "
+            "más de las que trae, contando los fondos que llevas o has cerrado: si fue así, "
+            "sube los retornos de todas.",
+            "The trial count already comes from the variants matrix you uploaded, one return "
+            "column per portfolio, strategy or variant. You will be asked whether you "
+            "evaluated more than it holds, counting the funds you run or have closed: if so, "
+            "upload the returns of all of them.",
+            "O número de tentativas já sai da matriz de variantes que você enviou, uma coluna "
+            "de retornos por carteira, estratégia ou variante. Vão perguntar a você se avaliou "
+            "mais do que as que ela traz, contando os fundos que administra ou já encerrou: se "
+            "foi assim, envie os retornos de todas.",
+        ),
+        NEUTRAL: _say(
+            "El número de intentos ya sale de la matriz de variantes subida, una columna de "
+            "retornos por cartera, estrategia o variante. Si se evaluaron más de las que trae, "
+            "contando los fondos que el gestor lleva o ha cerrado, conviene subir los retornos "
+            "de todas: un buen historial entre muchos pesa menos.",
+            "The trial count already comes from the uploaded variants matrix, one return "
+            "column per portfolio, strategy or variant. If more were evaluated than it holds, "
+            "counting the funds the manager runs or has closed, it is worth uploading the "
+            "returns of all of them: one good record among many weighs less.",
+            "O número de tentativas já sai da matriz de variantes enviada, uma coluna de "
+            "retornos por carteira, estratégia ou variante. Se foram avaliadas mais do que as "
+            "que ela traz, contando os fundos que o gestor administra ou já encerrou, convém "
+            "enviar os retornos de todas: um bom histórico entre muitos pesa menos.",
         ),
     },
     "fund_oos": {
@@ -1943,21 +2086,23 @@ PLAN: dict[str, dict[str, dict[str, str]]] = {
             "Declare desde quando o seu processo não muda",
         ),
     },
+    # Declared at upload or measured from the variants matrix: what the step asks
+    # is that every one evaluated is counted.
     "title_fund_multiplicity": {
         OWN: _say(
-            "Declara cuántos fondos llevas",
-            "Declare how many funds you run",
-            "Declare quantos fundos você administra",
+            "Cuenta todas las carteras, estrategias o variantes que evaluaste",
+            "Count every portfolio, strategy or variant you evaluated",
+            "Conte todas as carteiras, estratégias ou variantes que você avaliou",
         ),
         PROVIDER: _say(
-            "Declara cuántos fondos llevas",
-            "Declare how many funds you run",
-            "Declare quantos fundos você administra",
+            "Cuenta todas las carteras, estrategias o variantes que evaluaste",
+            "Count every portfolio, strategy or variant you evaluated",
+            "Conte todas as carteiras, estratégias ou variantes que você avaliou",
         ),
         NEUTRAL: _say(
-            "Declara cuántos fondos lleva el gestor",
-            "Declare how many funds the manager runs",
-            "Declare quantos fundos o gestor administra",
+            "Cuenta todas las carteras, estrategias o variantes evaluadas",
+            "Count every portfolio, strategy or variant evaluated",
+            "Conte todas as carteiras, estratégias ou variantes avaliadas",
         ),
     },
 }

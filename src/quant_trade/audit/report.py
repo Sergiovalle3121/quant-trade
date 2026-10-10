@@ -492,6 +492,44 @@ LOCKED_GAINS_ACCOUNT: dict[str, dict[str, str]] = {
     },
 }
 
+#: The lockbox's lines that read differently on a fund or portfolio's preview:
+#: its trials are the portfolios, strategies or variants evaluated before this
+#: one was chosen, as its dimension (``DIMENSION_TITLES_FUND``) and the plan's
+#: step count them, never the configurations a backtest tried. Every other line
+#: is the backtest's.
+LOCKED_GAINS_FUND: dict[str, dict[str, str]] = {
+    "es": {
+        "multiplicity": (
+            "Cuánto queda al descontar las carteras, estrategias o variantes evaluadas antes de "
+            "elegir esta"
+        ),
+        "cscv": (
+            "La probabilidad de que la mejor de las carteras, estrategias o variantes evaluadas "
+            "sea sobreajuste"
+        ),
+    },
+    "en": {
+        "multiplicity": (
+            "What is left after discounting the portfolios, strategies or variants evaluated "
+            "before this one was chosen"
+        ),
+        "cscv": (
+            "The probability that the best of the portfolios, strategies or variants evaluated "
+            "is overfit"
+        ),
+    },
+    "pt": {
+        "multiplicity": (
+            "Quanto sobra ao descontar as carteiras, estratégias ou variantes avaliadas antes de "
+            "escolher esta"
+        ),
+        "cscv": (
+            "A probabilidade de que a melhor das carteiras, estratégias ou variantes avaliadas "
+            "seja sobreajuste"
+        ),
+    },
+}
+
 LABELS: dict[str, dict[str, str]] = {
     "es": {
         "title": f"{BRAND} · Auditoría de backtest",
@@ -615,6 +653,17 @@ LABELS: dict[str, dict[str, str]] = {
             "aportan sus historiales, y la que produce el error de muestreo."
         ),
         "no_variants_account": "no se aportaron los historiales de las demás cuentas o señales",
+        # A fund or portfolio: its variants are the portfolios, strategies or
+        # variants evaluated before this one was chosen, one return column each.
+        "variance_policy_fund": (
+            "Varianza usada: la mayor entre la observada en las carteras, estrategias o "
+            "variantes evaluadas, cuando se suben sus retornos como matriz de variantes, y la "
+            "que produce el error de muestreo."
+        ),
+        "no_variants_fund": (
+            "no se subieron los retornos de las carteras, estrategias o variantes evaluadas "
+            "(la matriz de variantes)"
+        ),
         "pdf_long": "Descargar el informe en PDF",
         "pdf_busy": "Generando tu PDF… (unos segundos)",
         "pdf_wait": "El PDF tarda unos segundos en generarse.",
@@ -883,6 +932,44 @@ LABELS: dict[str, dict[str, str]] = {
             "E[Sharpe máximo] de intentos sin habilidad (Bailey y López de Prado); longitud "
             "mínima del historial (Bailey, Borwein, López de Prado y Zhu); descuento de "
             "Bonferroni (Harvey y Liu)"
+        ),
+        # A fund or portfolio: its trials are the portfolios, strategies or variants
+        # evaluated before this one was chosen; their returns are the variants matrix.
+        "luck_intro_fund": (
+            "Cuantas más carteras, estrategias o variantes se evalúan antes de elegir una, más "
+            "alto sale el Sharpe de la mejor aunque ninguna tenga ventaja. Aquí ponemos el "
+            "Sharpe de este historial junto al que daría la pura suerte con las carteras, "
+            "estrategias o variantes contadas, con la matemática publicada de Bailey y López de "
+            "Prado y de Harvey y Liu. Es el mismo cálculo que decide la dimensión «Número de "
+            "carteras, estrategias o variantes evaluadas», dicho en números."
+        ),
+        "luck_uncounted_fund": (
+            "El historial no dice cuántas carteras, estrategias o variantes se evaluaron antes "
+            "de elegir esta. La tabla muestra cuánto historial haría falta según cuántas "
+            "fueran: pregúntaselo al gestor. El número se declara al subir el historial o se "
+            "mide con la matriz de variantes, es decir, las columnas de retornos de las "
+            "variantes."
+        ),
+        "luck_table_trials_fund": "Carteras, estrategias o variantes evaluadas",
+        "luck_narrow_fund": (
+            "El Sharpe de {sharpe} supera al {luck} que darían {n} carteras, estrategias o "
+            "variantes sin habilidad, pero no con el margen que pedimos: la confianza de que no "
+            "sea suerte (DSR) es del {dsr}, y para superar esta dimensión pedimos {need}."
+        ),
+        "luck_beats_fund": (
+            "El Sharpe de {sharpe} supera al {luck} que darían {n} carteras, estrategias o "
+            "variantes sin habilidad."
+        ),
+        "luck_below_fund": (
+            "Con {n} carteras, estrategias o variantes, la pura suerte daría un Sharpe de "
+            "{luck}, igual o más que el {sharpe} de este historial."
+        ),
+        "luck_sharpe_fund": (
+            "Sharpe que darían {n} carteras, estrategias o variantes sin habilidad (el del "
+            "historial: {sharpe})"
+        ),
+        "luck_after_fund": (
+            "Sharpe que queda tras descontar {n} carteras, estrategias o variantes (Harvey y Liu)"
         ),
         "luck_table_luck": "Sharpe que daría la suerte",
         "luck_table_years": "Historial necesario",
@@ -2344,6 +2431,15 @@ LABELS: dict[str, dict[str, str]] = {
             "signals, when their histories are provided, and the one sampling error produces."
         ),
         "no_variants_account": "the histories of the other accounts or signals were not provided",
+        "variance_policy_fund": (
+            "Variance used: the larger of the one observed across the portfolios, strategies or "
+            "variants evaluated, when their returns are uploaded as a variants matrix, and the "
+            "one sampling error produces."
+        ),
+        "no_variants_fund": (
+            "the returns of the portfolios, strategies or variants evaluated (the variants "
+            "matrix) were not uploaded"
+        ),
         "pdf_long": "Download the report as PDF",
         "pdf_busy": "Preparing your PDF… (a few seconds)",
         "pdf_wait": "The PDF takes a few seconds to prepare.",
@@ -2601,6 +2697,41 @@ LABELS: dict[str, dict[str, str]] = {
         "luck_note_account": (
             "E[max Sharpe] of unskilled trials (Bailey & Lopez de Prado); minimum history "
             "length (Bailey, Borwein, Lopez de Prado & Zhu); Bonferroni haircut (Harvey & Liu)"
+        ),
+        "luck_intro_fund": (
+            "The more portfolios, strategies or variants are evaluated before one is chosen, "
+            "the higher the best one's Sharpe comes out even when none has an edge. Here this "
+            "history's Sharpe sits next to what pure luck would give with the portfolios, "
+            "strategies or variants counted, using the published math of Bailey and López de "
+            "Prado and of Harvey and Liu. It is the same calculation that decides the "
+            '"Number of portfolios, strategies or variants evaluated" dimension, in numbers.'
+        ),
+        "luck_uncounted_fund": (
+            "The history does not say how many portfolios, strategies or variants were "
+            "evaluated before this one was chosen. The table shows how much history each count "
+            "would need: ask the manager. The number is declared when the history is uploaded "
+            "or measured from the variants matrix, that is, the variants' return columns."
+        ),
+        "luck_table_trials_fund": "Portfolios, strategies or variants evaluated",
+        "luck_narrow_fund": (
+            "The Sharpe of {sharpe} beats the {luck} that {n} portfolios, strategies or "
+            "variants with no skill would show, but not by the margin we ask: the confidence "
+            "that it is not luck (DSR) is {dsr}, and passing this dimension needs {need}."
+        ),
+        "luck_beats_fund": (
+            "The Sharpe of {sharpe} beats the {luck} that {n} portfolios, strategies or "
+            "variants with no skill would show."
+        ),
+        "luck_below_fund": (
+            "With {n} portfolios, strategies or variants, pure luck would show a Sharpe of "
+            "{luck}, as much as or more than this history's {sharpe}."
+        ),
+        "luck_sharpe_fund": (
+            "Sharpe {n} portfolios, strategies or variants with no skill would show (the "
+            "history's: {sharpe})"
+        ),
+        "luck_after_fund": (
+            "Sharpe left after discounting {n} portfolios, strategies or variants (Harvey and Liu)"
         ),
         "luck_table_luck": "Sharpe luck would show",
         "luck_table_years": "History needed",
@@ -3943,6 +4074,15 @@ DIMENSION_TITLES_MIXED: dict[str, dict[str, str]] = {
     "en": {"multiplicity": "Number of trials"},
     "pt": {"multiplicity": "Número de tentativas"},
 }
+#: The dimensions a fund or portfolio names by what it counts: its trials are the
+#: portfolios, strategies or variants evaluated before this one was chosen
+#: (``ownership.PLAN["fund_trials"]``), declared at upload or measured from the
+#: variants matrix. Every other name is the backtest's.
+DIMENSION_TITLES_FUND: dict[str, dict[str, str]] = {
+    "es": {"multiplicity": "Número de carteras, estrategias o variantes evaluadas"},
+    "en": {"multiplicity": "Number of portfolios, strategies or variants evaluated"},
+    "pt": {"multiplicity": "Número de carteiras, estratégias ou variantes avaliadas"},
+}
 
 STATUS_TEXT: dict[str, dict[str, str]] = {
     "es": {
@@ -4064,6 +4204,9 @@ KEY_LABELS: dict[str, dict[str, str]] = {
         "floor": "Mínimo por error de muestreo",
         "observed_across_variants": "Observado en las variantes",
         "observed_across_accounts": "Observado en las demás cuentas o señales",
+        "observed_across_fund_variants": (
+            "Observado en las carteras, estrategias o variantes evaluadas"
+        ),
         "sharpe_variance_used": "Varianza del Sharpe usada",
         "dependence_ratio": "Aumento de la varianza por dependencia",
         "effective_observations": "Observaciones efectivas tras dependencia",
@@ -4178,6 +4321,9 @@ KEY_LABELS: dict[str, dict[str, str]] = {
         "floor": "Sampling-error floor",
         "observed_across_variants": "Observed across variants",
         "observed_across_accounts": "Observed across the other accounts or signals",
+        "observed_across_fund_variants": (
+            "Observed across the portfolios, strategies or variants evaluated"
+        ),
         "sharpe_variance_used": "Sharpe variance used",
         "dependence_ratio": "Variance increase from dependence",
         "effective_observations": "Effective observations after dependence",
@@ -4756,6 +4902,33 @@ def _account_cscv(cscv: dict[str, Any], labels: dict[str, str]) -> dict[str, Any
     return cscv
 
 
+def _fund_multiplicity_rows(rows: dict[str, Any], labels: dict[str, str]) -> dict[str, Any]:
+    """A fund or portfolio's multiplicity rows. Its trials are the portfolios,
+    strategies or variants evaluated before this one was chosen, whose returns
+    make the variants matrix: the row of the variance observed across them
+    names them so, measured or not, and with no matrix uploaded its note says
+    their returns were not uploaded. The figures and tags are as stored."""
+    observed = rows.get("observed_across_variants")
+    if not isinstance(observed, dict):
+        return rows
+    note = observed.get("note")
+    shown = {**observed, "note": labels["no_variants_fund"] if note == NO_VARIANTS else note}
+    return {
+        ("observed_across_fund_variants" if key == "observed_across_variants" else key): (
+            shown if key == "observed_across_variants" else value
+        )
+        for key, value in rows.items()
+    }
+
+
+def _fund_cscv(cscv: dict[str, Any], labels: dict[str, str]) -> dict[str, Any]:
+    """A fund or portfolio's CSCV section: with no matrix uploaded, its reason
+    names the returns of the portfolios, strategies or variants evaluated."""
+    if cscv.get("status") == "NOT_MEASURED" and cscv.get("reason") == NO_VARIANTS:
+        return {**cscv, "reason": labels["no_variants_fund"]}
+    return cscv
+
+
 def _status_line(section: dict[str, Any], labels: dict[str, str]) -> str:
     status = section.get("status")
     if status == "NOT_MEASURED":
@@ -4794,8 +4967,11 @@ def _status_badge(status: str, locale: str) -> str:
     return f'<span class="badge {_e(status)}">{_e(text)}</span>'
 
 
-def _dimension_title(name: str, locale: str, *, account: bool = False) -> str:
-    """A dimension's name; ``account``: an account or signal's, by what it counts."""
+def _dimension_title(name: str, locale: str, *, account: bool = False, fund: bool = False) -> str:
+    """A dimension's name; ``account``: an account or signal's, by what it counts;
+    ``fund``: a fund or portfolio's, by what it counts (``DIMENSION_TITLES_FUND``)."""
+    if fund and (title := DIMENSION_TITLES_FUND.get(locale, {}).get(name)):
+        return title
     if account and (title := DIMENSION_TITLES_ACCOUNT.get(locale, {}).get(name)):
         return title
     return DIMENSION_TITLES.get(locale, DIMENSION_TITLES["es"]).get(name, name)
@@ -4807,26 +4983,36 @@ def _account_page(data: Mapping[str, Any] | None) -> bool:
     return data is not None and report_kind(dict(data)) == "account"
 
 
+def _fund_page(data: Mapping[str, Any] | None) -> bool:
+    """A fund or portfolio's report (``report_kind``): its texts name the
+    portfolios, strategies or variants evaluated, never a robot or its
+    configurations."""
+    return data is not None and report_kind(dict(data)) == "fund"
+
+
 def shared_dimension_title(name: str, locale: str, results: Iterable[Mapping[str, Any]]) -> str:
     """A dimension's name over several stored results read together (a
     comparison, what changed between two): an account or signal's when every
-    one is (``DIMENSION_TITLES_ACCOUNT``), one both kinds share when an account
-    or signal sits beside a backtest (``DIMENSION_TITLES_MIXED``), else the
-    backtest's, as each report names it. A stored result whose context does
-    not read (not a mapping) counts as a backtest, as its own page would."""
+    one is (``DIMENSION_TITLES_ACCOUNT``), a fund or portfolio's when every one
+    is (``DIMENSION_TITLES_FUND``), one all kinds share when different kinds sit
+    side by side (``DIMENSION_TITLES_MIXED``), else the backtest's, as each
+    report names it. A stored result whose context does not read (not a
+    mapping) counts as a backtest, as its own page would."""
 
-    def account(data: Any) -> bool:
+    def kind(data: Any) -> str:
         if not isinstance(data, Mapping):
-            return False
+            return "backtest"
         inputs, fund = data.get("inputs"), data.get("fund")
         if not isinstance(inputs, Mapping) or not isinstance(fund, Mapping | None):
-            return False
-        return _account_page(data)
+            return "backtest"
+        return report_kind(dict(data))
 
-    accounts = [account(data) for data in results]
-    if accounts and all(accounts):
+    kinds = {kind(data) for data in results}
+    if kinds == {"account"}:
         return _dimension_title(name, locale, account=True)
-    if any(accounts) and (title := DIMENSION_TITLES_MIXED.get(locale, {}).get(name)):
+    if kinds == {"fund"}:
+        return _dimension_title(name, locale, fund=True)
+    if len(kinds) > 1 and (title := DIMENSION_TITLES_MIXED.get(locale, {}).get(name)):
         return title
     return _dimension_title(name, locale)
 
@@ -4864,7 +5050,7 @@ def _meaning_html(
         )
         items.append(
             f"<div class='item s-{_e(dimension['status'])}'>"
-            f"<h3>{_e(_dimension_title(name, locale, account=account and not fund))} "
+            f"<h3>{_e(_dimension_title(name, locale, account=account and not fund, fund=fund))} "
             f"{_status_badge(dimension['status'], locale)}</h3>"
             f"<p>{_e(text)}</p></div>"
         )
@@ -4878,7 +5064,7 @@ def _reasons_html(
     data: dict[str, Any] | None = None,
 ) -> str:
     rows = []
-    account = _account_page(data)
+    account, fund = _account_page(data), _fund_page(data)
     for d in verdict["dimensions"]:
         reasons = d.get("reasons_es") if locale == "es" and d.get("reasons_es") else d["reasons"]
         if locale == "pt":
@@ -4887,7 +5073,7 @@ def _reasons_html(
             # The PSR the class used, under the name the plan and the table give it.
             reasons = [_class_psr_reason(reason, data, locale) for reason in reasons]
         rows.append(
-            f"<tr><td>{_e(_dimension_title(d['name'], locale, account=account))}</td>"
+            f"<tr><td>{_e(_dimension_title(d['name'], locale, account=account, fund=fund))}</td>"
             f"<td>{_status_badge(d['status'], locale)}</td><td>{_e('; '.join(reasons))}</td></tr>"
         )
     return (
@@ -7073,7 +7259,7 @@ def _seller_message(
 
     def titles(status: str) -> list[str]:
         return [
-            _dimension_title(name, locale, account=account)
+            _dimension_title(name, locale, account=account, fund=fund)
             for name in DIMENSION_ORDER
             if by_name.get(name) == status
         ]
@@ -8764,6 +8950,7 @@ def _luck_html(
     dsr_pass: float = DEFAULT_THRESHOLDS.dsr_pass,
     *,
     account: bool = False,
+    fund: bool = False,
 ) -> str:
     """The file's Sharpe next to the luck of the configurations counted, and
     what a search of 10, 100 or 1,000 would need.
@@ -8771,7 +8958,11 @@ def _luck_html(
     ``account``: an account or signal history, whose trials are the accounts or
     signals behind it (no optimisation file to ask for): its introduction, its
     lines, the table's header and the sources' note count those, never the
-    configurations a backtest tried.
+    configurations a backtest tried. ``fund``: a fund or portfolio's track
+    record, whose trials are the portfolios, strategies or variants evaluated
+    before this one was chosen, declared at upload or measured from the
+    variants matrix: its texts count those, and the sources' note names the
+    history's minimum length, as an account's does.
 
     Beating the luck is a DSR of at least 0.5; the multiplicity dimension
     passes only at 0.95, so a Sharpe between the two says it beats the luck
@@ -8797,7 +8988,9 @@ def _luck_html(
         return _span_text(value, labels)
 
     def text(key: str) -> str:
-        """``key``'s wording, an account or signal's when it has one."""
+        """``key``'s wording, a fund's or an account or signal's when it has one."""
+        if fund and f"{key}_fund" in labels:
+            return labels[f"{key}_fund"]
         return labels[f"{key}_account"] if account and f"{key}_account" in labels else labels[key]
 
     span_value = float(luck["span_years"]["value"])
@@ -8845,7 +9038,7 @@ def _luck_html(
         out += f"<div class='facts'>{facts}</div>"
     else:
         out += (
-            f"<p>{_e(labels['luck_uncounted_account' if account else 'luck_uncounted'])}</p>"
+            f"<p>{_e(text('luck_uncounted'))}</p>"
             f"<p>{_e(labels['luck_span_line'].format(sharpe=sharpe, span=span))} "
             f"{_badge(luck['sharpe']['evidence'])}</p>"
         )
@@ -8874,8 +9067,10 @@ def _luck_html(
     if span_value < 1:
         out += f"<p class='muted'>{_e(labels['luck_short'])}</p>"
     note = str(luck.get("note", ""))
-    # The sources' note names the backtest's minimum length; an account's is its history's.
-    shown = labels["luck_note_account"] if account and note == LUCK_NOTE else localize(note, locale)
+    # The sources' note names the backtest's minimum length; an account's or a
+    # fund's is its history's.
+    real = account or fund
+    shown = labels["luck_note_account"] if real and note == LUCK_NOTE else localize(note, locale)
     out += f"<p class='muted'>{_e(_sentence(shown))}</p>"
     return out
 
@@ -10171,14 +10366,22 @@ def _ladder_html(current: str, labels: dict[str, str]) -> str:
 
 
 def _locked_gains(
-    titles: list[str], labels: dict[str, str], locale: str, *, account: bool = False
+    titles: list[str],
+    labels: dict[str, str],
+    locale: str,
+    *,
+    account: bool = False,
+    fund: bool = False,
 ) -> list[str]:
     """Each locked section as what it tells the buyer, in the report's order.
     On an account or signal (``account``) the lines of ``LOCKED_GAINS_ACCOUNT``
-    count what its own sections count."""
+    count what its own sections count, and on a fund or portfolio (``fund``)
+    those of ``LOCKED_GAINS_FUND``."""
     gains = ownership.gains_for(LOCKED_GAINS.get(locale, LOCKED_GAINS["es"]), labels)
     if account:
         gains.update(LOCKED_GAINS_ACCOUNT.get(locale, LOCKED_GAINS_ACCOUNT["es"]))
+    if fund:
+        gains.update(LOCKED_GAINS_FUND.get(locale, LOCKED_GAINS_FUND["es"]))
     by_title = {labels[key]: text for key, text in gains.items() if key in labels}
     out: list[str] = []
     for title in titles:
@@ -10754,17 +10957,26 @@ def render_html(
             )
             + "</table>"
         )
-    # An account or signal counts the accounts or signals behind it, not variants.
-    account_page = _account_page(data)
+    # An account or signal counts the accounts or signals behind it, not variants;
+    # a fund the portfolios, strategies or variants evaluated before this one.
+    account_page, fund_page = _account_page(data), _fund_page(data)
     multiplicity_rows = _one_dsr_row(data["multiplicity"], data["declared"])
     unmatched = False
     if account_page:
         multiplicity_rows, unmatched = _account_multiplicity_rows(multiplicity_rows, labels)
+    if fund_page:
+        multiplicity_rows = _fund_multiplicity_rows(multiplicity_rows, labels)
+    policy = (
+        "variance_policy_fund"
+        if fund_page
+        else "variance_policy_account"
+        if unmatched
+        else "variance_policy"
+    )
     multiplicity_html = (
         _status_line(data["multiplicity"], labels)
         + _evidence_rows(multiplicity_rows, labels, skip={"sensitivity"})
-        + f"<p class='muted'>"
-        f"{_e(labels['variance_policy_account' if unmatched else 'variance_policy'])}</p>"
+        + f"<p class='muted'>{_e(labels[policy])}</p>"
         + sens_html
     )
 
@@ -10840,7 +11052,13 @@ def render_html(
         )
         + _alpha_html(data["benchmark"], labels)
     )
-    cscv = _account_cscv(data["cscv"], labels) if account_page else data["cscv"]
+    cscv = (
+        _account_cscv(data["cscv"], labels)
+        if account_page
+        else _fund_cscv(data["cscv"], labels)
+        if fund_page
+        else data["cscv"]
+    )
     cscv_html = _status_line(cscv, labels) + _evidence_rows(cscv, labels, skip=set())
     if data["cscv"].get("status") == "MEASURED":
         cscv_html += (
@@ -11128,6 +11346,7 @@ def render_html(
                             )
                         ),
                         account=is_account_history(data) and not _fund_record(data),
+                        fund=_fund_page(data),
                     ),
                 )
             ]
@@ -11235,6 +11454,7 @@ def render_html(
                     labels,
                     locale,
                     account=_account_page(data),
+                    fund=_fund_page(data),
                 )
             )
             + "</ul>"
@@ -11617,9 +11837,9 @@ def _pdf_cover(
     ring = ring_svg(overall, css_class="pc-ring", letter=True)
     lead = str(verdict["summary"]).partition(". ")[0].rstrip(".") + "."
     by_name = {d["name"]: d for d in verdict["dimensions"]}
-    account = _account_page(data)
+    account, fund = _account_page(data), _fund_page(data)
     dims = "".join(
-        f"<li><span>{_e(_dimension_title(name, locale, account=account))}</span>"
+        f"<li><span>{_e(_dimension_title(name, locale, account=account, fund=fund))}</span>"
         f"{_status_badge(by_name[name]['status'], locale)}</li>"
         for name in DIMENSION_ORDER
         if name in by_name
