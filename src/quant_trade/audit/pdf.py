@@ -97,10 +97,12 @@ def footer_text(audit_id: str, locale: str) -> str:
 
 
 def _expand_details_for_pdf(page_html: str) -> str:
-    """Include every technical section regardless of the browser's open state."""
+    """Include every technical section regardless of the browser's open state,
+    and the challenge figures folded under their open-loss warning, which the
+    PDF prints after that warning."""
     return page_html.replace(
         "<details class='detail report-detail", "<details open class='detail report-detail"
-    )
+    ).replace("<details class='unseen-open'>", "<details open class='unseen-open'>")
 
 
 def report_pdf(

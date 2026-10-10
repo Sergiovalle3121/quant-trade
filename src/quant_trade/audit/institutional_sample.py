@@ -183,7 +183,8 @@ FIGURE_PATHS: dict[str, tuple[tuple[str, ...], str]] = {
     "sharpe": (("performance", "sharpe"), "ratio"),
     "max_drawdown": (("performance", "max_drawdown"), "pct"),
     "under_water": (("fund", "longest_under_water"), "int"),
-    "psr": (("significance", "psr"), "prob"),
+    # The probability the class uses: adjusted for the months' dependence (psr_names).
+    "psr": (("significance", "dependence", "psr"), "prob"),
     "trials": (("multiplicity", "trials_used"), "int"),
     "dsr": (("multiplicity", "dsr_at_trials_used"), "prob"),
     "luck_sharpe": (("luck", "luck_sharpe"), "ratio"),
@@ -361,9 +362,11 @@ COPY: dict[str, dict[str, Any]] = {
                 "El tramo más largo, en meses, sin recuperar un máximo anterior.",
             ),
             "psr": (
-                "Probabilidad de que el Sharpe real sea mayor que cero (PSR)",
-                "Como una sola prueba, con la longitud, la asimetría y las colas de la serie. "
-                "Para superar hace falta {psr_pass} o más.",
+                "Probabilidad de que el Sharpe real sea mayor que cero "
+                "(PSR ajustado por dependencia)",
+                "Como una sola prueba, con la longitud, la asimetría, las colas y la dependencia "
+                "entre meses de la serie: la cifra que usa la clase. Para superar hace falta "
+                "{psr_pass} o más.",
             ),
             "dsr": (
                 "Sharpe deflactado (DSR) con {trials} intentos",
@@ -575,9 +578,9 @@ COPY: dict[str, dict[str, Any]] = {
                 "The longest stretch, in months, without regaining an earlier peak.",
             ),
             "psr": (
-                "Probability that the true Sharpe is above zero (PSR)",
-                "As a single test, with the series' length, skew and tails. Passing needs "
-                "{psr_pass} or more.",
+                "Probability that the true Sharpe is above zero (PSR adjusted for dependence)",
+                "As a single test, with the series' length, skew, tails and the dependence "
+                "between months: the figure the class uses. Passing needs {psr_pass} or more.",
             ),
             "dsr": (
                 "Deflated Sharpe (DSR) with {trials} trials",
@@ -788,9 +791,10 @@ COPY: dict[str, dict[str, Any]] = {
                 "O trecho mais longo, em meses, sem recuperar um pico anterior.",
             ),
             "psr": (
-                "Probabilidade de o Sharpe real ser maior que zero (PSR)",
-                "Como um único teste, com o tamanho, a assimetria e as caudas da série. Para "
-                "passar são necessários {psr_pass} ou mais.",
+                "Probabilidade de o Sharpe real ser maior que zero (PSR ajustado por dependência)",
+                "Como um único teste, com o tamanho, a assimetria, as caudas e a dependência "
+                "entre meses da série: a cifra que a classe usa. Para passar são necessários "
+                "{psr_pass} ou mais.",
             ),
             "dsr": (
                 "Sharpe deflacionado (DSR) com {trials} tentativas",

@@ -90,6 +90,12 @@ def _net(parsed: ParsedTrades) -> np.ndarray:
     return pnl
 
 
+def _fees_itemised(parsed: ParsedTrades) -> bool:
+    """Whether the file gives each trade's own costs, which ``_net`` takes off:
+    only then are that side's figures net of fees. Display only."""
+    return parsed.reports_fees and len(parsed.fees or ()) == len(parsed.trades)
+
+
 def _sizes(parsed: ParsedTrades) -> np.ndarray:
     return np.array([float(trade.quantity) for trade in parsed.trades], dtype=float)
 
@@ -339,6 +345,8 @@ def compare_live(
         "size_ratio": measured(size_ratio),
         "backtest": backtest_side,
         "live": live_side,
+        # Which side's averages are net of fees the file itemises (the report's names).
+        "fees_itemised": {"backtest": _fees_itemised(backtest), "live": _fees_itemised(live)},
         "expected": {
             "net": _band(nets),
             "win_rate": _band(hits),

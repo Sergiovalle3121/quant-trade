@@ -2110,6 +2110,10 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
         "P[Sharpe real > 0] dada la longitud, la asimetría y la curtosis",
     ),
     (
+        "the figure the class uses: the lower of the two, since it never reads higher",
+        "la cifra que usa la clase: la menor de las dos, porque nunca sale más alta",
+    ),
+    (
         "observations needed for PSR to reach 0.95",
         "observaciones necesarias para que el PSR llegue a 0.95",
     ),

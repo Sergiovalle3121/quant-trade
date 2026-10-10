@@ -5892,3 +5892,191 @@ of the confirmation notice, and, per article and language, that the side
 button and the closing call follow the table above and that every link
 answers 200. Every new text passes `find_claims` and avoids "verificado",
 "certificado", "aprobado", "garantiza", "rentable" and processing times.
+
+## Account and signal reports without contradictions (9 October 2026)
+
+With the paid offer the signal sample is what a copier reads before paying,
+so every figure it shows twice now reads the same both times. No figure,
+threshold, class, stored evidence tag, simulator result, price or credit
+changed (`tests/test_audit_informe_cuenta_coherente.py`, es/en/pt); what a
+new result stores beyond its texts is listed under the fourth pass.
+
+- **One name per PSR** (`psr_names`). Since policy 2026-09-27-dependence-1
+  the statistical dimension uses the lower of the plain PSR and the
+  dependence-adjusted one; the report still said "the class uses the plain
+  count" and the plan quoted the plain figure. Results stored between the
+  dependence figure's arrival (26 September, informational) and that policy
+  (27 September) stored the adjusted figure but classified with the plain
+  count. `class_psr(data)` reads which figure each stored dimension used and
+  its track record; the plan, the technical detail ("PSR adjusted for
+  dependence 0.677 < 0.8") and the significance table ("PSR (plain count)",
+  plus a row for the adjusted figure) give each its name. The adjusted row's
+  note ("the figure the class uses") and the dependence sentence ("the class
+  uses the second figure") follow `class_psr`: a result that classified with
+  the plain count keeps "it is informational: the class uses the plain
+  count". The sentence says the dependence changes nothing only when both
+  figures read the same in the table. The plain track record rows say
+  "(plain count)".
+- **Declared floating result in the reconciliation.** When the engine values
+  no open position and the file declares a floating result
+  (`report.declared_open_value`: the account review's DECLARED figure, else
+  the platform summary), the "Open-position value" row shows it as Declared,
+  with its note and why it stays out of the expected balance (closed trades
+  only); the coverage line says the same. The expected balance is unchanged.
+  Only the reconciled file's own review counts: an account history uploaded
+  as the real account beside a backtest (`account.source == "live"`) has its
+  own section, and its floating result never reaches the backtest's
+  reconciliation or challenge (`report._own_account`).
+- **Under a year is not 12 months.** The luck section gives the history in
+  months with one decimal, or "almost 12 months", never rounded up to 12.
+- **Annual figures below -100 %.** The mean-shift section shows any yearly
+  average or band end below -100 % as "-100.0% or worse"; the stored band is
+  unchanged.
+- **Account wording.** On an account or signal history the out-of-sample
+  meaning and plan step ask since when the account or signal has traded
+  unchanged and whether it was reset or replaced a closed account; the
+  multiplicity step and meaning count the accounts or signals behind it
+  (no optimisation XML); the backtest to compare is "of the same strategy,
+  if it has one"; "keep this report" speaks of the signal's settings or a
+  new account. Every text has its own, provider and neutral voice
+  (`ownership.PLAN["account_trials"]`, `["account_trials_undeclared"]`,
+  `["title_account_multiplicity"]`, `MEANING["multiplicity.WEAK.account"]`,
+  `["multiplicity.WEAK.undeclared.account"]`, `LABELS["next_keep_account"]`).
+- **Challenge with an unseen open loss** (`report.unseen_open_loss`). With
+  HIDDEN_FLOATING_DRAWDOWN, or FLOATING_LOSS_AT_END on a balance-only curve,
+  the challenge section opens with a red callout: the open loss (its declared
+  share of the balance, given with FLOATING_LOSS_AT_END or when it shows as at
+  least 1 %, never "0%") already counts against the daily and total limits of
+  any challenge, and the figures below do not see it. With
+  HIDDEN_FLOATING_DRAWDOWN the callout also names the open losses the balance
+  hid during the history (the flag's title), alone when no share is given. The
+  outcome table, the ladder, the size table and the firms' table sit in
+  `<details class='unseen-open'>` under that callout (the size and firms
+  subsections each repeat a short line first). The simulator is unchanged;
+  the PDF opens the folds (`pdf._expand_details_for_pdf`).
+- **Two periods.** The header says "Curve data"; under the platform's figures
+  a line says Start and End are the platform's period or its first and last
+  trade, while the curve data run from the curve's first point (a deposit
+  or the opening balance) to its last.
+- **Net or gross.** The backtest-against-live table names its averages "net
+  of fees" only when both files itemise fees per trade (`live.fees_itemised`,
+  stored with the comparison; a result stored before it reads the backtest's
+  from `win_rate_gross` and the live file's as unknown), else plain "Average
+  win"; the trade table names its own "gross, before fees" when the file
+  itemises fees per trade.
+- **Account wording, second pass.** The multiplicity meaning and the summary
+  of an account or signal with no trial count declared count accounts or
+  signals, not configurations (`verdict` `multiplicity.FAIL.undeclared.account`,
+  `NOT_MEASURED.undeclared.account`, and the summary's `.undeclared.account`
+  templates; `ownership.MEANING` in every voice); the luck section asks how
+  many accounts or signals stand behind it (`luck_uncounted_account`, no
+  optimisation XML); the plan's new months are "data that was not used to
+  choose them", not "data the optimiser never saw"; the backtest question is
+  "of the same strategy, if it has one" in every voice, the seller message
+  included, and a result stored with the old wording shows the new one
+  (`analytics.question_now`).
+- **Account wording, third pass.** On an account or signal the luck
+  section's introduction, lines, table header and sources' note count the
+  accounts or signals behind it and the history's length
+  (`luck_*_account`), the challenge's luck row says the same
+  (`ch_ladder_undeclared_account`), and the multiplicity dimension is
+  "Number of accounts or signals behind it" in the list, the technical
+  detail, the PDF cover, the seller message and the public page
+  (`report.DIMENSION_TITLES_ACCOUNT`). The sizing and grid questions ask
+  about "this account or signal" (`analytics.ACCOUNT_QUESTIONS`, stored for
+  new account results and shown over older ones), and in every voice but
+  the buyer's they are answered by the account's own trades
+  (`ownership.ACCOUNT_QUESTIONS`, with the recent stretch's). The plan's data
+  step asks for sizes, positions, the floating curve and a history at a fixed
+  size or without averaging when one exists, never a backtest to upload, voice
+  by voice (`plan.ACCOUNT_FLAG_HINTS`, `ownership.PLAN["account_flag_*"]`);
+  "What to do now" and the instruments section name the account or signal.
+  The backtest's answer says "if it has one" once. A backtest keeps its
+  robot, configuration and optimiser wording; what does change on its page
+  comes from the points above that apply to every report (the PSR names,
+  "net" or "gross", "Curve data" and the drawdown's sign).
+- **One reading per figure.** The challenge callout tags the open loss
+  "(Declared)" as the account section does; each starting balance shows the
+  tag it stores (fifth pass); the dependence sentence rounds the variance
+  ratio as the multiplicity table does; the resampled one-year drawdowns carry
+  the minus sign of the summary's tile; the mean-shift sentence says when its
+  annual rates come from stretches under a year, and how long each lasts
+  (`shift_short`); the seller message lists the dimensions that fail apart
+  from the weak ones (`dimensions_weak`). Figures, classes and the simulator
+  are unchanged.
+- **Fourth pass (review of the third).**
+  - The recent stretch's question of an account or signal asks whether its
+    settings changed afterwards or it was restarted, not whether "the
+    system was reoptimised" (`analytics.ACCOUNT_QUESTIONS["recent_period"]`,
+    stored for new account results and shown over older ones, the seller
+    message included); its answer names the date of any change or restart.
+  - The reconciliation keeps the starting capital's stored tag, Measured:
+    the engine rebuilds it from the file (the deposits it lists before the
+    first trade, a Myfxbook statement's 1,000.00 among them), and the
+    downloadable JSON's `reconciliation.initial_capital` says so. (This pass
+    also showed the size table's balance with the reconciliation's tag; the
+    fifth pass takes that back.)
+  - The multiplicity detail and the CSCV row of an account or signal with no
+    matrix uploaded speak of the histories of the other accounts or signals
+    behind it, not "the variants you uploaded" (`variance_policy_account`,
+    `no_variants_account`, `KEY_LABELS["observed_across_accounts"]`); a
+    matrix that was uploaded keeps its row.
+  - A comparison and "what changed" name the multiplicity dimension by the
+    kinds of report shown (`report.shared_dimension_title`): an account's
+    name when every report is an account or signal, "Number of trials" when
+    one sits beside a backtest (`DIMENSION_TITLES_MIXED`), the backtest's
+    otherwise.
+  - The mean-shift sentence says each stretch's length as the luck section
+    says the history's (`report._span_text`): "almost 12 months" when a
+    stretch under a year rounds to 12.0, "1 month" for 1.0, years from a
+    full year on.
+  - Portuguese asks the "fornecedor" in the plan's account hints and the
+    account section, as the rest of the report does.
+  - The extreme jumps (MAD_SPIKES) of an account ask the provider whether
+    they come from deposits, withdrawals or bad prices, in the buyer's voice
+    (`plan.ACCOUNT_FLAG_HINTS`), and say what to upload, provide or read in
+    the developer's, provider's and neutral ones
+    (`ownership.PLAN["account_flag_MAD_SPIKES"]`); a backtest keeps "fix
+    them".
+  - When Start and End are not dates of the period the platform prints (a
+    Myfxbook statement prints none), the line under the platform's figures
+    says they are not stated by the platform but taken by Rigor from the
+    first and last trade (`platform_period_trades`,
+    `report._platform_states_period`); the table and its tag are as stored.
+  - Stored results. `live.compare_live` stores `fees_itemised` with every
+    comparison against a real account (display only: which side's averages
+    are net of the fees it itemises), and a new account result stores the
+    account wording of three questions. The public samples are rebuilt at
+    start-up, so the sha256 of their JSON (on `/ejemplo`, `/ejemplo-senal`,
+    their `/v/` pages, the English and Portuguese reports and the preview)
+    changes once with this release; no test, cache or `/comprobar` record
+    pins the earlier one, and a PDF downloaded before keeps the record it was
+    issued with.
+- **Fifth pass (the paid preview and the stored tags).**
+  - The paid preview of an account or signal, what whoever copies it reads
+    before paying USD 29 (an anonymous upload with `anon_preview=True` and
+    `welcome_full_report=False` shows it too), lists the multiplicity section
+    as "What is left after discounting the accounts or signals behind it"
+    (`report.LOCKED_GAINS_ACCOUNT`, es/en/pt, every voice), the accounts or
+    signals its dimension ("Number of accounts or signals behind it") and
+    the plan's step count, not "the configurations tried". No other line of
+    that preview speaks of configurations, robots or optimisers (the
+    singular "configuración" and "configuração" of the Spanish and Portuguese "keep
+    this report" line is the signal's settings). A backtest's preview keeps
+    its line.
+  - Each starting balance shows the tag it stores, as the downloadable JSON
+    gives it: the reconciliation's starting capital Measured (the first
+    point of the curve the engine rebuilds from the deposits the file
+    lists), the size table's balance Declared
+    (`challenge.sizing.starting_balance`). The display tag of the earlier
+    passes is gone (`report.reconciled_starting_balance`, and before it
+    `declared_initial_value`). On an account or signal the 1x line says in
+    a few words where its figure comes from: "the starting balance the file
+    declares (1,000)" (`ch_size_balance_declared`,
+    `report.file_declares_balance`), so Declared there and Measured in the
+    reconciliation read without contradiction. A balance the client declared
+    on the form, an assumed one or a curve's first value keeps its own line.
+    A backtest, `/ejemplo` and `/sample` included, reads both lines word for
+    word as before this branch (e1df258).
+  - Nothing stored changes: the samples' JSON and its sha256 are those of the
+    fourth pass.

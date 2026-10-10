@@ -27,9 +27,9 @@ from quant_trade.audit.report import (
     PDF_ROWS_WARNING,
     SOURCE_NAMES,
     STATUS_TEXT,
-    _dimension_title,
     _kpi_list,
     evidence_label,
+    shared_dimension_title,
 )
 from quant_trade.audit.theme import class_ring
 from quant_trade.audit.verdict import DIMENSION_ORDER
@@ -496,7 +496,7 @@ def comparison_body(
     )
     dims = [{d["name"]: d["status"] for d in data["verdict"]["dimensions"]} for data in results]
     dim_rows = "".join(
-        f"<tr><td>{_e(_dimension_title(name, locale))}</td>"
+        f"<tr><td>{_e(shared_dimension_title(name, locale, results))}</td>"
         + "".join(
             f"<td>{_status_cell(column.get(name, 'NOT_MEASURED'), locale)}</td>" for column in dims
         )

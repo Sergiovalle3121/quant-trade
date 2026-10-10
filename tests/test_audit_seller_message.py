@@ -164,14 +164,27 @@ def test_the_message_carries_class_figures_with_tags_and_the_questions(locale: s
     lines = message.split("\n")
     assert lines[0] == words["hello"]
     assert words["class"].format(cls=data["verdict"]["overall"]) in lines
-    # Every dimension that fails or is weak, by its name, with its status in words.
-    status = report.STATUS_TEXT[locale]
-    for dimension in data["verdict"]["dimensions"]:
-        named = f"{report._dimension_title(dimension['name'], locale)} ("
-        if dimension["status"] in ("FAIL", "WEAK"):
-            assert f"{named}{status[dimension['status']].lower()})" in message
-        else:
-            assert named not in message
+    # Every dimension that fails or is weak, by its name, under the list that says
+    # its status: those that do not pass, then the weak ones apart.
+    statuses = {d["name"]: d["status"] for d in data["verdict"]["dimensions"]}
+
+    def named(status: str) -> list[str]:
+        return [
+            report._dimension_title(name, locale)
+            for name in DIMENSION_ORDER
+            if statuses.get(name) == status
+        ]
+
+    failed, weak = named("FAIL"), named("WEAK")
+    line = (
+        words["dimensions"].format(items=", ".join(failed)) if failed else words["dimensions_none"]
+    )
+    if weak:
+        line += " " + words["dimensions_weak"].format(items=", ".join(weak))
+    assert line in lines
+    for name in DIMENSION_ORDER:
+        if statuses.get(name) not in ("FAIL", "WEAK"):
+            assert report._dimension_title(name, locale) not in line
     # The dimensions left unmeasured are named on their own line, or no such line.
     unmeasured = _unmeasured_line(data, locale)
     prefix = words["unmeasured"].split("{items}")[0]

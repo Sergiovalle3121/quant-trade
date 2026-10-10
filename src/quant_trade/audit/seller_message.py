@@ -5,11 +5,11 @@ copy into the MQL5 or Telegram chat, with the key figures and the costs in
 pips". When the client declared "La compré o la voy a comprar / copiar"
 (``ownership.BUYER``), the questions section of the full report ends with a
 plain text built from the report's own data only (``report._seller_message``):
-a neutral greeting, the class, the dimensions that do not pass and those not
-measured, two to four key figures with their evidence tag in words (summary
-tiles complete them when the files gave fewer), the open questions numbered, the
-public page's link when the report is published and "Informe hecho con Rigor
-(rigorscore.com)". The copy button is the site's ``data-copy`` button
+a neutral greeting, the class, the dimensions that do not pass, the weak ones
+apart and those not measured, two to four key figures with their evidence tag
+in words (summary tiles complete them when the files gave fewer), the open
+questions numbered, the public page's link when the report is published and
+"Informe hecho con Rigor (rigorscore.com)". The copy button is the site's ``data-copy`` button
 (``static/app.js``), so no new script is needed.
 
 Only the buyer gets it: the developer's and the neutral voice send nobody to a
@@ -71,6 +71,7 @@ COPY: dict[str, dict[str, str]] = {
         "class": "Clase del informe: {cls} (A es la más alta, D la más baja).",
         "dimensions": "Dimensiones que no superan: {items}.",
         "dimensions_none": "Dimensiones que no superan: ninguna.",
+        "dimensions_weak": "Dimensiones débiles: {items}.",
         "unmeasured": "Dimensiones sin medir: {items}.",
         "figures": "Cifras clave:",
         "questions": "Preguntas:",
@@ -104,6 +105,7 @@ COPY: dict[str, dict[str, str]] = {
         "class": "Report class: {cls} (A is the highest, D the lowest).",
         "dimensions": "Dimensions that do not pass: {items}.",
         "dimensions_none": "Dimensions that do not pass: none.",
+        "dimensions_weak": "Weak dimensions: {items}.",
         "unmeasured": "Dimensions not measured: {items}.",
         "figures": "Key figures:",
         "questions": "Questions:",
@@ -139,6 +141,7 @@ COPY: dict[str, dict[str, str]] = {
         "class": "Classe do relatório: {cls} (A é a mais alta, D a mais baixa).",
         "dimensions": "Dimensões que não passam: {items}.",
         "dimensions_none": "Dimensões que não passam: nenhuma.",
+        "dimensions_weak": "Dimensões fracas: {items}.",
         "unmeasured": "Dimensões não medidas: {items}.",
         "figures": "Números-chave:",
         "questions": "Perguntas:",
@@ -166,9 +169,12 @@ SELLER_ASK: dict[str, dict[str, str]] = {
         "encerradas ou reiniciadas?",
     ),
     "backtest_match": _say(
-        "¿Puedes enviar el backtest del mismo robot con la misma configuración que esta cuenta?",
-        "Can you send the backtest of the same robot with the same settings as this account?",
-        "Você pode enviar o backtest do mesmo robô com a mesma configuração desta conta?",
+        "¿La estrategia de esta cuenta tiene un backtest? Si lo tiene, ¿puedes enviarlo con la "
+        "misma configuración que esta cuenta?",
+        "Does this account's strategy have a backtest? If it does, can you send it with the "
+        "same settings as this account?",
+        "A estratégia desta conta tem um backtest? Se tiver, você pode enviá-lo com a mesma "
+        "configuração desta conta?",
     ),
     "trials": _say(
         "¿Cuántas combinaciones de parámetros se probaron antes de elegir esta? ¿Puedes enviar "

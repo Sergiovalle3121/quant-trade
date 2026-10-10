@@ -29,8 +29,8 @@ from datetime import datetime
 from typing import Any
 
 from quant_trade.audit.account_pt import STRATEGIES_PT
-from quant_trade.audit.portuguese import DIMENSION_TITLES_PT, STATUS_TEXT_PT
-from quant_trade.audit.report import STATUS_TEXT, _dimension_title, evidence_label
+from quant_trade.audit.portuguese import STATUS_TEXT_PT
+from quant_trade.audit.report import STATUS_TEXT, evidence_label, shared_dimension_title
 from quant_trade.audit.verdict import DIMENSION_ORDER
 
 #: Better classes first.
@@ -377,7 +377,6 @@ def what_changed(
     locale = locale if locale in COPY else "es"
     copy = COPY[locale]
     status_text = STATUS_TEXT_PT if locale == "pt" else STATUS_TEXT[locale]
-    titles = DIMENSION_TITLES_PT if locale == "pt" else None
     class_a = str(before["verdict"]["overall"])
     class_b = str(after["verdict"]["overall"])
     lines = [
@@ -391,7 +390,7 @@ def what_changed(
             assert status_a is not None and status_b is not None
             lines.append(
                 (
-                    f"{titles[name] if titles else _dimension_title(name, locale)}: "
+                    f"{shared_dimension_title(name, locale, (before, after))}: "
                     f"{status_text[status_a]} → "
                     f"{status_text[status_b]}",
                     # Each report is read with its own declarations: "changed", not a verdict.
