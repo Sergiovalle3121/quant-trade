@@ -173,7 +173,7 @@ def test_the_other_programs_run_the_same_series_as_the_ladder(
     assert figures["main_risk"] == again["main_risk"]
     # With the cost and out of sample the figure falls, as the ladder says it can.
     for row in fit["firms"]:
-        if row.get("market"):
+        if not row.get("pass"):
             continue
         assert float(row["scenarios"]["reference_cost"]["pass"]["value"]) <= float(
             row["pass"]["value"]
@@ -322,6 +322,9 @@ def test_topstep_goes_last_and_marked_with_a_forex_history() -> None:
         assert row["market"] == {
             "allowed": ["futures"],
             "history": ["fx"],
+            "symbols": ["EURUSD", "GBPUSD"],
+            "symbol_count": 2,
+            "spot": True,
             "source_url": TOPSTEP_PRODUCTS_URL,
             "as_of": PRESETS[row["keys"][0]].markets_as_of,
         }
@@ -332,6 +335,7 @@ def test_topstep_goes_last_and_marked_with_a_forex_history() -> None:
     # A metal pair is no futures contract either; a symbol the audit cannot place restricts nothing.
     gold = firmfit.firm_fit(_daily(), samples=100, seed=7, symbols=["XAUUSD"])
     assert all(_row(gold, [key]).get("market") for key in TOPSTEP)
+    assert _row(gold, [TOPSTEP[0]])["market"]["history"] == ["metal"]
     unknown = firmfit.firm_fit(_daily(), samples=100, seed=7, symbols=["EURUSD", "AAPL"])
     assert "history_markets" not in unknown
     assert not any(row.get("market") for row in unknown["firms"])
@@ -358,12 +362,14 @@ def test_the_left_out_row_says_why_and_shows_no_figure(locale: str) -> None:
     rows = re.findall(r"<tr class='ff-out'>(.*?)</tr>", page, flags=re.S)
     assert len(rows) == len(TOPSTEP)
     only = labels["ff_market_only"].format(markets=labels["ff_mk_futures"])
-    skip = labels["ff_market_skip"].format(history=labels["ff_hist_fx"])
+    why = labels["ff_market_why_spot"].format(
+        history=labels["ff_hist_fx"], symbols="EURUSD, GBPUSD"
+    )
     for row in rows:
         cells = re.findall(r"<td[^>]*>(.*?)</td>", row, flags=re.S)
         assert len(cells) == 2
         reason = html.unescape(cells[1])
-        assert reason == f"{only}: {skip}."
+        assert reason == f"{only}: {why}; {labels['ff_market_skip']}."
         assert "%" not in reason and "class='val'" not in row
     # The rules line names the page that says so and when it was read.
     assert f"href='{TOPSTEP_PRODUCTS_URL}'" in page
@@ -374,7 +380,15 @@ def test_the_left_out_row_says_why_and_shows_no_figure(locale: str) -> None:
         labels[key] for key in labels if key.startswith(("ff_rule", "ff_mk", "ff_market"))
     )
     assert not [word for word in ADVICE if word in new.lower()]
-    for key in ("ff_market_only", "ff_market_skip", "ff_rule_markets", "ff_mk_futures"):
+    for key in (
+        "ff_market_only",
+        "ff_market_skip",
+        "ff_market_why",
+        "ff_market_why_spot",
+        "ff_market_chosen",
+        "ff_rule_markets",
+        "ff_mk_futures",
+    ):
         assert find_claims(labels[key]) == [], (locale, key)
 
 

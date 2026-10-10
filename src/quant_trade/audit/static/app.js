@@ -14,9 +14,12 @@
   }
 
   ready(function () {
-    // Reports ship with their technical details open so a saved page, a PDF,
-    // and a no-JavaScript browser never lose evidence. Fold them only on screen.
-    var reportDetails = Array.prototype.slice.call(d.querySelectorAll("details.report-detail"));
+    // Reports ship with their technical details (and each firm's rules, source
+    // and date) open so a saved page, a PDF, and a no-JavaScript browser never
+    // lose evidence. Fold them only on screen; printing opens them again.
+    var reportDetails = Array.prototype.slice.call(
+      d.querySelectorAll("details.report-detail, details.ff-rules")
+    );
     if (reportDetails.length) {
       var target = window.location.hash.slice(1);
       reportDetails.forEach(function (item) { item.open = !!target && item.id === target; });

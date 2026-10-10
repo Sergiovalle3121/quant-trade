@@ -18,6 +18,8 @@ from audit_fixtures import csv_bytes, positive_drift, returns_frame, signed_in
 from quant_trade.audit import analytics, engine, firmfit
 from quant_trade.audit.engine import (
     RETURNS_NOT_MONEY,
+    SIZING_ACCOUNT_LOT_NOTE,
+    SIZING_ACCOUNT_LOT_ROW_NOTE,
     SIZING_ACCOUNT_NOTE,
     SIZING_BALANCE_ASSUMED,
     SIZING_BALANCE_CURVE,
@@ -26,7 +28,9 @@ from quant_trade.audit.engine import (
     SIZING_LOT_ROW_NOTE,
     SIZING_MULTIPLIERS,
     SIZING_NO_ACCOUNT,
+    SIZING_NO_ACCOUNT_BEFORE,
     SIZING_NO_SIZE,
+    SIZING_NO_SIZE_BEFORE,
     SIZING_NOTE,
     run_audit,
 )
@@ -60,6 +64,11 @@ NEW_NOTES = (
     SIZING_BALANCE_ASSUMED,
     SIZING_LOT_ROW_NOTE,
     SIZING_LOT_NOTE.format(lots="641.00", count="1,282", traded="1,282.00"),
+    SIZING_ACCOUNT_LOT_NOTE.format(account="100,000", balance="10,000"),
+    SIZING_ACCOUNT_LOT_ROW_NOTE,
+    # Stored results keep these; their rules stay.
+    SIZING_NO_SIZE_BEFORE,
+    SIZING_NO_ACCOUNT_BEFORE,
     firmfit.OUTCOME_NOTE,
 )
 #: The importer's own warning when the file states no starting balance.
@@ -380,7 +389,7 @@ def test_new_sentences_read_in_every_language_and_pass_the_guard(
             shown = localize(text, locale)
             assert shown != text and find_claims(shown) == [], (locale, text)
     keys = [key for key in LABELS["es"] if key.startswith("ch_size_")]
-    assert len(keys) == 14
+    assert len(keys) == 21
     for locale in LOCALES:
         texts = [LABELS[locale][key] for key in keys] + [LOCKED_GAINS[locale]["ch_size_title"]]
         for key in keys:
@@ -429,10 +438,12 @@ def test_the_report_shows_the_size_table_and_the_open_loss_warning(
     for needed in (
         labels["ch_size_one"],
         labels["ch_size_lot"],
-        labels["ch_size_lots"].format(lots="0.50"),
+        labels["ch_size_lots_on"].format(
+            lots=labels["ch_size_lots"].format(lots="0.50"), balance="10,000"
+        ),
         localize(lot_note, locale),
-        labels["ch_size_lot_col"],
-        labels["ch_size_no_account"],
+        labels["ch_size_lot_col_on"].format(balance="10,000"),
+        labels["ch_size_no_account_lots"].format(balance="10,000"),
         labels["ch_ladder_pass"],
         labels["fail_daily_loss"],
         labels["fail_total_loss"],
@@ -466,7 +477,8 @@ def test_the_table_prints_the_ladder_formats_and_the_rules_it_has(
         value = float(row["pass"]["value"])
         shown = "≥99%" if value >= 0.99 else f"{value:.0%}"
         lot = f"{float(row['average_lot']['value']):.2f}"
-        lots = f"<td class='val' data-l='{labels['ch_size_lot_col']}'>{lot}</td>"
+        head = labels["ch_size_lot_col_on"].format(balance="10,000")
+        lots = f"<td class='val' data-l='{head}'>{lot}</td>"
         cell = f"<td class='val' data-l='{labels['ch_ladder_pass']}'>{shown}</td>"
         assert f"<tr><td>{row['key']}</td>{lots}{cell}" in page
     assert labels["ff_clean"] not in page and labels["ff_no_rule"] not in page

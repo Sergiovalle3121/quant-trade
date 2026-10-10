@@ -14,10 +14,12 @@ the simulator's stated assumptions; the rules are each firm's page on its
 
 Each row carries the rules it was simulated with (``rules``, one entry per
 phase, copied from ``prop_presets``). A program whose page names the markets
-it allows (``ChallengeRules.markets``) and that does not take the markets the
-history's symbols trade (``crises.symbol_market``) is not simulated: it goes
-last, with ``market`` saying what it allows and what the history trades, and
-no figure that could be ranked against the others.
+it allows (``ChallengeRules.markets``) and that does not take every symbol the
+history trades (:func:`symbol_venues`) is not simulated: it goes last, with
+``market`` saying what it allows and which of the history's symbols and
+markets it does not take, and no figure that could be ranked against the
+others. The report's chosen program is the exception: it is simulated (its
+section already was) and keeps its figures, with the same ``market``.
 
 :func:`scenario_columns` adds the ladder's out-of-sample and cost rungs to
 every row, so the chosen program's figures are the ladder's own.
@@ -25,6 +27,7 @@ every row, so the chosen program's figures are the ladder's own.
 
 from __future__ import annotations
 
+from collections import Counter
 from collections.abc import Sequence
 from typing import Any
 
@@ -32,7 +35,7 @@ import numpy as np
 import pandas as pd
 
 from quant_trade.audit.analytics import simulate_challenge
-from quant_trade.audit.crises import traded_markets
+from quant_trade.audit.crises import symbol_market, traded_markets
 from quant_trade.audit.prop_presets import PRESETS
 from quant_trade.audit.schema import measured, not_measured
 
@@ -73,16 +76,22 @@ RULE_FIELDS = (
     "best_day_basis",
 )
 #: The program markets (``prop_presets.MARKETS``) that can carry a symbol of
-#: each market ``crises.symbol_market`` names. A pair such as ``EURUSD`` or
-#: ``XAUUSD`` is spot or CFD, never an exchange future (those are ``6E`` or
-#: ``GC``); an index or a coin name can be either (``NQ`` is the future, ``BTC``
-#: a root of both), so it fits futures too.
+#: each market ``crises.symbol_market`` names. A pair against a currency, such
+#: as ``EURUSD``, ``XAUUSD`` or ``BTCUSD`` (:data:`COIN_PAIRS`), is spot or CFD,
+#: never an exchange future (those are ``6E``, ``GC`` or ``MBT``); an index
+#: name, a bare coin root or a perpetual can be either (``NQ`` is the future,
+#: ``BTC`` a root of both), so it fits futures too.
 SYMBOL_MARKETS: dict[str, frozenset[str]] = {
     "fx": frozenset({"fx"}),
     "metal": frozenset({"metals"}),
     "us_equity": frozenset({"indices", "futures"}),
     "crypto": frozenset({"crypto", "futures"}),
 }
+#: A coin written against a currency or a stablecoin is a pair, spot or CFD,
+#: like gold's ``XAUUSD``: ``BTCUSD``, ``BTCUSDT``, ``XBTUSD`` (not a perpetual).
+COIN_PAIRS = ("BTCUSD", "XBTUSD")
+#: How many of the symbols a program does not take its ``market`` names.
+MARKET_SYMBOLS = 4
 #: The ladder rungs the firm table repeats for every program, in its order.
 SCENARIO_COLUMNS = ("out_of_sample", "reference_cost")
 SCENARIO_NOTE = (
@@ -99,18 +108,46 @@ def history_markets(symbols: Sequence[str] | None) -> list[str] | None:
     return sorted(found) if found else None
 
 
-def market_fit(key: str, history: list[str] | None) -> dict[str, Any] | None:
-    """Why ``key``'s program does not take the history's markets, or ``None``
-    when it does (or when its page or the symbols do not say)."""
+def symbol_venues(name: str) -> frozenset[str] | None:
+    """The program markets (``prop_presets.MARKETS``) that can carry one
+    symbol, or ``None`` when its name says nothing certain."""
+    market = symbol_market(name)
+    if market is None:
+        return None
+    text = "".join(ch for ch in str(name).rsplit(":", 1)[-1].upper() if ch.isalnum())
+    if market == "crypto" and text.startswith(COIN_PAIRS) and "PERP" not in text:
+        return frozenset({"crypto"})
+    return SYMBOL_MARKETS[market]
+
+
+def market_fit(key: str, symbols: Sequence[str] | None) -> dict[str, Any] | None:
+    """Why ``key``'s program does not take the history's symbols, or ``None``
+    when it takes them all (or when its page or one of the symbols does not say).
+
+    ``history`` and ``symbols`` are only what the program does not take (the
+    most traded symbols first, at most :data:`MARKET_SYMBOLS`, out of
+    ``symbol_count``); ``spot`` says that every one of them is a spot or CFD
+    pair, never an exchange future."""
     rules = PRESETS[key]
-    if rules.markets is None or not history:
+    counts = Counter(str(name) for name in symbols or [] if name)
+    if rules.markets is None or not counts:
+        return None
+    venues = {name: symbol_venues(name) for name in counts}
+    if any(found is None for found in venues.values()):
         return None
     allowed = set(rules.markets)
-    if all(SYMBOL_MARKETS.get(market, frozenset()) & allowed for market in history):
+    misfits = sorted(
+        (name for name, found in venues.items() if not (found or frozenset()) & allowed),
+        key=lambda name: (-counts[name], name),
+    )
+    if not misfits:
         return None
     return {
         "allowed": list(rules.markets),
-        "history": list(history),
+        "history": sorted({str(symbol_market(name)) for name in misfits}),
+        "symbols": misfits[:MARKET_SYMBOLS],
+        "symbol_count": len(misfits),
+        "spot": all("futures" not in (venues[name] or frozenset()) for name in misfits),
         "source_url": rules.markets_source,
         "as_of": rules.markets_as_of,
     }
@@ -310,19 +347,24 @@ def firm_fit(
     ``known`` maps a preset key to a result already simulated on the same
     history and seed (the report's chosen firm), so that firm's row shows the
     same figure as its own section. With ``symbols`` (the history's), a
-    program that does not take their markets is not simulated and is listed
-    last (:func:`market_fit`)."""
+    program that does not take them is not simulated and is listed last
+    (:func:`market_fit`), except the program of a ``known`` preset: its
+    section was simulated, so its row keeps its figures and its ``market``."""
     history = history_markets(symbols)
+    chosen = {key for known_key in known or {} for key in program_keys(known_key)}
     programs: dict[tuple[str, str], list[tuple[str, dict[str, Any]]]] = {}
+    marked: dict[tuple[str, str], dict[str, Any]] = {}
     left_out: dict[tuple[str, str], tuple[list[str], dict[str, Any]]] = {}
     for key, rules in PRESETS.items():
         if not rules.source_url.startswith("https://"):
             continue
         name = (rules.firm, rules.program)
-        market = market_fit(key, history)
-        if market is not None:
+        market = market_fit(key, symbols)
+        if market is not None and key not in chosen:
             left_out.setdefault(name, ([], market))[0].append(key)
             continue
+        if market is not None:
+            marked.setdefault(name, market)
         result = (known or {}).get(key) or simulate_challenge(
             daily_returns, rules, samples=samples, seed=seed
         )
@@ -330,7 +372,10 @@ def firm_fit(
             reason = result["probability"]["pass"].get("note", "not measured")
             return {"status": "NOT_MEASURED", "reason": reason}
         programs.setdefault(name, []).append((key, result))
-    rows = [_program(results) for results in programs.values()]
+    rows = [
+        {**_program(results), **({"market": marked[name]} if name in marked else {})}
+        for name, results in programs.items()
+    ]
     rows.sort(key=lambda row: (-_payable(row), row["firm"], row["program"]))
     out: dict[str, Any] = {
         "status": "MEASURED",
@@ -378,7 +423,7 @@ def scenario_columns(
     either, with the ladder's reason. Otherwise the chosen program's figures
     are the ladder's own and every other program is simulated on the same
     series (``program_pass`` with ``samples`` paths per phase). Programs left
-    out for their markets get no figure."""
+    out for their markets (no ``pass``) get no figure."""
     if fit.get("status") != "MEASURED":
         return fit
     chosen = program_keys(key)
@@ -398,7 +443,7 @@ def scenario_columns(
             continue
         columns.append({"key": name, **extra, "status": "MEASURED", "samples": samples})
         for row in rows:
-            if row.get("market"):
+            if not row.get("pass"):
                 continue
             keys = list(row.get("keys") or [])
             if keys == chosen:
@@ -410,6 +455,8 @@ def scenario_columns(
 
 
 __all__ = [
+    "COIN_PAIRS",
+    "MARKET_SYMBOLS",
     "OUTCOME_NOTE",
     "REPEATS",
     "RULE_FIELDS",
@@ -426,4 +473,5 @@ __all__ = [
     "program_pass",
     "rules_of",
     "scenario_columns",
+    "symbol_venues",
 ]
