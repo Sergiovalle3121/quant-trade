@@ -2039,6 +2039,18 @@ LABELS: dict[str, dict[str, str]] = {
         "ff_source_link": "fuente",
         "ff_market_only": "Solo {markets}",
         "ff_market_skip": "no se simula",
+        "ff_fold_many": (
+            "{n} programas solo de {markets} no se simulan porque el historial opera {history}"
+        ),
+        "ff_fold_one": (
+            "1 programa solo de {markets} no se simula porque el historial opera {history}"
+        ),
+        "ff_intro_counts": (
+            "En la comparación: {compared}. Aparte, sin cifra: {left}, cuya página no admite lo "
+            "que opera el historial."
+        ),
+        "ff_programs": "{n} programas",
+        "ff_program_one": "1 programa",
         "ff_mk_fx": "forex",
         "ff_mk_metals": "metales",
         "ff_mk_indices": "índices",
@@ -3783,6 +3795,20 @@ LABELS: dict[str, dict[str, str]] = {
         "ff_source_link": "source",
         "ff_market_only": "Only {markets}",
         "ff_market_skip": "not simulated",
+        "ff_fold_many": (
+            "{n} programs that take only {markets} are not simulated because the history trades "
+            "{history}"
+        ),
+        "ff_fold_one": (
+            "1 program that takes only {markets} is not simulated because the history trades "
+            "{history}"
+        ),
+        "ff_intro_counts": (
+            "In the comparison: {compared}. Set apart, without a figure: {left}, whose page does "
+            "not take what the history trades."
+        ),
+        "ff_programs": "{n} programs",
+        "ff_program_one": "1 program",
         "ff_mk_fx": "forex",
         "ff_mk_metals": "metals",
         "ff_mk_indices": "indices",
@@ -7023,6 +7049,58 @@ def _row_open_loss(row: dict[str, Any], platform_dd: float | None, labels: dict[
     return f"<br><small><strong>{_e(text)}</strong></small>"
 
 
+def _programs_count(count: int, labels: dict[str, str]) -> str:
+    """ "20 programas" or "1 programa"."""
+    return labels["ff_program_one"] if count == 1 else labels["ff_programs"].format(n=count)
+
+
+def _left_out_groups(
+    rows: list[dict[str, Any]],
+) -> list[tuple[list[str], list[str], list[dict[str, Any]]]]:
+    """The programs left out for their markets grouped by what their pages
+    allow, in the table's order: (allowed markets, the history's markets they
+    do not take, rows)."""
+    groups: dict[tuple[str, ...], tuple[set[str], list[dict[str, Any]]]] = {}
+    for row in rows:
+        market = row.get("market") or {}
+        allowed = tuple(str(name) for name in market.get("allowed") or [])
+        history, members = groups.setdefault(allowed, (set(), []))
+        history.update(str(name) for name in market.get("history") or [])
+        members.append(row)
+    return [
+        (list(allowed), sorted(history), members) for allowed, (history, members) in groups.items()
+    ]
+
+
+def _fold_summary(
+    count: int, allowed: list[str], history: list[str], labels: dict[str, str]
+) -> str:
+    """ "15 programas solo de futuros no se simulan porque el historial opera
+    forex": the count, what the pages allow and what of the history they do
+    not take, all read from the rows."""
+    markets = _and([labels.get(f"ff_mk_{name}", name) for name in allowed], labels)
+    traded = _and([labels.get(f"ff_hist_{name}", name) for name in history], labels)
+    key = "ff_fold_one" if count == 1 else "ff_fold_many"
+    return labels[key].format(n=count, markets=markets, history=traded)
+
+
+def _left_out_folds(
+    rows: list[dict[str, Any]],
+    labels: dict[str, str],
+    inner: Callable[[list[dict[str, Any]]], str],
+) -> str:
+    """The programs left out for their markets, folded after the ranked rows:
+    one ``<details>`` per set of allowed markets, its summary counting them
+    (:func:`_fold_summary`), ``inner`` rendering its rows as before. The PDF
+    opens them under that summary (``pdf._expand_details_for_pdf``)."""
+    return "".join(
+        f"<details class='ff-fold'><summary>"
+        f"{_e(_fold_summary(len(members), allowed, history, labels))}</summary>"
+        f"{inner(members)}</details>"
+        for allowed, history, members in _left_out_groups(rows)
+    )
+
+
 def _firm_fit_html(
     fit: dict[str, Any] | None,
     labels: dict[str, str],
@@ -7036,27 +7114,37 @@ def _firm_fit_html(
 
     Each program carries its rules, source and reading date; the ladder's
     out-of-sample and cost scenarios are repeated for every program when they
-    were measured (a column the ladder could not measure says why, once); a
-    program whose page does not take the history's markets goes last, with no
-    figure, except the chosen one, which keeps its figures and says so. A row
+    were measured (a column the ladder could not measure says why, once); the
+    programs whose pages do not take the history's markets are folded after
+    the ranked rows, grouped under a counted summary, with no figure, and the
+    introduction says how many are compared and how many are set apart; the
+    chosen one is the exception: it keeps its figures and says so. A row
     whose total loss limit the platform's open-trade drawdown (``platform_dd``)
     already reaches says its figures are optimistic."""
     if not fit or fit.get("status") != "MEASURED" or not fit.get("firms"):
         return ""
     columns = [c for c in fit.get("scenarios") or [] if c.get("status") == "MEASURED"]
     missing = [c for c in fit.get("scenarios") or [] if c.get("status") != "MEASURED"]
-    out = (
-        f"<h3>{_e(labels['ff_title'])}</h3>"
-        f"<p class='muted'>{_e(labels['ff_intro'])} {_badge('MEASURED')}</p>"
-    )
+    # The programs left out for their markets (no figure) are folded after the
+    # ranked rows, and the introduction counts both.
+    ranked = [row for row in fit["firms"] if row.get("pass")]
+    left = [row for row in fit["firms"] if not row.get("pass")]
+    intro = _e(labels["ff_intro"])
+    if left:
+        intro += " " + _e(
+            labels["ff_intro_counts"].format(
+                compared=_programs_count(len(ranked), labels),
+                left=_programs_count(len(left), labels),
+            )
+        )
+    out = f"<h3>{_e(labels['ff_title'])}</h3><p class='muted'>{intro} {_badge('MEASURED')}</p>"
     if ladder:
         out += f"<p class='muted'>{_e(labels['ff_basis_columns' if columns else 'ff_basis'])}</p>"
     if optimistic:
         out += f"<p><strong>{_e(labels['ff_optimistic'])}</strong></p>"
     uniform = fit.get("uniform")
     # Programs left out for their markets are not in the uniform figure: the
-    # sentence says "simulated" and they are still listed, with why.
-    left = [row for row in fit["firms"] if not row.get("pass")]
+    # sentence says "simulated" and they are still listed, folded, with why.
     simulated = "_simulated" if left else ""
     if uniform == "all_pass":
         out += f"<p>{_e(labels['ff_all_pass' + simulated])}</p>"
@@ -7065,11 +7153,16 @@ def _firm_fit_html(
         risk = labels[f"ff_risk_{common}"].lower()
         out += f"<p>{_e(labels['ff_all_fail' + simulated].format(risk=risk))}</p>"
     if uniform and not columns:
-        for row in left:
-            program = f"{row['firm']} · {row['program']}"
-            reason = _market_text(row.get("market") or {}, labels)
-            out += f"<p class='muted'>{_e(program)} — {_e(reason)}</p>"
-        return out
+
+        def lines(rows: list[dict[str, Any]]) -> str:
+            text = ""
+            for row in rows:
+                program = f"{row['firm']} · {row['program']}"
+                reason = _market_text(row.get("market") or {}, labels)
+                text += f"<p class='muted'>{_e(program)} — {_e(reason)}</p>"
+            return text
+
+        return out + _left_out_folds(left, labels, lines)
 
     def pct(item: dict[str, Any] | None, label: str) -> str:
         if not item:
@@ -7149,10 +7242,20 @@ def _firm_fit_html(
         )
         + f"<th>{_e(labels['ff_risk'])}</th>"
     )
-    body = "".join(line(row) for row in fit["firms"])
+    body = "".join(line(row) for row in ranked)
     out += (
         f"<table class='timing firms'><thead><tr>{head}</tr></thead><tbody>{body}</tbody></table>"
     )
+
+    def folded(rows: list[dict[str, Any]]) -> str:
+        # The same rows as before, under the fold's summary instead of the table's head.
+        return (
+            "<table class='timing firms'><tbody>"
+            + "".join(line(row) for row in rows)
+            + "</tbody></table>"
+        )
+
+    out += _left_out_folds(left, labels, folded)
     for column in missing:
         reason = localize(str((column.get("pass") or {}).get("note") or ""), locale)
         label = _challenge_ladder_label(column, labels)

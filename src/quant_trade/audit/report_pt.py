@@ -1231,6 +1231,18 @@ REPORT: dict[str, Any] = {
         "ff_source_link": "fonte",
         "ff_market_only": "Só {markets}",
         "ff_market_skip": "não é simulado",
+        "ff_fold_many": (
+            "{n} programas só de {markets} não são simulados porque o histórico opera {history}"
+        ),
+        "ff_fold_one": (
+            "1 programa só de {markets} não é simulado porque o histórico opera {history}"
+        ),
+        "ff_intro_counts": (
+            "Na comparação: {compared}. À parte, sem número: {left}, cuja página não admite o que "
+            "o histórico opera."
+        ),
+        "ff_programs": "{n} programas",
+        "ff_program_one": "1 programa",
         "ff_mk_fx": "forex",
         "ff_mk_metals": "metais",
         "ff_mk_indices": "índices",
