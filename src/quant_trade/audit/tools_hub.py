@@ -17,7 +17,7 @@ from typing import Any
 TOOLS_PATH: dict[str, str] = {"es": "/herramientas", "en": "/en/tools", "pt": "/pt/ferramentas"}
 
 #: The tools, in the order the page and the landing show them.
-TOOL_KEYS: tuple[str, ...] = ("calculator", "winrate", "challenge", "reading", "check")
+TOOL_KEYS: tuple[str, ...] = ("calculator", "winrate", "challenge", "ruin", "reading", "check")
 
 
 def tools_url(locale: str) -> str:
@@ -31,8 +31,8 @@ COPY: dict[str, dict[str, Any]] = {
         "title": "Herramientas gratis para revisar un backtest",
         "seo_title": "Herramientas gratis para backtests e historiales",
         "summary": (
-            "Calculadoras de suerte, aciertos y reto, tarjeta de cifras y comprobación de "
-            "informes: gratis y sin registro. Cifras declaradas; ninguna es una auditoría."
+            "Calculadoras de suerte, aciertos, reto y ruina, tarjeta de cifras y comprobación "
+            "de informes: gratis, sin registro. Cifras declaradas; ninguna es una auditoría."
         ),
         "intro": (
             "Todas usan cifras que tú declaras y muestran sus supuestos. No son una auditoría: "
@@ -81,6 +81,21 @@ COPY: dict[str, dict[str, Any]] = {
                 "quedar sin terminar, con las reglas publicadas de la firma y su fecha."
             ),
         },
+        "ruin": {
+            "question": (
+                "¿Qué probabilidad tienes de tocar un umbral de ruina con tus cifras, y cuánto "
+                "cambia con el límite inferior de tu % de aciertos?"
+            ),
+            "inputs": (
+                "% de aciertos, ganancia y pérdida medias, umbral de ruina y horizonte en "
+                "operaciones; opcional: operaciones del historial."
+            ),
+            "returns": (
+                "Esperanza por operación, probabilidad de tocar el umbral, drawdown máximo "
+                "mediano y p95 y racha perdedora más larga, también con el límite inferior del "
+                "intervalo."
+            ),
+        },
         "reading": {
             "question": "¿Qué dicen en contexto las cifras que publica alguien, o las tuyas?",
             "inputs": (
@@ -119,8 +134,8 @@ COPY: dict[str, dict[str, Any]] = {
         "title": "Free tools to check a backtest",
         "seo_title": "Free tools for backtests and track records",
         "summary": (
-            "Luck, win rate and challenge calculators, figures card and report check: free and "
-            "no signup. Declared figures and visible assumptions; none is an audit."
+            "Luck, win rate, challenge and ruin calculators, figures card and report check: "
+            "free and no signup. Declared figures and visible assumptions; none is an audit."
         ),
         "intro": (
             "Each one uses figures you declare and shows its assumptions. They are not an "
@@ -164,6 +179,20 @@ COPY: dict[str, dict[str, Any]] = {
                 "unfinished, under the firm's dated published rules."
             ),
         },
+        "ruin": {
+            "question": (
+                "How likely are you to touch a ruin threshold with your figures, and how much "
+                "does it change at the lower end of your win rate?"
+            ),
+            "inputs": (
+                "Win rate, average win and loss, ruin threshold and horizon in trades; optional: "
+                "trades in your history."
+            ),
+            "returns": (
+                "Expectancy per trade, chance of touching the threshold, median and p95 maximum "
+                "drawdown and longest losing streak, also at the lower end of the interval."
+            ),
+        },
         "reading": {
             "question": "What do someone's published figures, or yours, say in context?",
             "inputs": (
@@ -201,7 +230,7 @@ COPY: dict[str, dict[str, Any]] = {
         "title": "Ferramentas grátis para revisar um backtest",
         "seo_title": "Ferramentas grátis para backtests e históricos",
         "summary": (
-            "Calculadoras de sorte, acerto e desafio, cartão de números e conferência de "
+            "Calculadoras de sorte, acerto, desafio e ruína, cartão de números e checagem de "
             "relatórios: grátis e sem cadastro. Números declarados; nenhuma é uma auditoria."
         ),
         "intro": (
@@ -247,6 +276,20 @@ COPY: dict[str, dict[str, Any]] = {
             "returns": (
                 "Probabilidade de atingir a meta, de tocar o limite diário ou o total e de ficar "
                 "sem terminar, com as regras publicadas da empresa e a data."
+            ),
+        },
+        "ruin": {
+            "question": (
+                "Qual é a probabilidade de tocar um limite de ruína com os seus números, e quanto "
+                "muda no limite inferior da taxa de acerto?"
+            ),
+            "inputs": (
+                "Taxa de acerto, ganho e perda médios, limite de ruína e horizonte em operações; "
+                "opcional: operações do histórico."
+            ),
+            "returns": (
+                "Esperança por operação, probabilidade de tocar o limite, drawdown máximo mediano "
+                "e p95 e maior sequência de perdas, também no limite inferior do intervalo."
             ),
         },
         "reading": {

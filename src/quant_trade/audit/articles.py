@@ -16,7 +16,7 @@ from datetime import datetime
 from typing import Any
 from urllib.parse import urlencode
 
-from quant_trade.audit import winrate
+from quant_trade.audit import ruin_calc, winrate
 from quant_trade.audit.analytics import DEFAULT_BLOCK_SIZE, DRAWDOWN_THRESHOLDS
 from quant_trade.audit.article_numbers import (
     MC_DEEP_THRESHOLD,
@@ -89,6 +89,7 @@ RELATED_KINDS: frozenset[str] = frozenset(
         "reading",
         "article",
         "winrate",
+        "ruin",
     }
 )
 
@@ -8272,6 +8273,8 @@ ARTICLES_DATA += (
             {"kind": "audience", "slug": "retos-prop-firm"},
             {"kind": "article", "key": "cuantos-intentos-reto-prop-firm"},
             {"kind": "winrate"},
+            # The streak, the drawdown and the ruin threshold from the same declared figures.
+            {"kind": "ruin"},
             {"kind": "article", "key": MONTE_CARLO_ARTICLE_KEY},
             {"kind": "method"},
         ],
@@ -8358,6 +8361,8 @@ def related_links(article: Article, locale: str) -> tuple[tuple[str, str], ...]:
             links.append((SAMPLE_REPORT_LABEL[locale], SAMPLE_PAGE_PATHS[locale]))
         elif kind == "winrate":
             links.append((winrate.COPY[locale]["nav"], winrate.WINRATE_PATH[locale]))
+        elif kind == "ruin":
+            links.append((ruin_calc.COPY[locale]["nav"], ruin_calc.ruin_url(locale)))
         elif kind == "reading":
             if link.get("example") == "win-rate":
                 label = {

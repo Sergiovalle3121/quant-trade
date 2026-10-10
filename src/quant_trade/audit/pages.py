@@ -18,7 +18,7 @@ from datetime import datetime
 from typing import Any
 from urllib.parse import quote, urlencode
 
-from quant_trade.audit import accounts, institutional, paid_offer, reading, winrate
+from quant_trade.audit import accounts, institutional, paid_offer, reading, ruin_calc, winrate
 from quant_trade.audit import challenge_calc as challenge
 from quant_trade.audit.accounts import FREE_PREVIEWS_PER_MONTH as _FREE
 from quant_trade.audit.article_numbers import STREAK_ROWS
@@ -2069,6 +2069,8 @@ def _tool_name(key: str, locale: str) -> str:
         return str(winrate.COPY[locale]["nav"])
     if key == "challenge":
         return str(challenge.COPY[locale]["nav"])
+    if key == "ruin":
+        return str(ruin_calc.COPY[locale]["nav"])
     if key == "reading":
         return reading.COPY[locale]["title"]
     return str(_UI[locale]["footer_check"])
@@ -2081,6 +2083,8 @@ def _tool_url(key: str, locale: str) -> str:
         return winrate.WINRATE_PATH[locale]
     if key == "challenge":
         return challenge.challenge_url(locale)
+    if key == "ruin":
+        return ruin_calc.ruin_url(locale)
     if key == "reading":
         return reading.reading_url(locale)
     return _check_url(locale)
@@ -4487,6 +4491,8 @@ def winrate_page(
     further = (
         (article.text[locale].title, article_url(article.key, locale)),
         (str(CALCULATOR_COPY[locale]["nav"]), calculator_url(locale)),
+        # Ruin follows from the interval: the same figures, at its lower end.
+        (str(ruin_calc.COPY[locale]["nav"]), ruin_calc.ruin_url(locale)),
         (audience.text[locale].title, audience_url(audience.slug, locale)),
         (str(TOOLS_COPY[locale]["nav"]), tools_url(locale)),
     )
