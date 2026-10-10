@@ -144,7 +144,8 @@ COPY: dict[str, dict[str, Any]] = {
         "refund_q": "¿Y si el informe no me sirve?",
         "refund_a": (
             "Escribe a {contact} en los 7 días siguientes al pago, con el identificador del "
-            "informe o de la compra, y te devolvemos el importe completo. En un paquete, si no "
+            "informe o de la compra, y te devolvemos el importe completo; lo mismo con un "
+            "crédito suelto. En un paquete, si no "
             "usaste ningún crédito, te lo devolvemos completo; si usaste alguno, la parte de los "
             "créditos sin usar. Si pagaste con tarjeta, lo devolvemos desde Stripe a la misma "
             "tarjeta, en los plazos de tu banco. Los términos lo explican."
@@ -163,7 +164,7 @@ COPY: dict[str, dict[str, Any]] = {
         "gate_title": "Crea tu cuenta gratis para seguir",
         "gate_lead": (
             "Con tu cuenta tienes {limit} vistas previas gratis cada mes: la clase de A a D, las "
-            "gráficas y las señales de alerta. Tu archivo no se guardó: al crear tu cuenta "
+            "gráficas y las banderas rojas. Tu archivo no se guardó: al crear tu cuenta "
             "vuelves al formulario para subirlo otra vez. Si ya tienes un código de acceso, "
             "entra en tu cuenta y escríbelo en el formulario."
         ),
@@ -220,7 +221,8 @@ COPY: dict[str, dict[str, Any]] = {
         "refund_q": "What if the report is no use to me?",
         "refund_a": (
             "Write to {contact} within 7 days of paying, with the report's or the purchase's "
-            "identifier, and we refund the full amount. For a pack, if you used none of its "
+            "identifier, and we refund the full amount; the same for a single credit. For a "
+            "pack, if you used none of its "
             "credits, we refund it in full; if you used some, the part of the unused credits. "
             "If you paid by card, we refund it from Stripe to the same card, within your bank's "
             "times. The terms set it out."
@@ -300,7 +302,8 @@ COPY: dict[str, dict[str, Any]] = {
         "refund_q": "E se o relatório não me servir?",
         "refund_a": (
             "Escreva para {contact} nos 7 dias seguintes ao pagamento, com o identificador do "
-            "relatório ou da compra, e devolvemos o valor total. No pacote, se você não usou "
+            "relatório ou da compra, e devolvemos o valor total; o mesmo vale para um crédito "
+            "avulso. No pacote, se você não usou "
             "nenhum crédito, devolvemos o valor total; se usou algum, a parte dos créditos não "
             "usados. Se pagou com cartão, devolvemos pelo Stripe no mesmo cartão, nos prazos do "
             "seu banco. Os termos explicam isso."
@@ -319,7 +322,7 @@ COPY: dict[str, dict[str, Any]] = {
         "gate_title": "Crie sua conta grátis para continuar",
         "gate_lead": (
             "Com a sua conta você tem {limit} prévias grátis por mês: a classe de A a D, os "
-            "gráficos e as bandeiras vermelhas. Seu arquivo não foi guardado: com a conta criada "
+            "gráficos e os alertas. Seu arquivo não foi guardado: com a conta criada "
             "você volta ao formulário para enviá-lo de novo. Se você já tem um código de acesso, "
             "entre na sua conta e digite-o no formulário."
         ),
@@ -459,8 +462,8 @@ PROMISES: dict[str, tuple[tuple[str, str], ...]] = {
         (r"Qué llevar al informe gratis", "Qué llevar al informe"),
         (r"Pedir mi primer informe gratis", "{upload}"),
         (
-            r"Las pagadas y el primer informe completo gratis se conservan",
-            "Las pagadas se conservan",
+            r"Las pagadas y el primer informe completo gratis se conservan hasta que los borres",
+            "Las pagadas se conservan hasta que las borres",
         ),
         (
             r"Respuestas sobre el informe gratis de Rigor",
@@ -523,7 +526,10 @@ PROMISES: dict[str, tuple[tuple[str, str], ...]] = {
         (r"O relatório grátis permite começar", "O relatório permite começar"),
         (r"O que levar ao relatório grátis", "O que levar ao relatório"),
         (r"Pedir o meu primeiro relatório grátis", "{upload}"),
-        (r"As pagas e o primeiro relatório completo grátis ficam", "As pagas ficam"),
+        (
+            r"As pagas e o primeiro relatório completo grátis ficam até você excluí-los",
+            "As pagas ficam até você excluí-las",
+        ),
         (r"Respostas sobre o relatório grátis da Rigor", "Respostas sobre a prévia da Rigor"),
     ),
 }

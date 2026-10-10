@@ -156,7 +156,7 @@ GUIDES_COPY: dict[str, dict[str, str]] = {
         ),
         "paid_terms": (
             "Com uma conta você tem até {n} prévias grátis por mês, com a classe, os gráficos e "
-            "as bandeiras vermelhas. O relatório completo, com cada número e o PDF, é pago."
+            "os alertas. O relatório completo, com cada número e o PDF, é pago."
         ),
         "optimization_with_report": (
             "Este XML não é auditado sozinho: o relatório sai do relatório HTML do teste com a "

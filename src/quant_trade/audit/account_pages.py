@@ -14,7 +14,7 @@ from typing import Any
 from urllib.parse import quote
 
 from quant_trade.audit import paid_offer
-from quant_trade.audit.account_pt import COPY_PT, PATHS_PT
+from quant_trade.audit.account_pt import COPY_PT, PATHS_PT, STORES_PAID_PT
 from quant_trade.audit.accounts import (
     FREE_PREVIEWS_PER_MONTH,
     MIN_PASSWORD_CHARS,
@@ -160,7 +160,8 @@ COPY: dict[str, dict[str, str]] = {
         ),
         "welcome_confirm_paid": (
             "Cuenta creada. Te enviamos un enlace para confirmar tu correo (si no lo ves, "
-            "revisa la carpeta de spam). Ya puedes subir tu archivo."
+            "revisa la carpeta de spam): hace falta confirmarlo para pagar. Ya puedes subir tu "
+            "archivo."
         ),
         "welcome_confirm_guides": "Mientras llega el correo, exporta tu archivo",
         "next_title": "Así sigue",
@@ -468,6 +469,14 @@ COPY: dict[str, dict[str, str]] = {
             "El envío de correos no está disponible ahora. El primer informe completo gratis, "
             "las compras y los créditos por invitaciones requieren confirmar el correo."
         ),
+        # The paid offer: confirming opens no free report and there are no invites.
+        "email_unverified_status_paid": (
+            "Tu correo aún no está confirmado. Confírmalo para desbloquear las compras."
+        ),
+        "email_delivery_unavailable_paid": (
+            "El envío de correos no está disponible ahora. Las compras requieren confirmar el "
+            "correo."
+        ),
         "email_request_button": "Enviar enlace de confirmación",
         "email_pending_note": (
             "Cambio pendiente a {email}. Sigue entrando con tu correo actual hasta abrir "
@@ -482,6 +491,7 @@ COPY: dict[str, dict[str, str]] = {
         "email_verified": (
             "Correo confirmado. Ya puedes usar las compras y las recompensas disponibles."
         ),
+        "email_verified_paid": "Correo confirmado. Ya puedes usar las compras disponibles.",
         "email_verified_signin": "Correo confirmado. Inicia sesión.",
         "email_verified_report": (
             "Correo confirmado. Tu informe ya está completo, con PDF: lo tienes en tu lista de "
@@ -494,6 +504,7 @@ COPY: dict[str, dict[str, str]] = {
             "Confirma tu correo desde Mi cuenta antes de pagar. Confirmarlo también "
             "desbloquea tu primer informe completo gratis."
         ),
+        "email_checkout_required_paid": "Confirma tu correo desde Mi cuenta antes de pagar.",
         "email_now": "Ahora entras con {email}. Desde el cambio entrarás con el correo nuevo.",
         "email_new": "Correo nuevo",
         "email_again": "Repite el correo nuevo",
@@ -948,7 +959,8 @@ COPY: dict[str, dict[str, str]] = {
         ),
         "welcome_confirm_paid": (
             "Account created. We sent you a link to confirm your e-mail (if you do not see it, "
-            "check the spam folder). You can upload your file now."
+            "check the spam folder): you need to confirm it to pay. You can upload your file "
+            "now."
         ),
         "welcome_confirm_guides": "While the e-mail arrives, export your file",
         "next_title": "What happens next",
@@ -1251,6 +1263,12 @@ COPY: dict[str, dict[str, str]] = {
             "E-mail delivery is unavailable now. The first free full report, purchases and "
             "referral credits require a confirmed e-mail."
         ),
+        "email_unverified_status_paid": (
+            "Your e-mail is not confirmed yet. Confirm it to unlock purchases."
+        ),
+        "email_delivery_unavailable_paid": (
+            "E-mail delivery is unavailable now. Purchases require a confirmed e-mail."
+        ),
         "email_request_button": "Send a confirmation link",
         "email_pending_note": (
             "Change pending to {email}. Keep signing in with your current e-mail until you "
@@ -1263,6 +1281,7 @@ COPY: dict[str, dict[str, str]] = {
             "The change is pending. Open the link sent to the new e-mail to finish it."
         ),
         "email_verified": "E-mail confirmed. You can now use available purchases and rewards.",
+        "email_verified_paid": "E-mail confirmed. You can now use available purchases.",
         "email_verified_signin": "E-mail confirmed. Sign in.",
         "email_verified_report": (
             "E-mail confirmed. Your report is now complete, with the PDF: it is in your list "
@@ -1275,6 +1294,7 @@ COPY: dict[str, dict[str, str]] = {
             "Confirm your e-mail from My account before paying. Confirming it also unlocks "
             "your first free full report."
         ),
+        "email_checkout_required_paid": "Confirm your e-mail from My account before paying.",
         "email_now": "You sign in with {email}. After the change you sign in with the new address.",
         "email_new": "New e-mail",
         "email_again": "Repeat the new e-mail",
@@ -1627,6 +1647,67 @@ COPY: dict[str, dict[str, str]] = {
 }
 COPY["pt"] = COPY_PT
 PATHS["pt"] = PATHS_PT
+
+
+def _swap_items(items: str, swaps: dict[str, str]) -> str:
+    """``items`` (split by ``|``) with the one that starts with each key of
+    ``swaps`` replaced by its value; a key that names no single item fails."""
+    parts = items.split("|")
+    for start, new in swaps.items():
+        found = [n for n, part in enumerate(parts) if part.startswith(start)]
+        if len(found) != 1:
+            raise ValueError(f"no single 'What we keep' item starts with {start!r}")
+        parts[found[0]] = new
+    return "|".join(parts)
+
+
+#: "What we keep" under the paid offer (``stores_paid``): previews go after the
+#: retention days and full reports stay; what the free first report and the
+#: invites kept is said only of the accounts that had them, back when we offered
+#: them. Every other item is the same as ``stores``.
+STORES_PAID: dict[str, dict[str, str]] = {
+    "es": {
+        "Tus informes y los archivos que subes.": (
+            "Tus informes y los archivos que subes. De las vistas previas borramos archivos e "
+            "informe a los {days} días (queda solo su huella); los informes completos quedan "
+            "para que sigas abriéndolos."
+        ),
+        "Una marca aleatoria de tu navegador y la huella del archivo": (
+            "Si recibiste el primer informe gratis cuando lo ofrecíamos: la marca aleatoria de "
+            "tu navegador y la huella del archivo de entonces, que se conservan aunque borres "
+            "la cuenta, sin tu correo."
+        ),
+        "Si te uniste con el enlace de un colega": (
+            "Si te uniste con el enlace de un colega o alguien se unió con el tuyo cuando había "
+            "invitaciones: la fecha, si ya hubo primer informe y una marca aleatoria del "
+            "navegador (un hash). Nadie ve quién se unió. Se borra con la cuenta de quien "
+            "invitó; si borra la suya quien se unió, queda solo la fecha y el resultado, sin "
+            "nada suyo."
+        ),
+    },
+    "en": {
+        "Your reports and the files you upload.": (
+            "Your reports and the files you upload. For previews we delete the files and the "
+            "report after {days} days (only their fingerprint stays); full reports stay so you "
+            "can keep opening them."
+        ),
+        "A random mark of your browser and the file's fingerprint": (
+            "If you got the free first report when we offered it: the random mark of your "
+            "browser and the file's fingerprint from then, which stay even if you delete the "
+            "account, without your e-mail."
+        ),
+        "If you joined through a colleague's link": (
+            "If you joined through a colleague's link, or someone joined through yours, when "
+            "there were invites: the date, whether the first report happened and a random "
+            "browser mark (a hash). Nobody sees who joined. It goes with the inviter's account; "
+            "if the person who joined deletes theirs, only the date and outcome stay, with "
+            "nothing of theirs."
+        ),
+    },
+    "pt": STORES_PAID_PT,
+}
+for _lang, _swaps in STORES_PAID.items():
+    COPY[_lang]["stores_paid"] = _swap_items(COPY[_lang]["stores"], _swaps)
 #: Addresses people type by analogy with another language's sign-up path.
 SIGNUP_ALIASES: dict[str, tuple[str, ...]] = {"pt": ("/pt/registro", "/pt/signup")}
 #: The languages every account screen exists in.
@@ -2035,11 +2116,12 @@ def _stores_short(copy: dict[str, str], locale: str) -> str:
     )
 
 
-def _stores(copy: dict[str, str], retention_days: int) -> str:
-    """What the account keeps and how to delete it, in plain words."""
+def _stores(copy: dict[str, str], retention_days: int, *, paid: bool = False) -> str:
+    """What the account keeps and how to delete it, in plain words; ``paid``
+    (the paid offer) says the free first report only of the accounts that had it."""
+    listed = copy["stores_paid" if paid else "stores"].format(days=retention_days)
     items = "".join(
-        f"<li>{icon('check')}<span>{_e(item)}</span></li>"
-        for item in copy["stores"].format(days=retention_days).split("|")
+        f"<li>{icon('check')}<span>{_e(item)}</span></li>" for item in listed.split("|")
     )
     return (
         f"<div class='acct-card acct-stores'><h3>{icon('shield')}{_e(copy['stores_title'])}</h3>"
@@ -2864,17 +2946,21 @@ def _email_status_card(
     pending: str,
     delivery_ready: bool,
     verification_required: bool,
+    paid: bool = False,
 ) -> str:
+    """The account e-mail's state; ``paid`` (the paid offer): confirming unlocks
+    the purchases only, never a free report or invite credits."""
     if not verification_required:
         return ""
-    status = "email_verified_status" if verified else "email_unverified_status"
+    suffix = "_paid" if paid else ""
+    status = "email_verified_status" if verified else f"email_unverified_status{suffix}"
     pending_note = (
         f"<p class='muted'>{_e(copy['email_pending_note'].format(email=_safe_text(pending)))}</p>"
         if pending
         else ""
     )
     delivery_note = (
-        f"<p class='muted'>{_e(copy['email_delivery_unavailable'])}</p>"
+        f"<p class='muted'>{_e(copy['email_delivery_unavailable' + suffix])}</p>"
         if not delivery_ready and not verified
         else ""
     )
@@ -3075,14 +3161,20 @@ def account_page(
     email_pending: str = "",
     email_delivery_ready: bool = False,
     email_verification_required: bool = False,
+    offer: str = "welcome",
 ) -> str:
     """ "My reports": the reports, credits, codes and purchases of one account.
 
     ``recovery_created`` is when the account's recovery key was made (empty
-    without one).
+    without one). ``offer`` is the service's (``free``, ``welcome`` or ``paid``,
+    ``paid_offer.offer_kind``): under the paid offer the e-mail card, the
+    "e-mail confirmed" notice and "What we keep" promise no free report.
     """
     locale = _locale(locale)
     copy = COPY[locale]
+    paid = offer == "paid"
+    if paid and flash == "email_verified":
+        flash = "email_verified_paid"
     from quant_trade.audit.pages import AUDIT_PATHS
 
     signout = (
@@ -3332,7 +3424,9 @@ def account_page(
         + "<label class='check'><input type='checkbox' name='with_reports' value='yes'> "
         f"<span>{_e(copy['delete_reports'])}</span></label>"
         f"<p><button class='btn btn-ghost' type='submit'>{_e(copy['delete_button'])}</button></p>"
-        "</form></div>" + _stores(copy, retention_days) + "<div class='acct-card acct-export'>"
+        "</form></div>"
+        + _stores(copy, retention_days, paid=paid)
+        + "<div class='acct-card acct-export'>"
         f"<h3>{_e(copy['export_title'])}</h3><p class='muted'>{_e(copy['export_help'])}</p>"
         f"<a class='btn btn-ghost' href='{path('account', locale)}/datos' download>"
         f"{icon('file')} {_e(copy['export_button'])}</a></div>"
@@ -3362,6 +3456,7 @@ def account_page(
             pending=email_pending,
             delivery_ready=email_delivery_ready,
             verification_required=email_verification_required,
+            paid=paid,
         )
         + recovery_nudge
         + security,

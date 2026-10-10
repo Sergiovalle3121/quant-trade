@@ -235,18 +235,19 @@ def _account_email_status(ctx: LegalContext, locale: str) -> str:
 
 
 def _refund(ctx: LegalContext, locale: str) -> str:
-    """The refund policy: a paid report within ``REFUND_DAYS`` days of the payment,
-    a pack's unused credits, and always a duplicate charge or one that delivered
-    no report. The operator refunds a card payment from Stripe; nothing locks
-    the report again (``refund.created`` is recorded, ``record_stripe_refund``)."""
+    """The refund policy: a paid report or a single credit bought (used or not)
+    within ``REFUND_DAYS`` days of the payment, a pack's unused credits, and
+    always a duplicate charge or one that delivered no report. The operator
+    refunds a card payment from Stripe; nothing locks the report again
+    (``refund.created`` is recorded, ``record_stripe_refund``)."""
     contact = _value(ctx.operator_contact, locale)
     days = REFUND_DAYS
     pack = bool(ctx.pack_price_usd)
     if locale == "en":
         parts = [
-            f"{days}-day refund: if a paid report is no use to you, write to {contact} within "
-            f"{days} days of the payment, with the report's or the purchase's identifier, and "
-            "we refund the full amount."
+            f"{days}-day refund: if a paid report, or a single credit you bought, is no use to "
+            f"you, write to {contact} within {days} days of the payment, with the report's or "
+            "the purchase's identifier, and we refund the full amount."
         ]
         if pack:
             parts.append(
@@ -278,9 +279,10 @@ def _refund(ctx: LegalContext, locale: str) -> str:
         return " ".join(parts)
     if locale == "pt":
         parts = [
-            f"Devolução em {days} dias: se um relatório pago não servir para você, escreva para "
-            f"{contact} nos {days} dias seguintes ao pagamento, com o identificador do relatório "
-            "ou da compra, e devolvemos o valor total."
+            f"Devolução em {days} dias: se um relatório pago, ou um crédito avulso que você "
+            f"comprou, não servir para você, escreva para {contact} nos {days} dias seguintes "
+            "ao pagamento, com o identificador do relatório ou da compra, e devolvemos o valor "
+            "total."
         ]
         if pack:
             parts.append(
@@ -308,9 +310,9 @@ def _refund(ctx: LegalContext, locale: str) -> str:
         parts.append("Isso não limita os direitos previstos na lei aplicável.")
         return " ".join(parts)
     parts = [
-        f"Devolución en {days} días: si un informe pagado no te sirve, escribe a {contact} "
-        f"dentro de los {days} días siguientes al pago, con el identificador del informe o de "
-        "la compra, y te devolvemos el importe completo."
+        f"Devolución en {days} días: si un informe pagado, o un crédito suelto que compraste, "
+        f"no te sirve, escribe a {contact} dentro de los {days} días siguientes al pago, con "
+        "el identificador del informe o de la compra, y te devolvemos el importe completo."
     ]
     if pack:
         parts.append(
@@ -1090,7 +1092,8 @@ def _anon_keeps(ctx: LegalContext, locale: str, days: int) -> tuple[str, ...]:
             f"with ({REF_COOKIE} cookie), the date and, if you later move it to an account, "
             f"when; also your browser's identifier (as a hash only){marks}; and a hash of "
             "the network per day, to count its previews without an account. All of it is "
-            f"deleted with the report or after {days} days.",
+            f"deleted with the report or after {days} days; the network hash, after {days} "
+            "days.",
         )
     if locale == "pt":
         marks = (
@@ -1105,7 +1108,7 @@ def _anon_keeps(ctx: LegalContext, locale: str, days: int) -> tuple[str, ...]:
             f"chegou (cookie {REF_COOKIE}), a data e, se depois você o passar para uma conta, "
             f"quando; além disso, o identificador do seu navegador (só como hash){marks}; e "
             "um hash da rede por dia, para contar as prévias sem conta. Tudo é apagado com o "
-            f"relatório ou após {days} dias.",
+            f"relatório ou após {days} dias; o hash da rede, após {days} dias.",
         )
     marks = (
         ", el SHA-256 del archivo y la dirección de red, para abrirlo como informe gratis si "
@@ -1119,8 +1122,45 @@ def _anon_keeps(ctx: LegalContext, locale: str, days: int) -> tuple[str, ...]:
         f"llegaste (cookie {REF_COOKIE}), la fecha y, si luego lo pasas a una cuenta, cuándo; "
         f"además, el identificador de tu navegador (solo como hash){marks}; y un hash de la "
         "red por día, para contar las vistas previas sin cuenta. Todo se borra con el informe "
-        f"o a los {days} días.",
+        f"o a los {days} días; el hash de la red, a los {days} días.",
     )
+
+
+def _paid_offer(ctx: LegalContext) -> bool:
+    """The paid offer (``paid_offer``): no free first report, card check or invite,
+    so what they kept is said only of the accounts that had them, back when we
+    offered them."""
+    return not ctx.free_mode and not ctx.welcome_full_report
+
+
+def _device_cookie_use(ctx: LegalContext, locale: str) -> str:
+    """What the browser mark (``DEVICE_COOKIE``) is for, in the list of cookies."""
+    if not _paid_offer(ctx):
+        return {
+            "es": "marca tu navegador para el primer informe gratis",
+            "en": "marks your browser for the free first report",
+            "pt": "marca do navegador para a oferta gratuita",
+        }[locale]
+    if ctx.anon_preview:
+        return {
+            "es": (
+                "marca tu navegador, para que solo el que subió una vista previa sin cuenta "
+                "pueda pasarla a una cuenta y para avisarte de las visitas a «Mi cuenta»"
+            ),
+            "en": (
+                "marks your browser, so that only the one that uploaded a preview without an "
+                "account can move it to an account, and for the notice of visits to 'My account'"
+            ),
+            "pt": (
+                "marca do navegador (para que só o navegador que enviou uma prévia sem conta "
+                "possa passá-la para uma conta e para o aviso de visitas a 'Minha conta')"
+            ),
+        }[locale]
+    return {
+        "es": "marca tu navegador para avisarte de las visitas a «Mi cuenta»",
+        "en": "marks your browser for the notice of visits to 'My account'",
+        "pt": "marca do navegador para o aviso de visitas a 'Minha conta'",
+    }[locale]
 
 
 def privacy_text(ctx: LegalContext, locale: str = "es") -> LegalText:
@@ -1131,6 +1171,7 @@ def privacy_text(ctx: LegalContext, locale: str = "es") -> LegalText:
     days = ctx.retention_days
     limit = ctx.max_uploads_per_hour_per_ip
     warning = _warning(ctx, locale)
+    paid = _paid_offer(ctx)
     if locale == "pt":
         return _privacy_pt(ctx, name, address, contact, days, limit, warning)
     if locale == "en":
@@ -1162,33 +1203,59 @@ def privacy_text(ctx: LegalContext, locale: str = "es") -> LegalText:
                     "network address it came from. The address is cleared with the rest "
                     f"after {days} days.",
                     *_anon_keeps(ctx, "en", days),
-                    "For the free first full report: a random identifier of your browser "
-                    f"(a cookie named {DEVICE_COOKIE}, stored by us only as a hash), the "
-                    "SHA-256 of the file, a SHA-256 of your e-mail in its basic form (lower "
-                    "case, without anything after a '+' and, for Gmail, without dots) and the "
-                    "network address, so the same browser, file or inbox gets it only once. "
-                    f"The address is cleared after {days} days; the three hashes stay, even if "
-                    "you delete your account and without your e-mail in clear text, so the "
-                    "offer cannot be repeated.",
+                    (
+                        "If you got the free first full report when we offered it: we keep the "
+                        "three hashes taken then, of your browser's random identifier (the "
+                        f"{DEVICE_COOKIE} cookie), of the file and of your e-mail in its basic "
+                        "form, even if you delete your account and without your e-mail in "
+                        "clear text, so that it is not repeated. The network address of then "
+                        f"is cleared after {days} days."
+                        if paid
+                        else "For the free first full report: a random identifier of your "
+                        f"browser (a cookie named {DEVICE_COOKIE}, stored by us only as a hash), "
+                        "the SHA-256 of the file, a SHA-256 of your e-mail in its basic form "
+                        "(lower case, without anything after a '+' and, for Gmail, without dots) "
+                        "and the network address, so the same browser, file or inbox gets it "
+                        f"only once. The address is cleared after {days} days; the three hashes "
+                        "stay, even if you delete your account and without your e-mail in clear "
+                        "text, so the offer cannot be repeated."
+                    ),
                     *(
                         (
-                            "If a shared browser or network holds back that free report and you "
-                            "verify a card for it: Stripe checks the card without charging it, "
-                            "and we keep only a SHA-256 of the fingerprint Stripe gives that card"
-                            " (never its number) and the date, so each card gives one free "
-                            "report. The date goes with your account; the hash stays, like the "
-                            "three above.",
+                            (
+                                "If you had a card checked for that free report when we offered "
+                                "it: we keep only a SHA-256 of the fingerprint Stripe gives that "
+                                "card (never its number) and, until you delete your account, the "
+                                "date. We no longer check cards for it."
+                            )
+                            if paid
+                            else "If a shared browser or network holds back that free report "
+                            "and you verify a card for it: Stripe checks the card without "
+                            "charging it, and we keep only a SHA-256 of the fingerprint Stripe "
+                            "gives that card (never its number) and the date, so each card "
+                            "gives one free report. The date goes with your account; the hash "
+                            "stays, like the three above.",
                         )
                         if ctx.card_payments
                         else ()
                     ),
-                    "For 'Invite a colleague': each account's invite link, and for an account "
-                    "created through someone's link, the date, whether its free first report "
-                    "happened and the hash of its browser identifier, to refuse self-invites. "
-                    "The inviter sees only counts, never who joined. It is deleted with the "
-                    "inviter's account; when the account that joined is deleted, its row "
-                    "keeps only the dates and the outcome under a random id (no e-mail, no "
-                    "browser hash), so the monthly limit still holds.",
+                    (
+                        "If you had an invite link, or joined through a colleague's, when there "
+                        "were invites: that link and, for the account that joined, the date, "
+                        "whether its first report happened and the hash of its browser "
+                        "identifier. The inviter sees only counts, never who joined. It is "
+                        "deleted with the inviter's account; when the account that joined is "
+                        "deleted, its row keeps only the dates and the outcome under a random id "
+                        "(no e-mail, no browser hash)."
+                        if paid
+                        else "For 'Invite a colleague': each account's invite link, and for an "
+                        "account created through someone's link, the date, whether its free "
+                        "first report happened and the hash of its browser identifier, to "
+                        "refuse self-invites. The inviter sees only counts, never who joined. It "
+                        "is deleted with the inviter's account; when the account that joined is "
+                        "deleted, its row keeps only the dates and the outcome under a random id "
+                        "(no e-mail, no browser hash), so the monthly limit still holds."
+                    ),
                     "If you make a recovery key: only its SHA-256 and the date it was made, "
                     "never the key, which is shown to you once. It is deleted when you use it, "
                     "when you make a new one or with your account.",
@@ -1215,8 +1282,13 @@ def privacy_text(ctx: LegalContext, locale: str = "es") -> LegalText:
                     "time of the last one, never the e-mail or password typed; we keep the "
                     "latest 20 lines, and delete them after 90 days and with your account. And "
                     "for each browser you open 'My account' with, the time of its last visit and "
-                    "its label, kept under the hash of its random mark (the same cookie as the "
-                    "free report), only to tell you what happened since; it is deleted after 90 "
+                    "its label, kept under the hash of its random mark ("
+                    + (
+                        f"the {DEVICE_COOKIE} cookie"
+                        if paid
+                        else "the same cookie as the free report"
+                    )
+                    + "), only to tell you what happened since; it is deleted after 90 "
                     "days without a visit or with your account.",
                     "To know which of our own links brings visitors: visits to the home "
                     "and case pages are counted per day, language and link tag (such as "
@@ -1235,8 +1307,9 @@ def privacy_text(ctx: LegalContext, locale: str = "es") -> LegalText:
                     "passwords or card details. There is no third-party analytics or "
                     "advertising on these pages. The only cookies are our own: one that keeps "
                     "you signed in, one that protects the sign-in forms, one that for up to "
-                    "an hour remembers which report to return to after you sign in, one that marks "
-                    "your browser for the free first report, one that remembers which of "
+                    "an hour remembers which report to return to after you sign in, one that "
+                    + _device_cookie_use(ctx, "en")
+                    + ", one that remembers which of "
                     "our links brought you and one with today's date to count a visit once; "
                     "none tracks you across sites "
                     "or is shared. Our own access "
@@ -1263,8 +1336,15 @@ def privacy_text(ctx: LegalContext, locale: str = "es") -> LegalText:
                     "and the date remain so the record stays checkable.",
                     f"The upload IP address is deleted in that same clean-up after {days} "
                     "days, for paid audits too.",
-                    "Paid audits and your free first full report: kept so you can reopen the "
-                    "report, until you delete them with your account or ask us to delete them.",
+                    (
+                        "Paid audits, and the free first full report of whoever got it when we "
+                        "offered it: kept so you can reopen the report, until you delete them "
+                        "with your account or ask us to delete them."
+                        if paid
+                        else "Paid audits and your free first full report: kept so you can "
+                        "reopen the report, until you delete them with your account or ask us "
+                        "to delete them."
+                    ),
                     "Verification page: public until you withdraw it from your report or ask us to"
                     " withdraw it or to delete the audit. If you published it, the clean-up keeps "
                     "only what that page shows (class, dimension statuses, hashes, dates, trial "
@@ -1342,16 +1422,32 @@ def privacy_text(ctx: LegalContext, locale: str = "es") -> LegalText:
                 f"desde qué dirección de red. La dirección se borra con lo demás a los {days} "
                 "días.",
                 *_anon_keeps(ctx, "es", days),
-                "Para el primer informe completo gratis: un identificador al azar de tu "
-                f"navegador (una cookie llamada {DEVICE_COOKIE}, que guardamos solo como hash), "
-                "el SHA-256 del archivo, un SHA-256 de tu correo en su forma básica (en "
-                "minúsculas, sin lo que va tras un «+» y, en Gmail, sin puntos) y la dirección "
-                "de red, para que el mismo navegador, archivo o buzón lo reciba una sola vez. "
-                f"La dirección se borra a los {days} días; los tres hashes se quedan, aunque "
-                "borres tu cuenta y sin tu correo en claro, para que la oferta no se repita.",
+                (
+                    "Si recibiste el primer informe completo gratis cuando lo ofrecíamos: "
+                    "conservamos los tres hashes que tomamos entonces, del identificador al azar "
+                    f"de tu navegador (la cookie {DEVICE_COOKIE}), del archivo y de tu correo en "
+                    "su forma básica, aunque borres tu cuenta y sin tu correo en claro, para que "
+                    f"no se repita. La dirección de red de entonces se borra a los {days} días."
+                    if paid
+                    else "Para el primer informe completo gratis: un identificador al azar de tu "
+                    f"navegador (una cookie llamada {DEVICE_COOKIE}, que guardamos solo como "
+                    "hash), el SHA-256 del archivo, un SHA-256 de tu correo en su forma básica "
+                    "(en minúsculas, sin lo que va tras un «+» y, en Gmail, sin puntos) y la "
+                    "dirección de red, para que el mismo navegador, archivo o buzón lo reciba una "
+                    f"sola vez. La dirección se borra a los {days} días; los tres hashes se "
+                    "quedan, aunque borres tu cuenta y sin tu correo en claro, para que la oferta "
+                    "no se repita."
+                ),
                 *(
                     (
-                        "Si un navegador o una red compartidos frenan ese informe gratis y "
+                        (
+                            "Si verificaste una tarjeta para recibir ese informe gratis cuando lo "
+                            "ofrecíamos: conservamos solo un SHA-256 de la huella que Stripe da a "
+                            "esa tarjeta (nunca su número) y, hasta que borres tu cuenta, la "
+                            "fecha. Ya no verificamos tarjetas para eso."
+                        )
+                        if paid
+                        else "Si un navegador o una red compartidos frenan ese informe gratis y "
                         "verificas una tarjeta para recibirlo: Stripe revisa la tarjeta sin "
                         "cobrarla y nosotros guardamos solo un SHA-256 de la huella que Stripe da"
                         " a esa tarjeta (nunca su número) y la fecha, para que cada tarjeta dé un"
@@ -1361,13 +1457,22 @@ def privacy_text(ctx: LegalContext, locale: str = "es") -> LegalText:
                     if ctx.card_payments
                     else ()
                 ),
-                "Para «Invita a un colega»: el enlace de invitación de cada cuenta y, para una "
-                "cuenta creada con el enlace de alguien, la fecha, si ya recibió su primer "
-                "informe gratis y el hash del identificador de su navegador, para rechazar "
-                "autoinvitaciones. Quien invita ve solo cifras, nunca quién se unió. Se borra "
-                "con la cuenta de quien invita; si se borra la cuenta que se unió, su fila "
-                "guarda solo las fechas y el resultado bajo un id al azar (sin correo ni hash "
-                "del navegador), para que el límite mensual se mantenga.",
+                (
+                    "Si tuviste un enlace de invitación, o te uniste con el de un colega, cuando "
+                    "había invitaciones: ese enlace y, para la cuenta que se unió, la fecha, si ya "
+                    "recibió su primer informe y el hash del identificador de su navegador. Quien "
+                    "invitó ve solo cifras, nunca quién se unió. Se borra con la cuenta de quien "
+                    "invitó; si se borra la cuenta que se unió, su fila guarda solo las fechas y "
+                    "el resultado bajo un id al azar (sin correo ni hash del navegador)."
+                    if paid
+                    else "Para «Invita a un colega»: el enlace de invitación de cada cuenta y, "
+                    "para una cuenta creada con el enlace de alguien, la fecha, si ya recibió su "
+                    "primer informe gratis y el hash del identificador de su navegador, para "
+                    "rechazar autoinvitaciones. Quien invita ve solo cifras, nunca quién se unió. "
+                    "Se borra con la cuenta de quien invita; si se borra la cuenta que se unió, "
+                    "su fila guarda solo las fechas y el resultado bajo un id al azar (sin correo "
+                    "ni hash del navegador), para que el límite mensual se mantenga."
+                ),
                 "Si creas una clave de recuperación: solo su SHA-256 y la fecha en que la "
                 "creaste, nunca la clave, que te mostramos una sola vez. Se borra al usarla, "
                 "al crear una nueva o con tu cuenta.",
@@ -1393,8 +1498,9 @@ def privacy_text(ctx: LegalContext, locale: str = "es") -> LegalText:
                 "dispositivo y la hora del último, nunca el correo ni la contraseña escritos; "
                 "guardamos las últimas 20 líneas, las borramos a los 90 días y con tu cuenta. "
                 "Y, por cada navegador con el que abres «Mi cuenta», la hora de su última visita "
-                "y su etiqueta, guardado bajo el hash de su marca aleatoria (la misma cookie del "
-                "informe gratis), solo para avisarte de lo que pasó desde entonces; se borra a "
+                "y su etiqueta, guardado bajo el hash de su marca aleatoria ("
+                + (f"la cookie {DEVICE_COOKIE}" if paid else "la misma cookie del informe gratis")
+                + "), solo para avisarte de lo que pasó desde entonces; se borra a "
                 "los 90 días sin visitas o con tu cuenta.",
                 "Para saber cuál de nuestros propios enlaces trae visitas: las visitas a la "
                 "página principal y a las de cada caso se cuentan por día, idioma y etiqueta "
@@ -1413,8 +1519,7 @@ def privacy_text(ctx: LegalContext, locale: str = "es") -> LegalText:
                 "terceros en estas páginas. Las únicas cookies son nuestras: una que mantiene "
                 "tu sesión iniciada, otra que protege los formularios de acceso, otra que "
                 "durante una hora como máximo recuerda a qué informe volver después de entrar, "
-                "otra que "
-                "marca tu navegador para el primer informe gratis, otra que recuerda cuál de "
+                "otra que " + _device_cookie_use(ctx, "es") + ", otra que recuerda cuál de "
                 "nuestros enlaces te trajo y otra con la fecha de hoy para contar una visita "
                 "una sola vez; ninguna te sigue por otros "
                 "sitios ni se comparte. Nuestro propio "
@@ -1442,9 +1547,15 @@ def privacy_text(ctx: LegalContext, locale: str = "es") -> LegalText:
                 "comprobable.",
                 f"La IP de la subida se borra en esa misma limpieza a los {days} días, también "
                 "en las auditorías pagadas.",
-                "Auditorías pagadas y tu primer informe completo gratis: se conservan para que "
-                "puedas volver a abrir el informe, hasta que los borres con tu cuenta o nos "
-                "pidas borrarlos.",
+                (
+                    "Auditorías pagadas, y el primer informe completo gratis de quien lo recibió "
+                    "cuando lo ofrecíamos: se conservan para que puedas volver a abrir el informe, "
+                    "hasta que los borres con tu cuenta o nos pidas borrarlos."
+                    if paid
+                    else "Auditorías pagadas y tu primer informe completo gratis: se conservan "
+                    "para que puedas volver a abrir el informe, hasta que los borres con tu "
+                    "cuenta o nos pidas borrarlos."
+                ),
                 "Página de verificación: pública hasta que la retires desde tu informe o nos pidas"
                 " retirarla o borrar la auditoría. Si la publicaste, la limpieza conserva solo lo "
                 "que muestra esa página (clase, estado de cada dimensión, hashes, fechas, número "
@@ -1505,6 +1616,7 @@ def _privacy_pt(
     limit: int,
     warning: str | None,
 ) -> LegalText:
+    paid = _paid_offer(ctx)
     sections: tuple[tuple[str, tuple[str, ...]], ...] = (
         ("Responsável", (f"{name}, {address}. Contato: {contact}{_tel(ctx, 'pt')}.",)),
         (
@@ -1533,33 +1645,60 @@ def _privacy_pt(
                 "Para contar as prévias gratuitas: qual conta usou cada uma, quando e de qual "
                 f"endereço de rede. O endereço é eliminado com os demais dados após {days} dias.",
                 *_anon_keeps(ctx, "pt", days),
-                "Para o primeiro relatório completo gratuito: um identificador aleatório do "
-                f"navegador (cookie {DEVICE_COOKIE}, guardado por nós apenas como hash), "
-                "o SHA-256 do arquivo, um SHA-256 do seu e-mail na forma básica (em "
-                "minúsculas, sem o que vem após um '+' e, no Gmail, sem pontos) e o endereço "
-                "de rede, para que o mesmo navegador, arquivo ou caixa de entrada o receba uma "
-                f"só vez. O endereço é eliminado após {days} dias; os três hashes permanecem, "
-                "mesmo se você excluir a conta e sem o seu e-mail em texto claro, para que a "
-                "oferta não se repita.",
+                (
+                    "Se você recebeu o primeiro relatório completo gratuito quando o "
+                    "oferecíamos: guardamos os três hashes registrados então, do identificador "
+                    f"aleatório do navegador (cookie {DEVICE_COOKIE}), do arquivo e do seu "
+                    "e-mail na forma básica, mesmo se você excluir a conta e sem o seu e-mail em "
+                    "texto claro, para que ele não se repita. O endereço de rede daquela época é "
+                    f"eliminado após {days} dias."
+                    if paid
+                    else "Para o primeiro relatório completo gratuito: um identificador aleatório "
+                    f"do navegador (cookie {DEVICE_COOKIE}, guardado por nós apenas como hash), "
+                    "o SHA-256 do arquivo, um SHA-256 do seu e-mail na forma básica (em "
+                    "minúsculas, sem o que vem após um '+' e, no Gmail, sem pontos) e o endereço "
+                    "de rede, para que o mesmo navegador, arquivo ou caixa de entrada o receba "
+                    f"uma só vez. O endereço é eliminado após {days} dias; os três hashes "
+                    "permanecem, mesmo se você excluir a conta e sem o seu e-mail em texto claro, "
+                    "para que a oferta não se repita."
+                ),
                 *(
                     (
-                        "Se um navegador ou uma rede compartilhados impedirem esse relatório "
-                        "grátis e você verificar um cartão para recebê-lo: o Stripe confere o "
-                        "cartão sem cobrar, e guardamos só um SHA-256 da impressão que o Stripe "
-                        "dá a esse cartão (nunca o número) e a data, para que cada cartão dê um "
-                        "único relatório grátis. A data é eliminada com a sua conta; o hash "
-                        "permanece, como os três acima.",
+                        (
+                            "Se você verificou um cartão para receber esse relatório grátis "
+                            "quando o oferecíamos: guardamos só um SHA-256 da impressão que o "
+                            "Stripe dá a esse cartão (nunca o número) e, até a exclusão da sua "
+                            "conta, a data. Não verificamos mais cartões para isso."
+                        )
+                        if paid
+                        else "Se um navegador ou uma rede compartilhados impedirem esse "
+                        "relatório grátis e você verificar um cartão para recebê-lo: o Stripe "
+                        "confere o cartão sem cobrar, e guardamos só um SHA-256 da impressão que "
+                        "o Stripe dá a esse cartão (nunca o número) e a data, para que cada "
+                        "cartão dê um único relatório grátis. A data é eliminada com a sua "
+                        "conta; o hash permanece, como os três acima.",
                     )
                     if ctx.card_payments
                     else ()
                 ),
-                "Para 'Indique um colega': o link de indicação de cada conta e, para uma conta "
-                "criada por esse link, a data, se seu primeiro relatório gratuito foi concluído "
-                "e o hash do identificador do navegador, para impedir autoindicações. Quem "
-                "indicou vê apenas totais, não a identidade de quem entrou. Esses dados são "
-                "eliminados com a conta de quem indicou. Se a conta indicada for excluída, "
-                "seu registro conserva apenas datas e resultado sob um identificador aleatório "
-                "(sem e-mail nem hash do navegador), para manter o limite mensal.",
+                (
+                    "Se você teve um link de indicação, ou entrou pelo de um colega, quando havia "
+                    "indicações: esse link e, para a conta que entrou, a data, se seu primeiro "
+                    "relatório foi concluído e o hash do identificador do navegador. Quem indicou "
+                    "vê apenas totais, não a identidade de quem entrou. Esses dados são "
+                    "eliminados com a conta de quem indicou. Se a conta indicada for excluída, "
+                    "seu registro conserva apenas datas e resultado sob um identificador "
+                    "aleatório (sem e-mail nem hash do navegador)."
+                    if paid
+                    else "Para 'Indique um colega': o link de indicação de cada conta e, para uma "
+                    "conta criada por esse link, a data, se seu primeiro relatório gratuito foi "
+                    "concluído e o hash do identificador do navegador, para impedir "
+                    "autoindicações. Quem indicou vê apenas totais, não a identidade de quem "
+                    "entrou. Esses dados são eliminados com a conta de quem indicou. Se a conta "
+                    "indicada for excluída, seu registro conserva apenas datas e resultado sob um "
+                    "identificador aleatório (sem e-mail nem hash do navegador), para manter o "
+                    "limite mensal."
+                ),
                 "Se você cria uma chave de recuperação: apenas seu SHA-256 e a data de criação, "
                 "nunca a chave, mostrada uma única vez. Ela é eliminada quando usada, substituída "
                 "ou quando a conta é excluída.",
@@ -1600,8 +1739,9 @@ def _privacy_pt(
                 "Não pedimos nem guardamos chaves de corretora ou bolsa, senhas de conta de "
                 "trading ou dados de cartão. Estas páginas não usam analítica ou publicidade "
                 "de terceiros. Os cookies são nossos: sessão, proteção dos formulários, "
-                "relatório ao qual voltar depois de entrar (por até uma hora), marca "
-                "do navegador para a oferta gratuita, origem de nossos próprios links e data "
+                "relatório ao qual voltar depois de entrar (por até uma hora), "
+                + _device_cookie_use(ctx, "pt")
+                + ", origem de nossos próprios links e data "
                 "para contar uma visita por dia. Nenhum acompanha você entre sites ou é "
                 "compartilhado. Nosso registro de acessos guarda apenas o endereço abreviado "
                 "(sem a parte final do IP) e nunca o segredo do link do relatório. O provedor "
@@ -1626,8 +1766,15 @@ def _privacy_pt(
                 "a classe e a data, para que o registro ainda possa ser conferido.",
                 f"O IP do envio é eliminado nessa mesma limpeza após {days} dias, inclusive "
                 "nas auditorias pagas.",
-                "Auditorias pagas e primeiro relatório completo gratuito: guardados para que "
-                "você possa reabri-los até excluí-los com sua conta ou solicitar a exclusão.",
+                (
+                    "Auditorias pagas, e o primeiro relatório completo gratuito de quem o recebeu "
+                    "quando o oferecíamos: guardados para que você possa reabri-los até excluí-los "
+                    "com sua conta ou solicitar a exclusão."
+                    if paid
+                    else "Auditorias pagas e primeiro relatório completo gratuito: guardados para "
+                    "que você possa reabri-los até excluí-los com sua conta ou solicitar a "
+                    "exclusão."
+                ),
                 "Página de verificação: pública até você retirá-la no relatório, pedir sua "
                 "retirada ou pedir a exclusão da auditoria. Se publicada, a limpeza conserva "
                 "apenas o que ela mostra (classe, estados das dimensões, hashes, datas, "

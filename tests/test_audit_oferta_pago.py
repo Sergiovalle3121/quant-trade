@@ -29,7 +29,7 @@ pytest.importorskip("sqlalchemy")
 from fastapi.testclient import TestClient  # noqa: E402
 from test_audit_email_routes_ui import _outbox_id  # noqa: E402
 
-from quant_trade.audit import account_pages, accounts, mail, paid_offer  # noqa: E402
+from quant_trade.audit import account_pages, accounts, legal, mail, paid_offer  # noqa: E402
 from quant_trade.audit.accounts import (  # noqa: E402
     ANON_PREVIEWS_PER_IPV4_PER_DAY,
     ANON_PREVIEWS_PER_NETWORK_PER_DAY,
@@ -91,6 +91,17 @@ PROMISES: dict[str, tuple[str, ...]] = {
 }
 #: The words "7 days" and "the terms" every refund line carries.
 REFUND_WORDS = {"es": ("7 días", "términos"), "en": ("7 days", "terms"), "pt": ("7 dias", "termos")}
+#: How the paid offer words what the free first report kept for the accounts that
+#: had it: in the same sentence, always in the past.
+LEGACY = {"es": "cuando lo ofrecíamos", "en": "when we offered it", "pt": "quando o oferecíamos"}
+#: The new "My account" words of the paid offer.
+ACCOUNT_PAID_KEYS = (
+    "email_unverified_status_paid",
+    "email_delivery_unavailable_paid",
+    "email_checkout_required_paid",
+    "email_verified_paid",
+    "welcome_confirm_paid",
+)
 
 
 def _settings(tmp_path: Path, **extra: object) -> AuditSettings:
@@ -186,6 +197,20 @@ def _visible(page: str) -> str:
 
 def _promises(text: str, locale: str) -> list[str]:
     return [m.group(0) for p in PROMISES[locale] for m in re.finditer(p, text, re.I)]
+
+
+def _offered(text: str, locale: str) -> list[str]:
+    """The sentences of ``text`` that name a free full report as an offer: every one
+    but those that say what it kept back when we offered it (:data:`LEGACY`)."""
+    found: list[str] = []
+    for pattern in PROMISES[locale]:
+        for match in re.finditer(pattern, text, re.I):
+            start = text.rfind(".", 0, match.start()) + 1
+            end = text.find(".", match.end())
+            sentence = text[start : end if end >= 0 else len(text)].strip()
+            if LEGACY[locale] not in sentence:
+                found.append(sentence)
+    return found
 
 
 def _escaped(text: str) -> str:
@@ -444,7 +469,9 @@ def test_the_account_first_page_names_the_price_not_a_free_report(tmp_path: Path
 # -- 4. Every public page, the forms and both reports --------------------------------------
 def _pages(app: Any, store: Store) -> dict[str, list[tuple[str, str]]]:
     """Every sitemap page plus sign-up, the upload form, a preview made without an
-    account and a locked report on an account, by language: (path, html)."""
+    account, a locked report on an account, "My account" before and after
+    confirming the e-mail and the payment refused before it ("checkout <locale>"),
+    by language: (path, html)."""
     reader = _browser(app, "198.51.100.30")
     out: dict[str, list[tuple[str, str]]] = {locale: [] for locale in LOCALES}
     for paths in PUBLIC_PAGES:
@@ -469,28 +496,69 @@ def _pages(app: Any, store: Store) -> dict[str, list[tuple[str, str]]]:
             answer = client.get(path)
             assert answer.status_code == 200, path
             out[locale].append((path, answer.text))
+    for locale in LOCALES:
+        path = account_pages.path("account", locale)
+        answer = owner.get(path)
+        assert answer.status_code == 200, path
+        out[locale].append((path, answer.text))
+        refused = owner.post(
+            f"/audits/{mine_id}/checkout?token={mine_token}&lang={locale}",
+            data={"plan": "single", "billing_country": "MX", "final_sale": "yes"},
+            follow_redirects=False,
+        )
+        assert refused.status_code == 403, refused.text[:300]
+        out[locale].append((f"checkout {locale}", refused.text))
+    duena = store.find_account("duena@example.com")
+    assert duena is not None
+    _confirm(app, store, duena.id)
+    for locale in LOCALES:
+        path = f"{account_pages.path('account', locale)}?done=email_verified"
+        answer = owner.get(path)
+        assert answer.status_code == 200, path
+        out[locale].append((path, answer.text))
     return out
 
 
 def test_no_page_promises_a_free_full_report(tmp_path: Path) -> None:
-    """Every page in es/en/pt under the paid offer. The privacy policy is the one
-    exception: it still lists what the free first report kept for the accounts
-    that had it (its hashes stay), never as an offer; it is checked on its own."""
+    """Every page in es/en/pt under the paid offer, "My account" and the payment
+    refused before confirming the e-mail included. The privacy policy and "My
+    account" still say what the free first report kept for the accounts that had
+    it (its hashes stay), only in the past: never as an offer (:func:`_offered`)."""
     app, store, settings = _app(tmp_path)
-    privacy = {path for paths in LEGAL_PATHS.values() for path in (paths["privacy"],)}
+    past = {paths["privacy"] for paths in LEGAL_PATHS.values()}
+    for locale in LOCALES:
+        account = account_pages.path("account", locale)
+        past |= {account, f"{account}?done=email_verified"}
     offer = paid_offer.offer_of(settings)
     for locale, pages in _pages(app, store).items():
         for path, page in pages:
-            if path in privacy:
-                continue
             text = _visible(page)
-            assert _promises(text, locale) == [], (path, _promises(text, locale))
+            if path in past:
+                assert _offered(text, locale) == [], (path, _offered(text, locale))
+            else:
+                assert _promises(text, locale) == [], (path, _promises(text, locale))
         # The upload form and sign-up say the paid offer itself.
         form = dict(pages)[FORMS[locale]]
         assert _escaped(paid_offer.paid_text(locale, offer)) in form
         signup = dict(pages)[f"{SIGNUP[locale]}?next={FORMS[locale]}"]
         assert _escaped(paid_offer.next_report_text(locale, offer)) in signup
         assert _escaped(paid_offer.signup_lead(locale, offer, FREE_PREVIEWS_PER_MONTH)) in signup
+        # "My account" and the refused payment say what confirming the e-mail does now.
+        copy = account_pages.COPY[locale]
+        account = account_pages.path("account", locale)
+        before = dict(pages)[account]
+        after = dict(pages)[f"{account}?done=email_verified"]
+        refused = dict(pages)[f"checkout {locale}"]
+        assert _escaped(copy["email_unverified_status_paid"]) in before
+        assert _escaped(copy["email_unverified_status"]) not in before
+        assert _escaped(copy["email_verified_paid"]) in after
+        assert _escaped(copy["email_verified"]) not in after
+        assert _escaped(copy["email_checkout_required_paid"]) in refused
+        assert _escaped(copy["email_checkout_required"]) not in refused
+        stores = copy["stores_paid"].format(days=settings.retention_days)
+        for item in stores.split("|"):
+            assert _escaped(item) in before, item
+        assert _escaped(copy["stores"].format(days=settings.retention_days)) not in before
 
 
 def test_every_rewritten_sentence_still_exists_with_the_free_first_report(
@@ -530,10 +598,12 @@ def test_the_refund_shows_on_prices_questions_terms_and_the_boxes(
     assert f"<summary>{_escaped(question)}</summary>" in home
     assert _escaped(refund) in home
 
-    legal = terms_text(_context(settings, locale), locale)
-    price_lines = dict(legal.sections)[PRICE_SECTION[locale]]
+    sold = terms_text(_context(settings, locale), locale)
+    price_lines = dict(sold.sections)[PRICE_SECTION[locale]]
     refund_line = next(line for line in price_lines if days in line)
     assert "soporte@example.com" in refund_line and "Stripe" in refund_line
+    # A single credit bought from "My account" (whose box names the 7 days) is covered.
+    assert SINGLE_CREDIT[locale] in refund_line and SINGLE_CREDIT[locale] in answer
     assert REFUND_ENDS[locale] in refund_line
     assert not any(FINAL_SALE[locale] in line for line in price_lines)
 
@@ -547,6 +617,7 @@ def test_the_refund_shows_on_prices_questions_terms_and_the_boxes(
 
 
 LABELS_FOR: dict[str, dict[str, str]] = {locale: LABELS[locale] for locale in LOCALES}
+SINGLE_CREDIT = {"es": "crédito suelto", "en": "single credit", "pt": "crédito avulso"}
 PRICE_SECTION = {"es": "Precio y pago", "en": "Price and payment", "pt": "Preço e pagamento"}
 REFUND_ENDS = {
     "es": "Esto no limita los derechos que te conceda la ley aplicable.",
@@ -634,6 +705,55 @@ def test_the_privacy_policy_says_what_an_upload_without_an_account_keeps(
     assert len(welcome) == 1 and welcome_words in welcome[0] and "SHA-256" in welcome[0]
     assert kept(anon_preview=False) == []
     assert find_claims(paid[0]) == [] and find_claims(welcome[0]) == []
+    # The day's network count is not deleted with the report: only by the purge.
+    for line in (paid[0], welcome[0]):
+        assert NETWORK_HASH[locale] in line, line
+
+
+NETWORK_HASH = {
+    "es": "el hash de la red, a los 30 días",
+    "en": "the network hash, after 30 days",
+    "pt": "o hash da rede, após 30 dias",
+}
+INVITES_PAST = {
+    "es": "cuando había invitaciones",
+    "en": "when there were invites",
+    "pt": "quando havia indicações",
+}
+INVITES_NOW = {
+    "es": "Para «Invita a un colega»",
+    "en": "For 'Invite a colleague'",
+    "pt": "Para 'Indique",
+}
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+def test_the_privacy_policy_says_the_free_report_only_in_the_past(
+    tmp_path: Path, locale: str
+) -> None:
+    """Under the paid offer nothing takes the free report's marks, opens a card
+    check or records an invite: the policy says what they kept only of the accounts
+    that had them, and the browser mark by what it does now."""
+    settings = _settings(tmp_path)
+    for card in (True, False):
+        for anon in (True, False):
+            ctx = _context(settings, locale, card_payments=card, anon_preview=anon)
+            lines = [line for _, part in privacy_text(ctx, locale).sections for line in part]
+            whole = " ".join(lines)
+            assert _offered(whole, locale) == [], _offered(whole, locale)
+            # The free report, its retention and, with card payments, the card check.
+            assert sum(LEGACY[locale] in line for line in lines) == (3 if card else 2)
+            assert INVITES_PAST[locale] in whole and INVITES_NOW[locale] not in whole
+            use = legal._device_cookie_use(ctx, locale)
+            assert use in whole and ("account" in use or "conta" in use or "cuenta" in use)
+            assert ("sin cuenta" in use or "without an account" in use or "sem conta" in use) == (
+                anon
+            )
+            assert all(find_claims(line) == [] for line in lines)
+            welcome = privacy_text(replace(ctx, welcome_full_report=True), locale)
+            said = " ".join(" ".join(part) for _, part in welcome.sections)
+            assert LEGACY[locale] not in said and INVITES_NOW[locale] in said
+            assert legal._device_cookie_use(replace(ctx, welcome_full_report=True), locale) in said
 
 
 # -- 7. The words themselves ----------------------------------------------------------------
@@ -665,12 +785,13 @@ def test_every_new_text_passes_the_guard_and_names_no_endorsement() -> None:
         texts += [
             account_pages.COPY[locale][key]
             for key in (
-                "welcome_confirm_paid",
+                *ACCOUNT_PAID_KEYS,
                 "buy_final_sale",
                 "buy_final_sale_note",
                 "buy_final_sale_needed",
             )
         ]
+        texts += account_pages.COPY[locale]["stores_paid"].format(days=30).split("|")
         texts += [LABELS_FOR[locale][key] for key in ("final_sale", "pay_secure")]
     for text in texts:
         assert find_claims(text) == [], text
@@ -679,6 +800,68 @@ def test_every_new_text_passes_the_guard_and_names_no_endorsement() -> None:
     for locale in LOCALES:
         text = paid_offer.paid_text(locale, offers[0])
         assert "USD 29" in text and "7" in text and "A" in text and "D" in text
+    # One name for the red flags in each language, the "create your account" page too.
+    for locale, other in (("es", "señales de alerta"), ("pt", "bandeiras vermelhas")):
+        copy = paid_offer.words(locale)
+        said = [value for value in copy.values() if isinstance(value, str)]
+        said += paid_offer.gate_text(locale, offers[0], FREE_PREVIEWS_PER_MONTH)
+        assert not any(other in text for text in said), locale
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+def test_my_account_words_under_the_paid_offer(locale: str) -> None:
+    """The e-mail card, the notices and "What we keep" of the paid offer: confirming
+    unlocks the purchases only, and the free first report is said in the past."""
+    copy = account_pages.COPY[locale]
+    for key in ACCOUNT_PAID_KEYS:
+        assert _promises(copy[key], locale) == [], key
+        assert find_claims(copy[key]) == [], key
+    # The notice after sign-up says the e-mail must be confirmed to pay.
+    assert {"es": "para pagar", "en": "to pay", "pt": "para pagar"}[locale] in copy[
+        "welcome_confirm_paid"
+    ]
+    items, paid = copy["stores"].split("|"), copy["stores_paid"].split("|")
+    assert len(items) == len(paid)
+    assert sum(old != new for old, new in zip(items, paid, strict=True)) == 3
+    stores = copy["stores_paid"].format(days=30)
+    assert _offered(stores, locale) == [] and LEGACY[locale] in stores
+    assert _promises(copy["stores"].format(days=30), locale)  # the welcome list, as it was
+
+    def card(**extra: Any) -> str:
+        values: dict[str, Any] = {
+            "verified": False,
+            "pending": "",
+            "delivery_ready": False,
+            "verification_required": True,
+        }
+        values.update(extra)
+        return account_pages._email_status_card(copy, locale, "csrf", **values)
+
+    paid_card = card(paid=True)
+    for key in ("email_unverified_status_paid", "email_delivery_unavailable_paid"):
+        assert _escaped(copy[key]) in paid_card, key
+    assert _promises(_visible(paid_card), locale) == []
+    welcome_card = card()
+    for key in ("email_unverified_status", "email_delivery_unavailable"):
+        assert _escaped(copy[key]) in welcome_card, key
+
+
+def test_the_questions_page_rewrites_the_retention_answer_in_agreement(
+    tmp_path: Path,
+) -> None:
+    app, _store, _ = _app(tmp_path)
+    client = _browser(app)
+    said = {
+        "es": "Las pagadas se conservan hasta que las borres",
+        "en": "Paid audits are kept until you delete them",
+        "pt": "As pagas ficam até você excluí-las",
+    }
+    wrong = {"es": "se conservan hasta que los borres", "pt": "ficam até você excluí-los"}
+    for locale in LOCALES:
+        text = _visible(client.get(FAQ_PATH[locale]).text)
+        assert said[locale] in text, locale
+        if locale in wrong:
+            assert wrong[locale] not in text, locale
 
 
 def test_the_price_comes_from_the_settings(tmp_path: Path) -> None:

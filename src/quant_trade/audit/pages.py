@@ -4573,7 +4573,8 @@ def _guide_offer(
     one per e-mail, browser and file, and a monthly share per network). Without
     a free report the block says the full report is paid, next to the free
     previews, and links the prices; with its price (``paid_offer.Offer``) it says
-    the paid offer first: the free preview, the price and the 7-day refund. A file
+    the paid offer instead: the free preview, the price, the 7-day refund and the
+    account's monthly previews. A file
     that only goes next to a report (the optimisation XML,
     ``field == "optimization"``) says so, and in free mode drops "you only need
     the file".
@@ -4589,10 +4590,15 @@ def _guide_offer(
     elif offer == "free":
         # The line under the button already says every report is free.
         contents = report_contents(locale, "")
+    elif terms.price_usd > 0:
+        # The paid offer already says the full report is paid: only the account's
+        # monthly previews are added, not the guide's own "is paid" sentence.
+        monthly = paid_offer.words(locale)["account_previews"].format(
+            n=accounts.FREE_PREVIEWS_PER_MONTH
+        )
+        contents = f"{paid_offer.paid_text(locale, terms)} {monthly}"
     else:
         contents = words["paid_terms"].format(n=accounts.FREE_PREVIEWS_PER_MONTH)
-        if terms.price_usd > 0:
-            contents = f"{paid_offer.paid_text(locale, terms)} {contents}"
     lines = [contents]
     note = offer_text(offer, locale, email_verification=email_verification)
     if guide.field == "optimization":

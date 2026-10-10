@@ -3258,7 +3258,10 @@ an account never changes what a report says.
     and, only with the free first report on, the file's SHA-256 (under the
     paid offer `welcome_pending.file_sha256` is stored empty: nothing would
     ever check it); and a hash of the network per day for the daily count.
-    All of it goes with the report or at the retention purge.
+    All of it goes with the report or at the retention purge, except the
+    network's daily count (`free_claims` `anon:ip:*`), which only the purge
+    removes (`Store.delete_audit` leaves it, so deleting a report does not
+    give its network a preview back); the policy says so.
     - The welcome box's promise (`anon_preview_box`) cannot know whether the
       inbox already had its free report: the address is only known on
       signing up, and the notice afterwards (`welcome_refused_email`) says
@@ -3298,8 +3301,14 @@ an account never changes what a report says.
     made without an account says «Crea tu cuenta y ábrelo completo por USD
     29» with the refund (`paid_offer.anon_box_text`); another browser with
     the link gets the usual box. The notice after signing up with a
-    confirmation pending is `welcome_confirm_paid` (only the link, nothing
-    opens). The other public pages (articles and their closing calls, the
+    confirmation pending is `welcome_confirm_paid` (the link, and that
+    confirming is needed to pay; nothing opens). "My account" takes the offer
+    too (`account_page(offer=...)`): its e-mail card says confirming unlocks
+    the purchases (`email_unverified_status_paid`,
+    `email_delivery_unavailable_paid`), the confirmed notice names no rewards
+    (`email_verified_paid`) and "What we keep" is `stores_paid`; a payment
+    tried before confirming answers `email_checkout_required_paid`. The other
+    public pages (articles and their closing calls, the
     audience pages, the examples, the tools, the calculators and the figure
     reader) keep their copy and are served through `web._offered`, which
     swaps each sentence that promised the free first report
@@ -3307,12 +3316,18 @@ an account never changes what a report says.
     descriptions and the JSON-LD) for the paid one. With the free first
     report on, nothing is rewritten: a test renders every sitemap page with
     it on and checks that each pattern still finds its sentence, and another
-    renders every page, sign-up, the form and both kinds of report with the
-    paid offer and finds no promise of a free full report
+    renders every page, sign-up, the form, both kinds of report, "My account"
+    before and after confirming and the refused payment with the paid offer
+    and finds no promise of a free full report
     (`tests/test_audit_oferta_pago.py`).
-  - The privacy policy keeps listing what the free first report kept (its
-    hashes stay for the accounts that had it), worded as a data description,
-    not an offer.
+  - The privacy policy and "What we keep" say what the free first report,
+    its card check and the invites kept only of the accounts that had them,
+    in the past ("cuando lo ofrecíamos", "when we offered it", "quando o
+    oferecíamos"; "cuando había invitaciones"): their hashes stay. The
+    browser mark (`rigor_device`) is described by what it does now: the
+    browser that uploaded a preview without an account, and the notice of
+    visits to "My account" (`legal._device_cookie_use`). The test allows a
+    free report only in a sentence that carries that past marker.
 - **Free first full report** (`AUDIT_WELCOME_FULL_REPORT=true`, the default
   `accounts.WELCOME_FULL_REPORT = True`;
   `WELCOME_REPORTS_PER_IP_PER_MONTH = 3` per IPv6 /64,
@@ -4113,7 +4128,8 @@ the new page up with no further change.
 ### Terms and privacy
 
 A 7-day refund (Sergio's decision, 2026-10-09, replacing "all sales are
-final" of 2026-09-28; `legal._refund`, ES/EN/PT): if a paid report is no use,
+final" of 2026-09-28; `legal._refund`, ES/EN/PT): if a paid report, or a
+single credit bought from "My account", is no use,
 the buyer writes to the support contact within `paid_offer.REFUND_DAYS` (7)
 days of the payment, with the report's or the purchase's id, and gets the
 full amount back. A pack with no credit used in those 7 days is refunded in

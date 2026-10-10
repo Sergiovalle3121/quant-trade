@@ -2628,13 +2628,10 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         "passkey_full",
     )
 
-    def _offer() -> str:
-        """What a new visitor gets for a first file: every full report free (free
-        mode), the free first full report with an account, or neither."""
-        return paid_offer.offer_kind(cfg)
-
     def _offer_terms() -> paid_offer.Offer:
-        """The offer with its price, for the pages that word it (``paid_offer``)."""
+        """The offer with its price, for the pages that word it (``paid_offer``):
+        ``kind`` says what a new visitor gets for a first file, every full report
+        free (free mode), the free first full report with an account, or neither."""
         return paid_offer.offer_of(cfg)
 
     def _offered(page: str, locale: str) -> str:
@@ -3910,6 +3907,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                     email_pending=db.pending_email_change(account.id, now),
                     email_delivery_ready=cfg.email_delivery_ready,
                     email_verification_required=cfg.email_verification_required,
+                    offer=_offer_terms().kind,
                     free_mode=cfg.free_mode,
                     price_cents=cfg.price_usd_cents,
                     pack_price_cents=cfg.pack_price_usd_cents,
@@ -7607,12 +7605,13 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 or buyer_session[0].id != account_id
                 or not db.email_verified(account_id)
             ):
-                return _html_error(
-                    request,
-                    403,
-                    account_pages.COPY[locale]["email_checkout_required"],
-                    locale,
+                # Under the paid offer confirming opens no free report: only the payment.
+                required = (
+                    "email_checkout_required_paid"
+                    if _offer_terms().paid
+                    else "email_checkout_required"
                 )
+                return _html_error(request, 403, account_pages.COPY[locale][required], locale)
         if final_sale != "yes":
             final_sale_needed = {
                 "es": "Marca la casilla de los términos de compra para pagar.",

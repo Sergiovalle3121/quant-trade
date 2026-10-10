@@ -26,6 +26,27 @@ PATHS_PT: dict[str, str] = {
     "reset": "/pt/redefinir",
 }
 
+#: "O que guardamos" under the paid offer (``account_pages`` builds
+#: ``stores_paid`` from ``stores``): each key starts the item it replaces.
+STORES_PAID_PT: dict[str, str] = {
+    "Seus relatórios e os arquivos que você envia.": (
+        "Seus relatórios e os arquivos que você envia. Das prévias apagamos arquivos e "
+        "relatório após {days} dias (fica só a impressão digital); os relatórios completos "
+        "ficam para você continuar abrindo."
+    ),
+    "Uma marca aleatória do seu navegador e a impressão digital do arquivo": (
+        "Se você recebeu o primeiro relatório grátis quando o oferecíamos: a marca aleatória do "
+        "seu navegador e a impressão digital do arquivo daquela época, que ficam mesmo se você "
+        "apagar a conta, sem o seu e-mail."
+    ),
+    "Se você entrou pelo link de um colega": (
+        "Se você entrou pelo link de um colega ou alguém entrou pelo seu quando havia "
+        "indicações: a data, se já houve o primeiro relatório e uma marca aleatória do "
+        "navegador (um hash). Ninguém vê quem entrou. É apagado com a conta de quem convidou; "
+        "se quem entrou apagar a sua, ficam só a data e o resultado, sem nada seu."
+    ),
+}
+
 COPY_PT: dict[str, str] = {
     "eyebrow": "Sua conta",
     "signup_title": "Crie sua conta",
@@ -117,7 +138,7 @@ COPY_PT: dict[str, str] = {
     ),
     "welcome_confirm_paid": (
         "Conta criada. Enviamos um link para confirmar o seu e-mail (se não o vir, confira a "
-        "pasta de spam). Você já pode enviar o seu arquivo."
+        "pasta de spam): é preciso confirmá-lo para pagar. Você já pode enviar o seu arquivo."
     ),
     "welcome_confirm_guides": "Enquanto o e-mail chega, exporte o seu arquivo",
     "next_title": "Como continua",
@@ -421,6 +442,12 @@ COPY_PT: dict[str, str] = {
         "O envio de e-mails não está disponível agora. O primeiro relatório completo "
         "gratuito, as compras e os créditos por indicações exigem e-mail confirmado."
     ),
+    "email_unverified_status_paid": (
+        "Seu e-mail ainda não foi confirmado. Confirme-o para liberar as compras."
+    ),
+    "email_delivery_unavailable_paid": (
+        "O envio de e-mails não está disponível agora. As compras exigem e-mail confirmado."
+    ),
     "email_request_button": "Enviar link de confirmação",
     "email_pending_note": (
         "Troca pendente para {email}. Continue entrando com o e-mail atual até abrir o "
@@ -431,6 +458,7 @@ COPY_PT: dict[str, str] = {
     ),
     "email_pending": ("A troca está pendente. Abra o link enviado ao novo e-mail para concluí-la."),
     "email_verified": "E-mail confirmado. Você já pode usar compras e recompensas disponíveis.",
+    "email_verified_paid": "E-mail confirmado. Você já pode usar as compras disponíveis.",
     "email_verified_signin": "E-mail confirmado. Entre.",
     "email_verified_report": (
         "E-mail confirmado. Seu relatório já está completo, com o PDF: ele está na sua lista de "
@@ -443,6 +471,7 @@ COPY_PT: dict[str, str] = {
         "Confirme seu e-mail em Minha conta antes de pagar. A confirmação também "
         "libera seu primeiro relatório completo gratuito."
     ),
+    "email_checkout_required_paid": "Confirme seu e-mail em Minha conta antes de pagar.",
     "email_now": "Você entra com {email}. Depois da troca, você entra com o e-mail novo.",
     "email_new": "E-mail novo",
     "email_again": "Repita o e-mail novo",

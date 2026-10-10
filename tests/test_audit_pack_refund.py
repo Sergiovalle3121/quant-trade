@@ -1,4 +1,4 @@
-"""The 3-report pack and the no-refund policy, on the landing, the report and the terms."""
+"""The 3-report pack and the 7-day refund, on the landing, the report and the terms."""
 
 from __future__ import annotations
 
@@ -44,11 +44,14 @@ def test_pack_is_on_sale_only_with_codes_and_a_real_discount() -> None:
     assert hidden.pack_price_usd == 0.0
 
 
-def test_landing_shows_the_pack_and_no_refund_promise_when_selling(tmp_path: Path) -> None:
+def test_the_default_landing_shows_the_pack_without_the_refund_line(tmp_path: Path) -> None:
     client = _client(tmp_path, **SELLING)
     es = client.get("/?lang=es").text
     assert "Paquete de 3 informes: USD 69 (USD 23 cada uno)." in es
-    # Sales are final (owner's decision): the landing promises no refund.
+    # The default offer (the free first report, "welcome") keeps its landing as it
+    # was: the 7-day refund line and the question "¿Y si el informe no me sirve?"
+    # come with the paid offer only (tests/test_audit_oferta_pago.py). The terms
+    # state the refund in both (test_terms_state_the_pack_and_the_refund).
     assert "devolvemos" not in es and "reembolso" not in es
     en = client.get("/?lang=en").text
     assert "Pack of 3 reports: USD 69 (USD 23 each)." in en
