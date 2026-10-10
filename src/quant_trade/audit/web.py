@@ -1424,6 +1424,9 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     # The free calculator is a landing of its own: links on X and from creators point at it.
     visit_paths.update({path: loc for loc, path in CALCULATOR_PATH.items()})
     visit_paths.update({path: loc for loc, path in EXAMPLES_PATH.items()})
+    # The figures card and the tools page are free tools too (privacy policy names them).
+    visit_paths.update({path: loc for loc, path in reading.READING_PATH.items()})
+    visit_paths.update({path: loc for loc, path in TOOLS_PATH.items()})
     visit_paths.update({path: loc for loc, path in winrate.WINRATE_PATH.items()})
 
     def _funnel_visit(request: Request, response: Any) -> None:

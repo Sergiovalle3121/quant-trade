@@ -143,6 +143,31 @@ def test_calculator_visits_count_with_their_tag(tmp_path: Path) -> None:
     assert _visits(client) == {("es", "f6"): 1, ("en", ""): 1, ("pt", ""): 1}
 
 
+def test_reader_and_tools_visits_count_with_their_tag(tmp_path: Path) -> None:
+    from quant_trade.audit.reading import READING_PATH
+    from quant_trade.audit.tools_hub import TOOLS_PATH
+
+    client, _ = _client(tmp_path)
+    tagged = _browser(client)
+    assert tagged.get(f"{READING_PATH['es']}?ref=x").cookies.get(funnel.REF_COOKIE) == "x"
+    assert _browser(client).get(READING_PATH["en"]).status_code == 200
+    assert _browser(client).get(TOOLS_PATH["pt"]).status_code == 200
+    assert _browser(client).get(TOOLS_PATH["es"]).status_code == 200
+    assert _visits(client) == {("es", "x"): 1, ("en", ""): 1, ("pt", ""): 1, ("es", ""): 1}
+
+
+@pytest.mark.parametrize(
+    ("locale", "words"),
+    [("es", "herramientas gratis"), ("en", "free tools"), ("pt", "ferramentas grátis")],
+)
+def test_privacy_names_the_free_tools_in_every_language(locale: str, words: str) -> None:
+    from quant_trade.audit.legal import LegalContext, privacy_text
+
+    text = privacy_text(LegalContext(), locale=locale)
+    body = " ".join(paragraph for _, paragraphs in text.sections for paragraph in paragraphs)
+    assert words in body
+
+
 def test_unknown_tags_robots_and_other_pages_do_not_count(tmp_path: Path) -> None:
     client, _ = _client(tmp_path)
     unknown = client.get("/?ref=spam-tag")
