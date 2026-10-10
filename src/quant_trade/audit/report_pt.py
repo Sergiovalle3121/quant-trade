@@ -155,6 +155,23 @@ REPORT: dict[str, Any] = {
             "históricos forem enviados, e a que o erro de amostragem produz."
         ),
         "no_variants_account": "os históricos das demais contas ou sinais não foram enviados",
+        "variance_policy_fund": (
+            "Variância usada: a maior entre a observada nas carteiras, estratégias ou variantes "
+            "avaliadas, quando os seus retornos são enviados como matriz de variantes, e a que "
+            "o erro de amostragem produz."
+        ),
+        "no_variants_fund": (
+            "os retornos das carteiras, estratégias ou variantes avaliadas (a matriz de "
+            "variantes) não foram enviados"
+        ),
+        "flag_trials_below_variants_fund": (
+            "Foram declaradas {n} carteiras, estratégias ou variantes avaliadas, mas a matriz "
+            "de variantes traz {m} colunas de retornos; o número declarado é baixo demais"
+        ),
+        "flag_trials_below_variants_fund_one": (
+            "Foi declarada 1 carteira, estratégia ou variante avaliada, mas a matriz de "
+            "variantes traz {m} colunas de retornos; o número declarado é baixo demais"
+        ),
         "pdf_long": "Baixar o relatório em PDF",
         "pdf_busy": "Gerando seu PDF… (alguns segundos)",
         "pdf_wait": "O PDF leva alguns segundos para ser gerado.",
@@ -420,6 +437,41 @@ REPORT: dict[str, Any] = {
             "E[Sharpe máximo] de tentativas sem habilidade (Bailey e López de Prado); tamanho "
             "mínimo do histórico (Bailey, Borwein, López de Prado e Zhu); desconto de Bonferroni "
             "(Harvey e Liu)"
+        ),
+        "luck_intro_fund": (
+            "Quanto mais carteiras, estratégias ou variantes se avaliam antes de escolher uma, "
+            "mais alto sai o Sharpe da melhor, mesmo que nenhuma tenha vantagem. Aqui colocamos "
+            "o Sharpe deste histórico ao lado do que a pura sorte daria com as carteiras, "
+            "estratégias ou variantes contadas, com a matemática publicada de Bailey e López de "
+            "Prado e de Harvey e Liu. É o mesmo cálculo que decide a dimensão «Número de "
+            "carteiras, estratégias ou variantes avaliadas», dito em números."
+        ),
+        "luck_uncounted_fund": (
+            "O histórico não diz quantas carteiras, estratégias ou variantes foram avaliadas "
+            "antes de escolher esta. A tabela mostra quanto histórico seria necessário conforme "
+            "quantas fossem: pergunte ao gestor. O número é declarado ao enviar o histórico ou "
+            "medido com a matriz de variantes, ou seja, as colunas de retornos das variantes."
+        ),
+        "luck_table_trials_fund": "Carteiras, estratégias ou variantes avaliadas",
+        "luck_narrow_fund": (
+            "O Sharpe de {sharpe} supera o {luck} que {n} carteiras, estratégias ou variantes "
+            "sem habilidade dariam, mas não com a margem que exigimos: a confiança de que não "
+            "seja sorte (DSR) é de {dsr}, e para superar esta dimensão exigimos {need}."
+        ),
+        "luck_beats_fund": (
+            "O Sharpe de {sharpe} supera o {luck} que {n} carteiras, estratégias ou variantes "
+            "sem habilidade dariam."
+        ),
+        "luck_below_fund": (
+            "Com {n} carteiras, estratégias ou variantes, a pura sorte daria um Sharpe de "
+            "{luck}, igual ou maior que o {sharpe} deste histórico."
+        ),
+        "luck_sharpe_fund": (
+            "Sharpe que {n} carteiras, estratégias ou variantes sem habilidade dariam (o do "
+            "histórico: {sharpe})"
+        ),
+        "luck_after_fund": (
+            "Sharpe que sobra após descontar {n} carteiras, estratégias ou variantes (Harvey e Liu)"
         ),
         "luck_table_luck": "Sharpe que a sorte daria",
         "luck_table_years": "Histórico necessário",
@@ -2045,6 +2097,9 @@ REPORT: dict[str, Any] = {
         "floor": "Mínimo por erro de amostragem",
         "observed_across_variants": "Observado nas variantes",
         "observed_across_accounts": "Observado nas demais contas ou sinais",
+        "observed_across_fund_variants": (
+            "Observado nas carteiras, estratégias ou variantes avaliadas"
+        ),
         "sharpe_variance_used": "Variância do Sharpe usada",
         "dependence_ratio": "Aumento da variância por dependência",
         "effective_observations": "Observações efetivas após dependência",
@@ -2274,9 +2329,15 @@ VERDICT: dict[str, Any] = {
             "Não foi declarado quantas configurações foram testadas; o cálculo usa 1, o caso "
             "mais favorável, e a multiplicidade continua sem medição."
         ),
+        "multiplicity.WEAK.fund": (
+            "Com {trials_phrase}, o Sharpe ajustado por esses testes não chega ao limiar: se "
+            "mais carteiras, estratégias ou variantes foram avaliadas, o resultado pode vir de "
+            "escolher a melhor."
+        ),
         "multiplicity.NOT_MEASURED.undeclared.fund": (
-            "Não foi declarado quantos fundos ou estratégias o mesmo gestor administra; o "
-            "cálculo usa 1, o caso mais favorável, e a multiplicidade continua sem medição."
+            "Não foi declarado quantas carteiras, estratégias ou variantes foram avaliadas antes "
+            "de escolher esta; o cálculo usa 1, o caso mais favorável, e a multiplicidade "
+            "continua sem medição."
         ),
         "multiplicity.WEAK.undeclared": (
             "Não foi declarado quantas configurações foram testadas e, mesmo com 1, o caso mais "
@@ -2287,14 +2348,14 @@ VERDICT: dict[str, Any] = {
             "favorável, o resultado não supera o que uma tentativa sem habilidade produziria."
         ),
         "multiplicity.WEAK.undeclared.fund": (
-            "Não foi declarado quantos fundos ou estratégias o mesmo gestor administra e, mesmo "
-            "com 1, o caso mais favorável, o Sharpe ajustado por essas tentativas não chega ao "
-            "limiar."
+            "Não foi declarado quantas carteiras, estratégias ou variantes foram avaliadas antes "
+            "de escolher esta e, mesmo com 1, o caso mais favorável, o Sharpe ajustado por essas "
+            "tentativas não chega ao limiar."
         ),
         "multiplicity.FAIL.undeclared.fund": (
-            "Não foi declarado quantos fundos ou estratégias o mesmo gestor administra e, mesmo "
-            "com 1, o caso mais favorável, o resultado não supera o que uma tentativa sem "
-            "habilidade produziria."
+            "Não foi declarado quantas carteiras, estratégias ou variantes foram avaliadas antes "
+            "de escolher esta e, mesmo com 1, o caso mais favorável, o resultado não supera o "
+            "que uma tentativa sem habilidade produziria."
         ),
         "multiplicity.NOT_MEASURED.undeclared.account": (
             "Não foi declarado quantas contas ou sinais há por trás desta; o cálculo usa 1, o "
@@ -2360,6 +2421,27 @@ VERDICT: dict[str, Any] = {
             "Mesmo descontando as configurações testadas, o resultado continua de pé. Se foram "
             "testadas mais do que as informadas, esta conclusão se enfraquece."
         ),
+        "multiplicity.PASS.fund": (
+            "Mesmo descontando as carteiras, estratégias ou variantes avaliadas, o resultado "
+            "continua de pé. Se foram avaliadas mais do que as informadas, esta conclusão se "
+            "enfraquece."
+        ),
+        "multiplicity.WEAK.fund": (
+            "Parte do resultado pode vir de esta ser a melhor entre várias carteiras, "
+            "estratégias ou variantes avaliadas. Pergunte ao gestor quantas avaliou antes de "
+            "escolher esta, contando as que descartou: um bom histórico entre muitos pesa menos."
+        ),
+        "multiplicity.FAIL.fund": (
+            "Avaliando tantas carteiras, estratégias ou variantes, um resultado assim aparece "
+            "mesmo que nenhuma tenha vantagem real. É o que acontece ao ficar com a melhor "
+            "entre muitas."
+        ),
+        "multiplicity.WEAK.undeclared.fund": (
+            "Mesmo contando uma única carteira, o caso mais favorável, o resultado não basta "
+            "para descartar a sorte. Não foi declarado quantas carteiras, estratégias ou "
+            "variantes foram avaliadas antes de escolher esta: pergunte ao gestor, porque com "
+            "mais de uma a conclusão seria mais fraca."
+        ),
         "multiplicity.WEAK": (
             "Parte do resultado pode vir de escolher a melhor entre muitas configurações. "
             "Pergunte quantas foram testadas e peça o arquivo de otimização."
@@ -2383,9 +2465,9 @@ VERDICT: dict[str, Any] = {
             "passar de B. Ao declarar esse número (mesmo que seja 1), o Rigor pode descontá-lo."
         ),
         "multiplicity.NOT_MEASURED.undeclared.fund": (
-            "Não foi declarado quantos fundos ou estratégias o mesmo gestor administra, então a "
-            "classe não pode passar de B. Ao declarar esse número (mesmo que seja 1), o Rigor "
-            "pode descontá-lo."
+            "Não foi declarado quantas carteiras, estratégias ou variantes foram avaliadas antes "
+            "de escolher esta, então a classe não pode passar de B. Ao declarar esse número "
+            "(mesmo que seja 1) ou enviar a matriz de variantes, o Rigor pode descontá-lo."
         ),
         "multiplicity.FAIL.undeclared": (
             "Mesmo contando uma única configuração, o caso mais favorável, o resultado não "
@@ -2393,9 +2475,10 @@ VERDICT: dict[str, Any] = {
             "testadas: com mais de uma, a conclusão seria ainda mais fraca."
         ),
         "multiplicity.FAIL.undeclared.fund": (
-            "Mesmo contando um único fundo, o caso mais favorável, o resultado não supera o que "
-            "uma tentativa sem vantagem real daria. Não foi declarado quantos fundos ou "
-            "estratégias o gestor administra: com mais de um, a conclusão seria ainda mais fraca."
+            "Mesmo contando uma única carteira, o caso mais favorável, o resultado não supera o "
+            "que uma tentativa sem vantagem real daria. Não foi declarado quantas carteiras, "
+            "estratégias ou variantes foram avaliadas antes de escolher esta: com mais de uma, a "
+            "conclusão seria ainda mais fraca."
         ),
         "multiplicity.NOT_MEASURED.undeclared.account": (
             "Não foi declarado quantas contas ou sinais há por trás desta nem quantas foram "
@@ -2548,7 +2631,7 @@ PLAN: dict[str, Any] = {
     "FUND_TITLES": {
         "out_of_sample": "Descubra desde quando o processo do gestor não muda",
         "costs": "Confirme se os números são líquidos de taxas",
-        "multiplicity": "Pergunte quantos fundos o gestor administra",
+        "multiplicity": "Pergunte quantas carteiras, estratégias ou variantes foram avaliadas",
         "benchmark": "Compare com o índice do fundo",
     },
     "FLAG_HINTS": {

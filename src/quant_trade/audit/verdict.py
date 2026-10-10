@@ -596,9 +596,17 @@ _TEXT: dict[str, dict[str, str]] = {
             "No se declaró cuántas configuraciones se probaron; el cálculo usa 1, el caso "
             "más favorable, y la multiplicidad queda sin medir."
         ),
+        # A fund or portfolio: its trials are the portfolios, strategies or variants
+        # evaluated before this one was chosen.
+        f"{MULTIPLICITY}.WEAK.fund": (
+            "Con {trials_phrase}, el Sharpe ajustado por esas pruebas no llega al umbral: "
+            "si se evaluaron más carteras, estrategias o variantes, el resultado puede venir de "
+            "elegir la mejor."
+        ),
         f"{MULTIPLICITY}.NOT_MEASURED.undeclared.fund": (
-            "No se declaró cuántos fondos o estrategias lleva el mismo gestor; el cálculo "
-            "usa 1, el caso más favorable, y la multiplicidad queda sin medir."
+            "No se declaró cuántas carteras, estrategias o variantes se evaluaron antes de "
+            "elegir esta; el cálculo usa 1, el caso más favorable, y la multiplicidad queda sin "
+            "medir."
         ),
         f"{MULTIPLICITY}.WEAK.undeclared": (
             "No se declaró cuántas configuraciones se probaron, e incluso con 1, el caso más "
@@ -609,13 +617,14 @@ _TEXT: dict[str, dict[str, str]] = {
             "favorable, el resultado no supera lo que produciría un intento sin habilidad."
         ),
         f"{MULTIPLICITY}.WEAK.undeclared.fund": (
-            "No se declaró cuántos fondos o estrategias lleva el mismo gestor, e incluso con 1, "
-            "el caso más favorable, el Sharpe ajustado por esos intentos no llega al umbral."
+            "No se declaró cuántas carteras, estrategias o variantes se evaluaron antes de "
+            "elegir esta, e incluso con 1, el caso más favorable, el Sharpe ajustado por esos "
+            "intentos no llega al umbral."
         ),
         f"{MULTIPLICITY}.FAIL.undeclared.fund": (
-            "No se declaró cuántos fondos o estrategias lleva el mismo gestor, e incluso con 1, "
-            "el caso más favorable, el resultado no supera lo que produciría un intento sin "
-            "habilidad."
+            "No se declaró cuántas carteras, estrategias o variantes se evaluaron antes de "
+            "elegir esta, e incluso con 1, el caso más favorable, el resultado no supera lo que "
+            "produciría un intento sin habilidad."
         ),
         # An account or signal: its trials are the accounts or signals behind it.
         f"{MULTIPLICITY}.NOT_MEASURED.undeclared.account": (
@@ -723,9 +732,15 @@ _TEXT: dict[str, dict[str, str]] = {
             "The number of configurations tried was not declared; the calculation uses 1, "
             "the most favourable case, and multiplicity remains unmeasured."
         ),
+        f"{MULTIPLICITY}.WEAK.fund": (
+            "With {trials_phrase}, the Sharpe adjusted for those trials misses the bar: if "
+            "more portfolios, strategies or variants were evaluated, the result may come from "
+            "picking the best one."
+        ),
         f"{MULTIPLICITY}.NOT_MEASURED.undeclared.fund": (
-            "How many funds or strategies the same manager runs was not declared; the "
-            "calculation uses 1, the most favourable case, and multiplicity remains unmeasured."
+            "How many portfolios, strategies or variants were evaluated before this one was "
+            "chosen was not declared; the calculation uses 1, the most favourable case, and "
+            "multiplicity remains unmeasured."
         ),
         f"{MULTIPLICITY}.WEAK.undeclared": (
             "The number of configurations tried was not declared, and even with 1, the most "
@@ -736,14 +751,14 @@ _TEXT: dict[str, dict[str, str]] = {
             "favourable case, the result does not exceed what an unskilled trial would produce."
         ),
         f"{MULTIPLICITY}.WEAK.undeclared.fund": (
-            "How many funds or strategies the same manager runs was not declared, and even "
-            "with 1, the most favourable case, the Sharpe adjusted for those trials misses the "
-            "bar."
+            "How many portfolios, strategies or variants were evaluated before this one was "
+            "chosen was not declared, and even with 1, the most favourable case, the Sharpe "
+            "adjusted for those trials misses the bar."
         ),
         f"{MULTIPLICITY}.FAIL.undeclared.fund": (
-            "How many funds or strategies the same manager runs was not declared, and even "
-            "with 1, the most favourable case, the result does not exceed what an unskilled "
-            "trial would produce."
+            "How many portfolios, strategies or variants were evaluated before this one was "
+            "chosen was not declared, and even with 1, the most favourable case, the result "
+            "does not exceed what an unskilled trial would produce."
         ),
         f"{MULTIPLICITY}.NOT_MEASURED.undeclared.account": (
             "How many accounts or signals stand behind this one was not declared; the "
@@ -812,6 +827,28 @@ MEANING: dict[str, dict[str, str]] = {
             "Aun descontando las configuraciones probadas, el resultado sigue en pie. "
             "Si se probaron más de las indicadas, esta conclusión se debilita."
         ),
+        # A fund or portfolio: its trials are the portfolios, strategies or variants
+        # evaluated before this one was chosen, and their returns the variants matrix.
+        f"{MULTIPLICITY}.PASS.fund": (
+            "Aun descontando las carteras, estrategias o variantes evaluadas, el resultado "
+            "sigue en pie. Si se evaluaron más de las indicadas, esta conclusión se debilita."
+        ),
+        f"{MULTIPLICITY}.WEAK.fund": (
+            "Parte del resultado puede venir de que esta sea la mejor de varias carteras, "
+            "estrategias o variantes evaluadas. Pregunta al gestor cuántas evaluó antes de "
+            "elegir esta, contando las que descartó: un buen historial entre muchos pesa menos."
+        ),
+        f"{MULTIPLICITY}.FAIL.fund": (
+            "Evaluando tantas carteras, estrategias o variantes, un resultado así aparece "
+            "aunque ninguna tenga ventaja real. Es lo que pasa al quedarse con la mejor de "
+            "muchas."
+        ),
+        f"{MULTIPLICITY}.WEAK.undeclared.fund": (
+            "Aun contando una sola cartera, el caso más favorable, el resultado no basta para "
+            "descartar la suerte. No se declaró cuántas carteras, estrategias o variantes se "
+            "evaluaron antes de elegir esta: pregúntaselo al gestor, porque con más de una la "
+            "conclusión sería más débil."
+        ),
         f"{MULTIPLICITY}.WEAK": (
             "Parte del resultado puede venir de elegir la mejor de muchas configuraciones. "
             "Pregunta cuántas se probaron y pide el archivo de optimización."
@@ -834,8 +871,9 @@ MEANING: dict[str, dict[str, str]] = {
             "de B. Al declararlo (aunque sea 1), Rigor puede descontarlo."
         ),
         f"{MULTIPLICITY}.NOT_MEASURED.undeclared.fund": (
-            "No se declaró cuántos fondos o estrategias lleva el mismo gestor, así que la clase "
-            "no puede pasar de B. Al declararlo (aunque sea 1), Rigor puede descontarlo."
+            "No se declaró cuántas carteras, estrategias o variantes se evaluaron antes de "
+            "elegir esta, así que la clase no puede pasar de B. Al declararlo (aunque sea 1) o "
+            "subir la matriz de variantes, Rigor puede descontarlo."
         ),
         f"{MULTIPLICITY}.FAIL.undeclared": (
             "Incluso contando una sola configuración, el caso más favorable, el resultado no "
@@ -843,9 +881,10 @@ MEANING: dict[str, dict[str, str]] = {
             "con más de una, la conclusión sería aún más débil."
         ),
         f"{MULTIPLICITY}.FAIL.undeclared.fund": (
-            "Incluso contando un solo fondo, el caso más favorable, el resultado no supera lo "
-            "que daría un intento sin ventaja real. No se declaró cuántos fondos o estrategias "
-            "lleva el gestor: con más de uno, la conclusión sería aún más débil."
+            "Incluso contando una sola cartera, el caso más favorable, el resultado no supera lo "
+            "que daría un intento sin ventaja real. No se declaró cuántas carteras, estrategias "
+            "o variantes se evaluaron antes de elegir esta: con más de una, la conclusión sería "
+            "aún más débil."
         ),
         f"{MULTIPLICITY}.NOT_MEASURED.undeclared.account": (
             "No se declaró cuántas cuentas o señales hay detrás de esta ni cuántas se cerraron o "
@@ -959,6 +998,26 @@ MEANING: dict[str, dict[str, str]] = {
             "Even after discounting the configurations tried, the result still stands. "
             "If more were tried than stated, this conclusion weakens."
         ),
+        f"{MULTIPLICITY}.PASS.fund": (
+            "Even after discounting the portfolios, strategies or variants evaluated, the "
+            "result still stands. If more were evaluated than stated, this conclusion weakens."
+        ),
+        f"{MULTIPLICITY}.WEAK.fund": (
+            "Part of the result may come from this being the best of several portfolios, "
+            "strategies or variants evaluated. Ask the manager how many were evaluated before "
+            "this one was chosen, counting the ones discarded: one good record among many "
+            "weighs less."
+        ),
+        f"{MULTIPLICITY}.FAIL.fund": (
+            "Evaluating this many portfolios, strategies or variants produces a result like "
+            "this even when none has a real edge. It is what keeping the best of many does."
+        ),
+        f"{MULTIPLICITY}.WEAK.undeclared.fund": (
+            "Even counting a single portfolio, the most favourable case, the result is not "
+            "enough to rule out luck. How many portfolios, strategies or variants were "
+            "evaluated before this one was chosen was not declared: ask the manager, since with "
+            "more than one the conclusion would be weaker."
+        ),
         f"{MULTIPLICITY}.WEAK": (
             "Part of the result may come from picking the best of many configurations. "
             "Ask how many were tried and request the optimisation file."
@@ -981,8 +1040,9 @@ MEANING: dict[str, dict[str, str]] = {
             "B. Once it is declared (even if it is 1), Rigor can discount it."
         ),
         f"{MULTIPLICITY}.NOT_MEASURED.undeclared.fund": (
-            "How many funds or strategies the same manager runs was not declared, so the class "
-            "cannot go above B. Once it is declared (even if it is 1), Rigor can discount it."
+            "How many portfolios, strategies or variants were evaluated before this one was "
+            "chosen was not declared, so the class cannot go above B. Once it is declared (even "
+            "if it is 1) or the variants matrix is uploaded, Rigor can discount it."
         ),
         f"{MULTIPLICITY}.FAIL.undeclared": (
             "Even counting a single configuration, the most favourable case, the result does "
@@ -990,10 +1050,10 @@ MEANING: dict[str, dict[str, str]] = {
             "declared: with more than one, the conclusion would be weaker still."
         ),
         f"{MULTIPLICITY}.FAIL.undeclared.fund": (
-            "Even counting a single fund, the most favourable case, the result does not exceed "
-            "what a trial with no real edge would give. How many funds or strategies the "
-            "manager runs was not declared: with more than one, the conclusion would be weaker "
-            "still."
+            "Even counting a single portfolio, the most favourable case, the result does not "
+            "exceed what a trial with no real edge would give. How many portfolios, strategies "
+            "or variants were evaluated before this one was chosen was not declared: with more "
+            "than one, the conclusion would be weaker still."
         ),
         f"{MULTIPLICITY}.NOT_MEASURED.undeclared.account": (
             "How many accounts or signals stand behind this one, or were closed or reset, was "
@@ -1174,6 +1234,9 @@ def summary(
             elif account and f"{undeclared}.account" in text:
                 # An account or signal's trials are the accounts or signals behind it.
                 key = f"{undeclared}.account"
+        elif name == MULTIPLICITY and fund and f"{key}.fund" in text:
+            # A fund's trials are the portfolios, strategies or variants evaluated.
+            key = f"{key}.fund"
         template = text.get(key, f"{name}: {dimension.status}.")
         reasons = dimension.reasons_in(locale)
         lines.append(

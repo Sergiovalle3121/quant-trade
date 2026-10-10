@@ -109,6 +109,7 @@ from quant_trade.audit.report import (
     CLASS_LADDER,
     DIMENSION_TITLES,
     DIMENSION_TITLES_ACCOUNT,
+    DIMENSION_TITLES_FUND,
     DISCLAIMER,
     FREQUENCY_TEXT,
     STATUS_TEXT,
@@ -3192,8 +3193,10 @@ def verification_page(
     kind = report_kind(result)
     titles = {
         **DIMENSION_TITLES.get(locale, DIMENSION_TITLES["es"]),
-        # An account or signal names the dimensions by what it counts, as its report does.
+        # An account or signal names the dimensions by what it counts, as its report
+        # does, and so does a fund or portfolio.
         **(DIMENSION_TITLES_ACCOUNT.get(locale, {}) if kind == "account" else {}),
+        **(DIMENSION_TITLES_FUND.get(locale, {}) if kind == "fund" else {}),
     }
     # The same cards as the report's "what it means for you", so a buyer
     # reads one dimension at a time on a phone.
