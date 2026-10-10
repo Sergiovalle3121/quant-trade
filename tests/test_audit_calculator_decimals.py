@@ -283,7 +283,14 @@ def test_examples_link_to_a_calculator_in_the_same_typography(
         assert "," not in urlsplit(href).query
         response = client.get(href)
         assert response.status_code == 200
-        result = compute(value)
+        # The link carries the years as /ejemplos shows them (9 weeks ≈ 0.17), so
+        # the calculator answers for the figures in its own fields.
+        query = {k: v[0] for k, v in parse_qs(urlsplit(href).query).items()}
+        linked = parse_input(query["sharpe"], query["years"], query["trials"])
+        assert isinstance(linked, CalculatorInput)
+        assert linked.sharpe == value.sharpe and linked.trials == value.trials
+        assert linked.years == pytest.approx(value.years, abs=0.005)
+        result = compute(linked)
         section = _result_section(response.text, locale)
         if result["counted"]:
             for shown in _expected_counted(result, locale).values():
