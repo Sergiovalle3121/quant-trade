@@ -10,7 +10,7 @@ import pytest
 
 from quant_trade.audit.analytics import simulate_challenge
 from quant_trade.audit.engine import run_audit
-from quant_trade.audit.firmfit import REPEATS, firm_fit
+from quant_trade.audit.firmfit import REPEATS, firm_fit, shown_share
 from quant_trade.audit.guard import assert_report_clean, find_claims
 from quant_trade.audit.i18n import untranslated
 from quant_trade.audit.prop_presets import PRESETS
@@ -62,8 +62,9 @@ def test_programs_multiply_their_phases_and_rank_by_pass_odds() -> None:
     fit = firm_fit(daily, samples=400, seed=7)
     assert fit["status"] == "MEASURED"
     rows = fit["firms"]
-    passes = [row["pass"]["value"] for row in rows]
-    assert passes == sorted(passes, reverse=True)
+    # Ranked on the figure the table shows (a whole percent), ties by name.
+    shown = [shown_share((row.get("pass_within_best_day") or row["pass"])["value"]) for row in rows]
+    assert shown == sorted(shown, reverse=True)
     assert all(row["firm"] != "Generic" for row in rows)
     ftmo = next(row for row in rows if row["program"] == "FTMO Challenge 2-Step")
     assert ftmo["phases"] == 2 and ftmo["keys"] == ["ftmo-2step-phase1", "ftmo-2step-phase2"]
@@ -152,7 +153,10 @@ def test_no_program_passing_names_what_stops_it() -> None:
 def test_programs_rank_by_the_figure_within_the_best_day_rule() -> None:
     fit = firm_fit(_daily(), samples=400, seed=7)
     figures = [(row.get("pass_within_best_day") or row["pass"])["value"] for row in fit["firms"]]
-    assert figures == sorted(figures, reverse=True)
+    shown = [shown_share(value) for value in figures]
+    # Two rows that read the same figure go by firm, then program, as the intro says.
+    order = [(-s, row["firm"], row["program"]) for row, s in zip(fit["firms"], shown, strict=True)]
+    assert order == sorted(order)
     assert "uniform" not in fit
 
 

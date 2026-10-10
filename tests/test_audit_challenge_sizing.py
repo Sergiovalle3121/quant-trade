@@ -292,9 +292,12 @@ def test_lot_and_account_are_never_invented(no_balance: AuditResult) -> None:
 
 
 def test_account_sizes_are_the_presets_own_dollar_conversions() -> None:
-    assert set(ACCOUNT_SIZES) == {k for k in PRESETS if k.startswith("topstep-")}
+    # Topstep and E8 Markets state their limits in dollars at the size the program names.
+    named = {k for k in PRESETS if k.startswith(("topstep-", "e8-"))}
+    assert set(ACCOUNT_SIZES) == named
     dollars = {"topstep-50k-combine": 2_000, "topstep-100k-combine": 3_000}
     dollars["topstep-150k-combine"] = 4_500
+    dollars |= {"e8-signature-100k": 3_000, "e8-zero-100k": 3_000}
     for key, account in ACCOUNT_SIZES.items():
         assert get_preset(key).max_total_loss * account == pytest.approx(dollars[key])
         assert get_preset(key).program.endswith(f"{int(account) // 1000}K")
@@ -389,7 +392,8 @@ def test_new_sentences_read_in_every_language_and_pass_the_guard(
             shown = localize(text, locale)
             assert shown != text and find_claims(shown) == [], (locale, text)
     keys = [key for key in LABELS["es"] if key.startswith("ch_size_")]
-    assert len(keys) == 21
+    # 22 since ch_size_balance_declared (#489): the 1x line of an account names the file's balance.
+    assert len(keys) == 22
     for locale in LOCALES:
         texts = [LABELS[locale][key] for key in keys] + [LOCKED_GAINS[locale]["ch_size_title"]]
         for key in keys:

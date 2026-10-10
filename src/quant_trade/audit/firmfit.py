@@ -45,8 +45,9 @@ SAMPLES = 2000
 #: ranking says nothing and the report says so in one sentence.
 UNIFORM_HIGH = 0.99
 UNIFORM_LOW = 0.01
-#: Presets that stand for several identical phases in a row.
-REPEATS = {"the5ers-bootcamp-step": 3}
+#: Presets that stand for several identical phases in a row: The5ers Bootcamp,
+#: FXIFY Three Phase and Maven Trading 3-Step each repeat one rule set three times.
+REPEATS = {"the5ers-bootcamp-step": 3, "fxify-3phase-step": 3, "maven-3step-step": 3}
 
 NOTE = (
     "every published preset simulated on the same resampled daily paths, rules as each "
@@ -185,6 +186,18 @@ def _payable(row: dict[str, Any]) -> float:
     """The figure that matters for getting paid: within the best-day rule when
     the firm has one."""
     return float((row.get("pass_within_best_day") or row["pass"])["value"])
+
+
+def shown_share(value: float) -> float:
+    """``value`` as the firm table writes it: a whole percent, with everything at or
+    above 99 % shown as "≥99%" and everything above 0 up to 1 % as "≤1%"
+    (``report._firm_pct``). Rows are ranked on this, so two rows that read the same
+    figure go by name, as the table's introduction says."""
+    if value >= 0.99:
+        return 0.99
+    if 0 < value <= 0.01:
+        return 0.01
+    return round(value * 100) / 100
 
 
 def _program(results: list[tuple[str, dict[str, Any]]]) -> dict[str, Any]:
@@ -376,7 +389,7 @@ def firm_fit(
         {**_program(results), **({"market": marked[name]} if name in marked else {})}
         for name, results in programs.items()
     ]
-    rows.sort(key=lambda row: (-_payable(row), row["firm"], row["program"]))
+    rows.sort(key=lambda row: (-shown_share(_payable(row)), row["firm"], row["program"]))
     out: dict[str, Any] = {
         "status": "MEASURED",
         "note": NOTE,
@@ -473,5 +486,6 @@ __all__ = [
     "program_pass",
     "rules_of",
     "scenario_columns",
+    "shown_share",
     "symbol_venues",
 ]

@@ -102,7 +102,7 @@ from quant_trade.audit.portuguese import (
     link_locale,
 )
 from quant_trade.audit.pricing import PRICING_COPY, PRICING_PATH, offer_text, usd
-from quant_trade.audit.prop_presets import AS_OF, DEFAULT_PRESET, PRESETS, preset_label
+from quant_trade.audit.prop_presets import DEFAULT_PRESET, PRESETS, preset_label
 from quant_trade.audit.public_card import PublicClaim
 from quant_trade.audit.redflags import FLAG_TITLES
 from quant_trade.audit.report import (
@@ -331,7 +331,7 @@ _COPY: dict[str, dict[str, Any]] = {
         ),
         "initial_balance": "Balance inicial (si el informe no lo indica)",
         "challenge": "Reto de prop firm a simular",
-        "challenge_help": "Reglas leídas en la web oficial de cada firma el {as_of}. "
+        "challenge_help": "Reglas leídas en la web oficial de cada firma {when}. "
         "El informe cita la fuente; confirma las reglas con la firma antes de pagar su reto.",
         "trades": "Operaciones cerradas (CSV, opcional)",
         "trades_help": (
@@ -660,7 +660,7 @@ _COPY: dict[str, dict[str, Any]] = {
         ),
         "initial_balance": "Starting balance (if the report does not state it)",
         "challenge": "Prop-firm challenge to simulate",
-        "challenge_help": "Rules read on each firm's official site on {as_of}. "
+        "challenge_help": "Rules read on each firm's official site {when}. "
         "The report cites the source; confirm the rules with the firm before paying for its "
         "challenge.",
         "trades": "Closed trades (CSV, optional)",
@@ -1112,7 +1112,7 @@ _UI: dict[str, dict[str, Any]] = {
             "Banderas rojas y huellas de tus archivos",
         ],
         "full_items": [
-            "Simulación del reto que elijas de {firms}, con sus reglas publicadas",
+            "Tu reto de {firms}, simulado con sus reglas publicadas",
             "Cuánto costo aguanta antes de quedar en pérdida",
             "Riesgo remuestreado a un año y el capital que pide",
             "Las preguntas que deja abiertas: qué archivo responde cada una o qué preguntar al "
@@ -1951,8 +1951,8 @@ AUDIENCES: dict[str, dict[str, Any]] = {
                 "Vas a pagar un reto de prop firm",
                 "Una mala racha puede tumbar la cuenta aunque la estrategia funcione.",
                 "tu backtest o tu historial y el reto que quieres simular.",
-                "con qué frecuencia tocarías la pérdida diaria o la total en {presets} retos de "
-                "FTMO, FundedNext, The5ers y Topstep, remuestreando tu propio historial.",
+                "con qué frecuencia tocarías la pérdida diaria o la total en los retos de las "
+                "firmas que lleva el simulador, remuestreando tu propio historial.",
                 "",
             ),
             (
@@ -2009,8 +2009,8 @@ AUDIENCES: dict[str, dict[str, Any]] = {
                 "You are about to pay for a prop-firm challenge",
                 "One bad streak can end the account even when the strategy works.",
                 "your backtest or history and the challenge you want to simulate.",
-                "how often you would hit the daily or total loss limit in {presets} FTMO, "
-                "FundedNext, The5ers and Topstep challenges, resampling your own history.",
+                "how often you would hit the daily or total loss limit in the challenges of "
+                "the firms the simulator carries, resampling your own history.",
                 "",
             ),
             (
@@ -2169,16 +2169,10 @@ def _how_html(copy: dict[str, Any], locale: str, offer: paid_offer.Offer | None 
     )
 
 
-def _firm_names(locale: str) -> str:
-    """The firms whose published challenge rules the simulator carries, in words."""
-    names = sorted({rules.firm for rules in PRESETS.values() if rules.firm != "Generic"})
-    joiner = {"es": " o ", "en": " or ", "pt": " ou "}[locale]
-    return names[0] if len(names) == 1 else ", ".join(names[:-1]) + joiner + names[-1]
-
-
 def _full_items(locale: str) -> list[str]:
-    """What the full report adds, as the price card lists it (``_UI['full_items']``)."""
-    firms = _firm_names(locale)
+    """What the full report adds, as the price card lists it (``_UI['full_items']``):
+    "your challenge of A, B or C", every firm with published rules from A to Z."""
+    firms = challenge.firm_names(locale, "or")
     return [item.format(firms=firms) for item in _UI[locale]["full_items"]]
 
 
@@ -2644,7 +2638,7 @@ def _upload_form(
             "<select name='challenge'>"
             + _preset_options(locale, values.get("challenge", DEFAULT_PRESET))
             + "</select>",
-            copy["challenge_help"].format(as_of=_plain_date(AS_OF, locale)),
+            copy["challenge_help"].format(when=_rules_read_on(locale)),
         )
         + "</div></details>"
         + "<div class='form-grid'>"
@@ -3073,6 +3067,20 @@ def _plain_date(stamp: str, locale: str) -> str:
     if locale in ("es", "pt"):
         return f"{when.day} {month} {when.year}"
     return f"{month} {when.day}, {when.year}"
+
+
+def _rules_read_on(locale: str) -> str:
+    """When the firms' published rules were read: on one day, or between the first
+    and the last reading date of the presets."""
+    dates = sorted({r.as_of for r in PRESETS.values() if r.source_url.startswith("https://")})
+    first, last = _plain_date(dates[0], locale), _plain_date(dates[-1], locale)
+    if first == last:
+        return {"es": f"el {first}", "en": f"on {first}", "pt": f"em {first}"}[locale]
+    return {
+        "es": f"entre el {first} y el {last}",
+        "en": f"between {first} and {last}",
+        "pt": f"entre {first} e {last}",
+    }[locale]
 
 
 def _utc_time(stamp: str, locale: str) -> str:
@@ -4949,6 +4957,7 @@ def article_page(article: Article, *, locale: str = "es", base_url: str = "") ->
         sections.insert(2, (heading, table))
     if article.key == CHALLENGE_ARTICLE_KEY:
         heading, text_, label = CHALLENGE_ARTICLE_COPY[locale]
+        text_ = text_.format(firms=challenge.firm_names(locale))
         link = (
             f"<p><a class='link-more' href='{_e(challenge.challenge_url(locale))}' "
             f"data-challenge-calculator>{_e(label)}{icon('arrow')}</a></p>"
@@ -5020,31 +5029,31 @@ def article_page(article: Article, *, locale: str = "es", base_url: str = "") ->
 
 
 #: The prop-firm article opens the challenge calculator with its own section,
-#: after the worked example: (heading, text, link label).
+#: after the worked example: (heading, text, link label); ``{firms}`` is every
+#: firm with published rules (``challenge.firm_names``).
 CHALLENGE_ARTICLE_KEY = "cuantos-intentos-reto-prop-firm"
 CHALLENGE_ARTICLE_COPY: dict[str, tuple[str, str, str]] = {
     "es": (
         "La misma cuenta con las reglas de una firma",
         "La calculadora de reto hace esta cuenta con tus cifras declaradas (% de aciertos, "
-        "ganancia y pérdida medias y operaciones por día) y las reglas publicadas de FTMO, "
-        "FundedNext, The5ers y Topstep, con el mismo simulador del informe. Es gratis y no pide "
-        "registro ni archivo.",
+        "ganancia y pérdida medias y operaciones por día) y las reglas publicadas de "
+        "{firms}, con el mismo simulador del informe. Es gratis y no pide registro ni "
+        "archivo.",
         "Abrir la calculadora de reto",
     ),
     "en": (
         "The same calculation with a firm's rules",
         "The challenge calculator runs this calculation with your declared figures (win rate, "
-        "average win and loss and trades per day) and the published rules of FTMO, FundedNext, "
-        "The5ers and Topstep, with the report's own simulator. It is free and needs no signup "
-        "or file.",
+        "average win and loss and trades per day) and the published rules of {firms}, with "
+        "the report's own simulator. It is free and needs no signup or file.",
         "Open the challenge calculator",
     ),
     "pt": (
         "A mesma conta com as regras de uma empresa",
         "A calculadora de desafio faz esta conta com os seus números declarados (taxa de "
-        "acerto, ganho e perda médios e operações por dia) e as regras publicadas da FTMO, "
-        "FundedNext, The5ers e Topstep, com o mesmo simulador do relatório. É grátis e não pede "
-        "cadastro nem arquivo.",
+        "acerto, ganho e perda médios e operações por dia) e as regras publicadas da "
+        "{firms}, com o mesmo simulador do relatório. É grátis e não pede cadastro nem "
+        "arquivo.",
         "Abrir a calculadora de desafio",
     ),
 }
@@ -5074,10 +5083,19 @@ def audience_page(
     copy = _COPY[locale]
     words = AUDIENCE_COPY[locale]
     text = audience.text[locale]
+    # The firms a text names, from the presets: ``{firms}`` every one of them,
+    # ``{firms_short}`` three and how many others (for a description with a limit).
+    fill = {
+        "presets": FIRM_CHALLENGES,
+        "programs": FIRM_PROGRAMS,
+        "firms": challenge.firm_names(locale),
+        "firms_short": challenge.firms_short(locale),
+    }
+    summary = text.summary.format(**fill)
     title = f"{text.seo_title or text.title} · {BRAND}"
     meta = _public_meta(
         title,
-        text.seo_description or text.summary,
+        (text.seo_description or text.summary).format(**fill),
         locale,
         audience_url(audience.slug, locale),
         base_url,
@@ -5103,8 +5121,7 @@ def audience_page(
         else words["price_text"].format(price=price_usd, pack=pack_price_usd or price_usd * 3)
     )
     faq = "".join(
-        f"<details><summary>{_e(q)}</summary>"
-        f"<p>{_e(a.format(presets=FIRM_CHALLENGES, programs=FIRM_PROGRAMS))}</p></details>"
+        f"<details><summary>{_e(q)}</summary><p>{_e(a.format(**fill))}</p></details>"
         for q, a in text.faq
     )
     others = "".join(
@@ -5161,7 +5178,7 @@ def audience_page(
         alternates, locale
     )
     body = (
-        _page_hero(words["eyebrow"], text.title, text.summary, crumbs)
+        _page_hero(words["eyebrow"], text.title, summary, crumbs)
         + "<div class='paper page-main'><div class='wrap'>"
         + _doc(
             [

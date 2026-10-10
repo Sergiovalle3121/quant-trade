@@ -2427,6 +2427,329 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
         "Source for the target and consistency rule: {url}",
         "Fuente del objetivo y de la regla de consistencia: {url}",
     ),
+    # Notes of the firms read on 2026-10-10 (prop_presets._NEW_FIRM_PRESETS).
+    (
+        "each of phases 1-3",
+        "cada una de las fases 1-3",
+    ),
+    (
+        (
+            "Daily loss: 5 % of the higher of the opening balance or equity, reset at 00:00 "
+            "platform time (UTC+3); the 3 % daily loss add-on, not simulated here, has no "
+            "minimum trading days."
+        ),
+        (
+            "Pérdida diaria: 5 % del mayor entre el balance y la equity de apertura, que se "
+            "reinicia a las 00:00 hora de la plataforma (UTC+3); el complemento de pérdida "
+            "diaria del 3 %, que aquí no se simula, no tiene mínimo de días operados."
+        ),
+    ),
+    (
+        (
+            "FundingPips' help pages say both that the evaluation has no news trading "
+            "restrictions and that trading news on purpose is prohibited in the evaluation "
+            "and in the master phase ({url}); not simulated."
+        ),
+        (
+            "Las páginas de ayuda de FundingPips dicen a la vez que la evaluación no tiene "
+            "restricciones para operar noticias y que operar noticias a propósito está "
+            "prohibido en la evaluación y en la fase master ({url}); no se simula."
+        ),
+    ),
+    (
+        "No time limit on either phase.",
+        "Sin límite de tiempo en ninguna de las dos fases.",
+    ),
+    (
+        (
+            "Daily loss: {value} % of the higher of the opening balance or opening equity "
+            "of the day."
+        ),
+        "Pérdida diaria: {value} % del mayor entre el balance y la equity de apertura del día.",
+    ),
+    (
+        (
+            "No minimum trading days on the current rules; accounts bought before them "
+            "follow the Legacy Rules ({url})."
+        ),
+        (
+            "Sin mínimo de días operados con las reglas actuales; las cuentas compradas "
+            "antes siguen las Legacy Rules ({url})."
+        ),
+    ),
+    (
+        (
+            "Simulated with the 80 % split, which asks for 1 minimum trading day; the 95 % "
+            "split asks instead for 3 days each with a gain of at least 0.5 % of the "
+            "starting account size, which the simulator does not model."
+        ),
+        (
+            "Se simula con el reparto del 80 %, que pide 1 día operado como mínimo; el "
+            "reparto del 95 % pide en su lugar 3 días con una ganancia de al menos el 0,5 % "
+            "del tamaño inicial de la cuenta cada uno, algo que el simulador no modela."
+        ),
+    ),
+    (
+        (
+            "Simulated with the 3 % daily loss configuration (a 2 % one is also sold): 3 % "
+            "of the higher of the balance or equity at the start of the day."
+        ),
+        (
+            "Se simula con la configuración de pérdida diaria del 3 % (también se vende una "
+            "del 2 %): 3 % del mayor entre el balance y la equity al empezar el día."
+        ),
+    ),
+    (
+        "No minimum trading days and no time limit.",
+        "Sin mínimo de días operados y sin límite de tiempo.",
+    ),
+    (
+        (
+            "Daily loss: {value} % of the balance at the start of the day (00:00 GMT+3), "
+            "without the floating profit or loss carried from the day before; the breach is "
+            "measured on current equity ({url})."
+        ),
+        (
+            "Pérdida diaria: {value} % del balance al empezar el día (00:00 GMT+3), sin el "
+            "resultado flotante que venga del día anterior; la ruptura se mide sobre la "
+            "equity del momento ({url})."
+        ),
+    ),
+    (
+        (
+            "Daily loss: 3 % of the higher of the balance or equity at the start of the day "
+            "(00:00 GMT+3); the breach is measured on current equity ({url})."
+        ),
+        (
+            "Pérdida diaria: 3 % del mayor entre el balance y la equity al empezar el día "
+            "(00:00 GMT+3); la ruptura se mide sobre la equity del momento ({url})."
+        ),
+    ),
+    (
+        (
+            "A trading day is a day on which a trade is opened and closed; the simulator "
+            "counts every day with a non-zero return, so it may count more days than the "
+            "firm does."
+        ),
+        (
+            "Un día operado es un día en que se abre y se cierra una operación; el "
+            "simulador cuenta todo día con un retorno distinto de cero, así que puede "
+            "contar más días que la firma."
+        ),
+    ),
+    (
+        "The average duration of all trades must be greater than 2 minutes; not simulated.",
+        "La duración media de todas las operaciones debe superar los 2 minutos; no se simula.",
+    ),
+    (
+        "No time limit to reach the targets.",
+        "Sin límite de tiempo para alcanzar los objetivos.",
+    ),
+    (
+        (
+            "The news trading article says trading is free during the evaluation phases and "
+            "the 5-minute window applies to Qualified Analyst accounts ({url}); the plan page "
+            "states the window without that distinction; not simulated."
+        ),
+        (
+            "El artículo sobre noticias dice que en las fases de evaluación se opera "
+            "libremente y que la ventana de 5 minutos se aplica a las cuentas Qualified "
+            "Analyst ({url}); la página del plan indica la ventana sin esa distinción; no se "
+            "simula."
+        ),
+    ),
+    (
+        (
+            "Expert advisors that open trades on their own are prohibited; only "
+            "trade-management EAs are allowed ({url})."
+        ),
+        (
+            "Están prohibidos los asesores expertos (EA) que abren operaciones por su "
+            "cuenta; solo se permiten los que gestionan operaciones ({url})."
+        ),
+    ),
+    (
+        (
+            "A trade opened from 2 minutes before to 2 minutes after a news release must "
+            "last more than 2 minutes to be valid; not simulated."
+        ),
+        (
+            "Una operación abierta desde 2 minutos antes hasta 2 minutos después de una "
+            "noticia debe durar más de 2 minutos para ser válida; no se simula."
+        ),
+    ),
+    (
+        (
+            "Daily loss: {value} % of the balance recorded at 5 PM EST the day before; a "
+            "breach is measured on real-time equity ({url})."
+        ),
+        (
+            "Pérdida diaria: {value} % del balance registrado a las 5 PM EST del día "
+            "anterior; la ruptura se mide sobre la equity en tiempo real ({url})."
+        ),
+    ),
+    (
+        "Static maximum loss: {value} % of the initial balance for the life of the account.",
+        "Pérdida máxima fija: {value} % del balance inicial durante toda la vida de la cuenta.",
+    ),
+    (
+        (
+            "Minimum trading days: the 2 Phase Static (Two Phase Classic) account page says "
+            "4, the general assessment rules say 5 for all accounts ({url}); the simulator "
+            "uses 5 (stricter)."
+        ),
+        (
+            "Días operados mínimos: la página de la cuenta 2 Phase Static (Two Phase "
+            "Classic) dice 4 y las reglas generales de evaluación dicen 5 para todas las "
+            "cuentas ({url}); el simulador usa 5 (más estricto)."
+        ),
+    ),
+    (
+        "No consistency rule in the evaluation phases; no maximum number of trading days.",
+        "Sin regla de consistencia en las fases de evaluación; sin máximo de días operados.",
+    ),
+    (
+        "No maximum number of trading days in any of the three phases.",
+        "Sin máximo de días operados en ninguna de las tres fases.",
+    ),
+    (
+        (
+            "No daily loss limit in the challenge: the daily pause applies only to the "
+            "Performance account ({url})."
+        ),
+        (
+            "Sin límite de pérdida diaria en el reto: la pausa diaria solo se aplica a la "
+            "cuenta Performance ({url})."
+        ),
+    ),
+    (
+        (
+            "The maximum loss trails the highest end-of-day balance, updates once a day at "
+            "market close and locks at the initial balance; a breach is checked whenever "
+            "equity or balance reaches the level ({url})."
+        ),
+        (
+            "La pérdida máxima sigue al mayor balance de cierre diario, se actualiza una "
+            "vez al día al cierre del mercado y se fija en el balance inicial; la ruptura "
+            "cuenta en cuanto la equity o el balance tocan el nivel ({url})."
+        ),
+    ),
+    (
+        "All positions are closed by 23:00 server time: no overnight or weekend holding.",
+        (
+            "Todas las posiciones se cierran antes de las 23:00 hora del servidor: no se "
+            "mantienen de un día a otro ni el fin de semana."
+        ),
+    ),
+    (
+        (
+            "No best-day rule in the challenge; the 35 % best-day rule applies to the "
+            "Performance account's payouts."
+        ),
+        (
+            "Sin regla del mejor día en el reto; la regla del mejor día del 35 % se aplica "
+            "a los pagos de la cuenta Performance."
+        ),
+    ),
+    (
+        (
+            "No minimum trading days and no time limit; at least one trade must be placed "
+            "and closed every 60 days."
+        ),
+        (
+            "Sin mínimo de días operados y sin límite de tiempo; hay que abrir y cerrar al "
+            "menos una operación cada 60 días."
+        ),
+    ),
+    (
+        "Expert advisors are allowed on Classic Markets and not on Futures ({url}).",
+        "Se permiten asesores expertos (EA) en Classic Markets y no en Futures ({url}).",
+    ),
+    (
+        "Expert advisors are not allowed ({url}).",
+        "No se permiten asesores expertos (EA) ({url}).",
+    ),
+    (
+        "No daily loss limit ({url}).",
+        "Sin límite de pérdida diaria ({url}).",
+    ),
+    (
+        (
+            "The maximum loss trails the highest end-of-day balance; the drawdown article "
+            "says it does not lock at the initial balance in the challenge, the product "
+            "overview says it does, and the simulator lets it trail without locking "
+            "(stricter) ({url})."
+        ),
+        (
+            "La pérdida máxima sigue al mayor balance de cierre diario; el artículo del "
+            "drawdown dice que en el reto no se fija en el balance inicial y el resumen de "
+            "productos dice que sí, así que el simulador la deja seguir sin fijarse (más "
+            "estricto) ({url})."
+        ),
+    ),
+    (
+        (
+            "Best-day rule: no day may exceed 40 % of the total profit; checked against the "
+            "profit target when a path reaches it, on daily closes, which is stricter."
+        ),
+        (
+            "Regla del mejor día: ningún día puede superar el 40 % de la ganancia total; se "
+            "comprueba contra el objetivo de beneficio cuando un recorrido llega a él, con "
+            "cierres diarios, lo que es más estricto."
+        ),
+    ),
+    (
+        "All open positions are closed every day at 15:10 CT: no overnight holding.",
+        (
+            "Todas las posiciones abiertas se cierran cada día a las 15:10 CT: no se "
+            "mantienen de un día a otro."
+        ),
+    ),
+    (
+        "No minimum trading days; at least one trade must be placed and closed every 7 days.",
+        "Sin mínimo de días operados; hay que abrir y cerrar al menos una operación cada 7 días.",
+    ),
+    (
+        (
+            "Daily loss: 2 % of the higher of the equity or balance at 00:00 UTC; the "
+            "trading day runs from 00:00 to 23:59 UTC ({url})."
+        ),
+        (
+            "Pérdida diaria: 2 % del mayor entre la equity y el balance a las 00:00 UTC; el "
+            "día de trading va de 00:00 a 23:59 UTC ({url})."
+        ),
+    ),
+    (
+        (
+            "The pages read state no minimum trading days or time limit for the 3-Step; "
+            "accounts may not be dormant for more than 30 calendar days."
+        ),
+        (
+            "Las páginas leídas no indican mínimo de días operados ni límite de tiempo para "
+            "el 3-Step; las cuentas no pueden quedar inactivas más de 30 días naturales."
+        ),
+    ),
+    (
+        (
+            "No trade may be opened or closed from 2 minutes before to 2 minutes after a "
+            "red-folder news release; not simulated."
+        ),
+        (
+            "No se puede abrir ni cerrar ninguna operación desde 2 minutos antes hasta 2 "
+            "minutos después de una noticia «red folder»; no se simula."
+        ),
+    ),
+    (
+        (
+            "A single trade without a stop-loss, or risking more than 2 % (the 3-Step "
+            "drawdown limit), counts as prohibited all-in trading ({url}); not simulated."
+        ),
+        (
+            "Una sola operación sin stop-loss, o que arriesgue más del 2 % (el límite de "
+            "drawdown del 3-Step), cuenta como «all in», que está prohibido ({url}); no se "
+            "simula."
+        ),
+    ),
     # audit/luck.py
     (
         "the curve never falls below a previous high",

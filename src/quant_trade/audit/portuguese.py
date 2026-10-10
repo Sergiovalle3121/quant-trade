@@ -87,7 +87,7 @@ COPY_PT: dict[str, Any] = {
     ),
     "initial_balance": "Saldo inicial (se o relatório não informar)",
     "challenge": "Desafio de prop firm para simular",
-    "challenge_help": "Regras lidas no site oficial de cada firma em {as_of}. "
+    "challenge_help": "Regras lidas no site oficial de cada firma {when}. "
     "O relatório cita a fonte; confirme as regras com a firma antes de pagar o desafio.",
     "trades": "Operações fechadas (CSV, opcional)",
     "trades_help": "entry_time, exit_time, quantity, entry_price, exit_price, side. Até 5 MB.",
@@ -632,8 +632,8 @@ AUDIENCES_PT: dict[str, Any] = {
             "Você vai pagar um desafio de prop firm",
             "Uma sequência ruim pode derrubar a conta mesmo que a estratégia funcione.",
             "o seu backtest ou histórico e o desafio que quer simular.",
-            "com que frequência você tocaria a perda diária ou a total em {presets} desafios da "
-            "FTMO, FundedNext, The5ers e Topstep, reamostrando o seu próprio histórico.",
+            "com que frequência você tocaria a perda diária ou a total nos desafios das "
+            "empresas que o simulador traz, reamostrando o seu próprio histórico.",
             "",
         ),
         (

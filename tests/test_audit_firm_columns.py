@@ -20,7 +20,12 @@ from quant_trade.audit import analytics, engine, firmfit, ownership
 from quant_trade.audit.guard import find_claims
 from quant_trade.audit.i18n import localize, untranslated
 from quant_trade.audit.prop_presets import (
+    ALPHA_ASSETS_URL,
+    E8_OVERVIEW_URL,
+    FUNDINGPIPS_PRO_URL,
+    FUNDINGPIPS_STANDARD_URL,
     MARKETS,
+    MAVEN_FAQ_URL,
     PRESETS,
     TOPSTEP_PRODUCTS_URL,
     ChallengeRules,
@@ -39,6 +44,9 @@ from quant_trade.audit.schema import AuditResult, DeclaredMetadata, build_inputs
 NOW = datetime(2026, 10, 1, tzinfo=UTC)
 LOCALES = ("es", "en", "pt")
 TOPSTEP = ("topstep-50k-combine", "topstep-100k-combine", "topstep-150k-combine")
+#: Every program whose page says it is futures only: Topstep's and E8 Markets' Zero,
+#: in the order the presets list them (the order the left-out rows keep).
+FUTURES_ONLY = (*TOPSTEP, "e8-zero-100k")
 #: Advice the new texts must never give, in any of its languages.
 ADVICE = (
     "aprobar",
@@ -74,6 +82,27 @@ NUMERIC = {
     "topstep-50k-combine": (0.06, None, 0.04, 2, 0.55),
     "topstep-100k-combine": (0.06, None, 0.03, 2, 0.55),
     "topstep-150k-combine": (0.06, None, 0.03, 2, 0.55),
+    "fundingpips-2step-standard-phase1": (0.08, 0.05, 0.10, 3, None),
+    "fundingpips-2step-standard-phase2": (0.05, 0.05, 0.10, 3, None),
+    "fundingpips-2step-pro-phase1": (0.06, 0.03, 0.06, 0, None),
+    "fundingpips-2step-pro-phase2": (0.06, 0.03, 0.06, 0, None),
+    "fundingpips-2step-flex-phase1": (0.10, 0.04, 0.12, 1, None),
+    "fundingpips-2step-flex-phase2": (0.08, 0.04, 0.12, 1, None),
+    "fundingpips-1step-flex": (0.12, 0.03, 0.12, 0, None),
+    "alpha-pro-8-phase1": (0.08, 0.04, 0.08, 3, None),
+    "alpha-pro-8-phase2": (0.05, 0.04, 0.08, 3, None),
+    "alpha-pro-10-phase1": (0.10, 0.05, 0.10, 3, None),
+    "alpha-pro-10-phase2": (0.05, 0.05, 0.10, 3, None),
+    "alpha-pro-6-phase1": (0.06, 0.03, 0.06, 3, None),
+    "alpha-pro-6-phase2": (0.06, 0.03, 0.06, 3, None),
+    "alpha-swing-phase1": (0.10, 0.05, 0.10, 3, None),
+    "alpha-swing-phase2": (0.05, 0.05, 0.10, 3, None),
+    "e8-signature-100k": (0.06, None, 0.03, 0, None),
+    "e8-zero-100k": (0.065, None, 0.03, 0, 0.40),
+    "fxify-2phase-classic-phase1": (0.05, 0.04, 0.10, 5, None),
+    "fxify-2phase-classic-phase2": (0.10, 0.04, 0.10, 5, None),
+    "fxify-3phase-step": (0.05, 0.05, 0.05, 5, None),
+    "maven-3step-step": (0.03, 0.02, 0.03, 0, None),
 }
 
 
@@ -246,7 +275,10 @@ def test_the_rules_line_shows_what_each_program_has(
             phase["daily_loss_basis"] == "start_of_day"
         )
         days = phase["min_trading_days"]
-        assert (labels["ff_rule_days"].format(n=days) in cell) == (days > 0)
+        # One day reads in the singular (FundingPips 2-Step Flex asks for 1).
+        wanted = labels["ff_rule_day"] if days == 1 else labels["ff_rule_days"].format(n=days)
+        assert (wanted in cell) == (days > 0)
+        assert labels["ff_rule_days"].format(n=1) not in cell
         best = phase["best_day_limit"]
         assert (f"{best * 100:g}%" in cell) if best else True
         # A program whose page lists its markets says which, when read and where.
@@ -270,14 +302,37 @@ def test_the_rules_line_shows_what_each_program_has(
 # ------------------------------------------------------------- 3. markets
 
 
-def test_only_topstep_and_the5ers_pages_name_their_markets() -> None:
+def test_only_programs_whose_pages_name_their_markets_have_them() -> None:
     named = {key for key, rules in PRESETS.items() if rules.markets is not None}
+    alpha = {key for key, rules in PRESETS.items() if rules.firm == "Alpha Capital Group"}
+    fundingpips = {key for key, rules in PRESETS.items() if rules.firm == "FundingPips"}
     assert named == {
         *TOPSTEP,
         "the5ers-high-stakes-step1",
         "the5ers-high-stakes-step2",
         "the5ers-hyper-growth",
+        *fundingpips,
+        *alpha,
+        "e8-zero-100k",
+        "maven-3step-step",
     }
+    # Each FundingPips program's own page has the Instruments section ("41
+    # instruments across 5 asset classes"): its markets come from that page.
+    assert len(fundingpips) == 7
+    for key in fundingpips:
+        rules = PRESETS[key]
+        assert rules.markets_source == rules.source_url
+        assert rules.markets == ("fx", "metals", "indices", "energy", "crypto")
+    assert PRESETS["fundingpips-2step-pro-phase1"].markets_source == FUNDINGPIPS_PRO_URL
+    # Each from the page that says so: Alpha's assets list has no crypto.
+    for key in alpha:
+        assert PRESETS[key].markets_source == ALPHA_ASSETS_URL
+        assert "crypto" not in (PRESETS[key].markets or ())
+    assert PRESETS["e8-zero-100k"].markets == ("futures",)
+    assert PRESETS["e8-zero-100k"].markets_source == E8_OVERVIEW_URL
+    assert PRESETS["fundingpips-2step-standard-phase1"].markets_source == FUNDINGPIPS_STANDARD_URL
+    assert PRESETS["maven-3step-step"].markets_source == MAVEN_FAQ_URL
+    assert [key for key in PRESETS if PRESETS[key].markets == ("futures",)] == list(FUTURES_ONLY)
     for key in TOPSTEP:
         rules = PRESETS[key]
         assert rules.markets == ("futures",) and rules.markets_source == TOPSTEP_PRODUCTS_URL
@@ -315,8 +370,8 @@ def test_topstep_goes_last_and_marked_with_a_forex_history() -> None:
     fit = firmfit.firm_fit(_daily(), samples=300, seed=7, symbols=["EURUSD", "GBPUSD"])
     assert fit["history_markets"] == ["fx"]
     rows = fit["firms"]
-    tail = rows[-len(TOPSTEP) :]
-    assert [row["keys"] for row in tail] == [[key] for key in TOPSTEP]
+    tail = rows[-len(FUTURES_ONLY) :]
+    assert [row["keys"] for row in tail] == [[key] for key in FUTURES_ONLY]
     for row in tail:
         assert "pass" not in row and "main_risk" not in row
         assert row["market"] == {
@@ -325,13 +380,14 @@ def test_topstep_goes_last_and_marked_with_a_forex_history() -> None:
             "symbols": ["EURUSD", "GBPUSD"],
             "symbol_count": 2,
             "spot": True,
-            "source_url": TOPSTEP_PRODUCTS_URL,
+            "source_url": PRESETS[row["keys"][0]].markets_source,
             "as_of": PRESETS[row["keys"][0]].markets_as_of,
         }
-    head = rows[: -len(TOPSTEP)]
+    head = rows[: -len(FUTURES_ONLY)]
     assert all(row.get("pass") and not row.get("market") for row in head)
     figures = [(row.get("pass_within_best_day") or row["pass"])["value"] for row in head]
-    assert figures == sorted(figures, reverse=True)
+    shown = [firmfit.shown_share(value) for value in figures]
+    assert shown == sorted(shown, reverse=True)
     # A metal pair is no futures contract either; a symbol the audit cannot place restricts nothing.
     gold = firmfit.firm_fit(_daily(), samples=100, seed=7, symbols=["XAUUSD"])
     assert all(_row(gold, [key]).get("market") for key in TOPSTEP)
@@ -351,7 +407,8 @@ def test_topstep_keeps_its_place_with_a_futures_history() -> None:
         assert row["pass"]["evidence"] == "MEASURED" and "market" not in row
     # The ranking puts Topstep among the others by its figure, not at the end.
     figures = [(row.get("pass_within_best_day") or row["pass"])["value"] for row in plain["firms"]]
-    assert figures == sorted(figures, reverse=True)
+    shown = [firmfit.shown_share(value) for value in figures]
+    assert shown == sorted(shown, reverse=True)
 
 
 @pytest.mark.parametrize("locale", LOCALES)
@@ -360,7 +417,7 @@ def test_the_left_out_row_says_why_and_shows_no_figure(locale: str) -> None:
     fit = firmfit.firm_fit(_daily(), samples=200, seed=7, symbols=["EURUSD", "GBPUSD"])
     page = _firm_fit_html(fit, labels, locale=locale)
     rows = re.findall(r"<tr class='ff-out'>(.*?)</tr>", page, flags=re.S)
-    assert len(rows) == len(TOPSTEP)
+    assert len(rows) == len(FUTURES_ONLY)
     only = labels["ff_market_only"].format(markets=labels["ff_mk_futures"])
     why = labels["ff_market_why_spot"].format(
         history=labels["ff_hist_fx"], symbols="EURUSD, GBPUSD"
@@ -372,7 +429,7 @@ def test_the_left_out_row_says_why_and_shows_no_figure(locale: str) -> None:
         assert reason == f"{only}: {why}; {labels['ff_market_skip']}."
         assert "%" not in reason and "class='val'" not in row
     # The rules line names the page that says so and when it was read.
-    assert f"href='{TOPSTEP_PRODUCTS_URL}'" in page
+    assert f"href='{TOPSTEP_PRODUCTS_URL}'" in page and f"href='{E8_OVERVIEW_URL}'" in page
     assert page.rindex("ff-out") > page.index("<tbody>")
     text = _visible(page)
     assert find_claims(text) == []
@@ -399,8 +456,10 @@ def test_the_signal_sample_puts_topstep_last() -> None:
     assert result.challenge is not None
     fit = result.challenge["firm_fit"]
     assert fit["history_markets"] == ["fx"]
-    assert [row["keys"] for row in fit["firms"][-len(TOPSTEP) :]] == [[k] for k in TOPSTEP]
-    assert all(row["firm"] != "Topstep" for row in fit["firms"][: -len(TOPSTEP)])
+    tail = fit["firms"][-len(FUTURES_ONLY) :]
+    assert [row["keys"] for row in tail] == [[k] for k in FUTURES_ONLY]
+    head = fit["firms"][: -len(FUTURES_ONLY)]
+    assert all(row["keys"][0] not in FUTURES_ONLY for row in head)
     # Its ladder cannot take the cost off a curve with deposits: neither can the table.
     columns = {column["key"]: column for column in fit["scenarios"]}
     assert columns["reference_cost"]["pass"]["evidence"] == "NOT_MEASURED"
