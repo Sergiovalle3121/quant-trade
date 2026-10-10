@@ -105,6 +105,64 @@ has no limit and renders no card. It is the second tool on the free tools page
 "Keep reading" list links back to that page.
 Tests: `tests/test_audit_winrate.py`.
 
+The free challenge calculator (`audit/challenge_calc.py`, rendered by
+`audit/challenge_pages.py`) lives at `/calculadora-reto`,
+`/en/challenge-calculator` and `/pt/calculadora-desafio`, with one page per firm
+that has a published preset (`/ftmo`, `/fundednext`, `/the5ers`, `/topstep`
+under each), all fifteen in the sitemap with the date
+`seo.CHALLENGE_PUBLISHED`. Its GET form takes DECLARED fields: win rate, the
+average win and loss in % of the balance or in R with the risk per trade,
+trades per day, the program (the first preset of each published firm and
+program; a firm page offers only its own) and, optionally, the trades behind
+the win rate and the fee. Decimal commas, spaces and no-break spaces are read;
+a fee or a trade count takes a thousands mark; bad or repeated fields get a
+localized 400, never a 500, and are not echoed back. From those figures it
+builds 10,000 synthetic days (`SYNTHETIC_DAYS`) whose mix is fixed by the
+figures, not drawn: exactly `round(per_day × days)` trades (a fractional trades
+per day gives that many days one more trade), and each day's winners at an even
+quantile of the binomial for its trades, so the win rate and the mean return
+are the declared ones and the seed only shuffles the days (a seed's draw of
+1,000 days had given a declared 55 % as 57.9 % and inflated the headline
+figure). A lower win rate turns some of the same winners into losers, never the
+other way round. A day with trades that nets zero gets `TRADED_FLAT_DAY`, the
+smallest normal float, so the simulator (which counts a day whose return is not
+zero) counts it as a trading day, as a firm does. It then runs the report's own
+simulator on those days:
+`analytics.simulate_challenge` per phase with the preset's rules, 2,000 paths,
+combined by `firmfit.program_outcomes`; neither changes. The page shows the
+chance of reaching every phase's target (and within the best-day rule when the
+firm has one), of hitting the daily or the total limit and of being left
+unfinished, the median business days, the expected attempts (1 ÷ chance) and,
+with a fee, the expected cost per account (fee ÷ chance), the sizing table at
+0.5x, 1x and 2x (the report's logic: daily returns multiplied by the size) and,
+with the trades, the same program at the lower end of the win rate's 95 %
+Wilson interval (`winrate.read`), linked to the win-rate calculator. Results
+are labelled DECLARED (computed from declared figures, never MEASURED: no file
+is seen) or NOT_MEASURED with the reason; the lower bound itself is labelled
+too. A declared fee keeps its cents. The rules table shows each phase; under it
+one source line per page read, naming the programs it covers, with its `as_of`
+date, "Rigor is not affiliated with any firm", and the preset's notes under one
+heading per program, with any web address in a note as a short link. A program
+without a daily limit in its preset reads "not simulated (see the notes)", never
+"no daily limit": the firm's page may still have one that pauses the day. Each
+firm page has its own title and a description that says the tool is
+independent and not affiliated with the firm, all of the firm's programs and
+four questions whose figures are filled from the presets
+(`challenge_calc.firm_faq`: `{rules[key]}`, `{daily[key]}`, `{field[key.name]}`,
+`{horizon}`, with the date read in every answer that cites a rule; a test checks
+each figure against the preset's fields and notes), also as `FAQPage` JSON-LD.
+Every page carries a `WebApplication` with price 0 and Rigor as publisher. The
+figures are kept in no database or file and nothing touches the database, the
+network or the disk; since the form is GET, the server's access log may hold
+the address requested, and the page says so. Results are cached in memory per input
+and each address gets `REQUESTS_PER_HOUR` computations a sliding hour (past it,
+a 429 that keeps the form). Visits count in the in-memory funnel counter like
+the other tools; a shared link carries `ref=reto`. It is the third tool on the
+free tools page and is linked from the prop-firm case page and the article
+"cuantos-intentos-reto-prop-firm". It assumes average-sized wins and losses,
+no costs, slippage or intraday floating loss, and independent trades, and says
+so on the page. Tests: `tests/test_audit_challenge_calculator.py`.
+
 The public name is **Rigor** (the same word in Spanish and English: statistical
 rigor is what the audit sells). It replaced "Contraprueba" on 2026-09-24.
 `seo.BRAND` and `seo.TAGLINE` hold it; it shows in every page head, report
@@ -2817,7 +2875,8 @@ Routes:
 | `GET /terminos`, `GET /terms` | Terms of service (`audit/legal.py`), Spanish and English; either answers `?lang=`. |
 | `GET /privacidad`, `GET /privacy` | Privacy policy, Spanish and English. |
 | `GET /en/terms`, `/en/privacy`, `/pt/terms`, `/pt/privacy` | 301 to the legal page in that language (guessed addresses). |
-| `GET /herramientas` | The free tools page (`/en/tools`, `/pt/ferramentas`; `/tools` and `/pt/tools` redirect there): luck calculator, win-rate calculator, figure reader and report check. |
+| `GET /herramientas` | The free tools page (`/en/tools`, `/pt/ferramentas`; `/tools` and `/pt/tools` redirect there): luck calculator, win-rate calculator, challenge calculator, figure reader and report check. |
+| `GET /calculadora-reto`, `/en/challenge-calculator`, `/pt/calculadora-desafio` | The free prop-firm challenge calculator, and its firm pages under each (`/ftmo`, `/fundednext`, `/the5ers`, `/topstep`). |
 | `GET /en/calculator`, `/reading`, `/en/methodology`, `/en/articles`, `/en/guides`, `/en/sample`, `/en/check`, `/faq`, `/examples` | 301 to the page people meant (`/calculator`, `/en/reading`, `/methodology`, `/articles`, `/guides`, `/sample`, `/check`, `/en/faq`, `/en/examples`). The first two keep the query string. |
 | `POST /webhooks/stripe`, `POST /waitlist`, `GET /health` | Payment confirmation, waiting list, health check. |
 
@@ -5474,6 +5533,112 @@ Offline coverage: `test_audit_institutional_intake.py`,
 Windows commands use `D:\quant-trade\.venv\Scripts\python.exe`, a worktree-local
 `--basetemp`, and exclude `tests/test_audit_pdf*.py` and
 `tests/test_personal_paper*.py` as requested.
+
+### Institutional review offer and sample review (10 October 2026)
+
+`/revision-institucional` (and `/en/institutional-review`,
+`/pt/revisao-institucional`) now states the offer above the request form: a
+standard review from USD 2,500 (one portfolio or return series, one benchmark
+and the declared variants; written report with methodology notes, the full Rigor
+report and its PDF; a 60-minute call and a re-run after 30 days; delivery in 10
+business days from complete data) and an extended review up to USD 4,000
+(several portfolios or universes; attribution to several factors and capacity
+and costs by scenario, both computed apart from the Rigor report with the
+methodology agreed in the quote, since the engine computes neither; a second
+re-run). "Every figure comes from the report" is limited accordingly. Terms: the
+price does not depend on the result; the review is governed by the written quote
+(scope, price, payments, confidentiality, deletion) and the site's terms describe
+the automated report; nothing is published without written permission; 30 days
+after each delivery, or sooner on request, the whole audit is deleted with
+`audit delete <id> --yes` (files, report, private link, publication and the
+issued files, so `/comprobar` no longer recognises its PDF: the page says so and
+tells the client to keep a copy; the quote records the date); the series is
+uploaded with an access code, so the audit is paid and the retention purge of
+unpaid audits does not delete it before that date; 50 % on acceptance and 50 %
+on delivery; a mutual NDA is offered; and it is an independent statistical
+reading of the supplied series, not a verification of how the signal was built
+nor an accounting or regulatory audit. Every price and
+period is a constant in `institutional.py` (`STANDARD_PRICE_USD`,
+`EXTENDED_PRICE_USD`, `DELIVERY_BUSINESS_DAYS`, `CALL_MINUTES`, `RERUN_DAYS`,
+`DELETE_DAYS`, `DEPOSIT_PERCENT`); the copy, the page title and the schema.org
+`Service` read them when the page is built. The confirmation and error pages show
+no offer and stay noindex. Stripe, credits, the USD 29 report and
+`legal.py` are unchanged.
+
+`/revision-institucional/ejemplo` (`/en/institutional-review/sample`,
+`/pt/revisao-institucional/exemplo`) is the sample review
+(`institutional_sample.py`): methodology notes (data source, what was reviewed,
+how it was measured, results with their meaning, the report's six questions,
+factor attribution, what is not measured, what a client receives) over the
+production engine's report of a momentum portfolio: decile 10 of ten portfolios
+sorted on past 12-2 month returns, the ten deciles as the variants file (ten
+MEASURED trials, CSCV), the market as benchmark, declared as a provider's monthly
+return table. `/…/informe` (`/report`, `/relatorio`) is the full report with the
+notes as its first sections (noindex) and `/…/ejemplo.pdf` its PDF (503 without
+WeasyPrint, as the other samples). Every figure in the notes is read from the
+result (`note_figures`, `FIGURE_PATHS`). The information ratio is described as
+the engine computes it: the arithmetic mean of the monthly excess, times 12, over
+the tracking error (not the compound difference shown in the row above); the PBO
+threshold is shown in the PBO's unit (50 %). The engine attributes return to one
+factor only (the benchmark: beta, share explained, alpha with its 95 % range and
+t); with no cash rate (`cash_basis.source` null, as offline) the notes say cash
+stays inside the exposure and the alpha rather than "cash is counted apart".
+Attribution to several factors is labelled as part of the extended review,
+computed apart from the report, with no figures. The report and its PDF show the
+page's word (`REPORT_NAMES`) as the identifier, in the tab title and the head's
+description and preview tags (`show_report_name`, via
+`sample_publication.show_sample_word`, as `/ejemplo` does); the stored id stays
+`check.SAMPLE_AUDIT_ID`, the one `/comprobar` reads. The report uses its fund
+track record template, so the notes say that "fund", "manager" and "real
+history" there refer to the template, not to the data.
+
+The data is synthetic. The Kenneth R. French Data Library files (10 Portfolios
+Formed on Momentum, Fama/French 3 factors, momentum factor) were downloaded on
+2026-10-10: each ends with "Copyright 2026 Eugene F. Fama and Kenneth R.
+French", is built from the CRSP database, and the library's page states no
+licence to copy or redistribute them; this repository also keeps market data out
+of git. No month of that data is stored or shown. The sample's eleven series are
+generated from seed 20261010 (240 month ends, 2006-01 to 2025-12) with each
+decile's alpha, market and momentum loadings and residual volatility, and the
+market's and the momentum factor's moments, set from summary statistics of the
+value-weighted deciles (1963-01 to 2025-12, OLS on the market's excess return and
+the momentum factor), kept as rounded constants. The notes call the series a
+synthetic series that imitates decile 10 and state the simplifications: the
+deciles' residuals are independent of each other, and the market's Student's t
+tails (6 degrees of freedom) and the momentum crash mix were chosen by hand. The
+run is offline (cash taken as zero, which the report states), with a fixed clock
+and id.
+
+Open for the operator (outside this branch, `legal.py`):
+
+- The privacy policy keeps paid audits "until you delete them with your account
+  or ask us to", while the offer deletes the whole audit 30 days after each
+  delivery; it should name the quote's deletion date. The alternative is to keep
+  the issued files' hashes on that deletion so the PDF stays checkable, which
+  needs a store change and a privacy change that says the hashes stay.
+- The privacy policy does not cover the institutional request
+  (`institutional_requests`: name, organisation, email, strategy details and
+  description): what is kept, for how long, and that `audit delete` does not
+  remove it. No purge removes it either.
+- The terms define the service as the automated report at USD 29 per audit,
+  with the 7-day refund (`REFUND_DAYS`) and "a code paid outside the site is
+  refunded through the method you paid with". They need a clause for quoted
+  services: the 50/50 payment, whether the deposit is refundable, the NDA and
+  the deletion date. Until then the page says the written quote governs the
+  review.
+- No code schedules the 30-day deletion: the operator runs `audit delete` by
+  hand on the date in the quote.
+
+Offline coverage: `test_audit_institutional_review_sample.py` (prices from their
+constants, the three languages over HTTP with `find_claims == []` and none of
+"verificado", "certificado", "aprobado", "garantiza", "rentable", the same
+figures in every language, the engine's inputs and every quoted figure equal to
+the result's, the information ratio recomputed from the sample's files, the
+exposure's wording by cash basis, the PBO threshold in percent, the deletion and
+quote terms, the sitemap and its `lastmod`, one-factor attribution only, the
+shown identifier on the report page and the PDF source, the PDF source with
+notes before the report, 503 without a renderer), plus
+`test_audit_institutional_intake.py` and `test_audit_guides_seo.py`.
 
 ### Retail articles and public questions (7 October 2026)
 

@@ -679,7 +679,9 @@ def terms_text(ctx: LegalContext, locale: str = "es") -> LegalText:
                 "Badge and verification page",
                 (
                     "If you publish the verification, the page shows the class, the "
-                    "dimensions, the hashes, the date and a fixed notice; never your files, "
+                    "dimensions, what was audited (a backtest, an account or a fund), the "
+                    "period of the data (first and last date and frequency), the hashes, the "
+                    "date and a fixed notice; never your files, "
                     "trades or description. You may use the badge on your site, Telegram, "
                     "forums or videos, always linked to the verification page. You may not "
                     "present it as a promise of results, as an endorsement of a product, or "
@@ -788,7 +790,9 @@ def terms_text(ctx: LegalContext, locale: str = "es") -> LegalText:
             "Sello y página de verificación",
             (
                 "Si publicas la verificación, la página muestra la clase, las dimensiones, "
-                "los hashes, la fecha y un aviso fijo; nunca tus archivos, operaciones ni "
+                "qué se auditó (un backtest, una cuenta o un fondo), el periodo de los datos "
+                "(primera y última fecha y frecuencia), los hashes, la fecha y un aviso fijo; "
+                "nunca tus archivos, operaciones ni "
                 "descripción. Puedes usar el sello en tu web, Telegram, foros o videos, "
                 "siempre enlazado a la página de verificación. No puedes presentarlo como "
                 "promesa de resultados, como respaldo de un producto ni junto a afirmaciones "
@@ -919,7 +923,9 @@ def _terms_pt(
             "Selo e página de verificação",
             (
                 "Se você publicar a verificação, a página mostra a classe, as dimensões, "
-                "os hashes, a data e um aviso fixo, nunca arquivos, operações ou descrição. "
+                "o que foi auditado (um backtest, uma conta ou um fundo), o período dos dados "
+                "(primeira e última data e frequência), os hashes, a data e um aviso fixo, "
+                "nunca arquivos, operações ou descrição. "
                 "Você pode usar o selo em seu site, Telegram, fóruns ou vídeos, sempre "
                 "ligado à página de verificação. Não pode apresentá-lo como promessa de "
                 "resultado, endosso de um produto ou junto de alegações de rentabilidade; "
@@ -1291,7 +1297,9 @@ def privacy_text(ctx: LegalContext, locale: str = "es") -> LegalText:
                     + "), only to tell you what happened since; it is deleted after 90 "
                     "days without a visit or with your account.",
                     "To know which of our own links brings visitors: visits to the home "
-                    "and case pages are counted per day, language and link tag (such as "
+                    "page, the case pages and the free tools (calculators, figures card, "
+                    "examples and the tools page) are counted per day, language and link "
+                    "tag (such as "
                     "?ref=f4 in a link we posted), with no address; a cookie named "
                     f"{SEEN_COOKIE} holds only today's date so a browser counts once a day. "
                     "When you "
@@ -1347,8 +1355,9 @@ def privacy_text(ctx: LegalContext, locale: str = "es") -> LegalText:
                     ),
                     "Verification page: public until you withdraw it from your report or ask us to"
                     " withdraw it or to delete the audit. If you published it, the clean-up keeps "
-                    "only what that page shows (class, dimension statuses, hashes, dates, trial "
-                    "counts and engine version), so the page and its badge keep working.",
+                    "only what that page shows (class, dimension statuses, what was audited, "
+                    "the period of the data and its frequency, hashes, dates, trial counts and "
+                    "engine version), so the page and its badge keep working.",
                     "Updates list: until you ask to be removed.",
                     "Account: until you delete it from your account page or ask us to. "
                     "Deleting it removes the e-mail, the password hash, the sessions and the "
@@ -1368,7 +1377,8 @@ def privacy_text(ctx: LegalContext, locale: str = "es") -> LegalText:
                         else ""
                     )
                     + " A verification page, only if you publish it, shows the class, the "
-                    "dimensions, the hashes, the date and a fixed notice; never your files, "
+                    "dimensions, what was audited, the period of the data, the hashes, the date "
+                    "and a fixed notice; never your files, "
                     "trades, description or token.",
                     "The data may be hosted outside your country, on the servers of our "
                     "hosting provider.",
@@ -1503,7 +1513,9 @@ def privacy_text(ctx: LegalContext, locale: str = "es") -> LegalText:
                 + "), solo para avisarte de lo que pasó desde entonces; se borra a "
                 "los 90 días sin visitas o con tu cuenta.",
                 "Para saber cuál de nuestros propios enlaces trae visitas: las visitas a la "
-                "página principal y a las de cada caso se cuentan por día, idioma y etiqueta "
+                "página principal, a las de cada caso y a las herramientas gratis (calculadoras, "
+                "tarjeta de cifras, ejemplos y página de herramientas) se cuentan por día, idioma "
+                "y etiqueta "
                 "del enlace (como ?ref=f4 en un enlace que publicamos), sin dirección; una "
                 f"cookie llamada {SEEN_COOKIE} guarda solo la fecha de hoy para contar cada "
                 "navegador una vez al día. Si llegas desde un enlace con etiqueta, una cookie "
@@ -1558,8 +1570,9 @@ def privacy_text(ctx: LegalContext, locale: str = "es") -> LegalText:
                 ),
                 "Página de verificación: pública hasta que la retires desde tu informe o nos pidas"
                 " retirarla o borrar la auditoría. Si la publicaste, la limpieza conserva solo lo "
-                "que muestra esa página (clase, estado de cada dimensión, hashes, fechas, número "
-                "de intentos y versión del motor), para que la página y su sello sigan "
+                "que muestra esa página (clase, estado de cada dimensión, qué se auditó, periodo "
+                "de los datos y su frecuencia, hashes, fechas, número de intentos y versión del "
+                "motor), para que la página y su sello sigan "
                 "funcionando.",
                 "Lista de avisos: hasta que pidas darte de baja.",
                 "Cuenta: hasta que la borres desde la página de tu cuenta o nos pidas "
@@ -1580,7 +1593,8 @@ def privacy_text(ctx: LegalContext, locale: str = "es") -> LegalText:
                     else ""
                 )
                 + " Una página de verificación, solo si la publicas, muestra la clase, las "
-                "dimensiones, los hashes, la fecha y un aviso fijo; nunca tus archivos, "
+                "dimensiones, qué se auditó, el periodo de los datos, los hashes, la fecha y un "
+                "aviso fijo; nunca tus archivos, "
                 "operaciones, descripción ni el token.",
                 "Los datos pueden alojarse fuera de tu país, en los servidores de nuestro "
                 "proveedor de alojamiento.",
@@ -1725,7 +1739,9 @@ def _privacy_pt(
                 "sua marca aleatória, para mostrar o que ocorreu desde então; o registro é "
                 "eliminado após 90 dias sem visita ou com a conta.",
                 "Para contar visitas vindas de nossos próprios links: as visitas à página "
-                "inicial e às páginas de casos são contadas por dia, idioma e etiqueta do "
+                "inicial, às páginas de casos e às ferramentas grátis (calculadoras, cartão de "
+                "números, exemplos e página de ferramentas) são contadas por dia, idioma e "
+                "etiqueta do "
                 "link (como ?ref=f4), sem endereço de rede. O cookie "
                 f"{SEEN_COOKIE} guarda só a data de hoje para contar um navegador uma vez "
                 "por dia. Se você chega por um link etiquetado, o cookie "
@@ -1777,8 +1793,9 @@ def _privacy_pt(
                 ),
                 "Página de verificação: pública até você retirá-la no relatório, pedir sua "
                 "retirada ou pedir a exclusão da auditoria. Se publicada, a limpeza conserva "
-                "apenas o que ela mostra (classe, estados das dimensões, hashes, datas, "
-                "número de tentativas e versão do mecanismo), para manter a página e o selo.",
+                "apenas o que ela mostra (classe, estados das dimensões, o que foi auditado, "
+                "período dos dados e sua frequência, hashes, datas, número de tentativas e "
+                "versão do mecanismo), para manter a página e o selo.",
                 "Lista de novidades: até você pedir a remoção.",
                 "Conta: até você excluí-la na própria página ou pedir sua exclusão. Isso "
                 "elimina e-mail, hash da senha, sessões e a lista de relatórios e códigos. "
@@ -1797,7 +1814,8 @@ def _privacy_pt(
                     else ""
                 )
                 + " Uma página de verificação, apenas se você a publicar, mostra classe, "
-                "dimensões, hashes, data e aviso fixo; nunca arquivos, operações, descrição "
+                "dimensões, o que foi auditado, período dos dados, hashes, data e aviso fixo; "
+                "nunca arquivos, operações, descrição "
                 "ou token.",
                 "Os dados podem ser hospedados fora do seu país, nos servidores do provedor "
                 "de hospedagem.",

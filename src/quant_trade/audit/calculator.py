@@ -284,8 +284,10 @@ COPY: dict[str, dict[str, Any]] = {
             "dispersión que la de tu Sharpe.",
             "Descuento de Harvey y Liu con corrección de Bonferroni; suerte esperada de Bailey "
             "y López de Prado; longitud mínima de Bailey, Borwein, López de Prado y Zhu.",
-            "No guardamos lo que escribes. Es la misma fórmula que la sección de suerte del "
-            "informe; el informe usa la frecuencia real de tu archivo.",
+            "No guardamos tus cifras en ninguna base de datos ni archivo; como van en el enlace, "
+            "el registro de acceso del servidor puede contener la dirección pedida. Es la misma "
+            "fórmula que la sección de suerte del informe; el informe usa la frecuencia real de tu "
+            "archivo.",
             "Describe el pasado que declaras; no dice nada del futuro.",
         ],
     },
@@ -389,8 +391,9 @@ COPY: dict[str, dict[str, Any]] = {
             "Configurations are treated as independent tries with the same spread as your Sharpe.",
             "Harvey and Liu haircut with the Bonferroni correction; expected luck from Bailey "
             "and López de Prado; minimum length from Bailey, Borwein, López de Prado and Zhu.",
-            "We do not store what you type. It is the same formula as the report's luck "
-            "section; the report uses your file's actual frequency.",
+            "We keep your figures in no database or file; since they travel in the link, the "
+            "server's access log may hold the address requested. It is the same formula as the "
+            "report's luck section; the report uses your file's actual frequency.",
             "It describes the past you declare; it says nothing about the future.",
         ],
     },
@@ -499,8 +502,9 @@ COPY: dict[str, dict[str, Any]] = {
             "dispersão do seu Sharpe.",
             "Desconto de Harvey e Liu com a correção de Bonferroni; sorte esperada de Bailey "
             "e López de Prado; comprimento mínimo de Bailey, Borwein, López de Prado e Zhu.",
-            "Não guardamos o que você digita. É a mesma fórmula da seção de sorte do "
-            "relatório; o relatório usa a frequência real do seu arquivo.",
+            "Não guardamos os seus números em nenhum banco de dados nem arquivo; como vão no link, "
+            "o registro de acesso do servidor pode conter o endereço pedido. É a mesma fórmula da "
+            "seção de sorte do relatório; o relatório usa a frequência real do seu arquivo.",
             "Descreve o passado que você declara; não diz nada sobre o futuro.",
         ],
     },

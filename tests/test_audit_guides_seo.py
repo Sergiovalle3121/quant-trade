@@ -235,8 +235,10 @@ def test_every_sitemap_url_has_an_iso_lastmod_from_the_code(tmp_path: Path) -> N
     from datetime import date
 
     from quant_trade.audit.articles import ARTICLE_PUBLICATION_DATES
+    from quant_trade.audit.institutional import OFFER_UPDATED
     from quant_trade.audit.legal import LEGAL_PATHS, LEGAL_UPDATED
     from quant_trade.audit.seo import (
+        CHALLENGE_PUBLISHED,
         PAGE_DATES,
         SIGNAL_SAMPLE_PUBLISHED,
         SITE_UPDATED,
@@ -250,6 +252,8 @@ def test_every_sitemap_url_has_an_iso_lastmod_from_the_code(tmp_path: Path) -> N
         SITE_UPDATED,
         LEGAL_UPDATED,
         SIGNAL_SAMPLE_PUBLISHED,
+        CHALLENGE_PUBLISHED,
+        OFFER_UPDATED,
         *ARTICLE_PUBLICATION_DATES.values(),
     }
     for url in root.findall("s:url", SITEMAP_NS):

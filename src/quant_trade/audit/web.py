@@ -43,10 +43,12 @@ from pydantic import ValidationError
 
 from quant_trade.audit import (
     account_pages,
+    challenge_calc,
     forensics_web,
     funnel,
     inbox,
     institutional,
+    institutional_sample,
     mapping,
     owner_card,
     paid_offer,
@@ -82,6 +84,7 @@ from quant_trade.audit.calculator import (
     share_values,
 )
 from quant_trade.audit.calculator_card import calculator_card_svg
+from quant_trade.audit.challenge_pages import challenge_page
 from quant_trade.audit.compare import (
     COMPARE_PATH,
     MAX_COMPARED,
@@ -1291,6 +1294,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     reading_images = reading_png.ReadingPNGCache()
     reading_png_paths = {path + "/card.png" for path in reading.READING_PATH.values()}
     calculator_attempts = AttemptLog()
+    challenge_attempts = AttemptLog()
     calculator_images = reading_png.ReadingPNGCache(fields=CARD_FIELDS)
     calculator_png_paths = {path + "/card.png" for path in CALCULATOR_PATH.values()}
     card_lookups = AttemptLog()
@@ -1424,7 +1428,12 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     # The free calculator is a landing of its own: links on X and from creators point at it.
     visit_paths.update({path: loc for loc, path in CALCULATOR_PATH.items()})
     visit_paths.update({path: loc for loc, path in EXAMPLES_PATH.items()})
+    # The figures card and the tools page are free tools too (privacy policy names them).
+    visit_paths.update({path: loc for loc, path in reading.READING_PATH.items()})
+    visit_paths.update({path: loc for loc, path in TOOLS_PATH.items()})
     visit_paths.update({path: loc for loc, path in winrate.WINRATE_PATH.items()})
+    # The challenge calculator and its firm pages, like the other free tools.
+    visit_paths.update({path: loc for path, (loc, _firm) in challenge_calc.PAGES.items()})
 
     def _funnel_visit(request: Request, response: Any) -> None:
         """Count a person's visit to the landing or a case page; remember its tag.
@@ -7000,6 +7009,106 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     async def signal_sample_pt(request: Request) -> str:
         return await run_in_threadpool(_sample_html, "pt", _site_url(request), "signal")
 
+    # The sample institutional review (``institutional_sample``): its notes page, the
+    # report with the notes on top and their PDF. The input and the clock are fixed and
+    # no public series is read, so each is built once per language (and address) and
+    # kept; the run, the pages and the PDF have a lock each, so a PDF build never holds
+    # up the pages.
+    review_results: dict[str, AuditResult] = {}
+    review_result_lock = threading.Lock()
+    review_pages: dict[tuple[str, str, str], str] = {}
+    review_page_lock = threading.Lock()
+    review_pdfs: dict[str, bytes] = {}
+    review_pdf_lock = threading.Lock()
+
+    def _review_result(locale: str) -> AuditResult:
+        with review_result_lock:
+            if locale not in review_results:
+                review_results[locale] = institutional_sample.sample_result(locale)
+            return review_results[locale]
+
+    def _review_html(kind: str, locale: str, base_url: str) -> str:
+        key = (kind, locale, base_url)
+        with review_page_lock:
+            if key not in review_pages:
+                result = _review_result(locale)
+                review_pages[key] = guard_page(
+                    institutional_sample.sample_page(
+                        result, locale=locale, base_url=base_url, pdf_ok=pdf_ok
+                    )
+                    if kind == "notes"
+                    else institutional_sample.report_with_notes(
+                        result,
+                        locale=locale,
+                        pdf_url=institutional.SAMPLE_PDF_PATHS[locale] if pdf_ok else None,
+                    )
+                )
+            return review_pages[key]
+
+    def _review_pdf(locale: str) -> Response:
+        with review_pdf_lock:
+            if locale not in review_pdfs:
+                page = institutional_sample.report_with_notes(_review_result(locale), locale=locale)
+                try:
+                    review_pdfs[locale] = pdf_lib.report_pdf(
+                        page,
+                        audit_id=institutional_sample.REPORT_NAMES[locale],
+                        locale=locale,
+                        wait_seconds=PDF_WAIT_SECONDS,
+                    )
+                    # A public sample, recorded as the sample: /comprobar says so.
+                    _record_issued(
+                        review_pdfs[locale], audit_id=check_lib.SAMPLE_AUDIT_ID, kind="pdf"
+                    )
+                except (pdf_lib.PdfBusy, pdf_lib.PdfUnavailable):
+                    return HTMLResponse(
+                        error_page(message("pdf_busy", locale), locale=locale), status_code=503
+                    )
+        name = f"rigor-{institutional_sample.REPORT_NAMES[locale]}.pdf"
+        return Response(
+            content=review_pdfs[locale],
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": f'attachment; filename="{name}"',
+                "Cache-Control": "public, max-age=3600",
+            },
+        )
+
+    def _review_locale(path: str, paths: dict[str, str]) -> str:
+        return next(locale for locale, known in paths.items() if known == path)
+
+    async def review_sample_notes(request: Request) -> HTMLResponse:
+        locale = _review_locale(request.url.path, institutional.SAMPLE_PATHS)
+        page = await run_in_threadpool(_review_html, "notes", locale, _site_url(request))
+        return HTMLResponse(page)
+
+    async def review_sample_report(request: Request) -> HTMLResponse:
+        locale = _review_locale(request.url.path, institutional.SAMPLE_REPORT_PATHS)
+        page = await run_in_threadpool(_review_html, "report", locale, _site_url(request))
+        # The notes page is the public one; the report behind it is not listed.
+        return HTMLResponse(page, headers={"X-Robots-Tag": NOINDEX})
+
+    async def review_sample_pdf(request: Request) -> Response:
+        locale = _review_locale(request.url.path, institutional.SAMPLE_PDF_PATHS)
+        return await run_in_threadpool(_review_pdf, locale)
+
+    for review_locale in institutional.SAMPLE_PATHS:
+        app.add_api_route(
+            institutional.SAMPLE_PATHS[review_locale],
+            review_sample_notes,
+            methods=["GET"],
+            response_class=HTMLResponse,
+        )
+        app.add_api_route(
+            institutional.SAMPLE_REPORT_PATHS[review_locale],
+            review_sample_report,
+            methods=["GET"],
+            response_class=HTMLResponse,
+        )
+        app.add_api_route(
+            institutional.SAMPLE_PDF_PATHS[review_locale], review_sample_pdf, methods=["GET"]
+        )
+
     @app.get("/guias", response_class=HTMLResponse)
     def guides_es(request: Request, lang: str | None = None) -> str:
         return guides_index_page(locale=_locale(lang or "es"), base_url=_site_url(request))
@@ -7125,6 +7234,46 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     for winrate_path in winrate.WINRATE_PATH.values():
         app.add_api_route(
             winrate_path, public_winrate, methods=["GET"], response_class=HTMLResponse
+        )
+
+    def public_challenge(request: Request) -> Response:
+        """The challenge calculator and its firm pages: the report's simulator on
+        synthetic days from the declared figures. Nothing is stored; each address
+        gets ``REQUESTS_PER_HOUR`` computations a sliding hour, past which the
+        page keeps the form and says so (the result is cached per input)."""
+        locale, firm = challenge_calc.PAGES[request.url.path]
+        query = request.query_params
+        duplicate = any(len(query.getlist(name)) > 1 for name in challenge_calc.FIELDS)
+        values = {name: query.get(name, "") for name in challenge_calc.FIELDS}
+        status, limited = 200, False
+        if duplicate:
+            status = 400
+        elif challenge_calc.submitted(values):
+            parsed = challenge_calc.parse(values, firm)
+            if parsed.errors:
+                status = 400
+            else:
+                ip = _client_ip(request, cfg.trusted_proxy_hops)
+                seen = challenge_attempts.hit(ip, datetime.now(UTC))
+                if seen >= challenge_calc.REQUESTS_PER_HOUR:
+                    status, limited = 429, True
+        page = challenge_page(
+            locale=locale,
+            firm=firm,
+            base_url=_site_url(request),
+            values=values,
+            duplicate=duplicate,
+            limited=limited,
+        )
+        return HTMLResponse(
+            guard_page(_offered(page, locale)),
+            status_code=status,
+            headers={"Retry-After": "3600"} if limited else None,
+        )
+
+    for challenge_path in challenge_calc.PAGES:
+        app.add_api_route(
+            challenge_path, public_challenge, methods=["GET"], response_class=HTMLResponse
         )
 
     def public_faq(request: Request) -> str:

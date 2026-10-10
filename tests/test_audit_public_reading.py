@@ -427,12 +427,14 @@ def test_generation_does_not_use_network_database_or_create_files(
     monkeypatch.chdir(tmp_path)
 
     def forbidden(*args: object, **kwargs: object) -> None:
-        pytest.fail("Public reading must not fetch, use the database, or enqueue stored visits")
+        pytest.fail("Public reading must not fetch or use the database")
 
     store = client.app.state.store
     monkeypatch.setattr(store.engine, "begin", forbidden)
     monkeypatch.setattr(store.engine, "connect", forbidden)
-    monkeypatch.setattr(client.app.state.visits, "add", forbidden)
+    # A visit to a free tool is counted in memory (privacy policy): day, language and tag only.
+    counted: list[dict[str, str]] = []
+    monkeypatch.setattr(client.app.state.visits, "add", lambda **kw: counted.append(kw))
     monkeypatch.setattr(socket, "create_connection", forbidden)
     before = {
         path.relative_to(tmp_path): path.read_bytes()
@@ -452,3 +454,5 @@ def test_generation_does_not_use_network_database_or_create_files(
         if path.is_file()
     }
     assert after == before
+    assert all(set(visit) == {"day", "locale", "ref"} for visit in counted)
+    assert not {value for visit in counted for value in visit.values()} & set(FIGURES.values())
