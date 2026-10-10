@@ -648,8 +648,8 @@ COPY: dict[str, dict[str, Any]] = {
         "col_size": "Tamaño",
         "lower_title": "Con el límite inferior de tu % de aciertos",
         "lower_text": (
-            "Con {n} operaciones, un {rate} de aciertos declarado es compatible con un {low} "
-            "real: es el límite inferior del intervalo de confianza al 95 % (Wilson). Con ese "
+            "Con {n} operaciones, un {rate} de aciertos declarado es compatible con uno real "
+            "de {low}: es el límite inferior del intervalo de confianza al 95 % (Wilson). Con ese "
             "{low} y las mismas cifras, el programa queda así:"
         ),
         "lower_missing": (
