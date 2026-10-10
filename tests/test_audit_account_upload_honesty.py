@@ -340,9 +340,9 @@ def test_a_fund_says_one_fund() -> None:
         },
     }
     expected = {
-        "es": "Ya con 1 fondo, el caso más favorable",
-        "en": "Even at 1 fund, the most favourable case",
-        "pt": "Já com 1 fundo, o caso mais favorável",
+        "es": "Ya con 1 cartera, el caso más favorable",
+        "en": "Even at 1 portfolio, the most favourable case",
+        "pt": "Já com 1 carteira, o caso mais favorável",
     }
     for locale in LOCALES:
         finding, _ = _multiplicity_step(data, "FAIL", locale)
