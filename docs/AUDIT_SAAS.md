@@ -5534,6 +5534,112 @@ Windows commands use `D:\quant-trade\.venv\Scripts\python.exe`, a worktree-local
 `--basetemp`, and exclude `tests/test_audit_pdf*.py` and
 `tests/test_personal_paper*.py` as requested.
 
+### Institutional review offer and sample review (10 October 2026)
+
+`/revision-institucional` (and `/en/institutional-review`,
+`/pt/revisao-institucional`) now states the offer above the request form: a
+standard review from USD 2,500 (one portfolio or return series, one benchmark
+and the declared variants; written report with methodology notes, the full Rigor
+report and its PDF; a 60-minute call and a re-run after 30 days; delivery in 10
+business days from complete data) and an extended review up to USD 4,000
+(several portfolios or universes; attribution to several factors and capacity
+and costs by scenario, both computed apart from the Rigor report with the
+methodology agreed in the quote, since the engine computes neither; a second
+re-run). "Every figure comes from the report" is limited accordingly. Terms: the
+price does not depend on the result; the review is governed by the written quote
+(scope, price, payments, confidentiality, deletion) and the site's terms describe
+the automated report; nothing is published without written permission; 30 days
+after each delivery, or sooner on request, the whole audit is deleted with
+`audit delete <id> --yes` (files, report, private link, publication and the
+issued files, so `/comprobar` no longer recognises its PDF: the page says so and
+tells the client to keep a copy; the quote records the date); the series is
+uploaded with an access code, so the audit is paid and the retention purge of
+unpaid audits does not delete it before that date; 50 % on acceptance and 50 %
+on delivery; a mutual NDA is offered; and it is an independent statistical
+reading of the supplied series, not a verification of how the signal was built
+nor an accounting or regulatory audit. Every price and
+period is a constant in `institutional.py` (`STANDARD_PRICE_USD`,
+`EXTENDED_PRICE_USD`, `DELIVERY_BUSINESS_DAYS`, `CALL_MINUTES`, `RERUN_DAYS`,
+`DELETE_DAYS`, `DEPOSIT_PERCENT`); the copy, the page title and the schema.org
+`Service` read them when the page is built. The confirmation and error pages show
+no offer and stay noindex. Stripe, credits, the USD 29 report and
+`legal.py` are unchanged.
+
+`/revision-institucional/ejemplo` (`/en/institutional-review/sample`,
+`/pt/revisao-institucional/exemplo`) is the sample review
+(`institutional_sample.py`): methodology notes (data source, what was reviewed,
+how it was measured, results with their meaning, the report's six questions,
+factor attribution, what is not measured, what a client receives) over the
+production engine's report of a momentum portfolio: decile 10 of ten portfolios
+sorted on past 12-2 month returns, the ten deciles as the variants file (ten
+MEASURED trials, CSCV), the market as benchmark, declared as a provider's monthly
+return table. `/…/informe` (`/report`, `/relatorio`) is the full report with the
+notes as its first sections (noindex) and `/…/ejemplo.pdf` its PDF (503 without
+WeasyPrint, as the other samples). Every figure in the notes is read from the
+result (`note_figures`, `FIGURE_PATHS`). The information ratio is described as
+the engine computes it: the arithmetic mean of the monthly excess, times 12, over
+the tracking error (not the compound difference shown in the row above); the PBO
+threshold is shown in the PBO's unit (50 %). The engine attributes return to one
+factor only (the benchmark: beta, share explained, alpha with its 95 % range and
+t); with no cash rate (`cash_basis.source` null, as offline) the notes say cash
+stays inside the exposure and the alpha rather than "cash is counted apart".
+Attribution to several factors is labelled as part of the extended review,
+computed apart from the report, with no figures. The report and its PDF show the
+page's word (`REPORT_NAMES`) as the identifier, in the tab title and the head's
+description and preview tags (`show_report_name`, via
+`sample_publication.show_sample_word`, as `/ejemplo` does); the stored id stays
+`check.SAMPLE_AUDIT_ID`, the one `/comprobar` reads. The report uses its fund
+track record template, so the notes say that "fund", "manager" and "real
+history" there refer to the template, not to the data.
+
+The data is synthetic. The Kenneth R. French Data Library files (10 Portfolios
+Formed on Momentum, Fama/French 3 factors, momentum factor) were downloaded on
+2026-10-10: each ends with "Copyright 2026 Eugene F. Fama and Kenneth R.
+French", is built from the CRSP database, and the library's page states no
+licence to copy or redistribute them; this repository also keeps market data out
+of git. No month of that data is stored or shown. The sample's eleven series are
+generated from seed 20261010 (240 month ends, 2006-01 to 2025-12) with each
+decile's alpha, market and momentum loadings and residual volatility, and the
+market's and the momentum factor's moments, set from summary statistics of the
+value-weighted deciles (1963-01 to 2025-12, OLS on the market's excess return and
+the momentum factor), kept as rounded constants. The notes call the series a
+synthetic series that imitates decile 10 and state the simplifications: the
+deciles' residuals are independent of each other, and the market's Student's t
+tails (6 degrees of freedom) and the momentum crash mix were chosen by hand. The
+run is offline (cash taken as zero, which the report states), with a fixed clock
+and id.
+
+Open for the operator (outside this branch, `legal.py`):
+
+- The privacy policy keeps paid audits "until you delete them with your account
+  or ask us to", while the offer deletes the whole audit 30 days after each
+  delivery; it should name the quote's deletion date. The alternative is to keep
+  the issued files' hashes on that deletion so the PDF stays checkable, which
+  needs a store change and a privacy change that says the hashes stay.
+- The privacy policy does not cover the institutional request
+  (`institutional_requests`: name, organisation, email, strategy details and
+  description): what is kept, for how long, and that `audit delete` does not
+  remove it. No purge removes it either.
+- The terms define the service as the automated report at USD 29 per audit,
+  with the 7-day refund (`REFUND_DAYS`) and "a code paid outside the site is
+  refunded through the method you paid with". They need a clause for quoted
+  services: the 50/50 payment, whether the deposit is refundable, the NDA and
+  the deletion date. Until then the page says the written quote governs the
+  review.
+- No code schedules the 30-day deletion: the operator runs `audit delete` by
+  hand on the date in the quote.
+
+Offline coverage: `test_audit_institutional_review_sample.py` (prices from their
+constants, the three languages over HTTP with `find_claims == []` and none of
+"verificado", "certificado", "aprobado", "garantiza", "rentable", the same
+figures in every language, the engine's inputs and every quoted figure equal to
+the result's, the information ratio recomputed from the sample's files, the
+exposure's wording by cash basis, the PBO threshold in percent, the deletion and
+quote terms, the sitemap and its `lastmod`, one-factor attribution only, the
+shown identifier on the report page and the PDF source, the PDF source with
+notes before the report, 503 without a renderer), plus
+`test_audit_institutional_intake.py` and `test_audit_guides_seo.py`.
+
 ### Retail articles and public questions (7 October 2026)
 
 `articles.py` adds articles about prop-firm attempt counts, MQL5/Myfxbook

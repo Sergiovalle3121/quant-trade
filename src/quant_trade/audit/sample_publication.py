@@ -318,12 +318,17 @@ def show_sample_id(page: str, kind: str, locale: str) -> str:
 
     The holdout seal's identifier keeps the stored id, since its SHA-256 is computed
     with it; when the shown word differs, ``SAMPLE_SEAL_NOTE`` says so beside it."""
+    return show_sample_word(page, SAMPLE_SHOWN_IDS[kind][_lang(locale)], locale)
+
+
+def show_sample_word(page: str, word: str, locale: str) -> str:
+    """``show_sample_id`` with the word given, for a sample with its own (the sample
+    institutional review's report, ``institutional_sample.REPORT_NAMES``)."""
     from quant_trade.audit.check import SAMPLE_AUDIT_ID
     from quant_trade.audit.report import KEY_LABELS, LABELS
 
     lang = _lang(locale)
     label = html.escape(LABELS[lang]["audit_id"], quote=True)
-    word = SAMPLE_SHOWN_IDS[kind][lang]
     shown = html.escape(word, quote=True)
     page = page.replace(f"<span>{label} {SAMPLE_AUDIT_ID}", f"<span>{label} {shown}")
     if word == SAMPLE_AUDIT_ID:
@@ -401,4 +406,5 @@ __all__ = [
     "sample_publication",
     "sample_report_path",
     "show_sample_id",
+    "show_sample_word",
 ]
