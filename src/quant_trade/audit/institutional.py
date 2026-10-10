@@ -41,8 +41,9 @@ STANDARD_PRICE_USD = 2_500
 EXTENDED_PRICE_USD = 4_000
 #: The offer's other figures, spelled once: business days from complete data to the
 #: standard delivery, the call's minutes, the days after a delivery when the re-run
-#: happens and when the files sent are deleted, and the share paid on acceptance
-#: (the rest is paid on delivery).
+#: happens and when the whole audit is deleted (``audit delete``: files, report,
+#: private link and the issued files ``/comprobar`` reads), and the share paid on
+#: acceptance (the rest is paid on delivery).
 DELIVERY_BUSINESS_DAYS = 10
 CALL_MINUTES = 60
 RERUN_DAYS = 30
@@ -325,18 +326,21 @@ OFFER_COPY: dict[str, dict[str, Any]] = {
         "extended_lead": "Todo lo de la revisión estándar, y además:",
         "extended_items": (
             "Varias carteras o universos.",
-            "Atribución a factores.",
-            "Capacidad y costos por escenario.",
+            "Atribución a varios factores, calculada aparte del informe Rigor.",
+            "Capacidad y costos por escenario, calculados aparte del informe Rigor.",
             "Una segunda re-ejecución.",
         ),
         "request": "Solicitar una revisión",
         "deliverables_title": "Qué recibes",
         "deliverables": (
             "Notas de metodología: qué se midió, cómo, qué no se mide y qué significa cada "
-            "resultado. Cada cifra sale del informe.",
+            "resultado. Cada cifra sale del informe Rigor, salvo las que la revisión ampliada "
+            "calcula aparte (varios factores, capacidad), con la metodología que se acuerda en "
+            "la cotización.",
             "El informe Rigor completo: cada valor dice si se midió en tu serie, si lo "
             "declaraste o si no se pudo medir.",
-            "El PDF del informe, para compartirlo con quien tú decidas.",
+            "El PDF del informe, para compartirlo con quien tú decidas: se puede comprobar en "
+            "/comprobar mientras la auditoría no se borre.",
             "La llamada y las re-ejecuciones de tu alcance.",
         ),
         "timeline_title": "Plazos",
@@ -352,9 +356,16 @@ OFFER_COPY: dict[str, dict[str, Any]] = {
         "terms_title": "Condiciones",
         "terms": (
             "El precio no depende del resultado.",
+            "La revisión se rige por la cotización escrita que aceptas: alcance, precio, pagos, "
+            "confidencialidad y borrado. Los términos del sitio describen el informe automático.",
             "Nada se publica sin tu permiso escrito.",
-            "Los archivos que nos envías se borran a los {delete} días de cada entrega, o antes "
-            "si lo pides: ese pedido de borrado queda escrito en la cotización.",
+            "A los {delete} días de cada entrega, o antes si lo pides, borramos la auditoría "
+            "completa: los archivos, el informe, su enlace privado y el registro de sus "
+            "archivos. Desde entonces /comprobar ya no reconoce su PDF, así que guarda tu "
+            "copia. Ese plazo de borrado queda escrito en la cotización.",
+            "La serie se sube con el código de acceso que te enviamos al aceptar la cotización: "
+            "así la auditoría queda como pagada y la limpieza de las auditorías no pagadas no la "
+            "borra antes de ese plazo.",
             "Pago: {deposit} % al aceptar la cotización y {rest} % al entregar.",
             "Ofrecemos un acuerdo de confidencialidad (NDA) mutuo.",
             "Es una lectura estadística independiente de la serie que aportas, no una "
@@ -402,18 +413,21 @@ OFFER_COPY: dict[str, dict[str, Any]] = {
         "extended_lead": "Everything in the standard review, plus:",
         "extended_items": (
             "Several portfolios or universes.",
-            "Factor attribution.",
-            "Capacity and costs by scenario.",
+            "Attribution to several factors, computed apart from the Rigor report.",
+            "Capacity and costs by scenario, computed apart from the Rigor report.",
             "A second re-run.",
         ),
         "request": "Request a review",
         "deliverables_title": "What you receive",
         "deliverables": (
             "Methodology notes: what was measured, how, what is not measured and what each "
-            "result means. Every figure comes from the report.",
+            "result means. Every figure comes from the Rigor report, except those the extended "
+            "review computes apart (several factors, capacity), with the methodology agreed in "
+            "the quote.",
             "The full Rigor report: each value says whether it was measured on your series, "
             "declared by you or could not be measured.",
-            "The report's PDF, to share with whoever you choose.",
+            "The report's PDF, to share with whoever you choose: it can be checked on /check "
+            "until the audit is deleted.",
             "The call and the re-runs of your scope.",
         ),
         "timeline_title": "Timeline",
@@ -428,9 +442,16 @@ OFFER_COPY: dict[str, dict[str, Any]] = {
         "terms_title": "Terms",
         "terms": (
             "The price does not depend on the result.",
+            "The review is governed by the written quote you accept: scope, price, payments, "
+            "confidentiality and deletion. The site's terms describe the automated report.",
             "Nothing is published without your written permission.",
-            "The files you send are deleted {delete} days after each delivery, or sooner if "
-            "you ask: that deletion request is written into the quote.",
+            "{delete} days after each delivery, or sooner if you ask, we delete the whole "
+            "audit: the files, the report, its private link and the record of its files. From "
+            "then on /check no longer recognises its PDF, so keep your copy. That deletion "
+            "date is written into the quote.",
+            "The series is uploaded with the access code we send when you accept the quote: "
+            "the audit then counts as paid, and the clean-up of unpaid audits does not delete it "
+            "before that date.",
             "Payment: {deposit} % on accepting the quote and {rest} % on delivery.",
             "We offer a mutual non-disclosure agreement (NDA).",
             "It is an independent statistical reading of the series you supply, not a "
@@ -478,18 +499,21 @@ OFFER_COPY: dict[str, dict[str, Any]] = {
         "extended_lead": "Tudo o que a revisão padrão inclui e, além disso:",
         "extended_items": (
             "Várias carteiras ou universos.",
-            "Atribuição a fatores.",
-            "Capacidade e custos por cenário.",
+            "Atribuição a vários fatores, calculada à parte do relatório Rigor.",
+            "Capacidade e custos por cenário, calculados à parte do relatório Rigor.",
             "Uma segunda nova execução.",
         ),
         "request": "Solicitar uma revisão",
         "deliverables_title": "O que você recebe",
         "deliverables": (
             "Notas de metodologia: o que foi medido, como, o que não é medido e o que significa "
-            "cada resultado. Cada número sai do relatório.",
+            "cada resultado. Cada número sai do relatório Rigor, exceto os que a revisão "
+            "ampliada calcula à parte (vários fatores, capacidade), com a metodologia combinada "
+            "na cotação.",
             "O relatório Rigor completo: cada valor diz se foi medido na sua série, se foi "
             "declarado por você ou se não pôde ser medido.",
-            "O PDF do relatório, para compartilhar com quem você decidir.",
+            "O PDF do relatório, para compartilhar com quem você decidir: pode ser conferido em "
+            "/pt/comprovar enquanto a auditoria não for excluída.",
             "A chamada e as novas execuções do seu escopo.",
         ),
         "timeline_title": "Prazos",
@@ -504,9 +528,16 @@ OFFER_COPY: dict[str, dict[str, Any]] = {
         "terms_title": "Condições",
         "terms": (
             "O preço não depende do resultado.",
+            "A revisão é regida pela cotação escrita que você aceita: escopo, preço, pagamentos, "
+            "confidencialidade e exclusão. Os termos do site descrevem o relatório automático.",
             "Nada é publicado sem a sua permissão por escrito.",
-            "Os arquivos que você envia são excluídos {delete} dias após cada entrega, ou antes "
-            "se você pedir: esse pedido de exclusão fica escrito na cotação.",
+            "{delete} dias após cada entrega, ou antes se você pedir, excluímos a auditoria "
+            "inteira: os arquivos, o relatório, o link privado e o registro dos seus arquivos. "
+            "A partir daí, /pt/comprovar não reconhece mais o PDF, então guarde a sua cópia. "
+            "Esse prazo de exclusão fica escrito na cotação.",
+            "A série é enviada com o código de acesso que mandamos quando você aceita a cotação: "
+            "assim a auditoria fica como paga e a limpeza das auditorias não pagas não a exclui "
+            "antes desse prazo.",
             "Pagamento: {deposit} % ao aceitar a cotação e {rest} % na entrega.",
             "Oferecemos um acordo de confidencialidade (NDA) mútuo.",
             "É uma leitura estatística independente da série que você fornece, não uma "

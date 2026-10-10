@@ -10,11 +10,14 @@ the report. Nothing here reaches the network.
 from __future__ import annotations
 
 import html
+import io
 import json
+import math
 import re
 from pathlib import Path
 from typing import Any
 
+import pandas as pd
 import pytest
 
 pytest.importorskip("fastapi")
@@ -24,12 +27,14 @@ from fastapi.testclient import TestClient  # noqa: E402
 
 from quant_trade.audit import institutional, institutional_sample  # noqa: E402
 from quant_trade.audit import pdf as pdf_lib  # noqa: E402
+from quant_trade.audit.check import SAMPLE_AUDIT_ID  # noqa: E402
 from quant_trade.audit.guard import find_claims  # noqa: E402
 from quant_trade.audit.pages import institutional_review_page  # noqa: E402
+from quant_trade.audit.report import LABELS  # noqa: E402
 from quant_trade.audit.seo import PUBLIC_PAGES, page_lastmod  # noqa: E402
 from quant_trade.audit.settings import AuditSettings  # noqa: E402
 from quant_trade.audit.store import make_store  # noqa: E402
-from quant_trade.audit.web import create_app  # noqa: E402
+from quant_trade.audit.web import CHECK_PATHS, create_app  # noqa: E402
 
 BASE = "https://audit.example"
 LOCALES = ("es", "en", "pt")
@@ -294,3 +299,159 @@ def test_the_sample_pdf_answers_503_without_a_renderer(
     response = _client(tmp_path).get(institutional.SAMPLE_PDF_PATHS["pt"])
     assert response.status_code == 503
     assert "noindex" in response.headers["x-robots-tag"]
+
+
+# ---------------------------------------------------------------------------
+# What the offer promises matches what the service does
+# ---------------------------------------------------------------------------
+
+#: Each language's check page (``web.CHECK_PATHS``), which the terms name.
+CHECK_PAGE = {locale: path for path, locale in CHECK_PATHS.items()}
+#: The words each language uses for "the whole audit", "the written quote", "the
+#: access code" and "computed apart from the Rigor report".
+WHOLE_AUDIT = {"es": "auditoría completa", "en": "whole audit", "pt": "auditoria inteira"}
+WRITTEN_QUOTE = {"es": "cotización escrita", "en": "written quote", "pt": "cotação escrita"}
+ACCESS_CODE = {"es": "código de acceso", "en": "access code", "pt": "código de acesso"}
+APART = {
+    "es": "aparte del informe Rigor",
+    "en": "apart from the Rigor report",
+    "pt": "à parte do relatório Rigor",
+}
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+def test_the_terms_say_the_whole_audit_is_deleted_and_the_quote_governs(locale: str) -> None:
+    """``audit delete`` removes the whole audit, its issued files included, so
+    /comprobar stops recognising the PDF (``test_audit_check``): the terms say so,
+    with the check page of the language, instead of promising to delete only the
+    files. The series goes up with an access code, so the purge of unpaid audits
+    does not come first, and the written quote, not the site's terms for the
+    automated report, governs the review."""
+    terms = institutional.offer_lines(locale, "terms")
+    deletion = [line for line in terms if WHOLE_AUDIT[locale] in line]
+    assert len(deletion) == 1
+    assert str(institutional.DELETE_DAYS) in deletion[0]
+    assert CHECK_PAGE[locale] in deletion[0]
+    assert sum(WRITTEN_QUOTE[locale] in line for line in terms) == 1
+    assert sum(ACCESS_CODE[locale] in line for line in terms) == 1
+    # The PDF a client shares can be checked only while the audit exists.
+    pdf_line = institutional.offer_lines(locale, "deliverables")[2]
+    assert CHECK_PAGE[locale] in pdf_line
+    for line in (*terms, pdf_line):
+        assert find_claims(line) == [], line
+        assert ENDORSEMENTS.search(line) is None, line
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+def test_what_the_engine_does_not_compute_is_said_to_be_computed_apart(locale: str) -> None:
+    """Several factors and capacity are not in the engine: the extended review's
+    items, the deliverables and the sample's notes say they are computed apart."""
+    extended = institutional.offer_lines(locale, "extended_items")
+    assert sum(APART[locale] in line for line in extended) == 2
+    notes = institutional.offer_lines(locale, "deliverables")[0]
+    assert "Rigor" in notes and re.search(r"apart|aparte|à parte", notes)
+    words = institutional_sample.COPY[locale]
+    assert APART[locale] in words["multi_factor"]
+    assert APART[locale] in words["not_measured"]["costs"]
+
+
+def _returns(content: bytes) -> pd.Series:
+    return pd.read_csv(io.BytesIO(content))["return"]
+
+
+def test_the_information_ratio_is_the_arithmetic_excess_over_tracking_error(
+    results: dict[str, Any],
+) -> None:
+    """Recomputed from the sample's own files: the mean monthly excess times 12 over
+    the tracking error, not the compound difference the row above it shows, which
+    the notes now say."""
+    files = institutional_sample.sample_files()
+    excess = _returns(files["series"]) - _returns(files["benchmark"])
+    tracking = float(excess.std(ddof=1)) * math.sqrt(12)
+    information = float(excess.mean()) * 12 / tracking
+    figures = institutional_sample.note_figures(results["es"])
+    assert figures["tracking_error"].value == pytest.approx(tracking, rel=1e-9)
+    assert figures["information_ratio"].value == pytest.approx(information, rel=1e-9)
+    # The compound difference over the tracking error is another number.
+    compound = float(figures["excess"].value or 0.0) / tracking
+    assert abs(compound - information) > 0.05
+    for locale, word in (("es", "aritmética"), ("en", "arithmetic"), ("pt", "aritmética")):
+        meaning = institutional_sample.COPY[locale]["figures"]["information_ratio"][1]
+        assert word in meaning, locale
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+def test_the_exposure_says_where_cash_goes_and_the_pbo_threshold_is_a_percentage(
+    results: dict[str, Any], locale: str
+) -> None:
+    words = institutional_sample.COPY[locale]
+    data = results[locale].model_dump(mode="json")
+    skill = data["fund"]["benchmark"]["skill"]
+    # Offline there is no cash rate: cash is zero and stays inside exposure and alpha.
+    assert skill["cash_basis"]["source"] is None
+    assert skill["attribution"]["cash"]["value"] == 0.0
+    sections = dict(institutional_sample.notes_sections(results[locale], locale))
+    attribution = _visible(sections[words["s_attribution"]])
+    assert words["exposure_no_cash"] in attribution
+    assert words["attribution"]["exposure_share"][1] not in attribution
+    # With a cash rate, cash is its own line and the notes say so.
+    with_cash = {"fund": {"benchmark": {"skill": {"cash_basis": {"source": "DTB3"}}}}}
+    assert institutional_sample._cash_counted_apart(with_cash)
+    assert not institutional_sample._cash_counted_apart(data)
+    # The PBO and its threshold are shown in the same unit.
+    pbo_label = words["figures"]["pbo"][0]
+    rows = re.findall(r"<tr>.*?</tr>", sections[words["s_results"]], flags=re.S)
+    pbo_row = _visible(next(row for row in rows if html.escape(pbo_label) in row))
+    threshold = float(data["verdict"]["thresholds"]["pbo_max"])
+    assert f"{threshold:.0%}" in pbo_row
+    assert re.search(rf"(?<![\d.]){re.escape(str(threshold))}(?![\d%])", pbo_row) is None
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+def test_the_notes_call_the_series_synthetic_and_explain_the_fund_template(
+    results: dict[str, Any], locale: str
+) -> None:
+    words = institutional_sample.COPY[locale]
+    sections = dict(institutional_sample.notes_sections(results[locale], locale))
+    reviewed = _visible(sections[words["s_reviewed"]])
+    assert re.search(r"sintétic|synthetic", reviewed)
+    source = _visible(sections[words["s_data"]])
+    assert f" {institutional_sample.MARKET_T_DOF} " in source
+    how = _visible(sections[words["s_how"]])
+    assert words["how"]["template"] in how
+
+
+def _identifier_checks(page: str, locale: str) -> None:
+    """The page shows the sample's word as its identifier, never the stored id."""
+    name = institutional_sample.REPORT_NAMES[locale]
+    head = page[: page.index("</head>")]
+    assert f" · {SAMPLE_AUDIT_ID}" not in head
+    assert "<title>" in head and f" · {name}</title>" in head
+    assert head.count(f" · {name}'") >= 4
+    text = _visible(page)
+    label = LABELS[locale]["audit_id"]
+    assert f"{label} {SAMPLE_AUDIT_ID}" not in text
+    assert f"{label} {name}" in text
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+def test_the_report_and_its_pdf_show_the_pages_word_as_identifier(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, locale: str
+) -> None:
+    monkeypatch.setattr(pdf_lib, "available", lambda: True)
+    laid_out: list[str] = []
+
+    def fake_pdf(page_html: str, **_: Any) -> bytes:
+        laid_out.append(page_html)
+        return b"%PDF-1.7 sample"
+
+    monkeypatch.setattr(pdf_lib, "report_pdf", fake_pdf)
+    client = _client(tmp_path)
+    report = client.get(institutional.SAMPLE_REPORT_PATHS[locale])
+    assert report.status_code == 200
+    _identifier_checks(report.text, locale)
+    assert client.get(institutional.SAMPLE_PDF_PATHS[locale]).status_code == 200
+    assert len(laid_out) == 1
+    _identifier_checks(laid_out[0], locale)
+    # The stored id stays the one /comprobar reads.
+    assert institutional_sample.AUDIT_ID == SAMPLE_AUDIT_ID

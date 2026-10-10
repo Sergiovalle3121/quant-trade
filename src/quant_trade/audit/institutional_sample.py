@@ -291,15 +291,20 @@ COPY: dict[str, dict[str, Any]] = {
             "No guardamos ni mostramos esos datos: cada archivo lleva el aviso «Copyright 2026 "
             "Eugene F. Fama and Kenneth R. French», se construye con la base de datos de CRSP y "
             "la página de la biblioteca no da una licencia para copiarlos ni redistribuirlos. "
-            "Por eso este ejemplo usa una serie sintética con la misma estructura.",
+            "Por eso este ejemplo usa series sintéticas con parámetros tomados de esos "
+            "estadísticos.",
+            "Es una simplificación: los residuos de los deciles se generan independientes entre "
+            "sí, y las colas del mercado (una t de Student con {market_dof} grados de libertad) "
+            "y las caídas del momentum se eligieron a mano; no salen de esos archivos.",
         ),
         "source_link": "Página de la Kenneth R. French Data Library",
         "s_reviewed": "Qué se revisó",
         "reviewed": {
             "series": (
-                "La serie: el decil {selected}, la cartera de las acciones con mayor retorno en "
-                "los 12 meses previos sin contar el último, como la ofrecería un vendedor de "
-                "señales. Retornos mensuales, en fracción."
+                "La serie: una serie sintética que imita al decil {selected} de las carteras por "
+                "momentum (las acciones con mayor retorno en los 12 meses previos sin contar el "
+                "último), como la ofrecería un vendedor de señales. Retornos mensuales, en "
+                "fracción."
             ),
             "variants": (
                 "Las variantes: las {variants} carteras por decil, una columna cada una, "
@@ -327,6 +332,11 @@ COPY: dict[str, dict[str, Any]] = {
             "cash": (
                 "Sin datos públicos descargados: en el alfa la tasa de caja se toma como cero, "
                 "y el informe lo dice."
+            ),
+            "template": (
+                "El informe usa su plantilla de historial de fondo (retornos mensuales que alguien "
+                "presenta a otros): donde dice «fondo», «gestor» o «historial real» habla de esa "
+                "plantilla, no de los datos, que en este ejemplo son sintéticos."
             ),
             "tags": (
                 "Cada cifra lleva su etiqueta: Medido (calculado sobre la serie), Declarado (lo "
@@ -391,7 +401,8 @@ COPY: dict[str, dict[str, Any]] = {
             ),
             "information_ratio": (
                 "Ratio de información",
-                "La diferencia frente al benchmark por unidad de error de seguimiento.",
+                "El exceso medio anual frente al benchmark (media aritmética, no la diferencia "
+                "compuesta de arriba) por unidad de error de seguimiento.",
             ),
         },
         "s_dimensions": "Las seis preguntas del informe",
@@ -428,16 +439,21 @@ COPY: dict[str, dict[str, Any]] = {
                 "Con t entre -2 y 2, el alfa no se distingue de cero.",
             ),
         },
+        "exposure_no_cash": (
+            "Lo que daría tener el mercado con esa beta. Sin tasa de caja, la caja queda dentro "
+            "de esta exposición y del alfa."
+        ),
         "multi_factor": (
-            "Atribución a varios factores (tamaño, valor, momentum y otros): en la versión "
-            "ampliada. El motor todavía no la calcula, así que aquí no hay cifras."
+            "Atribución a varios factores (tamaño, valor, momentum y otros): en la revisión "
+            "ampliada, calculada aparte del informe Rigor con la metodología que se acuerda en "
+            "la cotización. El motor todavía no la calcula, así que aquí no hay cifras."
         ),
         "s_not_measured": "Qué no se mide",
         "not_measured": {
             "costs": (
                 "Costos: hacen falta la serie bruta y la neta, o las operaciones; sin ellas no se "
                 "vuelven a aplicar los costos. Capacidad y costos por escenario están en la "
-                "versión ampliada."
+                "revisión ampliada, calculados aparte del informe Rigor."
             ),
             "out_of_sample": (
                 "Fuera de muestra: la serie no dice desde qué fecha su proceso no cambió; con esa "
@@ -491,15 +507,19 @@ COPY: dict[str, dict[str, Any]] = {
             "We neither store nor show that data: each file carries the notice “Copyright 2026 "
             "Eugene F. Fama and Kenneth R. French”, is built from the CRSP database, and the "
             "library's page gives no licence to copy or redistribute it. That is why this "
-            "sample uses a synthetic series with the same structure.",
+            "sample uses synthetic series with parameters taken from those statistics.",
+            "It is a simplification: the deciles' residuals are generated independent of each "
+            "other, and the market's tails (a Student's t with {market_dof} degrees of freedom) "
+            "and the momentum crashes were chosen by hand; they do not come from those files.",
         ),
         "source_link": "Kenneth R. French Data Library page",
         "s_reviewed": "What was reviewed",
         "reviewed": {
             "series": (
-                "The series: decile {selected}, the portfolio of the stocks with the highest "
-                "return over the previous 12 months leaving out the last one, as a signal vendor "
-                "would offer it. Monthly returns, as fractions."
+                "The series: a synthetic series that imitates decile {selected} of the momentum "
+                "portfolios (the stocks with the highest return over the previous 12 months "
+                "leaving out the last one), as a signal vendor would offer it. Monthly returns, "
+                "as fractions."
             ),
             "variants": (
                 "The variants: the {variants} decile portfolios, one column each, declared as "
@@ -525,6 +545,11 @@ COPY: dict[str, dict[str, Any]] = {
             "cash": (
                 "No public data downloaded: in the alpha the cash rate is taken as zero, and the "
                 "report says so."
+            ),
+            "template": (
+                "The report uses its fund track record template (monthly returns someone presents "
+                "to others): where it says “fund”, “manager” or “real history” it speaks of that "
+                "template, not of the data, which in this sample is synthetic."
             ),
             "tags": (
                 "Every figure carries its tag: Measured (computed on the series), Declared "
@@ -589,7 +614,8 @@ COPY: dict[str, dict[str, Any]] = {
             ),
             "information_ratio": (
                 "Information ratio",
-                "The difference against the benchmark per unit of tracking error.",
+                "The mean annual excess over the benchmark (arithmetic mean, not the compound "
+                "difference above) per unit of tracking error.",
             ),
         },
         "s_dimensions": "The report's six questions",
@@ -626,16 +652,21 @@ COPY: dict[str, dict[str, Any]] = {
                 "With t between -2 and 2, the alpha cannot be told apart from zero.",
             ),
         },
+        "exposure_no_cash": (
+            "What holding the market with that beta would give. With no cash rate, cash stays "
+            "inside this exposure and the alpha."
+        ),
         "multi_factor": (
             "Attribution to several factors (size, value, momentum and others): in the extended "
-            "review. The engine does not compute it yet, so there are no figures here."
+            "review, computed apart from the Rigor report with the methodology agreed in the "
+            "quote. The engine does not compute it yet, so there are no figures here."
         ),
         "s_not_measured": "What is not measured",
         "not_measured": {
             "costs": (
                 "Costs: they need the gross and the net series, or the trades; without them the "
                 "costs are not re-applied. Capacity and costs by scenario are in the extended "
-                "review."
+                "review, computed apart from the Rigor report."
             ),
             "out_of_sample": (
                 "Out of sample: the series does not say since which date its process has not "
@@ -689,15 +720,18 @@ COPY: dict[str, dict[str, Any]] = {
             "Não guardamos nem mostramos esses dados: cada arquivo traz o aviso “Copyright 2026 "
             "Eugene F. Fama and Kenneth R. French”, é construído com a base de dados da CRSP e "
             "a página da biblioteca não dá uma licença para copiá-los nem redistribuí-los. Por "
-            "isso este exemplo usa uma série sintética com a mesma estrutura.",
+            "isso este exemplo usa séries sintéticas com parâmetros tirados dessas estatísticas.",
+            "É uma simplificação: os resíduos dos decis são gerados independentes entre si, e as "
+            "caudas do mercado (uma t de Student com {market_dof} graus de liberdade) e as "
+            "quedas do momentum foram escolhidas à mão; não saem desses arquivos.",
         ),
         "source_link": "Página da Kenneth R. French Data Library",
         "s_reviewed": "O que foi revisado",
         "reviewed": {
             "series": (
-                "A série: o decil {selected}, a carteira das ações com maior retorno nos 12 meses "
-                "anteriores sem contar o último, como um vendedor de sinais a ofereceria. "
-                "Retornos mensais, em fração."
+                "A série: uma série sintética que imita o decil {selected} das carteiras por "
+                "momentum (as ações com maior retorno nos 12 meses anteriores sem contar o "
+                "último), como um vendedor de sinais a ofereceria. Retornos mensais, em fração."
             ),
             "variants": (
                 "As variantes: as {variants} carteiras por decil, uma coluna cada, declaradas "
@@ -724,6 +758,11 @@ COPY: dict[str, dict[str, Any]] = {
             "cash": (
                 "Sem dados públicos baixados: no alfa a taxa de caixa é tomada como zero, e o "
                 "relatório diz isso."
+            ),
+            "template": (
+                "O relatório usa o seu modelo de histórico de fundo (retornos mensais que alguém "
+                "apresenta a outros): onde diz «fundo», «gestor» ou «histórico real» fala desse "
+                "modelo, não dos dados, que neste exemplo são sintéticos."
             ),
             "tags": (
                 "Cada número leva a sua etiqueta: Medido (calculado sobre a série), Declarado "
@@ -788,7 +827,8 @@ COPY: dict[str, dict[str, Any]] = {
             ),
             "information_ratio": (
                 "Índice de informação",
-                "A diferença frente ao benchmark por unidade de erro de acompanhamento.",
+                "O excesso médio anual frente ao benchmark (média aritmética, não a diferença "
+                "composta acima) por unidade de erro de acompanhamento.",
             ),
         },
         "s_dimensions": "As seis perguntas do relatório",
@@ -822,16 +862,21 @@ COPY: dict[str, dict[str, Any]] = {
                 "Com t entre -2 e 2, o alfa não se distingue de zero.",
             ),
         },
+        "exposure_no_cash": (
+            "O que daria ter o mercado com esse beta. Sem taxa de caixa, o caixa fica dentro "
+            "dessa exposição e do alfa."
+        ),
         "multi_factor": (
             "Atribuição a vários fatores (tamanho, valor, momentum e outros): na revisão "
-            "ampliada. O motor ainda não a calcula, então aqui não há números."
+            "ampliada, calculada à parte do relatório Rigor com a metodologia combinada na "
+            "cotação. O motor ainda não a calcula, então aqui não há números."
         ),
         "s_not_measured": "O que não é medido",
         "not_measured": {
             "costs": (
                 "Custos: são necessárias a série bruta e a líquida, ou as operações; sem elas os "
                 "custos não são reaplicados. Capacidade e custos por cenário estão na revisão "
-                "ampliada."
+                "ampliada, calculados à parte do relatório Rigor."
             ),
             "out_of_sample": (
                 "Fora da amostra: a série não diz desde que data o seu processo não mudou; com "
@@ -906,6 +951,7 @@ def _values(data: dict[str, Any], figures: dict[str, Figure]) -> dict[str, Any]:
         "first": first,
         "last": last,
         "seed": SEED,
+        "market_dof": MARKET_T_DOF,
         "selected": SELECTED,
         "variants": VARIANTS,
         "window_first": SOURCE_WINDOW[0],
@@ -917,7 +963,7 @@ def _values(data: dict[str, Any], figures: dict[str, Figure]) -> dict[str, Any]:
         "psr_pass": thresholds.get("psr_pass", ""),
         "dsr_pass": thresholds.get("dsr_pass", ""),
         "dsr_weak": thresholds.get("dsr_weak", ""),
-        "pbo_max": thresholds.get("pbo_max", ""),
+        "pbo_max": _threshold(thresholds.get("pbo_max", ""), FIGURE_PATHS["pbo"][1]),
         "minutes": institutional.CALL_MINUTES,
         "rerun": institutional.RERUN_DAYS,
     }
@@ -965,6 +1011,23 @@ def _plain(items: tuple[str, ...] | list[str]) -> str:
     return "<ul>" + "".join(f"<li>{_e(item)}</li>" for item in items) + "</ul>"
 
 
+def _cash_counted_apart(data: dict[str, Any]) -> bool:
+    """Whether the attribution had a cash rate (``cash_basis.source``), so that cash is
+    its own line; without one cash is taken as zero and stays inside the exposure and
+    the alpha."""
+    basis = _lookup(data, ("fund", "benchmark", "skill", "cash_basis"))
+    return isinstance(basis, dict) and basis.get("source") is not None
+
+
+def _threshold(value: object, style: str) -> object:
+    """A verdict threshold in the unit its figure is shown in (``_show``)."""
+    if isinstance(value, bool) or not isinstance(value, int | float):
+        return value
+    if style == "pct":
+        return f"{value:.0%}"
+    return value
+
+
 def notes_sections(result: AuditResult, locale: str) -> list[tuple[str, str]]:
     """The methodology notes as (heading, HTML) sections, every figure from ``result``."""
     locale = _locale(locale)
@@ -997,6 +1060,7 @@ def notes_sections(result: AuditResult, locale: str) -> list[tuple[str, str]]:
             how["engine"].format(**values),
             how["dates_ok" if dates_ok else "dates_unchecked"],
             how["cash"],
+            how["template"],
             how["tags"],
         ]
     )
@@ -1019,11 +1083,15 @@ def notes_sections(result: AuditResult, locale: str) -> list[tuple[str, str]]:
             evidence=False,
         )
     )
+    attribution_words = dict(words["attribution"])
+    if not _cash_counted_apart(data):
+        label, _ = attribution_words["exposure_share"]
+        attribution_words["exposure_share"] = (label, words["exposure_no_cash"])
     attribution_html = (
         f"<p>{_e(words['attribution_lead'])}</p>"
         + _table(
             words["cols"],
-            _figure_rows(ATTRIBUTION_KEYS, words["attribution"], figures, values, locale),
+            _figure_rows(ATTRIBUTION_KEYS, attribution_words, figures, values, locale),
         )
         + f"<p>{_badge('NOT_MEASURED', locale)} {_e(words['multi_factor'])}</p>"
     )
@@ -1132,6 +1200,24 @@ def sample_page(
     )
 
 
+def show_report_name(page: str, locale: str) -> str:
+    """The report's HTML with the sample's word (``REPORT_NAMES``) wherever it would
+    show the stored id, as ``/ejemplo`` does with its own (``show_sample_id``): the tab
+    title, the head's description and preview tags, and the identifier lines. The
+    stored id stays what ``/comprobar`` reads, and the holdout seal keeps it, with a
+    note, since its SHA-256 is computed with it."""
+    from quant_trade.audit.sample_publication import show_sample_word
+
+    name = REPORT_NAMES[_locale(locale)]
+    end = page.find("</head>")
+    if end < 0:
+        raise ValueError("the report has no head")
+    head = page[:end].replace(f" · {AUDIT_ID}</title>", f" · {name}</title>", 1)
+    # The description and preview tags repeat the tab title as an attribute value.
+    head = head.replace(f" · {AUDIT_ID}'", f" · {name}'")
+    return show_sample_word(head + page[end:], name, locale)
+
+
 #: Where the notes go in the report: right inside its main column.
 _REPORT_MAIN = re.compile(r"<main\b[^>]*>(?:\s*<div class='wrap wrap-mid'>)?")
 
@@ -1156,7 +1242,7 @@ def report_with_notes(
         pdf_url=pdf_url,
         tools_link=True,
     )
-    page = page.replace(" · sample</title>", f" · {REPORT_NAMES[locale]}</title>", 1)
+    page = show_report_name(page, locale)
     notes = _guarded(
         f"<section class='rsec' id='r-notes'><h2>{_e(words['notes_title'])}</h2>"
         f"<p>{_e(words['lead'])} {_e(institutional.offer_text(locale, 'not_audit'))}</p>"
@@ -1182,6 +1268,7 @@ __all__ = [
     "note_figures",
     "notes_sections",
     "report_with_notes",
+    "show_report_name",
     "sample_files",
     "sample_page",
     "sample_result",
