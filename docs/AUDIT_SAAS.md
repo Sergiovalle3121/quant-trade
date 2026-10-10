@@ -5475,6 +5475,66 @@ Windows commands use `D:\quant-trade\.venv\Scripts\python.exe`, a worktree-local
 `--basetemp`, and exclude `tests/test_audit_pdf*.py` and
 `tests/test_personal_paper*.py` as requested.
 
+### Institutional review offer and sample review (10 October 2026)
+
+`/revision-institucional` (and `/en/institutional-review`,
+`/pt/revisao-institucional`) now states the offer above the request form: a
+standard review from USD 2,500 (one portfolio or return series, one benchmark
+and the declared variants; written report with methodology notes, the full Rigor
+report and its PDF; a 60-minute call and a re-run after 30 days; delivery in 10
+business days from complete data) and an extended review up to USD 4,000
+(several portfolios or universes, factor attribution, capacity and costs by
+scenario, a second re-run). Terms: the price does not depend on the result,
+nothing is published without written permission, the files sent are deleted 30
+days after each delivery or sooner on request (the quote records that deletion
+request; the operator keeps it with `audit delete <id> --yes`), 50 % on
+acceptance and 50 % on delivery, a mutual NDA is offered, and it is an
+independent statistical reading of the supplied series, not a verification of
+how the signal was built nor an accounting or regulatory audit. Every price and
+period is a constant in `institutional.py` (`STANDARD_PRICE_USD`,
+`EXTENDED_PRICE_USD`, `DELIVERY_BUSINESS_DAYS`, `CALL_MINUTES`, `RERUN_DAYS`,
+`DELETE_DAYS`, `DEPOSIT_PERCENT`); the copy, the page title and the schema.org
+`Service` read them when the page is built. The confirmation and error pages show
+no offer and stay noindex. Stripe, credits, the USD 29 report and
+`legal.py` are unchanged.
+
+`/revision-institucional/ejemplo` (`/en/institutional-review/sample`,
+`/pt/revisao-institucional/exemplo`) is the sample review
+(`institutional_sample.py`): methodology notes (data source, what was reviewed,
+how it was measured, results with their meaning, the report's six questions,
+factor attribution, what is not measured, what a client receives) over the
+production engine's report of a momentum portfolio: decile 10 of ten portfolios
+sorted on past 12-2 month returns, the ten deciles as the variants file (ten
+MEASURED trials, CSCV), the market as benchmark, declared as a provider's monthly
+return table. `/…/informe` (`/report`, `/relatorio`) is the full report with the
+notes as its first sections (noindex) and `/…/ejemplo.pdf` its PDF (503 without
+WeasyPrint, as the other samples). Every figure in the notes is read from the
+result (`note_figures`, `FIGURE_PATHS`). The engine attributes return to one
+factor only (the benchmark: beta, share explained, alpha with its 95 % range and
+t); attribution to several factors is labelled as part of the extended review,
+with no figures.
+
+The data is synthetic. The Kenneth R. French Data Library files (10 Portfolios
+Formed on Momentum, Fama/French 3 factors, momentum factor) were downloaded on
+2026-10-10: each ends with "Copyright 2026 Eugene F. Fama and Kenneth R.
+French", is built from the CRSP database, and the library's page states no
+licence to copy or redistribute them; this repository also keeps market data out
+of git. No month of that data is stored or shown. The sample's eleven series are
+generated from seed 20261010 (240 month ends, 2006-01 to 2025-12) with each
+decile's alpha, market and momentum loadings and residual volatility, and the
+market's and the momentum factor's moments, set from summary statistics of the
+value-weighted deciles (1963-01 to 2025-12, OLS on the market's excess return and
+the momentum factor), kept as rounded constants. The run is offline (cash taken
+as zero, which the report states), with a fixed clock and id.
+
+Offline coverage: `test_audit_institutional_review_sample.py` (prices from their
+constants, the three languages over HTTP with `find_claims == []` and none of
+"verificado", "certificado", "aprobado", "garantiza", "rentable", the same
+figures in every language, the engine's inputs and every quoted figure equal to
+the result's, the sitemap and its `lastmod`, one-factor attribution only, the PDF
+source with notes before the report, 503 without a renderer), plus
+`test_audit_institutional_intake.py` and `test_audit_guides_seo.py`.
+
 ### Retail articles and public questions (7 October 2026)
 
 `articles.py` adds articles about prop-firm attempt counts, MQL5/Myfxbook

@@ -34,6 +34,7 @@ from quant_trade.audit.calculator import CALCULATOR_PATH
 from quant_trade.audit.examples import EXAMPLES_PATH
 from quant_trade.audit.faq import FAQ_PATH
 from quant_trade.audit.guides import GUIDES, guide_url, guides_index_url
+from quant_trade.audit.institutional import OFFER_UPDATED, REVIEW_PATHS, SAMPLE_PATHS
 from quant_trade.audit.legal import LEGAL_PATHS, LEGAL_UPDATED
 from quant_trade.audit.method import METHOD_PATH
 from quant_trade.audit.pricing import PRICING_PATH
@@ -97,12 +98,10 @@ PUBLIC_PAGES: tuple[dict[str, str], ...] = (
     {"es": "/contacto", "en": "/en/contact", "pt": "/pt/contato"},
     # Who is behind Rigor (about.py): the operator's published details.
     dict(ABOUT_PATH),
-    # The institutional intake (institutional.REVIEW_PATHS, kept in step by a test).
-    {
-        "es": "/revision-institucional",
-        "en": "/en/institutional-review",
-        "pt": "/pt/revisao-institucional",
-    },
+    # The institutional review with its request form, and its sample review
+    # (``institutional``: a leaf module, so importing it here makes no cycle).
+    dict(REVIEW_PATHS),
+    dict(SAMPLE_PATHS),
 )
 
 #: The date of the last change to the copy every public page shares (navigation,
@@ -124,6 +123,9 @@ def _page_dates() -> dict[str, str]:
     dates.update({articles_index_url(lang): newest for lang in LOCALES})
     dates.update({path: LEGAL_UPDATED for pages in LEGAL_PATHS.values() for path in pages.values()})
     dates.update({path: SIGNAL_SAMPLE_PUBLISHED for path in SIGNAL_SAMPLE_PATHS.values()})
+    # The institutional review's offer and its sample review changed together.
+    institutional = (*REVIEW_PATHS.values(), *SAMPLE_PATHS.values())
+    dates.update({path: OFFER_UPDATED for path in institutional})
     return dates
 
 
