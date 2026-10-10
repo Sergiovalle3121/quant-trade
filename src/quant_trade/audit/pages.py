@@ -107,6 +107,7 @@ from quant_trade.audit.redflags import FLAG_TITLES
 from quant_trade.audit.report import (
     CLASS_LADDER,
     DIMENSION_TITLES,
+    DIMENSION_TITLES_ACCOUNT,
     DISCLAIMER,
     FREQUENCY_TEXT,
     STATUS_TEXT,
@@ -3176,7 +3177,11 @@ def verification_page(
     # A backtest, an account history or a fund's track record: the class
     # sentence, the cards and the share text all name it the same way.
     kind = report_kind(result)
-    titles = DIMENSION_TITLES.get(locale, DIMENSION_TITLES["es"])
+    titles = {
+        **DIMENSION_TITLES.get(locale, DIMENSION_TITLES["es"]),
+        # An account or signal names the dimensions by what it counts, as its report does.
+        **(DIMENSION_TITLES_ACCOUNT.get(locale, {}) if kind == "account" else {}),
+    }
     # The same cards as the report's "what it means for you", so a buyer
     # reads one dimension at a time on a phone.
     cards = "".join(

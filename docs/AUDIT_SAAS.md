@@ -5809,3 +5809,33 @@ no figure, threshold, class, tag, simulator result, price or credit changed
   "of the same strategy, if it has one" in every voice, the seller message
   included, and a result stored with the old wording shows the new one
   (`analytics.question_now`).
+- **Account wording, third pass.** On an account or signal the luck
+  section's introduction, lines, table header and sources' note count the
+  accounts or signals behind it and the history's length
+  (`luck_*_account`), the challenge's luck row says the same
+  (`ch_ladder_undeclared_account`), and the multiplicity dimension is
+  "Number of accounts or signals behind it" in the list, the technical
+  detail, the PDF cover, the seller message and the public page
+  (`report.DIMENSION_TITLES_ACCOUNT`). The sizing and grid questions ask
+  about "this account or signal" (`analytics.ACCOUNT_QUESTIONS`, stored for
+  new account results and shown over older ones), and in every voice but
+  the buyer's they are answered by the account's own trades
+  (`ownership.ACCOUNT_QUESTIONS`, with the recent stretch's). The plan's data
+  step asks for sizes, positions, the floating curve and a history at a fixed
+  size or without averaging when one exists, never a backtest to upload, voice
+  by voice (`plan.ACCOUNT_FLAG_HINTS`, `ownership.PLAN["account_flag_*"]`);
+  "What to do now" and the instruments section name the account or signal.
+  The backtest's answer says "if it has one" once. A backtest keeps every one
+  of its texts.
+- **One reading per figure.** The challenge callout tags the open loss
+  "(Declared)" as the account section does; the reconciliation's starting
+  capital takes the Declared tag the size table gives the imported report's
+  starting balance when that is the figure it starts from
+  (`report.declared_initial_value`; a curve's own first value or an assumed
+  balance keeps the stored tag); the dependence sentence rounds the variance
+  ratio as the multiplicity table does; the resampled one-year drawdowns carry
+  the minus sign of the summary's tile; the mean-shift sentence says when its
+  annual rates come from stretches under a year, and how long each lasts
+  (`shift_short`); the seller message lists the dimensions that fail apart
+  from the weak ones (`dimensions_weak`). Figures, classes and the simulator
+  are unchanged.

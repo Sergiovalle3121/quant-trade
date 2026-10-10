@@ -386,6 +386,36 @@ REPORT: dict[str, Any] = {
         ),
         "luck_span_line": "Sharpe do arquivo: {sharpe}. Histórico: {span}.",
         "luck_table_trials": "Configurações testadas",
+        "luck_intro_account": (
+            "Quanto mais contas ou sinais se abrem com uma estratégia, mais alto sai o Sharpe da "
+            "melhor, mesmo que nenhuma tenha vantagem. Aqui colocamos o Sharpe deste histórico "
+            "ao lado do que a pura sorte daria com as contas ou sinais contados, com a "
+            "matemática publicada de Bailey e López de Prado e de Harvey e Liu. É o mesmo "
+            "cálculo que decide a dimensão «Número de contas ou sinais por trás desta», dito em "
+            "números."
+        ),
+        "luck_table_trials_account": "Contas ou sinais por trás",
+        "luck_narrow_account": (
+            "O Sharpe de {sharpe} supera o {luck} que {n} contas ou sinais sem habilidade "
+            "dariam, mas não com a margem que exigimos: a confiança de que não seja sorte (DSR) "
+            "é de {dsr}, e para superar esta dimensão exigimos {need}."
+        ),
+        "luck_beats_account": (
+            "O Sharpe de {sharpe} supera o {luck} que {n} contas ou sinais sem habilidade dariam."
+        ),
+        "luck_below_account": (
+            "Com {n} contas ou sinais, a pura sorte daria um Sharpe de {luck}, igual ou maior "
+            "que o {sharpe} deste histórico."
+        ),
+        "luck_sharpe_account": (
+            "Sharpe que {n} contas ou sinais sem habilidade dariam (o do histórico: {sharpe})"
+        ),
+        "luck_after_account": "Sharpe que sobra após descontar {n} contas ou sinais (Harvey e Liu)",
+        "luck_note_account": (
+            "E[Sharpe máximo] de tentativas sem habilidade (Bailey e López de Prado); tamanho "
+            "mínimo do histórico (Bailey, Borwein, López de Prado e Zhu); desconto de Bonferroni "
+            "(Harvey e Liu)"
+        ),
         "luck_table_luck": "Sharpe que a sorte daria",
         "luck_table_years": "Histórico necessário",
         "luck_table_enough": "Este histórico basta?",
@@ -398,6 +428,10 @@ REPORT: dict[str, Any] = {
         "luck_month_one": "1 mês",
         "luck_under_month": "menos de 1 mês",
         "luck_almost_year": "quase 12 meses",
+        "ch_ladder_undeclared_account": (
+            "o número de tentativas não foi declarado: o desconto precisa saber quantas contas "
+            "ou sinais há por trás desta"
+        ),
         "ride": "Como foi viver este histórico",
         "ride_intro": (
             "Um total e uma queda máxima não dizem como foi viver o histórico: quanto tempo "
@@ -494,6 +528,11 @@ REPORT: dict[str, Any] = {
         "shift_after": "Rentabilidade média ao ano desde {date}",
         "shift_band": "banda de 90 %: {low} a {high}",
         "shift_floor": "{pct} ou pior",
+        "shift_short": (
+            "São taxas anualizadas: o trecho de antes dura {before} e o de depois, {after}. Com "
+            "um trecho de menos de um ano servem para comparar os dois; não são o resultado de "
+            "um ano inteiro."
+        ),
         "recent_year": "Ano de fechamento",
         "fund": "O que quem investe em um fundo revisaria",
         "fund_intro": (
@@ -674,6 +713,10 @@ REPORT: dict[str, Any] = {
         "instruments": "Funciona em cada instrumento?",
         "ins_intro": (
             "Quando um robô ou um sinal opera vários mercados, o total pode vir de um só "
+            "enquanto os demais perdem. Não muda a classe: são perguntas a fazer."
+        ),
+        "ins_intro_account": (
+            "Quando uma conta ou um sinal opera vários mercados, o total pode vir de um só "
             "enquanto os demais perdem. Não muda a classe: são perguntas a fazer."
         ),
         "ins_head": "Instrumento",
@@ -914,6 +957,10 @@ REPORT: dict[str, Any] = {
             "Se você comprou ou está para comprar este robô ou sinal, isto é o que convém "
             "esclarecer primeiro, segundo o que a auditoria encontrou."
         ),
+        "next_intro_account": (
+            "Se você copia, comprou ou está para comprar esta conta ou sinal, isto é o que "
+            "convém esclarecer primeiro, segundo o que a auditoria encontrou."
+        ),
         "next_live": (
             "Pergunte ao vendedor por que sua conta real fica fora do que o backtest levava a "
             "esperar."
@@ -1008,9 +1055,9 @@ REPORT: dict[str, Any] = {
         "challenge_rules": "Regras simuladas",
         "open_loss_badge": "Perdas abertas",
         "ch_unseen_open": (
-            "A perda aberta de {share} do saldo, que seguia aberta quando o histórico foi "
-            "impresso, já conta contra os limites de perda diária e total de qualquer desafio, e "
-            "os números abaixo não a veem: o saldo conta só operações fechadas."
+            "A perda aberta de {share} do saldo ({tag}), que seguia aberta quando o histórico "
+            "foi impresso, já conta contra os limites de perda diária e total de qualquer "
+            "desafio, e os números abaixo não a veem: o saldo conta só operações fechadas."
         ),
         "ch_unseen_open_any": (
             "As perdas abertas que o saldo esconde já contam contra os limites de perda diária e "
@@ -6266,6 +6313,26 @@ RULES: tuple[tuple[str, str], ...] = (
     (
         "Ask for the full list of closed trades with sizes, prices and dates.",
         "Peça a lista completa de operações fechadas com tamanhos, preços e datas.",
+    ),
+    (
+        (
+            "Does this account or signal increase size after a loss? What is the largest size "
+            "it can open?"
+        ),
+        (
+            "Esta conta ou sinal aumenta o tamanho depois de uma perda? Qual é o tamanho máximo "
+            "que pode chegar a abrir?"
+        ),
+    ),
+    (
+        (
+            "Does this account or signal add positions against the move when price moves away? "
+            "How many at most?"
+        ),
+        (
+            "Esta conta ou sinal abre posições adicionais contra o movimento quando o preço se "
+            "afasta? Quantas no máximo?"
+        ),
     ),
     (
         "Does the robot increase size after a loss? What is the largest size it can open?",

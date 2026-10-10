@@ -1097,6 +1097,25 @@ _QUESTIONS: dict[str, dict[str, str]] = {
     },
 }
 
+#: The questions an account or signal is asked in its own words: the stored
+#: wording of ``vendor_questions`` for an account history, and the one the
+#: report shows over a result stored before it (``question_now``). A signal
+#: may have no robot behind it, so these ask about the account or signal.
+ACCOUNT_QUESTIONS: dict[str, dict[str, str]] = {
+    "martingale": {
+        "es": "¿Esta cuenta o señal aumenta el tamaño después de una pérdida? ¿Cuál es el "
+        "tamaño máximo que puede llegar a abrir?",
+        "en": "Does this account or signal increase size after a loss? What is the largest "
+        "size it can open?",
+    },
+    "grid": {
+        "es": "¿Esta cuenta o señal abre posiciones adicionales en contra cuando el precio se "
+        "aleja? ¿Cuántas como máximo?",
+        "en": "Does this account or signal add positions against the move when price moves "
+        "away? How many at most?",
+    },
+}
+
 _FLAG_QUESTIONS: dict[str, str] = {
     "MARTINGALE_SIZING": "martingale",
     "GRID_AVERAGING": "grid",
@@ -1138,10 +1157,13 @@ _QUESTION_ORDER: tuple[str, ...] = tuple(k for k in _QUESTIONS if k != "live_rec
 REWORDED_QUESTIONS: frozenset[str] = frozenset({"backtest_match"})
 
 
-def question_now(code: str) -> dict[str, str] | None:
+def question_now(code: str, *, account: bool = False) -> dict[str, str] | None:
     """The current Spanish and English of a stored question that was reworded
-    (``REWORDED_QUESTIONS``), so a result stored earlier reads as the plan does;
+    (``REWORDED_QUESTIONS``), so a result stored earlier reads as the plan does,
+    and an account or signal's own wording (``account``, ``ACCOUNT_QUESTIONS``);
     None for every other question, which keeps its stored text."""
+    if account and code in ACCOUNT_QUESTIONS:
+        return dict(ACCOUNT_QUESTIONS[code])
     if code not in REWORDED_QUESTIONS:
         return None
     return dict(_QUESTIONS[code])
@@ -1175,7 +1197,9 @@ def vendor_questions(
 
     An account history (``account_history``) is the live record itself and
     its prices are real fills, so the backtest questions (modelling, trials,
-    held-out period, assumed costs) give way to the ones an investor needs.
+    held-out period, assumed costs) give way to the ones an investor needs,
+    and the sizing and grid questions ask about the account or signal, which
+    may have no robot behind it (``ACCOUNT_QUESTIONS``).
     A fund's monthly record (``fund_record``) has no robot and no trades:
     it gets the questions a fund investor asks, plus the data-quality one.
     """
@@ -1218,7 +1242,9 @@ def vendor_questions(
     out: list[dict[str, str]] = []
     for key in _QUESTION_ORDER:
         if key in wanted:
-            text = _QUESTIONS[key]
+            text = (
+                ACCOUNT_QUESTIONS.get(key, _QUESTIONS[key]) if account_history else _QUESTIONS[key]
+            )
             if key == "live_record" and months > LIVE_RECORD_ASK_MONTHS:
                 # Years of live history is not a fair ask: say what it would take instead.
                 text = _QUESTIONS["live_record_long"]
@@ -1233,6 +1259,7 @@ def vendor_questions(
 
 
 __all__ = [
+    "ACCOUNT_QUESTIONS",
     "CHALLENGE_ASSUMPTIONS",
     "DRAWDOWN_THRESHOLDS",
     "FAN_QUANTILES",

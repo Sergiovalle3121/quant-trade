@@ -453,6 +453,76 @@ FLAG_HINTS: dict[str, dict[str, str]] = {
     },
 }
 
+#: The hints a builder follows with a backtest (``FLAG_HINTS``) as whoever holds
+#: or copies an account or signal can act on them: ask its provider for the
+#: sizes, the positions and the curve, and compare with a history at a fixed
+#: size or without averaging when one exists. The buyer's wording; the other
+#: voices are ``ownership.PLAN["account_flag_<code>"]``.
+ACCOUNT_FLAG_HINTS: dict[str, dict[str, str]] = {
+    "MARTINGALE_SIZING": {
+        "es": (
+            "El tamaño crece tras las pérdidas: pide al proveedor el tamaño máximo que puede "
+            "abrir esta cuenta o señal y, si existe, un historial de la misma estrategia con "
+            "tamaño fijo para compararlo con este."
+        ),
+        "en": (
+            "Size grows after losses: ask the provider for the largest size this account or "
+            "signal can open and, if there is one, a history of the same strategy at a fixed "
+            "size to compare with this one."
+        ),
+        "pt": (
+            "O tamanho cresce após as perdas: peça ao provedor o tamanho máximo que esta conta "
+            "ou sinal pode abrir e, se existir, um histórico da mesma estratégia com tamanho "
+            "fixo para comparar com este."
+        ),
+    },
+    "GRID_AVERAGING": {
+        "es": (
+            "Se abren posiciones contra la posición perdedora: pide al proveedor cuántas abre "
+            "como máximo esta cuenta o señal y, si existe, el historial de la misma estrategia "
+            "sin promediar, para ver cuánto depende de ello."
+        ),
+        "en": (
+            "Positions are added against the losing one: ask the provider how many this account "
+            "or signal opens at most and, if there is one, the history of the same strategy "
+            "without averaging, to see how much depends on it."
+        ),
+        "pt": (
+            "Abrem-se posições contra a posição perdedora: pergunte ao provedor quantas esta "
+            "conta ou sinal abre no máximo e peça, se existir, o histórico da mesma estratégia "
+            "sem preço médio, para ver quanto depende disso."
+        ),
+    },
+    "MANY_CONCURRENT_POSITIONS": {
+        "es": (
+            "Pide al proveedor cuántas posiciones abre como máximo a la vez esta cuenta o señal "
+            "y la curva de equity con flotante, que muestra lo que pierden juntas."
+        ),
+        "en": (
+            "Ask the provider how many positions this account or signal opens at most at once, "
+            "and for the equity curve with floating P&L, which shows what they lose together."
+        ),
+        "pt": (
+            "Pergunte ao provedor quantas posições esta conta ou sinal abre no máximo ao mesmo "
+            "tempo e peça a curva de patrimônio com flutuante, que mostra o que perdem juntas."
+        ),
+    },
+    "HIDDEN_FLOATING_DRAWDOWN": {
+        "es": (
+            "El historial solo muestra el balance: pide al proveedor la curva de equity (con "
+            "flotante) de esta cuenta para medir el drawdown real."
+        ),
+        "en": (
+            "The history shows only the balance: ask the provider for this account's equity "
+            "curve (with floating P&L) to measure the real drawdown."
+        ),
+        "pt": (
+            "O histórico mostra só o saldo: peça ao provedor a curva de patrimônio (com "
+            "flutuante) desta conta para medir o drawdown real."
+        ),
+    },
+}
+
 GENERIC_FLAG_HINT = {
     "es": "Revisa el detalle de la bandera en la tabla de banderas rojas.",
     "en": "Check the flag's detail in the red-flag table.",
@@ -1454,13 +1524,21 @@ def _data_quality_step(data: dict[str, Any], status: str, locale: str) -> tuple[
     seen: set[str] = set()
     actions = []
     role = ownership.role_of(data)
+    # An account or signal has no backtest to upload: its hints are what its
+    # holder, its provider or a reader can ask for or compare.
+    account = is_account_history(data) and not _fund_record(data)
     for flag in flags:
         code = str(flag.get("code", ""))
         if code in seen:
             continue
         seen.add(code)
         hint = (
-            ownership.plan_text(f"flag_{code}", locale, role)
+            (
+                ownership.plan_text(f"account_flag_{code}", locale, role)
+                or ACCOUNT_FLAG_HINTS[code][locale]
+            )
+            if account and code in ACCOUNT_FLAG_HINTS
+            else ownership.plan_text(f"flag_{code}", locale, role)
             or FLAG_HINTS.get(code, GENERIC_FLAG_HINT)[locale]
         )
         actions.append(f"{flag_title(code, locale)}. {hint}")
@@ -1539,4 +1617,11 @@ def improvement_plan(data: dict[str, Any], locale: str = "es") -> list[PlanStep]
 # The Portuguese of the tables above, over their English (see ``report_pt``).
 report_pt.install(globals(), report_pt.PLAN)
 
-__all__ = ["FLAG_HINTS", "PLAN_ORDER", "PlanStep", "TITLES", "improvement_plan"]
+__all__ = [
+    "ACCOUNT_FLAG_HINTS",
+    "FLAG_HINTS",
+    "PLAN_ORDER",
+    "PlanStep",
+    "TITLES",
+    "improvement_plan",
+]

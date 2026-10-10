@@ -35,8 +35,9 @@ from quant_trade.audit.crises import (
 )
 from quant_trade.audit.decay import is_weaker
 from quant_trade.audit.decay import signed_amount as _signed_amount
+from quant_trade.audit.engine import _ASSUMED_BALANCE_WARNING as ASSUMED_BALANCE_WARNING
 from quant_trade.audit.engine import _NO_PRINTED_BALANCE_REASON as NO_PRINTED_BALANCE_REASON
-from quant_trade.audit.engine import SIZING_NO_SIZE_BEFORE
+from quant_trade.audit.engine import LADDER_UNDECLARED, SIZING_NO_SIZE_BEFORE
 from quant_trade.audit.forensics.calibration import CALIBRATION
 from quant_trade.audit.forensics.copy import CHECK_NAMES as FORENSIC_CHECK_NAMES
 from quant_trade.audit.forensics.review import METHOD_VERSION as FORENSIC_METHOD_VERSION
@@ -53,6 +54,7 @@ from quant_trade.audit.importers import (
 from quant_trade.audit.instruments import MIN_EACH as _INSTRUMENTS_MIN
 from quant_trade.audit.instruments import OTHER as _INSTRUMENTS_OTHER
 from quant_trade.audit.legal import LINK_TEXT, legal_url
+from quant_trade.audit.luck import NOTE as LUCK_NOTE
 from quant_trade.audit.method import COPY as METHOD_COPY
 from quant_trade.audit.method import method_url
 from quant_trade.audit.plan import improvement_plan
@@ -828,6 +830,39 @@ LABELS: dict[str, dict[str, str]] = {
         ),
         "luck_span_line": "Sharpe del archivo: {sharpe}. Historial: {span}.",
         "luck_table_trials": "Configuraciones probadas",
+        # An account or signal: its trials are the accounts or signals behind it.
+        "luck_intro_account": (
+            "Cuantas más cuentas o señales se abren con una estrategia, más alto sale el Sharpe "
+            "de la mejor aunque ninguna tenga ventaja. Aquí ponemos el Sharpe de este historial "
+            "junto al que daría la pura suerte con las cuentas o señales contadas, con la "
+            "matemática publicada de Bailey y López de Prado y de Harvey y Liu. Es el mismo "
+            "cálculo que decide la dimensión «Número de cuentas o señales detrás de esta», "
+            "dicho en números."
+        ),
+        "luck_table_trials_account": "Cuentas o señales detrás",
+        "luck_narrow_account": (
+            "El Sharpe de {sharpe} supera al {luck} que darían {n} cuentas o señales sin "
+            "habilidad, pero no con el margen que pedimos: la confianza de que no sea suerte "
+            "(DSR) es del {dsr}, y para superar esta dimensión pedimos {need}."
+        ),
+        "luck_beats_account": (
+            "El Sharpe de {sharpe} supera al {luck} que darían {n} cuentas o señales sin habilidad."
+        ),
+        "luck_below_account": (
+            "Con {n} cuentas o señales, la pura suerte daría un Sharpe de {luck}, igual o más "
+            "que el {sharpe} de este historial."
+        ),
+        "luck_sharpe_account": (
+            "Sharpe que darían {n} cuentas o señales sin habilidad (el del historial: {sharpe})"
+        ),
+        "luck_after_account": (
+            "Sharpe que queda tras descontar {n} cuentas o señales (Harvey y Liu)"
+        ),
+        "luck_note_account": (
+            "E[Sharpe máximo] de intentos sin habilidad (Bailey y López de Prado); longitud "
+            "mínima del historial (Bailey, Borwein, López de Prado y Zhu); descuento de "
+            "Bonferroni (Harvey y Liu)"
+        ),
         "luck_table_luck": "Sharpe que daría la suerte",
         "luck_table_years": "Historial necesario",
         "luck_table_enough": "¿Alcanza este historial?",
@@ -840,6 +875,10 @@ LABELS: dict[str, dict[str, str]] = {
         "luck_month_one": "1 mes",
         "luck_under_month": "menos de 1 mes",
         "luck_almost_year": "casi 12 meses",
+        "ch_ladder_undeclared_account": (
+            "no se declaró el número de intentos: el descuento necesita saber cuántas cuentas o "
+            "señales hay detrás de esta"
+        ),
         "ride": "Cómo se vivió este historial",
         "ride_intro": (
             "Un total y una caída máxima no dicen cómo se vivió el historial: cuánto tiempo pasó "
@@ -938,6 +977,11 @@ LABELS: dict[str, dict[str, str]] = {
         "shift_after": "Rentabilidad media al año desde el {date}",
         "shift_band": "banda del 90 %: {low} a {high}",
         "shift_floor": "{pct} o peor",
+        "shift_short": (
+            "Son tasas anualizadas: el tramo de antes dura {before} y el de después, {after}. "
+            "Con un tramo de menos de un año sirven para comparar los dos; no son el resultado "
+            "de un año entero."
+        ),
         "fund": "Lo que revisaría quien invierte en un fondo",
         "fund_intro": (
             "Las cifras de una ficha de fondo y dos pruebas que usan los analistas de fondos: "
@@ -1417,6 +1461,10 @@ LABELS: dict[str, dict[str, str]] = {
             "Cuando un robot o una señal opera varios mercados, el total puede venir de uno "
             "solo mientras los demás pierden. No cambia la clase: son preguntas para hacer."
         ),
+        "ins_intro_account": (
+            "Cuando una cuenta o una señal opera varios mercados, el total puede venir de uno "
+            "solo mientras los demás pierden. No cambia la clase: son preguntas para hacer."
+        ),
         "ins_head": "Instrumento",
         "ins_other": "Otros ({n} con menos de {m} operaciones)",
         "ins_best": "Parte del resultado neto que viene de {best}",
@@ -1652,6 +1700,10 @@ LABELS: dict[str, dict[str, str]] = {
             "Si compraste o vas a comprar este robot o señal, esto es lo que conviene aclarar "
             "primero, según lo que encontró la auditoría."
         ),
+        "next_intro_account": (
+            "Si copias, compraste o vas a comprar esta cuenta o señal, esto es lo que conviene "
+            "aclarar primero, según lo que encontró la auditoría."
+        ),
         "next_live": (
             "Pregunta al vendedor por qué tu cuenta real queda fuera de lo que el backtest "
             "hacía esperar."
@@ -1746,9 +1798,10 @@ LABELS: dict[str, dict[str, str]] = {
         "challenge_rules": "Reglas simuladas",
         "open_loss_badge": "Pérdidas abiertas",
         "ch_unseen_open": (
-            "La pérdida abierta del {share} del balance, que seguía abierta cuando se imprimió el "
-            "historial, ya cuenta contra los límites de pérdida diaria y total de cualquier reto, "
-            "y las cifras de abajo no la ven: el balance solo cuenta operaciones cerradas."
+            "La pérdida abierta del {share} del balance ({tag}), que seguía abierta cuando se "
+            "imprimió el historial, ya cuenta contra los límites de pérdida diaria y total de "
+            "cualquier reto, y las cifras de abajo no la ven: el balance solo cuenta operaciones "
+            "cerradas."
         ),
         "ch_unseen_open_any": (
             "Las pérdidas abiertas que el balance oculta ya cuentan contra los límites de pérdida "
@@ -2480,6 +2533,39 @@ LABELS: dict[str, dict[str, str]] = {
         ),
         "luck_span_line": "The file's Sharpe: {sharpe}. History: {span}.",
         "luck_table_trials": "Configurations tried",
+        # An account or signal: its trials are the accounts or signals behind it.
+        "luck_intro_account": (
+            "The more accounts or signals are run with a strategy, the higher the best one's "
+            "Sharpe comes out even when none has an edge. Here this history's Sharpe sits next "
+            "to what pure luck would give with the accounts or signals counted, using the "
+            "published math of Bailey and López de Prado and of Harvey and Liu. It is the same "
+            'calculation that decides the "Number of accounts or signals behind it" dimension, '
+            "in numbers."
+        ),
+        "luck_table_trials_account": "Accounts or signals behind it",
+        "luck_narrow_account": (
+            "The Sharpe of {sharpe} beats the {luck} that {n} accounts or signals with no skill "
+            "would show, but not by the margin we ask: the confidence that it is not luck (DSR) "
+            "is {dsr}, and passing this dimension needs {need}."
+        ),
+        "luck_beats_account": (
+            "The Sharpe of {sharpe} beats the {luck} that {n} accounts or signals with no skill "
+            "would show."
+        ),
+        "luck_below_account": (
+            "With {n} accounts or signals, pure luck would show a Sharpe of {luck}, as much as "
+            "or more than this history's {sharpe}."
+        ),
+        "luck_sharpe_account": (
+            "Sharpe {n} accounts or signals with no skill would show (the history's: {sharpe})"
+        ),
+        "luck_after_account": (
+            "Sharpe left after discounting {n} accounts or signals (Harvey and Liu)"
+        ),
+        "luck_note_account": (
+            "E[max Sharpe] of unskilled trials (Bailey & Lopez de Prado); minimum history "
+            "length (Bailey, Borwein, Lopez de Prado & Zhu); Bonferroni haircut (Harvey & Liu)"
+        ),
         "luck_table_luck": "Sharpe luck would show",
         "luck_table_years": "History needed",
         "luck_table_enough": "Is this history enough?",
@@ -2492,6 +2578,10 @@ LABELS: dict[str, dict[str, str]] = {
         "luck_month_one": "1 month",
         "luck_under_month": "under 1 month",
         "luck_almost_year": "almost 12 months",
+        "ch_ladder_undeclared_account": (
+            "trial count not declared: the haircut needs to know how many accounts or signals "
+            "stand behind this one"
+        ),
         "ride": "What living through this history was like",
         "ride_intro": (
             "A total and a maximum drawdown do not say what the history was like to live "
@@ -2585,6 +2675,11 @@ LABELS: dict[str, dict[str, str]] = {
         "shift_after": "Average return a year since {date}",
         "shift_band": "90 % band: {low} to {high}",
         "shift_floor": "{pct} or worse",
+        "shift_short": (
+            "These are annualised rates: the stretch before lasts {before} and the one after, "
+            "{after}. With a stretch under a year they compare the two; they are not a full "
+            "year's result."
+        ),
         "fund": "What a fund investor would check",
         "fund_intro": (
             "A fund factsheet's figures and two tests fund analysts use: whether the monthly "
@@ -3052,6 +3147,10 @@ LABELS: dict[str, dict[str, str]] = {
             "When a robot or a signal trades several markets, the total can come from one of "
             "them while the others lose. It does not change the class: these are questions to ask."
         ),
+        "ins_intro_account": (
+            "When an account or a signal trades several markets, the total can come from one of "
+            "them while the others lose. It does not change the class: these are questions to ask."
+        ),
         "ins_head": "Instrument",
         "ins_other": "Others ({n} with fewer than {m} trades)",
         "ins_best": "Share of the net result that comes from {best}",
@@ -3284,6 +3383,10 @@ LABELS: dict[str, dict[str, str]] = {
             "If you bought or are about to buy this robot or signal, this is what is worth "
             "clearing up first, from what the audit found."
         ),
+        "next_intro_account": (
+            "If you copy, have bought or are about to buy this account or signal, this is what "
+            "is worth clearing up first, from what the audit found."
+        ),
         "next_live": (
             "Ask the seller why your live account falls outside what the backtest led you "
             "to expect."
@@ -3375,9 +3478,9 @@ LABELS: dict[str, dict[str, str]] = {
         "challenge_rules": "Rules simulated",
         "open_loss_badge": "Open losses",
         "ch_unseen_open": (
-            "The open loss of {share} of the balance, still open when the history was printed, "
-            "already counts against the daily and total loss limits of any challenge, and the "
-            "figures below do not see it: the balance counts closed trades only."
+            "The open loss of {share} of the balance ({tag}), still open when the history was "
+            "printed, already counts against the daily and total loss limits of any challenge, "
+            "and the figures below do not see it: the balance counts closed trades only."
         ),
         "ch_unseen_open_any": (
             "The open losses the balance hides already count against the daily and total loss "
@@ -3778,6 +3881,15 @@ DIMENSION_TITLES: dict[str, dict[str, str]] = {
         "data_quality": "Data quality and trading pattern",
         "benchmark": "Benchmark",
     },
+}
+
+#: The dimensions an account or signal names by what it counts: its trials are
+#: the accounts or signals behind it (``ownership.PLAN["account_trials"]``), not
+#: the configurations a backtest tried. Every other name is the backtest's.
+DIMENSION_TITLES_ACCOUNT: dict[str, dict[str, str]] = {
+    "es": {"multiplicity": "Número de cuentas o señales detrás de esta"},
+    "en": {"multiplicity": "Number of accounts or signals behind it"},
+    "pt": {"multiplicity": "Número de contas ou sinais por trás desta"},
 }
 
 STATUS_TEXT: dict[str, dict[str, str]] = {
@@ -4595,8 +4707,17 @@ def _status_badge(status: str, locale: str) -> str:
     return f'<span class="badge {_e(status)}">{_e(text)}</span>'
 
 
-def _dimension_title(name: str, locale: str) -> str:
+def _dimension_title(name: str, locale: str, *, account: bool = False) -> str:
+    """A dimension's name; ``account``: an account or signal's, by what it counts."""
+    if account and (title := DIMENSION_TITLES_ACCOUNT.get(locale, {}).get(name)):
+        return title
     return DIMENSION_TITLES.get(locale, DIMENSION_TITLES["es"]).get(name, name)
+
+
+def _account_page(data: Mapping[str, Any] | None) -> bool:
+    """An account or signal's report (``report_kind``): its texts name the
+    account or signal and what it counts, never a robot or its configurations."""
+    return data is not None and report_kind(dict(data)) == "account"
 
 
 def _meaning_html(
@@ -4632,7 +4753,7 @@ def _meaning_html(
         )
         items.append(
             f"<div class='item s-{_e(dimension['status'])}'>"
-            f"<h3>{_e(_dimension_title(name, locale))} "
+            f"<h3>{_e(_dimension_title(name, locale, account=account and not fund))} "
             f"{_status_badge(dimension['status'], locale)}</h3>"
             f"<p>{_e(text)}</p></div>"
         )
@@ -4646,6 +4767,7 @@ def _reasons_html(
     data: dict[str, Any] | None = None,
 ) -> str:
     rows = []
+    account = _account_page(data)
     for d in verdict["dimensions"]:
         reasons = d.get("reasons_es") if locale == "es" and d.get("reasons_es") else d["reasons"]
         if locale == "pt":
@@ -4654,7 +4776,7 @@ def _reasons_html(
             # The PSR the class used, under the name the plan and the table give it.
             reasons = [_class_psr_reason(reason, data, locale) for reason in reasons]
         rows.append(
-            f"<tr><td>{_e(_dimension_title(d['name'], locale))}</td>"
+            f"<tr><td>{_e(_dimension_title(d['name'], locale, account=account))}</td>"
             f"<td>{_status_badge(d['status'], locale)}</td><td>{_e('; '.join(reasons))}</td></tr>"
         )
     return (
@@ -5450,7 +5572,8 @@ def _dependence_html(
     else:
         n = f"{int(count):,}"
         out = labels["dependence_line"].format(
-            ratio=f"{ratio:.2f}" if ratio < 1.1 else f"{ratio:.1f}",
+            # As the multiplicity table shows the same ratio: one rounding for both.
+            ratio=_fmt(ratio, key="dependence_ratio"),
             plain=_table_pct(plain),
             psr=_table_pct(psr),
         )
@@ -5605,10 +5728,17 @@ def _risk_html(
         html_text += hidden_note
     if risk.get("status") == "MEASURED":
         dd = risk["max_drawdown"]
+
+        def fall(value: Any) -> str:
+            # A drawdown reads as a fall, with the minus sign the summary's tile gives it.
+            if isinstance(value, (int, float)) and not isinstance(value, bool):
+                return _fmt(-abs(float(value)), key="p50")
+            return _fmt(value, key="p50")
+
         html_text += (
             "<div class='facts'>"
             + "".join(
-                f"<div class='fact'><b>{_e(_fmt(dd[q].get('value'), key='p50'))}</b>"
+                f"<div class='fact'><b>{_e(fall(dd[q].get('value')))}</b>"
                 f"<p>{_e(labels['risk_dd'])} · {q} "
                 f"{_badge(dd[q].get('evidence', 'NOT_MEASURED'))}</p></div>"
                 for q in ("p50", "p95", "p99")
@@ -5833,7 +5963,14 @@ def unseen_open_loss_warning(data: dict[str, Any], labels: dict[str, str]) -> st
         return ""
     hidden = "HIDDEN_FLOATING_DRAWDOWN" in _unseen_flags(data)
     if share is not None:
-        text = labels["ch_unseen_open"].format(share=_loss_share(share))
+        # The figure carries its tag, as in the account's section: the file
+        # declares it (the account review's floating share, or the flag's
+        # figure, which is that same declared share).
+        floating = _own_account(data).get("floating_share") or {}
+        tag = str(floating.get("evidence")) if _ev_value(floating) is not None else "DECLARED"
+        text = labels["ch_unseen_open"].format(
+            share=_loss_share(share), tag=evidence_label(tag, _locale_of(labels))
+        )
         if hidden:
             text += " " + labels["ch_unseen_hidden_also"]
     else:
@@ -5871,6 +6008,8 @@ def _challenge_html(
     platform_dd: float | None = None,
     hidden_note: str = "",
     unseen_warning: str = "",
+    *,
+    account: bool = False,
 ) -> str:
     """The prop-firm challenge simulator. ``unseen_warning``
     (``unseen_open_loss_warning``) opens the section when the balance hides an
@@ -5961,7 +6100,12 @@ def _challenge_html(
                 f"{_badge('MEASURED')}</p>"
             )
         ladder = _challenge_ladder_html(
-            challenge.get("scenarios"), locale, labels, optimistic=optimistic, market=market_line
+            challenge.get("scenarios"),
+            locale,
+            labels,
+            optimistic=optimistic,
+            market=market_line,
+            account=account,
         )
         figures += ladder
         sizes = _challenge_sizing_html(
@@ -6086,11 +6230,13 @@ def _challenge_ladder_html(
     *,
     optimistic: bool = False,
     market: str = "",
+    account: bool = False,
 ) -> str:
     """The chosen program again on parts of the history and with what the
     report discounts, so the full-history figure is never read alone.
     ``market`` is the section's line when the program's page does not take
-    what the history trades."""
+    what the history trades. ``account``: an account or signal's, whose
+    undeclared trials are the accounts or signals behind it."""
     if not scenarios or scenarios.get("status") != "MEASURED" or not scenarios.get("rows"):
         return ""
     program = scenarios.get("program") or {}
@@ -6122,7 +6268,12 @@ def _challenge_ladder_html(
         )
         item = row.get("pass") or {}
         if item.get("evidence") != "MEASURED":
-            reason = localize(str(item.get("note", "")), locale)
+            note = str(item.get("note", ""))
+            reason = (
+                labels["ch_ladder_undeclared_account"]
+                if account and note == LADDER_UNDECLARED
+                else localize(note, locale)
+            )
             return (
                 f"<tr>{cells}<td colspan='{span}' data-l='{_e(target)}'>"
                 f"<span>{_badge('NOT_MEASURED')} <span class='muted'>{_e(reason)}</span>"
@@ -6596,18 +6747,27 @@ def _firm_fit_html(
     return out
 
 
-def _question_text(question: dict[str, str], locale: str) -> str:
-    # A question reworded since the result was stored reads as the plan does now.
-    question = {**question, **(question_now(str(question.get("code", ""))) or {})}
+def _question_text(question: dict[str, str], locale: str, *, account: bool = False) -> str:
+    # A question reworded since the result was stored reads as the plan does now;
+    # an account or signal's asks about it, not about a robot (``account``).
+    code = str(question.get("code", ""))
+    question = {**question, **(question_now(code, account=account) or {})}
     if locale == "pt":
         # A result stores its questions in Spanish and English only.
         return localize(question.get("en", ""), locale)
     return question.get(locale) or question.get("es", "")
 
 
-def _questions_html(questions: list[dict[str, str]], locale: str, labels: dict[str, str]) -> str:
+def _questions_html(
+    questions: list[dict[str, str]],
+    locale: str,
+    labels: dict[str, str],
+    *,
+    account: bool = False,
+) -> str:
     """The open questions, in the voice the labels carry: to put to the seller,
-    to answer with one's own files, or that clients will ask."""
+    to answer with one's own files, or that clients will ask. ``account``: an
+    account or signal's, asked and answered about it."""
     if not questions:
         return f"<p class='muted'>{_e(labels['none'])}</p>"
     role = getattr(labels, "role", ownership.BUYER)
@@ -6615,7 +6775,13 @@ def _questions_html(questions: list[dict[str, str]], locale: str, labels: dict[s
     items = "".join(
         "<li>"
         + _e(
-            ownership.question_item(str(q.get("code", "")), _question_text(q, locale), locale, role)
+            ownership.question_item(
+                str(q.get("code", "")),
+                _question_text(q, locale, account=account),
+                locale,
+                role,
+                account=account,
+            )
         )
         + "</li>"
         for q in questions
@@ -6761,7 +6927,7 @@ def _seller_message(
     number of questions it carries and of questions asked.
 
     Built from the report only: the class, the dimensions that do not pass
-    (failed or weak) and those not measured (a class short of a full
+    and, apart, the weak ones, those not measured (a class short of a full
     conclusion says why), ``_seller_figures``, the buyer's open questions in the
     seller's wording (``seller_message.seller_question``), the public page when
     ``public_id`` is given (only a published report has one) and the closing
@@ -6770,25 +6936,32 @@ def _seller_message(
     many more are in the report."""
     words = seller_message.words(locale)
     fund = report_kind(data) == "fund"
+    account = _account_page(data)
     verdict = data["verdict"]
-    status_words = STATUS_TEXT.get(locale, STATUS_TEXT["es"])
     by_name = {d.get("name"): d.get("status") for d in verdict.get("dimensions", [])}
-    short = [
-        f"{_dimension_title(name, locale)} ({status_words[status].lower()})"
-        for name in DIMENSION_ORDER
-        if (status := by_name.get(name)) in ("FAIL", "WEAK")
-    ]
+
+    def titles(status: str) -> list[str]:
+        return [
+            _dimension_title(name, locale, account=account)
+            for name in DIMENSION_ORDER
+            if by_name.get(name) == status
+        ]
+
+    # What fails and what is weak are two lists: a weak dimension is not one
+    # that "does not pass".
+    failed, weak = titles("FAIL"), titles("WEAK")
     # Missing pieces keep a class short of a full conclusion; "none fail" alone hides them.
-    unmeasured = [
-        _dimension_title(name, locale)
-        for name in DIMENSION_ORDER
-        if by_name.get(name) == "NOT_MEASURED"
-    ]
+    unmeasured = titles("NOT_MEASURED")
+    dimensions = (
+        words["dimensions"].format(items=", ".join(failed)) if failed else words["dimensions_none"]
+    )
+    if weak:
+        dimensions += " " + words["dimensions_weak"].format(items=", ".join(weak))
     head = [
         words["hello_fund" if fund else "hello"],
         "",
         words["class"].format(cls=verdict["overall"]),
-        words["dimensions"].format(items=", ".join(short)) if short else words["dimensions_none"],
+        dimensions,
         *([words["unmeasured"].format(items=", ".join(unmeasured))] if unmeasured else []),
         "",
         words["figures"],
@@ -6797,7 +6970,9 @@ def _seller_message(
         words["questions"],
     ]
     asked = [
-        seller_message.seller_question(str(q.get("code", "")), _question_text(q, locale), locale)
+        seller_message.seller_question(
+            str(q.get("code", "")), _question_text(q, locale, account=account), locale
+        )
         for q in ownership.open_questions(data, ownership.BUYER)
     ]
     tail = ["", words["thanks"], ""]
@@ -7082,14 +7257,39 @@ def declared_open_value(data: dict[str, Any]) -> dict[str, Any] | None:
     return {"value": number, "evidence": "DECLARED", "note": ACCOUNT_FLOATING_NOTE}
 
 
+def declared_initial_value(data: dict[str, Any]) -> dict[str, Any] | None:
+    """The starting balance the imported report states (DECLARED, as the
+    result's inputs and the size table tag it), when it is the figure the
+    reconciliation starts from. The engine starts there whenever a report
+    states one and tags it Measured all the same; a curve's own first value,
+    or a balance assumed because the file states none, keeps the stored tag.
+    None then."""
+    inputs = data.get("inputs") or {}
+    stated = inputs.get("initial_balance") or {}
+    start = (data.get("reconciliation") or {}).get("initial_capital") or {}
+    value, used = stated.get("value"), start.get("value")
+    if stated.get("evidence") != "DECLARED" or not isinstance(value, int | float):
+        return None
+    if not isinstance(used, int | float) or float(used) != float(value):
+        return None
+    if any(ASSUMED_BALANCE_WARNING in str(w) for w in inputs.get("parse_warnings") or []):
+        return None
+    return {**start, "evidence": "DECLARED"}
+
+
 def _reconciliation_html(
-    recon: dict[str, Any] | None, locale: str, open_value: dict[str, Any] | None = None
+    recon: dict[str, Any] | None,
+    locale: str,
+    open_value: dict[str, Any] | None = None,
+    initial_value: dict[str, Any] | None = None,
 ) -> str:
     """The money reconciliation. ``open_value`` (``declared_open_value``) is the
     floating result the file declares: when the reconciliation has no valuation
     of its own, its row shows that figure as Declared, with its note and why it
     stays out of the expected balance, the same figure the account's section
-    shows. Every figure of the reconciliation stays as stored."""
+    shows. ``initial_value`` (``declared_initial_value``) is the starting
+    balance the report states: its row carries the tag the size table gives
+    the same figure. Every figure of the reconciliation stays as stored."""
     if not recon:
         return ""
     copy = INTEGRITY_TEXT[locale]
@@ -7152,6 +7352,8 @@ def _reconciliation_html(
         item = recon.get(key)
         if key == "open_position_value" and declared_open is not None:
             item = declared_open
+        if key == "initial_capital" and initial_value is not None:
+            item = initial_value
         evidence = (
             str(item.get("evidence", "NOT_MEASURED")) if isinstance(item, dict) else "NOT_MEASURED"
         )
@@ -8229,12 +8431,41 @@ def _p_text(value: float) -> str:
     return "< 0.001" if value < 0.001 else f"= {value:.3f}"
 
 
-def _shift_html(shift: dict[str, Any], locale: str, labels: dict[str, str]) -> str:
+def _shift_html(
+    shift: dict[str, Any],
+    locale: str,
+    labels: dict[str, str],
+    *,
+    periods_per_year: float | None = None,
+) -> str:
     """Whether the average return shifted at some point, with the date's range
-    and the two averages when it did."""
+    and the two averages when it did.
+
+    The two averages are annual rates. When either stretch is shorter than a
+    year (its returns over ``periods_per_year``), the sentence says so and how
+    long each stretch lasts: the page does not annualise the whole history
+    under a year, so a short stretch's rate is never read as a year's result.
+    The figures are as stored."""
     p_value = _ev_value(shift.get("p_value"))
     if p_value is None:
         return ""
+
+    def length(count: Any) -> str | None:
+        if not isinstance(count, int) or not periods_per_year or periods_per_year <= 0:
+            return None
+        months = count / periods_per_year * 12
+        if months >= 12:
+            return f"{months / 12:.1f} {labels['luck_years_unit']}"
+        if months < 1:
+            return labels["luck_under_month"]
+        return labels["luck_months"].format(n=f"{months:.1f}")
+
+    counts = [(shift.get(side) or {}).get("returns") for side in ("before", "after")]
+    spans = [length(count) for count in counts]
+    year = float(periods_per_year or 0.0)
+    short = ""
+    if all(spans) and any(isinstance(count, int) and count < year for count in counts):
+        short = " " + labels["shift_short"].format(before=spans[0], after=spans[1])
 
     def annual(value: float) -> str:
         # A yearly average below -100 % says nothing a reader can picture: an
@@ -8262,7 +8493,7 @@ def _shift_html(shift: dict[str, Any], locale: str, labels: dict[str, str]) -> s
         )
         out += (
             f"<p class='live-verdict lv-INFO'><span class='badge INFO'>"
-            f"{_e(labels['shift_badge_changed'])}</span> {_e(text)}</p>"
+            f"{_e(labels['shift_badge_changed'])}</span> {_e(text + short)}</p>"
         )
         facts = ""
         for side, key in ((before, "shift_before"), (after, "shift_after")):
@@ -8370,8 +8601,10 @@ def _luck_html(
     """The file's Sharpe next to the luck of the configurations counted, and
     what a search of 10, 100 or 1,000 would need.
 
-    ``account``: an account or signal history, whose uncounted trials are the
-    accounts or signals behind it (no optimisation file to ask for).
+    ``account``: an account or signal history, whose trials are the accounts or
+    signals behind it (no optimisation file to ask for): its introduction, its
+    lines, the table's header and the sources' note count those, never the
+    configurations a backtest tried.
 
     Beating the luck is a DSR of at least 0.5; the multiplicity dimension
     passes only at 0.95, so a Sharpe between the two says it beats the luck
@@ -8404,9 +8637,13 @@ def _luck_html(
         shown = f"{months:.1f}"
         return labels["luck_month_one" if shown == "1.0" else "luck_months"].format(n=shown)
 
+    def text(key: str) -> str:
+        """``key``'s wording, an account or signal's when it has one."""
+        return labels[f"{key}_account"] if account and f"{key}_account" in labels else labels[key]
+
     span_value = float(luck["span_years"]["value"])
     span = history(span_value)
-    out = f"<p class='muted'>{_e(labels['luck_intro'])}</p>"
+    out = f"<p class='muted'>{_e(text('luck_intro'))}</p>"
     if luck.get("counted"):
         n = f"{int(luck['trials']):,}"
         chance = f"{float(luck['luck_sharpe']['value']):.2f}"
@@ -8416,7 +8653,7 @@ def _luck_html(
         narrow = beats and isinstance(dsr, (int, float)) and dsr < dsr_pass
         key = "narrow" if narrow else "beats" if beats else "below"
         tone = "PASS" if key == "beats" else "WEAK"
-        line = labels["luck_" + key].format(
+        line = text("luck_" + key).format(
             sharpe=sharpe,
             luck=chance,
             n=n,
@@ -8428,7 +8665,7 @@ def _luck_html(
             f"{_e(labels['luck_badge_' + key])}</span> {_e(line)}</p>"
         )
         cells = [
-            (chance, luck["luck_sharpe"], labels["luck_sharpe"].format(n=n, sharpe=sharpe)),
+            (chance, luck["luck_sharpe"], text("luck_sharpe").format(n=n, sharpe=sharpe)),
             (
                 years(float(luck["years_needed"]["value"])),
                 luck["years_needed"],
@@ -8437,7 +8674,7 @@ def _luck_html(
             (
                 f"{float(luck['sharpe_after']['value']):.2f}",
                 luck["sharpe_after"],
-                labels["luck_after"].format(n=n),
+                text("luck_after").format(n=n),
             ),
         ]
         tone = "" if beats else " neg"
@@ -8458,7 +8695,7 @@ def _luck_html(
         return "yes" if float(row["years_needed"]["value"]) <= span_value else "no"
 
     rows = "".join(
-        f"<tr><td data-l='{_e(labels['luck_table_trials'])}'>{int(row['trials']):,}</td>"
+        f"<tr><td data-l='{_e(text('luck_table_trials'))}'>{int(row['trials']):,}</td>"
         f"<td class='val' data-l='{_e(labels['luck_table_luck'])}'>"
         f"{float(row['luck_sharpe']['value']):.2f}</td>"
         f"<td class='val' data-l='{_e(labels['luck_table_years'])}'>"
@@ -8469,7 +8706,7 @@ def _luck_html(
     )
     if rows:
         out += (
-            f"<table class='luck'><thead><tr><th>{_e(labels['luck_table_trials'])}</th>"
+            f"<table class='luck'><thead><tr><th>{_e(text('luck_table_trials'))}</th>"
             f"<th class='val'>{_e(labels['luck_table_luck'])}</th>"
             f"<th class='val'>{_e(labels['luck_table_years'])}</th>"
             f"<th class='val'>{_e(labels['luck_table_enough'])}</th></tr></thead>"
@@ -8477,7 +8714,10 @@ def _luck_html(
         )
     if span_value < 1:
         out += f"<p class='muted'>{_e(labels['luck_short'])}</p>"
-    out += f"<p class='muted'>{_e(_sentence(localize(luck.get('note', ''), locale)))}</p>"
+    note = str(luck.get("note", ""))
+    # The sources' note names the backtest's minimum length; an account's is its history's.
+    shown = labels["luck_note_account"] if account and note == LUCK_NOTE else localize(note, locale)
+    out += f"<p class='muted'>{_e(_sentence(shown))}</p>"
     return out
 
 
@@ -8786,13 +9026,20 @@ def _instrument_best_text(review: dict[str, Any], share: float, labels: dict[str
     return labels["ins_best_over"].format(best=best, rest=rest[0], rest_share=rest[1])
 
 
-def _instruments_html(review: dict[str, Any] | None, locale: str, labels: dict[str, str]) -> str:
-    """Count, net result and hit rate per instrument; no class change."""
+def _instruments_html(
+    review: dict[str, Any] | None,
+    locale: str,
+    labels: dict[str, str],
+    *,
+    account: bool = False,
+) -> str:
+    """Count, net result and hit rate per instrument; no class change.
+    ``account``: an account or signal's, whose introduction names no robot."""
     if not review or review.get("status") != "MEASURED":
         return ""
     findings = list(review.get("findings") or [])
     best = (review.get("best") or {}).get("key", "")
-    out = f"<p class='muted'>{_e(labels['ins_intro'])}</p>"
+    out = f"<p class='muted'>{_e(labels['ins_intro_account' if account else 'ins_intro'])}</p>"
     if findings:
         texts = {
             "one_carries": labels["ins_one_carries"].format(best=best),
@@ -10599,7 +10846,19 @@ def render_html(
             else []
         ),
         *(
-            [(labels["shift"], _shift_html(data["mean_shift"], locale, labels))]
+            [
+                (
+                    labels["shift"],
+                    _shift_html(
+                        data["mean_shift"],
+                        locale,
+                        labels,
+                        periods_per_year=_ev_value(
+                            (data.get("inputs") or {}).get("periods_per_year")
+                        ),
+                    ),
+                )
+            ]
             if (data.get("mean_shift") or {}).get("status") == "MEASURED"
             else []
         ),
@@ -10649,7 +10908,14 @@ def render_html(
             else []
         ),
         *(
-            [(labels["instruments"], _instruments_html(data.get("instruments"), locale, labels))]
+            [
+                (
+                    labels["instruments"],
+                    _instruments_html(
+                        data.get("instruments"), locale, labels, account=_account_page(data)
+                    ),
+                )
+            ]
             if (data.get("instruments") or {}).get("status") == "MEASURED"
             else []
         ),
@@ -10733,6 +10999,7 @@ def render_html(
                         _ev_value((data.get("performance") or {}).get("platform_equity_drawdown")),
                         hidden,
                         unseen_open_loss_warning(data, labels),
+                        account=_account_page(data),
                     ),
                 )
             ]
@@ -10741,7 +11008,12 @@ def render_html(
         ),
         (
             labels["questions"],
-            _questions_html(ownership.open_questions(data, role), locale, labels)
+            _questions_html(
+                ownership.open_questions(data, role),
+                locale,
+                labels,
+                account=_account_page(data),
+            )
             + _seller_html(data, locale, labels, public_id),
         ),
         # The dimension reasons repeat the verdict in thresholds, so they open the
@@ -10990,7 +11262,9 @@ def render_html(
     )
     kpis_html = _kpis_html(data, labels, locked=locked)
     reading_html = _reading_html(data, labels)
-    recon_html = _reconciliation_html(data.get("reconciliation"), locale, declared_open_value(data))
+    recon_html = _reconciliation_html(
+        data.get("reconciliation"), locale, declared_open_value(data), declared_initial_value(data)
+    )
     forensics_html = _forensics_html(data.get("forensics"), locale)
     sections = [
         section(labels["reading"], reading_html, "r-reading") if reading_html else "",
@@ -11170,8 +11444,9 @@ def _pdf_cover(
     ring = ring_svg(overall, css_class="pc-ring", letter=True)
     lead = str(verdict["summary"]).partition(". ")[0].rstrip(".") + "."
     by_name = {d["name"]: d for d in verdict["dimensions"]}
+    account = _account_page(data)
     dims = "".join(
-        f"<li><span>{_e(_dimension_title(name, locale))}</span>"
+        f"<li><span>{_e(_dimension_title(name, locale, account=account))}</span>"
         f"{_status_badge(by_name[name]['status'], locale)}</li>"
         for name in DIMENSION_ORDER
         if name in by_name
@@ -11273,7 +11548,14 @@ def _next_steps_html(
     developer's tests, what a provider's clients will ask, or a neutral
     wording. Questions to ask and checks to make, never a trading instruction."""
     steps = _next_steps(data, verdict, labels)
-    intro = labels["next_intro_fund" if _fund_record(data) else "next_intro"]
+    # An account or signal is copied or bought, not a robot (every voice keeps its own).
+    intro = labels[
+        "next_intro_fund"
+        if _fund_record(data)
+        else "next_intro_account"
+        if _account_page(data)
+        else "next_intro"
+    ]
 
     def item(key: str, section: str) -> str:
         anchor = anchors.get(section, "")

@@ -45,6 +45,7 @@ import pytest
 
 from quant_trade.audit import analytics, ownership, psr_names, report, seller_message
 from quant_trade.audit import pdf as pdf_lib
+from quant_trade.audit import plan as plan_lib
 from quant_trade.audit.engine import run_audit
 from quant_trade.audit.guard import find_claims
 from quant_trade.audit.i18n import localize
@@ -382,7 +383,9 @@ def test_the_challenge_says_the_open_loss_counts_first_and_folds_its_figures(
     section = page.split(f"<h2>{html.escape(labels['challenge'], quote=True)}</h2>")[-1]
     section = section.split("<details open class='detail report-detail'")[0]
     fold = "<details class='unseen-open'>"
-    warning = labels["ch_unseen_open"].format(share=f"{abs(share):.0%}")
+    warning = labels["ch_unseen_open"].format(
+        share=f"{abs(share):.0%}", tag=evidence_label("DECLARED", locale)
+    )
     head = section[: section.index(fold)]
     # The warning comes before any simulated figure: no table and no value cell above it.
     assert html.escape(warning, quote=True) in head
@@ -689,7 +692,9 @@ def test_the_myfxbook_statement_reads_as_an_account_in_every_section(locale: str
     assert "HIDDEN_FLOATING_DRAWDOWN" in codes and "FLOATING_LOSS_AT_END" not in codes
     labels = LABELS[locale]
     share = data["account"]["floating_share"]["value"]
-    warning = labels["ch_unseen_open"].format(share=f"{abs(share):.0%}")
+    warning = labels["ch_unseen_open"].format(
+        share=f"{abs(share):.0%}", tag=evidence_label("DECLARED", locale)
+    )
     assert f"{warning} {labels['ch_unseen_hidden_also']}" in text
     assert find_claims(text) == []
 
@@ -716,7 +721,12 @@ def test_a_hidden_floating_drawdown_alone_never_reads_as_a_zero_open_loss(locale
     data["account"]["floating_share"]["value"] = -0.04
     assert unseen_open_loss(data) == (True, -0.04)
     warning = _visible(unseen_open_loss_warning(data, labels))
-    expected = labels["ch_unseen_open"].format(share="4%") + " " + labels["ch_unseen_hidden_also"]
+    declared_tag = evidence_label("DECLARED", locale)
+    expected = (
+        labels["ch_unseen_open"].format(share="4%", tag=declared_tag)
+        + " "
+        + labels["ch_unseen_hidden_also"]
+    )
     assert expected in warning
     for key in ("ch_unseen_hidden", "ch_unseen_hidden_also"):
         assert not re.search(r"aprob|aprova|approv", labels[key], re.I), key
@@ -839,3 +849,499 @@ def test_a_stored_backtest_question_reads_as_the_plan_does(locale: str) -> None:
         item = ownership.question_item("backtest_match", shown, locale, voice)
         assert not ROBOT.search(item) and find_claims(item) == []
     assert not ROBOT.search(seller_message.SELLER_ASK["backtest_match"][locale])
+
+
+# Third pass ------------------------------------------------------------------------------
+#
+# What the review of the second pass left: the luck section, the questions, the data
+# step of the plan and the dimension's name of an account or signal still spoke of
+# configurations tried and of a robot; the challenge callout's open loss carried no
+# tag; the variance ratio, the p95 drawdown and the starting balance read two ways;
+# the mean-shift section annualised short stretches without saying so; the seller's
+# message listed weak dimensions under "do not pass"; and four sentences read badly.
+
+#: The robot itself, which no text of an account or signal page names.
+ROBOT_WORD = re.compile(r"\b(robot|robots|robô|robôs)\b", re.I)
+#: The flags whose plan step was written for whoever builds and backtests the robot.
+BUILDER_FLAGS = (
+    "MARTINGALE_SIZING",
+    "GRID_AVERAGING",
+    "MANY_CONCURRENT_POSITIONS",
+    "HIDDEN_FLOATING_DRAWDOWN",
+)
+
+
+def _page_of(data: dict[str, Any], locale: str) -> str:
+    return _visible(render_html(AuditResult.model_validate(data), watermark=False, locale=locale))
+
+
+@cache
+def _voiced_signal_page(locale: str, role: str | None) -> str:
+    return _page_of(_with_role(_signal(locale), role), locale)
+
+
+def _luck_note() -> str:
+    from quant_trade.audit.luck import NOTE
+
+    return NOTE
+
+
+# 1 · the luck section counts the accounts or signals behind it -------------------------
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+@pytest.mark.parametrize("role", [*ownership.ROLES, None])
+def test_the_luck_section_of_an_account_counts_accounts_or_signals(
+    locale: str, role: str | None
+) -> None:
+    data = _with_role(_signal(locale), role)
+    voice = role or ownership.NEUTRAL
+    labels = ownership.labels_for(LABELS[locale], locale, voice)
+    section = _visible(
+        report._luck_html(data["luck"], locale, labels, data["multiplicity"], account=True)
+    )
+    # The introduction, the table's header and the dimension it names count the
+    # accounts or signals: what the trial count of an account is.
+    assert labels["luck_intro_account"] in section and labels["luck_intro"] not in section
+    assert labels["luck_table_trials_account"] in section
+    assert labels["luck_table_trials"] not in section
+    name = report._dimension_title("multiplicity", locale, account=True)
+    assert name in labels["luck_intro_account"]
+    assert report.DIMENSION_TITLES[locale]["multiplicity"] not in section
+    assert ACCOUNT_OR_SIGNAL[locale].split()[0] in labels["luck_table_trials_account"].lower()
+    assert not CONFIGURATIONS.search(section), CONFIGURATIONS.search(section)
+    # The challenge's "luck discounted" row says the same.
+    ladder = _visible(
+        report._challenge_ladder_html(data["challenge"]["scenarios"], locale, labels, account=True)
+    )
+    assert labels["ch_ladder_undeclared_account"] in ladder
+    assert not CONFIGURATIONS.search(ladder), ladder
+    # The whole page: no configurations tried, and the account's name of the dimension.
+    page = _voiced_signal_page(locale, role)
+    assert not CONFIGURATIONS.search(page), CONFIGURATIONS.search(page)
+    assert labels["luck_intro_account"] in page and labels["luck_intro"] not in page
+    assert find_claims(section) == [] and find_claims(ladder) == []
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+def test_a_counted_luck_of_an_account_names_accounts_and_a_backtest_keeps_its_words(
+    locale: str,
+) -> None:
+    labels = LABELS[locale]
+    data = _backtest_result(locale).model_dump(mode="json")
+    luck = data["luck"]
+    assert luck["counted"] and luck["trials"] > 1
+    account = _visible(report._luck_html(luck, locale, labels, data["multiplicity"], account=True))
+    n = f"{int(luck['trials']):,}"
+    sharpe = f"{float(luck['sharpe']['value']):.2f}"
+    assert labels["luck_sharpe_account"].format(n=n, sharpe=sharpe) in account
+    assert labels["luck_after_account"].format(n=n) in account
+    assert not CONFIGURATIONS.search(account), CONFIGURATIONS.search(account)
+    assert labels["luck_sharpe"].format(n=n, sharpe=sharpe) not in account
+    assert labels["luck_note_account"] in account
+    # A backtest's section is as it was: configurations tried, the backtest's length.
+    backtest = _visible(report._luck_html(luck, locale, labels, data["multiplicity"]))
+    assert labels["luck_intro"] in backtest and labels["luck_table_trials"] in backtest
+    assert labels["luck_sharpe"].format(n=n, sharpe=sharpe) in backtest
+    assert labels["luck_note_account"] not in backtest
+    assert localize(luck["note"], locale) in backtest
+    assert find_claims(account) == []
+
+
+# 2 · the questions ask about the account or signal ---------------------------------------
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+@pytest.mark.parametrize("role", [*ownership.ROLES, None])
+def test_the_questions_of_an_account_ask_about_the_account_or_signal(
+    locale: str, role: str | None
+) -> None:
+    data = _with_role(_signal(locale), role)
+    voice = role or ownership.NEUTRAL
+    codes = {q["code"] for q in data["vendor_questions"]}
+    assert {"martingale", "grid"} <= codes
+    page = _voiced_signal_page(locale, role)
+    for question in ownership.open_questions(data, voice):
+        shown = report._question_text(question, locale, account=True)
+        item = ownership.question_item(question["code"], shown, locale, voice, account=True)
+        assert not ROBOT_WORD.search(item), item
+        assert item in page, item
+        assert find_claims(item) == []
+        if question["code"] in ("martingale", "grid"):
+            # The question and, in every voice but the buyer's, what answers it.
+            assert ACCOUNT_OR_SIGNAL[locale] in shown, shown
+            if voice != ownership.BUYER:
+                answer = ownership.ACCOUNT_QUESTIONS[question["code"]][locale][1]
+                assert answer in item and ACCOUNT_OR_SIGNAL[locale] in answer
+    if voice == ownership.BUYER:
+        # Questions 6 and 7 of the message to paste.
+        message = report._seller_message(data, locale, LABELS[locale])[0]
+        assert not ROBOT_WORD.search(message), ROBOT_WORD.search(message)
+        for code in ("martingale", "grid"):
+            question = next(q for q in data["vendor_questions"] if q["code"] == code)
+            assert report._question_text(question, locale, account=True) in message
+    assert not ROBOT_WORD.search(page), ROBOT_WORD.search(page)
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+def test_a_question_stored_with_the_robot_reads_as_the_account_and_a_backtest_keeps_it(
+    locale: str,
+) -> None:
+    asked = analytics.vendor_questions(
+        ["MARTINGALE_SIZING", "GRID_AVERAGING"],
+        has_trades=True,
+        trials_measured=False,
+        has_out_of_sample=False,
+        has_costs=False,
+        balance_only=False,
+        account_history=True,
+    )
+    for code in ("martingale", "grid"):
+        stored = {"code": code, **analytics._QUESTIONS[code]}
+        account = report._question_text(stored, locale, account=True)
+        assert not ROBOT_WORD.search(account) and ACCOUNT_OR_SIGNAL[locale] in account
+        if locale == "pt":
+            assert account != analytics.ACCOUNT_QUESTIONS[code]["en"]
+        # The engine stores the account's wording for an account history ...
+        kept = next(q for q in asked if q["code"] == code)
+        assert kept["es"] == analytics.ACCOUNT_QUESTIONS[code]["es"]
+        assert kept["en"] == analytics.ACCOUNT_QUESTIONS[code]["en"]
+        # ... and a backtest's question still speaks of its robot.
+        backtest = report._question_text(stored, locale)
+        assert ROBOT_WORD.search(backtest), backtest
+        for voice in (ownership.OWN, ownership.PROVIDER, ownership.NEUTRAL):
+            item = ownership.question_item(code, backtest, locale, voice)
+            assert ownership.QUESTIONS[code][locale][1] in item
+    # Asked of an account, the recent stretch is answered by the account's history.
+    for voice in (ownership.OWN, ownership.PROVIDER, ownership.NEUTRAL):
+        item = ownership.question_item("recent_period", "?", locale, voice, account=True)
+        assert not ROBOT_WORD.search(item) and find_claims(item) == []
+        assert ownership.ACCOUNT_QUESTIONS["recent_period"][locale][1] in item
+
+
+# 3 · the data step of the plan: what someone with an account can do ---------------------
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+@pytest.mark.parametrize("role", [*ownership.ROLES, None])
+def test_the_data_step_of_an_account_asks_what_an_account_can_give(
+    locale: str, role: str | None
+) -> None:
+    data = _with_role(_signal(locale), role)
+    voice = role or ownership.NEUTRAL
+    step = next(s for s in improvement_plan(data, locale) if s.dimension == "data_quality")
+    page = _voiced_signal_page(locale, role)
+    for code in BUILDER_FLAGS:
+        lead = f"{flag_title(code, locale)}. "
+        action = next(a for a in step.actions if a.startswith(lead))
+        hint = action[len(lead) :]
+        voiced = ownership.plan_text(f"account_flag_{code}", locale, voice)
+        assert voice == ownership.BUYER or voiced is not None
+        assert hint == (voiced or plan_lib.ACCOUNT_FLAG_HINTS[code][locale])
+        # No backtest to upload, no robot, nothing only a builder does.
+        assert hint != plan_lib.FLAG_HINTS[code][locale]
+        assert not re.search(r"backtest|robot|robô", hint, re.I), hint
+        assert action in page
+        assert find_claims(hint) == []
+    # A backtest's step keeps the builder's wording.
+    backtest = _backtest_result(locale).model_dump(mode="json")
+    backtest["red_flags"] = [{"code": code, "severity": "WARN"} for code in BUILDER_FLAGS]
+    _, actions = plan_lib._data_quality_step(backtest, "WEAK", locale)
+    for code in BUILDER_FLAGS:
+        assert f"{flag_title(code, locale)}. {plan_lib.FLAG_HINTS[code][locale]}" in actions
+
+
+# 4 · the dimension's name ------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+def test_an_account_names_the_multiplicity_dimension_by_what_it_counts(locale: str) -> None:
+    from quant_trade.audit.pages import verification_page
+
+    data = _signal(locale)
+    name = report._dimension_title("multiplicity", locale, account=True)
+    backtest_name = report.DIMENSION_TITLES[locale]["multiplicity"]
+    assert name != backtest_name and ACCOUNT_OR_SIGNAL[locale].split()[0] in name.lower()
+    page = _signal_page(locale)
+    # The list of dimensions, the technical detail, the PDF cover and the message.
+    assert f"<h3>{html.escape(name, quote=True)} " in page
+    assert f"<td>{html.escape(name, quote=True)}</td>" in page
+    assert f"<span>{html.escape(name, quote=True)}</span>" in page
+    message = report._seller_message(data, locale, LABELS[locale])[0]
+    assert name in message and backtest_name not in message
+    assert backtest_name not in _visible(page)
+    # The public page's cards too.
+    public = _visible(
+        verification_page(
+            data,
+            public_id="abc123",
+            published_at="2026-10-01T00:00:00Z",
+            result_sha256="0" * 64,
+            base_url="https://rigorscore.com",
+            locale=locale,
+        )
+    )
+    assert name in public and backtest_name not in public
+    # A backtest keeps its name.
+    assert backtest_name in _visible(_backtest_page(locale))
+    assert report._dimension_title("multiplicity", locale) == backtest_name
+    assert find_claims(name) == []
+
+
+# 5 · the challenge callout tags the declared open loss -----------------------------------
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+def test_the_challenge_callout_tags_the_open_loss_as_declared(locale: str) -> None:
+    data = _signal(locale)
+    share = data["account"]["floating_share"]
+    assert share["evidence"] == "DECLARED"
+    labels = LABELS[locale]
+    tag = evidence_label("DECLARED", locale)
+    warning = labels["ch_unseen_open"].format(share=f"{abs(share['value']):.0%}", tag=tag)
+    assert f"({tag})" in warning
+    assert warning in _visible(unseen_open_loss_warning(data, labels))
+    # The same figure carries the same tag in the account's section.
+    page = _visible(_signal_page(locale))
+    assert warning in page
+    floating = f"{KEY_LABELS[locale]['floating_share']} {report._table_pct(share['value'])}"
+    assert f"{floating} {tag}" in page
+    # A share read from the flag alone is the file's declared figure too.
+    data["account"] = None
+    assert f"({tag})" in _visible(unseen_open_loss_warning(data, labels))
+    assert find_claims(warning) == []
+
+
+# 6 · one presentation of the variance ratio -----------------------------------------------
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+def test_the_variance_ratio_reads_the_same_in_the_sentence_and_the_table(locale: str) -> None:
+    data = _signal(locale)
+    labels = LABELS[locale]
+    significance = data["significance"]
+    ratio = significance["dependence"]["ratio"]["value"]
+    assert f"{ratio:.1f}" != f"{ratio:.2f}"
+    shown = report._fmt(ratio, key="dependence_ratio")
+    line = _visible(report._dependence_html(significance, labels, data))
+    expected = labels["dependence_line"].format(
+        ratio=shown,
+        plain=report._table_pct(significance["psr"]["value"]),
+        psr=report._table_pct(significance["dependence"]["psr"]["value"]),
+    )
+    assert expected in line
+    text = _visible(_signal_page(locale))
+    assert expected in text
+    assert f"{KEY_LABELS[locale]['dependence_ratio']} {shown}" in text
+
+
+# 7 · one sign for the p95 drawdown --------------------------------------------------------
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+def test_the_p95_drawdown_has_one_sign_in_the_summary_and_the_risk_section(locale: str) -> None:
+    data = _signal(locale)
+    labels = LABELS[locale]
+    drawdown = data["risk"]["max_drawdown"]
+    tiles = {label: shown for label, shown, _ in report._kpi_list(data, labels)}
+    tile = tiles[labels["kpi_dd_p95_closed"]]
+    section = _visible(report._risk_html(data["risk"], locale, labels))
+    fact = report._fmt(-abs(drawdown["p95"]["value"]), key="p50")
+    assert tile.startswith("-") and fact.startswith("-")
+    for q in ("p50", "p95", "p99"):
+        value = abs(drawdown[q]["value"])
+        assert f"{report._fmt(-value, key='p50')} {labels['risk_dd']} · {q}" in section
+        positive = re.escape(f"{report._fmt(value, key='p50')} {labels['risk_dd']}")
+        assert not re.search(rf"(?<![-\d.]){positive}", section), section
+    # The same figure, rounded the same way.
+    assert abs(float(tile.rstrip("%")) - float(fact.rstrip("%"))) < 0.06
+    assert f"{fact} {labels['risk_dd']} · p95" in _visible(_signal_page(locale))
+
+
+# 8 · a short stretch's annual rate says it is one ------------------------------------------
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+def test_the_mean_shift_says_its_annual_rates_come_from_short_stretches(locale: str) -> None:
+    data = _signal(locale)
+    labels = LABELS[locale]
+    shift = data["mean_shift"]
+    ppy = data["inputs"]["periods_per_year"]["value"]
+    before, after = shift["before"]["returns"], shift["after"]["returns"]
+    assert before < ppy and after < ppy
+    # The annual return says it is not annualised under a year.
+    assert data["performance"]["cagr"]["evidence"] == "NOT_MEASURED"
+
+    def months(count: int) -> str:
+        return labels["luck_months"].format(n=f"{count / ppy * 12:.1f}")
+
+    note = labels["shift_short"].format(before=months(before), after=months(after))
+    section = _visible(report._shift_html(shift, locale, labels, periods_per_year=ppy))
+    assert note in section
+    assert note in _visible(_signal_page(locale))
+    # Two stretches of over a year each need no such note.
+    long_shift = copy.deepcopy(shift)
+    long_shift["before"]["returns"] = long_shift["after"]["returns"] = int(ppy * 2)
+    long = _visible(report._shift_html(long_shift, locale, labels, periods_per_year=ppy))
+    assert labels["shift_short"].split("{")[0].strip() not in long
+    assert find_claims(note) == []
+
+
+# 9 · the seller's message lists what fails apart from what is weak -------------------------
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+def test_the_seller_message_lists_weak_dimensions_apart_from_those_that_fail(
+    locale: str,
+) -> None:
+    data = _signal(locale)
+    words = seller_message.words(locale)
+
+    def names(status: str) -> str:
+        statuses = {d["name"]: d["status"] for d in data["verdict"]["dimensions"]}
+        return ", ".join(
+            report._dimension_title(name, locale, account=True)
+            for name in report.DIMENSION_ORDER
+            if statuses.get(name) == status
+        )
+
+    assert names("FAIL") and names("WEAK")
+    line = (
+        words["dimensions"].format(items=names("FAIL"))
+        + " "
+        + words["dimensions_weak"].format(items=names("WEAK"))
+    )
+    lines = report._seller_message(data, locale, LABELS[locale])[0].split("\n")
+    assert line in lines
+    weak = report.STATUS_TEXT[locale]["WEAK"].lower()
+    assert f"({weak})" not in "\n".join(lines)
+    # Only weak ones: none fails, and the weak ones are named as such.
+    weak_names = names("WEAK")
+    for dimension in data["verdict"]["dimensions"]:
+        if dimension["status"] == "FAIL":
+            dimension["status"] = "PASS"
+    lines = report._seller_message(data, locale, LABELS[locale])[0].split("\n")
+    only_weak = words["dimensions_none"] + " " + words["dimensions_weak"].format(items=weak_names)
+    assert only_weak in lines
+    assert find_claims(line) == []
+
+
+# 10 · one tag for the starting balance ------------------------------------------------------
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+def test_the_starting_balance_has_one_tag_in_the_reconciliation_and_the_sizes(
+    locale: str,
+) -> None:
+    data = _signal(locale)
+    initial = data["inputs"]["initial_balance"]
+    recon = data["reconciliation"]["initial_capital"]
+    sizing = data["challenge"]["sizing"]["starting_balance"]
+    # The same figure: the imported report's starting balance, which the file states.
+    assert initial["value"] == recon["value"] == sizing["value"]
+    assert initial["evidence"] == sizing["evidence"] == "DECLARED"
+    assert recon["evidence"] == "MEASURED"
+    copy_ = INTEGRITY_TEXT[locale]
+    tag = evidence_label("DECLARED", locale)
+    measured_tag = evidence_label("MEASURED", locale)
+    amount = report._table_money(recon["value"])
+    text = _visible(_signal_page(locale))
+    assert f"{copy_['recon_initial']} {amount} {tag}" in text
+    assert f"{copy_['recon_initial']} {amount} {measured_tag}" not in text
+    balance = report._fmt(float(sizing["value"]), key="starting_balance")
+    assert f"{LABELS[locale]['ch_size_balance'].format(balance=balance)} {tag}" in text
+    # With no imported report's balance, the reconciliation keeps its own tag
+    # (the badge's code: the page translates it).
+    shown = _visible(report._reconciliation_html(data["reconciliation"], locale))
+    assert f"{copy_['recon_initial']} {amount} MEASURED" in shown
+    data["inputs"]["initial_balance"] = not_measured("no report imported")
+    assert report.declared_initial_value(data) is None
+
+
+# 11 · four sentences --------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+def test_the_backtest_question_says_if_it_has_one_once_in_every_voice(locale: str) -> None:
+    once = {"es": "si lo tiene", "en": "if it has one", "pt": "se ela tiver um"}[locale]
+    data = _signal(locale)
+    question = next(q for q in data["vendor_questions"] if q["code"] == "backtest_match")
+    shown = report._question_text(question, locale, account=True)
+    for voice in (ownership.OWN, ownership.PROVIDER, ownership.NEUTRAL):
+        item = ownership.question_item("backtest_match", shown, locale, voice, account=True)
+        assert item.count(once) == 1, item
+        assert item in _voiced_signal_page(locale, voice)
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+def test_what_to_do_and_the_instruments_of_an_account_name_no_robot(locale: str) -> None:
+    labels = LABELS[locale]
+    page = _visible(_signal_page(locale))
+    for key in ("next_intro_account", "ins_intro_account"):
+        assert labels[key] in page and not ROBOT_WORD.search(labels[key])
+        assert labels[key.removesuffix("_account")] not in page
+    assert ACCOUNT_OR_SIGNAL[locale] in labels["next_intro_account"]
+    # Every other voice keeps its own introduction (PR 478).
+    for voice in (ownership.OWN, ownership.PROVIDER, ownership.NEUTRAL):
+        voiced = ownership.labels_for(labels, locale, voice)
+        assert voiced["next_intro_account"] == voiced["next_intro"]
+        assert voiced["next_intro"] in _voiced_signal_page(locale, voice)
+    # The luck section's sources speak of the history's length.
+    assert labels["luck_note_account"] in page
+    assert localize(_luck_note(), locale) not in page
+    # A backtest keeps its words.
+    backtest = _visible(_backtest_page(locale))
+    assert labels["ins_intro"] in backtest and labels["ins_intro_account"] not in backtest
+    assert localize(_luck_note(), locale) in backtest
+    for key in ("next_intro_account", "ins_intro_account", "luck_note_account"):
+        assert find_claims(labels[key]) == []
+
+
+# The new texts of the third pass ------------------------------------------------------------
+
+THIRD_LABELS = (
+    "luck_intro_account",
+    "luck_table_trials_account",
+    "luck_narrow_account",
+    "luck_beats_account",
+    "luck_below_account",
+    "luck_sharpe_account",
+    "luck_after_account",
+    "luck_note_account",
+    "ch_ladder_undeclared_account",
+    "ins_intro_account",
+    "next_intro_account",
+    "shift_short",
+)
+
+
+def test_every_third_pass_text_exists_in_three_languages_and_passes_the_guard() -> None:
+    texts: list[str] = []
+    for locale in LOCALES:
+        for key in THIRD_LABELS:
+            text = LABELS[locale][key]
+            if locale != "en":
+                assert text != LABELS["en"][key], (locale, key)
+            assert not CONFIGURATIONS.search(text), (locale, key)
+            texts.append(text)
+        name = report.DIMENSION_TITLES_ACCOUNT[locale]["multiplicity"]
+        if locale != "en":
+            assert name != report.DIMENSION_TITLES_ACCOUNT["en"]["multiplicity"]
+        texts.append(name)
+        words = seller_message.COPY[locale]["dimensions_weak"]
+        assert locale == "en" or words != seller_message.COPY["en"]["dimensions_weak"]
+        texts.append(words)
+        for answers in ownership.ACCOUNT_QUESTIONS.values():
+            texts.append(answers[locale][1])
+        for code in BUILDER_FLAGS:
+            texts.append(plan_lib.ACCOUNT_FLAG_HINTS[code][locale])
+            texts.extend(
+                voices[locale] for voices in ownership.PLAN[f"account_flag_{code}"].values()
+            )
+        for code in ("martingale", "grid"):
+            texts.append(report._question_text({"code": code}, locale, account=True))
+    for text in texts:
+        assert text, texts
+        assert find_claims(text) == [], text
+        assert not [word for word in BANNED if word in text.lower()], text
+        assert not ROBOT_WORD.search(text), text

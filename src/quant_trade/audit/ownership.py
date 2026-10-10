@@ -835,6 +835,11 @@ class Voiced(dict[str, str]):
         self.role = role
 
 
+# An account or signal's "what to do now" opens as every other report does in
+# each voice but the buyer's, whose wording names the account or signal.
+LABELS["next_intro_account"] = LABELS["next_intro"]
+
+
 def labels_for(base: dict[str, str], locale: str, role: str) -> dict[str, str]:
     """``base`` (``report.LABELS[locale]``) in ``role``'s voice.
 
@@ -1519,6 +1524,126 @@ PLAN: dict[str, dict[str, dict[str, str]]] = {
             "relatório mostra quanto pesam as taxas.",
         ),
     },
+    "account_flag_MARTINGALE_SIZING": {
+        OWN: _say(
+            "El tamaño crece tras las pérdidas: si llevas también una cuenta con tamaño fijo o "
+            "riesgo fijo, súbela para comparar; si no, el riesgo real es el del tamaño máximo "
+            "que llegó a abrir esta.",
+            "Size grows after losses: if you also run an account at a fixed size or fixed risk, "
+            "upload it to compare; if not, the real risk is that of the largest size this one "
+            "opened.",
+            "O tamanho cresce após as perdas: se você também opera uma conta com tamanho fixo ou "
+            "risco fixo, envie-a para comparar; se não, o risco real é o do maior tamanho que "
+            "esta chegou a abrir.",
+        ),
+        PROVIDER: _say(
+            "El tamaño crece tras las pérdidas: te van a preguntar el tamaño máximo que puede "
+            "abrir esta cuenta o señal y por un historial con tamaño fijo, si existe: apórtalos.",
+            "Size grows after losses: you will be asked for the largest size this account or "
+            "signal can open, and for a history at a fixed size if there is one: provide them.",
+            "O tamanho cresce após as perdas: vão perguntar a você o tamanho máximo que esta "
+            "conta ou sinal pode abrir e pedir um histórico com tamanho fixo, se existir: "
+            "forneça-os.",
+        ),
+        NEUTRAL: _say(
+            "El tamaño crece tras las pérdidas: el riesgo real depende del tamaño máximo que "
+            "puede abrir esta cuenta o señal; un historial de la misma estrategia con tamaño "
+            "fijo, si existe, permite compararlo.",
+            "Size grows after losses: the real risk depends on the largest size this account or "
+            "signal can open; a history of the same strategy at a fixed size, if there is one, "
+            "allows a comparison.",
+            "O tamanho cresce após as perdas: o risco real depende do tamanho máximo que esta "
+            "conta ou sinal pode abrir; um histórico da mesma estratégia com tamanho fixo, se "
+            "existir, permite comparar.",
+        ),
+    },
+    "account_flag_GRID_AVERAGING": {
+        OWN: _say(
+            "Se abren posiciones contra la posición perdedora: si llevas también una cuenta sin "
+            "promediar, súbela para ver cuánto depende de ello; si no, el riesgo real es el de "
+            "todas las posiciones abiertas a la vez.",
+            "Positions are added against the losing one: if you also run an account without "
+            "averaging, upload it to see how much depends on it; if not, the real risk is that "
+            "of all the positions open at once.",
+            "Abrem-se posições contra a posição perdedora: se você também opera uma conta sem "
+            "preço médio, envie-a para ver quanto depende disso; se não, o risco real é o de "
+            "todas as posições abertas ao mesmo tempo.",
+        ),
+        PROVIDER: _say(
+            "Se abren posiciones contra la posición perdedora: te van a preguntar cuántas abre "
+            "como máximo esta cuenta o señal y por un historial sin promediar, si existe: "
+            "apórtalos.",
+            "Positions are added against the losing one: you will be asked how many this "
+            "account or signal opens at most, and for a history without averaging if there is "
+            "one: provide them.",
+            "Abrem-se posições contra a posição perdedora: vão perguntar a você quantas esta "
+            "conta ou sinal abre no máximo e pedir um histórico sem preço médio, se existir: "
+            "forneça-os.",
+        ),
+        NEUTRAL: _say(
+            "Se abren posiciones contra la posición perdedora: cuánto depende de ello se ve en "
+            "el máximo de posiciones que abre esta cuenta o señal y, si existe, en un historial "
+            "de la misma estrategia sin promediar.",
+            "Positions are added against the losing one: how much depends on it shows in the "
+            "most positions this account or signal opens and, if there is one, in a history of "
+            "the same strategy without averaging.",
+            "Abrem-se posições contra a posição perdedora: quanto depende disso se vê no máximo "
+            "de posições que esta conta ou sinal abre e, se existir, num histórico da mesma "
+            "estratégia sem preço médio.",
+        ),
+    },
+    "account_flag_MANY_CONCURRENT_POSITIONS": {
+        OWN: _say(
+            "Sube la curva de equity con flotante de esta cuenta: muestra lo que pierden juntas "
+            "las posiciones abiertas a la vez.",
+            "Upload this account's equity curve with floating P&L: it shows what the positions "
+            "open at once lose together.",
+            "Envie a curva de patrimônio com flutuante desta conta: mostra o que as posições "
+            "abertas ao mesmo tempo perdem juntas.",
+        ),
+        PROVIDER: _say(
+            "Te van a preguntar cuántas posiciones abre como máximo a la vez esta cuenta o señal "
+            "y te van a pedir la curva de equity con flotante: apórtala.",
+            "You will be asked how many positions this account or signal opens at most at once, "
+            "and for the equity curve with floating P&L: provide it.",
+            "Vão perguntar a você quantas posições esta conta ou sinal abre no máximo ao mesmo "
+            "tempo e pedir a curva de patrimônio com flutuante: forneça-a.",
+        ),
+        NEUTRAL: _say(
+            "Lo que pierden juntas las posiciones abiertas a la vez se ve en la curva de equity "
+            "con flotante y en el máximo de posiciones que abre esta cuenta o señal.",
+            "What the positions open at once lose together shows in the equity curve with "
+            "floating P&L and in the most positions this account or signal opens.",
+            "O que as posições abertas ao mesmo tempo perdem juntas se vê na curva de patrimônio "
+            "com flutuante e no máximo de posições que esta conta ou sinal abre.",
+        ),
+    },
+    "account_flag_HIDDEN_FLOATING_DRAWDOWN": {
+        OWN: _say(
+            "El historial solo muestra el balance: sube la curva de equity (con flotante) de "
+            "esta cuenta para medir el drawdown real.",
+            "The history shows only the balance: upload this account's equity curve (with "
+            "floating P&L) to measure the real drawdown.",
+            "O histórico mostra só o saldo: envie a curva de patrimônio (com flutuante) desta "
+            "conta para medir o drawdown real.",
+        ),
+        PROVIDER: _say(
+            "El historial solo muestra el balance: te van a pedir la curva de equity (con "
+            "flotante) de esta cuenta, que mide el drawdown real: apórtala.",
+            "The history shows only the balance: you will be asked for this account's equity "
+            "curve (with floating P&L), which measures the real drawdown: provide it.",
+            "O histórico mostra só o saldo: vão pedir a você a curva de patrimônio (com "
+            "flutuante) desta conta, que mede o drawdown real: forneça-a.",
+        ),
+        NEUTRAL: _say(
+            "El historial solo muestra el balance: el drawdown real se mide con la curva de "
+            "equity (con flotante) de esta cuenta.",
+            "The history shows only the balance: the real drawdown is measured on this "
+            "account's equity curve (with floating P&L).",
+            "O histórico mostra só o saldo: o drawdown real se mede com a curva de patrimônio "
+            "(com flutuante) desta conta.",
+        ),
+    },
     "flag_PROFIT_CONCENTRATION": {
         OWN: _say(
             "Revisa la mejor operación en el archivo (fecha, tamaño, precio) y sube más "
@@ -1893,20 +2018,20 @@ QUESTIONS: dict[str, dict[str, tuple[str | None, str]]] = {
         "es": (
             "¿Se parece esta cuenta al backtest de la misma estrategia, si lo tiene, con la "
             "misma configuración?",
-            "el backtest de la misma estrategia con la misma configuración, si lo tiene, subido "
-            "junto a esta cuenta: el informe compara los dos operación por operación",
+            "el backtest de la misma estrategia con la misma configuración, subido junto a esta "
+            "cuenta: el informe compara los dos operación por operación",
         ),
         "en": (
             "Does this account look like the backtest of the same strategy, if it has one, "
             "with the same settings?",
-            "the backtest of the same strategy with the same settings, if it has one, uploaded "
-            "together with this account: the report compares the two trade by trade",
+            "the backtest of the same strategy with the same settings, uploaded together with "
+            "this account: the report compares the two trade by trade",
         ),
         "pt": (
             "Esta conta se parece com o backtest da mesma estratégia, se ela tiver um, com a "
             "mesma configuração?",
-            "o backtest da mesma estratégia com a mesma configuração, se ela tiver um, enviado "
-            "junto com esta conta: o relatório compara os dois operação por operação",
+            "o backtest da mesma estratégia com a mesma configuração, enviado junto com esta "
+            "conta: o relatório compara os dois operação por operação",
         ),
     },
     "live_record": {
@@ -2206,6 +2331,63 @@ QUESTIONS: dict[str, dict[str, tuple[str | None, str]]] = {
 # The long-history wording of the live-record question has the same answer.
 QUESTIONS["live_record_long"] = QUESTIONS["live_record"]
 
+#: What answers a question asked of an account or signal (``question_item`` with
+#: ``account``) where the backtest's answer names the robot: the account's own
+#: trades and history. The question itself is ``analytics.ACCOUNT_QUESTIONS``.
+ACCOUNT_QUESTIONS: dict[str, dict[str, tuple[str | None, str]]] = {
+    "martingale": {
+        "es": (
+            None,
+            "la lista de operaciones con sus tamaños y el tamaño máximo que puede abrir esta "
+            "cuenta o señal",
+        ),
+        "en": (
+            None,
+            "the list of trades with their sizes, and the largest size this account or signal "
+            "can open",
+        ),
+        "pt": (
+            None,
+            "a lista de operações com seus tamanhos e o tamanho máximo que esta conta ou sinal "
+            "pode abrir",
+        ),
+    },
+    "grid": {
+        "es": (
+            None,
+            "la lista de operaciones con horas de entrada y tamaños, y el máximo de posiciones "
+            "que abre a la vez esta cuenta o señal",
+        ),
+        "en": (
+            None,
+            "the list of trades with entry times and sizes, and the most positions this account "
+            "or signal opens at once",
+        ),
+        "pt": (
+            None,
+            "a lista de operações com horas de entrada e tamanhos, e o máximo de posições que "
+            "esta conta ou sinal abre ao mesmo tempo",
+        ),
+    },
+    "recent_period": {
+        "es": (
+            None,
+            "el historial de esta cuenta o señal en ese último tramo y la fecha de cualquier "
+            "cambio de configuración",
+        ),
+        "en": (
+            None,
+            "this account or signal's history over that last stretch and the date of any change "
+            "to its settings",
+        ),
+        "pt": (
+            None,
+            "o histórico desta conta ou sinal nesse último trecho e a data de qualquer mudança "
+            "de configuração",
+        ),
+    },
+}
+
 #: How a question reads in each voice: the developer's and the neutral list say
 #: what answers it; the provider's says it will be asked and what to provide.
 QUESTION_ITEM: dict[str, dict[str, str]] = {
@@ -2227,11 +2409,13 @@ QUESTION_ITEM: dict[str, dict[str, str]] = {
 }
 
 
-def question_item(code: str, stored: str, locale: str, role: str) -> str:
-    """One stored question (``stored``, already in ``locale``) in ``role``'s voice."""
+def question_item(code: str, stored: str, locale: str, role: str, *, account: bool = False) -> str:
+    """One stored question (``stored``, already in ``locale``) in ``role``'s voice.
+    ``account``: asked of an account or signal, answered by its own history."""
     if role == BUYER:
         return stored
-    entry = QUESTIONS.get(code, {}).get(locale)
+    answers = ACCOUNT_QUESTIONS if account and code in ACCOUNT_QUESTIONS else QUESTIONS
+    entry = answers.get(code, {}).get(locale)
     template = QUESTION_ITEM.get(role, {}).get(locale)
     if entry is None or template is None:
         return stored
@@ -2331,6 +2515,7 @@ def demo_step(data: Mapping[str, Any], role: str) -> str | None:
 
 
 __all__ = [
+    "ACCOUNT_QUESTIONS",
     "BUYER",
     "FORM",
     "LABELS",
