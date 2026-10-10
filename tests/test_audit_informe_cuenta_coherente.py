@@ -27,6 +27,17 @@ reads "0%" and names the hidden floating drawdown; the dependence sentence and
 the table's note follow the figure the stored class used; "net of fees" only
 when both files itemise them.
 
+The fourth pass (review of the third) adds: the recent stretch's question asks
+whether the account or signal's settings changed or it was restarted, never
+whether a system was reoptimised; the reconciliation keeps its stored tag for
+the starting capital, and the size table's balance takes it (one figure, one
+tag, as the money deposited); the multiplicity detail and CSCV of an account
+name the other accounts or signals, not variants; a comparison names the
+dimension by the kinds of report it shows; a stretch under a year never reads
+"12.0 months" or "1.0 months"; Portuguese says "fornecedor"; the extreme jumps
+hint asks the provider in the buyer's voice; Start and End taken from the
+trades say so.
+
 No figure, class or tag changes: every test reads the stored result as the
 engine wrote it. Nothing reaches the network.
 """
@@ -88,9 +99,11 @@ ROBOT = re.compile(
     r"otimizador)\b",
     re.I,
 )
-#: Optimiser words and the robot's backtest, anywhere on an account or signal's page.
+#: Optimiser words, a reoptimisation, variants and the robot's backtest, anywhere on
+#: an account or signal's page.
 ROBOT_ANYWHERE = re.compile(
     r"\b(EA|XML|optimi[sz]ation|optimi[sz]er|optimización|optimizador|otimização|otimizador)\b"
+    r"|\bre-?optimi\w*|\breotimi\w*|\bvariant\w*"
     r"|same robot|mismo robot|mesmo robô",
     re.I,
 )
@@ -442,7 +455,9 @@ def test_the_two_periods_say_where_each_comes_from(locale: str) -> None:
     text = _visible(_signal_page(locale))
     assert f"{labels['data_period']} {first} → {last}" in text
     assert f"{platform_label('start', locale)} {start}" in text
-    assert labels["platform_period_note"].format(first=first, last=last) in text
+    # A Myfxbook statement gives no period: Rigor took Start and End from its trades.
+    assert labels["platform_period_trades"].format(first=first, last=last) in text
+    assert labels["platform_period_note"].format(first=first, last=last) not in text
     assert find_claims(labels["platform_period_note"]) == []
 
 
@@ -862,12 +877,14 @@ def test_a_stored_backtest_question_reads_as_the_plan_does(locale: str) -> None:
 
 #: The robot itself, which no text of an account or signal page names.
 ROBOT_WORD = re.compile(r"\b(robot|robots|robô|robôs)\b", re.I)
-#: The flags whose plan step was written for whoever builds and backtests the robot.
+#: The flags whose plan step was written for whoever builds and backtests the robot
+#: (the extreme jumps' "fix them" too: only the file's author can).
 BUILDER_FLAGS = (
     "MARTINGALE_SIZING",
     "GRID_AVERAGING",
     "MANY_CONCURRENT_POSITIONS",
     "HIDDEN_FLOATING_DRAWDOWN",
+    "MAD_SPIKES",
 )
 
 
@@ -960,27 +977,36 @@ def test_the_questions_of_an_account_ask_about_the_account_or_signal(
     voice = role or ownership.NEUTRAL
     codes = {q["code"] for q in data["vendor_questions"]}
     assert {"martingale", "grid"} <= codes
-    page = _voiced_signal_page(locale, role)
+    # A fading edge asks about the recent stretch, stored with the robot's wording
+    # (a result stored before the account's): the page shows the account's.
+    assert "recent_period" not in codes
+    data["vendor_questions"].append(
+        {"code": "recent_period", **analytics._QUESTIONS["recent_period"]}
+    )
+    page = _page_of(data, locale)
     for question in ownership.open_questions(data, voice):
         shown = report._question_text(question, locale, account=True)
         item = ownership.question_item(question["code"], shown, locale, voice, account=True)
         assert not ROBOT_WORD.search(item), item
         assert item in page, item
         assert find_claims(item) == []
-        if question["code"] in ("martingale", "grid"):
+        assert not ROBOT_ANYWHERE.search(item), item
+        if question["code"] in ("martingale", "grid", "recent_period"):
             # The question and, in every voice but the buyer's, what answers it.
             assert ACCOUNT_OR_SIGNAL[locale] in shown, shown
             if voice != ownership.BUYER:
                 answer = ownership.ACCOUNT_QUESTIONS[question["code"]][locale][1]
                 assert answer in item and ACCOUNT_OR_SIGNAL[locale] in answer
     if voice == ownership.BUYER:
-        # Questions 6 and 7 of the message to paste.
+        # Questions 6 and 7 of the message to paste, and the recent stretch's.
         message = report._seller_message(data, locale, LABELS[locale])[0]
         assert not ROBOT_WORD.search(message), ROBOT_WORD.search(message)
-        for code in ("martingale", "grid"):
+        assert not ROBOT_ANYWHERE.search(message), ROBOT_ANYWHERE.search(message)
+        for code in ("martingale", "grid", "recent_period"):
             question = next(q for q in data["vendor_questions"] if q["code"] == code)
             assert report._question_text(question, locale, account=True) in message
     assert not ROBOT_WORD.search(page), ROBOT_WORD.search(page)
+    assert not ROBOT_ANYWHERE.search(page), ROBOT_ANYWHERE.search(page)
 
 
 @pytest.mark.parametrize("locale", LOCALES)
@@ -988,7 +1014,7 @@ def test_a_question_stored_with_the_robot_reads_as_the_account_and_a_backtest_ke
     locale: str,
 ) -> None:
     asked = analytics.vendor_questions(
-        ["MARTINGALE_SIZING", "GRID_AVERAGING"],
+        ["MARTINGALE_SIZING", "GRID_AVERAGING", "EDGE_FADING"],
         has_trades=True,
         trials_measured=False,
         has_out_of_sample=False,
@@ -996,6 +1022,28 @@ def test_a_question_stored_with_the_robot_reads_as_the_account_and_a_backtest_ke
         balance_only=False,
         account_history=True,
     )
+    # The recent stretch asks whether the account or signal changed or was restarted.
+    recent = next(q for q in asked if q["code"] == "recent_period")
+    assert recent["es"] == analytics.ACCOUNT_QUESTIONS["recent_period"]["es"]
+    assert recent["en"] == analytics.ACCOUNT_QUESTIONS["recent_period"]["en"]
+    stored = {"code": "recent_period", **analytics._QUESTIONS["recent_period"]}
+    for question in (recent, stored):
+        account = report._question_text(question, locale, account=True)
+        assert ACCOUNT_OR_SIGNAL[locale] in account and not ROBOT_ANYWHERE.search(account)
+        assert locale != "pt" or account != analytics.ACCOUNT_QUESTIONS["recent_period"]["en"]
+        assert find_claims(account) == []
+    # A backtest's keeps its reoptimisation.
+    backtest = report._question_text(stored, locale)
+    assert re.search(r"reoptimi|reotimi", backtest), backtest
+    kept = analytics.vendor_questions(
+        ["EDGE_FADING"],
+        has_trades=True,
+        trials_measured=True,
+        has_out_of_sample=True,
+        has_costs=True,
+        balance_only=False,
+    )
+    assert next(q for q in kept if q["code"] == "recent_period") == stored
     for code in ("martingale", "grid"):
         stored = {"code": code, **analytics._QUESTIONS[code]}
         account = report._question_text(stored, locale, account=True)
@@ -1230,32 +1278,66 @@ def test_the_seller_message_lists_weak_dimensions_apart_from_those_that_fail(
 
 
 @pytest.mark.parametrize("locale", LOCALES)
+@pytest.mark.parametrize("kind", ["signal", "backtest"])
 def test_the_starting_balance_has_one_tag_in_the_reconciliation_and_the_sizes(
-    locale: str,
+    locale: str, kind: str
 ) -> None:
-    data = _signal(locale)
-    initial = data["inputs"]["initial_balance"]
+    signal = kind == "signal"
+    data = _signal(locale) if signal else _backtest_result(locale).model_dump(mode="json")
     recon = data["reconciliation"]["initial_capital"]
     sizing = data["challenge"]["sizing"]["starting_balance"]
-    # The same figure: the imported report's starting balance, which the file states.
-    assert initial["value"] == recon["value"] == sizing["value"]
-    assert initial["evidence"] == sizing["evidence"] == "DECLARED"
-    assert recon["evidence"] == "MEASURED"
+    # The same figure: the deposits the file lists before the first trade, which
+    # the reconciliation stores Measured and the size table Declared.
+    assert data["inputs"]["initial_balance"]["value"] == recon["value"] == sizing["value"]
+    assert recon["evidence"] == "MEASURED" and sizing["evidence"] == "DECLARED"
     copy_ = INTEGRITY_TEXT[locale]
-    tag = evidence_label("DECLARED", locale)
-    measured_tag = evidence_label("MEASURED", locale)
+    tag = evidence_label("MEASURED", locale)
+    declared_tag = evidence_label("DECLARED", locale)
     amount = report._table_money(recon["value"])
-    text = _visible(_signal_page(locale))
+    text = _visible(_signal_page(locale) if signal else _backtest_page(locale))
+    # The reconciliation keeps the tag it stores (and the downloadable JSON gives) ...
     assert f"{copy_['recon_initial']} {amount} {tag}" in text
-    assert f"{copy_['recon_initial']} {amount} {measured_tag}" not in text
+    assert f"{copy_['recon_initial']} {amount} {declared_tag}" not in text
+    # ... and the size table's balance, the same figure, carries it too.
     balance = report._fmt(float(sizing["value"]), key="starting_balance")
-    assert f"{LABELS[locale]['ch_size_balance'].format(balance=balance)} {tag}" in text
-    # With no imported report's balance, the reconciliation keeps its own tag
-    # (the badge's code: the page translates it).
-    shown = _visible(report._reconciliation_html(data["reconciliation"], locale))
-    assert f"{copy_['recon_initial']} {amount} MEASURED" in shown
-    data["inputs"]["initial_balance"] = not_measured("no report imported")
-    assert report.declared_initial_value(data) is None
+    line = LABELS[locale]["ch_size_balance"].format(balance=balance)
+    assert f"{line} {tag}" in text and f"{line} {declared_tag}" not in text
+    assert report.reconciled_starting_balance(data) == recon
+    if signal:
+        # The money deposited, which holds that starting balance, reads the same.
+        deposited = data["account"]["deposits"]["total"]
+        assert deposited["evidence"] == recon["evidence"]
+        money = report._fmt(deposited["value"], key="deposits_total")
+        assert f"{KEY_LABELS[locale]['deposits_total']} {money} {tag}" in text
+    # The stored result is untouched.
+    assert data["reconciliation"]["initial_capital"]["evidence"] == "MEASURED"
+    assert data["challenge"]["sizing"]["starting_balance"]["evidence"] == "DECLARED"
+
+
+def test_a_starting_balance_the_client_declared_or_assumed_keeps_its_own_tag() -> None:
+    data = _signal("es")
+    sizing = data["challenge"]["sizing"]
+    value = sizing["starting_balance"]["value"]
+    # The client declared the same balance on the form: the size table keeps Declared.
+    client = copy.deepcopy(data)
+    client["declared"]["initial_balance"] = declared(value)
+    assert report.reconciled_starting_balance(client) is None
+    # An assumed balance keeps its own wording.
+    assumed = copy.deepcopy(data)
+    assumed["inputs"]["parse_warnings"].append(
+        f"report: {report.ASSUMED_BALANCE_WARNING} 10,000 was assumed"
+    )
+    assert report.reconciled_starting_balance(assumed) is None
+    # Another figure, or a size table with no balance, keeps the stored tag.
+    other = copy.deepcopy(data)
+    other["challenge"]["sizing"]["starting_balance"]["value"] = value + 1
+    assert report.reconciled_starting_balance(other) is None
+    plain = report._sizing_balance_html(sizing, LABELS["es"])
+    assert plain.endswith(report._badge("DECLARED"))
+    shown = report._sizing_balance_html(
+        sizing, LABELS["es"], data["reconciliation"]["initial_capital"]
+    )
+    assert shown.endswith(report._badge("MEASURED"))
 
 
 # 11 · four sentences --------------------------------------------------------------------------
@@ -1345,3 +1427,202 @@ def test_every_third_pass_text_exists_in_three_languages_and_passes_the_guard() 
         assert find_claims(text) == [], text
         assert not [word for word in BANNED if word in text.lower()], text
         assert not ROBOT_WORD.search(text), text
+
+
+# Fourth pass ------------------------------------------------------------------------------
+# A review of the third pass found: the recent stretch's question still asked about a
+# reoptimisation; the reconciliation's starting capital turned Declared although the file's
+# deposits give it; the multiplicity detail and CSCV of an account spoke of variants; a
+# comparison named the dimension "settings tried"; a stretch under a year read "12.0 months"
+# or "1.0 months"; Portuguese said "provedor"; the extreme jumps asked the buyer to fix the
+# data; Start and End taken from the trades read as the platform's.
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+@pytest.mark.parametrize("role", [*ownership.ROLES, None])
+def test_the_multiplicity_detail_of_an_account_names_the_other_accounts_not_variants(
+    locale: str, role: str | None
+) -> None:
+    voice = role or ownership.NEUTRAL
+    labels = ownership.labels_for(LABELS[locale], locale, voice)
+    data = _signal(locale)
+    observed = data["multiplicity"]["observed_across_variants"]
+    assert observed["evidence"] == "NOT_MEASURED" and observed["note"] == report.NO_VARIANTS
+    assert data["cscv"] == {"status": "NOT_MEASURED", "reason": report.NO_VARIANTS}
+    page = _voiced_signal_page(locale, role)
+    assert labels["variance_policy_account"] in page and labels["variance_policy"] not in page
+    key_labels = KEY_LABELS[locale]
+    assert f"{key_labels['observed_across_accounts']} — " in page
+    assert key_labels["observed_across_variants"] not in page
+    assert labels["no_variants_account"] in page
+    # The CSCV row and the "not measured" list say the same.
+    assert f"{labels['cscv']} {_sentence_case(labels['no_variants_account'])}." in page
+    assert localize(report.NO_VARIANTS, locale) not in page
+    assert not ROBOT_ANYWHERE.search(page), ROBOT_ANYWHERE.search(page)
+    # The stored result is unchanged.
+    assert data["multiplicity"]["observed_across_variants"] == observed
+
+
+def _sentence_case(text: str) -> str:
+    return text[:1].upper() + text[1:]
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+def test_a_backtest_keeps_its_variants_and_an_uploaded_matrix_keeps_its_row(locale: str) -> None:
+    labels, key_labels = LABELS[locale], KEY_LABELS[locale]
+    backtest = _visible(_backtest_page(locale))
+    assert labels["variance_policy"] in backtest
+    assert labels["variance_policy_account"] not in backtest
+    assert f"{key_labels['observed_across_variants']} — " in backtest
+    assert labels["no_variants_account"] not in backtest
+    # An account whose matrix was uploaded keeps the row as measured.
+    rows = {"observed_across_variants": measured(0.01, "variance across 3 variants")}
+    kept, unmatched = report._account_multiplicity_rows(rows, labels)
+    assert kept == rows and not unmatched
+    measured_cscv = {"status": "MEASURED", "pbo": measured(0.2)}
+    assert report._account_cscv(measured_cscv, labels) == measured_cscv
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+def test_a_comparison_names_the_dimension_by_the_kinds_of_report_it_shows(locale: str) -> None:
+    from quant_trade.audit.compare import comparison_body
+    from quant_trade.audit.comparison_delta import change_summary
+    from quant_trade.audit.strategies import what_changed
+
+    signal = _signal(locale)
+    backtest = _backtest_result(locale).model_dump(mode="json")
+    account_name = report.DIMENSION_TITLES_ACCOUNT[locale]["multiplicity"]
+    mixed_name = report.DIMENSION_TITLES_MIXED[locale]["multiplicity"]
+    backtest_name = report.DIMENSION_TITLES[locale]["multiplicity"]
+    for pair, name in (
+        ((signal, signal), account_name),
+        ((signal, backtest), mixed_name),
+        ((backtest, signal), mixed_name),
+        ((backtest, backtest), backtest_name),
+    ):
+        body = comparison_body(list(pair), hrefs=["/a", "/b"], locale=locale)
+        assert f"<tr><td>{html.escape(name)}</td>" in body, (name, locale)
+        others = {account_name, mixed_name, backtest_name} - {name}
+        assert not [other for other in others if f"<td>{html.escape(other)}</td>" in body]
+        assert report.shared_dimension_title("multiplicity", locale, pair) == name
+    # What changed between two of them names it the same way.
+    changed = copy.deepcopy(signal)
+    for dimension in changed["verdict"]["dimensions"]:
+        if dimension["name"] == "multiplicity":
+            dimension["status"] = "PASS"
+    summary = _visible(change_summary(signal, changed, locale))
+    assert account_name in summary and backtest_name not in summary
+    lines = [what for what, _ in what_changed(signal, changed, locale)]
+    assert any(line.startswith(f"{account_name}: ") for line in lines), lines
+    assert not CONFIGURATIONS.search(" ".join(lines))
+    for name in (mixed_name, account_name):
+        assert find_claims(name) == [] and not CONFIGURATIONS.search(name)
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+def test_a_stretch_under_a_year_never_reads_twelve_or_one_point_zero_months(locale: str) -> None:
+    data = _signal(locale)
+    labels = LABELS[locale]
+    ppy = data["inputs"]["periods_per_year"]["value"]
+    assert 259 < ppy < 261
+
+    def sentence(before: int, after: int) -> str:
+        shift = copy.deepcopy(data["mean_shift"])
+        shift["before"]["returns"], shift["after"]["returns"] = before, after
+        return _visible(report._shift_html(shift, locale, labels, periods_per_year=ppy))
+
+    six = labels["luck_months"].format(n="6.0")
+    # 260 returns are just under a year: almost 12 months, never "12.0 months".
+    almost = sentence(260, 131)
+    assert labels["shift_short"].format(before=labels["luck_almost_year"], after=six) in almost
+    assert labels["luck_months"].format(n="12.0") not in almost
+    # 22 returns are one month: "1 month", never "1.0 months".
+    one = sentence(22, 131)
+    assert labels["shift_short"].format(before=labels["luck_month_one"], after=six) in one
+    assert labels["luck_months"].format(n="1.0") not in one
+    # A full year reads in years; under a month, as the luck section says it.
+    year = sentence(262, 131)
+    full = f"1.0 {labels['luck_years_unit']}"
+    assert labels["shift_short"].format(before=full, after=six) in year
+    assert labels["luck_under_month"] in sentence(5, 131)
+    # The luck section's history reads its length with the same words.
+    assert report._span_text(0.999, labels) == labels["luck_almost_year"]
+    assert report._span_text(1 / 12, labels) == labels["luck_month_one"]
+
+
+def test_portuguese_asks_the_fornecedor_everywhere() -> None:
+    page = _visible(_signal_page("pt"))
+    assert not re.search(r"\bprovedor", page, re.I)
+    for code, hints in plan_lib.ACCOUNT_FLAG_HINTS.items():
+        assert "provedor" not in hints["pt"], code
+    assert "fornecedor" in LABELS["pt"]["account_clean_unseen"]
+    assert "provedor" not in LABELS["pt"]["account_clean_unseen"]
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+def test_the_extreme_jumps_of_an_account_ask_instead_of_fixing(locale: str) -> None:
+    fix = {"es": "corrígelos", "en": "fix them", "pt": "corrija-os"}[locale]
+    assert fix in plan_lib.FLAG_HINTS["MAD_SPIKES"][locale]
+    data = _signal(locale)
+    assert "MAD_SPIKES" in {flag["code"] for flag in data["red_flags"]}
+    for role in (*ownership.ROLES, None):
+        voice = role or ownership.NEUTRAL
+        step = next(
+            s
+            for s in improvement_plan(_with_role(data, role), locale)
+            if s.dimension == "data_quality"
+        )
+        lead = f"{flag_title('MAD_SPIKES', locale)}. "
+        action = next(a for a in step.actions if a.startswith(lead))
+        assert fix not in action, (voice, action)
+        if voice == ownership.BUYER:
+            assert action == lead + plan_lib.ACCOUNT_FLAG_HINTS["MAD_SPIKES"][locale]
+        assert find_claims(action) == []
+        assert action in _voiced_signal_page(locale, role)
+
+
+def test_start_and_end_say_whether_the_platform_or_the_trades_give_them() -> None:
+    states = report._platform_states_period
+    tester = {"period": "H1 (2020.01.02 - 2024.11.29)", "start": "2020-01-02", "end": "2024-11-29"}
+    assert states(tester)
+    assert not states({"start": "2025-09-22", "end": "2026-09-16"})
+    # A period that does not hold Start or End: they came from the trades.
+    assert not states({"period": "2019.01.01 - 2019.12.31", "start": "2020-01-02"})
+    backtest = _backtest_result("es").model_dump(mode="json")
+    metadata = backtest["inputs"]["report_metadata"]
+    first, last = (
+        backtest["inputs"]["first_timestamp"][:10],
+        backtest["inputs"]["last_timestamp"][:10],
+    )
+    assert metadata["start"] != first and states(metadata)
+    text = _visible(_backtest_page("es"))
+    assert LABELS["es"]["platform_period_note"].format(first=first, last=last) in text
+    assert LABELS["es"]["platform_period_trades"].split(":")[0] not in text
+
+
+FOURTH_LABELS = ("variance_policy_account", "no_variants_account", "platform_period_trades")
+
+
+def test_every_fourth_pass_text_exists_in_three_languages_and_passes_the_guard() -> None:
+    texts: list[str] = []
+    for locale in LOCALES:
+        for key in FOURTH_LABELS:
+            text = LABELS[locale][key]
+            assert locale == "en" or text != LABELS["en"][key], (locale, key)
+            texts.append(text)
+        texts.append(KEY_LABELS[locale]["observed_across_accounts"])
+        texts.append(report.DIMENSION_TITLES_MIXED[locale]["multiplicity"])
+        texts.append(plan_lib.ACCOUNT_FLAG_HINTS["MAD_SPIKES"][locale])
+        texts.extend(
+            voices[locale] for voices in ownership.PLAN["account_flag_MAD_SPIKES"].values()
+        )
+        texts.append(report._question_text({"code": "recent_period"}, locale, account=True))
+        texts.append(ownership.ACCOUNT_QUESTIONS["recent_period"][locale][1])
+    observed = {locale: KEY_LABELS[locale]["observed_across_accounts"] for locale in LOCALES}
+    assert len(set(observed.values())) == len(LOCALES)
+    for text in texts:
+        assert text, texts
+        assert find_claims(text) == [], text
+        assert not [word for word in BANNED if word in text.lower()], text
+        assert not ROBOT_WORD.search(text) and not ROBOT_ANYWHERE.search(text), text
+        assert not CONFIGURATIONS.search(text), text

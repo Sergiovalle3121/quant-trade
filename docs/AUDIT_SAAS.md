@@ -5731,9 +5731,10 @@ answers 200. Every new text passes `find_claims` and avoids "verificado",
 ## Account and signal reports without contradictions (9 October 2026)
 
 With the paid offer the signal sample is what a copier reads before paying,
-so every figure it shows twice now reads the same both times. Display only:
-no figure, threshold, class, tag, simulator result, price or credit changed
-(`tests/test_audit_informe_cuenta_coherente.py`, es/en/pt).
+so every figure it shows twice now reads the same both times. No figure,
+threshold, class, stored evidence tag, simulator result, price or credit
+changed (`tests/test_audit_informe_cuenta_coherente.py`, es/en/pt); what a
+new result stores beyond its texts is listed under the fourth pass.
 
 - **One name per PSR** (`psr_names`). Since policy 2026-09-27-dependence-1
   the statistical dimension uses the lower of the plain PSR and the
@@ -5825,17 +5826,71 @@ no figure, threshold, class, tag, simulator result, price or credit changed
   size or without averaging when one exists, never a backtest to upload, voice
   by voice (`plan.ACCOUNT_FLAG_HINTS`, `ownership.PLAN["account_flag_*"]`);
   "What to do now" and the instruments section name the account or signal.
-  The backtest's answer says "if it has one" once. A backtest keeps every one
-  of its texts.
+  The backtest's answer says "if it has one" once. A backtest keeps its
+  robot, configuration and optimiser wording; what does change on its page
+  comes from the points above that apply to every report (the PSR names,
+  "net" or "gross", "Curve data", the drawdown's sign and the size table's
+  tag of the starting balance).
 - **One reading per figure.** The challenge callout tags the open loss
-  "(Declared)" as the account section does; the reconciliation's starting
-  capital takes the Declared tag the size table gives the imported report's
-  starting balance when that is the figure it starts from
-  (`report.declared_initial_value`; a curve's own first value or an assumed
-  balance keeps the stored tag); the dependence sentence rounds the variance
+  "(Declared)" as the account section does; the starting balance has one
+  tag in the reconciliation and the size table (see the fourth pass); the
+  dependence sentence rounds the variance
   ratio as the multiplicity table does; the resampled one-year drawdowns carry
   the minus sign of the summary's tile; the mean-shift sentence says when its
   annual rates come from stretches under a year, and how long each lasts
   (`shift_short`); the seller message lists the dimensions that fail apart
   from the weak ones (`dimensions_weak`). Figures, classes and the simulator
   are unchanged.
+- **Fourth pass (review of the third).**
+  - The recent stretch's question of an account or signal asks whether its
+    settings changed afterwards or it was restarted, not whether "the
+    system was reoptimised" (`analytics.ACCOUNT_QUESTIONS["recent_period"]`,
+    stored for new account results and shown over older ones, the seller
+    message included); its answer names the date of any change or restart.
+  - The reconciliation keeps the starting capital's stored tag, Measured:
+    the engine rebuilds it from the file (the deposits it lists before the
+    first trade, a Myfxbook statement's 1,000.00 among them), and the
+    downloadable JSON's `reconciliation.initial_capital` says so. The size
+    table stores the same figure as Declared; its 1x line now shows the
+    reconciliation's tag (`report.reconciled_starting_balance`), unless the
+    balance was assumed or is the one the client declared on the form. On
+    the signal sample the starting capital, the size table's balance and the
+    money deposited that holds it all read Measured, and on the backtest
+    sample the starting capital and the size table's balance do; the stored
+    tags are unchanged.
+  - The multiplicity detail and the CSCV row of an account or signal with no
+    matrix uploaded speak of the histories of the other accounts or signals
+    behind it, not "the variants you uploaded" (`variance_policy_account`,
+    `no_variants_account`, `KEY_LABELS["observed_across_accounts"]`); a
+    matrix that was uploaded keeps its row.
+  - A comparison and "what changed" name the multiplicity dimension by the
+    kinds of report shown (`report.shared_dimension_title`): an account's
+    name when every report is an account or signal, "Number of trials" when
+    one sits beside a backtest (`DIMENSION_TITLES_MIXED`), the backtest's
+    otherwise.
+  - The mean-shift sentence says each stretch's length as the luck section
+    says the history's (`report._span_text`): "almost 12 months" when a
+    stretch under a year rounds to 12.0, "1 month" for 1.0, years from a
+    full year on.
+  - Portuguese asks the "fornecedor" in the plan's account hints and the
+    account section, as the rest of the report does.
+  - The extreme jumps (MAD_SPIKES) of an account ask the provider whether
+    they come from deposits, withdrawals or bad prices, in the buyer's voice
+    (`plan.ACCOUNT_FLAG_HINTS`), and say what to upload, provide or read in
+    the developer's, provider's and neutral ones
+    (`ownership.PLAN["account_flag_MAD_SPIKES"]`); a backtest keeps "fix
+    them".
+  - When Start and End are not dates of the period the platform prints (a
+    Myfxbook statement prints none), the line under the platform's figures
+    says they are not stated by the platform but taken by Rigor from the
+    first and last trade (`platform_period_trades`,
+    `report._platform_states_period`); the table and its tag are as stored.
+  - Stored results. `live.compare_live` stores `fees_itemised` with every
+    comparison against a real account (display only: which side's averages
+    are net of the fees it itemises), and a new account result stores the
+    account wording of three questions. The public samples are rebuilt at
+    start-up, so the sha256 of their JSON (on `/ejemplo`, `/ejemplo-senal`,
+    their `/v/` pages, the English and Portuguese reports and the preview)
+    changes once with this release; no test, cache or `/comprobar` record
+    pins the earlier one, and a PDF downloaded before keeps the record it was
+    issued with.

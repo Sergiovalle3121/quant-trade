@@ -11,7 +11,7 @@ from typing import Any
 
 from quant_trade.audit.guides import guides_index_url
 from quant_trade.audit.redflags import flag_title
-from quant_trade.audit.report import LABELS, _dimension_title
+from quant_trade.audit.report import LABELS, shared_dimension_title
 from quant_trade.audit.verdict import DIMENSION_ORDER
 
 COPY = {
@@ -613,7 +613,9 @@ def change_summary(
         e(copy["dimensions"].format(n=len(changed))),
     ]
     if changed:
-        lines.append(e(" · ".join(_dimension_title(name, locale) for name in changed)))
+        lines.append(
+            e(" · ".join(shared_dimension_title(name, locale, (a, b)) for name in changed))
+        )
     flag_sets = [
         {str(flag["code"]) for flag in data.get("red_flags", []) if flag.get("code")}
         for data in (a, b)

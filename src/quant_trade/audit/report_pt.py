@@ -150,6 +150,11 @@ REPORT: dict[str, Any] = {
             "Variância usada: a maior entre a observada nas variantes que você enviou e a que o "
             "erro de amostragem produz."
         ),
+        "variance_policy_account": (
+            "Variância usada: a maior entre a observada nas demais contas ou sinais, se os seus "
+            "históricos forem enviados, e a que o erro de amostragem produz."
+        ),
+        "no_variants_account": "os históricos das demais contas ou sinais não foram enviados",
         "pdf_long": "Baixar o relatório em PDF",
         "pdf_busy": "Gerando seu PDF… (alguns segundos)",
         "pdf_wait": "O PDF leva alguns segundos para ser gerado.",
@@ -313,7 +318,7 @@ REPORT: dict[str, Any] = {
         ),
         "account_clean_unseen": (
             "Não vimos depósitos em plena perda nem uma porcentagem que se afaste do dinheiro. O "
-            "arquivo não diz quanto as posições abertas estavam perdendo: peça ao provedor a "
+            "arquivo não diz quanto as posições abertas estavam perdendo: peça ao fornecedor a "
             "curva de patrimônio com o flutuante."
         ),
         "account_live": (
@@ -1314,6 +1319,12 @@ REPORT: dict[str, Any] = {
             "({first} → {last}) vão do primeiro ponto da curva ao último, que pode ser um "
             "depósito ou o saldo inicial antes da primeira operação."
         ),
+        "platform_period_trades": (
+            "Início e Fim não são declarados pela plataforma: são as datas da primeira e da "
+            "última operação do arquivo, que a Rigor toma da sua lista de operações. Os dados "
+            "da curva ({first} → {last}) vão do primeiro ponto da curva ao último, que pode ser "
+            "um depósito ou o saldo inicial antes da primeira operação."
+        ),
         "colmap": "Como cada coluna do seu arquivo foi lida",
         "optimization": "Exportação de otimização",
         "passes": "configurações testadas",
@@ -2028,6 +2039,7 @@ REPORT: dict[str, Any] = {
         "kurtosis": "Curtose",
         "floor": "Mínimo por erro de amostragem",
         "observed_across_variants": "Observado nas variantes",
+        "observed_across_accounts": "Observado nas demais contas ou sinais",
         "sharpe_variance_used": "Variância do Sharpe usada",
         "dependence_ratio": "Aumento da variância por dependência",
         "effective_observations": "Observações efetivas após dependência",
@@ -6313,6 +6325,16 @@ RULES: tuple[tuple[str, str], ...] = (
     (
         "Ask for the full list of closed trades with sizes, prices and dates.",
         "Peça a lista completa de operações fechadas com tamanhos, preços e datas.",
+    ),
+    (
+        (
+            "What changed in the last stretch of the history, where the trades stop adding up? "
+            "Did this account or signal's settings change afterwards, or was it restarted?"
+        ),
+        (
+            "O que mudou no último trecho do histórico, em que as operações deixam de somar? A "
+            "configuração desta conta ou sinal mudou depois, ou houve um reinício?"
+        ),
     ),
     (
         (

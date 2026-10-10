@@ -1114,6 +1114,12 @@ ACCOUNT_QUESTIONS: dict[str, dict[str, str]] = {
         "en": "Does this account or signal add positions against the move when price moves "
         "away? How many at most?",
     },
+    "recent_period": {
+        "es": "¿Qué cambió en el último tramo del historial, en el que las operaciones dejan de "
+        "sumar? ¿Cambió después la configuración de esta cuenta o señal, o se reinició?",
+        "en": "What changed in the last stretch of the history, where the trades stop adding "
+        "up? Did this account or signal's settings change afterwards, or was it restarted?",
+    },
 }
 
 _FLAG_QUESTIONS: dict[str, str] = {
@@ -1198,8 +1204,8 @@ def vendor_questions(
     An account history (``account_history``) is the live record itself and
     its prices are real fills, so the backtest questions (modelling, trials,
     held-out period, assumed costs) give way to the ones an investor needs,
-    and the sizing and grid questions ask about the account or signal, which
-    may have no robot behind it (``ACCOUNT_QUESTIONS``).
+    and the sizing, grid and recent-stretch questions ask about the account
+    or signal, which may have no robot behind it (``ACCOUNT_QUESTIONS``).
     A fund's monthly record (``fund_record``) has no robot and no trades:
     it gets the questions a fund investor asks, plus the data-quality one.
     """

@@ -471,7 +471,7 @@ ACCOUNT_FLAG_HINTS: dict[str, dict[str, str]] = {
             "size to compare with this one."
         ),
         "pt": (
-            "O tamanho cresce após as perdas: peça ao provedor o tamanho máximo que esta conta "
+            "O tamanho cresce após as perdas: peça ao fornecedor o tamanho máximo que esta conta "
             "ou sinal pode abrir e, se existir, um histórico da mesma estratégia com tamanho "
             "fixo para comparar com este."
         ),
@@ -488,7 +488,7 @@ ACCOUNT_FLAG_HINTS: dict[str, dict[str, str]] = {
             "without averaging, to see how much depends on it."
         ),
         "pt": (
-            "Abrem-se posições contra a posição perdedora: pergunte ao provedor quantas esta "
+            "Abrem-se posições contra a posição perdedora: pergunte ao fornecedor quantas esta "
             "conta ou sinal abre no máximo e peça, se existir, o histórico da mesma estratégia "
             "sem preço médio, para ver quanto depende disso."
         ),
@@ -503,7 +503,7 @@ ACCOUNT_FLAG_HINTS: dict[str, dict[str, str]] = {
             "and for the equity curve with floating P&L, which shows what they lose together."
         ),
         "pt": (
-            "Pergunte ao provedor quantas posições esta conta ou sinal abre no máximo ao mesmo "
+            "Pergunte ao fornecedor quantas posições esta conta ou sinal abre no máximo ao mesmo "
             "tempo e peça a curva de patrimônio com flutuante, que mostra o que perdem juntas."
         ),
     },
@@ -517,8 +517,25 @@ ACCOUNT_FLAG_HINTS: dict[str, dict[str, str]] = {
             "curve (with floating P&L) to measure the real drawdown."
         ),
         "pt": (
-            "O histórico mostra só o saldo: peça ao provedor a curva de patrimônio (com "
+            "O histórico mostra só o saldo: peça ao fornecedor a curva de patrimônio (com "
             "flutuante) desta conta para medir o drawdown real."
+        ),
+    },
+    "MAD_SPIKES": {
+        "es": (
+            "Hay días en que la cuenta se mueve más de un 15 %: pregunta al proveedor si vienen "
+            "de depósitos, retiros o precios erróneos; si son operaciones reales, el tamaño es "
+            "muy agresivo para la cuenta."
+        ),
+        "en": (
+            "On some days the account moves more than 15 %: ask the provider whether they come "
+            "from deposits, withdrawals or bad prices; if they are real trades, the size is very "
+            "aggressive for the account."
+        ),
+        "pt": (
+            "Há dias em que a conta se move mais de 15 %: pergunte ao fornecedor se vêm de "
+            "depósitos, saques ou preços errados; se são operações reais, o tamanho é muito "
+            "agressivo para a conta."
         ),
     },
 }

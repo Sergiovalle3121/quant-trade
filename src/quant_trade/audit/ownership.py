@@ -1644,6 +1644,44 @@ PLAN: dict[str, dict[str, dict[str, str]]] = {
             "(com flutuante) desta conta.",
         ),
     },
+    "account_flag_MAD_SPIKES": {
+        OWN: _say(
+            "Hay días en que la cuenta se mueve más de un 15 %: si vienen de depósitos, retiros "
+            "o precios erróneos, sube el historial que exporta la plataforma con cada depósito y "
+            "retiro; si son operaciones reales, el tamaño es muy agresivo para la cuenta.",
+            "On some days the account moves more than 15 %: if they come from deposits, "
+            "withdrawals or bad prices, upload the history the platform exports with every "
+            "deposit and withdrawal; if they are real trades, the size is very aggressive for "
+            "the account.",
+            "Há dias em que a conta se move mais de 15 %: se vêm de depósitos, saques ou preços "
+            "errados, envie o histórico que a plataforma exporta com cada depósito e saque; se "
+            "são operações reais, o tamanho é muito agressivo para a conta.",
+        ),
+        PROVIDER: _say(
+            "Hay días en que la cuenta se mueve más de un 15 %: te van a preguntar si vienen de "
+            "depósitos, retiros o precios erróneos; aporta el historial de la plataforma con "
+            "cada depósito y retiro. Si son operaciones reales, el tamaño es muy agresivo para "
+            "la cuenta.",
+            "On some days the account moves more than 15 %: you will be asked whether they come "
+            "from deposits, withdrawals or bad prices; provide the platform's history with every "
+            "deposit and withdrawal. If they are real trades, the size is very aggressive for "
+            "the account.",
+            "Há dias em que a conta se move mais de 15 %: vão perguntar a você se vêm de "
+            "depósitos, saques ou preços errados; forneça o histórico da plataforma com cada "
+            "depósito e saque. Se são operações reais, o tamanho é muito agressivo para a conta.",
+        ),
+        NEUTRAL: _say(
+            "Hay días en que la cuenta se mueve más de un 15 %: el historial de la plataforma con "
+            "cada depósito y retiro muestra si vienen de depósitos, retiros o precios erróneos; "
+            "si son operaciones reales, el tamaño es muy agresivo para la cuenta.",
+            "On some days the account moves more than 15 %: the platform's history with every "
+            "deposit and withdrawal shows whether they come from deposits, withdrawals or bad "
+            "prices; if they are real trades, the size is very aggressive for the account.",
+            "Há dias em que a conta se move mais de 15 %: o histórico da plataforma com cada "
+            "depósito e saque mostra se vêm de depósitos, saques ou preços errados; se são "
+            "operações reais, o tamanho é muito agressivo para a conta.",
+        ),
+    },
     "flag_PROFIT_CONCENTRATION": {
         OWN: _say(
             "Revisa la mejor operación en el archivo (fecha, tamaño, precio) y sube más "
@@ -2373,17 +2411,17 @@ ACCOUNT_QUESTIONS: dict[str, dict[str, tuple[str | None, str]]] = {
         "es": (
             None,
             "el historial de esta cuenta o señal en ese último tramo y la fecha de cualquier "
-            "cambio de configuración",
+            "cambio de configuración o reinicio",
         ),
         "en": (
             None,
             "this account or signal's history over that last stretch and the date of any change "
-            "to its settings",
+            "to its settings or restart",
         ),
         "pt": (
             None,
             "o histórico desta conta ou sinal nesse último trecho e a data de qualquer mudança "
-            "de configuração",
+            "de configuração ou reinício",
         ),
     },
 }

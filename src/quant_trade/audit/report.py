@@ -16,7 +16,7 @@ from __future__ import annotations
 import html
 import math
 import re
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from datetime import date
 from typing import Any
 from urllib.parse import parse_qsl, quote, urlencode, urlsplit, urlunsplit
@@ -594,6 +594,11 @@ LABELS: dict[str, dict[str, str]] = {
             "Varianza usada: la mayor entre la observada en las variantes que subiste y la "
             "que produce el error de muestreo."
         ),
+        "variance_policy_account": (
+            "Varianza usada: la mayor entre la observada en las demás cuentas o señales, si se "
+            "aportan sus historiales, y la que produce el error de muestreo."
+        ),
+        "no_variants_account": "no se aportaron los historiales de las demás cuentas o señales",
         "pdf_long": "Descargar el informe en PDF",
         "pdf_busy": "Generando tu PDF… (unos segundos)",
         "pdf_wait": "El PDF tarda unos segundos en generarse.",
@@ -2066,6 +2071,12 @@ LABELS: dict[str, dict[str, str]] = {
             "({first} → {last}) van del primer punto de la curva al último, que puede ser un "
             "depósito o el saldo inicial antes de la primera operación."
         ),
+        "platform_period_trades": (
+            "Inicio y Fin no los declara la plataforma: son las fechas de la primera y la "
+            "última operación del archivo, que Rigor toma de su lista de operaciones. Los datos "
+            "de la curva ({first} → {last}) van del primer punto de la curva al último, que "
+            "puede ser un depósito o el saldo inicial antes de la primera operación."
+        ),
         "colmap": "Cómo se leyó cada columna de tu archivo",
         "optimization": "Exportación de optimización",
         "passes": "configuraciones probadas",
@@ -2308,6 +2319,11 @@ LABELS: dict[str, dict[str, str]] = {
             "Variance used: the larger of the one observed across the variants you uploaded "
             "and the one sampling error produces."
         ),
+        "variance_policy_account": (
+            "Variance used: the larger of the one observed across the other accounts or "
+            "signals, when their histories are provided, and the one sampling error produces."
+        ),
+        "no_variants_account": "the histories of the other accounts or signals were not provided",
         "pdf_long": "Download the report as PDF",
         "pdf_busy": "Preparing your PDF… (a few seconds)",
         "pdf_wait": "The PDF takes a few seconds to prepare.",
@@ -3737,6 +3753,12 @@ LABELS: dict[str, dict[str, str]] = {
             "{last}) run from the curve's first point to its last, which can be a deposit or "
             "the opening balance before the first trade."
         ),
+        "platform_period_trades": (
+            "Start and End are not stated by the platform: they are the dates of the file's "
+            "first and last trade, which Rigor takes from its list of trades. The curve data "
+            "({first} → {last}) run from the curve's first point to its last, which can be a "
+            "deposit or the opening balance before the first trade."
+        ),
         "colmap": "How each column of your file was read",
         "optimization": "Optimisation export",
         "passes": "configurations tried",
@@ -3891,6 +3913,13 @@ DIMENSION_TITLES_ACCOUNT: dict[str, dict[str, str]] = {
     "en": {"multiplicity": "Number of accounts or signals behind it"},
     "pt": {"multiplicity": "Número de contas ou sinais por trás desta"},
 }
+#: The same dimensions over an account or signal and a backtest side by side
+#: (a comparison): each counts its trials its own way, so the row names the trials.
+DIMENSION_TITLES_MIXED: dict[str, dict[str, str]] = {
+    "es": {"multiplicity": "Número de intentos"},
+    "en": {"multiplicity": "Number of trials"},
+    "pt": {"multiplicity": "Número de tentativas"},
+}
 
 STATUS_TEXT: dict[str, dict[str, str]] = {
     "es": {
@@ -4011,6 +4040,7 @@ KEY_LABELS: dict[str, dict[str, str]] = {
         "kurtosis": "Curtosis",
         "floor": "Mínimo por error de muestreo",
         "observed_across_variants": "Observado en las variantes",
+        "observed_across_accounts": "Observado en las demás cuentas o señales",
         "sharpe_variance_used": "Varianza del Sharpe usada",
         "dependence_ratio": "Aumento de la varianza por dependencia",
         "effective_observations": "Observaciones efectivas tras dependencia",
@@ -4124,6 +4154,7 @@ KEY_LABELS: dict[str, dict[str, str]] = {
         "kurtosis": "Kurtosis",
         "floor": "Sampling-error floor",
         "observed_across_variants": "Observed across variants",
+        "observed_across_accounts": "Observed across the other accounts or signals",
         "sharpe_variance_used": "Sharpe variance used",
         "dependence_ratio": "Variance increase from dependence",
         "effective_observations": "Effective observations after dependence",
@@ -4669,6 +4700,39 @@ def _one_dsr_row(multiplicity: dict[str, Any], declared: dict[str, Any]) -> dict
     return shown
 
 
+#: The engine's reason when no variants matrix came with the upload.
+NO_VARIANTS = "no variants uploaded"
+
+
+def _account_multiplicity_rows(
+    rows: dict[str, Any], labels: dict[str, str]
+) -> tuple[dict[str, Any], bool]:
+    """An account or signal's multiplicity rows, and whether nothing was
+    measured across other histories. Its trials are the other accounts or
+    signals behind it, not a backtest's variants: with no matrix uploaded the
+    row of the variance observed across them says so in those words. A matrix
+    that was uploaded keeps its own row. The figures and tags are as stored."""
+    observed = rows.get("observed_across_variants")
+    if not isinstance(observed, dict) or observed.get("evidence") != "NOT_MEASURED":
+        return rows, False
+    note = observed.get("note")
+    shown = {**observed, "note": labels["no_variants_account"] if note == NO_VARIANTS else note}
+    return {
+        ("observed_across_accounts" if key == "observed_across_variants" else key): (
+            shown if key == "observed_across_variants" else value
+        )
+        for key, value in rows.items()
+    }, True
+
+
+def _account_cscv(cscv: dict[str, Any], labels: dict[str, str]) -> dict[str, Any]:
+    """An account or signal's CSCV section: with no matrix uploaded, its reason
+    names the other accounts or signals' histories, not a variants matrix."""
+    if cscv.get("status") == "NOT_MEASURED" and cscv.get("reason") == NO_VARIANTS:
+        return {**cscv, "reason": labels["no_variants_account"]}
+    return cscv
+
+
 def _status_line(section: dict[str, Any], labels: dict[str, str]) -> str:
     status = section.get("status")
     if status == "NOT_MEASURED":
@@ -4718,6 +4782,30 @@ def _account_page(data: Mapping[str, Any] | None) -> bool:
     """An account or signal's report (``report_kind``): its texts name the
     account or signal and what it counts, never a robot or its configurations."""
     return data is not None and report_kind(dict(data)) == "account"
+
+
+def shared_dimension_title(name: str, locale: str, results: Iterable[Mapping[str, Any]]) -> str:
+    """A dimension's name over several stored results read together (a
+    comparison, what changed between two): an account or signal's when every
+    one is (``DIMENSION_TITLES_ACCOUNT``), one both kinds share when an account
+    or signal sits beside a backtest (``DIMENSION_TITLES_MIXED``), else the
+    backtest's, as each report names it. A stored result whose context does
+    not read (not a mapping) counts as a backtest, as its own page would."""
+
+    def account(data: Any) -> bool:
+        if not isinstance(data, Mapping):
+            return False
+        inputs, fund = data.get("inputs"), data.get("fund")
+        if not isinstance(inputs, Mapping) or not isinstance(fund, Mapping | None):
+            return False
+        return _account_page(data)
+
+    accounts = [account(data) for data in results]
+    if accounts and all(accounts):
+        return _dimension_title(name, locale, account=True)
+    if any(accounts) and (title := DIMENSION_TITLES_MIXED.get(locale, {}).get(name)):
+        return title
+    return _dimension_title(name, locale)
 
 
 def _meaning_html(
@@ -6010,12 +6098,15 @@ def _challenge_html(
     unseen_warning: str = "",
     *,
     account: bool = False,
+    starting_balance: dict[str, Any] | None = None,
 ) -> str:
     """The prop-firm challenge simulator. ``unseen_warning``
     (``unseen_open_loss_warning``) opens the section when the balance hides an
     open loss: the outcome, the ladder, the sizes and the firms' table then sit
-    folded under it, each subsection with its own short warning first. Nothing
-    the simulator measured changes."""
+    folded under it, each subsection with its own short warning first.
+    ``starting_balance`` (``reconciled_starting_balance``): the size table's
+    balance as the reconciliation tags it. Nothing the simulator measured
+    changes."""
     if not challenge:
         return f"<p class='muted'>{_e(labels['none'])}</p>"
     fold = bool(unseen_warning) and challenge.get("status") == "MEASURED"
@@ -6116,6 +6207,7 @@ def _challenge_html(
             horizon=horizon,
             optimistic=optimistic,
             market=market_line,
+            starting_balance=starting_balance,
         )
     if fold:
         short = f"<p><strong>{_e(labels['ch_unseen_sizes'])}</strong></p>"
@@ -6323,9 +6415,12 @@ def _challenge_sizing_html(
     horizon: int | None,
     optimistic: bool = False,
     market: str = "",
+    starting_balance: dict[str, Any] | None = None,
 ) -> str:
     """The chosen program at 0.5x, 1x, 1.5x and 2x the history's size, under
     the ladder: what changes with the size, never which size to use.
+    ``starting_balance`` (``reconciled_starting_balance``) gives the 1x line's
+    balance the reconciliation's tag.
 
     The lots are those of the balance the shares at 1x are measured on, and
     the table says so; on the account a program names they are scaled to it
@@ -6410,7 +6505,8 @@ def _challenge_sizing_html(
     out = (
         title
         + f"<p class='muted'>{_e(intro)} {_badge('MEASURED')}</p>{market}"
-        + f"<p>{_e(labels['ch_size_one'])}{_sizing_balance_html(sizing, labels)}</p>"
+        + f"<p>{_e(labels['ch_size_one'])}"
+        f"{_sizing_balance_html(sizing, labels, starting_balance)}</p>"
     )
     measured_lot = per_trade.get("evidence") == "MEASURED" and per_trade.get("value") is not None
     if per_trade.get("evidence") == "NOT_MEASURED":
@@ -6470,14 +6566,18 @@ def _lot_text(value: Any) -> str:
     return f"{lots:,.2f}" if lots >= 0.1 else f"{lots:,.3f}"
 
 
-def _sizing_balance_html(sizing: dict[str, Any], labels: dict[str, str]) -> str:
+def _sizing_balance_html(
+    sizing: dict[str, Any], labels: dict[str, str], reconciled: dict[str, Any] | None = None
+) -> str:
     """The balance 1x's daily shares are measured on, as the capital section
-    names it; an assumed one says so. Empty for a result stored without it."""
+    names it; an assumed one says so. Empty for a result stored without it.
+    ``reconciled`` (``reconciled_starting_balance``) is the same figure as the
+    reconciliation tags it: the line then carries that tag."""
     balance = sizing.get("starting_balance") or {}
     if not balance.get("value"):
         return ""
     shown = _fmt(float(balance["value"]), key="starting_balance")
-    evidence = str(balance.get("evidence") or "NOT_MEASURED")
+    evidence = str((reconciled or balance).get("evidence") or "NOT_MEASURED")
     key = "ch_size_balance_assumed" if evidence == "NOT_MEASURED" else "ch_size_balance"
     return f" {_e(labels[key].format(balance=shown))} {_badge(evidence)}"
 
@@ -7078,15 +7178,33 @@ def _platform_period_note(
     """Where each period comes from when the platform's Start and End are not
     the curve's dates at the top of the report (a deposit days before the first
     trade): one line under the platform's figures, so the two never read as two
-    histories."""
+    histories. When Start and End are not dates of the period the platform
+    prints (``_platform_states_period``; a Myfxbook statement prints none), the
+    importer filled them with the first and last trade, and the line says Rigor
+    took them from there, not the platform; the table and its tag are as
+    stored."""
     inputs = data.get("inputs") or {}
     first = str(inputs.get("first_timestamp") or "")[:10]
     last = str(inputs.get("last_timestamp") or "")[:10]
     start, end = str(metadata.get("start") or "")[:10], str(metadata.get("end") or "")[:10]
     if not first or not last or not (start or end) or (start in ("", first) and end in ("", last)):
         return ""
-    text = labels["platform_period_note"].format(first=first, last=last)
+    key = "platform_period_note" if _platform_states_period(metadata) else "platform_period_trades"
+    text = labels[key].format(first=first, last=last)
     return f"<p class='muted platform-period'>{_e(text)}</p>"
+
+
+#: A date as a platform's period prints it: 2020.01.02, 2020-01-02 or 2020/01/02.
+_PERIOD_DATE = re.compile(r"(\d{4})[.\-/](\d{2})[.\-/](\d{2})")
+
+
+def _platform_states_period(metadata: Mapping[str, Any]) -> bool:
+    """Whether Start or End is a date of the period the platform prints
+    (``period``, as a tester report's header gives it). Otherwise the
+    importers filled them with the first entry and the last exit."""
+    dates = {"-".join(found) for found in _PERIOD_DATE.findall(str(metadata.get("period") or ""))}
+    start, end = str(metadata.get("start") or "")[:10], str(metadata.get("end") or "")[:10]
+    return bool(dates) and (start in dates or end in dates)
 
 
 #: Metadata keys an importer computes from the file's rows (the running
@@ -7257,39 +7375,49 @@ def declared_open_value(data: dict[str, Any]) -> dict[str, Any] | None:
     return {"value": number, "evidence": "DECLARED", "note": ACCOUNT_FLOATING_NOTE}
 
 
-def declared_initial_value(data: dict[str, Any]) -> dict[str, Any] | None:
-    """The starting balance the imported report states (DECLARED, as the
-    result's inputs and the size table tag it), when it is the figure the
-    reconciliation starts from. The engine starts there whenever a report
-    states one and tags it Measured all the same; a curve's own first value,
-    or a balance assumed because the file states none, keeps the stored tag.
-    None then."""
-    inputs = data.get("inputs") or {}
-    stated = inputs.get("initial_balance") or {}
+def reconciled_starting_balance(data: dict[str, Any]) -> dict[str, Any] | None:
+    """The size table's starting balance as the reconciliation tags the same
+    figure, so one figure reads with one tag on the page.
+
+    The reconciliation's starting capital is the first figure of the curve
+    the engine rebuilds from the file (the deposits it lists before the first
+    trade, the balance its report prints when it lists none), stored Measured
+    as the downloadable JSON's reconciliation gives it; the size table stores
+    the same figure as the file's balance, Declared. Both show the
+    reconciliation's tag, which the page keeps as stored. None, and the size
+    table keeps its own tag, when the two are not the same figure, when the
+    balance was assumed because the file states none, or when it is the one
+    the client declared on the form."""
+    balance = ((data.get("challenge") or {}).get("sizing") or {}).get("starting_balance") or {}
     start = (data.get("reconciliation") or {}).get("initial_capital") or {}
-    value, used = stated.get("value"), start.get("value")
-    if stated.get("evidence") != "DECLARED" or not isinstance(value, int | float):
+    value, used = balance.get("value"), start.get("value")
+    if balance.get("evidence") != "DECLARED" or start.get("evidence") != "MEASURED":
         return None
-    if not isinstance(used, int | float) or float(used) != float(value):
+    if not isinstance(value, int | float) or not isinstance(used, int | float):
         return None
+    if float(value) != float(used):
+        return None
+    inputs = data.get("inputs") or {}
     if any(ASSUMED_BALANCE_WARNING in str(w) for w in inputs.get("parse_warnings") or []):
         return None
-    return {**start, "evidence": "DECLARED"}
+    client = (data.get("declared") or {}).get("initial_balance") or {}
+    stated = client.get("value")
+    if client.get("evidence") == "DECLARED" and isinstance(stated, int | float):
+        return None if float(stated) == float(value) else dict(start)
+    return dict(start)
 
 
 def _reconciliation_html(
     recon: dict[str, Any] | None,
     locale: str,
     open_value: dict[str, Any] | None = None,
-    initial_value: dict[str, Any] | None = None,
 ) -> str:
     """The money reconciliation. ``open_value`` (``declared_open_value``) is the
     floating result the file declares: when the reconciliation has no valuation
     of its own, its row shows that figure as Declared, with its note and why it
     stays out of the expected balance, the same figure the account's section
-    shows. ``initial_value`` (``declared_initial_value``) is the starting
-    balance the report states: its row carries the tag the size table gives
-    the same figure. Every figure of the reconciliation stays as stored."""
+    shows. Every figure and tag of the reconciliation stays as stored (the size
+    table's starting balance takes its tag: ``reconciled_starting_balance``)."""
     if not recon:
         return ""
     copy = INTEGRITY_TEXT[locale]
@@ -7352,8 +7480,6 @@ def _reconciliation_html(
         item = recon.get(key)
         if key == "open_position_value" and declared_open is not None:
             item = declared_open
-        if key == "initial_capital" and initial_value is not None:
-            item = initial_value
         evidence = (
             str(item.get("evidence", "NOT_MEASURED")) if isinstance(item, dict) else "NOT_MEASURED"
         )
@@ -8431,6 +8557,25 @@ def _p_text(value: float) -> str:
     return "< 0.001" if value < 0.001 else f"= {value:.3f}"
 
 
+def _span_text(value: float, labels: dict[str, str]) -> str:
+    """A history's or a stretch's length in years (``value``) as the report
+    says it. Under a year it is never rounded up to 12 months, which would
+    contradict an "under a year" beside it: the months with one decimal, "1
+    month" for 1.0 and "almost 12 months" when the decimal reaches 12.0. Years
+    from a full year on."""
+    if value > LUCK_YEARS_SHOWN:
+        return labels["luck_more_than"].format(n=LUCK_YEARS_SHOWN)
+    if value >= 1:
+        return f"{value:.1f} {labels['luck_years_unit']}"
+    months = value * 12
+    if months < 1:
+        return labels["luck_under_month"]
+    if round(months, 1) >= 12:
+        return labels["luck_almost_year"]
+    shown = f"{months:.1f}"
+    return labels["luck_month_one" if shown == "1.0" else "luck_months"].format(n=shown)
+
+
 def _shift_html(
     shift: dict[str, Any],
     locale: str,
@@ -8445,6 +8590,7 @@ def _shift_html(
     year (its returns over ``periods_per_year``), the sentence says so and how
     long each stretch lasts: the page does not annualise the whole history
     under a year, so a short stretch's rate is never read as a year's result.
+    Each length reads as the luck section reads the history's (``_span_text``).
     The figures are as stored."""
     p_value = _ev_value(shift.get("p_value"))
     if p_value is None:
@@ -8453,12 +8599,7 @@ def _shift_html(
     def length(count: Any) -> str | None:
         if not isinstance(count, int) or not periods_per_year or periods_per_year <= 0:
             return None
-        months = count / periods_per_year * 12
-        if months >= 12:
-            return f"{months / 12:.1f} {labels['luck_years_unit']}"
-        if months < 1:
-            return labels["luck_under_month"]
-        return labels["luck_months"].format(n=f"{months:.1f}")
+        return _span_text(count / periods_per_year, labels)
 
     counts = [(shift.get(side) or {}).get("returns") for side in ("before", "after")]
     spans = [length(count) for count in counts]
@@ -8627,15 +8768,7 @@ def _luck_html(
         """The history's own length. Under a year it is never rounded up to 12
         months, which would contradict the "under a year of history" of the
         annual return: the months with one decimal, or "almost 12 months"."""
-        if value >= 1:
-            return years(value)
-        months = value * 12
-        if months < 1:
-            return labels["luck_under_month"]
-        if round(months, 1) >= 12:
-            return labels["luck_almost_year"]
-        shown = f"{months:.1f}"
-        return labels["luck_month_one" if shown == "1.0" else "luck_months"].format(n=shown)
+        return _span_text(value, labels)
 
     def text(key: str) -> str:
         """``key``'s wording, an account or signal's when it has one."""
@@ -10589,12 +10722,17 @@ def render_html(
             )
             + "</table>"
         )
+    # An account or signal counts the accounts or signals behind it, not variants.
+    account_page = _account_page(data)
+    multiplicity_rows = _one_dsr_row(data["multiplicity"], data["declared"])
+    unmatched = False
+    if account_page:
+        multiplicity_rows, unmatched = _account_multiplicity_rows(multiplicity_rows, labels)
     multiplicity_html = (
         _status_line(data["multiplicity"], labels)
-        + _evidence_rows(
-            _one_dsr_row(data["multiplicity"], data["declared"]), labels, skip={"sensitivity"}
-        )
-        + f"<p class='muted'>{_e(labels['variance_policy'])}</p>"
+        + _evidence_rows(multiplicity_rows, labels, skip={"sensitivity"})
+        + f"<p class='muted'>"
+        f"{_e(labels['variance_policy_account' if unmatched else 'variance_policy'])}</p>"
         + sens_html
     )
 
@@ -10670,9 +10808,8 @@ def render_html(
         )
         + _alpha_html(data["benchmark"], labels)
     )
-    cscv_html = _status_line(data["cscv"], labels) + _evidence_rows(
-        data["cscv"], labels, skip=set()
-    )
+    cscv = _account_cscv(data["cscv"], labels) if account_page else data["cscv"]
+    cscv_html = _status_line(cscv, labels) + _evidence_rows(cscv, labels, skip=set())
     if data["cscv"].get("status") == "MEASURED":
         cscv_html += (
             "<p class='muted'>"
@@ -10765,7 +10902,7 @@ def render_html(
             ("holdout", data["holdout"]),
             ("costs", data["costs"]),
             ("benchmark", data["benchmark"]),
-            ("cscv", data["cscv"]),
+            ("cscv", cscv),
             ("risk", data.get("risk") or {}),
             ("challenge", data.get("challenge") or {}),
         )
@@ -11000,6 +11137,7 @@ def render_html(
                         hidden,
                         unseen_open_loss_warning(data, labels),
                         account=_account_page(data),
+                        starting_balance=reconciled_starting_balance(data),
                     ),
                 )
             ]
@@ -11262,9 +11400,7 @@ def render_html(
     )
     kpis_html = _kpis_html(data, labels, locked=locked)
     reading_html = _reading_html(data, labels)
-    recon_html = _reconciliation_html(
-        data.get("reconciliation"), locale, declared_open_value(data), declared_initial_value(data)
-    )
+    recon_html = _reconciliation_html(data.get("reconciliation"), locale, declared_open_value(data))
     forensics_html = _forensics_html(data.get("forensics"), locale)
     sections = [
         section(labels["reading"], reading_html, "r-reading") if reading_html else "",
