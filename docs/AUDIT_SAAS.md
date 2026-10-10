@@ -180,6 +180,43 @@ free tools page and is linked from the prop-firm case page and the article
 no costs, slippage or intraday floating loss, and independent trades, and says
 so on the page. Tests: `tests/test_audit_challenge_calculator.py`.
 
+The free risk-of-ruin calculator (`audit/ruin_calc.py`, rendered by
+`audit/ruin_pages.py`) lives at `/calculadora-ruina`,
+`/en/risk-of-ruin-calculator` and `/pt/calculadora-risco-de-ruina`, in the
+sitemap with the date `seo.RUIN_PUBLISHED`. Its GET form takes DECLARED
+fields with the challenge calculator's parser and bounds: win rate, the
+average win and loss in % of the balance or in R with the risk per trade, the
+ruin threshold in % of the initial balance (50 % by default; the result also
+shows 20 %, 30 % and 50 %, the thresholds a challenge sets), the horizon in
+trades (500 by default, 10 to 2,000) and, optionally, the trades behind the
+win rate. From those figures it draws 4,000 paths (`SAMPLES`) of independent
+trades with a fixed seed, every trade of the average size counted on the
+initial balance, as the classic ruin formula assumes; the uniforms come out of
+the seed before the rate is applied, so the lower win rate only turns winners
+into losers on the same paths. The page shows the expectancy per trade in R
+and in % (in % of the balance, one R is the average loss), the share of paths
+that touched the threshold within the horizon, the classic formula `(q/p)^U`
+without a horizon when the average win equals the average loss (NOT_MEASURED
+otherwise; `U` is the whole number of net losses that touch the threshold,
+rounded up with the simulation's tolerance, never a fractional exponent), the
+horizon's maximum drawdown at the median path and the 95th percentile, and
+the longest losing streak half the histories reach and 1 in 20 reach, from
+the engine's exact `streaks.longest_run_tail`, not from the paths (asked for
+at most `STREAK_TOP` lengths at once, about 8 MB; past it, win rates under
+about 1 %, the same recurrence runs one length at a time, and the streak
+reading is cached per horizon and rate). With the trades, everything is
+computed again at the lower end of the
+win rate's 95 % Wilson interval (`winrate.read`) and a sentence says how the
+ruin figure moves. Every figure is Declared or computed from the declared;
+nothing is Measured, stored or fetched. Results are cached in memory per
+input and each address gets `REQUESTS_PER_HOUR` computations a sliding hour
+(past it, a 429 that keeps the form); visits count in the in-memory funnel
+counter and a shared link carries `ref=ruina`. It is the fourth tool on the
+free tools page and is linked from the win-rate and challenge calculators and
+from the related links of the article "rachas-perdedoras". The page carries a
+three-question FAQ (visible and as `FAQPage`), a `WebApplication` with price 0
+and no sizing advice. Tests: `tests/test_audit_ruin_calculator.py`.
+
 Five firms were added on 2026-10-10 (`prop_presets.NEW_FIRMS_AS_OF`), each
 from its official site and only with the programs whose rules fit the
 simulator's types exactly or by an approximation stricter than the firm's:
@@ -3040,8 +3077,9 @@ Routes:
 | `GET /terminos`, `GET /terms` | Terms of service (`audit/legal.py`), Spanish and English; either answers `?lang=`. |
 | `GET /privacidad`, `GET /privacy` | Privacy policy, Spanish and English. |
 | `GET /en/terms`, `/en/privacy`, `/pt/terms`, `/pt/privacy` | 301 to the legal page in that language (guessed addresses). |
-| `GET /herramientas` | The free tools page (`/en/tools`, `/pt/ferramentas`; `/tools` and `/pt/tools` redirect there): luck calculator, win-rate calculator, challenge calculator, figure reader and report check. |
 | `GET /calculadora-reto`, `/en/challenge-calculator`, `/pt/calculadora-desafio` | The free prop-firm challenge calculator, and its firm pages under each (`/ftmo`, `/fundednext`, `/the5ers`, `/topstep`, `/fundingpips`, `/alpha-capital-group`, `/e8-markets`, `/fxify`, `/maven-trading`, `/take-profit-trader`, `/myfundedfutures`, `/tradeify`, `/bulenox`, `/earn2trade`, `/alpha-futures`, `/lucid-trading`). |
+| `GET /herramientas` | The free tools page (`/en/tools`, `/pt/ferramentas`; `/tools` and `/pt/tools` redirect there): luck calculator, win-rate calculator, challenge calculator, risk-of-ruin calculator, figure reader and report check. |
+| `GET /calculadora-ruina`, `/en/risk-of-ruin-calculator`, `/pt/calculadora-risco-de-ruina` | The free risk-of-ruin and expectancy calculator (`audit/ruin_calc.py`, `audit/ruin_pages.py`): declared figures, fixed-size paths, the engine's streak function and the win rate's Wilson interval. |
 | `GET /en/calculator`, `/reading`, `/en/methodology`, `/en/articles`, `/en/guides`, `/en/sample`, `/en/check`, `/faq`, `/examples` | 301 to the page people meant (`/calculator`, `/en/reading`, `/methodology`, `/articles`, `/guides`, `/sample`, `/check`, `/en/faq`, `/en/examples`). The first two keep the query string. |
 | `POST /webhooks/stripe`, `POST /waitlist`, `GET /health` | Payment confirmation, waiting list, health check. |
 
@@ -5540,8 +5578,8 @@ URL's `options`. See
   those inputs. All calculator links carry `ref=ejemplos`.
 - **Free tools page.** `/herramientas`, `/en/tools` and `/pt/ferramentas`
   (`tools_hub.py`, rendered by `pages.tools_page`) gather the tools that need
-  no file: the luck calculator, the win-rate calculator, the figure reader and
-  the report check (`tools_hub.TOOL_KEYS`). Each
+  no file: the luck calculator, the win-rate, challenge and risk-of-ruin
+  calculators, the figure reader and the report check (`tools_hub.TOOL_KEYS`). Each
   block says what the visitor enters and what comes back, without an account,
   and the page shows no figure of its own; a last block points to the upload
   form, the sample report and the articles. The page is in `PUBLIC_PAGES`

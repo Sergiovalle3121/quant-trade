@@ -56,6 +56,7 @@ from quant_trade.audit import (
     raster,
     reading,
     reading_png,
+    ruin_calc,
     track_seal_pages,
     universal,
     upload_rejections,
@@ -167,6 +168,7 @@ from quant_trade.audit.public_card import public_card_svg
 from quant_trade.audit.report import render, report_kind, result_sha256
 from quant_trade.audit.retention import RetentionWorker
 from quant_trade.audit.return_series import is_return_series
+from quant_trade.audit.ruin_pages import ruin_page
 from quant_trade.audit.sample import sample_result, signal_sample_result
 from quant_trade.audit.sample_publication import (
     SAMPLE_KIND_BY_PUBLIC_ID,
@@ -1295,6 +1297,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     reading_png_paths = {path + "/card.png" for path in reading.READING_PATH.values()}
     calculator_attempts = AttemptLog()
     challenge_attempts = AttemptLog()
+    ruin_attempts = AttemptLog()
     calculator_images = reading_png.ReadingPNGCache(fields=CARD_FIELDS)
     calculator_png_paths = {path + "/card.png" for path in CALCULATOR_PATH.values()}
     card_lookups = AttemptLog()
@@ -1434,6 +1437,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     visit_paths.update({path: loc for loc, path in winrate.WINRATE_PATH.items()})
     # The challenge calculator and its firm pages, like the other free tools.
     visit_paths.update({path: loc for path, (loc, _firm) in challenge_calc.PAGES.items()})
+    visit_paths.update({path: loc for loc, path in ruin_calc.RUIN_PATH.items()})
 
     def _funnel_visit(request: Request, response: Any) -> None:
         """Count a person's visit to the landing or a case page; remember its tag.
@@ -7275,6 +7279,43 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         app.add_api_route(
             challenge_path, public_challenge, methods=["GET"], response_class=HTMLResponse
         )
+
+    def public_ruin(request: Request) -> Response:
+        """The risk-of-ruin calculator: fixed-size paths from the declared figures,
+        the engine's streak function and the win rate's Wilson interval. Nothing
+        is stored; each address gets ``REQUESTS_PER_HOUR`` computations a sliding
+        hour, past which the page keeps the form and says so (the result is
+        cached per input)."""
+        locale = next(k for k, path in ruin_calc.RUIN_PATH.items() if path == request.url.path)
+        query = request.query_params
+        duplicate = any(len(query.getlist(name)) > 1 for name in ruin_calc.FIELDS)
+        values = {name: query.get(name, "") for name in ruin_calc.FIELDS}
+        status, limited = 200, False
+        if duplicate:
+            status = 400
+        elif ruin_calc.submitted(values):
+            parsed = ruin_calc.parse(values)
+            if parsed.errors:
+                status = 400
+            else:
+                ip = _client_ip(request, cfg.trusted_proxy_hops)
+                if ruin_attempts.hit(ip, datetime.now(UTC)) >= ruin_calc.REQUESTS_PER_HOUR:
+                    status, limited = 429, True
+        page = ruin_page(
+            locale=locale,
+            base_url=_site_url(request),
+            values=values,
+            duplicate=duplicate,
+            limited=limited,
+        )
+        return HTMLResponse(
+            guard_page(_offered(page, locale)),
+            status_code=status,
+            headers={"Retry-After": "3600"} if limited else None,
+        )
+
+    for ruin_path in ruin_calc.RUIN_PATH.values():
+        app.add_api_route(ruin_path, public_ruin, methods=["GET"], response_class=HTMLResponse)
 
     def public_faq(request: Request) -> str:
         locale = next(lang for lang, path in FAQ_PATH.items() if path == request.url.path)

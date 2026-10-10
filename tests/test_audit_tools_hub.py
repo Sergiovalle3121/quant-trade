@@ -108,9 +108,9 @@ def test_tools_hub_is_public_in_every_language(client: TestClient, locale: str) 
     data = [json.loads(block) for block in blocks]
     tools = next(item for item in data if item.get("@type") == "ItemList")
     apps = [element["item"] for element in tools["itemListElement"]]
-    # One entry per tool on the page: the luck calculator, the win-rate and challenge
-    # calculators (added after this page shipped), the figure reader and the report check.
-    assert len(apps) == len(TOOL_KEYS) == 5
+    # One entry per tool on the page: the luck calculator, the win-rate, challenge and
+    # ruin calculators (added after this page shipped), the figure reader and the check.
+    assert len(apps) == len(TOOL_KEYS) == 6
     for app in apps:
         assert app["@type"] == "WebApplication"
         assert app["isAccessibleForFree"] is True

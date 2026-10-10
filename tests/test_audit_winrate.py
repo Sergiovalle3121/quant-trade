@@ -370,10 +370,10 @@ def test_tools_hub_lists_the_winrate_calculator(client: TestClient, locale: str)
     assert apps[1]["url"] == BASE + path
     assert apps[1]["name"] == winrate.COPY[locale]["nav"]
     assert find_claims(html.unescape(hub.text)) == []
-    # The short landing links the hub from its closing call; the hub has the five tools.
+    # The short landing links the hub from its closing call; the hub has the six tools.
     main = landing(locale=locale).split("<main", 1)[1].split("</main>", 1)[0]
     assert tools_url(locale) in _links(main)
-    assert len(TOOL_KEYS) == 5
+    assert len(TOOL_KEYS) == 6
     # The calculator's "Keep reading" list (not only the menu) links the tools page.
     calculator = client.get(path).text
     further = calculator.split("<ul class='aud-others'>", 1)[1].split("</ul>", 1)[0]
