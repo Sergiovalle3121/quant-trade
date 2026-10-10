@@ -21,6 +21,7 @@ figure moves with it.
 
 from __future__ import annotations
 
+import math
 from collections.abc import Mapping
 from dataclasses import dataclass
 from functools import lru_cache
@@ -42,7 +43,7 @@ from quant_trade.audit.challenge_calc import (
     _text,
 )
 from quant_trade.audit.public_card import PublicClaim, _num, _wilson
-from quant_trade.audit.streaks import RARE, longest_run_tail
+from quant_trade.audit.streaks import RARE, _longest_at_least, longest_run_tail
 
 #: The page's path in each language.
 RUIN_PATH: dict[str, str] = {
@@ -75,8 +76,14 @@ REQUESTS_PER_HOUR = 120
 CACHE_SIZE = 64
 
 #: Input bounds beyond the challenge calculator's. Outside them the form says which.
+#: The longest horizon keeps a request (two simulations, declared and lower end,
+#: and two streaks) under a second or so on a small instance.
 RUIN_RANGE = (0.0, 100.0)  # both ends excluded
-HORIZON_RANGE = (10, 5_000)
+HORIZON_RANGE = (10, 2_000)
+#: Streak lengths asked of the engine's tail at once: its memory grows with their
+#: square (about 8 MB here). Past it, win rates under about 1 % over the longest
+#: horizon, the same recurrence runs one length at a time.
+STREAK_TOP = 1024
 
 
 def _locale(locale: str) -> str:
@@ -323,29 +330,79 @@ def ruin_share(paths: Paths, ruin: float) -> float:
     return float(np.mean(paths.lowest <= 1.0 - ruin + TOUCH))
 
 
-def classic_ruin(win_rate: float, units: float) -> float:
+def classic_ruin(win_rate: float, units: int) -> float:
     """The textbook ruin probability without a horizon, for wins equal to losses:
-    ``(q / p) ** units``, where ``units`` is how many losses the threshold holds.
-    With no edge or a negative one it is 1."""
+    ``(q / p) ** units``, where ``units`` is the net losses it takes to touch the
+    threshold: a whole number, since a path cannot lose half a trade (``run``
+    rounds the threshold up to the next loss). With no edge or a negative one
+    it is 1."""
     q = 1.0 - win_rate
     if win_rate <= q:
         return 1.0
     return float((q / win_rate) ** units)
 
 
+def _streak_guess(horizon: int, q: float) -> int:
+    """About the longest losing streak 1 in 20 histories reach: the length past
+    which ``horizon · p · q^k``, the expected count of such runs, falls under
+    ``RARE``, with a margin. The whole horizon when that never happens."""
+    p = 1.0 - q
+    if horizon * p <= RARE:
+        return horizon
+    return math.ceil(1.1 * math.log(RARE / (horizon * p)) / math.log(q)) + 4
+
+
+def _tail_at(horizon: int, q: float, k: int) -> float:
+    """``P(longest run of losses >= k)`` in ``horizon`` independent trades, for
+    one ``k``: the recurrence behind the engine's ``longest_run_tail``, the same
+    operations in the same order, so both agree to the last digit. Linear time
+    in the horizon and no memory to speak of."""
+    if k <= 0:
+        return 1.0
+    if k > horizon:
+        return 0.0
+    p = 1.0 - q
+    qk = q**k
+    # none[m]: the probability of no run of k losses in m trades.
+    none = [1.0] * (horizon + 1)
+    none[k] = 1.0 - qk
+    for m in range(k + 1, horizon + 1):
+        none[m] = none[m - 1] - p * qk * none[m - k - 1]
+    return min(1.0, max(0.0, 1.0 - none[horizon]))
+
+
+@lru_cache(maxsize=CACHE_SIZE * 2)
 def losing_streaks(horizon: int, win_rate: float) -> tuple[int, int]:
     """The longest losing streak of ``horizon`` independent trades: the length
     at least half the histories reach, and the one at least 1 in 20 reach, from
-    the engine's exact ``longest_run_tail``."""
+    the engine's exact ``longest_run_tail``.
+
+    The tail is asked for up to about the rare length (``_streak_guess``), at
+    most ``STREAK_TOP`` lengths at once; while its last value still reaches
+    ``RARE`` the length asked doubles. Past ``STREAK_TOP`` (win rates under
+    about 1 %, or Wilson's lower end with one trade behind the rate) both
+    lengths come from the same recurrence one length at a time (``_tail_at``),
+    so no request holds the tail's square in memory. Cached: the two runs of
+    one reading share a horizon, and readings share both."""
     q = 1.0 - win_rate
-    top = min(horizon, 64)
+    limit = min(horizon, STREAK_TOP)
+    top = min(limit, max(8, _streak_guess(horizon, q)))
     tail = longest_run_tail(horizon, q, top)
-    while top < horizon and tail[-1] >= RARE / 10:
-        top = min(horizon, top * 2)
+    while top < limit and tail[-1] >= RARE:
+        top = min(limit, top * 2)
         tail = longest_run_tail(horizon, q, top)
-    median = int(np.max(np.nonzero(tail >= 0.5)[0]))
-    rare = int(np.max(np.nonzero(tail >= RARE)[0]))
-    return median, rare
+    if tail[-1] < RARE or top == horizon:
+        median = int(np.max(np.nonzero(tail >= 0.5)[0]))
+        rare = int(np.max(np.nonzero(tail >= RARE)[0]))
+        return median, rare
+    known: dict[int, float] = {}
+
+    def at(k: int) -> float:
+        if k not in known:
+            known[k] = _tail_at(horizon, q, k)
+        return known[k]
+
+    return _longest_at_least(at, horizon, 0.5), _longest_at_least(at, horizon, RARE)
 
 
 @dataclass(frozen=True)
@@ -380,7 +437,12 @@ def run(value: RuinInput, win_rate: float) -> RuinRun:
         # In percent of the balance, one R is the average loss.
         expectancy_r = expectancy_share / value.loss
     paths = simulate(win_rate, value.win, value.loss, value.horizon)
-    classic = classic_ruin(win_rate, value.ruin / value.loss) if value.equal_sizes else None
+    classic = None
+    if value.equal_sizes:
+        # The net losses that touch the threshold, with the simulation's own tolerance:
+        # half a loss still takes one, and 0.07 / 0.01 (7.000000000000001) takes seven.
+        units = max(1, math.ceil((value.ruin - TOUCH) / value.loss))
+        classic = classic_ruin(win_rate, units)
     median, rare = losing_streaks(value.horizon, win_rate)
     return RuinRun(
         win_rate=win_rate,
@@ -440,15 +502,16 @@ COPY: dict[str, dict[str, Any]] = {
         "nav": "Calculadora de riesgo de ruina",
         "eyebrow": "Calculadora gratis",
         "title": "¿Qué probabilidad tienes de tocar tu umbral de ruina?",
-        "seo_title": "Calculadora de riesgo de ruina y esperanza",
+        "seo_title": "Calculadora de riesgo de ruina y esperanza matemática",
         "summary": (
-            "Calculadora gratis de riesgo de ruina, esperanza, drawdown y racha perdedora con "
-            "cifras declaradas, y cuánto cambian en el límite inferior de tu % de aciertos."
+            "Calculadora gratis de riesgo de ruina, esperanza matemática, drawdown y racha con "
+            "cifras declaradas, y cuánto cambian en el límite inferior del % de aciertos."
         ),
         "lead": (
             "Escribe tu % de aciertos, tu ganancia y tu pérdida medias y un umbral de ruina: "
-            "calculamos la esperanza por operación, la probabilidad de tocar el umbral dentro "
-            "del horizonte, el drawdown máximo y la racha perdedora. Sin registro ni archivo."
+            "calculamos la esperanza matemática por operación, la probabilidad de tocar el "
+            "umbral dentro del horizonte, el drawdown máximo y la racha perdedora. Sin "
+            "registro ni archivo."
         ),
         "form_title": "Tus cifras",
         "optional": (
@@ -482,7 +545,7 @@ COPY: dict[str, dict[str, Any]] = {
         ),
         "horizon": "Horizonte (operaciones)",
         "horizon_help": (
-            "Cuántas operaciones recorre cada trayectoria. Por defecto 500; como mucho 5.000."
+            "Cuántas operaciones recorre cada trayectoria. Por defecto 500; como mucho 2.000."
         ),
         "submit": "Calcular",
         "error_number": "Revisa los números: escribe cifras como 55, 0,8 o 1.5.",
@@ -502,7 +565,7 @@ COPY: dict[str, dict[str, Any]] = {
         ),
         "error_risk": "El riesgo por operación debe ser mayor que 0 y como mucho 20 %.",
         "error_ruin": "El umbral de ruina debe ser mayor que 0 y menor que 100 % del balance.",
-        "error_horizon": "El horizonte debe ser un número entero de operaciones entre 10 y 5.000.",
+        "error_horizon": "El horizonte debe ser un número entero de operaciones entre 10 y 2.000.",
         "error_trades": (
             "Las operaciones del historial deben ser un número entero entre 1 y 10.000.000."
         ),
@@ -529,9 +592,11 @@ COPY: dict[str, dict[str, Any]] = {
         "r_is_loss": "En % del balance, 1 R es tu pérdida media.",
         "no_classic": "solo cuando la ganancia media es igual a la pérdida media",
         "classic_note": (
-            "La fórmula clásica, (q ÷ p) elevado a las pérdidas que caben en el umbral, cuenta "
-            "las trayectorias que tocan el umbral en cualquier momento, sin límite de "
-            "operaciones; por eso no queda por debajo de la simulada."
+            "La fórmula clásica, (q ÷ p) elevado al número de pérdidas netas necesarias para "
+            "tocar el umbral, cuenta las trayectorias que lo tocan en cualquier momento, sin "
+            "límite de operaciones. En teoría es igual o mayor que la simulada; la cifra "
+            "simulada lleva además el error de muestreo de sus trayectorias, de alrededor de "
+            "un punto."
         ),
         "thresholds_title": "Otros umbrales con las mismas cifras",
         "col_threshold": "Umbral (% del balance inicial)",
@@ -549,6 +614,11 @@ COPY: dict[str, dict[str, Any]] = {
             "de {low}: es el límite inferior del intervalo de confianza al 95 % (Wilson). Con "
             "ese {low} y las mismas cifras, la probabilidad de tocar el umbral cambia de "
             "{ruin} a {ruin_low}."
+        ),
+        "lower_text_same": (
+            "Con {n} operaciones, un {rate} de aciertos declarado es compatible con uno real "
+            "de {low}: es el límite inferior del intervalo de confianza al 95 % (Wilson). Con "
+            "ese {low} y las mismas cifras, la probabilidad de tocar el umbral sigue en {ruin}."
         ),
         "lower_computed": "calculado con tus operaciones y tu % de aciertos declarados (Wilson)",
         "lower_missing": (
@@ -660,12 +730,12 @@ COPY: dict[str, dict[str, Any]] = {
         ),
         "ruin": "Ruin threshold (% of the initial balance)",
         "ruin_help": (
-            "Ending at that share of the initial balance, or below it, counts as touching the "
-            "threshold. 50 % by default; for a challenge try 20 % or 30 %: the result shows "
-            "those thresholds too."
+            "Reaching that share of the initial balance, or falling below it, at any point "
+            "counts as touching the threshold. 50 % by default; for a challenge try 20 % or "
+            "30 %: the result shows those thresholds too."
         ),
         "horizon": "Horizon (trades)",
-        "horizon_help": "How many trades each path walks. 500 by default; at most 5,000.",
+        "horizon_help": "How many trades each path walks. 500 by default; at most 2,000.",
         "submit": "Calculate",
         "error_number": "Check the numbers: write figures like 55, 0.8 or 1,5.",
         "error_missing": (
@@ -684,7 +754,7 @@ COPY: dict[str, dict[str, Any]] = {
         ),
         "error_risk": "The risk per trade must be above 0 and at most 20 %.",
         "error_ruin": "The ruin threshold must be above 0 and below 100 % of the balance.",
-        "error_horizon": "The horizon must be a whole number of trades between 10 and 5,000.",
+        "error_horizon": "The horizon must be a whole number of trades between 10 and 2,000.",
         "error_trades": "The trades in your history must be a whole number from 1 to 10,000,000.",
         "error_invalid": "Check the fields: each one must appear once.",
         "limited": "Too many calculations from this address in the last hour. Try again later.",
@@ -706,9 +776,10 @@ COPY: dict[str, dict[str, Any]] = {
         "r_is_loss": "In % of the balance, one R is your average loss.",
         "no_classic": "only when the average win equals the average loss",
         "classic_note": (
-            "The classic formula, (q ÷ p) to the power of the losses the threshold holds, "
-            "counts the paths that touch the threshold at any time, with no limit on trades; "
-            "that is why it does not sit below the simulated figure."
+            "The classic formula, (q ÷ p) to the power of the net losses it takes to touch "
+            "the threshold, counts the paths that touch it at any time, with no limit on "
+            "trades. In theory it is equal to or above the simulated figure; the simulated "
+            "figure also carries the sampling error of its paths, around one point."
         ),
         "thresholds_title": "Other thresholds with the same figures",
         "col_threshold": "Threshold (% of the initial balance)",
@@ -725,6 +796,11 @@ COPY: dict[str, dict[str, Any]] = {
             "With {n} trades, a declared {rate} win rate is compatible with a real {low}: the "
             "lower end of the 95 % confidence interval (Wilson). At that {low}, with the same "
             "figures, the chance of touching the threshold moves from {ruin} to {ruin_low}."
+        ),
+        "lower_text_same": (
+            "With {n} trades, a declared {rate} win rate is compatible with a real {low}: the "
+            "lower end of the 95 % confidence interval (Wilson). At that {low}, with the same "
+            "figures, the chance of touching the threshold stays at {ruin}."
         ),
         "lower_computed": "computed with your declared trades and win rate (Wilson)",
         "lower_missing": (
@@ -743,11 +819,11 @@ COPY: dict[str, dict[str, Any]] = {
         "faq": [
             (
                 "What is the risk of ruin?",
-                "The chance that the balance ends at a threshold you set, or below it, within "
-                "a number of trades: for example, 50 % of the initial balance within 500 "
-                "trades. Here it is computed on paths of independent trades built from your "
-                "declared figures, with the classic formula next to it when the average win "
-                "equals the average loss.",
+                "The chance that the balance reaches a threshold you set, or falls below it, "
+                "at any point within a number of trades: for example, 50 % of the initial "
+                "balance within 500 trades. Here it is computed on paths of independent trades "
+                "built from your declared figures, with the classic formula next to it when "
+                "the average win equals the average loss.",
             ),
             (
                 "Why does it ask how many trades my history has?",
@@ -768,9 +844,9 @@ COPY: dict[str, dict[str, Any]] = {
             "Each path has independent trades: each one wins your average win with your win "
             "rate or loses your average loss. Fixed size, counted on the initial balance, as "
             "in the classic ruin formula.",
-            "Touching the threshold is ending at the share of the initial balance you set, or "
-            "below it, on any trade of the horizon; the path walks on to the end so the "
-            "drawdown is measured.",
+            "Touching the threshold is reaching the share of the initial balance you set, or "
+            "falling below it, on any trade of the horizon; the path walks on to the end so "
+            "the drawdown is measured.",
             "The maximum drawdown is measured from each path's own peak; the longest losing "
             "streak comes from longest_run_tail, Rigor's engine function for independent "
             "trades.",
@@ -796,16 +872,16 @@ COPY: dict[str, dict[str, Any]] = {
         "nav": "Calculadora de risco de ruína",
         "eyebrow": "Calculadora grátis",
         "title": "Qual é a probabilidade de tocar o seu limite de ruína?",
-        "seo_title": "Calculadora de risco de ruína e esperança",
+        "seo_title": "Calculadora de risco de ruína e esperança matemática",
         "summary": (
-            "Calculadora grátis de risco de ruína, esperança, drawdown e sequência de perdas "
+            "Calculadora grátis de risco de ruína, esperança matemática, drawdown e sequência "
             "com números declarados, e quanto mudam no limite inferior da taxa de acerto."
         ),
         "lead": (
             "Digite a sua taxa de acerto, o seu ganho e a sua perda médios e um limite de "
-            "ruína: calculamos a esperança por operação, a probabilidade de tocar o limite "
-            "dentro do horizonte, o drawdown máximo e a sequência de perdas. Sem cadastro nem "
-            "arquivo."
+            "ruína: calculamos a esperança matemática por operação, a probabilidade de tocar "
+            "o limite dentro do horizonte, o drawdown máximo e a sequência de perdas. Sem "
+            "cadastro nem arquivo."
         ),
         "form_title": "Seus números",
         "optional": (
@@ -838,7 +914,7 @@ COPY: dict[str, dict[str, Any]] = {
         ),
         "horizon": "Horizonte (operações)",
         "horizon_help": (
-            "Quantas operações cada trajetória percorre. Por padrão 500; no máximo 5.000."
+            "Quantas operações cada trajetória percorre. Por padrão 500; no máximo 2.000."
         ),
         "submit": "Calcular",
         "error_number": "Revise os números: escreva valores como 55, 0,8 ou 1.5.",
@@ -858,7 +934,7 @@ COPY: dict[str, dict[str, Any]] = {
         ),
         "error_risk": "O risco por operação deve ser maior que 0 e no máximo 20 %.",
         "error_ruin": "O limite de ruína deve ser maior que 0 e menor que 100 % do saldo.",
-        "error_horizon": "O horizonte deve ser um número inteiro de operações entre 10 e 5.000.",
+        "error_horizon": "O horizonte deve ser um número inteiro de operações entre 10 e 2.000.",
         "error_trades": (
             "As operações do histórico devem ser um número inteiro entre 1 e 10.000.000."
         ),
@@ -882,9 +958,11 @@ COPY: dict[str, dict[str, Any]] = {
         "r_is_loss": "Em % do saldo, 1 R é a sua perda média.",
         "no_classic": "só quando o ganho médio é igual à perda média",
         "classic_note": (
-            "A fórmula clássica, (q ÷ p) elevado às perdas que cabem no limite, conta as "
-            "trajetórias que tocam o limite em qualquer momento, sem limite de operações; por "
-            "isso não fica abaixo da simulada."
+            "A fórmula clássica, (q ÷ p) elevado ao número de perdas líquidas necessárias para "
+            "tocar o limite, conta as trajetórias que o tocam em qualquer momento, sem limite "
+            "de operações. Em teoria é igual ou maior que a simulada; o número simulado "
+            "carrega além disso o erro de amostragem das suas trajetórias, de cerca de um "
+            "ponto."
         ),
         "thresholds_title": "Outros limites com os mesmos números",
         "col_threshold": "Limite (% do saldo inicial)",
@@ -902,6 +980,12 @@ COPY: dict[str, dict[str, Any]] = {
             "real de {low}: é o limite inferior do intervalo de confiança de 95 % (Wilson). "
             "Com esse {low} e os mesmos números, a probabilidade de tocar o limite muda de "
             "{ruin} para {ruin_low}."
+        ),
+        "lower_text_same": (
+            "Com {n} operações, uma taxa de acerto declarada de {rate} é compatível com uma "
+            "real de {low}: é o limite inferior do intervalo de confiança de 95 % (Wilson). "
+            "Com esse {low} e os mesmos números, a probabilidade de tocar o limite continua "
+            "em {ruin}."
         ),
         "lower_computed": (
             "calculado com as suas operações e a sua taxa de acerto declaradas (Wilson)"
@@ -994,6 +1078,7 @@ __all__ = [
     "SAMPLES",
     "SEED",
     "SHARE_REF",
+    "STREAK_TOP",
     "TOUCH",
     "Parsed",
     "Paths",

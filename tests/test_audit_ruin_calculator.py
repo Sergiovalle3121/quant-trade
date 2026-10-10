@@ -6,6 +6,8 @@ import html
 import json
 import re
 import socket
+import time
+import tracemalloc
 from datetime import UTC, datetime
 from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
@@ -48,7 +50,7 @@ FIGURES = {
 #: The same in % of the balance, with a challenge's threshold and a short horizon.
 PCT = {"win_rate": "52", "avg_win": "0.9", "avg_loss": "0.6", "ruin": "30", "horizon": "300"}
 #: The classic case: a win equal to a loss, 1 % each, a threshold of ten losses, a long horizon.
-EQUAL = {"win_rate": "55", "avg_win": "1", "avg_loss": "1", "ruin": "10", "horizon": "3000"}
+EQUAL = {"win_rate": "55", "avg_win": "1", "avg_loss": "1", "ruin": "10", "horizon": "2000"}
 #: Words the brief keeps off this page, in the three languages.
 FORBIDDEN = re.compile(
     r"\b(aprobar\w*|aprobad\w*|pasar|pasas?|pass|passed|passes|passing|aprovar\w*|aprovad\w*|"
@@ -176,6 +178,10 @@ def test_copy_passes_the_guard_and_the_brief_words(locale: str) -> None:
         for text in texts:
             for word in ("informe", "archivo", "Sube "):
                 assert word not in text, (word, text)
+    if locale == "en":
+        # Touching the threshold happens at any point, not at the end of the horizon.
+        for text in texts:
+            assert "ends at" not in text and "ending at" not in text.lower(), text
 
 
 def test_metadata_is_own_and_within_bounds() -> None:
@@ -192,6 +198,9 @@ def test_metadata_is_own_and_within_bounds() -> None:
         assert 15 <= len(title) <= 65 and title.endswith(" · Rigor"), title
         assert 50 <= len(description) <= 160, (len(description), description)
         assert find_claims(title) == [] and find_claims(description) == []
+        # The search term: "expectancy" in English, "esperanza/esperança matemática" otherwise.
+        term = "expectancy" if locale == "en" else "matemática"
+        assert term in title.lower() and term in description.lower(), (title, description)
         # Its own words, not the other calculators'.
         for other in (
             winrate_page(locale=locale, base_url=BASE),
@@ -257,6 +266,24 @@ def test_expectancy_in_r_and_in_percent_of_the_balance(site: TestClient) -> None
     assert "+-" not in _row(page, "expectancy_r")
 
 
+def test_an_expectancy_that_rounds_to_zero_shows_no_sign(site: TestClient) -> None:
+    flat = {"win_rate": "49.9", "avg_win": "1", "avg_loss": "1"}
+    run = calc.compute(_parse(flat)).declared
+    assert run.expectancy_r < 0 and round(run.expectancy_r, 2) == 0
+    for locale in LOCALES:
+        page = site.get(calc.ruin_url(locale), params=flat).text
+        for key in ("expectancy_r", "expectancy_pct"):
+            cell = _row(page, key)
+            assert "-0" not in cell and "+" not in cell, cell
+        assert f"{_num(0.0, locale, 2)} R" in _row(page, "expectancy_r")
+        assert f"{_num(0.0, locale, 2)} %" in _row(page, "expectancy_pct")
+    # Exactly no edge reads the same way; a small positive one keeps its plus.
+    even = site.get(calc.ruin_url("en"), params={**flat, "win_rate": "50"}).text
+    assert "0.00 R" in _row(even, "expectancy_r") and "+" not in _row(even, "expectancy_r")
+    edge = site.get(calc.ruin_url("en"), params={**flat, "win_rate": "50.5"}).text
+    assert "+0.01 R" in _row(edge, "expectancy_r")
+
+
 def test_paths_are_fixed_size_and_a_lower_rate_only_turns_winners_into_losers() -> None:
     sure = calc.simulate(1.0, 0.01, 0.01, 300, samples=50, seed=3)
     assert np.all(sure.lowest == 1.0) and np.all(sure.drawdown == 0.0)
@@ -290,8 +317,18 @@ def test_closed_formula_matches_the_simulation_when_wins_equal_losses(site: Test
     classic = (0.45 / 0.55) ** 10
     assert run.classic == pytest.approx(classic)
     assert calc.classic_ruin(0.55, 10) == pytest.approx(classic)
-    # Within 3,000 trades nearly every path that touches ten losses below has done so.
+    # Within 2,000 trades nearly every path that touches ten losses below has done so.
     assert run.ruin == pytest.approx(classic, abs=0.02)
+    # The exponent is the whole number of net losses that touch the threshold: half a
+    # loss still takes one (never (q/p) ** 0.5), and 2.5 losses take three.
+    half = calc.compute(_parse({**EQUAL, "ruin": "0.5"})).declared
+    assert half.classic == pytest.approx(0.45 / 0.55)
+    assert half.ruin == pytest.approx(0.45 / 0.55, abs=0.02)
+    three = calc.compute(_parse({"win_rate": "60", "avg_win": "2", "avg_loss": "2", "ruin": "5"}))
+    assert three.declared.classic == pytest.approx((0.4 / 0.6) ** 3)
+    # 0.07 / 0.01 is 7.000000000000001 in floating point, and still seven losses.
+    seven = calc.compute(_parse({**EQUAL, "ruin": "7"})).declared
+    assert seven.classic == pytest.approx((0.45 / 0.55) ** 7)
     # With no edge or a negative one the formula gives 1; the paths agree within the horizon.
     assert calc.classic_ruin(0.5, 10) == 1.0 and calc.classic_ruin(0.4, 3) == 1.0
     negative = calc.compute(_parse({**EQUAL, "win_rate": "45", "ruin": "20"})).declared
@@ -357,6 +394,63 @@ def test_streak_is_the_engines_longest_run_tail(horizon: int, win_rate: float) -
     rare = int(np.max(np.nonzero(tail >= RARE)[0]))
     assert calc.losing_streaks(horizon, win_rate) == (median, rare)
     assert 1 <= median <= rare < horizon
+
+
+@pytest.mark.parametrize(("horizon", "q"), [(300, 0.3), (300, 0.6), (200, 0.95), (120, 0.999)])
+def test_one_length_at_a_time_is_the_engines_recurrence_to_the_last_digit(
+    horizon: int, q: float
+) -> None:
+    tail = longest_run_tail(horizon, q, horizon)
+    assert [calc._tail_at(horizon, q, k) for k in range(horizon + 1)] == list(tail)
+    assert calc._tail_at(horizon, q, horizon + 1) == 0.0
+
+
+@pytest.mark.parametrize(
+    ("horizon", "win_rate", "past_window"),
+    [(1500, 0.002, True), (1200, 0.0005, True), (2000, 0.01, False), (2000, 0.30, False)],
+)
+def test_streaks_past_the_engines_window_agree_with_its_whole_tail(
+    horizon: int, win_rate: float, past_window: bool
+) -> None:
+    # The whole tail at once is the reference (tens of megabytes here, never on the page).
+    tail = longest_run_tail(horizon, 1.0 - win_rate, horizon)
+    median = int(np.max(np.nonzero(tail >= 0.5)[0]))
+    rare = int(np.max(np.nonzero(tail >= RARE)[0]))
+    assert (rare > calc.STREAK_TOP) is past_window
+    calc.losing_streaks.cache_clear()
+    assert calc.losing_streaks(horizon, win_rate) == (median, rare)
+    assert median <= rare <= horizon
+
+
+def test_the_worst_case_fits_the_time_and_memory_budget() -> None:
+    # A win rate near zero with one trade behind it: Wilson's lower end is about zero,
+    # so the losing streak runs the whole horizon, and both runs walk the longest one.
+    worst = _parse(
+        {
+            "win_rate": "0.1",
+            "avg_win": "1",
+            "avg_loss": "1",
+            "trades": "1",
+            "horizon": str(calc.HORIZON_RANGE[1]),
+        }
+    )
+    calc.compute.cache_clear()
+    calc.losing_streaks.cache_clear()
+    tracemalloc.start()
+    started = time.perf_counter()
+    reading = calc.compute(worst)
+    elapsed = time.perf_counter() - started
+    _current, peak = tracemalloc.get_traced_memory()
+    tracemalloc.stop()
+    assert elapsed < 2.0, elapsed
+    # The tail's window is about 8 MB; the simulation's blocks are the rest.
+    assert peak < 96 * 1024 * 1024, peak
+    assert reading.lower is not None
+    assert reading.lower.streak_rare == calc.HORIZON_RANGE[1]
+    # At 0.1 % the median streak already lies past the window and the rare one is the horizon.
+    assert calc.STREAK_TOP < reading.declared.streak_median <= reading.declared.streak_rare
+    # The second reading of the same horizon and rate costs nothing.
+    assert calc.losing_streaks.cache_info().currsize >= 2
 
 
 def test_streak_rows_show_the_engines_figures(site: TestClient) -> None:
@@ -438,7 +532,7 @@ def test_invalid_inputs_give_a_clear_message_and_never_a_500(site: TestClient, l
         ({**FIGURES, "ruin": "-10"}, "ruin"),
         ({**FIGURES, "horizon": "0"}, "horizon"),
         ({**FIGURES, "horizon": "9"}, "horizon"),
-        ({**FIGURES, "horizon": "5001"}, "horizon"),
+        ({**FIGURES, "horizon": "2001"}, "horizon"),
         ({**FIGURES, "horizon": "4,5"}, "horizon"),
         ({**FIGURES, "horizon": "abc"}, "horizon"),
         ({**FIGURES, "unit": "lots"}, "unit"),
@@ -503,6 +597,28 @@ def test_lower_bound_reuses_the_win_rate_calculator(site: TestClient) -> None:
     assert "data-ruin-lower-missing" in page
     assert calc.COPY["es"]["lower_missing"] in _visible(page)
     assert winrate.WINRATE_PATH["es"] in _links(page)
+
+
+def test_lower_bound_sentence_says_the_ruin_stays_when_both_figures_round_the_same(
+    site: TestClient,
+) -> None:
+    # A long history and a far threshold: 0.0 % at the declared rate and at the lower end.
+    long = {"win_rate": "60", "avg_win": "1", "avg_loss": "1", "trades": "5000"}
+    reading = calc.compute(_parse(long))
+    assert reading.lower is not None
+    for locale in LOCALES:
+        words = calc.COPY[locale]
+        ruin = _percent(reading.declared.ruin, locale)
+        assert ruin == _percent(reading.lower.ruin, locale) == _percent(0.0, locale)
+        page = site.get(calc.ruin_url(locale), params=long).text
+        found = re.search(r"<p data-ruin-lower>(.*?)</p>", page, re.S)
+        assert found is not None
+        sentence = _visible(found.group(1))
+        stays = words["lower_text_same"].split("{low}")[-1].format(ruin=ruin)
+        moves = words["lower_text"].split("{low}")[-1].format(ruin=ruin, ruin_low=ruin)
+        assert _visible(stays) in sentence, (locale, sentence)
+        assert _visible(moves) not in sentence, (locale, sentence)
+        assert find_claims(sentence) == []
 
 
 # -- links, sitemap, counters --------------------------------------------------

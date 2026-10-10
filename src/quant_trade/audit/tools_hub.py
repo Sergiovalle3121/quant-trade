@@ -230,8 +230,8 @@ COPY: dict[str, dict[str, Any]] = {
         "title": "Ferramentas grátis para revisar um backtest",
         "seo_title": "Ferramentas grátis para backtests e históricos",
         "summary": (
-            "Calculadoras de sorte, acerto, desafio e ruína, cartão de números e checagem de "
-            "relatórios: grátis e sem cadastro. Números declarados; nenhuma é uma auditoria."
+            "Calculadoras de sorte, acerto, desafio e ruína, cartão de números e conferência "
+            "de relatório: grátis, sem cadastro. Números declarados; nenhuma é uma auditoria."
         ),
         "intro": (
             "Todas usam números que você declara e mostram as suas suposições. Não são uma "

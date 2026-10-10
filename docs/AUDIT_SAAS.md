@@ -184,7 +184,7 @@ fields with the challenge calculator's parser and bounds: win rate, the
 average win and loss in % of the balance or in R with the risk per trade, the
 ruin threshold in % of the initial balance (50 % by default; the result also
 shows 20 %, 30 % and 50 %, the thresholds a challenge sets), the horizon in
-trades (500 by default, 10 to 5,000) and, optionally, the trades behind the
+trades (500 by default, 10 to 2,000) and, optionally, the trades behind the
 win rate. From those figures it draws 4,000 paths (`SAMPLES`) of independent
 trades with a fixed seed, every trade of the average size counted on the
 initial balance, as the classic ruin formula assumes; the uniforms come out of
@@ -193,10 +193,15 @@ into losers on the same paths. The page shows the expectancy per trade in R
 and in % (in % of the balance, one R is the average loss), the share of paths
 that touched the threshold within the horizon, the classic formula `(q/p)^U`
 without a horizon when the average win equals the average loss (NOT_MEASURED
-otherwise), the horizon's maximum drawdown at the median path and the 95th
-percentile, and the longest losing streak half the histories reach and 1 in
-20 reach, from the engine's exact `streaks.longest_run_tail`, not from the
-paths. With the trades, everything is computed again at the lower end of the
+otherwise; `U` is the whole number of net losses that touch the threshold,
+rounded up with the simulation's tolerance, never a fractional exponent), the
+horizon's maximum drawdown at the median path and the 95th percentile, and
+the longest losing streak half the histories reach and 1 in 20 reach, from
+the engine's exact `streaks.longest_run_tail`, not from the paths (asked for
+at most `STREAK_TOP` lengths at once, about 8 MB; past it, win rates under
+about 1 %, the same recurrence runs one length at a time, and the streak
+reading is cached per horizon and rate). With the trades, everything is
+computed again at the lower end of the
 win rate's 95 % Wilson interval (`winrate.read`) and a sentence says how the
 ruin figure moves. Every figure is Declared or computed from the declared;
 nothing is Measured, stored or fetched. Results are cached in memory per

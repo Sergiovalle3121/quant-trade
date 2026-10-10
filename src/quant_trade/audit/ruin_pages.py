@@ -49,9 +49,14 @@ def _percent(value: float, locale: str) -> str:
     return f"{_num(value * 100, locale, 1)} %"
 
 
-def _signed(text: str) -> str:
-    """An expectancy with its sign, so a positive one reads as a gain at a glance."""
-    return text if text.startswith("-") else "+" + text
+def _signed(value: float, text: str) -> str:
+    """``text`` (``value`` at two decimals) with its sign, so a positive expectancy
+    reads as a gain at a glance. The sign follows the rounded value: one that
+    rounds to zero shows none, never «-0,00»."""
+    rounded = round(value, 2)
+    if rounded == 0:
+        return text.lstrip("-")
+    return "+" + text if rounded > 0 else text
 
 
 def _declared(text: str, locale: str) -> str:
@@ -80,7 +85,13 @@ def _rows(
         (
             "expectancy_r",
             words["row_expectancy_r"],
-            _declared(_signed(words["r_unit"].format(n=_num(run.expectancy_r, locale, 2))), locale),
+            _declared(
+                _signed(
+                    run.expectancy_r,
+                    words["r_unit"].format(n=_num(run.expectancy_r, locale, 2)),
+                ),
+                locale,
+            ),
         )
     ]
     if not compact:
@@ -88,7 +99,13 @@ def _rows(
             (
                 "expectancy_pct",
                 words["row_expectancy_pct"],
-                _declared(_signed(f"{_num(run.expectancy_share * 100, locale, 2)} %"), locale),
+                _declared(
+                    _signed(
+                        run.expectancy_share * 100,
+                        f"{_num(run.expectancy_share * 100, locale, 2)} %",
+                    ),
+                    locale,
+                ),
             )
         )
     rows.append(
@@ -186,13 +203,12 @@ def _lower(value: calc.RuinInput, reading_: calc.RuinReading, locale: str) -> st
     lower_rate = _percent(low, locale)
     # The lower bound is a computed figure too: its first mention carries the label.
     marker = ""
+    ruin, ruin_low = _percent(declared.ruin, locale), _percent(lower.ruin, locale)
+    # When both figures round to the same, the sentence says it stays, not "0.0 % to 0.0 %".
+    sentence = words["lower_text_same" if ruin == ruin_low else "lower_text"]
     text = _e(
-        words["lower_text"].format(
-            n=_num(value.trades, locale, 0),
-            rate=rate,
-            low=marker,
-            ruin=_percent(declared.ruin, locale),
-            ruin_low=_percent(lower.ruin, locale),
+        sentence.format(
+            n=_num(value.trades, locale, 0), rate=rate, low=marker, ruin=ruin, ruin_low=ruin_low
         )
     )
     labelled = f"<b>{_e(lower_rate)}</b> {_badge('DECLARED', locale)}"
