@@ -83,6 +83,13 @@ SIGNAL_SAMPLE_PUBLISHED = "2026-10-09"
 CHALLENGE_PUBLISHED = "2026-10-10"
 #: The day the risk-of-ruin calculator was published.
 RUIN_PUBLISHED = "2026-10-10"
+#: The day each export guide added after ``SITE_UPDATED`` was published, by its
+#: Spanish slug: the futures platforms' guides (``guides.GUIDES``).
+GUIDES_PUBLISHED: dict[str, str] = {
+    "tradovate": "2026-10-10",
+    "topstepx": "2026-10-10",
+    "sierra-chart": "2026-10-10",
+}
 
 #: Each public page as its path per language. The sitemap lists exactly these.
 #: Spanish and English exist for every page; Portuguese only where translated.
@@ -150,6 +157,10 @@ def _page_dates() -> dict[str, str]:
         }
     )
     dates.update({path: RUIN_PUBLISHED for path in RUIN_PATH.values()})
+    # A guide published after the site's date carries its own, in every language.
+    dates.update(
+        {guide_url(slug, lang): date for slug, date in GUIDES_PUBLISHED.items() for lang in LOCALES}
+    )
     # The rules table: its publication, or a later reading of a preset (the same
     # date its ``Dataset`` names as ``dateModified``).
     dates.update({path: rules_table_lastmod() for path in rules_table_paths().values()})
@@ -534,6 +545,7 @@ __all__ = [
     "BRAND",
     "CHALLENGE_PUBLISHED",
     "DISALLOWED_PATHS",
+    "GUIDES_PUBLISHED",
     "NOINDEX",
     "NOINDEX_PATHS",
     "OG_IMAGE_LOCALE",

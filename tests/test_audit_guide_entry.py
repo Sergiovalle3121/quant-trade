@@ -155,7 +155,7 @@ def test_every_guide_has_a_purpose_a_tool_and_two_to_four_points() -> None:
         assert len(set(keys)) == len(keys), slug
         assert set(keys) <= set(CAPABILITIES), slug
         assert set(GUIDE_PURPOSE[slug]) == set(LOCALES), slug
-        assert GUIDE_TOOL[slug] in {"calculator", "winrate"}, slug
+        assert GUIDE_TOOL[slug] in {"calculator", "winrate", "challenge"}, slug
     # Every point is used by some guide: none is kept around unchecked.
     assert {key for keys in GUIDE_CAPABILITIES.values() for key in keys} == set(CAPABILITIES)
 
@@ -233,6 +233,10 @@ def _samples() -> list[tuple[str, bytes, str]]:
         ("quantconnect", "quantconnect_trades.csv"),
         ("backtesting-py", "backtestingpy_trades.csv"),
         ("vectorbt", "vectorbt_trades.csv"),
+        ("tradovate", "tradovate_performance.csv"),
+        ("tradovate", "tradovate_orders.csv"),
+        ("topstepx", "topstepx_trades.csv"),
+        ("sierra-chart", "sierra_chart_trade_activity.txt"),
     ]
     samples = [(slug, (FIXTURES / name).read_bytes(), name) for slug, name in files]
     samples += [
@@ -338,13 +342,20 @@ def test_the_tool_fits_the_guide(tmp_path: Path) -> None:
         assert GUIDE_TOOL[slug] == "winrate", slug
     for slug in ("mt5", "mt5-optimization", "tradingview"):
         assert GUIDE_TOOL[slug] == "calculator", slug
+    for slug in ("tradovate", "topstepx", "sierra-chart"):
+        assert GUIDE_TOOL[slug] == "challenge", slug
     client = _client(tmp_path)
     for slug, locale, page in (
         ("myfxbook", "es", client.get(guide_url("myfxbook", "es")).text),
         ("mt5-optimization", "en", client.get(guide_url("mt5-optimization", "en")).text),
+        ("tradovate", "en", client.get(guide_url("tradovate", "en")).text),
     ):
         get = _section(page, GUIDES_COPY[locale]["get"])
-        wanted = {"winrate": "/calculadora-aciertos", "calculator": "/calculator"}[GUIDE_TOOL[slug]]
+        wanted = {
+            "winrate": "/calculadora-aciertos",
+            "calculator": "/calculator",
+            "challenge": "/en/challenge-calculator",
+        }[GUIDE_TOOL[slug]]
         assert f"href='{wanted}'" in get, slug
 
 
