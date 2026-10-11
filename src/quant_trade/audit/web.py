@@ -1516,7 +1516,11 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         # "/" renders Spanish or English; Portuguese lives at /pt.
         if path == "/" and request.query_params.get("lang") in ("es", "en"):
             locale = request.query_params["lang"]
-        visits.add(day=today, locale=locale, ref=kept or arrived, page_group=page_group)
+        try:
+            visits.add(day=today, locale=locale, ref=kept or arrived, page_group=page_group)
+        except ValueError as exc:
+            # A group outside the catalogue is a bug to fix, never a failed page.
+            logger.warning("visit to %s not counted: %s", page_group, exc)
 
     canonical_host = urlsplit(cfg.base_url).netloc.lower()
     www_host = f"www.{canonical_host}"

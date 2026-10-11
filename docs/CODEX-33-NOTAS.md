@@ -77,3 +77,52 @@ Ambos casos pasaron al repetirse y no quedan fallos funcionales pendientes.
   preservación de historial, concurrencia y reversión/reintento atómico.
 - Las pruebas de renderizado nativo CairoSVG se omiten por la biblioteca nativa
   ausente. Las pruebas de lectura y PNG con el renderizador simulado sí pasan.
+
+## Revisión posterior (hallazgos aplicados sobre 29a1fa5)
+
+- `_funnel_visit` envuelve `visits.add` en `try/except ValueError` y registra un
+  aviso con el grupo (nunca la ruta ni la consulta): si `visit_paths` y
+  `page_groups()` divergieran, la página seguiría respondiendo 200 sin contar.
+- `VisitCounter.add` acota las etiquetas de campaña no listadas
+  (`CAMPAIGN_TAG` sin entrada en `REF_TAGS`): como máximo
+  `MAX_PENDING_CAMPAIGN_REFS` (200) distintas por lote de flush; las siguientes
+  se cuentan como directo con un aviso. Un lote que falla al escribir conserva
+  sus etiquetas dentro del tope. Herencia de la base, no regresión de la rama.
+- `/panel` lee los grupos guardados por forma (`shaped_page_group`: segmentos
+  `[a-z0-9-]`, máximo dos, 96 caracteres) en lugar de por pertenencia al
+  catálogo vivo: un slug renombrado o una firma retirada conserva su historial.
+  La escritura (`VisitCounter.add`, `Store.count_visit`) sigue siendo estricta.
+- `test_privacy_text_names_every_counted_page_family` ata el párrafo de la
+  política que nombra `rigor_seen` a las familias de `page_groups()`. Las que
+  el texto aún no nombra están en `LEGAL_TEXT_PENDING` con la palabra que se
+  espera en es/en/pt; cuando `legal.py` las nombre, el test falla hasta subirlas
+  a `LEGAL_NAMES`. Hallazgo adicional: ya en la base 94ee9d0 se contaban la
+  tabla de reglas (`reglas-prop-firm`) y las páginas públicas de verificación
+  (`/v/<id>`, `/v/ejemplo`) sin que el texto las nombrara.
+
+### Propuesta de texto para la PR hermana sobre `legal.py`
+
+Sustituir en el párrafo del contador (es/en/pt) la lista de páginas y las
+dimensiones; los tres textos deben seguir pasando el guard:
+
+- es: «las visitas a la página principal, a las de cada caso, a las guías, a
+  los artículos, a la revisión institucional, a las páginas públicas de
+  verificación y a las herramientas gratis (calculadoras, tabla de reglas,
+  tarjeta de cifras, ejemplos y página de herramientas) se cuentan por día,
+  idioma, etiqueta del enlace (…) y grupo de página (un nombre corto de la
+  página, nunca la dirección completa ni sus parámetros), sin dirección».
+- en: «visits to the home page, the case pages, the guides, the articles, the
+  institutional review, the public verification pages and the free tools
+  (calculators, rules table, figures card, examples and the tools page) are
+  counted per day, language, link tag (…) and page group (a short page name,
+  never the full address or its parameters), with no address».
+- pt: «as visitas à página inicial, às páginas de casos, aos guias, aos
+  artigos, à revisão institucional, às páginas públicas de verificação e às
+  ferramentas grátis (calculadoras, tabela de regras, cartão de números,
+  exemplos e página de ferramentas) são contadas por dia, idioma, etiqueta do
+  link (…) e grupo de página (um nome curto da página, nunca o endereço
+  completo nem seus parâmetros), sem endereço de rede».
+
+Al aplicarla, vaciar `LEGAL_TEXT_PENDING` en `tests/test_audit_page_visits.py`
+moviendo cada entrada a `LEGAL_NAMES` (y la dimensión a una comprobación de
+presencia). Hasta entonces la rama no debe ir sola a producción.

@@ -4235,8 +4235,13 @@ reports (by code and by card). It answers "which of my posts brings
 customers" without any third-party analytics.
 
 - **Tags.** A link carries `?ref=<tag>`. Only tags listed in
-  `funnel.REF_TAGS` count (the playbook template ids and a few channels);
-  anything missing, malformed or unlisted is "directo". The first listed tag
+  `funnel.REF_TAGS` (the playbook template ids and a few channels) or shaped
+  like a per-community campaign tag (`funnel.CAMPAIGN_TAG`, e.g. `dc-us-103`)
+  count; anything missing, malformed or unlisted is "directo". One flush batch
+  keeps at most `funnel.MAX_PENDING_CAMPAIGN_REFS` (200) distinct unlisted
+  campaign tags; past that, new tags count as "directo" with a warning, so
+  invented tags cannot grow the in-memory counter or the visit tables (the
+  campaign tags of a real batch are far fewer). The first listed tag
   a browser arrives with is kept for 30 days in the `rigor_ref` cookie, which
   holds only the tag, and stored in `account_refs` when an account is created.
   The row goes with `delete_account`.
@@ -4267,6 +4272,10 @@ customers" without any third-party analytics.
   The ref table shows the most frequent measured entry group in its existing
   30-day window, with alphabetical tie-breaking. The daily cookie is unchanged:
   these are first counted entries per browser/day, not all page views or people.
+  A group outside the catalogue is refused by the counter and by `count_visit`;
+  the request path logs it and still serves the page. `/panel` reads stored
+  groups by shape (lowercase slug segments, at most two), so a renamed article
+  or a firm that left the calculator keeps its history in the totals.
 - **The other stages** are read from the tables the service already keeps
   (`accounts`, `welcome_reports`, `free_previews`, and paid `audits` with
   their payment reference), with the language and tag of the account

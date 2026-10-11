@@ -8,7 +8,7 @@ from datetime import UTC, datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
-from quant_trade.audit.funnel import DIRECT, clean_page_group, clean_ref, since_day
+from quant_trade.audit.funnel import DIRECT, clean_ref, shaped_page_group, since_day
 from quant_trade.audit.ops import percentile_bucket, retention_status
 from quant_trade.audit.pages import _e
 from quant_trade.audit.store_ops import COST_CATEGORIES, OUTCOMES
@@ -51,11 +51,15 @@ def table(headers: list[str], rows: list[list[str]]) -> str:
 
 
 def top_entry_pages(rows: Sequence[PageVisitRow], *, at: datetime, days: int) -> dict[str, str]:
-    """Most frequent measured entry group per ref; ties use the group name."""
+    """Most frequent measured entry group per ref; ties use the group name.
+
+    Stored groups are read by shape, not by the current catalogue, so a
+    retired slug or firm keeps its history.
+    """
     first, last = since_day(at, days), since_day(at, 1)
     counts: dict[str, Counter[str]] = defaultdict(Counter)
     for day, _locale, ref, raw_group, visits in rows:
-        group = clean_page_group(raw_group)
+        group = shaped_page_group(raw_group)
         if first <= day <= last and group and visits > 0:
             counts[clean_ref(ref) or DIRECT][group] += visits
     return {
@@ -70,7 +74,7 @@ def page_visits_section(rows: Sequence[PageVisitRow], *, at: datetime) -> str:
     counts_28: Counter[str] = Counter()
     counts_7: Counter[str] = Counter()
     for day, _locale, _ref, raw_group, visits in rows:
-        group = clean_page_group(raw_group)
+        group = shaped_page_group(raw_group)
         if first_28 <= day <= last and group and visits > 0:
             counts_28[group] += visits
             if day >= first_7:

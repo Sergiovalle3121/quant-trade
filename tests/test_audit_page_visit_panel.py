@@ -14,7 +14,7 @@ pytest.importorskip("sqlalchemy")
 
 from fastapi.testclient import TestClient  # noqa: E402
 
-from quant_trade.audit.funnel import Funnel  # noqa: E402
+from quant_trade.audit.funnel import DIRECT, Funnel  # noqa: E402
 from quant_trade.audit.guard import find_claims  # noqa: E402
 from quant_trade.audit.ops_panel import (  # noqa: E402
     PageVisitRow,
@@ -164,3 +164,26 @@ def test_private_panel_shows_entry_groups_without_request_or_person_details(tmp_
     for value in (private, agent, "SyntheticUniqueBrowser3847", "testclient"):
         assert value not in response.text
     assert find_claims(response.text) == []
+
+
+def test_retired_groups_keep_their_history_in_the_panel() -> None:
+    """A renamed slug or a firm that left the calculator still counts in the totals."""
+    rows: list[PageVisitRow] = [
+        ("2026-10-11", "es", "f4", "articulos/slug-antiguo", 40),
+        ("2026-10-10", "en", "f4", "calculadora-reto/firma-retirada", 3),
+        ("2026-10-11", "es", "", "landing", 1),
+        ("2026-10-11", "es", "f4", "Lectura", 100),  # never written: not a stored shape
+        ("2026-10-11", "es", "f4", "lectura/x/y", 100),
+    ]
+    page = page_visits_section(rows, at=NOW)
+    assert _rows(page) == [
+        ["articulos/slug-antiguo", "40", "40"],
+        ["calculadora-reto", "3", "3"],
+        ["↳ calculadora-reto/firma-retirada", "3", "3"],
+        ["landing", "1", "1"],
+    ]
+    assert "100" not in page
+    assert top_entry_pages(rows, at=NOW, days=30) == {
+        "f4": "articulos/slug-antiguo",
+        DIRECT: "landing",
+    }

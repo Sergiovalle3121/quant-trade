@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -25,6 +26,7 @@ from quant_trade.audit.audiences import AUDIENCE_PAGES, audience_url  # noqa: E4
 from quant_trade.audit.calculator import CALCULATOR_PATH  # noqa: E402
 from quant_trade.audit.examples import EXAMPLES_PATH  # noqa: E402
 from quant_trade.audit.guides import GUIDES, guide_url  # noqa: E402
+from quant_trade.audit.legal import LegalContext, privacy_text  # noqa: E402
 from quant_trade.audit.pages import LANDING_PATHS  # noqa: E402
 from quant_trade.audit.rules_table import RULES_TABLE_PATH  # noqa: E402
 from quant_trade.audit.settings import AuditSettings  # noqa: E402
@@ -183,3 +185,116 @@ def test_panel_displays_only_aggregate_visit_dimensions(tmp_path: Path) -> None:
         "page_group",
         "visits",
     }
+
+
+#: What the privacy text calls each counted family of pages, per language (es, en, pt).
+LEGAL_NAMES: dict[str, tuple[str, str, str]] = {
+    "landing": ("página principal", "home page", "página inicial"),
+    "audiencia": ("cada caso", "case pages", "páginas de casos"),
+    "calculadora-suerte": ("calculadoras", "calculators", "calculadoras"),
+    "calculadora-aciertos": ("calculadoras", "calculators", "calculadoras"),
+    "calculadora-reto": ("calculadoras", "calculators", "calculadoras"),
+    "calculadora-ruina": ("calculadoras", "calculators", "calculadoras"),
+    "lectura": ("tarjeta de cifras", "figures card", "cartão de números"),
+    "ejemplos": ("ejemplos", "examples", "exemplos"),
+    "herramientas": ("página de herramientas", "tools page", "página de ferramentas"),
+}
+#: Families the counter records that the privacy text does not name yet, and the
+#: page-group dimension it persists: ``legal.py`` catches up in its own change
+#: (docs/CODEX-33-NOTAS.md, «Texto de privacidad»). Once the text names one of
+#: these, this test fails until the entry moves up to LEGAL_NAMES: the promise
+#: and the counter can drift apart only on purpose.
+LEGAL_TEXT_PENDING: dict[str, tuple[str, str, str]] = {
+    "reglas-prop-firm": ("reglas", "rules", "regras"),  # counted before this branch
+    "v": ("verificación", "verification", "verificação"),  # counted before this branch
+    "guias": ("guías", "guides", "guias"),
+    "articulos": ("artículos", "articles", "artigos"),
+    "revision-institucional": (
+        "revisión institucional",
+        "institutional review",
+        "revisão institucional",
+    ),
+    "dimension:page-group": ("grupo de página", "page group", "grupo de página"),
+}
+
+
+def _counting_paragraph(locale: str) -> str:
+    """The privacy paragraph that describes the visit counter (it names the daily cookie)."""
+    text = privacy_text(LegalContext(), locale)
+    found = [p for _title, items in text.sections for p in items if funnel.SEEN_COOKIE in p]
+    assert len(found) == 1, locale
+    return found[0].lower()
+
+
+def test_privacy_text_names_every_counted_page_family() -> None:
+    families = {group.split("/", 1)[0] for group in funnel.page_groups()}
+    pending = {key for key in LEGAL_TEXT_PENDING if not key.startswith("dimension:")}
+    assert families == set(LEGAL_NAMES) | pending, "a new family needs its legal name"
+    for index, locale in enumerate(("es", "en", "pt")):
+        paragraph = _counting_paragraph(locale)
+        for family, names in LEGAL_NAMES.items():
+            assert names[index] in paragraph, f"{locale}: privacy text no longer names {family}"
+        for key, names in LEGAL_TEXT_PENDING.items():
+            assert names[index] not in paragraph, (
+                f"{locale} now names {key}: move it to LEGAL_NAMES"
+            )
+
+
+def test_unlisted_campaign_tags_are_capped_per_flush_batch(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    class Sink:
+        fail = False
+        rows: list[dict[str, Any]] = []
+
+        def count_visit(self, **kw: Any) -> None:
+            if self.fail:
+                raise RuntimeError("unavailable")
+            self.rows.append(kw)
+
+    sink = Sink()
+    counter = funnel.VisitCounter(sink)
+    limit = funnel.MAX_PENDING_CAMPAIGN_REFS
+    tags = [f"dc-{chr(97 + i // 26)}{chr(97 + i % 26)}-100" for i in range(limit + 5)]
+    assert all(funnel.clean_ref(tag) == tag and tag not in funnel.REF_TAGS for tag in tags)
+    with caplog.at_level(logging.WARNING, logger="quant_trade.audit.funnel"):
+        for tag in tags:
+            counter.add(day="2026-10-11", locale="es", ref=tag, page_group="lectura")
+        # A listed tag and an already pending campaign tag are never demoted.
+        counter.add(day="2026-10-11", locale="es", ref="f6", page_group="lectura")
+        counter.add(day="2026-10-11", locale="en", ref=tags[0], page_group="landing")
+    assert sum("count as direct" in record.message for record in caplog.records) == 1
+    # A failed write keeps the batch, and its tags still count toward the cap.
+    sink.fail = True
+    counter.flush()
+    counter.add(day="2026-10-11", locale="es", ref=tags[-1], page_group="lectura")
+    sink.fail = False
+    counter.flush()
+    by_ref = {(row["locale"], row["ref"], row["page_group"]): row["amount"] for row in sink.rows}
+    assert all(by_ref[("es", tag, "lectura")] == 1 for tag in tags[:limit])
+    assert all(("es", tag, "lectura") not in by_ref for tag in tags[limit:])
+    assert by_ref[("es", "", "lectura")] == 6
+    assert by_ref[("es", "f6", "lectura")] == 1
+    assert by_ref[("en", tags[0], "landing")] == 1
+    # The next batch starts afresh: a new campaign tag counts again.
+    counter.add(day="2026-10-11", locale="es", ref=tags[-1], page_group="lectura")
+    counter.flush()
+    assert sink.rows[-1]["ref"] == tags[-1]
+
+
+def test_a_counter_error_never_breaks_a_public_page(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    app = create_app(AuditSettings(database_url=f"sqlite:///{tmp_path}/audit.db", admin_key=KEY))
+
+    def broken(**_kw: Any) -> None:
+        raise ValueError("invalid visit page group")
+
+    app.state.visits.add = broken
+    client = TestClient(app, headers=BROWSER)
+    with caplog.at_level(logging.WARNING, logger="quant_trade.audit.web"):
+        response = client.get("/lectura", params={"private": QUERY_SECRET})
+    assert response.status_code == 200
+    messages = [record.getMessage() for record in caplog.records if "not counted" in record.message]
+    assert messages == ["visit to lectura not counted: invalid visit page group"]
+    assert QUERY_SECRET not in " ".join(messages)
