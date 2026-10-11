@@ -23,16 +23,25 @@
     if (reportDetails.length) {
       var target = window.location.hash.slice(1);
       reportDetails.forEach(function (item) { item.open = !!target && item.id === target; });
+    }
+    // The challenge figures folded under their open-loss warning and the firm
+    // table's programs left out for their markets ship closed and stay so on
+    // screen. A closed <details> prints nothing, so printing opens them too,
+    // as the server's PDF does (pdf._expand_details_for_pdf).
+    var printDetails = reportDetails.concat(
+      Array.prototype.slice.call(d.querySelectorAll("details.ff-fold, details.unseen-open"))
+    );
+    if (printDetails.length) {
       var openBeforePrint = null;
       window.addEventListener("beforeprint", function () {
         if (openBeforePrint === null) {
-          openBeforePrint = reportDetails.map(function (item) { return item.open; });
+          openBeforePrint = printDetails.map(function (item) { return item.open; });
         }
-        reportDetails.forEach(function (item) { item.open = true; });
+        printDetails.forEach(function (item) { item.open = true; });
       });
       window.addEventListener("afterprint", function () {
         if (openBeforePrint === null) return;
-        reportDetails.forEach(function (item, i) { item.open = openBeforePrint[i]; });
+        printDetails.forEach(function (item, i) { item.open = openBeforePrint[i]; });
         openBeforePrint = null;
       });
     }
