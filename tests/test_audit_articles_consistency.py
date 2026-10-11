@@ -6,6 +6,7 @@ import html
 import json
 import re
 from dataclasses import replace
+from decimal import Decimal
 from html.parser import HTMLParser
 from xml.etree import ElementTree
 
@@ -31,8 +32,8 @@ from quant_trade.audit.audiences import audience_url  # noqa: E402
 from quant_trade.audit.guard import find_claims  # noqa: E402
 from quant_trade.audit.pages import SAMPLE_PAGE_PATHS, article_page, audit_path  # noqa: E402
 from quant_trade.audit.prop_presets import PRESETS  # noqa: E402
-from quant_trade.audit.public_card import _pct  # noqa: E402
 from quant_trade.audit.report import evidence_label  # noqa: E402
+from quant_trade.audit.rules_table import COPY as RULES_COPY  # noqa: E402
 from quant_trade.audit.rules_table import rules_table_url  # noqa: E402
 from quant_trade.audit.settings import AuditSettings  # noqa: E402
 from quant_trade.audit.store import make_store  # noqa: E402
@@ -78,6 +79,16 @@ def _rows(table: str, attribute: str) -> dict[str, str]:
     return dict(re.findall(rf"<tr {attribute}='([^']+)'>(.*?)</tr>", table, re.S))
 
 
+def _share(value: float, locale: str) -> str:
+    """A table share with two decimals: the precision at which the rows add up."""
+    return f"{_num(value * 100, locale, 2)} %"
+
+
+def _decimal(cell: str) -> Decimal:
+    """The number inside a rendered share cell such as ``Declarado · 81,35 %``."""
+    return Decimal(cell.rsplit(" · ", 1)[-1].rstrip(" %").replace(",", "."))
+
+
 @pytest.fixture(scope="module")
 def client(tmp_path_factory: pytest.TempPathFactory) -> TestClient:
     folder = tmp_path_factory.mktemp("consistency-article")
@@ -119,6 +130,8 @@ def test_consistency_article_metadata_guard_and_language(
         "pt": "O Rigor não é afiliado a nenhuma empresa",
     }
     assert affiliation[locale].casefold() in article_text
+    # The site's words, not the code's: the reader never meets "presets".
+    assert "preset" not in article_text, locale
     assert any(term in article_text for term in ("intradí", "intradi", "intraday"))
     assert {"es": "flotante", "en": "floating", "pt": "flutuante"}[locale] in article_text
     detail, _breadcrumb = [
@@ -143,8 +156,17 @@ def test_consistency_article_links_discovery_and_lastmod(
         article_url("cuantos-intentos-reto-prop-firm", locale),
     }
     assert expected_related <= {url for _, url in related_links(article, locale)}
+    # The rules table by its nav label, like the calculator and the other tools.
+    assert (RULES_COPY[locale]["nav"], rules_table_url(locale)) in related_links(article, locale)
     assert expected_related | {audit_path(locale), SAMPLE_PAGE_PATHS[locale]} <= _Links(page).links
     path = article_url(article_key, locale)
+    # The pages a reader of prop-firm challenges already visits link back to it.
+    for inbound in (
+        article_url("cuantos-intentos-reto-prop-firm", locale),
+        audience_url("retos-prop-firm", locale),
+    ):
+        linking = client.get(inbound)
+        assert linking.status_code == 200 and path in _Links(linking.text).links, inbound
     index = client.get(articles_index_url(locale))
     assert index.status_code == 200 and path in _Links(index.text).links
     sitemap = client.get("/sitemap.xml")
@@ -210,6 +232,23 @@ def test_consistency_cases_and_sensitivity_match_compute(article_key: str) -> No
         )
         assert item.target_rule_cap == cap
         assert item.maximum_initial_day_gain == max(reading.declared.daily)
+        assert item.maximum_initial_day_loss == -min(reading.declared.daily)
+    # The programs note: Builder's daily limit stays out of reach, so both rows coincide.
+    with_rule, without_rule = numbers.consistency_examples()
+    builder = PRESETS[without_rule.inputs.program]
+    assert builder.max_daily_loss is not None and builder.daily_loss_basis == "initial_balance"
+    assert without_rule.maximum_initial_day_loss < builder.max_daily_loss
+    assert without_rule.daily_limit == 0.0
+    for attribute in ("target", "daily_limit", "total_limit", "unfinished", "median_days"):
+        assert getattr(with_rule, attribute) == getattr(without_rule, attribute), attribute
+    # The sensitivity note: each variation keeps every synthetic day under the cap.
+    base_row, *variation_rows = numbers.consistency_variations()
+    cap = base_row.target_rule_cap
+    assert cap is not None and base_row.maximum_initial_day_gain > cap
+    for row in variation_rows:
+        growth = 1 + PRESETS[row.inputs.program].profit_target
+        assert row.maximum_initial_day_gain * growth <= cap
+        assert row.within_best_day == row.target
 
 
 @pytest.mark.parametrize("locale", LOCALES)
@@ -218,10 +257,24 @@ def test_consistency_tables_print_calculator_figures_as_declared(
 ) -> None:
     page = article_page(ARTICLES_BY_KEY[article_key], locale=locale, base_url=BASE)
     declared = evidence_label("DECLARED", locale)
-    example = numbers.consistency_examples()[0]
+    visible = _visible(page)
+    example, without_rule = numbers.consistency_examples()
     assert example.target_rule_cap is not None
     for value in (example.target_rule_cap, example.maximum_initial_day_gain):
-        assert f"{_num(value * 100, locale, 2)} %" in _visible(page)
+        assert f"{_num(value * 100, locale, 2)} %" in visible
+    # The programs note prints Builder's daily limit and the worst synthetic day.
+    builder = PRESETS[without_rule.inputs.program]
+    assert builder.max_daily_loss is not None
+    assert f"({_num(builder.max_daily_loss * 100, locale, 0)} %" in visible
+    assert f"{_num(without_rule.maximum_initial_day_loss * 100, locale, 2)} %" in visible
+    # The sensitivity note names each variation's largest day beside the cap.
+    for row in numbers.consistency_variations()[1:]:
+        assert f"{_num(row.maximum_initial_day_gain * 100, locale, 2)} %" in visible
+    # The sensitivity table has its own caption, not a copy of the cases caption.
+    notes = CONSISTENCY_TABLE_COPY[locale]
+    sensitivity = _visible(_table(page, "sensitivity"))
+    assert notes["sensitivity_note"].split(" · ", 1)[1] in sensitivity
+    assert notes["outcome_note"].split(" · ", 1)[1] not in sensitivity
     for name, examples in (
         ("cases", numbers.consistency_examples()),
         ("sensitivity", numbers.consistency_variations()),
@@ -242,21 +295,24 @@ def test_consistency_tables_print_calculator_figures_as_declared(
             within = (
                 {"es": "Sin regla", "en": "No rule", "pt": "Sem regra"}[locale]
                 if item.within_best_day is None
-                else f"{declared} · {_pct(item.within_best_day, locale)}"
+                else f"{declared} · {_share(item.within_best_day, locale)}"
             )
             assert item.median_days is not None
             expected_cells = [
-                f"{declared} · {_pct(item.target, locale)}",
+                f"{declared} · {_share(item.target, locale)}",
                 within,
-                f"{declared} · {_pct(item.daily_limit + item.total_limit, locale)}",
-                f"{declared} · {_pct(item.unfinished, locale)}",
+                f"{declared} · {_share(item.daily_limit + item.total_limit, locale)}",
+                f"{declared} · {_share(item.unfinished, locale)}",
                 f"{declared} · {_num(item.median_days, locale, 0)}",
             ]
+            # The three outcomes printed add up to 100 % exactly at two decimals.
+            assert sum(_decimal(expected_cells[i]) for i in (0, 2, 3)) == 100
             if name == "sensitivity":
                 assert item.inputs.risk is not None
                 expected_cells = [
                     f"{declared} · {_num(item.inputs.per_day, locale, 0)}",
                     f"{declared} · {_num(item.inputs.risk, locale, 2)} %",
+                    f"{declared} · {_share(item.maximum_initial_day_gain, locale)}",
                     *expected_cells,
                 ]
                 assert cells == expected_cells
@@ -286,9 +342,12 @@ def test_consistency_rules_are_complete_sourced_presets(article_key: str, locale
             preset.program,
             preset.best_day_limit,
             preset.best_day_basis,
-            preset.source_url,
+            preset.best_day_source_url or preset.source_url,
             preset.as_of,
         )
+        if preset.best_day_source_url is not None:
+            # The firm's page about the rule itself, not the program's general source.
+            assert "consisten" in row.source_url.casefold(), row.key
         rendered = _visible(rows[row.key])
         assert row.firm in rendered and row.program in rendered
         declared = evidence_label("DECLARED", locale)
@@ -296,4 +355,11 @@ def test_consistency_rules_are_complete_sourced_presets(article_key: str, locale
         assert CONSISTENCY_TABLE_COPY[locale][row.basis] in rendered
         assert row.as_of in rendered
         assert row.source_url in _Links(rows[row.key]).links
+        # Nofollow like every other source link of the site, the firm's page named as
+        # the calculator names it, and the reading date beside the link, not inside it.
+        anchor = f"<a href='{html.escape(row.source_url, quote=True)}' rel='noopener nofollow'>"
+        assert anchor in rows[row.key]
+        assert calc.COPY[locale]["source_link"].format(firm=row.firm) in rendered
+        assert f"<time datetime='{row.as_of}'>{row.as_of}</time>" in rows[row.key]
+        assert f"{declared} · {row.as_of}" not in rendered
         assert find_claims(rendered) == []

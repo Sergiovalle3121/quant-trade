@@ -48,6 +48,8 @@ from quant_trade.audit.articles import (
     article_url,
     articles_index_faq,
     articles_index_url,
+    consistency_programs_note,
+    consistency_sensitivity_note,
     consistency_worked_example,
     next_step_call,
     next_step_links,
@@ -4945,22 +4947,23 @@ def _consistency_article_tables(locale: str) -> dict[str, str]:
             f"<thead><tr>{headers}</tr></thead><tbody>{rows}</tbody></table>"
         )
 
+    def share(value: float) -> str:
+        # Two decimals: every share is a multiple of 100 / challenge.SAMPLES percent
+        # (0.05 % with 2,000 paths), so the printed rows add up to 100 % exactly.
+        return declared(f"{_num(value * 100, locale, 2)} %")
+
     def outcomes(row: ConsistencyExample) -> str:
-        within = (
-            _e(words["no_rule"])
-            if row.within_best_day is None
-            else declared(f"{_num(row.within_best_day * 100, locale, 1)} %")
-        )
+        within = _e(words["no_rule"]) if row.within_best_day is None else share(row.within_best_day)
         days = (
             "NOT_MEASURED"
             if row.median_days is None
             else declared(_num(row.median_days, locale, 0))
         )
         cells = (
-            declared(f"{_num(row.target * 100, locale, 1)} %"),
+            share(row.target),
             within,
-            declared(f"{_num((row.daily_limit + row.total_limit) * 100, locale, 1)} %"),
-            declared(f"{_num(row.unfinished * 100, locale, 1)} %"),
+            share(row.daily_limit + row.total_limit),
+            share(row.unfinished),
             days,
         )
         return "".join(f"<td>{cell}</td>" for cell in cells)
@@ -4976,15 +4979,21 @@ def _consistency_article_tables(locale: str) -> dict[str, str]:
         f"<tr data-case='{index}'><th scope='row'>"
         f"{declared(_num(row.inputs.per_day, locale, 0))}</th>"
         f"<td>{declared(_num(row.inputs.risk or 0, locale, 2) + ' %')}</td>"
+        f"<td>{share(row.maximum_initial_day_gain)}</td>"
         f"{outcomes(row)}</tr>"
         for index, row in enumerate(consistency_variations())
     )
+    # The firm's own page, named as the calculator names it, and the reading date
+    # beside the link: a date is not a declared figure.
+    source_link = challenge.COPY[locale]["source_link"]
     rule_rows = "".join(
         f"<tr data-preset='{_e(row.key)}'><th scope='row'>"
         f"{_e(row.firm)} · {_e(row.program)}</th>"
         f"<td>{declared(_num(row.limit * 100, locale, 0) + ' %')}</td>"
         f"<td>{_e(words[row.basis])}</td>"
-        f"<td><a href='{_e(row.source_url)}'>{declared(row.as_of)}</a></td></tr>"
+        f"<td><a href='{_e(row.source_url)}' rel='noopener nofollow'>"
+        f"{_e(source_link.format(firm=row.firm))}</a> · "
+        f"<time datetime='{_e(row.as_of)}'>{_e(row.as_of)}</time></td></tr>"
         for row in consistency_rules()
     )
     return {
@@ -4992,9 +5001,14 @@ def _consistency_article_tables(locale: str) -> dict[str, str]:
             "rules", ("program", "limit", "basis", "source"), rule_rows, "rules_note"
         ),
         words["cases"]: f"<p>{_e(consistency_worked_example(locale))}</p>"
+        f"<p>{_e(consistency_programs_note(locale))}</p>"
         + table("cases", ("program", *columns), case_rows, "outcome_note"),
-        words["sensitivity"]: table(
-            "sensitivity", ("per_day", "risk", *columns), variation_rows, "outcome_note"
+        words["sensitivity"]: f"<p>{_e(consistency_sensitivity_note(locale))}</p>"
+        + table(
+            "sensitivity",
+            ("per_day", "risk", "max_day", *columns),
+            variation_rows,
+            "sensitivity_note",
         ),
     }
 
@@ -5159,7 +5173,11 @@ AUDIENCE_TOOLS: dict[str, str] = {"retos-prop-firm": "challenge"}
 
 #: Articles each case page lists before the other cases (article keys, in order).
 AUDIENCE_ARTICLES: dict[str, tuple[str, ...]] = {
-    "retos-prop-firm": ("cuantos-intentos-reto-prop-firm", "rachas-perdedoras"),
+    "retos-prop-firm": (
+        "cuantos-intentos-reto-prop-firm",
+        "rachas-perdedoras",
+        "regla-de-consistencia-prop-firm",
+    ),
     "compradores-de-robots": ("ea-sobreoptimizado", "lo-eligio-el-optimizador"),
     "copiar-senales": ("copiar-senales-mql5-myfxbook",),
 }

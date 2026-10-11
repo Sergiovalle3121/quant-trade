@@ -43,7 +43,9 @@ from quant_trade.audit.article_numbers import (
     STREAK_RISKS,
     STREAK_TRADE_COUNTS,
     STREAK_WIN_RATES,
+    ConsistencyExample,
     consistency_examples,
+    consistency_variations,
     streak_for,
 )
 from quant_trade.audit.audiences import AUDIENCE_PAGES, audience_url
@@ -4770,6 +4772,7 @@ ARTICLES_DATA: tuple[dict[str, Any], ...] = (
             {"kind": "method"},
             {"kind": "samples"},
             {"kind": "audience", "slug": "retos-prop-firm"},
+            {"kind": "article", "key": "regla-de-consistencia-prop-firm"},
         ],
     },
     {
@@ -8292,13 +8295,13 @@ CONSISTENCY_ARTICLE_KEY = "regla-de-consistencia-prop-firm"
 #: Headings also locate the calculated tables within the article's prose.
 CONSISTENCY_TABLE_COPY: dict[str, dict[str, str]] = {
     "es": {
-        "rules": "Qué programas incluyen la regla en los presets",
+        "rules": "Qué programas incluyen la regla en la calculadora",
         "cases": "Alcanzar el objetivo y alcanzarlo dentro de la regla",
         "sensitivity": "Menos operaciones al día o menor riesgo",
         "program": "Firma y programa",
         "limit": "Límite del mejor día",
         "basis": "Base del simulador",
-        "source": "Fuente del preset y fecha de lectura",
+        "source": "Fuente y fecha de lectura",
         "profit_target": "Objetivo fijo",
         "positive_days": "Suma de ganancias de los días positivos",
         "no_rule": "Sin regla",
@@ -8306,24 +8309,27 @@ CONSISTENCY_TABLE_COPY: dict[str, dict[str, str]] = {
         "within": "Objetivo dentro de la regla",
         "loss": "Toca un límite de pérdida",
         "unfinished": "Queda sin terminar",
-        "days": "Días hasta el objetivo (mediana)",
+        "days": "Días hábiles hasta el objetivo (mediana)",
         "per_day": "Operaciones al día",
         "risk": "Riesgo por operación",
-        "rules_note": "DECLARED · Reglas recogidas en los presets, con su base de simulación; "
-        "no son una consulta en tiempo real ni mediciones de un archivo.",
+        "max_day": "Mayor día sintético",
+        "rules_note": "DECLARED · Reglas recogidas en la calculadora de reto, con su base de "
+        "simulación; no son una consulta en tiempo real ni mediciones de un archivo.",
         "outcome_note": "DECLARED · Porcentajes sobre todas las trayectorias. La columna dentro "
         "de la regla es un subconjunto del objetivo, no otro desenlace. El límite de pérdida "
         "agrupa el diario y el total. La mediana incluye todas las trayectorias que alcanzan "
         "el objetivo, aunque no cumplan la regla del mejor día.",
+        "sensitivity_note": "DECLARED · Mismo denominador y columnas que la tabla anterior; "
+        "cambia una entrada por fila. El mayor día sintético se mide desde el balance inicial.",
     },
     "en": {
-        "rules": "Which programs include the rule in the presets",
+        "rules": "Which programs include the rule in the calculator",
         "cases": "Reaching the target and reaching it within the rule",
         "sensitivity": "Fewer trades per day or less risk",
         "program": "Firm and program",
         "limit": "Best-day limit",
         "basis": "Simulator basis",
-        "source": "Preset source and reading date",
+        "source": "Source and reading date",
         "profit_target": "Fixed target",
         "positive_days": "Sum of positive days' gains",
         "no_rule": "No rule",
@@ -8331,24 +8337,27 @@ CONSISTENCY_TABLE_COPY: dict[str, dict[str, str]] = {
         "within": "Target within rule",
         "loss": "Hits a loss limit",
         "unfinished": "Remains unfinished",
-        "days": "Days to target (median)",
+        "days": "Business days to target (median)",
         "per_day": "Trades per day",
         "risk": "Risk per trade",
-        "rules_note": "DECLARED · Rules recorded in the presets, with their simulation basis; "
-        "these are neither a live lookup nor file measurements.",
+        "max_day": "Largest synthetic day",
+        "rules_note": "DECLARED · Rules recorded in the challenge calculator, with their "
+        "simulation basis; these are neither a live lookup nor file measurements.",
         "outcome_note": "DECLARED · Percentages of all paths. Within the rule is a subset of "
         "reaching the target, not another outcome. The loss-limit column combines daily and "
         "total limits. The median includes every path reaching the target, even those "
         "outside the best-day rule.",
+        "sensitivity_note": "DECLARED · Same denominator and columns as the table above; one "
+        "input changes per row. The largest synthetic day is measured from the initial balance.",
     },
     "pt": {
-        "rules": "Quais programas incluem a regra nos presets",
+        "rules": "Quais programas incluem a regra na calculadora",
         "cases": "Atingir a meta e atingi-la dentro da regra",
         "sensitivity": "Menos operações por dia ou menor risco",
         "program": "Empresa e programa",
         "limit": "Limite do melhor dia",
         "basis": "Base do simulador",
-        "source": "Fonte do preset e data de leitura",
+        "source": "Fonte e data de leitura",
         "profit_target": "Meta fixa",
         "positive_days": "Soma dos ganhos dos dias positivos",
         "no_rule": "Sem regra",
@@ -8356,15 +8365,18 @@ CONSISTENCY_TABLE_COPY: dict[str, dict[str, str]] = {
         "within": "Meta dentro da regra",
         "loss": "Toca um limite de perda",
         "unfinished": "Fica sem terminar",
-        "days": "Dias até a meta (mediana)",
+        "days": "Dias úteis até a meta (mediana)",
         "per_day": "Operações por dia",
         "risk": "Risco por operação",
-        "rules_note": "DECLARED · Regras registradas nos presets, com a sua base de simulação; "
-        "não são uma consulta em tempo real nem medições de um arquivo.",
+        "max_day": "Maior dia sintético",
+        "rules_note": "DECLARED · Regras registradas na calculadora de desafio, com a sua base "
+        "de simulação; não são uma consulta em tempo real nem medições de um arquivo.",
         "outcome_note": "DECLARED · Percentuais sobre todas as trajetórias. Dentro da regra é "
         "um subconjunto das que atingem a meta, não outro desfecho. O limite de perda agrupa "
         "o diário e o total. A mediana inclui todas as trajetórias que atingem a meta, mesmo "
         "as que ficam fora da regra do melhor dia.",
+        "sensitivity_note": "DECLARED · Mesmo denominador e colunas da tabela anterior; muda "
+        "uma entrada por linha. O maior dia sintético é medido a partir do saldo inicial.",
     },
 }
 
@@ -8378,11 +8390,12 @@ def _consistency_assumptions(locale: str) -> str:
             "ganadora, pérdida de {loss} R por operación perdedora, riesgo de {risk} % del "
             "balance por operación y {per_day} operaciones al día. Son operaciones "
             "independientes con probabilidad y tamaños constantes; se suman dentro del día y "
-            "el balance se capitaliza entre cierres. Sin costos, flotante ni tamaño de muestra "
-            "declarado para estimar la incertidumbre del porcentaje de aciertos. La calculadora "
-            "construye {history} días sintéticos y remuestrea {samples} trayectorias por fase, "
-            "con semilla {seed} y un horizonte de {horizon} días hábiles en estos casos. "
-            "Las frecuencias dependen de esos supuestos; no son probabilidades personales."
+            "el balance se capitaliza entre cierres. Sin costos, sin equity flotante y sin "
+            "tamaño de muestra declarado para estimar la incertidumbre del porcentaje de "
+            "aciertos. La calculadora construye {history} días sintéticos y remuestrea "
+            "{samples} trayectorias por fase, con semilla {seed} y un horizonte de {horizon} "
+            "días hábiles en estos casos. Las frecuencias dependen de esos supuestos; no son "
+            "probabilidades personales."
         ),
         "en": (
             "DECLARED · {rate} % win rate, a gain of {win} R per winning trade, a "
@@ -8400,11 +8413,11 @@ def _consistency_assumptions(locale: str) -> str:
             "ganhadora, perda de {loss} R por operação perdedora, risco de {risk} % do saldo "
             "por operação e {per_day} operações por dia. As operações são independentes com "
             "probabilidade e tamanhos constantes; os retornos se somam dentro do dia e o "
-            "saldo se capitaliza entre fechamentos. Sem custos, flutuante nem tamanho de "
-            "amostra declarado para estimar a incerteza da taxa de acerto. A calculadora "
-            "constrói {history} dias sintéticos e reamostra {samples} trajetórias por fase, "
-            "com semente {seed} e horizonte de {horizon} dias úteis nestes casos. As frequências "
-            "dependem dessas suposições; não são probabilidades pessoais."
+            "saldo se capitaliza entre fechamentos. Sem custos, sem patrimônio flutuante e "
+            "sem tamanho de amostra declarado para estimar a incerteza da taxa de acerto. A "
+            "calculadora constrói {history} dias sintéticos e reamostra {samples} trajetórias "
+            "por fase, com semente {seed} e horizonte de {horizon} dias úteis nestes casos. As "
+            "frequências dependem dessas suposições; não são probabilidades pessoais."
         ),
     }[locale].format(
         rate=_num(value.win_rate_pct, locale, 0),
@@ -8446,6 +8459,92 @@ def consistency_worked_example(locale: str) -> str:
     )
 
 
+def consistency_programs_note(locale: str) -> str:
+    """Why the two programs' rows coincide except for the rule, from the same examples."""
+    with_rule, without_rule = consistency_examples()
+    rules = challenge_calc.PRESETS[without_rule.inputs.program]
+    if rules.max_daily_loss is None or rules.daily_loss_basis != "initial_balance":
+        raise ValueError("the programs note describes a daily limit on the initial balance")
+
+    def outcome(row: ConsistencyExample) -> tuple[float | None, ...]:
+        return (row.target, row.daily_limit, row.total_limit, row.unfinished, row.median_days)
+
+    if without_rule.daily_limit != 0.0 or outcome(with_rule) != outcome(without_rule):
+        raise ValueError("the programs note expects both rows to coincide except for the rule")
+    return {
+        "es": "DECLARED · Con estas entradas, el límite diario de {program} ({daily} del balance "
+        "inicial) no se activa: el peor día sintético pierde {worst} si empieza con ese "
+        "balance. Las demás condiciones simuladas producen el mismo recuento; por eso ambas "
+        "filas coinciden salvo en la regla.",
+        "en": "DECLARED · With these inputs, the {program} daily limit ({daily} of the initial "
+        "balance) is not triggered: the worst synthetic day loses {worst} when starting at "
+        "that balance. The other simulated conditions produce the same count; that is why "
+        "both rows coincide except for the rule.",
+        "pt": "DECLARED · Com estas entradas, o limite diário do {program} ({daily} do saldo "
+        "inicial) não é acionado: o pior dia sintético perde {worst} se começa com esse saldo. "
+        "As demais condições simuladas produzem a mesma contagem; por isso as duas linhas "
+        "coincidem exceto na regra.",
+    }[locale].format(
+        program=rules.program,
+        daily=_whole_pct(rules.max_daily_loss, locale),
+        worst=f"{_num(without_rule.maximum_initial_day_loss * 100, locale, 2)} %",
+    )
+
+
+def _variation_label(row: ConsistencyExample, base: ConsistencyExample, locale: str) -> str:
+    """The one input a sensitivity row changes, as the reader sees it in the table."""
+    if row.inputs.per_day != base.inputs.per_day:
+        count = _num(row.inputs.per_day, locale, 0)
+        one = row.inputs.per_day == 1
+        return {
+            "es": f"con {count} {'operación' if one else 'operaciones'} al día",
+            "en": f"with {count} {'trade' if one else 'trades'} per day",
+            "pt": f"com {count} {'operação' if one else 'operações'} por dia",
+        }[locale]
+    risk = _num(row.inputs.risk or 0, locale, 2)
+    return {
+        "es": f"con un riesgo de {risk} %",
+        "en": f"with {risk} % risk",
+        "pt": f"com risco de {risk} %",
+    }[locale]
+
+
+def consistency_sensitivity_note(locale: str) -> str:
+    """Why the variations show the same share inside the rule as reaching the target."""
+    base, *variations = consistency_variations()
+    rules = challenge_calc.PRESETS[base.inputs.program]
+    if base.target_rule_cap is None:
+        raise ValueError("the sensitivity note needs a target-based best-day rule")
+    # Margin: a day that still fits the cap after the balance has grown to the target
+    # cannot breach it on the way there; the equality below is the measured confirmation.
+    growth = 1 + rules.profit_target
+    for row in variations:
+        if row.maximum_initial_day_gain * growth > base.target_rule_cap:
+            raise ValueError("the sensitivity note expects every variation under the cap")
+        if row.within_best_day != row.target:
+            raise ValueError("the sensitivity note expects both target columns to match")
+    joiner = {"es": " y ", "en": " and ", "pt": " e "}[locale]
+    items = joiner.join(
+        f"{_num(row.maximum_initial_day_gain * 100, locale, 2)} % "
+        f"{_variation_label(row, base, locale)}"
+        for row in variations
+    )
+    return {
+        "es": "DECLARED · El tope de {cap} del balance inicial se compara con el mayor día "
+        "sintético de cada fila: {items}. Ninguno alcanza el tope, tampoco tras capitalizar "
+        "los cierres hasta el objetivo; por eso en esas filas alcanzar el objetivo y "
+        "alcanzarlo dentro de la regla coinciden.",
+        "en": "DECLARED · The {cap} cap of the initial balance is compared with each row's "
+        "largest synthetic day: {items}. None reaches the cap, not even after compounding the "
+        "closes up to the target; that is why reaching the target and reaching it within the "
+        "rule coincide in those rows.",
+        "pt": "DECLARED · O teto de {cap} do saldo inicial é comparado com o maior dia "
+        "sintético de cada linha: {items}. Nenhum alcança o teto, nem depois de capitalizar os "
+        "fechamentos até a meta; por isso nessas linhas atingir a meta e atingi-la dentro da "
+        "regra coincidem.",
+    }[locale].format(cap=f"{_num(base.target_rule_cap * 100, locale, 2)} %", items=items)
+
+
 ARTICLES_DATA += (
     {
         "key": CONSISTENCY_ARTICLE_KEY,
@@ -8471,18 +8570,18 @@ ARTICLES_DATA += (
             "operações ou menor risco mudam a simulação, com números declarados.",
         },
         "intro": {
-            "es": "Una trayectoria puede alcanzar el objetivo de un reto y tener demasiado "
-            "resultado concentrado en un solo día. La regla de consistencia añade esa segunda "
+            "es": "Una trayectoria puede alcanzar el objetivo de un reto y concentrar una parte "
+            "excesiva del resultado en un solo día. La regla de consistencia añade esa segunda "
             "comprobación. Aquí distinguimos ambas con la calculadora de reto y las reglas "
-            "recogidas en sus presets. Rigor no está afiliado a ninguna firma.",
+            "recogidas en ella. Rigor no está afiliado a ninguna firma.",
             "en": "A path can reach a challenge target while too much of its result comes from "
             "a single day. The consistency rule adds that second check. Here we separate the "
-            "two using the challenge calculator and the rules recorded in its presets. "
+            "two using the challenge calculator and the rules recorded in it. "
             "Rigor is not affiliated with any firm.",
             "pt": "Uma trajetória pode atingir a meta de um desafio e concentrar uma parcela "
             "excessiva do resultado num único dia. A regra de consistência acrescenta essa "
             "segunda conferência. Aqui distinguimos as duas com a calculadora de desafio e "
-            "as regras registradas nos seus presets. O Rigor não é afiliado a nenhuma empresa.",
+            "as regras registradas nela. O Rigor não é afiliado a nenhuma empresa.",
         },
         "sections": {
             "es": [
@@ -8505,17 +8604,18 @@ ARTICLES_DATA += (
                 {
                     "heading": CONSISTENCY_TABLE_COPY["es"]["rules"],
                     "paragraphs": [
-                        "La tabla toma firma, programa, límite, base, fuente y fecha de los "
-                        "presets publicados. Describe las evaluaciones incluidas; no extiende "
-                        "sus reglas a otras etapas o a retiros. La fecha es la lectura guardada "
-                        "en el preset, no una revisión de las condiciones de hoy.",
+                        "La tabla toma firma, programa, límite, base, fuente y fecha de las "
+                        "reglas publicadas en la calculadora de reto. Describe las evaluaciones "
+                        "incluidas; no extiende sus reglas a otras etapas o a retiros. El enlace "
+                        "de cada fila es la página de la firma de donde se leyó la regla, y la "
+                        "fecha es esa lectura, no una revisión de las condiciones de hoy.",
                         "Varios programas publican una proporción sobre el resultado total. "
-                        "Su preset usa el objetivo fijo como aproximación más estricta: un "
+                        "La calculadora usa el objetivo fijo como aproximación más estricta: un "
                         "exceso sobre el objetivo no amplía el mejor día permitido. La tabla "
                         "de reglas enlaza las fuentes y las calculadoras de cada firma, donde "
-                        "se detallan estas aproximaciones. "
-                        "Las condiciones de la firma pueden exigir más días al exceder la "
-                        "concentración; eso no equivale por sí solo a tocar un límite de pérdida.",
+                        "se detallan estas aproximaciones. Las condiciones de la firma pueden "
+                        "exigir más días o elevar el objetivo al exceder la concentración; "
+                        "ninguna de las dos equivale por sí sola a tocar un límite de pérdida.",
                     ],
                 },
                 {
@@ -8565,11 +8665,11 @@ ARTICLES_DATA += (
                         "observaciones de equity dentro del día. Rigor extrae cierres diarios "
                         "del archivo y utiliza el mismo simulador sobre esa serie. Agrupa por "
                         "días UTC, que pueden diferir del corte horario de la firma.",
-                        "La subida y el informe de ejemplo están enlazados al final. El "
-                        "informe distingue lo medido en los datos aportados de lo declarado "
-                        "y de lo no medido. Remuestrear un historial sigue siendo una "
-                        "simulación condicionada a ese archivo; no recupera el flotante "
-                        "ausente ni anticipa el resultado de otro reto.",
+                        "El formulario para subir tu historial y el informe de ejemplo están "
+                        "enlazados al final. El informe distingue lo medido en los datos "
+                        "aportados de lo declarado y de lo no medido. Remuestrear un historial "
+                        "sigue siendo una simulación condicionada a ese archivo; no recupera el "
+                        "flotante ausente ni anticipa el resultado de otro reto.",
                     ],
                 },
             ],
@@ -8594,17 +8694,18 @@ ARTICLES_DATA += (
                     "heading": CONSISTENCY_TABLE_COPY["en"]["rules"],
                     "paragraphs": [
                         "The table reads the firm, program, limit, basis, source and date "
-                        "from the published presets. It describes the included evaluations; "
-                        "it does not extend their rules to other stages or withdrawals. "
-                        "The date is the reading stored in the preset, not a review of "
-                        "today's conditions.",
-                        "Several programs publish a ratio against total profit. Their "
-                        "presets use the fixed target as a stricter approximation: exceeding "
-                        "the target does not increase the permitted best day. The linked "
-                        "rules table links the sources and each firm's calculator, where "
-                        "these approximations are detailed. "
-                        "A firm's conditions may require more days when concentration is "
-                        "too high; that alone does not mean hitting a loss limit.",
+                        "from the rules published in the challenge calculator. It describes "
+                        "the included evaluations; it does not extend their rules to other "
+                        "stages or withdrawals. Each row links the firm's page the rule was "
+                        "read from, and the date is that reading, not a review of today's "
+                        "conditions.",
+                        "Several programs publish a ratio against total profit. The "
+                        "calculator uses the fixed target as a stricter approximation: "
+                        "exceeding the target does not increase the permitted best day. The "
+                        "rules table links to the sources and to each firm's calculator, "
+                        "where these approximations are detailed. A firm's conditions may "
+                        "require more days or raise the target when concentration is too "
+                        "high; neither alone means hitting a loss limit.",
                     ],
                 },
                 {
@@ -8653,11 +8754,11 @@ ARTICLES_DATA += (
                         "intraday equity observations. Rigor extracts daily closes from "
                         "the file and uses the same simulator on that series. It groups "
                         "by UTC days, which can differ from the firm's session boundary.",
-                        "The upload and sample report are linked at the end. The report "
-                        "separates measurements of supplied data from declarations and "
-                        "unmeasured quantities. Resampling a history remains a simulation "
-                        "conditioned on that file; it cannot recover missing floating "
-                        "equity or predict the outcome of another challenge.",
+                        "The form to upload your history and the sample report are linked at "
+                        "the end. The report separates measurements of supplied data from "
+                        "declarations and unmeasured quantities. Resampling a history remains "
+                        "a simulation conditioned on that file; it cannot recover missing "
+                        "floating equity or predict the outcome of another challenge.",
                     ],
                 },
             ],
@@ -8681,17 +8782,18 @@ ARTICLES_DATA += (
                 {
                     "heading": CONSISTENCY_TABLE_COPY["pt"]["rules"],
                     "paragraphs": [
-                        "A tabela lê empresa, programa, limite, base, fonte e data dos "
-                        "presets publicados. Descreve as avaliações incluídas; não estende "
-                        "suas regras a outras etapas ou saques. A data é a leitura "
-                        "registrada no preset, não uma revisão das condições de hoje.",
+                        "A tabela lê empresa, programa, limite, base, fonte e data das "
+                        "regras publicadas na calculadora de desafio. Descreve as avaliações "
+                        "incluídas; não estende suas regras a outras etapas ou saques. O link "
+                        "de cada linha é a página da empresa de onde a regra foi lida, e a "
+                        "data é essa leitura, não uma revisão das condições de hoje.",
                         "Vários programas publicam uma proporção sobre o resultado total. "
-                        "Seus presets usam a meta fixa como aproximação mais estrita: "
+                        "A calculadora usa a meta fixa como aproximação mais estrita: "
                         "um resultado acima da meta não amplia o melhor dia permitido. "
                         "A tabela de regras tem links para as fontes e as calculadoras "
                         "de cada empresa, que detalham essas aproximações. As condições "
-                        "da empresa podem exigir mais dias "
-                        "quando há concentração excessiva; isso não equivale por si só "
+                        "da empresa podem exigir mais dias ou elevar a meta quando há "
+                        "concentração excessiva; nenhuma das duas equivale por si só "
                         "a tocar um limite de perda.",
                     ],
                 },
@@ -8744,7 +8846,8 @@ ARTICLES_DATA += (
                         "O Rigor extrai fechamentos diários do arquivo e usa o mesmo "
                         "simulador nessa série. Agrupa por dias UTC, que podem diferir "
                         "do corte horário da empresa.",
-                        "O envio e o relatório de exemplo estão nos links ao final. "
+                        "O formulário para enviar o seu histórico e o relatório de exemplo "
+                        "estão nos links ao final. "
                         "O relatório distingue o que é medido nos dados enviados do "
                         "que é declarado e do que não é medido. Reamostrar um histórico "
                         "continua sendo uma simulação condicionada àquele arquivo; "
@@ -8890,7 +8993,7 @@ def related_links(article: Article, locale: str) -> tuple[tuple[str, str], ...]:
         elif kind == "challenge":
             links.append((challenge_calc.COPY[locale]["nav"], challenge_calc.challenge_url(locale)))
         elif kind == "rules":
-            links.append((rules_table.COPY[locale]["title"], rules_table.rules_table_url(locale)))
+            links.append((rules_table.COPY[locale]["nav"], rules_table.rules_table_url(locale)))
         elif kind == "reading":
             if link.get("example") == "win-rate":
                 label = {

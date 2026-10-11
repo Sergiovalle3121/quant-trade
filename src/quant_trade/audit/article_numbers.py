@@ -249,7 +249,11 @@ CONSISTENCY_VARIATION_INPUTS: tuple[ChallengeInput, ...] = (
 
 @dataclass(frozen=True)
 class ConsistencyRuleRow:
-    """A published preset's best-day rule, retaining its source and date."""
+    """A published preset's best-day rule, with the page it was read from and the date.
+
+    ``source_url`` is the preset's ``best_day_source_url`` when the firm states the
+    rule on a page other than the program's general source.
+    """
 
     key: str
     firm: str
@@ -269,7 +273,7 @@ def consistency_rules() -> tuple[ConsistencyRuleRow, ...]:
             program=rules.program,
             limit=rules.best_day_limit,
             basis=rules.best_day_basis,
-            source_url=rules.source_url,
+            source_url=rules.best_day_source_url or rules.source_url,
             as_of=rules.as_of,
         )
         for key, rules in PRESETS.items()
@@ -305,6 +309,8 @@ class ConsistencyExample:
     target_rule_cap: float | None
     #: Largest synthetic day's gain when the day starts at the initial balance.
     maximum_initial_day_gain: float
+    #: Worst synthetic day's loss, as a positive share of the initial balance.
+    maximum_initial_day_loss: float
     evidence: str = "DECLARED"
 
 
@@ -347,6 +353,7 @@ def consistency_example(inputs: ChallengeInput) -> ConsistencyExample:
         block_size=float(method["expected_block_size"]),
         target_rule_cap=cap,
         maximum_initial_day_gain=float(np.max(run.daily)),
+        maximum_initial_day_loss=float(-np.min(run.daily)),
     )
 
 
