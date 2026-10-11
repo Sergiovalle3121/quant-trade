@@ -409,6 +409,7 @@ SYNONYMS: dict[str, tuple[str, ...]] = {
         "filled qty",
         "paired qty",
         "closing quantity",
+        "trade quantity",
         "quantity #",
         "no. of shares",
         "exec qty",

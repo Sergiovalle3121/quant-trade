@@ -457,12 +457,29 @@ FROZEN: dict[str, tuple[Any, ...]] = {
     "fixtures/quantconnect_trades.csv": (
         "D", "2024-03-01", "2024-03-05", 3, 0.0053, -0.012378, None, 0.289333,
         "ND/ND/PS/ND/FL/ND", "TOO_FEW_OBSERVATIONS"),
+    # The futures fixtures of #500, read on fix/ci-sierra-fixture: Sierra Chart's
+    # Trades tab once "Trade Quantity" is a quantity name the importer knows.
+    "fixtures/sierra_chart_trade_activity.txt": (
+        "D", "2026-08-31", "2026-09-02", 3, 0.012, 0.0, None, 0.108379,
+        "ND/ND/FL/ND/FL/ND", "TOO_FEW_OBSERVATIONS,ZERO_DECLARED_COSTS"),
+    "fixtures/sierra_chart_trades.txt": (
+        "D", "2026-08-31", "2026-09-02", 3, 0.01135, 0.0, None, 0.104963,
+        "ND/ND/WK/ND/FL/ND", "TOO_FEW_OBSERVATIONS"),
+    "fixtures/topstepx_trades.csv": (
+        "D", "2026-08-31", "2026-09-04", 5, -0.014251, -0.020022, -6.082628, 0.212281,
+        "FL/FL/FL/ND/FL/ND", "TOO_FEW_OBSERVATIONS"),
     "fixtures/tradingview_g1.csv": (
         "D", "2024-11-01", "2024-11-05", 3, 0.00085, -0.00409, None, 0.086477,
         "ND/ND/FL/ND/FL/ND", "TOO_FEW_OBSERVATIONS,TRADE_PNL_MISMATCH,ZERO_DECLARED_COSTS"),
     "fixtures/tradingview_g3b.csv": (
         "D", "2026-02-27", "2026-03-03", 3, 0.00085, -0.00409, None, 0.086477,
         "ND/ND/PS/ND/FL/ND", "TOO_FEW_OBSERVATIONS"),
+    "fixtures/tradovate_orders.csv": (
+        "D", "2026-04-10", "2026-04-14", 3, 0.022, 0.0, None, 0.172378,
+        "ND/ND/FL/ND/FL/ND", "INVALID_TRADE_ROWS,TOO_FEW_OBSERVATIONS,ZERO_DECLARED_COSTS"),
+    "fixtures/tradovate_performance.csv": (
+        "D", "2026-04-08", "2026-04-13", 4, 0.0206, -0.001995, 8.763809, 0.171653,
+        "WK/WK/FL/ND/FL/ND", "IMPLAUSIBLE_SHARPE,TOO_FEW_OBSERVATIONS,ZERO_DECLARED_COSTS"),
     "fixtures/vectorbt_trades.csv": (
         "D", "2024-01-01", "2024-01-20", 20, 0.051097, -0.03612, 2.40107, 0.435265,
         "FL/WK/PS/ND/FL/ND", "TOO_FEW_OBSERVATIONS"),
