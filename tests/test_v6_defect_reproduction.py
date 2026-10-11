@@ -11,6 +11,7 @@ from __future__ import annotations
 import dataclasses
 import json
 from pathlib import Path
+from typing import Any
 
 import pytest
 import yaml
@@ -38,7 +39,7 @@ def _real_json_campaign(tmp_path, periods=120, funding=0.001):
 
 def _poll_store(tmp_path, n=120):
     """A jsonl store containing ONLY quote polls — zero settlements."""
-    base = {
+    base: dict[str, Any] = {
         "venue": "bybit",
         "symbol": "BTC",
         "spot_bid": 100.0,
@@ -175,7 +176,7 @@ def test_backfilled_settlements_can_power_research_via_panel(tmp_path):
     # The pipeline executes end-to-end; fixture provenance keeps it TEST_ONLY.
     from quant_trade.carry.panel_backfill import run_panel_backfill
 
-    fixtures = {
+    fixtures: dict[str, str | Path] = {
         "spot": "tests/fixtures/bybit_kline_spot.json",
         "perp": "tests/fixtures/bybit_kline_perp.json",
         "mark": "tests/fixtures/bybit_kline_mark.json",

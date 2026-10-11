@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from datetime import datetime, timedelta
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -60,7 +61,7 @@ class GrowingFeed:
 
 
 def _config(tmp_path, **overrides) -> LoopConfig:
-    defaults = dict(
+    defaults: dict[str, Any] = dict(
         session_name="loop_test",
         strategy="time_series_momentum",
         strategy_params={"lookback_days": 10, "rebalance_frequency": "daily"},

@@ -346,9 +346,9 @@ def test_winrate_visits_count(tmp_path: Path) -> None:
     assert tagged.cookies.get(funnel.REF_COOKIE) == "aciertos"
     assert browser().get(WINRATE_PATH["en"]).status_code == 200
     assert browser().get(WINRATE_PATH["pt"], params=FIGURES).status_code == 200
-    client.app.state.visits.flush()  # type: ignore[attr-defined]
+    client.app.state.visits.flush()
     day = funnel.day_of(datetime.now(UTC))
-    rows = client.app.state.store.funnel_events(day)["visits"]  # type: ignore[attr-defined]
+    rows = client.app.state.store.funnel_events(day)["visits"]
     counts = {(locale, ref): count for _, locale, ref, count in rows}
     assert counts == {("es", "aciertos"): 1, ("en", ""): 1, ("pt", ""): 1}
 

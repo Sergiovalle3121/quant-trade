@@ -6,6 +6,7 @@ import copy
 import html
 import re
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -37,7 +38,7 @@ from quant_trade.audit.settings import AuditSettings  # noqa: E402
 from quant_trade.audit.store import make_store  # noqa: E402
 from quant_trade.audit.web import create_app  # noqa: E402
 
-OPERATOR = {
+OPERATOR: dict[str, Any] = {
     "operator_name": "Operador de Prueba SAS",
     "operator_contact": "ayuda@operador.example",
     "operator_address": "Calle Falsa 123, Ciudad Ejemplo",

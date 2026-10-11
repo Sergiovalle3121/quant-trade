@@ -7,6 +7,8 @@ the plateau and forward checks use.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 import pytest
 
 from quant_trade.audit.importers import ReportFormatError, parse_optimization
@@ -18,8 +20,9 @@ def _cell(value: object) -> str:
     return f'<Cell><Data ss:Type="{kind}">{value}</Data></Cell>'
 
 
-def _export(header: list[str], rows: list[list[object]]) -> bytes:
-    body = "".join("<Row>" + "".join(_cell(c) for c in row) + "</Row>" for row in [header, *rows])
+def _export(header: list[str], rows: Sequence[Sequence[object]]) -> bytes:
+    all_rows: Sequence[Sequence[object]] = [header, *rows]
+    body = "".join("<Row>" + "".join(_cell(c) for c in row) + "</Row>" for row in all_rows)
     return (
         '<?xml version="1.0"?>\n<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" '
         'xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">'

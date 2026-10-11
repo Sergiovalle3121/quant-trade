@@ -90,7 +90,7 @@ def _lost(fast: int, slow: int) -> float:
     return 150.0 - _back(fast, slow) / 4
 
 
-def _review(forward: Callable[[int, int], float]):  # type: ignore[no-untyped-def]
+def _review(forward: Callable[[int, int], float]):
     summary = parse_optimization(_export(forward))
     return forward_review(summary.table, summary.parameters, report_inputs="FastMA=12; SlowMA=48")
 

@@ -54,7 +54,9 @@ def test_fixed_share_text_is_guard_clean_and_x_uses_the_same_text(locale, overal
     assert find_claims(" ".join(COPY[locale].values())) == []
     assert "https://rigorscore.com/v/public123?ref=share" in text
     assert f"/v/public123/card.svg?lang={locale}" in block
-    intent = html.unescape(re.search(r"href='([^']+)'", block).group(1))
+    intent_match = re.search(r"href='([^']+)'", block)
+    assert intent_match is not None
+    intent = html.unescape(intent_match.group(1))
     assert intent.startswith("https://x.com/intent/post?")
     assert parse_qs(urlsplit(intent).query)["text"] == [text]
     assert html.escape(text) in block
@@ -160,7 +162,9 @@ def test_public_page_and_report_follow_publication_lifecycle(
         response = client.get(url)
         assert response.status_code == 200
         assert "data-public-share" in response.text
-        block = re.search(r"<section[^>]+data-public-share>.*?</section>", response.text).group()
+        block_match = re.search(r"<section[^>]+data-public-share>.*?</section>", response.text)
+        assert block_match is not None
+        block = block_match.group()
         assert f"/v/{public_id}?ref=share" in block
         assert "https://wa.me/?" in block
         assert "https://t.me/share/url?" in block
@@ -183,7 +187,9 @@ def test_published_fund_keeps_its_share_text_after_purge(tmp_path: Path, locale:
     public_url = f"/v/{public_id}?lang={locale}"
     before = client.get(public_url)
     assert before.status_code == 200
-    before_block = re.search(r"<section[^>]+data-public-share>.*?</section>", before.text).group()
+    before_match = re.search(r"<section[^>]+data-public-share>.*?</section>", before.text)
+    assert before_match is not None
+    before_block = before_match.group()
     assert html.escape(SHARE_PHRASES[locale]["fund"]) in before_block
 
     assert store.purge_expired(datetime(2100, 1, 1, tzinfo=UTC), retention_days=1) == 1
@@ -196,7 +202,9 @@ def test_published_fund_keeps_its_share_text_after_purge(tmp_path: Path, locale:
 
     response = client.get(public_url)
     assert response.status_code == 200
-    block = re.search(r"<section[^>]+data-public-share>.*?</section>", response.text).group()
+    block_match = re.search(r"<section[^>]+data-public-share>.*?</section>", response.text)
+    assert block_match is not None
+    block = block_match.group()
     assert block == before_block
     assert find_claims(html.unescape(response.text)) == []
     for secret in (audit_id, token, PRIVATE, "fund.csv", "token="):

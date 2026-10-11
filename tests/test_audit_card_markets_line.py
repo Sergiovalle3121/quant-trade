@@ -3,6 +3,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+from typing import cast
+
 from quant_trade.audit.guard import find_claims
 from quant_trade.audit.pages import card_markets_line, landing
 
@@ -30,7 +33,7 @@ def test_line_names_the_approved_countries_in_a_fixed_order() -> None:
         == "Por ahora solo en México, Estados Unidos, Brasil y España."
     )
     assert (
-        card_markets_line(frozenset({"MX", "US", "BR", "ES"}), "en")
+        card_markets_line(cast(Sequence[str], frozenset({"MX", "US", "BR", "ES"})), "en")
         == "For now, in Mexico, the United States, Brazil and Spain only."
     )
     assert (

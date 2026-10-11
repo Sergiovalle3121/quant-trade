@@ -14,7 +14,7 @@ from quant_trade.audit.guard import assert_report_clean, find_claims
 from quant_trade.audit.i18n import untranslated
 from quant_trade.audit.plan import FUND_TITLES, improvement_plan
 from quant_trade.audit.report import render
-from quant_trade.audit.schema import DeclaredMetadata, build_inputs
+from quant_trade.audit.schema import AuditResult, DeclaredMetadata, build_inputs
 from quant_trade.audit.verdict import _TEXT, FUND_OOS_REASON, MEANING
 
 
@@ -33,25 +33,25 @@ def _pair(n: int = 96, seed: int = 11, edge: float = 0.002) -> tuple[np.ndarray,
     return 0.9 * index + rng.normal(edge, 0.01, n), index
 
 
-def _run(data: bytes, locale: str = "es", **declared: object) -> object:
-    inputs = build_inputs(data, DeclaredMetadata(locale=locale, **declared))  # type: ignore[arg-type]
+def _run(data: bytes, locale: str = "es", **declared: object) -> AuditResult:
+    inputs = build_inputs(data, DeclaredMetadata(locale=locale, **declared))
     return run_audit(inputs, bootstrap_samples=200)
 
 
-def _status(result: object) -> dict[str, str]:
-    return {d.name: d.status for d in result.verdict.dimensions}  # type: ignore[attr-defined]
+def _status(result: AuditResult) -> dict[str, str]:
+    return {d.name: d.status for d in result.verdict.dimensions}
 
 
 def test_a_fund_that_trails_its_own_index_fails_the_benchmark() -> None:
     fund, index = _pair(edge=-0.004)
     result = _run(_dated(fund, index))
     assert _status(result)["benchmark"] == "FAIL"
-    bench = result.benchmark  # type: ignore[attr-defined]
+    bench = result.benchmark
     # A periodic-return file names where its benchmark came from, as a declared value.
     assert bench["source"] == {"value": "embedded column", "evidence": "DECLARED", "note": ""}
     assert bench["excess_return"]["value"] < 0
     assert bench["overlap_share"]["note"] == FILE_BENCHMARK_NOTE
-    data = result.model_dump(mode="json")  # type: ignore[attr-defined]
+    data = result.model_dump(mode="json")
     steps = {step.dimension: step for step in improvement_plan(data, "es")}
     assert "índice que trae el propio archivo" in steps["benchmark"].finding
     assert untranslated(data) == []
@@ -84,7 +84,7 @@ def test_an_index_with_a_missing_month_is_not_used() -> None:
     result = _run(("\n".join(data) + "\n").encode())
     assert _status(result)["benchmark"] == "NOT_MEASURED"
     # The source is still named so the reader knows which column could not be used.
-    assert result.benchmark["source"]["value"] == "embedded column"  # type: ignore[attr-defined]
+    assert result.benchmark["source"]["value"] == "embedded column"
 
 
 @pytest.mark.parametrize("locale", ["es", "en", "pt"])
@@ -93,10 +93,10 @@ def test_a_fund_record_reads_as_a_fund_in_the_verdict_and_the_plan(locale: str) 
     # A declared investor reads the questions for the manager; with no answer the
     # wording is neutral (test_audit_ownership.py).
     result = _run(_dated(fund), locale, trials_declared=False, ownership="buyer")
-    flags = {flag["code"] for flag in result.red_flags}  # type: ignore[attr-defined]
+    flags = {flag["code"] for flag in result.red_flags}
     assert "ZERO_DECLARED_COSTS" not in flags
-    assert result.holdout["reason"] == FUND_OOS_REASON  # type: ignore[attr-defined]
-    data = result.model_dump(mode="json")  # type: ignore[attr-defined]
+    assert result.holdout["reason"] == FUND_OOS_REASON
+    data = result.model_dump(mode="json")
     assert data["fund"]["track_record"] is True
     steps = {step.dimension: step for step in improvement_plan(data, locale)}
     oos = steps["out_of_sample"]
@@ -107,10 +107,10 @@ def test_a_fund_record_reads_as_a_fund_in_the_verdict_and_the_plan(locale: str) 
     assert words in oos.finding and words in " ".join(oos.actions)
     costs = steps["costs"]
     assert "MT5" not in " ".join(costs.actions) and words in " ".join(costs.actions)
-    html, _ = render(result, watermark=False)  # type: ignore[arg-type]
+    html, _ = render(result, watermark=False)
     assert_report_clean(html)
     assert escape(MEANING[locale]["out_of_sample.NOT_MEASURED.fund"]) in html
-    summary = result.verdict.summary  # type: ignore[attr-defined]
+    summary = result.verdict.summary
     if locale == "es":
         assert "carteras, estrategias o variantes" in summary and "configuraciones" not in summary
     assert untranslated(data) == []
@@ -124,9 +124,9 @@ def test_a_backtest_keeps_its_own_wording() -> None:
         f"{t.date()},{v:.2f}" for t, v in zip(days, levels, strict=True)
     )
     result = _run((body + "\n").encode())
-    assert result.holdout["reason"] == "no out-of-sample start declared"  # type: ignore[attr-defined]
-    assert "ZERO_DECLARED_COSTS" in {f["code"] for f in result.red_flags}  # type: ignore[attr-defined]
-    assert "configuraciones" in result.verdict.summary  # type: ignore[attr-defined]
+    assert result.holdout["reason"] == "no out-of-sample start declared"
+    assert "ZERO_DECLARED_COSTS" in {f["code"] for f in result.red_flags}
+    assert "configuraciones" in result.verdict.summary
 
 
 def test_new_fund_texts_make_no_claims() -> None:
@@ -143,23 +143,23 @@ def test_no_plan_step_asks_a_fund_for_robot_files(locale: str) -> None:
     rng = np.random.default_rng(4)
     for fund in (_pair()[0], rng.normal(-0.004, 0.03, 60), rng.normal(0.002, 0.03, 60)):
         result = _run(_dated(fund), locale, trials=40)
-        data = result.model_dump(mode="json")  # type: ignore[attr-defined]
+        data = result.model_dump(mode="json")
         text = " ".join(
             " ".join([step.title, step.finding, *step.actions])
             for step in improvement_plan(data, locale)
         )
         for word in ("MT5", "EA ", "XML", "costo por lado", "cost per side", "optimiza", "optimis"):
             assert word not in text, (locale, word)
-        assert_report_clean(render(result, watermark=False)[0])  # type: ignore[arg-type]
+        assert_report_clean(render(result, watermark=False)[0])
 
 
 def test_a_failing_fund_is_called_a_fund_in_the_summary() -> None:
     rng = np.random.default_rng(9)
     result = _run(_dated(rng.normal(-0.01, 0.03, 60)))
-    overall = result.verdict.overall  # type: ignore[attr-defined]
+    overall = result.verdict.overall
     assert overall in {"C", "D"}
     first = _TEXT["es"][f"{overall}.fund"]
-    assert result.verdict.summary.startswith(first)  # type: ignore[attr-defined]
+    assert result.verdict.summary.startswith(first)
     assert "backtest" not in first
 
 
@@ -170,7 +170,7 @@ def test_a_grid_with_its_index_shows_no_robot_steps_and_a_measured_benchmark() -
     fund, index = _pair(72)
     result = _run(_labelled_grid(fund, index, "alternating"))
     assert _status(result)["benchmark"] != "NOT_MEASURED"
-    data = result.model_dump(mode="json")  # type: ignore[attr-defined]
+    data = result.model_dump(mode="json")
     plan = " ".join(
         " ".join([step.title, step.finding, *step.actions]) for step in improvement_plan(data, "es")
     )
@@ -180,7 +180,7 @@ def test_a_grid_with_its_index_shows_no_robot_steps_and_a_measured_benchmark() -
         "Compara con una alternativa pasiva",
     ):
         assert phrase not in plan
-    page = render(result, watermark=False)[0]  # type: ignore[arg-type]
+    page = render(result, watermark=False)[0]
     assert "no se subió un benchmark" not in page
 
 
@@ -194,9 +194,9 @@ def test_an_index_month_of_minus_100_percent_gives_a_report_not_a_crash(locale: 
     fund, index = _pair(72)
     index[30] = -1.0
     result = _run(_labelled_grid(fund, index, "alternating"), locale)
-    data = result.model_dump(mode="json")  # type: ignore[attr-defined]
+    data = result.model_dump(mode="json")
     assert data["fund"]["benchmark"]["reason"] == FULL_LOSS_MONTH
-    html = render(result, watermark=False)[0]  # type: ignore[arg-type]
+    html = render(result, watermark=False)[0]
     assert_report_clean(html)
     assert untranslated(data) == []
     if locale != "en":

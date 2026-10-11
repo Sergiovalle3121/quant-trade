@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 from collections.abc import Iterator
 from pathlib import Path
+from typing import Any
 from xml.etree import ElementTree
 
 import pytest
@@ -199,7 +200,7 @@ def _hidden_phone_actions(stylesheet: str) -> list[str]:
             # Pseudo-elements cannot hide these DOM nodes; vendor names also
             # fall outside cssselect2's supported set. Split only top-level
             # commas so an ordinary selector in the same list is still checked.
-            groups = [[]]
+            groups: list[list[Any]] = [[]]
             for token in tinycss2.parse_component_value_list(selector_text, skip_comments=True):
                 if token.type == "literal" and token.value == ",":
                     groups.append([])
@@ -218,7 +219,7 @@ def _hidden_phone_actions(stylesheet: str) -> list[str]:
     # hidden in base CSS and is displayed by the wider 720px phone rule.
     hidden_elements = set()
     for element in root.iter_subtree():
-        winners = {}
+        winners: dict[str, tuple[bool, tuple[int, int, int], int, int, bool]] = {}
         for specificity, order, _pseudo, declarations in matcher.match(element):
             for index, (property_name, important, hides) in enumerate(declarations):
                 candidate = (important, specificity, order, index, hides)
@@ -226,7 +227,7 @@ def _hidden_phone_actions(stylesheet: str) -> list[str]:
         if any(winner[-1] for winner in winners.values()):
             hidden_elements.add(element)
 
-    def is_hidden(element: cssselect2.ElementWrapper) -> bool:
+    def is_hidden(element: Any) -> bool:
         return any(parent in hidden_elements for parent in (*element.ancestors, element))
 
     hidden_actions = [

@@ -6,6 +6,7 @@ import json
 import re
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import cast
 
 import pytest
 from audit_fixtures import csv_bytes, positive_drift
@@ -35,7 +36,7 @@ from quant_trade.audit.legal import LegalContext, privacy_text, terms_text  # no
 from quant_trade.audit.pages import upload_page  # noqa: E402
 from quant_trade.audit.payments import fulfil, pack_code  # noqa: E402
 from quant_trade.audit.settings import AuditSettings  # noqa: E402
-from quant_trade.audit.store import make_store  # noqa: E402
+from quant_trade.audit.store import Store, make_store  # noqa: E402
 from quant_trade.audit.web import create_app  # noqa: E402
 from quant_trade.cli import app as cli_app  # noqa: E402
 
@@ -384,7 +385,9 @@ def test_the_code_that_expires_first_is_spent_first(tmp_path: Path) -> None:
     forever, _ = store.create_access_code(credits=1, note="", at=NOW)
     soon, _ = store.create_access_code(credits=1, note="", at=NOW, expires_days=5)
     for code in (forever, soon):
-        store.link_code(account.id, store.code_id(code), at=NOW)
+        code_id = store.code_id(code)
+        assert code_id is not None
+        store.link_code(account.id, code_id, at=NOW)
     store.create_audit(
         audit_id="a1",
         created_at=NOW,
@@ -399,8 +402,10 @@ def test_the_code_that_expires_first_is_spent_first(tmp_path: Path) -> None:
     )
     assert store.account_credits(account.id, NOW) == 2
     assert store.redeem_with_account("a1", account.id, at=NOW)
-    assert store.get_access_code(soon).credits_left == 0
-    assert store.get_access_code(forever).credits_left == 1
+    soon_record = store.get_access_code(soon)
+    forever_record = store.get_access_code(forever)
+    assert soon_record is not None and soon_record.credits_left == 0
+    assert forever_record is not None and forever_record.credits_left == 1
     assert not store.redeem_with_account("a1", account.id, at=NOW)  # already paid
     assert store.account_credits(account.id, NOW + timedelta(days=10)) == 1
 
@@ -1364,13 +1369,13 @@ def test_sign_in_limits_survive_a_restart(tmp_path: Path, monkeypatch: pytest.Mo
     # A deploy: a new app on the same database keeps the count.
     again = TestClient(create_app(settings, make_store(settings.database_url)))
     assert _signin(again, "kept@example.com", ip="203.0.113.7").status_code == 429
-    with store.engine.connect() as conn:  # type: ignore[attr-defined]
+    with store.engine.connect() as conn:
         keys = [
             row[0]
             for row in conn.execute(
                 store.attempts.select().with_only_columns(store.attempts.c.key_sha256)
             )
-        ]  # type: ignore[attr-defined]
+        ]
     assert keys and all("@" not in key and "203.0" not in key for key in keys)
 
 
@@ -1980,10 +1985,6 @@ def _join(client: TestClient, email: str, token: str, headers: dict[str, str] | 
     )
 
 
-def _seeded_file(seed: int) -> dict[str, tuple[str, bytes, str]]:
-    return {"equity": ("e.csv", csv_bytes(positive_drift(430, seed=seed)), "text/csv")}
-
-
 @pytest.mark.usefixtures("confirmed_emails")
 def test_an_invite_credits_the_inviter_once_the_new_account_gets_its_free_report(
     tmp_path: Path,
@@ -2026,7 +2027,9 @@ def test_an_invite_credits_the_inviter_once_the_new_account_gets_its_free_report
     assert store.account_credits(ana.id, datetime.now(UTC)) == 1  # type: ignore[attr-defined]
     summary = store.invite_summary(ana.id, datetime.now(UTC))  # type: ignore[attr-defined]
     assert (summary.joined, summary.waiting, summary.credited) == (1, 0, 1)
-    metrics = funnel.build(store.funnel_events(funnel.day_of(datetime.now(UTC)))).total.counts
+    metrics = funnel.build(
+        cast(Store, store).funnel_events(funnel.day_of(datetime.now(UTC)))
+    ).total.counts
     assert metrics["gift_credits"] == 1
     assert metrics["purchases"] == 0 and metrics["gross_usd_cents"] == 0
     assert "bea@example.com" not in client.get("/cuenta").text  # never who joined
@@ -2115,7 +2118,7 @@ def test_global_referral_budget_is_atomic_and_stays_spent_after_deletion(
     with store.engine.connect() as conn:  # type: ignore[attr-defined]
         outcomes = [
             row[0]
-            for row in conn.execute(  # type: ignore[attr-defined]
+            for row in conn.execute(
                 store.referrals.select().with_only_columns(store.referrals.c.outcome)  # type: ignore[attr-defined]
             ).all()
         ]
@@ -3140,7 +3143,7 @@ def test_recent_activity_is_capped_expires_and_goes_with_the_account(tmp_path: P
     assert len(rows) == ACCOUNT_EVENT_MAX  # the oldest went, signup and the old one included
     store.note_event(ana.id, "signin", now=old)  # type: ignore[attr-defined]
     store.purge_sessions(datetime.now(UTC))  # type: ignore[attr-defined]
-    assert all(  # type: ignore[attr-defined]
+    assert all(
         e.at > old.isoformat()[:10]
         for e in store.list_events(ana.id)  # type: ignore[attr-defined]
     )
@@ -3189,9 +3192,9 @@ def test_recent_activity_exists_in_every_language(tmp_path: Path) -> None:
         operator_address="México",
         jurisdiction="Leyes de México",
     )
-    for locale, words in (("es", "Actividad reciente"), ("en", "Recent activity")):
+    for locale, privacy_phrase in (("es", "Actividad reciente"), ("en", "Recent activity")):
         privacy = " ".join(" ".join(p) for _, p in privacy_text(ctx, locale).sections)
-        assert words in privacy and not find_claims(privacy)
+        assert privacy_phrase in privacy and not find_claims(privacy)
 
 
 def test_wrong_passwords_are_counted_per_network_and_hour(tmp_path: Path) -> None:
@@ -3366,9 +3369,9 @@ def test_since_your_last_visit_exists_in_every_language(tmp_path: Path) -> None:
         operator_address="México",
         jurisdiction="Leyes de México",
     )
-    for locale, words in (("es", "última visita"), ("en", "last visit")):
+    for locale, privacy_phrase in (("es", "última visita"), ("en", "last visit")):
         privacy = " ".join(" ".join(p) for _, p in privacy_text(ctx, locale).sections)
-        assert words in privacy and not find_claims(privacy)
+        assert privacy_phrase in privacy and not find_claims(privacy)
 
 
 def test_an_intruder_opening_mi_cuenta_never_clears_the_owners_notice(tmp_path: Path) -> None:
@@ -3502,7 +3505,8 @@ def test_changing_the_email_refuses_mistakes_and_keeps_the_old_one(tmp_path: Pat
         (("other@example.com",), "No se pudo usar ese correo"),
     ):
         if message is None:
-            refused = _change_email(client, *args, current="la contraseña equivocada")
+            assert len(args) == 1
+            refused = _change_email(client, args[0], current="la contraseña equivocada")
             message = "La contraseña actual no coincide."
         else:
             refused = _change_email(client, *args)
@@ -3663,7 +3667,7 @@ def test_unconfirmed_email_waits_for_the_free_report(tmp_path: Path) -> None:
 def test_throwaway_inboxes_cannot_open_an_account(tmp_path: Path, email: str) -> None:
     client, store, _ = _client(tmp_path)
     response = _signup(client, email, welcome=True)
-    assert store.find_account(email) is None
+    assert cast(Store, store).find_account(email) is None
     assert response.status_code == 400
     assert "buzones temporales" in response.text
 
@@ -3690,7 +3694,9 @@ def test_review_fixes_reserved_domains_pt_alias_and_upload_next(tmp_path: Path) 
     assert safe_next("/auditarx") == "" and safe_next("//auditar") == ""
     client, store, _ = _client(tmp_path, refuse_reserved_emails=True)
     refused = _signup(client, "fake@example.com", welcome=True)
-    assert refused.status_code == 400 and store.find_account("fake@example.com") is None
+    assert (
+        refused.status_code == 400 and cast(Store, store).find_account("fake@example.com") is None
+    )
     alias = client.get("/pt/registro?next=/pt/auditar", follow_redirects=False)
     assert alias.status_code == 308
     assert alias.headers["location"] == "/pt/cadastro?next=/pt/auditar"
@@ -3713,7 +3719,7 @@ def test_an_invite_is_not_credited_before_both_addresses_are_confirmed(
     monkeypatch.setattr(AuditSettings, "email_delivery_ready", property(lambda self: True))
     client, store, _ = _client(tmp_path)
     _signup(client, "host@example.com", welcome=True)
-    host = store.find_account("host@example.com")
+    host = cast(Store, store).find_account("host@example.com")
     assert host is not None
     link = re.search(r"id='invite-link'[^>]*value='([^']+)'", client.get("/cuenta").text)
     assert link is not None
@@ -3729,7 +3735,7 @@ def test_an_invite_is_not_credited_before_both_addresses_are_confirmed(
         "/audits", files=_seeded_file(31), data={"consent": "on"}, follow_redirects=False
     )
     assert "acct=welcome" in upload.headers["location"]
-    assert store.account_credits(host.id, datetime.now(UTC)) == 0
+    assert cast(Store, store).account_credits(host.id, datetime.now(UTC)) == 0
 
 
 def test_invite_card_says_both_addresses_must_be_confirmed() -> None:
@@ -3747,7 +3753,8 @@ def test_without_mail_no_invite_is_offered_or_noted(tmp_path: Path) -> None:
     assert not settings.email_delivery_ready
     _signup(client, "host@example.com", welcome=True)
     assert "id='invite-link'" not in client.get("/cuenta").text
-    host = store.find_account("host@example.com")
+    host = cast(Store, store).find_account("host@example.com")
+    assert host is not None
     token = store.invite_token(host.id, at=NOW)  # type: ignore[attr-defined]
     guest = TestClient(client.app)
     page = guest.get(f"/registro?invita={token}").text
@@ -3811,7 +3818,7 @@ def test_signup_refuses_a_domain_that_takes_no_mail(tmp_path: Path) -> None:
         follow_redirects=False,
     )
     assert refused.status_code == 400 and "No encontramos ese dominio" in refused.text
-    assert store.find_account("qa@rigor-review-qa.dev") is None  # type: ignore[attr-defined]
+    assert store.find_account("qa@rigor-review-qa.dev") is None
     english = client.get("/signup").text
     created = client.post(
         "/signup",
@@ -3819,7 +3826,7 @@ def test_signup_refuses_a_domain_that_takes_no_mail(tmp_path: Path) -> None:
         follow_redirects=False,
     )
     assert created.status_code == 303
-    assert store.find_account("ana@real.test") is not None  # type: ignore[attr-defined]
+    assert store.find_account("ana@real.test") is not None
 
 
 def test_the_dns_check_is_on_in_the_service_and_can_be_turned_off() -> None:

@@ -22,12 +22,12 @@ from quant_trade.audit.importers import (
 from quant_trade.audit.universal import guess_columns, normalise
 
 
-def _net(report) -> list[float]:  # type: ignore[no-untyped-def]
+def _net(report) -> list[float]:
     fees = report.trades.fees or [0.0] * len(report.trades.trades)
     return [round(t.pnl - f, 2) for t, f in zip(report.trades.trades, fees, strict=True)]
 
 
-def _clean(report) -> None:  # type: ignore[no-untyped-def]
+def _clean(report) -> None:
     assert untranslated({"inputs": {"parse_warnings": report.warnings}}) == []
     assert all(find_claims(warning) == [] for warning in report.warnings)
 
@@ -148,8 +148,10 @@ def test_title_lines_above_the_header_are_skipped() -> None:
 
 
 def test_an_excel_trade_list_is_read() -> None:
-    header = ["Instrument", "Entry time", "Exit time", "Direction", "Qty", "Entry price",
-              "Exit price", "PnL"]  # fmt: skip
+    header: list[object] = [
+        "Instrument", "Entry time", "Exit time", "Direction", "Qty", "Entry price",
+        "Exit price", "PnL",
+    ]  # fmt: skip
     rows: list[list[object]] = [header]
     for i in range(8):
         serial = 46_000 + i  # Excel day serials

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import pytest
 
 from quant_trade.audit import account_pages
@@ -21,7 +23,7 @@ def test_confirmation_status_and_recovery_forms_follow_delivery_state(
     locale: str, account_path: str, forgot_path: str, pending_phrase: str
 ) -> None:
     account = AccountRecord("a1", "old@example.com", locale, "2026-09-27")
-    common = dict(
+    common: dict[str, Any] = dict(
         locale=locale,
         account=account,
         audits=(),

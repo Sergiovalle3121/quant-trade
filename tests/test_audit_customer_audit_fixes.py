@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -24,13 +25,13 @@ from quant_trade.audit.theme import STYLE  # noqa: E402
 from quant_trade.audit.web import WAITLIST_PER_HOUR_PER_IP, create_app  # noqa: E402
 
 BASE = "https://rigor.example"
-OPERATOR = {
+OPERATOR: dict[str, Any] = {
     "operator_name": "Operador de Prueba",
     "operator_contact": "hola@rigor.example",
     "operator_address": "Calle Falsa 123, Ciudad de Prueba, País de Prueba",
     "jurisdiction": "Leyes del País de Prueba; tribunales de la Ciudad de Prueba",
 }
-OVERRIDES = {
+OVERRIDES: dict[str, Any] = {
     "operator_address_en": "123 Fake Street, Test City, Test Country",
     "operator_address_pt": "Rua Falsa 123, Cidade de Teste, País de Teste",
     "jurisdiction_en": "Laws of Test Country; courts of Test City",

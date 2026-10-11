@@ -33,7 +33,7 @@ def _inputs(tmp_path, count=270):
     start = (dates[0] - pd.Timedelta(hours=1)).isoformat()
     rng = np.random.default_rng(20)
     control = rng.normal(0.0004, 0.012, count - 1)
-    rows = []
+    rows: list[dict[str, str | int | float]] = []
     for name in (*CANDIDATES, CONTROL):
         returns = control if name == CONTROL else control * 0.4 + 0.0003
         for stress in (1, 2, 3):

@@ -38,7 +38,7 @@ class _Offline(MarketData):
     def _refuse(series: str) -> str:
         raise OSError("offline test")
 
-    def warm(self):  # type: ignore[no-untyped-def]
+    def warm(self):
         return None
 
 
@@ -49,7 +49,7 @@ class _Warmed(MarketData):
     def __init__(self) -> None:
         super().__init__(_bills_only)
 
-    def warm(self):  # type: ignore[no-untyped-def]
+    def warm(self):
         self.refresh(CASH.key)
         return None
 
@@ -150,7 +150,7 @@ class _WarmedAll(MarketData):
     def __init__(self) -> None:
         super().__init__(_bills_prices_and_rates)
 
-    def warm(self):  # type: ignore[no-untyped-def]
+    def warm(self):
         for key in (CASH.key, CPI.key, *(asset.key for asset in FX)):
             self.refresh(key)
         return None

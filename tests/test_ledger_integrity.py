@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from typing import Any
 
 from quant_trade.research.ledger import (
     append_trial,
@@ -20,7 +21,7 @@ from quant_trade.research.ledger import (
 
 
 def _record(tmp_path, **overrides):
-    kwargs = dict(
+    kwargs: dict[str, Any] = dict(
         source="unit_test",
         strategy="tsmom",
         strategy_params={"lookback_days": 21},

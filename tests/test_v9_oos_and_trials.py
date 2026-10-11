@@ -7,6 +7,7 @@ and it forgets how many answers it tried. These tests pin both.
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -179,7 +180,7 @@ def test_the_frozen_hash_changes_with_the_configuration() -> None:
 
 
 def _verdict(**overrides) -> HoldoutVerdict:
-    payload = {
+    payload: dict[str, Any] = {
         "frozen_variant": "a",
         "frozen_hash": "h" * 64,
         "holdout_observations": 200,
@@ -254,7 +255,7 @@ def test_an_undefined_deflated_sharpe_is_never_treated_as_passing() -> None:
 
 
 def _trial(path: Path, **overrides) -> TrialRecord:
-    payload = {
+    payload: dict[str, Any] = {
         "trial_id": "t1",
         "hypothesis_id": "H1",
         "variant_id": "v1",

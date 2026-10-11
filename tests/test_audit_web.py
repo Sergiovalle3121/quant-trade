@@ -387,7 +387,7 @@ def test_a_platform_report_alone_is_audited_and_stored(tmp_path: Path) -> None:
     assert body["inputs"]["source_format"] == "mt5_tester_html"
     assert body["multiplicity"]["trials_used"]["value"] == 30
     assert body["challenge"]["preset"] == "ftmo-2step-phase1"
-    store = client.app.state.store  # type: ignore[attr-defined]
+    store = client.app.state.store
     record = store.get_audit(audit_id, with_blobs=True)
     assert record.equity_csv is None
     assert set(record.files) == {"report.html", "optimization.xml"}
@@ -438,7 +438,7 @@ def test_report_uploads_are_purged_with_their_audit(tmp_path: Path) -> None:
     files = {"report": ("r.html", synthetic_mt5_report(days=60), "text/html")}
     response = client.post("/audits", files=files, data={"consent": "on"}, follow_redirects=False)
     audit_id, _ = _id_and_token(response.headers["location"])
-    store = client.app.state.store  # type: ignore[attr-defined]
+    store = client.app.state.store
     later = datetime.now(UTC) + timedelta(days=40)
     assert store.purge_expired(later, retention_days=30) == 1
     record = store.get_audit(audit_id, with_blobs=True)

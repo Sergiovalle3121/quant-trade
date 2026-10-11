@@ -202,7 +202,7 @@ def test_pdf_buttons_say_the_pdf_is_being_prepared(tmp_path: Path) -> None:
     ):
         # A client's report has two PDF buttons; the public sample adds a third in
         # its "check it yourself" block (report.sample_check_block).
-        pages = ((client.get(f"{location}&lang={lang}").text, 2),)
+        pages: tuple[tuple[str, int], ...] = ((client.get(f"{location}&lang={lang}").text, 2),)
         pages += ((client.get("/ejemplo" if lang == "es" else "/sample").text, 3),)
         signal = "/ejemplo-senal" if lang == "es" else "/en/sample-signal"
         pages += ((client.get(signal).text, 3),)

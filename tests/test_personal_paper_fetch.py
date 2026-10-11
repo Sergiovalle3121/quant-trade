@@ -79,6 +79,7 @@ def test_quote_keeps_price_time_and_rejects_missed_open():
         index=pd.to_datetime(["2024-01-03T14:30:00Z"]),
     )
     quote = normalize_open_quote(raw, "SPY", _calendar(), pd.Timestamp("2024-01-03T14:32:00Z"))
+    assert quote is not None
     assert quote["observed_at_utc"] == "2024-01-03T14:31:00+00:00"
     assert quote["previous_session_date"] == "2024-01-02"
     assert quote["available_volume"] == 1000

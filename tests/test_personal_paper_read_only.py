@@ -31,7 +31,7 @@ def _foreign_snapshot(path: Path) -> tuple[str, str, list[tuple], list[tuple]]:
 
 def _sealed_writer(path: Path) -> PaperStore:
     store = PaperStore(path)
-    manifest = {
+    manifest: dict[str, object] = {
         "prospective_started_at": None,
         "clock_source": "SYSTEM_UTC",
         "closed_sessions": 0,

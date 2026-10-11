@@ -8,6 +8,7 @@ import re
 import socket
 import struct
 from pathlib import Path
+from typing import Any
 from urllib.parse import parse_qs, urlsplit
 from xml.etree import ElementTree as ET
 
@@ -192,8 +193,8 @@ def test_invalid_png_parameters_return_empty_404(client: TestClient, locale: str
         assert response.status_code == 404, params
         assert response.content == b""
     for field in (*FIGURES, "download"):
-        params = [*FIGURES.items(), (field, "svg"), (field, "svg")]
-        response = client.get(path, params=params)
+        repeated_params = [*FIGURES.items(), (field, "svg"), (field, "svg")]
+        response = client.get(path, params=repeated_params)
         assert response.status_code == 404, field
         assert response.content == b""
 
@@ -226,7 +227,7 @@ def test_missing_cairosvg_import_returns_503_and_keeps_page_usable(
 ) -> None:
     original_import = builtins.__import__
 
-    def without_cairo(name: str, *args: object, **kwargs: object) -> object:
+    def without_cairo(name: str, *args: Any, **kwargs: Any) -> object:
         if name == "cairosvg":
             raise ImportError("optional CairoSVG is absent")
         return original_import(name, *args, **kwargs)
@@ -286,7 +287,7 @@ def test_png_and_preview_generation_do_not_use_database_network_or_files(
 ) -> None:
     monkeypatch.chdir(tmp_path)
 
-    def forbidden(*args: object, **kwargs: object) -> None:
+    def forbidden(*args: Any, **kwargs: Any) -> None:
         pytest.fail("Reader PNG must not use the database, network or files")
 
     store = client.app.state.store

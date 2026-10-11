@@ -18,7 +18,7 @@ import time
 from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import pytest
 from audit_fixtures import csv_bytes, positive_drift
@@ -50,7 +50,7 @@ from quant_trade.audit.pricing import PRICING_PATH, start_cta  # noqa: E402
 from quant_trade.audit.report import LABELS  # noqa: E402
 from quant_trade.audit.seo import PUBLIC_PAGES  # noqa: E402
 from quant_trade.audit.settings import AuditSettings  # noqa: E402
-from quant_trade.audit.store import Store, make_store  # noqa: E402
+from quant_trade.audit.store import AuditRecord, Store, make_store  # noqa: E402
 from quant_trade.audit.web import create_app, sign_stripe_payload  # noqa: E402
 
 BASE = "https://rigor.example"
@@ -331,7 +331,7 @@ def test_preview_sign_up_locked_report_purchase_and_unlock(tmp_path: Path) -> No
     assert account is not None
     # Linked to the account, locked, one of the month's previews; nothing pending.
     assert store.account_for_audit(audit_id) == account.id
-    assert not store.get_audit(audit_id).paid
+    assert not cast(AuditRecord, store.get_audit(audit_id)).paid
     assert not store.welcome_used(account.id)
     assert store.welcome_pending_for(account.id, since=datetime(2000, 1, 1, tzinfo=UTC)) == []
     now = datetime.now(UTC)
@@ -347,13 +347,15 @@ def test_preview_sign_up_locked_report_purchase_and_unlock(tmp_path: Path) -> No
     assert "done=email_verified" in confirmed.headers["location"]
     assert "email_verified_report" not in confirmed.headers["location"]
     assert store.email_verified(account.id)
-    assert not store.get_audit(audit_id).paid and not store.welcome_used(account.id)
+    assert not cast(AuditRecord, store.get_audit(audit_id)).paid and not store.welcome_used(
+        account.id
+    )
 
     # The purchase of always: the box ticked records the terms' version.
     locked = visitor.get(f"/audits/{audit_id}?token={token}&lang=es").text
     assert _escaped(LABELS["es"]["final_sale"]) in locked
     order_id = _pay(app, visitor, settings, audit_id, token)
-    assert store.get_audit(audit_id).paid
+    assert cast(AuditRecord, store.get_audit(audit_id)).paid
     acceptance = store.final_sale_acceptance(order_id)
     assert acceptance is not None and acceptance[0] == LEGAL_UPDATED == "2026-10-09"
     opened = visitor.get(f"/audits/{audit_id}?token={token}&lang=es").text
@@ -399,14 +401,14 @@ def test_no_path_grants_a_free_full_report(tmp_path: Path) -> None:
     first = _upload(guest, 51)
     assert first.status_code == 303 and "acct=" not in first.headers["location"]
     first_id, first_token = _location(first)
-    assert not store.get_audit(first_id).paid
+    assert not cast(AuditRecord, store.get_audit(first_id)).paid
     assert store.welcome_pending_for(friend.id, since=datetime(2000, 1, 1, tzinfo=UTC)) == []
     _confirm(app, store, friend.id)
-    assert not store.get_audit(first_id).paid
+    assert not cast(AuditRecord, store.get_audit(first_id)).paid
     # And after confirming, the next upload is a preview too.
     second = _upload(guest, 52)
     second_id, _ = _location(second)
-    assert not store.get_audit(second_id).paid
+    assert not cast(AuditRecord, store.get_audit(second_id)).paid
     assert not store.welcome_used(friend.id)
     now = datetime.now(UTC)
     assert store.account_credits(host.id, now) == 0
@@ -435,7 +437,7 @@ def test_no_path_grants_a_free_full_report(tmp_path: Path) -> None:
         follow_redirects=False,
     )
     assert redeemed.status_code == 303
-    assert store.get_audit(first_id).paid
+    assert cast(AuditRecord, store.get_audit(first_id)).paid
 
 
 def test_the_account_first_page_names_the_price_not_a_free_report(tmp_path: Path) -> None:
@@ -489,7 +491,7 @@ def _pages(app: Any, store: Store) -> dict[str, list[tuple[str, str]]]:
     owner = _browser(app, "198.51.100.32")
     assert _signup(owner, "duena@example.com").status_code == 303
     mine_id, mine_token = _location(_upload(owner, 62))
-    assert not store.get_audit(mine_id).paid
+    assert not cast(AuditRecord, store.get_audit(mine_id)).paid
     for locale in LOCALES:
         for client, audit_id, token in ((anon, anon_id, anon_token), (owner, mine_id, mine_token)):
             path = f"/audits/{audit_id}?token={token}&lang={locale}"

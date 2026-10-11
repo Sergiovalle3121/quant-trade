@@ -6,6 +6,7 @@ import builtins
 import struct
 import sys
 from types import SimpleNamespace
+from typing import Any
 
 import pytest
 
@@ -33,7 +34,7 @@ def test_import_failure_is_optional(
 ) -> None:
     original_import = builtins.__import__
 
-    def unavailable(name: str, *args: object, **kwargs: object) -> object:
+    def unavailable(name: str, *args: Any, **kwargs: Any) -> object:
         if name == "cairosvg":
             raise error("renderer unavailable")
         return original_import(name, *args, **kwargs)

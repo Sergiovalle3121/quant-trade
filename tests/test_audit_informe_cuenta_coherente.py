@@ -213,7 +213,7 @@ def test_each_psr_says_which_it_is_with_one_name_in_plan_table_and_detail(locale
 def test_without_a_dependence_figure_the_class_uses_the_plain_count_by_that_name(
     locale: str,
 ) -> None:
-    data = {
+    data: dict[str, Any] = {
         "significance": {
             "status": "MEASURED",
             "observations": measured(300),
@@ -398,7 +398,8 @@ def test_the_challenge_says_the_open_loss_counts_first_and_folds_its_figures(
     assert {"FLOATING_LOSS_AT_END", "HIDDEN_FLOATING_DRAWDOWN"} <= codes
     assert data["inputs"]["balance_only"] and data["challenge"]["status"] == "MEASURED"
     unseen, share = unseen_open_loss(data)
-    assert unseen and share == data["account"]["floating_share"]["value"]
+    assert unseen and share is not None
+    assert share == data["account"]["floating_share"]["value"]
     labels = LABELS[locale]
     page = _signal_page(locale)
     section = page.split(f"<h2>{html.escape(labels['challenge'], quote=True)}</h2>")[-1]
@@ -570,7 +571,9 @@ def test_every_new_text_exists_in_three_languages_and_passes_the_guard() -> None
             )
         for status in ("NOT_MEASURED", "WEAK", "FAIL"):
             texts.append(VERDICT_TEXT[locale][f"multiplicity.{status}.undeclared.account"])
-        texts.extend(ownership.QUESTIONS["backtest_match"][locale])
+        for question in ownership.QUESTIONS["backtest_match"][locale]:
+            assert question is not None
+            texts.append(question)
         texts.append(seller_message.SELLER_ASK["backtest_match"][locale])
         texts.append(report._question_text({"code": "backtest_match"}, locale))
         texts.append(localize(psr_names.CLASS_NOTE, locale))
@@ -1059,9 +1062,9 @@ def test_a_question_stored_with_the_robot_reads_as_the_account_and_a_backtest_ke
         if locale == "pt":
             assert account != analytics.ACCOUNT_QUESTIONS[code]["en"]
         # The engine stores the account's wording for an account history ...
-        kept = next(q for q in asked if q["code"] == code)
-        assert kept["es"] == analytics.ACCOUNT_QUESTIONS[code]["es"]
-        assert kept["en"] == analytics.ACCOUNT_QUESTIONS[code]["en"]
+        account_question = next(q for q in asked if q["code"] == code)
+        assert account_question["es"] == analytics.ACCOUNT_QUESTIONS[code]["es"]
+        assert account_question["en"] == analytics.ACCOUNT_QUESTIONS[code]["en"]
         # ... and a backtest's question still speaks of its robot.
         backtest = report._question_text(stored, locale)
         assert ROBOT_WORD.search(backtest), backtest

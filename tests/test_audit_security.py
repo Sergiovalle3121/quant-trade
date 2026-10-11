@@ -137,7 +137,9 @@ def test_a_utf16_doctype_inside_a_workbook_is_refused_before_any_entity() -> Non
 
 def test_plain_xml_without_a_doctype_still_parses() -> None:
     root = _xml(b"\xff\xfe" + "<a><b>1</b></a>".encode("utf-16-le"))
-    assert root.find("b").text == "1"
+    child = root.find("b")
+    assert child is not None
+    assert child.text == "1"
 
 
 def test_a_csv_line_past_the_limit_is_refused_at_once() -> None:

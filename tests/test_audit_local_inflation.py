@@ -6,6 +6,7 @@ import io
 import json
 import logging
 import zipfile
+from collections.abc import Callable
 from dataclasses import replace
 from html import escape
 from typing import Any
@@ -62,6 +63,10 @@ BCB = json.dumps(
         {"data": "01/02/1995", "valor": "-0.50"},
     ]
 )
+
+
+def _reply(text: str) -> Callable[[str], str]:
+    return lambda _series: text
 
 
 def _curve(days: pd.DatetimeIndex, levels: np.ndarray) -> pd.DataFrame:
@@ -257,7 +262,9 @@ def test_the_methodology_page_credits_every_public_source(locale: str) -> None:
     page = method_page(locale=locale)
     words = METHOD_COPY[locale]
     assert words["data_title"] != METHOD_COPY["en"]["data_title"] or locale == "en"
-    for line in words["data"]:  # type: ignore[union-attr]
+    data_lines = words["data"]
+    assert isinstance(data_lines, (list, tuple))
+    for line in data_lines:
         assert escape(str(line)) in page
         assert find_claims(str(line)) == []
     for name in (
@@ -332,7 +339,7 @@ def test_a_brazilian_chain_with_a_missing_repeated_or_unreadable_month_is_refuse
     for broken in (json.dumps(rows) for rows in (missing, repeated, unreadable)):
         with pytest.raises(ValueError):
             parse_provider(broken, "bcb")
-        assert MarketData(lambda series, text=broken: text).refresh("cpi_brl") is False
+        assert MarketData(_reply(broken)).refresh("cpi_brl") is False
 
 
 INPC = "Índice nacional de precios al consumidor (mensual), Resumen, Precios al Consumidor (INPC)"
@@ -394,7 +401,7 @@ def test_a_broken_mexican_or_japanese_file_keeps_nothing() -> None:
     ]
     for reply in broken:
         key = "cpi_mxn" if "zip" in reply or "PK" in reply[:2] else "cpi_jpy"
-        assert MarketData(lambda series, text=reply: text).refresh(key) is False, reply[:30]
+        assert MarketData(_reply(reply)).refresh(key) is False, reply[:30]
 
 
 def test_an_inegi_table_too_large_to_open_is_refused(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -480,7 +487,7 @@ def test_an_account_in_pesos_and_the_yen_row_credit_their_sources(locale: str) -
 def test_an_account_in_another_currency_reads_one_period(locale: str) -> None:
     inputs, _ = _inputs(locale)
     inputs = replace(inputs, account_currency="AUD")
-    result = run_audit(inputs, bootstrap_samples=200, risk_samples=300, market={}.get)
+    result = run_audit(inputs, bootstrap_samples=200, risk_samples=300, market=lambda _key: None)
     assert result.in_currencies is not None
     assert result.in_currencies["reason"] == OTHER_CURRENCY
     html, _ = render(result, watermark=False)
@@ -556,7 +563,11 @@ def test_a_reply_that_trims_too_much_or_ends_earlier_is_refused_and_logged(
         _boc(history[:-1]),  # ends a month earlier
     ):
         replies = [reply, _boc(history)]
-        data = MarketData(lambda series, replies=replies: replies.pop())
+
+        def fetch(_series: str, replies: list[str] = replies) -> str:
+            return replies.pop()
+
+        data = MarketData(fetch)
         assert data.refresh("cpi_cad") is True
         kept = data.closes("cpi_cad")
         caplog.clear()

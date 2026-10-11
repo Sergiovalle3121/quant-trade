@@ -39,10 +39,8 @@ def _browser(client: TestClient) -> TestClient:
 
 
 def _visits(client: TestClient) -> dict[tuple[str, str], int]:
-    client.app.state.visits.flush()  # type: ignore[attr-defined]
-    rows = client.app.state.store.funnel_events(  # type: ignore[attr-defined]
-        funnel.day_of(datetime.now(UTC))
-    )["visits"]
+    client.app.state.visits.flush()
+    rows = client.app.state.store.funnel_events(funnel.day_of(datetime.now(UTC)))["visits"]
     return {(locale, ref): count for _, locale, ref, count in rows}
 
 

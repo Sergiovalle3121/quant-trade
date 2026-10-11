@@ -7,6 +7,7 @@ import re
 import threading
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import Any, cast
 
 import pytest
 from audit_fixtures import csv_bytes, positive_drift
@@ -27,13 +28,13 @@ from quant_trade.audit.legal import (  # noqa: E402
 from quant_trade.audit.pages import error_page, landing, legal_page  # noqa: E402
 from quant_trade.audit.retention import RetentionWorker, run_retention  # noqa: E402
 from quant_trade.audit.settings import AuditSettings  # noqa: E402
-from quant_trade.audit.store import make_store  # noqa: E402
+from quant_trade.audit.store import AuditRecord, Store, make_store  # noqa: E402
 from quant_trade.audit.theme import SCRIPT_TAG  # noqa: E402
 from quant_trade.audit.web import create_app  # noqa: E402
 from quant_trade.cli import app  # noqa: E402
 
 NOW = datetime(2026, 1, 31, tzinfo=UTC)
-OPERATOR = {
+OPERATOR: dict[str, Any] = {
     "operator_name": "Operador de Prueba SAS",
     "operator_contact": "privacidad@operador.example",
     "operator_address": "Calle Falsa 123, Ciudad Ejemplo",
@@ -47,7 +48,7 @@ CONTEXTS = [
 ]
 
 
-def _client(tmp_path: Path, **overrides) -> tuple[TestClient, object]:
+def _client(tmp_path: Path, **overrides) -> tuple[TestClient, Store]:
     settings = AuditSettings(
         database_url=f"sqlite:///{tmp_path}/audit.db",
         bootstrap_samples=100,
@@ -386,11 +387,14 @@ def test_purge_clears_the_ip_of_every_old_audit_paid_included(tmp_path: Path) ->
     _create(store, "recent", at=NOW - timedelta(days=5))
     store.mark_paid("old_paid", stripe_session_id="cs", at=NOW)
     assert store.purge_expired(NOW, retention_days=30, dry_run=True) == 0
-    assert store.get_audit("old_paid").client_ip == "1.2.3.4"  # dry run changes nothing
+    assert (
+        cast(AuditRecord, store.get_audit("old_paid")).client_ip == "1.2.3.4"
+    )  # dry run changes nothing
     assert store.purge_expired(NOW, retention_days=30) == 0
     old = store.get_audit("old_paid", with_blobs=True)
+    assert old is not None
     assert old.client_ip == "" and old.equity_csv is not None  # paid content stays
-    assert store.get_audit("recent").client_ip == "1.2.3.4"
+    assert cast(AuditRecord, store.get_audit("recent")).client_ip == "1.2.3.4"
 
 
 def test_delete_removes_everything_including_the_publication(tmp_path: Path) -> None:
@@ -467,8 +471,8 @@ def test_service_purges_at_startup_when_auto_purge_is_on(tmp_path: Path) -> None
                 break
             threading.Event().wait(0.01)
         assert worker.runs >= 1
-    assert store.get_audit("old").purged_at is not None
-    assert store.get_audit("new").purged_at is None
+    assert cast(AuditRecord, store.get_audit("old")).purged_at is not None
+    assert cast(AuditRecord, store.get_audit("new")).purged_at is None
 
 
 def test_service_never_purges_without_the_opt_in(tmp_path: Path) -> None:
@@ -478,7 +482,7 @@ def test_service_never_purges_without_the_opt_in(tmp_path: Path) -> None:
     with TestClient(create_app(settings, store)) as client:
         assert client.get("/health").json()["auto_purge"] is False
         assert client.app.state.retention.runs == 0
-    assert store.get_audit("old").purged_at is None
+    assert cast(AuditRecord, store.get_audit("old")).purged_at is None
 
 
 def test_worker_repeats_on_its_interval_and_survives_a_failure() -> None:
@@ -554,7 +558,12 @@ def test_card_payment_wording_appears_only_while_cards_are_on() -> None:
 
 
 def test_privacy_names_resend_only_when_it_carries_the_mail() -> None:
-    base = {**OPERATOR, "free_mode": False, "price_usd": 29, "email_delivery_ready": True}
+    base: dict[str, Any] = {
+        **OPERATOR,
+        "free_mode": False,
+        "price_usd": 29,
+        "email_delivery_ready": True,
+    }
     with_resend = LegalContext(**base, email_via_resend=True)
     without = LegalContext(**base)
     for locale in ("es", "en", "pt"):

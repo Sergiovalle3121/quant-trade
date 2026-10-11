@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import html
 import re
+from typing import cast
 
 import pytest
 
@@ -46,9 +47,9 @@ def test_trials_read_thousands_as_people_type_them() -> None:
     nbsp, narrow = "\u00a0", "\u202f"
     for typed in ("1.000", "1,000", "1 000", f"1{nbsp}000", f"1{narrow}000", "1000", "1e3"):
         assert parse_input("1,8", "3", typed) == thousand, typed
-    assert parse_input("1,8", "3", "12.500").trials == 12500
-    assert parse_input("1,8", "3", "1.000.000").trials == 1_000_000
-    assert parse_input("1,8", "3", "100.0").trials == 100
+    assert cast(CalculatorInput, parse_input("1,8", "3", "12.500")).trials == 12500
+    assert cast(CalculatorInput, parse_input("1,8", "3", "1.000.000")).trials == 1_000_000
+    assert cast(CalculatorInput, parse_input("1,8", "3", "100.0")).trials == 100
     # A fraction is not a number of configurations ("1,5" used to read as 15).
     for typed in ("1,5", "12.5", "1.0001"):
         assert parse_input("1,8", "3", typed) == "error_number", typed

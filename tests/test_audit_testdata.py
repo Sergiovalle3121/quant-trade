@@ -32,7 +32,7 @@ MT4_WINDOW = "(2024.01.01 - 2024.01.06)"
 NEW_FLAGS = {"COARSE_TICK_MODEL", "TEST_DATA_QUALITY_LOW", "REPORT_HEADER_MISMATCH"}
 
 
-def _audit(text: str, name: str, locale: str = "es"):  # type: ignore[no-untyped-def]
+def _audit(text: str, name: str, locale: str = "es"):
     inputs = build_inputs(
         None,
         DeclaredMetadata(locale=locale),
@@ -42,7 +42,7 @@ def _audit(text: str, name: str, locale: str = "es"):  # type: ignore[no-untyped
     return run_audit(inputs, bootstrap_samples=200)
 
 
-def _mt4(*, model: str = EVERY_TICK, quality: str = "90.00%", window: str = MT4_WINDOW):  # type: ignore[no-untyped-def]
+def _mt4(*, model: str = EVERY_TICK, quality: str = "90.00%", window: str = MT4_WINDOW):
     text = (
         MT4.replace(EVERY_TICK, model)
         .replace(QUALITY, f"<td align=right>{quality}</td>")
@@ -51,7 +51,7 @@ def _mt4(*, model: str = EVERY_TICK, quality: str = "90.00%", window: str = MT4_
     return _audit(text, "StrategyTester.htm")
 
 
-def _flags(result) -> dict[str, list[str]]:  # type: ignore[no-untyped-def]
+def _flags(result) -> dict[str, list[str]]:
     found: dict[str, list[str]] = {}
     for flag in result.red_flags:
         found.setdefault(flag["code"], []).append(flag["severity"])

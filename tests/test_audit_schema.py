@@ -233,7 +233,7 @@ def test_declared_metadata_normalises_oos_start_to_utc() -> None:
     with pytest.raises(ValueError):
         DeclaredMetadata(trials=0)
     with pytest.raises(ValueError):
-        DeclaredMetadata(locale="fr")  # type: ignore[arg-type]
+        DeclaredMetadata(locale="fr")
 
 
 def test_build_inputs_hashes_every_file() -> None:

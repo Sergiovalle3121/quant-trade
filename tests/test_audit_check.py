@@ -30,7 +30,7 @@ def _upload(client: TestClient) -> tuple[str, str]:
     return audit_id, query
 
 
-def _check(client: TestClient, content: bytes, path: str = "/comprobar", name: str = "r.json"):  # type: ignore[no-untyped-def]
+def _check(client: TestClient, content: bytes, path: str = "/comprobar", name: str = "r.json"):
     return client.post(path, files={"report": (name, content, "application/octet-stream")})
 
 
@@ -207,7 +207,7 @@ def test_a_streamed_oversized_check_is_cut_off(tmp_path: Path) -> None:
     client, _ = _client(tmp_path)
     limit = check_body_limit()
 
-    def chunks():  # type: ignore[no-untyped-def]
+    def chunks():
         sent = 0
         while sent <= limit:
             yield b"x" * (1 << 20)

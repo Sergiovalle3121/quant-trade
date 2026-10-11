@@ -17,7 +17,7 @@ from quant_trade.carry.panel_backfill import run_panel_backfill
 SPOT = Path("tests/fixtures/bybit_kline_spot.json")
 SINCE, UNTIL = 1784505600000, 1784649600000
 
-FIXTURES = {
+FIXTURES: dict[str, str | Path] = {
     "spot": "tests/fixtures/bybit_kline_spot.json",
     "perp": "tests/fixtures/bybit_kline_perp.json",
     "mark": "tests/fixtures/bybit_kline_mark.json",

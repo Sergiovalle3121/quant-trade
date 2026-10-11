@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import replace
 from html import escape
 
@@ -17,6 +18,10 @@ from quant_trade.audit.i18n import untranslated
 from quant_trade.audit.market import CASH, LOCAL_CASH, SERIES, MarketData, parse_rates
 from quant_trade.audit.report import LABELS, render
 from quant_trade.audit.schema import AuditInputs, DeclaredMetadata, build_inputs
+
+
+def _reply(text: str) -> Callable[[str], str]:
+    return lambda _series: text
 
 
 def _curve(days: pd.DatetimeIndex, returns: np.ndarray) -> pd.DataFrame:
@@ -383,7 +388,7 @@ def test_each_new_source_is_read_in_its_own_shape() -> None:
         ("cash_eur_mro_bid", ECB_MRR_MBR),
         ("cash_jpy", _bis("JP", [("2026-07", "1"), ("2026-08", "1")])),
     ):
-        data = MarketData(lambda series, text=text: text)
+        data = MarketData(_reply(text))
         assert data.refresh(key) is True, key
 
 
@@ -392,7 +397,7 @@ def test_a_broken_reply_from_a_new_source_is_refused() -> None:
     other = _bis("BR", [("2026-07", "14.25"), ("2026-08", "14")])
     blank = _bis("CH", [("2026-07", "0"), ("2026-08", "NaN")])
     for text in (twice, other, blank, "<html>busy</html>"):
-        assert MarketData(lambda series, text=text: text).refresh("cash_mxn") is False
+        assert MarketData(_reply(text)).refresh("cash_mxn") is False
     # Each ECB series refuses a reply for another one (the fixed rate for the
     # deposit rate, the minimum bid for the fixed rate), a repeated day and a blank.
     for key, text in (
@@ -401,7 +406,7 @@ def test_a_broken_reply_from_a_new_source_is_refused() -> None:
         ("cash_eur_mro_bid", ECB_MRR_MBR.replace("2008-10-13", "2008-10-14")),
         ("cash_eur_mro", ECB_MRR_FR.replace("2008-10-16,3.75", "2008-10-16,")),
     ):
-        assert MarketData(lambda series, text=text: text).refresh(key) is False, key
+        assert MarketData(_reply(text)).refresh(key) is False, key
     unreadable = BOC_CORRA.replace('"2026-09-23","2.2900"', '"2026-09-23","n/a"')
     assert MarketData(lambda series: unreadable).refresh("cash_cad") is False
     with pytest.raises(ValueError):

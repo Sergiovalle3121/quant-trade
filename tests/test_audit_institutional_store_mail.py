@@ -33,7 +33,7 @@ def _settings(tmp_path: Path) -> AuditSettings:
 
 
 def _request(store: Store, **overrides: Any) -> str:
-    fields = {
+    fields: dict[str, Any] = {
         "name": "Ana Ejemplo",
         "organization": "Ejemplo Capital",
         "email": "prospect@example.com",

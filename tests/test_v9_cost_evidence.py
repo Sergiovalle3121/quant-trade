@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -26,7 +27,7 @@ NOW = "2026-07-28T00:00:00Z"
 
 
 def _schedule(**overrides) -> FeeSchedule:
-    payload = {
+    payload: dict[str, Any] = {
         "venue": "bybit",
         "instrument": "BTCUSDT",
         "leg": "spot",

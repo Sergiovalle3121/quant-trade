@@ -157,6 +157,7 @@ def test_the_sample_report_shows_a_live_account() -> None:
     assert result.live["pairing"]["matched"]["value"] >= 50
     assert not result.live["pairing"]["low_match"]
     # Its money: a top-up during a losing stretch, a withdrawal, an open position.
+    assert result.account is not None
     assert result.account["source"] == "live" and result.account["top_ups"]["value"] == 1
     assert result.account["withdrawals"]["count"]["value"] == 1
     assert result.account["floating_pnl"]["value"] < 0
@@ -200,7 +201,7 @@ def test_a_live_statement_is_uploaded_stored_and_shown(tmp_path: Path) -> None:
     assert body["live"]["status"] == "MEASURED"
     assert body["live"]["live"]["trades"]["value"] == 40
     assert "live.html" in body["inputs"]["digests"]
-    record = client.app.state.store.get_audit(audit_id, with_blobs=True)  # type: ignore[attr-defined]
+    record = client.app.state.store.get_audit(audit_id, with_blobs=True)
     assert set(record.files) == {"report.html", "live.html"}
 
 

@@ -107,7 +107,7 @@ def test_every_label_passes_the_guard() -> None:
                 assert find_claims(text) == [], text
 
 
-def _inputs(locale: str):  # type: ignore[no-untyped-def]
+def _inputs(locale: str):
     rng = np.random.default_rng(12)
     returns = rng.normal(0.0008, 0.006, 1200)
     curve = pd.DataFrame(

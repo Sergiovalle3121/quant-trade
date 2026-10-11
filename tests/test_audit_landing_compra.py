@@ -12,6 +12,7 @@ import html
 import re
 from dataclasses import replace
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -91,7 +92,7 @@ def _first_section(page: str) -> str:
 
 
 def _paid_landing(locale: str, **extra: object) -> str:
-    values: dict[str, object] = {
+    values: dict[str, Any] = {
         "locale": locale,
         "free_mode": False,
         "price_usd": 29.0,
@@ -103,7 +104,7 @@ def _paid_landing(locale: str, **extra: object) -> str:
         "completed_audits": 1234,
     }
     values.update(extra)
-    return landing(**values)  # type: ignore[arg-type]
+    return landing(**values)
 
 
 @pytest.fixture

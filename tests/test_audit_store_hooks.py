@@ -11,6 +11,7 @@ import os
 import secrets
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import Any, cast
 
 import pytest
 
@@ -18,22 +19,32 @@ from quant_trade.audit import forensics_web, store_hooks, track_seal_pages
 from quant_trade.audit.settings import AuditSettings
 from quant_trade.audit.store import VIA_UPLOAD, Store, make_store
 
+
+class HookStore(Store):
+    """Tables installed dynamically by the track-record hooks."""
+
+    track_seals: Any
+    track_seal_uploads: Any
+    track_seal_events: Any
+    track_seal_quota: Any
+
+
 NOW = datetime(2026, 9, 26, 12, 0, tzinfo=UTC)
 PG_URL = os.environ.get("RIGOR_TEST_PG_URL", "")
 BACKENDS = ["sqlite", "postgresql"] if PG_URL else ["sqlite"]
 
 
 @pytest.fixture(params=BACKENDS)
-def store(request: pytest.FixtureRequest, tmp_path: Path) -> Store:
+def store(request: pytest.FixtureRequest, tmp_path: Path) -> HookStore:
     if request.param == "sqlite":
-        return make_store(f"sqlite:///{tmp_path}/audit.db")
-    built = make_store(PG_URL)
+        return cast(HookStore, make_store(f"sqlite:///{tmp_path}/audit.db"))
+    built = cast(HookStore, make_store(PG_URL))
     built.metadata.drop_all(built.engine)
     built.metadata.create_all(built.engine)
     return built
 
 
-def _create(store: Store, audit_id: str, *, at: datetime = NOW) -> None:
+def _create(store: HookStore, audit_id: str, *, at: datetime = NOW) -> None:
     store.create_audit(
         audit_id=audit_id,
         created_at=at,
@@ -48,14 +59,14 @@ def _create(store: Store, audit_id: str, *, at: datetime = NOW) -> None:
     )
 
 
-def _account(store: Store, email: str) -> str:
+def _account(store: HookStore, email: str) -> str:
     account = store.create_account(email=email, password_hash="x", locale="es", at=NOW)
     assert account is not None
     return account.id
 
 
 def _seal(
-    store: Store,
+    store: HookStore,
     account_id: str | None,
     *,
     audit_id: str | None = None,
@@ -115,7 +126,7 @@ def _seal(
     return seal_id
 
 
-def _count(store: Store, table, **where) -> int:
+def _count(store: HookStore, table, **where) -> int:
     sa = store._sa
     query = sa.select(sa.func.count()).select_from(table)
     for key, value in where.items():
@@ -124,7 +135,7 @@ def _count(store: Store, table, **where) -> int:
         return int(conn.execute(query).scalar() or 0)
 
 
-def _seal_row(store: Store, seal_id: str):
+def _seal_row(store: HookStore, seal_id: str):
     with store.engine.connect() as conn:
         return (
             conn.execute(
@@ -135,7 +146,7 @@ def _seal_row(store: Store, seal_id: str):
         )
 
 
-def test_tables_exist_and_start_empty(store: Store) -> None:
+def test_tables_exist_and_start_empty(store: HookStore) -> None:
     for table in (
         store.track_seals,
         store.track_seal_uploads,
@@ -148,7 +159,7 @@ def test_tables_exist_and_start_empty(store: Store) -> None:
     assert not any("account_number" in column.name for column in store.track_seals.columns)
 
 
-def test_delete_export_and_purge_unchanged_while_empty(store: Store) -> None:
+def test_delete_export_and_purge_unchanged_while_empty(store: HookStore) -> None:
     account_id = _account(store, "a@example.com")
     _create(store, "own")
     _create(store, "old", at=NOW - timedelta(days=40))
@@ -167,7 +178,7 @@ def test_delete_export_and_purge_unchanged_while_empty(store: Store) -> None:
     assert store.get_audit("mine") is None
 
 
-def test_deleting_a_linked_report_ends_the_seal_with_an_event(store: Store) -> None:
+def test_deleting_a_linked_report_ends_the_seal_with_an_event(store: HookStore) -> None:
     account_id = _account(store, "b@example.com")
     _create(store, "link")
     seal_id = _seal(store, account_id, audit_id="link")
@@ -187,7 +198,7 @@ def test_deleting_a_linked_report_ends_the_seal_with_an_event(store: Store) -> N
         assert store_hooks.end_seals(store, conn, [seal_id], reason="holder", now=NOW) == []
 
 
-def test_deleting_the_account_withdraws_its_seals(store: Store) -> None:
+def test_deleting_the_account_withdraws_its_seals(store: HookStore) -> None:
     account_id = _account(store, "c@example.com")
     stranger = _account(store, "d@example.com")
     public = _seal(store, account_id, published_since="2026-09-02T00:00:00Z")
@@ -211,7 +222,7 @@ def test_deleting_the_account_withdraws_its_seals(store: Store) -> None:
     assert _count(store, store.track_seal_uploads, seal_id=theirs) == 1
 
 
-def test_purge_drops_only_ended_unpublished_seals_past_the_window(store: Store) -> None:
+def test_purge_drops_only_ended_unpublished_seals_past_the_window(store: HookStore) -> None:
     account_id = _account(store, "e@example.com")
     stale = _seal(
         store, account_id, status=store_hooks.STATUS_ENDED, ended_at="2026-07-01T00:00:00Z"
@@ -242,7 +253,7 @@ def test_purge_drops_only_ended_unpublished_seals_past_the_window(store: Store) 
     assert _seal_row(store, stale2) is not None
 
 
-def test_export_lists_the_seals_without_files(store: Store) -> None:
+def test_export_lists_the_seals_without_files(store: HookStore) -> None:
     account_id = _account(store, "f@example.com")
     _create(store, "src")
     seal_id = _seal(store, account_id, audit_id="src")

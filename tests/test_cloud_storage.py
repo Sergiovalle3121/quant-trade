@@ -36,6 +36,7 @@ def test_s3_mocked_read_write():
     c = C()
     st = S3StorageBackend(c)
     st.write_json("s3://b/k.json", {"x": 2})
+    assert c.put is not None
     assert c.put["Bucket"] == "b"
     assert st.read_json("s3://b/k.json")["ok"] is True
 

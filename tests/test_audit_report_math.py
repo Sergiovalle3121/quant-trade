@@ -7,6 +7,7 @@ import html
 import re
 from datetime import UTC, datetime
 from functools import cache
+from typing import Any
 
 import pytest
 from audit_fixtures import benchmark_lower_drift, csv_bytes, positive_drift, trades_following
@@ -54,7 +55,7 @@ def test_the_report_shows_the_trade_ranges_and_the_alpha(locale: str) -> None:
 
 def test_a_range_across_break_even_says_so() -> None:
     labels = report.LABELS["es"]
-    ranges = {
+    ranges: dict[str, Any] = {
         "status": "MEASURED",
         "trades": 40,
         "win_rate": {"low": measured(0.4), "high": measured(0.6)},
@@ -86,7 +87,7 @@ def test_a_range_across_break_even_says_so() -> None:
 @pytest.mark.parametrize("locale", LOCALES)
 def test_a_range_wholly_below_break_even_says_so(locale: str) -> None:
     labels = report.LABELS[locale]
-    ranges = {
+    ranges: dict[str, Any] = {
         "status": "MEASURED",
         "trades": 60,
         "win_rate": {"low": measured(0.2), "high": measured(0.35)},

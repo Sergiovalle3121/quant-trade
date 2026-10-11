@@ -12,7 +12,7 @@ import hashlib
 import json
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import pytest
 
@@ -42,22 +42,31 @@ FIXTURE_SYMBOLS = ("eurusd", "xauusd")
 FIXTURE_TICKETS = ("1000001", "1000002", "1000003", "1000005", "1000006", "1000007")
 
 
+class _TrackStore(Store):
+    """Tables attached dynamically by the track-record store hooks."""
+
+    track_seals: Any
+    track_seal_uploads: Any
+    track_seal_events: Any
+    track_seal_quota: Any
+
+
 def _bytes(name: str) -> bytes:
     return (FIXTURES / name).read_bytes()
 
 
-def _store(tmp_path: Path) -> Store:
-    return make_store(f"sqlite:///{tmp_path}/audit.db")
+def _store(tmp_path: Path) -> _TrackStore:
+    return cast(_TrackStore, make_store(f"sqlite:///{tmp_path}/audit.db"))
 
 
-def _account(store: Store, email: str = "holder@example.com") -> str:
+def _account(store: _TrackStore, email: str = "holder@example.com") -> str:
     account = store.create_account(email=email, password_hash="x", locale="es", at=T1)
     assert account is not None
     return account.id
 
 
 def _audit(
-    store: Store,
+    store: _TrackStore,
     account_id: str | None,
     audit_id: str,
     data: bytes,
@@ -96,7 +105,7 @@ def _audit(
     return audit_id
 
 
-def _monthly_audit(store: Store, account_id: str, audit_id: str, csv: bytes) -> str:
+def _monthly_audit(store: _TrackStore, account_id: str, audit_id: str, csv: bytes) -> str:
     result = {"audit_id": audit_id, "inputs": {"source": "equity"}, "verdict": {"overall": "C"}}
     store.create_audit(
         audit_id=audit_id,
@@ -115,7 +124,7 @@ def _monthly_audit(store: Store, account_id: str, audit_id: str, csv: bytes) -> 
     return audit_id
 
 
-def _rows(store: Store, table: Any, **where: object) -> list[dict[str, Any]]:
+def _rows(store: _TrackStore, table: Any, **where: object) -> list[dict[str, Any]]:
     sa = store._sa
     query = sa.select(table)
     for key, value in where.items():
@@ -124,7 +133,7 @@ def _rows(store: Store, table: Any, **where: object) -> list[dict[str, Any]]:
         return [dict(row) for row in conn.execute(query).mappings().all()]
 
 
-def _seal(store: Store, seal_id: str) -> dict[str, Any]:
+def _seal(store: _TrackStore, seal_id: str) -> dict[str, Any]:
     (row,) = _rows(store, store.track_seals, id=seal_id)
     return row
 
@@ -165,7 +174,7 @@ def _long_mt4() -> bytes:
     return data
 
 
-def _open_cut1(store: Store, account_id: str) -> tuple[str, service.Opened]:
+def _open_cut1(store: _TrackStore, account_id: str) -> tuple[str, service.Opened]:
     audit_id = _audit(
         store, account_id, "opening-report", edit.cut_statement(_bytes(MT4), keep_to=D1)
     )
@@ -460,7 +469,8 @@ def test_refusals_of_an_upload_write_nothing(tmp_path: Path) -> None:
         "unpaid"
     )
     stranger = _account(store, "other@example.com")
-    assert attempt(full and _audit(store, stranger, "theirs", full), who=stranger) == (
+    assert full
+    assert attempt(_audit(store, stranger, "theirs", full), who=stranger) == (
         track_seal.Refusal("record_not_open")
     )
     assert attempt("missing", seal_id="nope") == track_seal.Refusal("record_not_open")

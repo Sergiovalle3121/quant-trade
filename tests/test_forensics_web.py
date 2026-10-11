@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import pytest
@@ -30,7 +31,7 @@ from quant_trade.audit.web import create_app  # noqa: E402
 
 FIXTURES = Path(__file__).parent / "fixtures" / "audit_imports"
 MT4 = FIXTURES / "mt4_statement.htm"
-STRIPE = {
+STRIPE: dict[str, Any] = {
     "stripe_secret_key": "sk_live_x",
     "stripe_webhook_secret": "whsec_test",
     "stripe_price_id": "price_x",

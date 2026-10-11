@@ -6,6 +6,7 @@ from __future__ import annotations
 import re
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -55,7 +56,7 @@ def _kinds(warnings: list[str]) -> set[str]:
 ALLOWED_NEW = _kinds([INITIAL_NOTE, OPEN_NOTE])
 
 
-def _new_kinds(cut: bytes, full: bytes, **kwargs: float) -> set[str]:
+def _new_kinds(cut: bytes, full: bytes, **kwargs: Any) -> set[str]:
     before = importers.import_report(full)
     after = importers.import_report(cut, **kwargs)
     return _kinds(after.warnings) - _kinds(before.warnings)

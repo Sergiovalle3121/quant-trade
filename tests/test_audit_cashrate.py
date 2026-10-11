@@ -123,7 +123,11 @@ def test_the_discount_rate_becomes_the_bills_annual_yield() -> None:
 def test_a_rate_reply_out_of_range_counts_as_unavailable() -> None:
     for bad in ("99999", "1e300"):
         text = f"DATE,DTB3\n2024-01-02,5.1\n2024-01-03,{bad}\n2024-01-04,5.2\n"
-        data = MarketData(lambda series, text=text: text)
+
+        def reply(series: str, text: str = text) -> str:
+            return text
+
+        data = MarketData(reply)
         assert data.refresh("tbill3m") is False and data.closes("tbill3m") is None
     good = MarketData(lambda series: "DATE,DTB3\n2024-01-02,5.1\n2024-01-03,5.2\n")
     assert good.refresh("tbill3m") is True

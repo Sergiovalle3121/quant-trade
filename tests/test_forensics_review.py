@@ -232,6 +232,7 @@ def test_monthly_review_runs_without_rows() -> None:
 
 def test_frozen_modules_are_pinned_to_the_method_version() -> None:
     """Changing a threshold or a calibration cell is changing the method."""
+    assert review_module.__file__ is not None
     package = Path(review_module.__file__).parent
     pins = {
         "forensics-1": (

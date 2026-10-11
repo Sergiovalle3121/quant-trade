@@ -25,7 +25,7 @@ from quant_trade.audit.store import account_order_ref, make_store  # noqa: E402
 from quant_trade.audit.web import create_app, sign_stripe_payload  # noqa: E402
 
 WEBHOOK_SECRET = "whsec_test"
-SELLING = {
+SELLING: dict[str, Any] = {
     "stripe_secret_key": "sk_live_x",
     "stripe_webhook_secret": WEBHOOK_SECRET,
     "free_mode": False,
@@ -347,7 +347,7 @@ def test_only_open_unexpired_orders_of_the_same_purchase_are_superseded(
     now = datetime(2026, 9, 25, tzinfo=UTC)
     account = "ab" * 16
     ref = account_order_ref(account)
-    kwargs = {"account_id": account, "amount_cents": 2900, "currency": "usd"}
+    kwargs: dict[str, Any] = {"account_id": account, "amount_cents": 2900, "currency": "usd"}
 
     def opened(locale: str, sid: str, *, plan: str = PLAN_SINGLE, at: datetime = now) -> str:
         order = store.reserve_checkout(ref, plan=plan, at=at, locale=locale, **kwargs)
@@ -376,6 +376,7 @@ def test_only_open_unexpired_orders_of_the_same_purchase_are_superseded(
     assert store.mark_checkout_expired(es, session_id="cs_live_es", at=now)
     assert store.superseded_checkouts(en, at=now) == []
     marked = store.get_checkout_order(es)
+    assert marked is not None
     assert marked.status == "open" and marked.session_id == "cs_live_es"
     assert marked.checkout_url  # the funnel still counts the started checkout
     # The Spanish slot rotates to a new order instead of reusing the expired one.
@@ -387,7 +388,12 @@ def test_a_slow_older_request_never_supersedes_the_newer_session(tmp_path: Path)
     now = datetime(2026, 9, 25, tzinfo=UTC)
     account = "ab" * 16
     ref = account_order_ref(account)
-    kwargs = {"account_id": account, "plan": PLAN_SINGLE, "amount_cents": 2900, "currency": "usd"}
+    kwargs: dict[str, Any] = {
+        "account_id": account,
+        "plan": PLAN_SINGLE,
+        "amount_cents": 2900,
+        "currency": "usd",
+    }
     # Spanish is reserved first, but Stripe answers it after the English one.
     slow = store.reserve_checkout(ref, at=now, locale="es", **kwargs)
     later = now + timedelta(seconds=2)
@@ -411,7 +417,12 @@ def test_a_refused_permission_leaves_the_old_session_open(tmp_path: Path) -> Non
     now = datetime(2026, 9, 25, tzinfo=UTC)
     account = "ab" * 16
     ref = account_order_ref(account)
-    kwargs = {"account_id": account, "plan": PLAN_SINGLE, "amount_cents": 2900, "currency": "usd"}
+    kwargs: dict[str, Any] = {
+        "account_id": account,
+        "plan": PLAN_SINGLE,
+        "amount_cents": 2900,
+        "currency": "usd",
+    }
     orders = []
     for locale in ("es", "en"):
         order = store.reserve_checkout(ref, at=now, locale=locale, **kwargs)
@@ -423,16 +434,23 @@ def test_a_refused_permission_leaves_the_old_session_open(tmp_path: Path) -> Non
         )
         orders.append(order.id)
     calls: list[str] = []
+
+    def expire(cfg: AuditSettings, sid: str) -> dict[str, str]:
+        calls.append(sid)
+        return {"id": sid, "status": "expired"}
+
     done = payments.expire_superseded(
         store,
         settings,
         orders[1],
-        expirer=lambda cfg, sid: calls.append(sid) or {"id": sid, "status": "expired"},
+        expirer=expire,
         at=now,
         allowed=lambda: False,
     )
     assert done == 0 and calls == []
-    assert store.get_checkout_order(orders[0]).resolution == ""
+    kept = store.get_checkout_order(orders[0])
+    assert kept is not None
+    assert kept.resolution == ""
     assert store.reserve_checkout(ref, at=now, locale="es", **kwargs).id == orders[0]
 
 
@@ -445,11 +463,16 @@ def test_expire_superseded_never_raises(tmp_path: Path) -> None:
 
     store.superseded_checkouts = broken  # type: ignore[method-assign]
     calls: list[str] = []
+
+    def expire(cfg: AuditSettings, sid: str) -> dict[str, str]:
+        calls.append(sid)
+        return {}
+
     done = payments.expire_superseded(
         store,
         settings,
         "0" * 32,
-        expirer=lambda cfg, sid: calls.append(sid) or {},
+        expirer=expire,
         at=datetime(2026, 9, 25, tzinfo=UTC),
     )
     assert done == 0 and calls == []
@@ -459,7 +482,9 @@ def test_the_expire_call_is_one_post_to_stripes_expire_endpoint(tmp_path: Path) 
     stripe = pytest.importorskip("stripe")
     seen: list[tuple[str, str, Any]] = []
 
-    class Recorder(stripe.HTTPClient):
+    http_client: Any = stripe.HTTPClient
+
+    class Recorder(http_client):
         name = "recorder"
 
         def request(self, method: str, url: str, headers: Any, post_data: Any = None) -> Any:
@@ -627,7 +652,12 @@ def test_a_card_check_in_another_language_expires_nothing(tmp_path: Path) -> Non
 
     app, store, fake = _app(tmp_path)
     expired: list[str] = []
-    app.state.session_expirer = lambda cfg, sid: expired.append(sid) or {}
+
+    def expire(cfg: AuditSettings, sid: str) -> dict[str, str]:
+        expired.append(sid)
+        return {}
+
+    app.state.session_expirer = expire
     client, _ = _shared_browser(app, store)
     audit_id, token, location = upload_preview(client, 2)
     csrf = _CSRF.findall(client.get(location).text)[-1]

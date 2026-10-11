@@ -214,7 +214,7 @@ def test_signed_sandbox_sale_and_refund_are_visible_but_excluded_from_commercial
     tmp_path: Path,
 ) -> None:
     database_url = f"sqlite:///{tmp_path}/sandbox.db"
-    common = dict(
+    common: dict[str, Any] = dict(
         database_url=database_url,
         base_url="https://rigor.example",
         stripe_secret_key="sk_test_example",
@@ -226,7 +226,7 @@ def test_signed_sandbox_sale_and_refund_are_visible_but_excluded_from_commercial
     setup = AuditSettings(**common)
     setup_client = signed_in(TestClient(create_app(setup, make_store(database_url))))
     audit_id = _upload(setup_client)
-    listed = AuditSettings(**common, stripe_test_audits={audit_id})
+    listed = AuditSettings(**common, stripe_test_audits=frozenset({audit_id}))
     client = signed_in(TestClient(create_app(listed, make_store(database_url))))
     _paid(client, audit_id, pi="pi_sandbox", sid="cs_sandbox", livemode=False)
     assert (

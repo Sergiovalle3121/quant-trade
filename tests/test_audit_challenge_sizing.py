@@ -152,6 +152,7 @@ def test_one_row_per_size_with_the_ladder_program(audited: tuple[Any, AuditResul
     assert sizing["status"] == "MEASURED" and sizing["note"] == SIZING_NOTE
     assert [row["key"] for row in sizing["rows"]] == SIZES
     assert [row["multiplier"] for row in sizing["rows"]] == list(SIZING_MULTIPLIERS)
+    assert result.challenge is not None
     assert sizing["program"] == result.challenge["scenarios"]["program"]
     for row in sizing["rows"]:
         assert all(row[key]["evidence"] == "MEASURED" for key in OUTCOMES)

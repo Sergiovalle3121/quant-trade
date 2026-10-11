@@ -8,6 +8,7 @@ import socket
 from collections.abc import Iterator
 from dataclasses import dataclass, field
 from html.parser import HTMLParser
+from typing import Any
 from urllib.parse import urldefrag, urljoin, urlsplit
 from xml.etree import ElementTree
 
@@ -131,7 +132,7 @@ def public_site(tmp_path_factory: pytest.TempPathFactory) -> Iterator[PublicSite
         assert isinstance(address, tuple) and address[0] in {"127.0.0.1", "::1"}, address
         return original_connect(connection, address)
 
-    def local_getaddrinfo(host: str, *args: object, **kwargs: object) -> list:
+    def local_getaddrinfo(host: str, *args: Any, **kwargs: Any) -> list:
         assert host in {"localhost", "127.0.0.1", "::1"}, host
         return original_getaddrinfo(host, *args, **kwargs)
 

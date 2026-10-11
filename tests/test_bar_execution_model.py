@@ -1,3 +1,5 @@
+from typing import Any
+
 import pytest
 
 from quant_trade.execution.bar_model import (
@@ -10,7 +12,7 @@ from quant_trade.execution.bar_model import (
 
 
 def _order(**overrides) -> BarOrderState:
-    values = {
+    values: dict[str, Any] = {
         "order_id": "o-1",
         "symbol": "SPY",
         "signed_quantity": 100.0,

@@ -11,7 +11,7 @@ from quant_trade.paper.models import PaperOrder
 def test_maps_buy_and_sell() -> None:
     cfg = BrokerConfig(universe=["SPY"])
     for side in ("buy", "sell"):
-        req = paper_order_to_broker_order_request(PaperOrder("1", "t", "SPY", side, 1.5), cfg)  # type: ignore[arg-type]
+        req = paper_order_to_broker_order_request(PaperOrder("1", "t", "SPY", side, 1.5), cfg)
         assert req.side == side
         assert req.symbol == "SPY"
 

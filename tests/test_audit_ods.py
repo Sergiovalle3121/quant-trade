@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import io
 import zipfile
+from collections.abc import Sequence
 
 import pytest
 
@@ -46,7 +47,7 @@ def _cell(value: object) -> str:
     )
 
 
-def _ods(rows: list[list[object]], *, tail: str = "", name: str = "Hoja1") -> bytes:
+def _ods(rows: Sequence[Sequence[object]], *, tail: str = "", name: str = "Hoja1") -> bytes:
     body = "".join(
         "<table:table-row>" + "".join(map(_cell, row)) + "</table:table-row>" for row in rows
     )
@@ -88,7 +89,9 @@ def _trade(day: int, close: float) -> list[object]:
 
 
 def test_a_trade_list_saved_as_ods_is_read_like_a_workbook() -> None:
-    rows = [HEADER, *(_trade(day, 1.101 if day % 2 else 1.0995) for day in range(2, 12))]
+    rows: list[Sequence[object]] = [
+        HEADER, *(_trade(day, 1.101 if day % 2 else 1.0995) for day in range(2, 12))
+    ]
     data = _ods(rows, tail=EDGE)
     assert unwrap(data) == data
     assert detect_format(data) is not None
@@ -138,7 +141,7 @@ def test_a_repeated_row_past_the_cell_limit_is_refused() -> None:
 
 
 def test_the_column_screen_offers_an_ods_sheet() -> None:
-    rows = [
+    rows: list[Sequence[object]] = [
         ["Fecha", "Resultado", "Nota"],
         *([f"2026-01-{d:02d}", d - 10, "x"] for d in range(2, 20)),
     ]

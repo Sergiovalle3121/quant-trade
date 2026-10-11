@@ -225,6 +225,7 @@ def test_a_swap_credit_counts_in_the_net_result() -> None:
 
     data = fixture("mt5_tester.html").encode("utf-8")
     inputs = build_inputs(None, DeclaredMetadata(), report_bytes=data, report_filename="r.html")
+    assert inputs.trades is not None
     gross_sum = sum(trade.pnl for trade in inputs.trades.trades)
     # Swap paid to the account (positive) raises the net result, as MetaTrader shows it.
     credited = replace(inputs, reported_fees={"commission": 0.0, "swap": 1.7})

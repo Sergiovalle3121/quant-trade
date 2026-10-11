@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Literal, cast
 
 import numpy as np
 import pytest
@@ -257,7 +258,7 @@ def test_undeclared_trials_read_as_the_most_favourable_case() -> None:
         text = summary(
             result.verdict.dimensions,
             result.verdict.overall,
-            locale=locale,
+            locale=cast(Literal["es", "en", "pt"], locale),
             trials=1,
             trials_evidence="NOT_MEASURED",
         )

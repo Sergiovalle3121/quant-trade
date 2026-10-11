@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from quant_trade.carry.cross_venue import (
@@ -80,7 +82,7 @@ def test_scanner_runs_h3_on_two_panels_and_stays_test_only(tmp_path):
     from quant_trade.carry.panel_backfill import run_panel_backfill
     from quant_trade.opportunities.trading_scan import scan_trading_opportunities
 
-    fixtures = {
+    fixtures: dict[str, str | Path] = {
         "spot": "tests/fixtures/bybit_kline_spot.json",
         "perp": "tests/fixtures/bybit_kline_perp.json",
         "mark": "tests/fixtures/bybit_kline_mark.json",

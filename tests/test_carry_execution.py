@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from quant_trade.carry.execution import (
     FillStep,
     TwoLegPlan,
@@ -11,7 +13,7 @@ from quant_trade.carry.execution import (
 
 
 def _plan(**overrides) -> TwoLegPlan:
-    base = dict(
+    base: dict[str, Any] = dict(
         symbol="BTC",
         exchange="venue",
         spot_target_qty=1.0,

@@ -65,7 +65,7 @@ def _plateau(fast: int, slow: int) -> float:
     return 800.0 - 10 * abs(fast - 12) - 3 * abs(slow - 48)
 
 
-def _review(profit: Callable[[int, int], float], inputs: str | None = "FastMA=12; SlowMA=48"):  # type: ignore[no-untyped-def]
+def _review(profit: Callable[[int, int], float], inputs: str | None = "FastMA=12; SlowMA=48"):
     summary = parse_optimization(_export(profit))
     return parameter_stability(summary.table, summary.parameters, report_inputs=inputs)
 

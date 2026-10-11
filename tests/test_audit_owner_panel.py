@@ -145,7 +145,7 @@ METHODS = ("GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS")
 
 
 def _answer(client: TestClient, method: str, path: str, **kwargs: object) -> tuple[object, ...]:
-    response = client.request(method, path, **kwargs)  # type: ignore[arg-type]
+    response = client.request(method, path, **kwargs)
     return response.status_code, response.content, sorted(response.headers.items())
 
 
@@ -316,7 +316,7 @@ def test_with_a_key_the_recorded_limits_are_the_only_tells(tmp_path: Path) -> No
 def test_only_the_panel_uses_the_first_segment_of_its_path(tmp_path: Path, panel_path: str) -> None:
     client, _ = _client(tmp_path, panel_path=panel_path)
     first = panel_path.split("/")[1].lower()
-    paths = [str(getattr(route, "path", "")) for route in client.app.routes]  # type: ignore[attr-defined]
+    paths = [str(getattr(route, "path", "")) for route in client.app.routes]
     shared = {path for path in paths if path.lower().split("/")[1:2] == [first]}
     assert shared == {panel_path, panel_path + "/public-card"}
 
