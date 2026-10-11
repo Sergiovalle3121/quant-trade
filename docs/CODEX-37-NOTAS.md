@@ -34,12 +34,48 @@ externas durante esta tarea.
 
 - **Comprobación de informes:** la herramienta solo calcula una huella al recibir
   un archivo por POST y compararla con el registro de archivos emitidos. No existe
-  un parámetro de consulta que reproduzca una comprobación. La tarjeta explica
-  que hace falta elegir el archivo y abre el formulario existente; no presenta
-  una coincidencia ficticia ni un resultado calculado. Esta parte de la petición
-  no puede reproducirse mediante los enlaces existentes.
+  un parámetro de consulta que reproduzca una comprobación. El caso público es el
+  PDF de ejemplo (`/ejemplo.pdf`, `/sample.pdf`, `/pt/exemplo.pdf`): el servicio
+  lo registra como informe de ejemplo al generarlo y `/comprobar` responde «Es el
+  informe de ejemplo de Rigor, sin cambios». La tarjeta enlaza ese PDF y abre el
+  formulario; no presenta huella, fecha ni resultado inventados.
 - **Tabla de reglas:** el ejemplo describe el catálogo completo. Abre la tabla
   sin filtros; añadir un filtro cambiaría los conteos que se muestran.
+
+## Revisión del 11 de octubre
+
+Cambios tras la revisión de la rama (HEAD `c94c895`):
+
+- Los enlaces «Ver este ejemplo» llevan la misma consulta que `share_url`
+  pero sin `ref`: esas etiquetas (`calculadora`, `aciertos`, `reto`, `ruina`,
+  `lectura`) significan «compartida» en `/panel`, y un visitante directo que
+  pulsara el ejemplo quedaba atribuido 30 días a un compartido (cookie
+  `rigor_ref`). Un test comprueba que el enlace del hub no deja la cookie y que
+  el de compartir sí.
+- El intervalo de aciertos del hub se escribe con `articles.win_rate_interval`,
+  la misma función que la página de destino («44,6–73,7 %»), de modo que la
+  cadena del ejemplo aparece literalmente en el destino; el test ya no
+  documenta una excepción de formato.
+- El ejemplo de reto mantiene los insumos del brief (50 %, 1,5R/1R, 0,5 %,
+  3/día, FTMO 2-Step) y su 100,0 %; el texto lo presenta como resultado del
+  modelo y muestra en la misma línea las cuotas que tocan el límite diario y el
+  total (0,0 % y 0,0 %), también tomadas de `challenge_calc.compute`. Cambiar
+  el caso es decisión de Sergio; con la misma función: riesgo 1 % → 96,6 %
+  (3,4 % toca el límite total); riesgo 2 % → 28,4 % (71,6 % toca el límite
+  diario); 45 %, riesgo 1 %, 2/día → 77,5 % (22,5 % toca el límite total).
+- La tarjeta de comprobación ya no cita un «informe JSON de ejemplo» que el
+  sitio no ofrece: señala el PDF de ejemplo, lo enlaza para descargarlo y dice
+  lo que la comprobación responde al elegirlo (texto existente en `check.py`).
+- La línea «Ejemplo:» lleva `margin-top:16px` (como la lista que la precede;
+  `.article-cta p` pone los márgenes a 0), de modo que no queda pegada a «Sin
+  registro» a 375 px.
+- La nota de evidencia es la misma cadena que usa el lector
+  (`public_card.COPY["computed"]`, «Calculado a partir de lo declarado»); la
+  tabla de reglas lleva una nota propia («Contado en las reglas publicadas») y la
+  comprobación no lleva nota. La insignia Declarado se mantiene en las siete
+  tarjetas, como pedía el brief.
+- Reglas de `i18n.py` actualizadas para las notas y el texto nuevo de
+  comprobación.
 
 ## Validación
 

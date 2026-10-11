@@ -4884,10 +4884,23 @@ def tools_page(*, locale: str = "es", base_url: str = "") -> str:
 
     def example_line(key: str) -> str:
         example = examples[key]
-        note = "" if key == "check" else f" · {_e(words['example_evidence'])}"
+        if key == "check":
+            note = ""  # No figure: the card points to the sample PDF the check recognises.
+        elif key == "rules_table":
+            note = f" · {_e(words['example_count'])}"  # Counts over the preset rows.
+        else:
+            note = f" · {_e(words['example_evidence'])}"
+        download = ""
+        if example.download:
+            download = (
+                f" <a href='{_e(example.download)}' download data-tool-example-file='{key}'>"
+                f"{_e(words['example_file'])}</a>"
+            )
+        # Inline like the list above it: .article-cta p resets margins to 0.
         return (
-            f"<p data-tool-example='{key}' data-evidence='{_e(example.evidence)}'>"
-            f"<strong>{_e(words['example'])}</strong> {_e(example.text)} "
+            f"<p data-tool-example='{key}' data-evidence='{_e(example.evidence)}' "
+            f"style='margin-top:16px'>"
+            f"<strong>{_e(words['example'])}</strong> {_e(example.text)}{download} "
             f"<span class='muted'>{_badge(example.evidence, locale)}{note}</span></p>"
         )
 

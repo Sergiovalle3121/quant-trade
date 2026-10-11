@@ -7,7 +7,7 @@ import json
 import re
 from collections.abc import Iterator
 from pathlib import Path
-from urllib.parse import parse_qsl, urlsplit
+from urllib.parse import parse_qsl, urlencode, urlsplit
 
 import pytest
 
@@ -42,7 +42,7 @@ from quant_trade.audit.pages import _sample_url, audit_path, landing  # noqa: E4
 from quant_trade.audit.settings import AuditSettings  # noqa: E402
 from quant_trade.audit.store import make_store  # noqa: E402
 from quant_trade.audit.tools_hub import COPY, TOOL_KEYS, TOOLS_PATH, tools_url  # noqa: E402
-from quant_trade.audit.web import create_app  # noqa: E402
+from quant_trade.audit.web import SAMPLE_PDF_PATHS, create_app  # noqa: E402
 from quant_trade.audit.winrate import WINRATE_PATH  # noqa: E402
 
 BASE = "https://audit.example"
@@ -337,21 +337,72 @@ def test_tools_examples_have_declared_evidence_and_localized_links(
         assert "badge DECLARED" in paragraph
         assert example.text in visible
         assert COPY[locale]["example"] in visible
-        if key != "check":
+        if key == "check":
+            # No figure to compute: the card names the public sample PDF instead.
+            assert COPY[locale]["example_evidence"] not in visible
+            assert COPY[locale]["example_count"] not in visible
+        elif key == "rules_table":
+            # Counts over the preset rows, not a calculation from a declaration.
+            assert COPY[locale]["example_count"] in visible
+            assert COPY[locale]["example_evidence"] not in visible
+        else:
             assert COPY[locale]["example_evidence"] in visible
+            assert COPY[locale]["example_count"] not in visible
         assert _example_link(main, key) == example.url
+        # A click inside the site is never a share: no ref tag for /panel.
+        assert "ref" not in dict(parse_qsl(urlsplit(example.url).query))
         assert find_claims(visible) == []
         assert forbidden.search(visible) is None
         assert main.count(f"data-tool-example='{key}'") == 1
         assert main.count(f"data-tool-example-link='{key}'") == 1
+        # The line keeps the list's own gap: .article-cta p resets margins to 0.
+        assert re.search(rf"<p\b[^>]*data-tool-example='{key}'[^>]*style='margin-top:16px'>", main)
     assert main.count(COPY[locale]["example_open"]) == len(examples)
+    # The hub note is the reader's note, so /lectura and /herramientas read alike.
+    assert COPY[locale]["example_evidence"] == public_card.COPY[locale]["computed"]
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+def test_tools_example_links_carry_no_share_tag_and_set_no_ref_cookie(
+    client: TestClient, locale: str
+) -> None:
+    """The share buttons tag their links so /panel counts shares; the hub's example
+    links reuse the same query without the tag, or a direct visitor who clicks one
+    would be attributed to a share for 30 days."""
+    examples = tools_examples.examples(locale)
+    tagged = {
+        "calculator": calculator.share_url(locale, tools_examples.CALCULATOR_INPUT),
+        "winrate": winrate.share_url(locale, tools_examples.WINRATE_VALUES),
+        "challenge": challenge_calc.share_url(locale, tools_examples.CHALLENGE_INPUT),
+        "ruin": ruin_calc.share_url(locale, tools_examples.RUIN_INPUT),
+        "reading": reading.reading_url(locale, tools_examples.READING_VALUES),
+    }
+    tags = {
+        "calculator": "calculadora",
+        "winrate": winrate.SHARE_REF,
+        "challenge": challenge_calc.SHARE_REF,
+        "ruin": ruin_calc.SHARE_REF,
+        "reading": "lectura",
+    }
+    for key, share in tagged.items():
+        # Same destination and same query as the share link, minus the tag only.
+        assert share == examples[key].url + "&" + urlencode({"ref": tags[key]}), key
+    assert client.get(tools_url(locale)).status_code == 200
+    assert "rigor_ref" not in client.cookies
+    for key, example in examples.items():
+        assert client.get(example.url).status_code == 200, key
+        assert "rigor_ref" not in client.cookies, key
+    # The share link itself still tags the visit, as /panel expects.
+    assert client.get(tagged["calculator"]).status_code == 200
+    assert client.cookies.get("rigor_ref") == "calculadora"
 
 
 @pytest.mark.parametrize("locale", LOCALES)
 def test_tools_luck_example_recalculates_from_its_link(client: TestClient, locale: str) -> None:
     example = tools_examples.examples(locale)["calculator"]
-    assert example.url == calculator.share_url(locale, tools_examples.CALCULATOR_INPUT)
+    assert urlsplit(example.url).path == calculator_url(locale)
     values = dict(parse_qsl(urlsplit(example.url).query))
+    assert values == calculator.share_values(tools_examples.CALCULATOR_INPUT)
     value = calculator.read_input(
         values.get("sharpe"),
         values.get("years"),
@@ -372,21 +423,22 @@ def test_tools_luck_example_recalculates_from_its_link(client: TestClient, local
 @pytest.mark.parametrize("locale", LOCALES)
 def test_tools_winrate_example_recalculates_from_its_link(client: TestClient, locale: str) -> None:
     example = tools_examples.examples(locale)["winrate"]
-    assert example.url == winrate.share_url(locale, tools_examples.WINRATE_VALUES)
+    assert urlsplit(example.url).path == WINRATE_PATH[locale]
     values = dict(parse_qsl(urlsplit(example.url).query))
+    assert values == tools_examples.WINRATE_VALUES
     claim = winrate.parse(values, locale)
     assert claim == winrate.parse(tools_examples.WINRATE_VALUES, locale)
     interval = winrate.read(claim).interval
     assert interval is not None
+    assert claim.win_rate is not None and claim.trades is not None
+    # One string, written by the function the win-rate page itself uses.
+    expected = win_rate_interval(claim.win_rate, claim.trades, locale)
+    assert expected in example.text
+    for bound in interval:
+        assert _number(bound * 100, locale) in expected
     response = client.get(example.url)
     assert response.status_code == 200
-    result = _table(response.text, "class='calc-result'")
-    for bound in interval:
-        expected = _percent(bound, locale)
-        assert expected in example.text
-    # The destination's editorial interval places one percent sign after both bounds.
-    assert claim.win_rate is not None and claim.trades is not None
-    assert win_rate_interval(claim.win_rate, claim.trades, locale) in result
+    assert expected in _table(response.text, "class='calc-result'")
 
 
 @pytest.mark.parametrize("locale", LOCALES)
@@ -394,17 +446,21 @@ def test_tools_challenge_example_recalculates_from_its_link(
     client: TestClient, locale: str
 ) -> None:
     example = tools_examples.examples(locale)["challenge"]
-    assert example.url == challenge_calc.share_url(locale, tools_examples.CHALLENGE_INPUT)
+    assert urlsplit(example.url).path == challenge_calc.challenge_url(locale)
     values = dict(parse_qsl(urlsplit(example.url).query))
+    assert values == challenge_calc.share_values(tools_examples.CHALLENGE_INPUT)
     parsed = challenge_calc.parse(values)
     assert parsed.value == tools_examples.CHALLENGE_INPUT
     assert parsed.value is not None
     result = challenge_calc.compute(parsed.value)
-    expected = _percent(result.declared.outcome["pass"]["value"], locale)
-    assert expected in example.text
     response = client.get(example.url)
     assert response.status_code == 200
-    assert expected in _table(response.text, "class='calc-result' data-challenge-result")
+    table = _table(response.text, "class='calc-result' data-challenge-result")
+    # The model's result with its failure shares on the same line, as the page lists them.
+    for name in ("pass", "fail_daily_loss", "fail_total_loss"):
+        expected = _percent(result.declared.outcome[name]["value"], locale)
+        assert expected in example.text, name
+        assert expected in table, name
 
 
 @pytest.mark.parametrize("locale", LOCALES)
@@ -412,8 +468,9 @@ def test_tools_ruin_example_recalculates_both_rates_from_its_link(
     client: TestClient, locale: str
 ) -> None:
     example = tools_examples.examples(locale)["ruin"]
-    assert example.url == ruin_calc.share_url(locale, tools_examples.RUIN_INPUT)
+    assert urlsplit(example.url).path == ruin_calc.ruin_url(locale)
     values = dict(parse_qsl(urlsplit(example.url).query))
+    assert values == ruin_calc.share_values(tools_examples.RUIN_INPUT)
     parsed = ruin_calc.parse(values)
     assert parsed.value == tools_examples.RUIN_INPUT
     assert parsed.value is not None
@@ -434,8 +491,9 @@ def test_tools_ruin_example_recalculates_both_rates_from_its_link(
 @pytest.mark.parametrize("locale", LOCALES)
 def test_tools_reader_example_recalculates_from_its_link(client: TestClient, locale: str) -> None:
     example = tools_examples.examples(locale)["reading"]
-    assert example.url == reading.reading_url(locale, tools_examples.READING_VALUES)
+    assert urlsplit(example.url).path == reading.READING_PATH[locale]
     values = dict(parse_qsl(urlsplit(example.url).query))
+    assert values == tools_examples.READING_VALUES
     claim = reading.claim_from_query(values, locale)
     assert claim == reading.claim_from_query(tools_examples.READING_VALUES, locale)
     response = client.get(example.url)
@@ -477,9 +535,22 @@ def test_tools_check_example_opens_the_file_form_without_fabricating_a_result(
     client: TestClient, locale: str
 ) -> None:
     # Check accepts a local file by POST, so its example cannot preload a file in a GET URL.
+    # The public case is the sample PDF, which /comprobar records as the sample on
+    # first download (web._sample_pdf) and answers with check.COPY["sample"].
     example = tools_examples.examples(locale)["check"]
     assert example.url == seo.CHECK_PATH[locale]
     assert urlsplit(example.url).query == ""
+    assert example.download == SAMPLE_PDF_PATHS[locale] == tools_examples.SAMPLE_PDF_PATHS[locale]
+    assert example.download in {getattr(route, "path", "") for route in client.app.routes}
+    hub = _main(client.get(tools_url(locale)).text)
+    paragraph = _example_paragraph(hub, "check")
+    assert f"<a href='{example.download}' download data-tool-example-file='check'>" in paragraph
+    assert COPY[locale]["example_file"] in _visible_text(paragraph)
+    assert hub.count("data-tool-example-file=") == 1
+    # No invented fingerprint, date or class: the text names the file and the answer only.
+    assert re.search(r"[0-9a-f]{16,}|\d{4}-\d{2}-\d{2}|\b[A-D]\b", example.text) is None
+    for other in tools_examples.examples(locale).values():
+        assert other is example or other.download == ""
     response = client.get(example.url)
     assert response.status_code == 200
     main = _main(response.text)
@@ -520,6 +591,7 @@ def test_tools_examples_do_not_add_results_to_structured_data(
 
 def test_tools_example_notes_have_explicit_spanish_translations() -> None:
     assert localize(COPY["en"]["example_evidence"], "es") == COPY["es"]["example_evidence"]
+    assert localize(COPY["en"]["example_count"], "es") == COPY["es"]["example_count"]
     assert (
         localize(tools_examples.examples("en")["check"].text, "es")
         == tools_examples.examples("es")["check"].text

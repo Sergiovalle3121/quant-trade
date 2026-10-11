@@ -45,7 +45,10 @@ COPY: dict[str, dict[str, Any]] = {
         "open": "Abrir",
         "example": "Ejemplo:",
         "example_open": "Ver este ejemplo",
-        "example_evidence": "calculado a partir de lo declarado",
+        # The reader's own note (public_card.COPY["computed"]), so both pages read alike.
+        "example_evidence": "Calculado a partir de lo declarado",
+        "example_count": "Contado en las reglas publicadas",
+        "example_file": "Descargar el PDF de ejemplo",
         "calculator": {
             "question": (
                 "¿Cuánto de tu Sharpe podría explicar la suerte de haber probado muchas "
@@ -151,7 +154,9 @@ COPY: dict[str, dict[str, Any]] = {
         "open": "Open",
         "example": "Example:",
         "example_open": "View this example",
-        "example_evidence": "calculated from declared figures",
+        "example_evidence": "Computed from declared figures",
+        "example_count": "Counted from the published rules",
+        "example_file": "Download the sample PDF",
         "calculator": {
             "question": (
                 "How much of your Sharpe could the luck of trying many configurations explain?"
@@ -250,7 +255,9 @@ COPY: dict[str, dict[str, Any]] = {
         "open": "Abrir",
         "example": "Exemplo:",
         "example_open": "Ver este exemplo",
-        "example_evidence": "calculado a partir do declarado",
+        "example_evidence": "Calculado a partir do declarado",
+        "example_count": "Contado nas regras publicadas",
+        "example_file": "Baixar o PDF de exemplo",
         "calculator": {
             "question": (
                 "Quanto do seu Sharpe a sorte de testar muitas configurações poderia explicar?"

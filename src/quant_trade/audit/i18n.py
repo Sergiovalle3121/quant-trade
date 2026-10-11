@@ -118,11 +118,14 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
             ),
         )
     ),
-    # Tools hub evidence note also has native ES/PT page copy.
-    ("calculated from declared figures", "calculado a partir de lo declarado"),
+    # Tools hub example notes (tools_hub.COPY) also have native ES/PT page copy.
+    ("Computed from declared figures", "Calculado a partir de lo declarado"),
+    ("Counted from the published rules", "Contado en las reglas publicadas"),
     (
-        "Sample JSON report → choose the file to compare its fingerprint.",
-        "Informe JSON de ejemplo → para comparar su huella hay que elegir el archivo.",
+        "Rigor's sample PDF → choose it in the form and the check answers that it is the "
+        "sample report, unchanged.",
+        "PDF de ejemplo de Rigor → al elegirlo en el formulario, la comprobación responde "
+        "que es el informe de ejemplo, sin cambios.",
     ),
     # Public figure reader notes (reading.COPY); keep the Spanish rules explicit.
     (
