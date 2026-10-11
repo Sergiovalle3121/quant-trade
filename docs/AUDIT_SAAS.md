@@ -6444,6 +6444,11 @@ and three visible questions serialized as `FAQPage`. `audience_numbers.py`
 reuses Wilson, fixed-size ruin and history-versus-luck calculations; all example
 inputs and derived outputs are DECLARED. It imports the existing account and
 trade-pattern thresholds, adding no flag or criterion. Gain and drawdown are
-not inputs of the current figure reader, so the page leaves missing luck
-evidence NOT_MEASURED and asks for the file. Assumptions, precision, title-length
-exceptions and checks are recorded in `docs/CODEX-31-NOTAS.md`.
+not inputs of the current figure reader, so the page leaves the luck Sharpe
+unmeasured (trial count missing) and asks for the file. The reader and ruin
+links open pre-filled with the example, the example states the break-even win
+rate and the expectancy at the declared rate and at Wilson's lower end, and
+evidence codes stay in attributes (inside a sentence the localizer would print
+them capitalised). Only the English title keeps the full search query above the
+65-character cap. Assumptions, precision and checks are recorded in
+`docs/CODEX-31-NOTAS.md`.

@@ -7,6 +7,7 @@ import html
 import json
 import re
 from pathlib import Path
+from urllib.parse import parse_qs, urlsplit
 
 import pytest
 
@@ -30,9 +31,9 @@ from quant_trade.audit.web import create_app  # noqa: E402
 from quant_trade.audit.winrate import WINRATE_PATH  # noqa: E402
 
 SIGNAL_QUESTIONS = {
-    "es": "¿Cómo elijo un proveedor de señales para copiar sin que me barran?",
+    "es": "¿Cómo elijo un proveedor de señales sin que me barran?",
     "en": "How do I pick a signal provider to copy without getting wiped out?",
-    "pt": "Como escolher um fornecedor de sinais para copiar sem quebrar a conta?",
+    "pt": "Como escolher fornecedor de sinais sem quebrar a conta?",
 }
 
 
@@ -247,15 +248,32 @@ def test_signal_copiers_link_free_tools_sample_and_export_guides(
     client = _client(tmp_path)
     page = client.get(audience_url("copiar-senales", locale)).text
     for path in (
-        READING_PATH[locale],
         WINRATE_PATH[locale],
-        RUIN_PATH[locale],
         SIGNAL_SAMPLE_PATHS[locale],
         guide_url("myfxbook", locale),
         guide_url("mql5-signal", locale),
     ):
         assert f"href='{path}'" in page, (locale, path)
         assert client.get(path, follow_redirects=False).status_code == 200, path
+    # The reader and the ruin calculator open pre-filled with the example, so the
+    # visitor sees the Wilson figures the page describes, not an empty form.
+    values = signal_copier_values(locale)
+    checklist = re.search(r"<ol\b[^>]*\bdata-signal-checklist[^>]*>(.*?)</ol>", page, re.S)
+    example = re.search(r"<div\b[^>]*\bdata-signal-example[^>]*>(.*?)</div>", page, re.S)
+    assert checklist is not None and example is not None
+    for path, block, keys in (
+        (READING_PATH[locale], example.group(1), ("wilson_low", "wilson_high", "coin")),
+        (RUIN_PATH[locale], checklist.group(1), ("wilson_low", "ruin", "ruin_low")),
+    ):
+        matched = re.search(rf"href='({re.escape(path)}\?[^']+)'", block)
+        assert matched is not None, (locale, path)
+        href = html.unescape(matched.group(1))
+        response = client.get(href, follow_redirects=False)
+        assert response.status_code == 200, href
+        for key in keys:
+            assert values[key] in response.text, (locale, key, href)
+        query = parse_qs(urlsplit(href).query)
+        assert query["trades"] == ["40"] and query["win_rate"] == ["80"], href
 
 
 @pytest.mark.parametrize("locale", ("es", "en", "pt"))
@@ -276,8 +294,12 @@ def test_signal_copiers_example_shows_calculated_declared_figures(
         "drawdown",
         "wilson_low",
         "wilson_high",
+        "coin",
         "win",
         "loss",
+        "breakeven",
+        "expectancy",
+        "expectancy_low",
         "ruin_limit",
         "horizon",
         "samples",
@@ -288,6 +310,15 @@ def test_signal_copiers_example_shows_calculated_declared_figures(
     assert {"es": "Declarado", "en": "Declared", "pt": "Declarado"}[locale] in example
     assert "++" not in example
     assert not re.search(r"\bMEASURED\b", example)
+    # Evidence codes stay in attributes: localized inside a sentence they would read
+    # "Declarado (Declarado)" or "queda No medido".
+    main = page.split("<main", 1)[1].split("</main>", 1)[0]
+    text = html.unescape(re.sub(r"<[^>]+>", " ", main))
+    assert not re.search(r"\b(?:NOT_MEASURED|DECLARED|MEASURED)\b", text)
+    for doubled in ("Declarado (Declarado)", "Declared (Declared)"):
+        assert doubled not in text
+    for mid_sentence in ("queda No medido", "fica Não medido", "stays Not measured"):
+        assert mid_sentence not in text
 
 
 @pytest.mark.parametrize("locale", ("es", "en", "pt"))

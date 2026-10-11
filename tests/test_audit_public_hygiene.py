@@ -33,17 +33,12 @@ PUBLIC_URLS = [
 ]
 PAGE_CASES = [pytest.param(locale, path, id=path) for locale, path in PUBLIC_URLS]
 SITEMAP_NS = {"s": "http://www.sitemaps.org/schemas/sitemap/0.9"}
-# These three audience titles deliberately answer the complete search question.
-# Keep the exception exact; every other public title retains the 65-character cap.
+# This audience title deliberately quotes the complete English search query.
+# Keep the exception exact; every other public title (the Spanish and Portuguese
+# translations included) retains the 65-character cap.
 SIGNAL_QUESTION_TITLES = {
-    "/para/copiar-senales": (
-        "¿Cómo elijo un proveedor de señales para copiar sin que me barran? · Rigor"
-    ),
     "/for/signal-copiers": (
         "How do I pick a signal provider to copy without getting wiped out? · Rigor"
-    ),
-    "/pt/para/copiar-sinais": (
-        "Como escolher um fornecedor de sinais para copiar sem quebrar a conta? · Rigor"
     ),
 }
 

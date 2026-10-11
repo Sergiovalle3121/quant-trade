@@ -8,26 +8,33 @@ from __future__ import annotations
 
 from html import escape
 
-from quant_trade.audit.audience_numbers import signal_copier_values
+from quant_trade.audit.audience_numbers import (
+    reader_values,
+    signal_copier_example,
+    signal_copier_values,
+)
 from quant_trade.audit.calculator import calculator_url
 from quant_trade.audit.guides import guide_url
 from quant_trade.audit.reading import reading_url
-from quant_trade.audit.ruin_calc import ruin_url
+from quant_trade.audit.ruin_calc import share_url
+from quant_trade.audit.seller_message import COPY as SELLER_COPY
 from quant_trade.audit.winrate import winrate_url
 
 # Each check names a numeric comparison and the existing tool that supplies it.
+# Evidence codes appear only in attributes: inside a sentence the report's
+# localizer would print them capitalised and without agreement.
 CHECKS: dict[str, tuple[tuple[str, str, str], ...]] = {
     "es": (
         (
             "Meses frente a la suerte: Sharpe deflactado",
-            "Compara los {months} meses declarados con el historial frente a la suerte. "
-            "Como supuesto aparte (DECLARED), Sharpe anual {sharpe} y {trials} "
-            "configuraciones dan unos {luck_months} meses para que el máximo esperado por "
-            "azar quede debajo del Sharpe supuesto. La calculadora supone retornos "
-            "diarios normales e independientes ({luck_frequency}/año) y búsquedas "
-            "independientes; no fija un nivel de Sharpe deflactado. El informe calcula el "
-            "Sharpe deflactado con los retornos del archivo; sin Sharpe y búsquedas no "
-            "puedes hacer esa comparación.",
+            "Los {months} meses declarados quedan por debajo de los {luck_months} meses "
+            "que, como supuesto declarado aparte (Sharpe anual {sharpe}, {trials} "
+            "configuraciones), harían falta para que el máximo esperado por azar quede "
+            "debajo de ese Sharpe. La calculadora supone retornos diarios normales e "
+            "independientes ({luck_frequency}/año) y búsquedas independientes; no fija "
+            "un nivel de Sharpe deflactado. El informe calcula el Sharpe deflactado con "
+            "los retornos del archivo; sin Sharpe y búsquedas no puedes hacer esa "
+            "comparación.",
             "luck",
         ),
         (
@@ -46,7 +53,7 @@ CHECKS: dict[str, tuple[tuple[str, str, str], ...]] = {
             "bandera de drawdown flotante oculto si la curva solo recoge cierres y hubo "
             "posiciones solapadas en el mismo instrumento; su regla de pérdida flotante "
             "al cierre avisa desde "
-            "{floating_warn} del saldo. Sin esos datos, el flotante queda NOT_MEASURED.",
+            "{floating_warn} del saldo. Sin esos datos, el flotante queda sin medir.",
             "audit",
         ),
         (
@@ -71,17 +78,19 @@ CHECKS: dict[str, tuple[tuple[str, str, str], ...]] = {
         ),
         (
             "Ruina al tamaño que copiarías",
-            "Introduce tu ganancia y pérdida medias al tamaño de copia, el horizonte y el "
-            "límite que quieres estudiar: perder {ruin_limit} del saldo inicial en este "
-            "ejemplo DECLARED. Mira tanto el cálculo con {rate} como el del extremo "
-            "inferior de Wilson, {wilson_low}. Cambiar tamaño cambia el resultado; el "
-            "drawdown pasado no es un techo para pérdidas futuras.",
+            "Introduce tu acierto con sus {trades} operaciones, tu ganancia y pérdida "
+            "medias al tamaño de copia, el horizonte y el límite que quieres estudiar: "
+            "perder {ruin_limit} del saldo inicial en este ejemplo declarado. El enlace "
+            "abre la calculadora con estas cifras y muestra tanto el cálculo con {rate} "
+            "como el del extremo inferior de Wilson, {wilson_low}; sin las operaciones no "
+            "hay intervalo. Cambiar tamaño cambia el resultado; el drawdown pasado no es "
+            "un techo para pérdidas futuras.",
             "ruin",
         ),
         (
             "Qué pedirle al proveedor",
-            "Usa el mensaje para el vendedor del informe y pide que cada cifra tenga su "
-            "archivo de origen. Para este ejemplo DECLARED: «Envía el historial completo "
+            "Usa el «{seller}» que incluye el informe y pide que cada cifra tenga su "
+            "archivo de origen. Para este ejemplo declarado: «Envía el historial completo "
             "de los {months} meses y las {trades} operaciones, con tamaños, costos, "
             "depósitos y retiros; la equity con posiciones abiertas, el tamaño máximo y "
             "las cuentas cerradas o reiniciadas». Lo que no entregue queda sin medir.",
@@ -91,14 +100,13 @@ CHECKS: dict[str, tuple[tuple[str, str, str], ...]] = {
     "en": (
         (
             "Months of history against luck: deflated Sharpe",
-            "Compare the declared {months} months with history against luck. As a separate "
-            "assumption (DECLARED), annual Sharpe {sharpe} and {trials} configurations give "
-            "about {luck_months} months for the expected random maximum to fall below the "
-            "assumed Sharpe. The calculator assumes normal, independent daily returns "
+            "The declared {months} months fall short of the {luck_months} months that, as "
+            "a separate declared assumption (annual Sharpe {sharpe}, {trials} "
+            "configurations), would be needed for the expected random maximum to fall "
+            "below that Sharpe. The calculator assumes normal, independent daily returns "
             "({luck_frequency}/year) and independent searches; it does not set a deflated "
-            "Sharpe level. The report computes deflated "
-            "Sharpe from the file's returns; without Sharpe and search count you cannot "
-            "make that comparison.",
+            "Sharpe level. The report computes deflated Sharpe from the file's returns; "
+            "without Sharpe and search count you cannot make that comparison.",
             "luck",
         ),
         (
@@ -117,7 +125,7 @@ CHECKS: dict[str, tuple[tuple[str, str, str], ...]] = {
             "when the curve records only closed trades and positions on the same "
             "instrument overlapped; its "
             "end-of-statement floating-loss rule warns from {floating_warn} of balance. "
-            "Without those data, floating P&L stays NOT_MEASURED.",
+            "Without those data, floating P&L stays unmeasured.",
             "audit",
         ),
         (
@@ -142,17 +150,19 @@ CHECKS: dict[str, tuple[tuple[str, str, str], ...]] = {
         ),
         (
             "Ruin at the size you would copy",
-            "Enter your average win and loss at the copy size, the horizon and the limit "
-            "you want to study: losing {ruin_limit} of initial balance in this DECLARED "
-            "example. Read both the calculation at {rate} and the one at Wilson's lower "
-            "end, {wilson_low}. Changing size changes the result; past drawdown is not "
-            "a ceiling on future losses.",
+            "Enter your win rate with its {trades} trades, your average win and loss at "
+            "the copy size, the horizon and the limit you want to study: losing "
+            "{ruin_limit} of initial balance in this declared example. The link opens the "
+            "calculator with these figures and shows both the calculation at {rate} and "
+            "the one at Wilson's lower end, {wilson_low}; without the trade count there is "
+            "no interval. Changing size changes the result; past drawdown is not a "
+            "ceiling on future losses.",
             "ruin",
         ),
         (
             "What to ask the provider",
-            "Use the report's message to the vendor and ask for a source file behind each "
-            "figure. For this DECLARED example: ‘Send the complete {months}-month history "
+            "Use the report's ‘{seller}’ and ask for a source file behind each "
+            "figure. For this declared example: ‘Send the complete {months}-month history "
             "and {trades} trades with sizes, costs, deposits and withdrawals; equity with "
             "open positions, maximum size, and closed or restarted accounts.’ Anything "
             "not supplied remains unmeasured.",
@@ -162,14 +172,13 @@ CHECKS: dict[str, tuple[tuple[str, str, str], ...]] = {
     "pt": (
         (
             "Meses de histórico contra a sorte: Sharpe deflacionado",
-            "Compare os {months} meses declarados com o histórico contra a sorte. Como "
-            "hipótese separada (DECLARED), Sharpe anual {sharpe} e {trials} configurações "
-            "dão cerca de {luck_months} meses para que o máximo esperado por acaso fique "
-            "abaixo do Sharpe suposto. A calculadora supõe retornos diários normais e "
-            "independentes ({luck_frequency}/ano) e buscas independentes; não fixa um "
-            "nível de Sharpe deflacionado. O relatório "
-            "calcula o Sharpe deflacionado com os retornos do arquivo; sem Sharpe e número "
-            "de buscas não é possível fazer essa comparação.",
+            "Os {months} meses declarados ficam abaixo dos {luck_months} meses que, como "
+            "hipótese declarada separada (Sharpe anual {sharpe}, {trials} configurações), "
+            "seriam necessários para que o máximo esperado por acaso fique abaixo desse "
+            "Sharpe. A calculadora supõe retornos diários normais e independentes "
+            "({luck_frequency}/ano) e buscas independentes; não fixa um nível de Sharpe "
+            "deflacionado. O relatório calcula o Sharpe deflacionado com os retornos do "
+            "arquivo; sem Sharpe e número de buscas não é possível fazer essa comparação.",
             "luck",
         ),
         (
@@ -189,7 +198,7 @@ CHECKS: dict[str, tuple[tuple[str, str, str], ...]] = {
             "fechadas e houve posições sobrepostas no mesmo instrumento; sua regra de "
             "perda flutuante no fim "
             "do extrato alerta a partir de {floating_warn} do saldo. Sem esses dados, "
-            "o resultado flutuante fica NOT_MEASURED.",
+            "o resultado flutuante fica sem medir.",
             "audit",
         ),
         (
@@ -215,17 +224,19 @@ CHECKS: dict[str, tuple[tuple[str, str, str], ...]] = {
         ),
         (
             "Ruína no tamanho que você copiaria",
-            "Informe ganho e perda médios no tamanho de cópia, horizonte e limite que "
-            "quer estudar: perder {ruin_limit} do saldo inicial neste exemplo DECLARED. "
-            "Leia tanto o cálculo com {rate} quanto o do extremo inferior de Wilson, "
-            "{wilson_low}. Mudar o tamanho muda o resultado; o drawdown passado não é "
-            "um teto para perdas futuras.",
+            "Informe sua taxa de acerto com as {trades} operações, ganho e perda médios "
+            "no tamanho de cópia, horizonte e limite que quer estudar: perder "
+            "{ruin_limit} do saldo inicial neste exemplo declarado. O link abre a "
+            "calculadora com esses números e mostra tanto o cálculo com {rate} quanto o "
+            "do extremo inferior de Wilson, {wilson_low}; sem as operações não há "
+            "intervalo. Mudar o tamanho muda o resultado; o drawdown passado não é um "
+            "teto para perdas futuras.",
             "ruin",
         ),
         (
             "O que pedir ao fornecedor",
-            "Use a mensagem ao vendedor do relatório e peça o arquivo de origem de cada "
-            "número. Para este exemplo DECLARED: ‘Envie o histórico completo dos "
+            "Use a ‘{seller}’ do relatório e peça o arquivo de origem de cada "
+            "número. Para este exemplo declarado: ‘Envie o histórico completo dos "
             "{months} meses e das {trades} operações, com tamanhos, custos, depósitos e "
             "saques; a equity com posições abertas, o tamanho máximo e as contas "
             "encerradas ou reiniciadas.’ O que não for enviado fica sem medir.",
@@ -251,7 +262,7 @@ COPY: dict[str, dict[str, str]] = {
         "ruin": "Calculadora de ruina gratis",
         "sample": "Ejemplo de señal y mensaje para el vendedor",
         "example_title": "Ejemplo: aciertos, ganancia declarada y tamaño de copia",
-        "declared": "Declarado (DECLARED): ejemplo hipotético, sin archivo de un proveedor.",
+        "declared": "Declarado: ejemplo hipotético, sin archivo de un proveedor.",
         "inputs": (
             "El anuncio dice «{rate} de aciertos y {trades} operaciones» y «{gain} en "
             "{months} meses con drawdown {drawdown}». Todas las entradas y salidas de este "
@@ -269,6 +280,12 @@ COPY: dict[str, dict[str, str]] = {
             "hace {ruin_low}. Son frecuencias de simulación bajo esos supuestos, no una "
             "probabilidad observada del proveedor ni un intervalo de confianza para la ruina."
         ),
+        "breakeven": (
+            "Con +{win}/−{loss}, el acierto de equilibrio antes de costos es {breakeven}: "
+            "el {rate} declarado queda por encima ({expectancy} por operación) y el "
+            "{wilson_low} queda por debajo ({expectancy_low}); por eso la frecuencia de "
+            "ruina pasa de {ruin} a {ruin_low}."
+        ),
         "model": (
             "El tamaño es un supuesto aparte: no reconstruye el {gain}. El modelo usa "
             "operaciones independientes, importes fijos, sin capitalización ni costos "
@@ -276,11 +293,13 @@ COPY: dict[str, dict[str, str]] = {
             "parte del saldo inicial, no del máximo de la curva."
         ),
         "reader": (
-            "El lector reproduce el intervalo Wilson con {trades} y {rate}; los {months} "
-            "meses se introducen como {years} años. Ganancia y drawdown no son campos de "
-            "esta versión. Con esos datos, suerte queda NOT_MEASURED: faltan las búsquedas "
-            "y no hay Sharpe para compararlo. {gain} y {drawdown} no permiten deducirlo "
-            "ni detectar flujos o flotante; pide el historial."
+            "El lector reproduce el intervalo Wilson con {trades} y {rate}; el enlace ya "
+            "lleva los {months} meses como {years} años. Ganancia y drawdown no son campos "
+            "de esta versión. Con {trades} operaciones el lector también muestra el mejor "
+            "acierto esperado de monedas justas ({coin}); el Sharpe anual esperado por "
+            "suerte queda sin medir porque falta el número de configuraciones. {gain} y "
+            "{drawdown} no permiten deducirlo ni detectar flujos o flotante; pide el "
+            "historial."
         ),
         "reading": "Abrir el lector de cifras gratis",
         "guides": "Qué exportar:",
@@ -299,9 +318,9 @@ COPY: dict[str, dict[str, str]] = {
         "winrate": "Free win-rate calculator",
         "audit": "First report free with an account",
         "ruin": "Free risk-of-ruin calculator",
-        "sample": "Signal sample and message to the vendor",
+        "sample": "Signal sample and message for the seller",
         "example_title": "Example: win rate, declared gain and copy size",
-        "declared": "Declared (DECLARED): a hypothetical example, without a provider's file.",
+        "declared": "Declared: a hypothetical example, without a provider's file.",
         "inputs": (
             "The advert says ‘{rate} wins and {trades} trades’ and ‘{gain} in {months} "
             "months with {drawdown} drawdown’. All inputs and outputs in this example "
@@ -319,6 +338,12 @@ COPY: dict[str, dict[str, str]] = {
             "{ruin_low} does. These are simulation frequencies under those assumptions, "
             "not an observed probability for the provider or a confidence interval for ruin."
         ),
+        "breakeven": (
+            "With +{win}/−{loss}, the break-even win rate before costs is {breakeven}: "
+            "the declared {rate} sits above it ({expectancy} per trade) and {wilson_low} "
+            "sits below it ({expectancy_low}); that is why the ruin frequency moves from "
+            "{ruin} to {ruin_low}."
+        ),
         "model": (
             "Size is a separate assumption: it does not reconstruct the {gain}. The model "
             "uses independent trades, fixed amounts, no compounding or additional costs; "
@@ -326,11 +351,13 @@ COPY: dict[str, dict[str, str]] = {
             "starts from initial balance, not the curve's peak."
         ),
         "reader": (
-            "The reader reproduces the Wilson interval with {trades} and {rate}; enter "
-            "{months} months as {years} years. Gain and drawdown are not fields in this "
-            "version. With these inputs, luck stays NOT_MEASURED: search count is missing "
-            "and there is no Sharpe to compare. {gain} and {drawdown} cannot supply it "
-            "or detect flows or floating losses; ask for the history."
+            "The reader reproduces the Wilson interval with {trades} and {rate}; the link "
+            "already carries the {months} months as {years} years. Gain and drawdown are "
+            "not fields in this version. With {trades} trades the reader also shows the "
+            "best expected result of fair coins ({coin}); the expected annual Sharpe from "
+            "luck stays unmeasured because the number of configurations is missing. "
+            "{gain} and {drawdown} cannot supply it or detect flows or floating losses; "
+            "ask for the history."
         ),
         "reading": "Open the free figure reader",
         "guides": "What to export:",
@@ -349,9 +376,9 @@ COPY: dict[str, dict[str, str]] = {
         "winrate": "Calculadora de acertos grátis",
         "audit": "Primeiro relatório grátis com conta",
         "ruin": "Calculadora de ruína grátis",
-        "sample": "Exemplo de sinal e mensagem ao vendedor",
+        "sample": "Exemplo de sinal e mensagem para o vendedor",
         "example_title": "Exemplo: acertos, ganho declarado e tamanho de cópia",
-        "declared": "Declarado (DECLARED): exemplo hipotético, sem arquivo de um fornecedor.",
+        "declared": "Declarado: exemplo hipotético, sem arquivo de um fornecedor.",
         "inputs": (
             "O anúncio diz ‘{rate} de acertos e {trades} operações’ e ‘{gain} em {months} "
             "meses com drawdown {drawdown}’. Todas as entradas e saídas deste exemplo "
@@ -369,6 +396,12 @@ COPY: dict[str, dict[str, str]] = {
             "toca esse limite. São frequências de simulação sob essas hipóteses, não uma "
             "probabilidade observada do fornecedor nem um intervalo de confiança para ruína."
         ),
+        "breakeven": (
+            "Com +{win}/−{loss}, a taxa de acerto de equilíbrio antes dos custos é "
+            "{breakeven}: os {rate} declarados ficam acima ({expectancy} por operação) e "
+            "{wilson_low} fica abaixo ({expectancy_low}); por isso a frequência de ruína "
+            "passa de {ruin} a {ruin_low}."
+        ),
         "model": (
             "O tamanho é uma hipótese separada: não reconstrói o {gain}. O modelo usa "
             "operações independentes, valores fixos, sem capitalização nem custos adicionais; "
@@ -376,11 +409,13 @@ COPY: dict[str, dict[str, str]] = {
             "inicial, não do pico da curva."
         ),
         "reader": (
-            "O leitor reproduz o intervalo Wilson com {trades} e {rate}; informe os "
-            "{months} meses como {years} anos. Ganho e drawdown não são campos desta "
-            "versão. Com esses dados, sorte fica NOT_MEASURED: falta o número de buscas "
-            "e não há Sharpe para comparar. {gain} e {drawdown} não permitem deduzi-lo "
-            "nem detectar fluxos ou perdas flutuantes; peça o histórico."
+            "O leitor reproduz o intervalo Wilson com {trades} e {rate}; o link já leva "
+            "os {months} meses como {years} anos. Ganho e drawdown não são campos desta "
+            "versão. Com {trades} operações o leitor também mostra o melhor resultado "
+            "esperado de moedas justas ({coin}); o Sharpe anual esperado por sorte fica "
+            "sem medir porque falta o número de configurações. {gain} e {drawdown} não "
+            "permitem deduzi-lo nem detectar fluxos ou perdas flutuantes; peça o "
+            "histórico."
         ),
         "reading": "Abrir o leitor de números grátis",
         "guides": "O que exportar:",
@@ -394,15 +429,18 @@ def checklist_sections(
     """Two normal audience sections, escaped like the surrounding document."""
     words = COPY[locale]
     figures = signal_copier_values(locale)
+    # The sample's own section title, so the check names what the visitor will find.
+    seller = SELLER_COPY[locale]["title"]
     urls = {
         "luck": calculator_url(locale),
         "winrate": winrate_url(locale),
         "audit": audit_url,
-        "ruin": ruin_url(locale),
+        # Pre-filled with the example, so the page opens on Wilson's lower-end twin.
+        "ruin": share_url(locale, signal_copier_example().ruin_input),
         "sample": sample_url,
     }
     checks = "".join(
-        f"<li><h3>{escape(title)}</h3><p>{escape(body.format(**figures))} "
+        f"<li><h3>{escape(title)}</h3><p>{escape(body.format(**figures, seller=seller))} "
         f"<a href='{escape(urls[tool], quote=True)}'>{escape(words[tool])}</a>.</p></li>"
         for title, body, tool in CHECKS[locale]
     )
@@ -415,9 +453,11 @@ def checklist_sections(
         f"<p><strong>{escape(words['declared'])}</strong></p>"
         + "".join(
             f"<p>{escape(words[key].format(**figures))}</p>"
-            for key in ("inputs", "wilson", "ruin_result", "model", "reader")
+            for key in ("inputs", "wilson", "ruin_result", "breakeven", "model", "reader")
         )
-        + f"<p><a href='{escape(reading_url(locale))}'>{escape(words['reading'])}</a>.</p>"
+        # The reader opens on the example's own fields, as the paragraph describes.
+        + f"<p><a href='{escape(reading_url(locale, reader_values()), quote=True)}'>"
+        f"{escape(words['reading'])}</a>.</p>"
         + f"<p>{escape(words['guides'])} "
         + " · ".join(
             f"<a href='{escape(guide_url(slug, locale))}'>{label}</a>"

@@ -43,10 +43,15 @@ queda `NOT_MEASURED` porque falta el número de búsquedas; tampoco se infiere
 un Sharpe de ganancia/drawdown. La página explica esta limitación y pide
 el historial para revisar depósitos, flotante y patrones de tamaño.
 
-La pregunta completa más la marca supera los 65 caracteres del control
-general de títulos. `public_hygiene` conserva ese control para todas las
-demás páginas y exige el título exacto para estas tres rutas. Las meta
-descriptions mantienen el límite de 160 caracteres.
+La pregunta completa en inglés más la marca supera los 65 caracteres del
+control general de títulos; es la consulta literal de Search Console y se
+conserva. `public_hygiene` mantiene ese control para todas las demás páginas
+y exige el título exacto solo para `/for/signal-copiers`. Las preguntas en
+español y portugués no son consultas reales: se acortaron («¿Cómo elijo un
+proveedor de señales sin que me barran?», «Como escolher fornecedor de
+sinais sem quebrar a conta?») para caber en el tope con la marca, y el H2 y
+la meta description llevan la misma pregunta corta. Las meta descriptions
+mantienen el límite de 160 caracteres.
 
 Las traducciones nuevas son contenido editorial explícito es/en/pt, no
 notas nuevas del motor de informes; no cambian las reglas de `i18n.py`.
@@ -87,3 +92,28 @@ sin errores.
 
 Trabajo local en `feat/copiadores-checklist`, sin push ni PR. No se añaden
 datos de clientes, cachés, conexiones a proveedores ni ejecución de operaciones.
+
+## Revisión posterior (hallazgos aplicados)
+
+- Los enlaces al lector y a la calculadora de ruina van prellenados con el
+  ejemplo (`reading_url(locale, reader_values())` y
+  `ruin_calc.share_url(locale, ruin_input)`), para que el visitante vea el
+  intervalo Wilson y el gemelo al extremo inferior que la página describe;
+  la comprobación 6 pide el acierto con sus operaciones, sin las cuales la
+  calculadora no muestra ese gemelo. El test de enlaces abre ambos href y
+  exige 200 y las cifras.
+- Cifras nuevas, siempre calculadas: acierto de equilibrio con +1 %/−3 %
+  (`winrate.read` con `target_r`/`stop_r`, 75,0 %), esperanza por operación
+  al acierto declarado (+0,20 %) y al extremo inferior de Wilson (−0,39 %),
+  tomadas de `RuinRun.expectancy_share`, y la fila de monedas justas del
+  lector (`reader_rows`, clave `coin`), que sí se calcula con 40 operaciones.
+  La fila que queda sin medir es el Sharpe esperado por suerte, por falta de
+  configuraciones (sin Sharpe declarado el lector usa el modelo nulo).
+- Los códigos de evidencia quedan solo en atributos: dentro de una frase
+  `localize_text_nodes` los imprimía como «Declarado (Declarado)» o «queda No
+  medido». El texto usa «declarado», «sin medir» / «unmeasured» / «sem medir».
+- La comprobación 1 contrapone los 6 meses declarados a los 78 que calcula
+  la calculadora de suerte; un test exige esa desigualdad.
+- La comprobación 7 nombra la sección del ejemplo tal cual
+  (`seller_message.COPY[locale]["title"]`: «Mensaje para el vendedor»,
+  «Message for the seller», «Mensagem para o vendedor»).

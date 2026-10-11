@@ -1432,9 +1432,10 @@ AUDIENCE_PAGES: tuple[Audience, ...] = (
                         "El informe incluye un mensaje para pedir la evidencia que falta.",
                     ),
                 ),
-                seo_title="¿Cómo elijo un proveedor de señales para copiar sin que me barran?",
+                # Shorter than the English query so the title fits the site's cap.
+                seo_title="¿Cómo elijo un proveedor de señales sin que me barran?",
                 seo_description=(
-                    "¿Cómo elijo un proveedor de señales para copiar sin que me barran? "
+                    "¿Cómo elijo un proveedor de señales sin que me barran? "
                     "7 comprobaciones con cifras y herramientas gratis: historial, "
                     "aciertos y ruina."
                 ),
@@ -1620,11 +1621,10 @@ AUDIENCE_PAGES: tuple[Audience, ...] = (
                         "relatório inclui uma mensagem para pedir a evidência que falta.",
                     ),
                 ),
-                seo_title=(
-                    "Como escolher um fornecedor de sinais para copiar sem quebrar a conta?"
-                ),
+                # Shorter than the English query so the title fits the site's cap.
+                seo_title="Como escolher fornecedor de sinais sem quebrar a conta?",
                 seo_description=(
-                    "Como escolher um fornecedor de sinais para copiar sem quebrar a conta? "
+                    "Como escolher fornecedor de sinais sem quebrar a conta? "
                     "7 checagens com números e ferramentas grátis: histórico, acertos e ruína."
                 ),
             ),

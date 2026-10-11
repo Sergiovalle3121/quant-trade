@@ -9,7 +9,7 @@ import pytest
 
 from quant_trade.audit import audience_numbers as numbers
 from quant_trade.audit import calculator, reading, ruin_calc, winrate
-from quant_trade.audit.public_card import _pct, _readings
+from quant_trade.audit.public_card import _num, _pct, _readings, breakeven_rate
 
 
 def test_example_uses_the_public_calculators_and_fixed_sizing() -> None:
@@ -40,6 +40,17 @@ def test_example_uses_the_public_calculators_and_fixed_sizing() -> None:
     assert example.ruin.interval == example.winrate.interval
     assert example.ruin.lower.win_rate == example.winrate.interval[0]
     assert example.ruin.lower.ruin > example.ruin.declared.ruin
+    # The break-even win rate comes from the win-rate calculator with the same
+    # +1 %/−3 % sizes; the declared rate sits above it and Wilson's lower end below,
+    # which is the ruin comparison the page explains.
+    sized = reading.claim_from_query(
+        {"trades": "40", "win_rate": "80", "years": "0.5", "target_r": "1", "stop_r": "3"}, "en"
+    )
+    assert example.sizing == winrate.read(sized)
+    assert example.sizing.breakeven == breakeven_rate(1.0, 3.0)
+    assert example.sizing.interval == example.winrate.interval
+    assert example.winrate.interval[0] < example.sizing.breakeven < numbers.DECLARED_RATE_PCT / 100
+    assert example.ruin.declared.expectancy_share > 0 > example.ruin.lower.expectancy_share
 
 
 def test_ruin_is_a_thirty_percent_loss_and_the_example_is_reproducible() -> None:
@@ -63,6 +74,8 @@ def test_luck_uses_separate_declared_sharpe_and_trials() -> None:
     # Gain and drawdown do not imply the missing Sharpe or trial count.
     assert example.claim.sharpe is None
     assert example.claim.trials is None
+    # The first check contrasts the declared months with the months luck needs.
+    assert math.ceil(example.luck_years_needed * 12.0) > numbers.DECLARED_MONTHS
 
 
 @pytest.mark.parametrize("locale", ["es", "en", "pt"])
@@ -75,8 +88,16 @@ def test_reader_keeps_unsupported_and_missing_figures_absent(locale: str) -> Non
     assert rows == tuple(_readings(claim))
     by_key = {key: value for key, value, _ in rows}
     assert by_key["wilson"] is not None
+    # With 40 trades the reader prints its fair-coin row; the luck row stays absent
+    # because trials are missing (a Sharpe is not required: the null model applies).
+    assert by_key["coin"] is not None
     assert by_key["luck"] is None
     assert by_key["breakeven"] is None
+    assert numbers.signal_copier_values(locale)["coin"] == by_key["coin"]
+    assert not {"profit_factor", "sharpe", "trials", "target_r", "stop_r"} & set(
+        numbers.reader_values()
+    )
+    assert set(numbers.sizing_values()) == set(values) | {"target_r", "stop_r"}
     link = reading.reading_url(locale, values)
     assert parse_qs(urlsplit(link).query) == {
         **{key: [value] for key, value in values.items()},
@@ -97,3 +118,12 @@ def test_display_preserves_precision_until_localized_render(locale: str) -> None
     assert values["ruin_low"] == _pct(example.ruin.lower.ruin, locale)
     assert values["luck_months"] == str(math.ceil(example.luck_years_needed * 12.0))
     assert values["remaining"] == "70 %"
+    assert example.sizing.breakeven is not None
+    assert values["breakeven"] == _pct(example.sizing.breakeven, locale)
+    # Expectancy as the ruin page writes it: two decimals, sign from the rounded value.
+    declared = example.ruin.declared.expectancy_share * 100
+    lower = example.ruin.lower.expectancy_share * 100
+    assert values["expectancy"] == f"+{_num(declared, locale, 2)} %"
+    assert values["expectancy_low"] == f"−{_num(abs(lower), locale, 2)} %"
+    assert numbers._signed_pct(0.0, locale) == f"{_num(0.0, locale, 2)} %"
+    assert numbers._signed_pct(-0.000001, locale) == f"{_num(0.0, locale, 2)} %"

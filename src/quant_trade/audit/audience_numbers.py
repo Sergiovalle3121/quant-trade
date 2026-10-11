@@ -52,11 +52,35 @@ def reader_rows(locale: str) -> tuple[tuple[str, str | None, str], ...]:
     return tuple(_readings(reading.claim_from_query(reader_values(), locale)))
 
 
+def sizing_values() -> dict[str, str]:
+    """The reader's fields plus the copy sizes as target and stop: only their
+    ratio matters for the break-even win rate, the same one the ruin page uses."""
+    return {
+        **reader_values(),
+        "target_r": f"{DECLARED_AVERAGE_WIN_PCT:g}",
+        "stop_r": f"{DECLARED_AVERAGE_LOSS_PCT:g}",
+    }
+
+
+def _signed_pct(value: float, locale: str) -> str:
+    """A share of the balance as a signed percentage with two decimals, as the
+    ruin page writes expectancy: the sign follows the rounded value, so one that
+    rounds to zero shows none; the minus is typographic, like the page's losses."""
+    text = f"{_num(value * 100, locale, 2)} %"
+    rounded = round(value * 100, 2)
+    if rounded == 0:
+        return text.lstrip("-")
+    return "+" + text if rounded > 0 else "−" + text.lstrip("-")
+
+
 @dataclass(frozen=True)
 class SignalCopierExample:
     """Calculator outputs retained at full precision; every input is DECLARED."""
 
     claim: PublicClaim
+    #: The same claim with the copy sizes, for the break-even win rate before costs.
+    #: Declared before ``winrate``, whose field name shadows the module in this scope.
+    sizing: winrate.WinRateReading
     winrate: winrate.WinRateReading
     ruin_input: ruin_calc.RuinInput
     ruin: ruin_calc.RuinReading
@@ -88,6 +112,7 @@ def signal_copier_example() -> SignalCopierExample:
     return SignalCopierExample(
         claim=claim,
         winrate=winrate.read(claim),
+        sizing=winrate.read(reading.claim_from_query(sizing_values(), "en")),
         ruin_input=ruin_input,
         ruin=ruin_calc.compute(ruin_input),
         luck_input=luck_input,
@@ -101,8 +126,11 @@ def signal_copier_values(locale: str) -> dict[str, str]:
     example = signal_copier_example()
     interval = example.winrate.interval
     lower = example.ruin.lower
-    if interval is None or lower is None:
-        raise ValueError("the declared example requires its Wilson interval")
+    breakeven = example.sizing.breakeven
+    # The reader's own fair-coin row, exactly as the linked page prints it.
+    coin = {key: value for key, value, _ in reader_rows(locale)}.get("coin")
+    if interval is None or lower is None or breakeven is None or coin is None:
+        raise ValueError("the declared example requires Wilson, break-even and coin rows")
 
     def input_percent(value: float) -> str:
         return f"{_num(value, locale, 0)} %"
@@ -116,8 +144,12 @@ def signal_copier_values(locale: str) -> dict[str, str]:
         "drawdown": input_percent(DECLARED_DRAWDOWN_PCT),
         "wilson_low": _pct(interval[0], locale),
         "wilson_high": _pct(interval[1], locale),
+        "coin": coin,
         "win": input_percent(DECLARED_AVERAGE_WIN_PCT),
         "loss": input_percent(DECLARED_AVERAGE_LOSS_PCT),
+        "breakeven": _pct(breakeven, locale),
+        "expectancy": _signed_pct(example.ruin.declared.expectancy_share, locale),
+        "expectancy_low": _signed_pct(lower.expectancy_share, locale),
         "ruin_limit": input_percent(DECLARED_RUIN_PCT),
         "remaining": input_percent(100.0 - DECLARED_RUIN_PCT),
         "horizon": _num(DECLARED_HORIZON, locale, 0),
