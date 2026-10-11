@@ -36,6 +36,7 @@ from collections import OrderedDict
 from collections.abc import AsyncIterator, Callable, Mapping
 from datetime import UTC, datetime, timedelta
 from html import escape
+from pathlib import Path
 from typing import Annotated, Any
 from urllib.parse import quote, urlencode, urlsplit
 
@@ -57,6 +58,7 @@ from quant_trade.audit import (
     reading,
     reading_png,
     ruin_calc,
+    tool_cards,
     track_seal_pages,
     universal,
     upload_rejections,
@@ -1302,6 +1304,18 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     ruin_attempts = AttemptLog()
     calculator_images = reading_png.ReadingPNGCache(fields=CARD_FIELDS)
     calculator_png_paths = {path + "/card.png" for path in CALCULATOR_PATH.values()}
+    tool_images = tool_cards.ToolPNGCache()
+    tool_png_paths = {
+        tool_cards.tool_image_path(kind, locale, firm): (kind, locale, firm)
+        for kind in tool_cards.TOOL_KINDS
+        for locale in REPORT_LOCALES
+        for firm in (("", *challenge_calc.FIRMS) if kind == "calculadora-reto" else ("",))
+    }
+    # Load the packaged fallback once, never from disk during an OG request.
+    tool_default_images = {
+        locale: (Path(__file__).with_name("static") / og_image_name("", locale)).read_bytes()
+        for locale in REPORT_LOCALES
+    }
     card_lookups = AttemptLog()
     failed_card_sessions = AttemptLog()
     app.state.attempt_logs = (upload_attempts, redeem_attempts, waitlist_attempts, panel_failures)
@@ -1455,7 +1469,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         if request.method != "GET" or response.status_code != 200:
             return
         path = request.url.path
-        if path in reading_png_paths or path in calculator_png_paths:
+        if path in reading_png_paths or path in calculator_png_paths or path in tool_png_paths:
             return  # Public image responses never carry a visitor's referral cookie.
         kept = funnel.clean_ref(request.cookies.get(funnel.REF_COOKIE))
         arrived = funnel.clean_ref(request.query_params.get("ref"))
@@ -1539,6 +1553,9 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             request.url.path in reading_png_paths or request.url.path in calculator_png_paths
         ) and ok:
             response.headers["Cache-Control"] = "public, max-age=86400"
+        elif request.url.path in tool_png_paths and ok:
+            # A fallback is not cached by browsers: a repaired renderer can recover.
+            response.headers.setdefault("Cache-Control", "public, max-age=86400")
         else:
             public = (
                 request.url.path.startswith("/v/")
@@ -2077,6 +2094,21 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             raise _not_found()
         content, media_type = found
         return Response(content=content, media_type=media_type)
+
+    def tool_card_png(request: Request) -> Response:
+        """Fixed public tool previews; queries cannot alter the image or cache key."""
+        kind, locale, firm = tool_png_paths[request.url.path]
+        png = tool_images.get(kind, locale, firm)
+        if png is None:
+            return Response(
+                content=tool_default_images[locale],
+                media_type="image/png",
+                headers={"Cache-Control": "no-store"},
+            )
+        return Response(content=png, media_type="image/png")
+
+    for tool_path in tool_png_paths:
+        app.add_api_route(tool_path, tool_card_png, methods=["GET"], include_in_schema=False)
 
     # The icon where browsers, phones and search engines ask for it.
     def _icon(name: str) -> Callable[[], Response]:
