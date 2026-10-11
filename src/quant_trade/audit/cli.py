@@ -1,7 +1,7 @@
 """``quant-trade audit``: run an audit from files, serve the web app, purge old
 uploads, answer a client's privacy request (``export``, ``delete``,
 ``unpublish``, ``waitlist-remove``), and announce the public pages to the
-IndexNow engines (``indexnow``).
+IndexNow engines (``indexnow``), or check the deployed public site (``smoke``).
 
 ``run`` is the whole product without a browser: the operator receives a CSV
 by e-mail, runs one command, and sends back ``report.html``. ``serve`` and
@@ -222,6 +222,63 @@ def indexnow(
         typer.echo(f"Batch {number}: {batch.urls} URL(s), {answer}, {batch.meaning}")
     if not result.accepted:
         typer.echo("At least one batch was refused or got no answer.", err=True)
+        raise typer.Exit(code=1)
+
+
+@audit_app.command("smoke")
+def smoke(
+    site: Annotated[str, typer.Option("--site", help="HTTP(S) site root, including localhost")],
+    concurrency: Annotated[
+        int, typer.Option("--concurrency", min=1, max=4, help="Maximum simultaneous GET requests")
+    ] = 4,
+    timeout: Annotated[
+        float, typer.Option("--timeout", help="HTTP timeout in seconds; finite and positive")
+    ] = 20.0,
+    only: Annotated[
+        str, typer.Option("--only", help="Checks: sitemap, links, images or all")
+    ] = "all",
+    json_path: Annotated[
+        Path | None, typer.Option("--json", help="Write the JSON report here; parent must exist")
+    ] = None,
+) -> None:
+    """Check public pages, internal links and share images using GET, without retries."""
+    from quant_trade.audit.smoke import run_smoke
+
+    if json_path is not None and (not json_path.parent.is_dir() or json_path.is_dir()):
+        raise typer.BadParameter("--json needs a file path with an existing parent directory")
+    try:
+        report = run_smoke(site, concurrency=concurrency, timeout=timeout, only=only)
+    except ValueError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    counts = report.summary
+    typer.echo(
+        f"RigorSmoke: total={counts['total']}, 200={counts['ok']}, "
+        f"no-200={counts['non_200']}, lentas > 3 s={counts['slow']}, "
+        f"imágenes rotas={counts['broken_images']}, enlaces rotos={counts['broken_links']}"
+    )
+    for request in report.requests:
+        if request.elapsed_seconds > 3.0:
+            typer.echo(f"Lenta: {request.url} ({request.elapsed_seconds:.3f} s)")
+    for failure in report.failures:
+        typer.echo(
+            f"FALLO [{failure.kind}] {failure.url}: {failure.reason}\n"
+            f"  origen: {failure.source}"
+        )
+    for reference in report.external:
+        typer.echo(
+            f"Externo, no comprobado [{reference.kind}]: {reference.url}\n"
+            f"  origen: {reference.source}"
+        )
+    if json_path is not None:
+        try:
+            json_path.write_text(
+                json.dumps(report.to_dict(), ensure_ascii=False, indent=2, allow_nan=False) + "\n",
+                encoding="utf-8",
+                newline="\n",
+            )
+        except OSError as exc:
+            raise typer.BadParameter("cannot write the --json report") from exc
+    if not report.ok:
         raise typer.Exit(code=1)
 
 

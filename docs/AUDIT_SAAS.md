@@ -5418,6 +5418,57 @@ commit SHA.
 
 ## Operator probes and incident admission
 
+After deployment, check the public site with:
+
+```sh
+quant-trade audit smoke --site https://rigorscore.com --concurrency 4 --timeout 20 --only all
+quant-trade audit smoke --site https://rigorscore.com --json outputs/smoke.json
+quant-trade audit smoke --site http://127.0.0.1:8000 --only links
+```
+
+For a local server, set its `AUDIT_BASE_URL=http://127.0.0.1:8000` so its
+canonical, hreflang and card-image URLs point to the local site. The smoke
+command requests the site's `/sitemap.xml`, follows same-origin sitemap
+indexes, and checks the union of sitemap page URLs and `seo.PUBLIC_PAGES`.
+HTML pages also supply links to crawl recursively. All requests use GET,
+`User-Agent: RigorSmoke/1.0`, no retries, and no redirect following. The
+concurrency default and maximum are 4 (minimum 1); `--timeout` defaults to
+20 seconds and must be finite and positive for each request.
+
+`--only sitemap` checks the sitemap and its pages, plus `PUBLIC_PAGES`.
+`--only links` additionally checks HTML anchor links, canonical URLs and
+hreflang URLs; `--only images` instead checks `og:image` and `twitter:image`;
+`--only all` (the default) checks both groups. Requests are cached by URL:
+fragments are removed, query strings are retained, and a URL is requested
+only once even when several pages reference it. Only the exact site origin
+(scheme, host and port) is requested. External references are listed as
+external and unchecked; `mailto:`, `tel:` and other non-HTTP schemes are
+also left unchecked. Redirects, including same-origin redirects, fail the
+strict 200 check rather than expanding the crawl.
+The crawl stops admitting new URLs at 10,000 unique internal URLs and reports
+an incomplete-check failure (exit 1), so endless query-string pagination
+cannot keep the command running indefinitely.
+
+Every response records its status, elapsed time and size. Card images must
+return 200 with `image/png` or `image/svg+xml`; this checks the response MIME
+type, without decoding or validating the image bytes. The summary counts
+unique requests (including sitemap requests), 200 responses, non-200 or
+missing responses, requests slower than 3 seconds, and unique broken
+images and links. Malformed or empty sitemaps and unparseable HTML also fail.
+Slow responses alone are informational. Failures include
+the page or sitemap that referenced the URL. Exit status is 0 when checks
+pass, 1 when checks fail, or 2 for invalid arguments or an unwritable JSON
+report destination.
+
+`--json <path>` is optional and writes the same report to that one file;
+its parent directory must already exist. The command does not import the
+web app, access its database, load credentials or write other artifacts.
+Remote GET requests can still cause the service's ordinary request logging
+or other GET-side effects. It does not execute JavaScript, render a browser,
+or validate fragment targets. This is an availability and metadata check
+for the research/backtesting site; passing it does not establish readiness
+for real-money trading. Tests use offline HTTP transports.
+
 `GET /live` checks only that the web process can answer. The legacy `GET
 /health` exposes non-secret configuration and also remains a liveness probe;
 it does **not** query storage. Route new traffic using `GET /ready`: it runs
