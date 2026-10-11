@@ -16,9 +16,10 @@ from datetime import datetime
 from typing import Any
 from urllib.parse import urlencode
 
-from quant_trade.audit import challenge_calc, ruin_calc, winrate
+from quant_trade.audit import challenge_calc, ruin_calc, rules_table, winrate
 from quant_trade.audit.analytics import DEFAULT_BLOCK_SIZE, DRAWDOWN_THRESHOLDS
 from quant_trade.audit.article_numbers import (
+    CONSISTENCY_INPUTS,
     MC_DEEP_THRESHOLD,
     MC_REFERENCE_DAYS,
     MC_REFERENCE_RISK,
@@ -50,6 +51,9 @@ from quant_trade.audit.article_numbers import (
     STREAK_RISKS,
     STREAK_TRADE_COUNTS,
     STREAK_WIN_RATES,
+    ConsistencyExample,
+    consistency_examples,
+    consistency_variations,
     streak_for,
 )
 from quant_trade.audit.audiences import AUDIENCE_PAGES, audience_url
@@ -99,6 +103,7 @@ RELATED_KINDS: frozenset[str] = frozenset(
         "winrate",
         "ruin",
         "challenge",
+        "rules",
     }
 )
 
@@ -658,6 +663,7 @@ ARTICLE_PUBLICATION_DATES = {
     "lo-eligio-el-optimizador": "2026-10-08",
     "monte-carlo-backtest": "2026-10-08",
     "rachas-perdedoras": "2026-10-08",
+    "regla-de-consistencia-prop-firm": "2026-10-11",
     RUIN_ARTICLE_KEY: "2026-10-11",
 }
 
@@ -856,6 +862,7 @@ ARTICLE_NEXT_STEPS: dict[str, tuple[dict[str, str], ...]] = {
     "monte-carlo-backtest": ({"kind": "audit"}, {"kind": "sample"}),
     # Streaks follow from the win rate: its free calculator comes first.
     "rachas-perdedoras": ({"kind": "winrate", "example": "win-rate"},),
+    "regla-de-consistencia-prop-firm": ({"kind": "audit"}, {"kind": "sample"}),
     RUIN_ARTICLE_KEY: ({"kind": "audit"}, {"kind": "sample"}),
 }
 #: An article missing from the table keeps the old closing call.
@@ -4824,6 +4831,7 @@ ARTICLES_DATA: tuple[dict[str, Any], ...] = (
             {"kind": "method"},
             {"kind": "samples"},
             {"kind": "audience", "slug": "retos-prop-firm"},
+            {"kind": "article", "key": "regla-de-consistencia-prop-firm"},
         ],
     },
     {
@@ -8338,6 +8346,624 @@ ARTICLES_DATA += (
     },
 )
 
+CONSISTENCY_ARTICLE_KEY = "regla-de-consistencia-prop-firm"
+
+#: Headings also locate the calculated tables within the article's prose.
+CONSISTENCY_TABLE_COPY: dict[str, dict[str, str]] = {
+    "es": {
+        "rules": "Qué programas incluyen la regla en la calculadora",
+        "cases": "Alcanzar el objetivo y alcanzarlo dentro de la regla",
+        "sensitivity": "Menos operaciones al día o menor riesgo",
+        "program": "Firma y programa",
+        "limit": "Límite del mejor día",
+        "basis": "Base del simulador",
+        "source": "Fuente y fecha de lectura",
+        "profit_target": "Objetivo fijo",
+        "positive_days": "Suma de ganancias de los días positivos",
+        "no_rule": "Sin regla",
+        "target": "Alcanza el objetivo",
+        "within": "Objetivo dentro de la regla",
+        "loss": "Toca un límite de pérdida",
+        "unfinished": "Queda sin terminar",
+        "days": "Días hábiles hasta el objetivo (mediana)",
+        "per_day": "Operaciones al día",
+        "risk": "Riesgo por operación",
+        "max_day": "Mayor día sintético",
+        "rules_note": "DECLARED · Reglas recogidas en la calculadora de reto, con su base de "
+        "simulación; no son una consulta en tiempo real ni mediciones de un archivo.",
+        "outcome_note": "DECLARED · Porcentajes sobre todas las trayectorias. La columna dentro "
+        "de la regla es un subconjunto del objetivo, no otro desenlace. El límite de pérdida "
+        "agrupa el diario y el total. La mediana incluye todas las trayectorias que alcanzan "
+        "el objetivo, aunque no cumplan la regla del mejor día.",
+        "sensitivity_note": "DECLARED · Mismo denominador y columnas que la tabla anterior; "
+        "cambia una entrada por fila. El mayor día sintético se mide desde el balance inicial.",
+    },
+    "en": {
+        "rules": "Which programs include the rule in the calculator",
+        "cases": "Reaching the target and reaching it within the rule",
+        "sensitivity": "Fewer trades per day or less risk",
+        "program": "Firm and program",
+        "limit": "Best-day limit",
+        "basis": "Simulator basis",
+        "source": "Source and reading date",
+        "profit_target": "Fixed target",
+        "positive_days": "Sum of positive days' gains",
+        "no_rule": "No rule",
+        "target": "Reaches target",
+        "within": "Target within rule",
+        "loss": "Hits a loss limit",
+        "unfinished": "Remains unfinished",
+        "days": "Business days to target (median)",
+        "per_day": "Trades per day",
+        "risk": "Risk per trade",
+        "max_day": "Largest synthetic day",
+        "rules_note": "DECLARED · Rules recorded in the challenge calculator, with their "
+        "simulation basis; these are neither a live lookup nor file measurements.",
+        "outcome_note": "DECLARED · Percentages of all paths. Within the rule is a subset of "
+        "reaching the target, not another outcome. The loss-limit column combines daily and "
+        "total limits. The median includes every path reaching the target, even those "
+        "outside the best-day rule.",
+        "sensitivity_note": "DECLARED · Same denominator and columns as the table above; one "
+        "input changes per row. The largest synthetic day is measured from the initial balance.",
+    },
+    "pt": {
+        "rules": "Quais programas incluem a regra na calculadora",
+        "cases": "Atingir a meta e atingi-la dentro da regra",
+        "sensitivity": "Menos operações por dia ou menor risco",
+        "program": "Empresa e programa",
+        "limit": "Limite do melhor dia",
+        "basis": "Base do simulador",
+        "source": "Fonte e data de leitura",
+        "profit_target": "Meta fixa",
+        "positive_days": "Soma dos ganhos dos dias positivos",
+        "no_rule": "Sem regra",
+        "target": "Atinge a meta",
+        "within": "Meta dentro da regra",
+        "loss": "Toca um limite de perda",
+        "unfinished": "Fica sem terminar",
+        "days": "Dias úteis até a meta (mediana)",
+        "per_day": "Operações por dia",
+        "risk": "Risco por operação",
+        "max_day": "Maior dia sintético",
+        "rules_note": "DECLARED · Regras registradas na calculadora de desafio, com a sua base "
+        "de simulação; não são uma consulta em tempo real nem medições de um arquivo.",
+        "outcome_note": "DECLARED · Percentuais sobre todas as trajetórias. Dentro da regra é "
+        "um subconjunto das que atingem a meta, não outro desfecho. O limite de perda agrupa "
+        "o diário e o total. A mediana inclui todas as trajetórias que atingem a meta, mesmo "
+        "as que ficam fora da regra do melhor dia.",
+        "sensitivity_note": "DECLARED · Mesmo denominador e colunas da tabela anterior; muda "
+        "uma entrada por linha. O maior dia sintético é medido a partir do saldo inicial.",
+    },
+}
+
+
+def _consistency_assumptions(locale: str) -> str:
+    """Declared inputs and simulation settings, without running an article at import."""
+    value = CONSISTENCY_INPUTS[0]
+    return {
+        "es": (
+            "DECLARED · {rate} % de aciertos, ganancia de {win} R por operación "
+            "ganadora, pérdida de {loss} R por operación perdedora, riesgo de {risk} % del "
+            "balance por operación y {per_day} operaciones al día. Son operaciones "
+            "independientes con probabilidad y tamaños constantes; se suman dentro del día y "
+            "el balance se capitaliza entre cierres. Sin costos, sin equity flotante y sin "
+            "tamaño de muestra declarado para estimar la incertidumbre del porcentaje de "
+            "aciertos. La calculadora construye {history} días sintéticos y remuestrea "
+            "{samples} trayectorias por fase, con semilla {seed} y un horizonte de {horizon} "
+            "días hábiles en estos casos. Las frecuencias dependen de esos supuestos; no son "
+            "probabilidades personales."
+        ),
+        "en": (
+            "DECLARED · {rate} % win rate, a gain of {win} R per winning trade, a "
+            "loss of {loss} R per losing trade, risk of {risk} % of the balance per trade and "
+            "{per_day} trades per day. Trades are independent with constant probability and "
+            "sizes; returns add within each day and the balance compounds between closes. "
+            "No costs, floating equity or declared sample size to estimate win-rate "
+            "uncertainty. The calculator builds {history} synthetic days and resamples "
+            "{samples} paths per phase, using seed {seed} and a horizon of {horizon} business "
+            "days in these cases. Frequencies depend on these assumptions; they are not "
+            "personal probabilities."
+        ),
+        "pt": (
+            "DECLARED · {rate} % de acerto, ganho de {win} R por operação "
+            "ganhadora, perda de {loss} R por operação perdedora, risco de {risk} % do saldo "
+            "por operação e {per_day} operações por dia. As operações são independentes com "
+            "probabilidade e tamanhos constantes; os retornos se somam dentro do dia e o "
+            "saldo se capitaliza entre fechamentos. Sem custos, sem patrimônio flutuante e "
+            "sem tamanho de amostra declarado para estimar a incerteza da taxa de acerto. A "
+            "calculadora constrói {history} dias sintéticos e reamostra {samples} trajetórias "
+            "por fase, com semente {seed} e horizonte de {horizon} dias úteis nestes casos. As "
+            "frequências dependem dessas suposições; não são probabilidades pessoais."
+        ),
+    }[locale].format(
+        rate=_num(value.win_rate_pct, locale, 0),
+        win=_num(value.avg_win, locale, 1),
+        loss=_num(value.avg_loss, locale, 0),
+        risk=_num(value.risk or 0, locale, 1),
+        per_day=_num(value.per_day, locale, 0),
+        history=_num(challenge_calc.SYNTHETIC_DAYS, locale, 0),
+        samples=_num(challenge_calc.SAMPLES, locale, 0),
+        seed=challenge_calc.SEED,
+        horizon=challenge_calc.horizon(value.program),
+    )
+
+
+def consistency_worked_example(locale: str) -> str:
+    """The target cap and a synthetic day, calculated lazily with the table."""
+    example = consistency_examples()[0]
+    rules = challenge_calc.PRESETS[example.inputs.program]
+    assert rules.best_day_limit is not None and example.target_rule_cap is not None
+    return {
+        "es": "DECLARED · En este caso, el {limit} del objetivo de {target} permite un mejor "
+        "día de hasta {cap} del balance inicial. El mayor día sintético, si empieza con ese "
+        "balance, suma {day}. Una trayectoria puede alcanzar el objetivo y quedar fuera "
+        "de la regla. Al "
+        "capitalizar los cierres, la ganancia monetaria del mismo tipo de día también cambia.",
+        "en": "DECLARED · Here, {limit} of the {target} target allows a best day of at most "
+        "{cap} of the initial balance. The largest synthetic day, when starting at that "
+        "balance, adds {day}. A path can reach the target while outside the rule. As daily "
+        "closes compound, the monetary gain of the same kind of day also changes.",
+        "pt": "DECLARED · Neste caso, {limit} da meta de {target} permite um melhor dia "
+        "de até {cap} do saldo inicial. O maior dia sintético, se começa com esse saldo, "
+        "soma {day}. Uma trajetória pode atingir a meta e ficar fora da regra. Ao "
+        "capitalizar os fechamentos, o ganho monetário do mesmo tipo de dia também muda.",
+    }[locale].format(
+        limit=_whole_pct(rules.best_day_limit, locale),
+        target=_whole_pct(rules.profit_target, locale),
+        cap=f"{_num(example.target_rule_cap * 100, locale, 2)} %",
+        day=f"{_num(example.maximum_initial_day_gain * 100, locale, 2)} %",
+    )
+
+
+def consistency_programs_note(locale: str) -> str:
+    """Why the two programs' rows coincide except for the rule, from the same examples."""
+    with_rule, without_rule = consistency_examples()
+    rules = challenge_calc.PRESETS[without_rule.inputs.program]
+    if rules.max_daily_loss is None or rules.daily_loss_basis != "initial_balance":
+        raise ValueError("the programs note describes a daily limit on the initial balance")
+
+    def outcome(row: ConsistencyExample) -> tuple[float | None, ...]:
+        return (row.target, row.daily_limit, row.total_limit, row.unfinished, row.median_days)
+
+    if without_rule.daily_limit != 0.0 or outcome(with_rule) != outcome(without_rule):
+        raise ValueError("the programs note expects both rows to coincide except for the rule")
+    return {
+        "es": "DECLARED · Con estas entradas, el límite diario de {program} ({daily} del balance "
+        "inicial) no se activa: el peor día sintético pierde {worst} si empieza con ese "
+        "balance. Las demás condiciones simuladas producen el mismo recuento; por eso ambas "
+        "filas coinciden salvo en la regla.",
+        "en": "DECLARED · With these inputs, the {program} daily limit ({daily} of the initial "
+        "balance) is not triggered: the worst synthetic day loses {worst} when starting at "
+        "that balance. The other simulated conditions produce the same count; that is why "
+        "both rows coincide except for the rule.",
+        "pt": "DECLARED · Com estas entradas, o limite diário do {program} ({daily} do saldo "
+        "inicial) não é acionado: o pior dia sintético perde {worst} se começa com esse saldo. "
+        "As demais condições simuladas produzem a mesma contagem; por isso as duas linhas "
+        "coincidem exceto na regra.",
+    }[locale].format(
+        program=rules.program,
+        daily=_whole_pct(rules.max_daily_loss, locale),
+        worst=f"{_num(without_rule.maximum_initial_day_loss * 100, locale, 2)} %",
+    )
+
+
+def _variation_label(row: ConsistencyExample, base: ConsistencyExample, locale: str) -> str:
+    """The one input a sensitivity row changes, as the reader sees it in the table."""
+    if row.inputs.per_day != base.inputs.per_day:
+        count = _num(row.inputs.per_day, locale, 0)
+        one = row.inputs.per_day == 1
+        return {
+            "es": f"con {count} {'operación' if one else 'operaciones'} al día",
+            "en": f"with {count} {'trade' if one else 'trades'} per day",
+            "pt": f"com {count} {'operação' if one else 'operações'} por dia",
+        }[locale]
+    risk = _num(row.inputs.risk or 0, locale, 2)
+    return {
+        "es": f"con un riesgo de {risk} %",
+        "en": f"with {risk} % risk",
+        "pt": f"com risco de {risk} %",
+    }[locale]
+
+
+def consistency_sensitivity_note(locale: str) -> str:
+    """Why the variations show the same share inside the rule as reaching the target."""
+    base, *variations = consistency_variations()
+    rules = challenge_calc.PRESETS[base.inputs.program]
+    if base.target_rule_cap is None:
+        raise ValueError("the sensitivity note needs a target-based best-day rule")
+    # Margin: a day that still fits the cap after the balance has grown to the target
+    # cannot breach it on the way there; the equality below is the measured confirmation.
+    growth = 1 + rules.profit_target
+    for row in variations:
+        if row.maximum_initial_day_gain * growth > base.target_rule_cap:
+            raise ValueError("the sensitivity note expects every variation under the cap")
+        if row.within_best_day != row.target:
+            raise ValueError("the sensitivity note expects both target columns to match")
+    joiner = {"es": " y ", "en": " and ", "pt": " e "}[locale]
+    items = joiner.join(
+        f"{_num(row.maximum_initial_day_gain * 100, locale, 2)} % "
+        f"{_variation_label(row, base, locale)}"
+        for row in variations
+    )
+    return {
+        "es": "DECLARED · El tope de {cap} del balance inicial se compara con el mayor día "
+        "sintético de cada fila: {items}. Ninguno alcanza el tope, tampoco tras capitalizar "
+        "los cierres hasta el objetivo; por eso en esas filas alcanzar el objetivo y "
+        "alcanzarlo dentro de la regla coinciden.",
+        "en": "DECLARED · The {cap} cap of the initial balance is compared with each row's "
+        "largest synthetic day: {items}. None reaches the cap, not even after compounding the "
+        "closes up to the target; that is why reaching the target and reaching it within the "
+        "rule coincide in those rows.",
+        "pt": "DECLARED · O teto de {cap} do saldo inicial é comparado com o maior dia "
+        "sintético de cada linha: {items}. Nenhum alcança o teto, nem depois de capitalizar os "
+        "fechamentos até a meta; por isso nessas linhas atingir a meta e atingi-la dentro da "
+        "regra coincidem.",
+    }[locale].format(cap=f"{_num(base.target_rule_cap * 100, locale, 2)} %", items=items)
+
+
+ARTICLES_DATA += (
+    {
+        "key": CONSISTENCY_ARTICLE_KEY,
+        "slug": {
+            "es": "regla-de-consistencia-prop-firm",
+            "en": "prop-firm-consistency-rule-numbers",
+            "pt": "regra-de-consistencia-prop-firm",
+        },
+        "title": {
+            "es": "La regla de consistencia de las prop firms, con números",
+            "en": "The prop-firm consistency rule, with numbers",
+            "pt": "A regra de consistência das prop firms, com números",
+        },
+        "seo_title": {
+            "es": "Regla de consistencia de prop firms, con números",
+        },
+        "summary": {
+            "es": "Qué mide el mejor día, qué programas incluyen la regla y cómo cambian los "
+            "resultados al reducir operaciones o riesgo, con cifras declaradas.",
+            "en": "What the best-day rule measures, which programs include it and how fewer "
+            "trades or less risk change the simulation, using declared figures.",
+            "pt": "O que mede o melhor dia, quais programas incluem a regra e como menos "
+            "operações ou menor risco mudam a simulação, com números declarados.",
+        },
+        "intro": {
+            "es": "Una trayectoria puede alcanzar el objetivo de un reto y concentrar una parte "
+            "excesiva del resultado en un solo día. La regla de consistencia añade esa segunda "
+            "comprobación. Aquí distinguimos ambas con la calculadora de reto y las reglas "
+            "recogidas en ella. Rigor no está afiliado a ninguna firma.",
+            "en": "A path can reach a challenge target while too much of its result comes from "
+            "a single day. The consistency rule adds that second check. Here we separate the "
+            "two using the challenge calculator and the rules recorded in it. "
+            "Rigor is not affiliated with any firm.",
+            "pt": "Uma trajetória pode atingir a meta de um desafio e concentrar uma parcela "
+            "excessiva do resultado num único dia. A regra de consistência acrescenta essa "
+            "segunda conferência. Aqui distinguimos as duas com a calculadora de desafio e "
+            "as regras registradas nela. O Rigor não é afiliado a nenhuma empresa.",
+        },
+        "sections": {
+            "es": [
+                {
+                    "heading": "Qué es la regla del mejor día y para qué sirve",
+                    "paragraphs": [
+                        "La regla limita la concentración: la mayor ganancia neta diaria no "
+                        "puede superar una fracción de la base definida por el programa. Su "
+                        "función es exigir un resultado repartido entre días; una sola sesión "
+                        "extraordinaria no describe por sí misma un patrón repetible. Esto "
+                        "tampoco convierte la regularidad observada en evidencia del futuro.",
+                        "La base importa tanto como el porcentaje. Con base en el objetivo, "
+                        "el simulador exige: mejor día ≤ límite × objetivo inicial. Con base "
+                        "en días positivos: mejor día ≤ límite × suma de sus ganancias. No es "
+                        "el número de días positivos ni el resultado neto después de restar "
+                        "los días negativos. Las ganancias se comparan en dinero, o en su "
+                        "equivalente como fracción del balance inicial.",
+                    ],
+                },
+                {
+                    "heading": CONSISTENCY_TABLE_COPY["es"]["rules"],
+                    "paragraphs": [
+                        "La tabla toma firma, programa, límite, base, fuente y fecha de las "
+                        "reglas publicadas en la calculadora de reto. Describe las evaluaciones "
+                        "incluidas; no extiende sus reglas a otras etapas o a retiros. El enlace "
+                        "de cada fila es la página de la firma de donde se leyó la regla, y la "
+                        "fecha es esa lectura, no una revisión de las condiciones de hoy.",
+                        "Varios programas publican una proporción sobre el resultado total. "
+                        "La calculadora usa el objetivo fijo como aproximación más estricta: un "
+                        "exceso sobre el objetivo no amplía el mejor día permitido. La tabla "
+                        "de reglas enlaza las fuentes y las calculadoras de cada firma, donde "
+                        "se detallan estas aproximaciones. Las condiciones de la firma pueden "
+                        "exigir más días o elevar el objetivo al exceder la concentración; "
+                        "ninguna de las dos equivale por sí sola a tocar un límite de pérdida.",
+                    ],
+                },
+                {
+                    "heading": CONSISTENCY_TABLE_COPY["es"]["cases"],
+                    "paragraphs": [
+                        _consistency_assumptions("es"),
+                        "Aplicamos las mismas entradas a MyFundedFutures Rapid EOD 50K y "
+                        "Builder 50K. El primero incluye la regla del mejor día y el segundo "
+                        "no la incluye en la evaluación recogida. También cambian otras "
+                        "condiciones: esta comparación entre programas no aísla por sí sola "
+                        "el efecto de la regla. La comparación dentro de la fila Rapid EOD "
+                        "sí separa alcanzar el objetivo de alcanzarlo dentro de la regla.",
+                        "El simulador revisa primero los límites de pérdida y después el "
+                        "objetivo con los días mínimos. Al primer cierre que lo alcanza, "
+                        "detiene la trayectoria y comprueba el mejor día. No añade días para "
+                        "diluir su peso. La diferencia entre las dos columnas no se suma a "
+                        "los límites ni a las trayectorias sin terminar. Todos los porcentajes "
+                        "usan el total de trayectorias como denominador.",
+                    ],
+                },
+                {
+                    "heading": CONSISTENCY_TABLE_COPY["es"]["sensitivity"],
+                    "paragraphs": [
+                        "En Rapid EOD mantenemos el porcentaje de aciertos y la relación "
+                        "entre ganancia y pérdida. Cambiamos una entrada cada vez: menos "
+                        "operaciones al día o menor riesgo por operación. Ambas reducen el "
+                        "tamaño posible de un día concentrado, pero también cambian el tiempo "
+                        "hasta el objetivo y la exposición a los límites. La tabla muestra "
+                        "esas diferencias, incluidas las trayectorias que tocan el límite.",
+                        "La mediana de días se calcula solo entre quienes alcanzan el "
+                        "objetivo: no es el plazo de una trayectoria cualquiera ni el tiempo "
+                        "necesario para corregir una concentración excesiva. Ninguna fila "
+                        "es una recomendación de tamaño o de compra de un reto.",
+                    ],
+                },
+                {
+                    "heading": "Qué no ve la calculadora y qué aporta un historial",
+                    "paragraphs": [
+                        "Los cierres diarios no muestran un trailing intradía, un máximo de "
+                        "equity entre cierres ni una pérdida flotante que luego se recupera. "
+                        "También quedan fuera restricciones de noticias, posiciones y sesión. "
+                        "Las cifras sintéticas no reconstruyen esas condiciones; una lectura "
+                        "favorable en esta tabla puede omitir una infracción dentro del día.",
+                        "Con un historial real, agrupa el resultado neto por sesión y compara "
+                        "el mejor día con la base exacta del programa. Conserva fechas, "
+                        "costos y balance inicial; para evaluar flotante necesitas además "
+                        "observaciones de equity dentro del día. Rigor extrae cierres diarios "
+                        "del archivo y utiliza el mismo simulador sobre esa serie. Agrupa por "
+                        "días UTC, que pueden diferir del corte horario de la firma.",
+                        "El formulario para subir tu historial y el informe de ejemplo están "
+                        "enlazados al final. El informe distingue lo medido en los datos "
+                        "aportados de lo declarado y de lo no medido. Remuestrear un historial "
+                        "sigue siendo una simulación condicionada a ese archivo; no recupera el "
+                        "flotante ausente ni anticipa el resultado de otro reto.",
+                    ],
+                },
+            ],
+            "en": [
+                {
+                    "heading": "What the best-day rule is and why it exists",
+                    "paragraphs": [
+                        "The rule limits concentration: the largest net daily gain must not "
+                        "exceed a fraction of the basis defined by the program. Its function "
+                        "is to require a result spread across days; a single exceptional "
+                        "session does not establish a repeatable pattern. Observed "
+                        "regularity is not evidence of future outcomes either.",
+                        "The basis matters as much as the percentage. With a target basis, "
+                        "the simulator requires: best day ≤ limit × initial target. With a "
+                        "positive-days basis: best day ≤ limit × sum of their gains. That "
+                        "is neither the count of positive days nor the net result after "
+                        "subtracting negative days. Gains are compared in money, or its "
+                        "equivalent as a fraction of the initial balance.",
+                    ],
+                },
+                {
+                    "heading": CONSISTENCY_TABLE_COPY["en"]["rules"],
+                    "paragraphs": [
+                        "The table reads the firm, program, limit, basis, source and date "
+                        "from the rules published in the challenge calculator. It describes "
+                        "the included evaluations; it does not extend their rules to other "
+                        "stages or withdrawals. Each row links the firm's page the rule was "
+                        "read from, and the date is that reading, not a review of today's "
+                        "conditions.",
+                        "Several programs publish a ratio against total profit. The "
+                        "calculator uses the fixed target as a stricter approximation: "
+                        "exceeding the target does not increase the permitted best day. The "
+                        "rules table links to the sources and to each firm's calculator, "
+                        "where these approximations are detailed. A firm's conditions may "
+                        "require more days or raise the target when concentration is too "
+                        "high; neither alone means hitting a loss limit.",
+                    ],
+                },
+                {
+                    "heading": CONSISTENCY_TABLE_COPY["en"]["cases"],
+                    "paragraphs": [
+                        _consistency_assumptions("en"),
+                        "We apply the same inputs to MyFundedFutures Rapid EOD 50K and "
+                        "Builder 50K. The former includes a best-day rule; the latter has "
+                        "none in the recorded evaluation. Other conditions also differ: "
+                        "comparing these programs does not isolate the rule's effect. "
+                        "Comparing the columns within the Rapid EOD row does separate "
+                        "reaching the target from reaching it within the rule.",
+                        "The simulator checks loss limits first, then the target and "
+                        "minimum days. At the first close reaching that target, it stops "
+                        "the path and checks the best day. It adds no days to dilute its "
+                        "weight. The difference between the columns is not added to loss "
+                        "limits or unfinished paths. Every percentage uses all paths as "
+                        "its denominator.",
+                    ],
+                },
+                {
+                    "heading": CONSISTENCY_TABLE_COPY["en"]["sensitivity"],
+                    "paragraphs": [
+                        "For Rapid EOD we keep the win rate and the gain-to-loss ratio. "
+                        "We change one input at a time: fewer trades per day or less risk "
+                        "per trade. Both reduce the possible size of a concentrated day, "
+                        "but also change time to target and exposure to loss limits. "
+                        "The table shows those differences, including paths hitting a limit.",
+                        "The median day count uses only paths reaching the target: it is "
+                        "neither a deadline for an arbitrary path nor the time required to "
+                        "correct excessive concentration. No row recommends a position "
+                        "size or buying a challenge.",
+                    ],
+                },
+                {
+                    "heading": "What the calculator misses and what a history adds",
+                    "paragraphs": [
+                        "Daily closes cannot show intraday trailing, an equity high "
+                        "between closes or a floating loss later recovered. News, position "
+                        "and session restrictions are also outside the model. Synthetic "
+                        "figures do not reconstruct these conditions; a favorable reading "
+                        "in this table can omit an intraday breach.",
+                        "With a real history, group the net result by session and compare "
+                        "the best day with the program's exact basis. Keep dates, costs "
+                        "and the initial balance; assessing floating equity also requires "
+                        "intraday equity observations. Rigor extracts daily closes from "
+                        "the file and uses the same simulator on that series. It groups "
+                        "by UTC days, which can differ from the firm's session boundary.",
+                        "The form to upload your history and the sample report are linked at "
+                        "the end. The report separates measurements of supplied data from "
+                        "declarations and unmeasured quantities. Resampling a history remains "
+                        "a simulation conditioned on that file; it cannot recover missing "
+                        "floating equity or predict the outcome of another challenge.",
+                    ],
+                },
+            ],
+            "pt": [
+                {
+                    "heading": "O que é a regra do melhor dia e para que serve",
+                    "paragraphs": [
+                        "A regra limita a concentração: o maior ganho líquido diário não "
+                        "pode exceder uma fração da base definida pelo programa. Sua função "
+                        "é exigir um resultado distribuído entre dias; uma sessão "
+                        "excepcional não descreve sozinha um padrão repetível. A "
+                        "regularidade observada também não é evidência do futuro.",
+                        "A base importa tanto quanto o percentual. Com base na meta, "
+                        "o simulador exige: melhor dia ≤ limite × meta inicial. Com base "
+                        "nos dias positivos: melhor dia ≤ limite × soma dos seus ganhos. "
+                        "Não é o número de dias positivos nem o resultado líquido depois "
+                        "de descontar os dias negativos. Os ganhos são comparados em "
+                        "dinheiro, ou no equivalente como fração do saldo inicial.",
+                    ],
+                },
+                {
+                    "heading": CONSISTENCY_TABLE_COPY["pt"]["rules"],
+                    "paragraphs": [
+                        "A tabela lê empresa, programa, limite, base, fonte e data das "
+                        "regras publicadas na calculadora de desafio. Descreve as avaliações "
+                        "incluídas; não estende suas regras a outras etapas ou saques. O link "
+                        "de cada linha é a página da empresa de onde a regra foi lida, e a "
+                        "data é essa leitura, não uma revisão das condições de hoje.",
+                        "Vários programas publicam uma proporção sobre o resultado total. "
+                        "A calculadora usa a meta fixa como aproximação mais estrita: "
+                        "um resultado acima da meta não amplia o melhor dia permitido. "
+                        "A tabela de regras tem links para as fontes e as calculadoras "
+                        "de cada empresa, que detalham essas aproximações. As condições "
+                        "da empresa podem exigir mais dias ou elevar a meta quando há "
+                        "concentração excessiva; nenhuma das duas equivale por si só "
+                        "a tocar um limite de perda.",
+                    ],
+                },
+                {
+                    "heading": CONSISTENCY_TABLE_COPY["pt"]["cases"],
+                    "paragraphs": [
+                        _consistency_assumptions("pt"),
+                        "Aplicamos as mesmas entradas a MyFundedFutures Rapid EOD 50K e "
+                        "Builder 50K. O primeiro inclui a regra do melhor dia e o segundo "
+                        "não a inclui na avaliação registrada. Outras condições também "
+                        "mudam: essa comparação entre programas não isola o efeito da "
+                        "regra. A comparação dentro da linha Rapid EOD separa atingir "
+                        "a meta de atingi-la dentro da regra.",
+                        "O simulador confere primeiro os limites de perda e depois a meta "
+                        "com os dias mínimos. No primeiro fechamento que a atinge, encerra "
+                        "a trajetória e confere o melhor dia. Não acrescenta dias para "
+                        "diluir o seu peso. A diferença entre as colunas não se soma aos "
+                        "limites nem às trajetórias sem terminar. Todos os percentuais "
+                        "usam o total de trajetórias como denominador.",
+                    ],
+                },
+                {
+                    "heading": CONSISTENCY_TABLE_COPY["pt"]["sensitivity"],
+                    "paragraphs": [
+                        "No Rapid EOD mantemos a taxa de acerto e a relação entre ganho "
+                        "e perda. Mudamos uma entrada por vez: menos operações por dia ou "
+                        "menor risco por operação. Ambas reduzem o tamanho possível de "
+                        "um dia concentrado, mas também mudam o tempo até a meta e a "
+                        "exposição aos limites. A tabela mostra essas diferenças, "
+                        "incluindo as trajetórias que tocam o limite.",
+                        "A mediana de dias considera apenas quem atinge a meta: não é "
+                        "o prazo de uma trajetória qualquer nem o tempo necessário "
+                        "para corrigir uma concentração excessiva. Nenhuma linha é "
+                        "uma recomendação de tamanho ou de compra de um desafio.",
+                    ],
+                },
+                {
+                    "heading": "O que a calculadora não vê e o que um histórico acrescenta",
+                    "paragraphs": [
+                        "Os fechamentos diários não mostram um trailing intradiário, "
+                        "um máximo de patrimônio entre fechamentos nem uma perda "
+                        "flutuante depois recuperada. Restrições de notícias, posições "
+                        "e sessão também ficam fora do modelo. Os números sintéticos "
+                        "não reconstroem essas condições; uma leitura favorável nesta "
+                        "tabela pode omitir uma infração dentro do dia.",
+                        "Com um histórico real, agrupe o resultado líquido por sessão "
+                        "e compare o melhor dia com a base exata do programa. Conserve "
+                        "datas, custos e saldo inicial; para avaliar o flutuante são "
+                        "necessárias também observações intradiárias de patrimônio. "
+                        "O Rigor extrai fechamentos diários do arquivo e usa o mesmo "
+                        "simulador nessa série. Agrupa por dias UTC, que podem diferir "
+                        "do corte horário da empresa.",
+                        "O formulário para enviar o seu histórico e o relatório de exemplo "
+                        "estão nos links ao final. "
+                        "O relatório distingue o que é medido nos dados enviados do "
+                        "que é declarado e do que não é medido. Reamostrar um histórico "
+                        "continua sendo uma simulação condicionada àquele arquivo; "
+                        "não recupera o flutuante ausente nem antecipa o resultado "
+                        "de outro desafio.",
+                    ],
+                },
+            ],
+        },
+        "faq": {
+            "es": [
+                {
+                    "q": "¿Alcanzar el objetivo significa estar dentro de la regla?",
+                    "a": "No. El resultado total y su concentración diaria son comprobaciones "
+                    "distintas. La tabla las separa al primer cierre que alcanza el objetivo.",
+                },
+                {
+                    "q": "¿Menor riesgo siempre mejora el resultado de la simulación?",
+                    "a": "No hay una relación universal. Puede reducir la concentración diaria "
+                    "y cambiar tanto la frecuencia de tocar límites como el tiempo necesario. "
+                    "Un horizonte finito también puede dejar trayectorias sin terminar.",
+                },
+            ],
+            "en": [
+                {
+                    "q": "Does reaching the target mean being within the rule?",
+                    "a": "No. The total result and its daily concentration are separate checks. "
+                    "The table separates them at the first close reaching the target.",
+                },
+                {
+                    "q": "Does less risk always improve the simulation outcome?",
+                    "a": "There is no universal relationship. It can reduce daily concentration "
+                    "and change both the frequency of hitting limits and the time required. "
+                    "A finite horizon can also leave paths unfinished.",
+                },
+            ],
+            "pt": [
+                {
+                    "q": "Atingir a meta significa estar dentro da regra?",
+                    "a": "Não. O resultado total e sua concentração diária são conferências "
+                    "distintas. A tabela as separa no primeiro fechamento que atinge a meta.",
+                },
+                {
+                    "q": "Menor risco sempre melhora o resultado da simulação?",
+                    "a": "Não há uma relação universal. Pode reduzir a concentração diária "
+                    "e mudar tanto a frequência de tocar limites quanto o tempo necessário. "
+                    "Um horizonte finito também pode deixar trajetórias sem terminar.",
+                },
+            ],
+        },
+        "related": [
+            {"kind": "challenge"},
+            {"kind": "rules"},
+            {"kind": "audience", "slug": "retos-prop-firm"},
+            {"kind": "article", "key": "cuantos-intentos-reto-prop-firm"},
+            {"kind": "sample"},
+        ],
+    },
+)
+
 ARTICLES_DATA += (
     {
         "key": RUIN_ARTICLE_KEY,
@@ -8971,6 +9597,8 @@ def related_links(article: Article, locale: str) -> tuple[tuple[str, str], ...]:
             links.append((ruin_calc.COPY[locale]["nav"], ruin_calc.ruin_url(locale)))
         elif kind == "challenge":
             links.append((challenge_calc.COPY[locale]["nav"], challenge_calc.challenge_url(locale)))
+        elif kind == "rules":
+            links.append((rules_table.COPY[locale]["nav"], rules_table.rules_table_url(locale)))
         elif kind == "reading":
             if link.get("example") == "win-rate":
                 label = {

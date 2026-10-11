@@ -27,6 +27,8 @@ Loss rules the simulator understands:
 - ``best_day_limit`` with ``best_day_basis``: the best day's gain may not
   exceed that share of the profit target (``profit_target``) or of the
   positive days' summed gain (``positive_days``); checked at the pass.
+  ``best_day_source_url`` is the firm's page that states that rule when it is
+  not ``source_url``; ``None`` means ``source_url`` is where it was read.
 
 ``markets`` lists what a program lets the trader trade (``MARKETS``), only when
 a page of the firm says so: ``markets_source`` is that page and
@@ -75,6 +77,8 @@ class ChallengeRules:
     #: share of the profit target or of the positive days' summed gain.
     best_day_limit: float | None = None
     best_day_basis: BestDayBasis | None = None
+    #: The firm's page that states the best-day rule, when it is not ``source_url``.
+    best_day_source_url: str | None = None
     #: What the program lets the trader trade (``MARKETS``), as the page at
     #: ``markets_source`` said on ``markets_as_of``; ``None`` when no page read says.
     markets: tuple[str, ...] | None = None
@@ -104,6 +108,11 @@ class ChallengeRules:
             raise ValueError(f"{self.key}: best_day_limit and best_day_basis go together")
         if self.best_day_limit is not None and not 0.0 < self.best_day_limit < 1.0:
             raise ValueError(f"{self.key}: best_day_limit must be a fraction in (0, 1)")
+        if self.best_day_source_url is not None:
+            if self.best_day_limit is None:
+                raise ValueError(f"{self.key}: best_day_source_url needs a best-day rule")
+            if not self.best_day_source_url.startswith("https://"):
+                raise ValueError(f"{self.key}: best_day_source_url must be an https page")
         if self.markets is not None:
             if not self.markets or any(market not in MARKETS for market in self.markets):
                 raise ValueError(f"{self.key}: markets must be a non-empty subset of MARKETS")
@@ -131,6 +140,10 @@ THE5ERS_HIGH_STAKES_URL = "https://the5ers.com/high-stakes/"
 THE5ERS_HYPER_GROWTH_URL = "https://the5ers.com/hyper-growth/"
 THE5ERS_BOOTCAMP_URL = "https://the5ers.com/bootcamp/"
 TOPSTEP_URL = "https://help.topstep.com/en/articles/8284204-what-is-the-maximum-loss-limit"
+#: The target and the consistency rule, read on the same day.
+TOPSTEP_CONSISTENCY_URL = (
+    "https://help.topstep.com/en/articles/8284208-what-is-the-consistency-target"
+)
 #: "Topstep is a Futures-only program": every CME Group product, no forex.
 TOPSTEP_PRODUCTS_URL = (
     "https://help.topstep.com/en/articles/8284206-when-and-what-products-can-i-trade"
@@ -165,8 +178,7 @@ _TOPSTEP_NOTES = (
     "Consistency target: the best day must stay at or below 55 % of the profit target, "
     "otherwise the target rises; checked when a path reaches the target, on daily closes.",
     "No time limit stated on the pages read.",
-    "Source for the target and consistency rule: "
-    "https://help.topstep.com/en/articles/8284208-what-is-the-consistency-target",
+    "Source for the target and consistency rule: " + TOPSTEP_CONSISTENCY_URL,
 )
 
 
@@ -196,6 +208,7 @@ def _topstep(size: str, maximum_loss: float) -> ChallengeRules:
         as_of=AS_OF,
         best_day_limit=0.55,
         best_day_basis="profit_target",
+        best_day_source_url=TOPSTEP_CONSISTENCY_URL,
         markets=("futures",),
         markets_source=TOPSTEP_PRODUCTS_URL,
         markets_as_of=MARKETS_AS_OF,
@@ -966,8 +979,13 @@ def _futures(
     markets_source: str,
     time: int | None = None,
     best: float | None = None,
+    best_source: str | None = None,
 ) -> ChallengeRules:
-    """A single-phase futures evaluation: its dollars over its account."""
+    """A single-phase futures evaluation: its dollars over its account.
+
+    ``best_source`` is the firm's page that states the best-day rule when the
+    program's ``source`` page does not.
+    """
     account, target, daily, loss = _FUTURES_DOLLARS[key]
     return ChallengeRules(
         key=key,
@@ -986,6 +1004,7 @@ def _futures(
         as_of=FUTURES_AS_OF,
         best_day_limit=best,
         best_day_basis=None if best is None else "profit_target",
+        best_day_source_url=best_source,
         markets=("futures",),
         markets_source=markets_source,
         markets_as_of=FUTURES_AS_OF,
@@ -1002,6 +1021,7 @@ _FUTURES_PRESETS: tuple[ChallengeRules, ...] = (
         best=0.50,
         notes=_TPT_NOTES,
         source=TPT_DRAWDOWN_URL,
+        best_source=TPT_CONSISTENCY_URL,
         markets_source=TPT_PRODUCTS_URL,
     ),
     _futures(
@@ -1013,6 +1033,7 @@ _FUTURES_PRESETS: tuple[ChallengeRules, ...] = (
         best=0.30,
         notes=_mff_notes("myfundedfutures-rapid-eod-50k", 30, 3),
         source=MFF_RAPID_EOD_URL,
+        best_source=MFF_CONSISTENCY_URL,
         markets_source=MFF_MARKETS_URL,
     ),
     _futures(
@@ -1032,6 +1053,7 @@ _FUTURES_PRESETS: tuple[ChallengeRules, ...] = (
             ),
         ),
         source=MFF_RAPID_URL,
+        best_source=MFF_CONSISTENCY_URL,
         markets_source=MFF_MARKETS_URL,
     ),
     _futures(
@@ -1051,6 +1073,7 @@ _FUTURES_PRESETS: tuple[ChallengeRules, ...] = (
             ),
         ),
         source=MFF_EVALUATION_URL,
+        best_source=MFF_CONSISTENCY_URL,
         markets_source=MFF_MARKETS_URL,
     ),
     _futures(
@@ -1181,6 +1204,7 @@ _FUTURES_PRESETS: tuple[ChallengeRules, ...] = (
         best=0.30,
         notes=_e2t_notes("earn2trade-tcp-25k", E2T_TCP_LADDER_URL),
         source=E2T_TCP_URL,
+        best_source=E2T_CONSISTENCY_URL,
         markets_source=E2T_TCP_URL,
     ),
     _futures(
@@ -1192,6 +1216,7 @@ _FUTURES_PRESETS: tuple[ChallengeRules, ...] = (
         best=0.30,
         notes=_e2t_notes("earn2trade-gauntlet-mini-50k", E2T_GAUNTLET_LADDER_URL),
         source=E2T_GAUNTLET_URL,
+        best_source=E2T_CONSISTENCY_URL,
         markets_source=E2T_GAUNTLET_URL,
     ),
     _futures(

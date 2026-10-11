@@ -100,6 +100,9 @@ def test_every_guide_exists_in_every_language_and_passes_the_guard() -> None:
         "fxblue",
         "robinhood",
         "zerodha",
+        "tradovate",
+        "topstepx",
+        "sierra-chart",
         "csv-universal",
     }
     for guide in GUIDES:
@@ -107,8 +110,8 @@ def test_every_guide_exists_in_every_language_and_passes_the_guard() -> None:
         assert guide.field in {"report", "optimization"}
         for text in guide.text.values():
             assert text.steps and text.tips
-    for words in _all_guide_texts():
-        assert find_claims(words) == [], words
+    for piece in _all_guide_texts():
+        assert find_claims(piece) == [], piece
 
 
 def test_guides_cover_every_report_format_family() -> None:
@@ -239,6 +242,7 @@ def test_every_sitemap_url_has_an_iso_lastmod_from_the_code(tmp_path: Path) -> N
     from quant_trade.audit.legal import LEGAL_PATHS, LEGAL_UPDATED
     from quant_trade.audit.seo import (
         CHALLENGE_PUBLISHED,
+        GUIDES_PUBLISHED,
         PAGE_DATES,
         RULES_TABLE_PUBLISHED,
         SIGNAL_SAMPLE_PUBLISHED,
@@ -247,6 +251,7 @@ def test_every_sitemap_url_has_an_iso_lastmod_from_the_code(tmp_path: Path) -> N
         rules_table_lastmod,
     )
 
+    assert ARTICLE_PUBLICATION_DATES["regla-de-consistencia-prop-firm"] == "2026-10-11"
     response = _client(tmp_path).get("/sitemap.xml")
     assert response.status_code == 200
     root = ElementTree.fromstring(response.content)
@@ -259,6 +264,7 @@ def test_every_sitemap_url_has_an_iso_lastmod_from_the_code(tmp_path: Path) -> N
         rules_table_lastmod(),
         OFFER_UPDATED,
         *ARTICLE_PUBLICATION_DATES.values(),
+        *GUIDES_PUBLISHED.values(),
     }
     assert ARTICLE_PUBLICATION_DATES["riesgo-de-ruina-intervalo-de-confianza"] == "2026-10-11"
     assert "2026-10-11" in known
