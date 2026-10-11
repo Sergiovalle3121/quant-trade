@@ -133,7 +133,7 @@ from quant_trade.audit.report import (
 )
 from quant_trade.audit.report import LABELS as REPORT_LABELS
 from quant_trade.audit.rules_table import COPY as RULES_COPY
-from quant_trade.audit.rules_table import rules_table_url
+from quant_trade.audit.rules_table import FILTER_MARKET, rules_table_url
 from quant_trade.audit.sample_publication import SamplePage, public_pages_line
 from quant_trade.audit.schema import MAX_UPLOAD_BYTES
 from quant_trade.audit.seo import (
@@ -4656,7 +4656,9 @@ def _guide_offer(
 ) -> str:
     """ "What you get" on a guide: the report's contents and the free report as the
     sign-up panel and /precios word them, the upload button, the sample report
-    and the free tool that fits the guide (``guide_capabilities.GUIDE_TOOL``).
+    and the free tool that fits the guide (``guide_capabilities.GUIDE_TOOL``);
+    when that tool is the challenge calculator, also the rules table and its
+    futures firms.
 
     ``offer`` is the service's (``free``, ``welcome`` or ``paid``). The free first
     report comes with the limits the upload applies to it (``web._first_look``:
@@ -4707,6 +4709,16 @@ def _guide_offer(
         if guide.slug in SIGNAL_SAMPLE_GUIDES
         else ""
     )
+    rules = ""
+    if tool == "challenge":
+        # The rules behind that tool: every firm on one page with source and
+        # date, and the same table narrowed to the futures firms.
+        futures = f"{rules_table_url(locale)}?{FILTER_MARKET}=futures"
+        rules = (
+            f"<p data-guide-rules>{_e(RULES_COPY[locale]['audience_line'])} "
+            f"<a href='{_e(rules_table_url(locale))}'>{_e(RULES_COPY[locale]['nav'])}</a> · "
+            f"<a href='{_e(futures)}'>{_e(words['futures_firms'])}</a></p>"
+        )
     return (
         "".join(f"<p>{_e(line)}</p>" for line in lines)
         + f"<p><a class='btn btn-dark' href='{_e(_form_url(locale))}'>{_e(words['upload_this'])}"
@@ -4715,6 +4727,7 @@ def _guide_offer(
         f"{signal}</p>{after}"
         f"<p>{_e(words['tool'])} <a href='{_e(_tool_url(tool, locale))}'>"
         f"{_e(_tool_name(tool, locale))}</a>. {_e(TOOLS_COPY[locale][tool]['question'])}</p>"
+        f"{rules}"
     )
 
 
@@ -4746,7 +4759,17 @@ def guide_page(
     meta = _public_meta(
         title, text.seo_description or text.summary, locale, guide_url(guide.slug, locale), base_url
     )
-    steps = "".join(f"<li>{_e(step)}</li>" for step in text.steps)
+    items = "".join(f"<li>{_e(step)}</li>" for step in text.steps)
+    steps = f"<ol class='list-steps steps-guide'>{items}</ol>"
+    if guide.sources:
+        # The platform's own pages the steps were read from, and the day.
+        links = " · ".join(
+            f"<a href='{_e(url)}' rel='noopener noreferrer'>{_e(title)}</a>"
+            for title, url in guide.sources
+        )
+        read_on = words["read_on"].format(date=_plain_date(guide.read_on, locale))
+        label = words["sources" if len(guide.sources) > 1 else "source"]
+        steps += f"<p class='muted guide-sources'>{_e(label)} {links}. {_e(read_on)}</p>"
     tips = "".join(f"<li>{icon('check')}<span>{_e(tip)}</span></li>" for tip in text.tips)
     does = "".join(
         f"<li>{icon('check')}<span>{_e(point)}</span></li>"
@@ -4757,7 +4780,7 @@ def guide_page(
     )
     sections = [
         (words["file"], f"<p>{_e(text.file)}</p>"),
-        (words["steps"], f"<ol class='list-steps steps-guide'>{steps}</ol>"),
+        (words["steps"], steps),
         (
             words["upload"],
             f"<p>{_e(text.upload)}</p>"
@@ -5171,6 +5194,22 @@ CHALLENGE_ARTICLE_COPY: dict[str, tuple[str, str, str]] = {
 #: the file at hand (a ``tools_hub.TOOL_KEYS`` key).
 AUDIENCE_TOOLS: dict[str, str] = {"retos-prop-firm": "challenge"}
 
+#: The challenge audience's companion tool, using declared figures without a file.
+AUDIENCE_RUIN_COPY: dict[str, str] = {
+    "es": (
+        "La calculadora de ruina estima la frecuencia de tocar un límite de pérdida "
+        "a partir de tus cifras declaradas."
+    ),
+    "en": (
+        "The risk-of-ruin calculator estimates how often a loss threshold is touched "
+        "from your declared figures."
+    ),
+    "pt": (
+        "A calculadora de ruína estima a frequência de tocar um limite de perda "
+        "a partir dos seus números declarados."
+    ),
+}
+
 #: Articles each case page lists before the other cases (article keys, in order).
 AUDIENCE_ARTICLES: dict[str, tuple[str, ...]] = {
     "retos-prop-firm": (
@@ -5294,6 +5333,10 @@ def audience_page(
         lead += (
             f"<p class='muted' data-audience-rules>{_e(RULES_COPY[locale]['audience_line'])} "
             f"<a href='{_e(rules_table_url(locale))}'>{_e(RULES_COPY[locale]['nav'])}</a></p>"
+        )
+        lead += (
+            f"<p class='muted' data-audience-ruin>{_e(AUDIENCE_RUIN_COPY[locale])} "
+            f"<a href='{_e(ruin_calc.ruin_url(locale))}'>{_e(_tool_name('ruin', locale))}</a></p>"
         )
     alternates = {lang: audience_url(audience.slug, lang) for lang in ("es", "en", "pt")}
     crumbs = f"<a href='{_e(_home(locale))}'>{_e(words['home'])}</a>" + _language_crumbs(
