@@ -64,6 +64,7 @@ from quant_trade.audit.articles import (
     next_step_call,
     next_step_links,
     related_links,
+    trailing_outcome_note,
     win_rate_interval,
 )
 from quant_trade.audit.audiences import (
@@ -5071,11 +5072,13 @@ def _trailing_article_tables(locale: str) -> dict[str, str]:
 
     def table(name: str, columns: tuple[str, ...], rows: str, note: str) -> str:
         headers = "".join(f"<th scope='col'>{_e(words[key])}</th>" for key in columns)
+        # The note stays outside the scrolling region, where a phone shows it
+        # whole: a <caption> is as wide as the table and scrolls away with it.
         return (
+            f"<p>{_e(note)}</p>"
             f"<div class='tscroll ruin-scroll' role='region' tabindex='0' "
             f"aria-label='{_e(words[name])}'><table class='article-trailing-{name}'>"
-            f"<caption>{_e(words[note])}</caption><thead><tr>{headers}</tr></thead>"
-            f"<tbody>{rows}</tbody></table></div>"
+            f"<thead><tr>{headers}</tr></thead><tbody>{rows}</tbody></table></div>"
         )
 
     rule_rows = "".join(
@@ -5088,18 +5091,21 @@ def _trailing_article_tables(locale: str) -> dict[str, str]:
     case_rows: list[str] = []
     for row in trailing_examples():
         rules = PRESETS[row.inputs.program]
-        outcomes = (
-            rules.profit_target,
-            row.target,
-            row.total_limit,
-            row.daily_limit,
-            row.unfinished,
+        # A program whose daily limit is not simulated has no daily outcome: a
+        # zero there would present an unmodelled rule as a simulated result.
+        daily = _e(words["no_daily"]) if rules.max_daily_loss is None else share(row.daily_limit)
+        cells = (
+            share(rules.profit_target),
+            share(row.target),
+            share(row.total_limit),
+            daily,
+            share(row.unfinished),
         )
         case_rows.append(
             f"<tr data-case='{_e(row.inputs.program)}'><th scope='row'>"
             f"{_e(rules.firm)} · {_e(rules.program)}</th>"
             f"<td>{loss_link(rules.total_loss_type)}</td>"
-            + "".join(f"<td>{share(value)}</td>" for value in outcomes)
+            + "".join(f"<td>{cell}</td>" for cell in cells)
             + "</tr>"
         )
     notes = "".join(
@@ -5111,13 +5117,13 @@ def _trailing_article_tables(locale: str) -> dict[str, str]:
     )
     return {
         words["rules"]: table(
-            "rules", ("program", "type", "limit", "source"), rule_rows, "rules_note"
+            "rules", ("program", "type", "limit", "source"), rule_rows, words["rules_note"]
         ),
         words["cases"]: table(
             "cases",
             ("program", "type", "target_rule", "target", "total", "daily", "unfinished"),
             "".join(case_rows),
-            "outcome_note",
+            trailing_outcome_note(locale),
         ),
         words["notes"]: f"<p>{_e(words['notes_note'])}</p>"
         f"<div class='article-trailing-notes'>{notes}</div>",

@@ -9532,14 +9532,17 @@ TRAILING_TABLE_COPY: dict[str, dict[str, str]] = {
         "total": "Límite total al cierre",
         "daily": "Límite diario al cierre",
         "unfinished": "Sin terminar",
+        "no_daily": "Sin regla diaria simulada",
         "rules_note": "DECLARED · Ejemplos del catálogo, agrupados por la regla simulada. "
         "La cifra es la distancia permitida respecto de la referencia, no el nivel del suelo. "
         "Las fuentes son lecturas fechadas, no consultas en tiempo real.",
         "outcome_note": "DECLARED · Frecuencias sobre todas las trayectorias de cada programa. "
         "Cada trayectoria termina en el primer desenlace; sus frecuencias suman el total. "
         "El objetivo no incluye la comprobación de la regla del mejor día.",
-        "notes_note": "Notas del catálogo, con su fuente y fecha. Distinguen mover el suelo "
-        "durante el día de vigilar durante el día un suelo calculado al cierre.",
+        "notes_note": "Notas del catálogo, citadas tal cual, con su fuente y fecha; «el "
+        "artículo» o «el resumen» que mencionan son páginas de la firma enlazadas en la propia "
+        "nota. Distinguen mover el suelo durante el día de vigilar durante el día un suelo "
+        "calculado al cierre.",
     },
     "en": {
         "rules": "Programs and limits recorded in the rules table",
@@ -9554,14 +9557,17 @@ TRAILING_TABLE_COPY: dict[str, dict[str, str]] = {
         "total": "Total limit at the close",
         "daily": "Daily limit at the close",
         "unfinished": "Unfinished",
+        "no_daily": "No simulated daily rule",
         "rules_note": "DECLARED · Catalog examples grouped by their simulated rule. "
         "The figure is the allowed distance from the reference, not the floor level. "
         "Sources are dated readings, not live lookups.",
         "outcome_note": "DECLARED · Frequencies over all paths for each program. Each path "
         "stops at its first outcome; outcome frequencies cover the total. The target column does "
         "not include the best-day rule check.",
-        "notes_note": "Catalog notes with their source and date. They distinguish moving "
-        "the floor during the day from monitoring a floor calculated at the close.",
+        "notes_note": "Catalog notes quoted as written, with their source and date; “the "
+        "article” or “the overview” they mention are the firm's pages linked in the note "
+        "itself. They distinguish moving the floor during the day from monitoring a floor "
+        "calculated at the close.",
     },
     "pt": {
         "rules": "Programas e limites registrados na tabela de regras",
@@ -9576,14 +9582,17 @@ TRAILING_TABLE_COPY: dict[str, dict[str, str]] = {
         "total": "Limite total no fechamento",
         "daily": "Limite diário no fechamento",
         "unfinished": "Sem terminar",
+        "no_daily": "Sem regra diária simulada",
         "rules_note": "DECLARED · Exemplos do catálogo, agrupados pela regra simulada. "
         "O número é a distância permitida em relação à referência, não o nível do piso. "
         "As fontes são leituras datadas, não consultas em tempo real.",
         "outcome_note": "DECLARED · Frequências sobre todas as trajetórias de cada programa. "
         "Cada trajetória termina no primeiro desfecho; suas frequências cobrem o total. A coluna "
         "da meta não inclui a conferência da regra do melhor dia.",
-        "notes_note": "Notas do catálogo, com fonte e data. Distinguem mover o piso durante "
-        "o dia de monitorar durante o dia um piso calculado no fechamento.",
+        "notes_note": "Notas do catálogo, citadas como estão, com fonte e data; «o artigo» "
+        "ou «o resumo» que mencionam são páginas da empresa com link na própria nota. "
+        "Distinguem mover o piso durante o dia de monitorar durante o dia um piso calculado "
+        "no fechamento.",
     },
 }
 
@@ -9591,6 +9600,8 @@ TRAILING_TABLE_COPY: dict[str, dict[str, str]] = {
 def _trailing_assumptions(locale: str) -> str:
     """The fixed declared inputs and the calculator settings, without running it on import."""
     value = TRAILING_INPUTS[0]
+    # "Up to": the longest horizon among the compared programs, read program by program.
+    horizon = max(challenge_calc.horizon(item.program) for item in TRAILING_INPUTS)
     return {
         "es": "DECLARED · {rate} % de aciertos, ganancia de {win} R, pérdida de {loss} R, "
         "riesgo de {risk} % del balance por operación y {trades} operaciones al día. La "
@@ -9627,8 +9638,73 @@ def _trailing_assumptions(locale: str) -> str:
         history=_num(challenge_calc.SYNTHETIC_DAYS, locale, 0),
         samples=_num(challenge_calc.SAMPLES, locale, 0),
         seed=challenge_calc.SEED,
-        horizon=challenge_calc.horizon(value.program),
+        horizon=_num(horizon, locale, 0),
     )
+
+
+def _trailing_type_names(locale: str) -> str:
+    """Bridge the section names to the calculator's wording, which the table and filter use."""
+    names = rules_table.loss_names(locale)
+    return {
+        "es": "La tabla y el filtro usan los nombres de la calculadora: estático aparece como "
+        "«{static}», trailing EOD como «{trailing}» y trailing EOD con fijación como «{lock}».",
+        "en": "The table and the filter use the calculator's names: static appears as "
+        "“{static}”, trailing EOD as “{trailing}” and locking trailing EOD as “{lock}”.",
+        "pt": "A tabela e o filtro usam os nomes da calculadora: estático aparece como "
+        "«{static}», trailing EOD como «{trailing}» e trailing EOD com fixação como «{lock}».",
+    }[locale].format(
+        static=names["static"], trailing=names["trailing_eod"], lock=names["trailing_eod_lock"]
+    )
+
+
+def _limit_pct(value: float, locale: str) -> str:
+    """A share as a percentage with only the decimals it needs: 3 %, 1,5 %, 2,25 %."""
+    pct = round(value * 100, 6)
+    decimals = 0 if pct.is_integer() else 1 if round(pct * 10, 6).is_integer() else 2
+    return f"{_num(pct, locale, decimals)} %"
+
+
+def trailing_outcome_note(locale: str) -> str:
+    """The cases table's note, plus why the daily column cannot fire with these inputs.
+
+    The worst synthetic day holds ``per_day`` losing trades, and no simulated day
+    starts above ``1 + profit_target`` because paths stop at the target. The extra
+    sentence is written only while that bound stays below the lowest simulated
+    daily limit; every figure in it comes from ``TRAILING_INPUTS`` and ``PRESETS``.
+    """
+    words = TRAILING_TABLE_COPY[locale]
+    value = TRAILING_INPUTS[0]
+    worst_day = value.loss * value.per_day
+    limits: list[float] = []
+    targets: list[float] = []
+    for item in TRAILING_INPUTS:
+        rules = challenge_calc.PRESETS[item.program]
+        if rules.max_daily_loss is not None:
+            limits.append(rules.max_daily_loss)
+            targets.append(rules.profit_target)
+    if not limits or worst_day * (1 + max(targets)) >= min(limits):
+        return words["outcome_note"]
+    sentence = {
+        "es": "Con {trades} operaciones al día, pérdida de {loss} R y riesgo del {risk} %, la "
+        "peor jornada posible resta el {worst} del balance, por debajo del límite diario más "
+        "bajo de estos programas ({daily}): con estas entradas esa columna no puede activarse, "
+        "y la celda indica dónde no hay regla diaria simulada.",
+        "en": "With {trades} trades a day, a {loss} R loss and {risk} % at risk, the worst "
+        "possible day loses {worst} of the balance, below the lowest daily limit among these "
+        "programs ({daily}): with these inputs that column cannot be triggered, and the cell "
+        "says where no daily rule is simulated.",
+        "pt": "Com {trades} operações por dia, perda de {loss} R e risco de {risk} %, o pior "
+        "dia possível perde {worst} do saldo, abaixo do menor limite diário destes programas "
+        "({daily}): com estas entradas essa coluna não pode ser acionada, e a célula indica "
+        "onde não há regra diária simulada.",
+    }[locale].format(
+        trades=_num(value.per_day, locale, 0),
+        loss=_num(value.avg_loss, locale, 0),
+        risk=_num(value.risk or 0, locale, 1),
+        worst=_limit_pct(worst_day, locale),
+        daily=_limit_pct(min(limits), locale),
+    )
+    return f"{words['outcome_note']} {sentence}"
 
 
 ARTICLES_DATA += (
@@ -9733,6 +9809,7 @@ ARTICLES_DATA += (
                         "Lee la fase, la fuente y las notas: la clasificación describe "
                         "la simulación, que en algunos programas adopta una lectura más "
                         "estricta cuando las páginas de la firma discrepan sobre la fijación.",
+                        _trailing_type_names("es"),
                     ],
                 },
                 {
@@ -9831,6 +9908,7 @@ ARTICLES_DATA += (
                         "table. Read the phase, source and notes: the classification "
                         "describes the simulation, which sometimes adopts a stricter "
                         "reading when the firm's pages disagree about the lock.",
+                        _trailing_type_names("en"),
                     ],
                 },
                 {
@@ -9934,6 +10012,7 @@ ARTICLES_DATA += (
                         "a simulação, que em alguns programas adota uma leitura "
                         "mais estrita quando as páginas da empresa divergem sobre "
                         "a fixação.",
+                        _trailing_type_names("pt"),
                     ],
                 },
                 {
@@ -9987,7 +10066,7 @@ ARTICLES_DATA += (
                     "q": "¿La tabla mide el riesgo del trailing intradía?",
                     "a": "No. Usa cierres diarios y reglas compatibles con ellos. Un "
                     "máximo flotante seguido de una caída dentro de la sesión puede "
-                    "quedar oculto. Esa probabilidad intradía queda NOT_MEASURED.",
+                    "quedar oculto. Esa probabilidad intradía queda sin medir aquí.",
                 },
             ],
             "en": [
@@ -10001,7 +10080,7 @@ ARTICLES_DATA += (
                     "q": "Does the table measure intraday trailing risk?",
                     "a": "No. It uses daily closes and compatible rules. A floating "
                     "high followed by a fall within the session may be hidden. "
-                    "That intraday probability remains NOT_MEASURED.",
+                    "That intraday probability remains unmeasured here.",
                 },
             ],
             "pt": [
@@ -10015,7 +10094,7 @@ ARTICLES_DATA += (
                     "q": "A tabela mede o risco do trailing intradiário?",
                     "a": "Não. Usa fechamentos diários e regras compatíveis. Um "
                     "máximo flutuante seguido de uma queda dentro da sessão pode "
-                    "ficar oculto. Essa probabilidade intradiária fica NOT_MEASURED.",
+                    "ficar oculto. Essa probabilidade intradiária fica sem medição aqui.",
                 },
             ],
         },

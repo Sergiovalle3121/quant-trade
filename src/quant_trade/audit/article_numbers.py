@@ -455,6 +455,8 @@ class TrailingCaveatRow:
 
 #: Prefixes select complete existing notes; they do not recreate their copy.
 #: A changed note fails visibly instead of silently removing a limitation.
+#: Every quoted program is in TRAILING_RULE_KEYS, and no two notes repeat the
+#: same wording with another URL (Earn2Trade's copies Take Profit Trader's).
 _TRAILING_CAVEATS: tuple[tuple[str, str], ...] = (
     ("ftmo-1step", "Maximum loss is an end-of-day trailing limit;"),
     ("e8-zero-100k", "The maximum loss trails the highest end-of-day balance;"),
@@ -465,7 +467,6 @@ _TRAILING_CAVEATS: tuple[tuple[str, str], ...] = (
     ("myfundedfutures-rapid-50k", "Only the evaluation is simulated;"),
     ("topstep-50k-combine", "Maximum loss trails the highest end-of-day balance"),
     ("take-profit-trader-test-50k", "The maximum-loss floor moves only at the day's close,"),
-    ("earn2trade-tcp-25k", "The maximum-loss floor moves only at the day's close,"),
 )
 
 

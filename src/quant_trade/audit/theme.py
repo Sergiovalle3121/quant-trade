@@ -1021,6 +1021,8 @@ color:var(--text-3)}
 .paper .ruin-scroll table{display:table;overflow:visible;margin:0;border:0;border-radius:0}
 .ruin-scroll th[scope=row]{position:sticky;left:0;z-index:1;background:#fafafb;box-shadow:inset -1px 0 0 var(--border)}
 .ruin-scroll thead th:first-child{position:sticky;left:0;z-index:2;box-shadow:inset -1px 0 0 var(--border)}
+/* Quoted catalog notes carry bare URLs: let them break, or a phone's viewport widens. */
+.article-trailing-notes p,.article-trailing-notes footer{overflow-wrap:anywhere}
 @media print{.tscroll{overflow:visible}.tscroll table{display:table!important;table-layout:auto;width:100%;font-size:7.5pt}.tscroll td{white-space:nowrap!important;padding:6px 5px!important}.tscroll th{white-space:normal!important;font-size:6.5pt;letter-spacing:0;padding:6px 5px!important}}
 .flag-cards .flag-code{margin-top:6px;font-family:var(--mono);font-size:.72rem;letter-spacing:.04em;color:var(--text-3)}.nm-list{list-style:none;margin:14px 0;padding:0;background:#fff;border:1px solid var(--border);border-radius:14px}.nm-list li{padding:12px 18px;border-top:1px solid var(--border)}.nm-list li:first-child{border-top:0}@media print{.flag-cards li,.nm-list li{break-inside:avoid;page-break-inside:avoid}td+td{overflow-wrap:anywhere}}.nm-list b{display:block;font-weight:600;font-size:.95rem}.nm-list span{display:block;margin-top:2px;color:var(--text-2);font-size:.9rem;line-height:1.5}
 .read-notes{margin:14px 0;padding:14px 18px;border-radius:14px;background:#fff;border:1px solid var(--border);font-size:.88rem;color:var(--text-2)}.read-notes p{margin:0 0 6px;font-weight:600;color:var(--text)}.read-notes ul{margin:0;padding-left:18px}.read-notes li{margin:3px 0;line-height:1.5}

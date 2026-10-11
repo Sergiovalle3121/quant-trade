@@ -83,3 +83,29 @@ prohibidas; `guard.find_claims` devuelve `[]` en los tres idiomas.
 Único aviso de pytest: deprecación preexistente de Starlette al usar httpx.
 
 No se hace push ni se crea PR. Se deja el trabajo en commits locales.
+
+## Revisión posterior (mismo día)
+
+- La columna «Límite diario al cierre» imprime «Sin regla diaria simulada» cuando
+  el preset no tiene `max_daily_loss` (Topstep); antes mostraba un 0,00 %
+  declarado para una regla que el simulador no modela. La nota de la tabla
+  añade, con cifras derivadas de las entradas y de `PRESETS`, que la peor
+  jornada posible (3 pérdidas de 0,5 %) queda por debajo del límite diario más
+  bajo (3 %), así que esa columna no puede activarse con estas entradas.
+- Las notas de las dos tablas salen del `<caption>` a un párrafo anterior al
+  contenedor desplazable: a 375 px el caption medía lo mismo que la tabla
+  (472 y 666 px) y solo se leía desplazando.
+- Las citas del catálogo llevan URL sin punto de corte; `theme.py` añade
+  `overflow-wrap:anywhere` a sus párrafos y pies. Medido a 375 px: el ancho de
+  desplazamiento pasa de 472 a 375 px en los tres idiomas.
+- El horizonte del párrafo de supuestos se lee por programa (máximo de los
+  tres, «hasta»), no solo del primero; la prueba comprueba que coinciden.
+- Un párrafo generado desde `rules_table.loss_names` enlaza «estático»,
+  «trailing EOD» y «con fijación» con los rótulos de la tabla y del filtro
+  («fija», «sigue al mayor cierre diario», …).
+- La introducción de las notas citadas aclara que «el artículo» y «el resumen»
+  de la nota de E8 son páginas de la firma enlazadas en la propia nota.
+- La respuesta de la FAQ dice «queda sin medir aquí» en lugar de incrustar el
+  código `NOT_MEASURED` a mitad de frase.
+- Se retira la cita de Earn2Trade, idéntica a la de Take Profit Trader salvo la
+  URL y de un programa ausente en la tabla de reglas.

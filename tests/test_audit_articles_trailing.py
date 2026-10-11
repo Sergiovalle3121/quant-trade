@@ -21,17 +21,19 @@ from quant_trade.audit import challenge_calc as calc  # noqa: E402
 from quant_trade.audit.articles import (  # noqa: E402
     ARTICLE_PUBLICATION_DATES,
     ARTICLES_BY_KEY,
+    TRAILING_TABLE_COPY,
     _num,
     article_url,
     articles_index_url,
     related_links,
+    trailing_outcome_note,
 )
 from quant_trade.audit.audiences import audience_url  # noqa: E402
 from quant_trade.audit.guard import find_claims  # noqa: E402
 from quant_trade.audit.i18n import localize  # noqa: E402
 from quant_trade.audit.pages import article_page  # noqa: E402
 from quant_trade.audit.prop_presets import PRESETS, TOTAL_LOSS_TYPES  # noqa: E402
-from quant_trade.audit.report import evidence_label  # noqa: E402
+from quant_trade.audit.report import evidence_label, localize_tags  # noqa: E402
 from quant_trade.audit.rules_table import loss_names, rules_table_url  # noqa: E402
 from quant_trade.audit.settings import AuditSettings  # noqa: E402
 from quant_trade.audit.store import make_store  # noqa: E402
@@ -124,6 +126,9 @@ def test_trailing_article_locales_metadata_guard_and_affiliation(
     assert {"es": "flotante", "en": "floating", "pt": "flutuante"}[locale] in article_text
     assert any(term in article_text for term in ("intradí", "intradi", "intraday"))
     assert "preset" not in article_text
+    for text in stored:
+        for code in re.finditer(r"(?:NOT_MEASURED|MEASURED|DECLARED)", text):
+            assert code.start() == 0 and text.startswith(f"{code.group()} · "), text
     detail = json.loads(
         re.findall(r"<script type='application/ld\+json'>(.*?)</script>", page, re.S)[0]
     )
@@ -173,6 +178,16 @@ def test_trailing_examples_use_identical_declared_inputs_and_recompute(article_k
         assert item.synthetic_days == calc.SYNTHETIC_DAYS == method["observations"]
         assert item.seed == calc.SEED == method["seed"]
         assert item.block_size == method["expected_block_size"]
+    # The assumptions paragraph says "up to N business days in these programs": one
+    # horizon shared by every row, read per program rather than from the first one.
+    horizons = {item.horizon for item in examples}
+    assert horizons == {calc.horizon(value.program) for value in inputs}
+    assert len(horizons) == 1
+    for locale in LOCALES:
+        words = ARTICLES_BY_KEY[article_key].text[locale]
+        cases = next(s for s in words.sections if s.heading == TRAILING_TABLE_COPY[locale]["cases"])
+        assert f" {_num(max(horizons), locale, 0)} " in cases.paragraphs[0]
+        assert f"{_num(calc.SAMPLES, locale, 0)} " in cases.paragraphs[0]
 
 
 @pytest.mark.parametrize("locale", LOCALES)
@@ -188,19 +203,47 @@ def test_trailing_case_table_prints_calculator_outcomes_as_declared(
         outcome = calc.compute(value).declared.outcome
         cells = _cells(rows[value.program])
         assert preset.firm in cells[0] and preset.program in cells[0]
+        daily = (
+            TRAILING_TABLE_COPY[locale]["no_daily"]
+            if preset.max_daily_loss is None
+            else _share(outcome["fail_daily_loss"]["value"], locale)
+        )
         assert cells[1:] == [
             loss_names(locale)[preset.total_loss_type],
             _share(preset.profit_target, locale),
-            *[
-                _share(outcome[field]["value"], locale)
-                for field in ("pass", "fail_total_loss", "fail_daily_loss", "unfinished")
-            ],
+            _share(outcome["pass"]["value"], locale),
+            _share(outcome["fail_total_loss"]["value"], locale),
+            daily,
+            _share(outcome["unfinished"]["value"], locale),
         ]
         assert f"{rules_table_url(locale)}?perdida={preset.total_loss_type}" in _links(
             rows[value.program]
         )
+    assert any(PRESETS[value.program].max_daily_loss is None for value in numbers.TRAILING_INPUTS)
     assert evidence_label("MEASURED", locale) not in _visible(table)
     assert find_claims(_visible(table)) == []
+    # The note is a paragraph before the scrolling region, not a <caption> as wide as
+    # the table, and it says why the daily column cannot fire: the worst synthetic day
+    # (per_day losses) stays below the lowest simulated daily limit of these programs.
+    assert "<caption>" not in page
+    note = trailing_outcome_note(locale)
+    assert note.startswith(TRAILING_TABLE_COPY[locale]["outcome_note"])
+    assert (
+        f"<p>{html.escape(localize_tags(note, locale))}</p><div class='tscroll ruin-scroll'" in page
+    )
+    base = numbers.TRAILING_INPUTS[0]
+    limits = [
+        limit
+        for value in numbers.TRAILING_INPUTS
+        if (limit := PRESETS[value.program].max_daily_loss) is not None
+    ]
+    assert base.loss * base.per_day < min(limits)
+    assert f" {_num(base.loss * base.per_day * 100, locale, 1)} %" in note
+    assert f"({_num(min(limits) * 100, locale, 0)} %)" in note
+    assert find_claims(note) == []
+    rules_note = TRAILING_TABLE_COPY[locale]["rules_note"]
+    rules_note = html.escape(localize_tags(rules_note, locale))
+    assert f"<p>{rules_note}</p><div class='tscroll ruin-scroll'" in page
 
 
 @pytest.mark.parametrize("locale", LOCALES)
@@ -236,6 +279,13 @@ def test_trailing_rules_match_dated_sourced_preset_figures(article_key: str, loc
         )
         assert f"<time datetime='{row.as_of}'>{row.as_of}</time>" in rows[row.key]
         assert find_claims(_visible(rows[row.key])) == []
+    words = ARTICLES_BY_KEY[article_key].text[locale]
+    section = next(s for s in words.sections if s.heading == TRAILING_TABLE_COPY[locale]["rules"])
+    bridge = section.paragraphs[-1]
+    for kind in TOTAL_LOSS_TYPES:
+        assert loss_names(locale)[kind] in bridge
+    assert {"es": "estático", "en": "static", "pt": "estático"}[locale] in bridge
+    assert bridge in _visible(page)
 
 
 @pytest.mark.parametrize("locale", LOCALES)
@@ -245,6 +295,12 @@ def test_trailing_caveats_quote_localized_notes_without_a_fictional_intraday_mod
     page = article_page(ARTICLES_BY_KEY[article_key], locale=locale, base_url=BASE)
     caveats = numbers.trailing_caveats()
     assert caveats
+    wordings = [re.sub(r"\(https?://[^)]+\)", "", row.note) for row in caveats]
+    assert len(set(wordings)) == len(wordings)
+    assert {row.key for row in caveats} <= set(numbers.TRAILING_RULE_KEYS)
+    intro = TRAILING_TABLE_COPY[locale]["notes_note"]
+    assert f"<p>{html.escape(intro)}</p><div class='article-trailing-notes'>" in page
+    assert {"es": "el artículo", "en": "the article", "pt": "o artigo"}[locale] in intro
     for row in caveats:
         preset = PRESETS[row.key]
         assert row.note in preset.notes
