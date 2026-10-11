@@ -4396,9 +4396,17 @@ TopstepX, troubleshooting and Trading Combine parameters articles
 read by their column names (`audit/universal.py`, `GUIDE_FORMATS`): Tradovate's
 Performance report as a trade list and its Orders report as a fill list,
 TopstepX's Trades tab as a trade list (a file with a single time column is
-refused, as the guide warns), Sierra Chart's Trade Activity tab (tab-delimited
+refused, as the guide warns, and the column mapping does not fix that:
+`mapping.MAPPABLE_CODES`), Sierra Chart's Trade Activity tab (tab-delimited
 text, Fills rows kept) as a fill list and its Trades tab as a trade list once
-`Trade Quantity` is named as the quantity on the form. Their free tool is the
+`Trade Quantity` is named as the quantity on the form and the default BP/EP
+position markers are turned off (Edit >> Include Begin/End Indicators in Trades
+List), which the importer otherwise refuses. The guides say only what those
+pages say: Tradovate's time-zone article covers the Notification Ticker alone,
+its Account Reports article names Live and Demo accounts and lists no fields,
+Topstep calls the file a CSV only for the Orders export, and Sierra Chart's
+documentation describes a tab-delimited text file and no other format. Their
+free tool is the
 challenge calculator, and "What you get" also links the rules table and the
 same table narrowed to the futures firms (`?mercado=futures`). Their sitemap
 date is their publication (`seo.GUIDES_PUBLISHED`). Rithmic's R | Trader Pro has

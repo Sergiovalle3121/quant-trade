@@ -4757,7 +4757,8 @@ def guide_page(
             for title, url in guide.sources
         )
         read_on = words["read_on"].format(date=_plain_date(guide.read_on, locale))
-        steps += f"<p class='muted guide-sources'>{_e(words['source'])} {links}. {_e(read_on)}</p>"
+        label = words["sources" if len(guide.sources) > 1 else "source"]
+        steps += f"<p class='muted guide-sources'>{_e(label)} {links}. {_e(read_on)}</p>"
     tips = "".join(f"<li>{icon('check')}<span>{_e(tip)}</span></li>" for tip in text.tips)
     does = "".join(
         f"<li>{icon('check')}<span>{_e(point)}</span></li>"

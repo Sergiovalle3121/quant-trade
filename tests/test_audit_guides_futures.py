@@ -4,10 +4,11 @@ Each guide's steps come from the platform's own help pages, named on the page
 under the steps with the day they were read (``Guide.sources``,
 ``Guide.read_on``). None of those pages publishes the file's headers, so each
 file is read by its column names (``audit/universal.py``): a synthetic fixture
-per file shape goes through the importer here, and the two shapes the importer
-refuses are refused the way the guide warns. The pages link the challenge
-calculator, the rules table and its futures firms, carry their publication date
-in the sitemap, and promise nothing. Rithmic's R | Trader Pro has no guide: its
+per file shape goes through the importer here, and the shapes the importer
+refuses (a single time column, the Trades tab with its default BP/EP markers or
+without its quantity named) are refused the way the guide warns. The pages link
+the challenge calculator, the rules table and its futures firms, carry their
+publication date in the sitemap, and promise nothing. Rithmic's R | Trader Pro has no guide: its
 official pages describe no export (``docs/AUDIT_SAAS.md``).
 """
 
@@ -41,6 +42,7 @@ from quant_trade.audit.importers import (  # noqa: E402
     ReportFormatError,
     import_report,
 )
+from quant_trade.audit.mapping import MAPPABLE_CODES  # noqa: E402
 from quant_trade.audit.rules_table import FILTER_MARKET, rules_table_url  # noqa: E402
 from quant_trade.audit.seo import GUIDES_PUBLISHED, SITE_UPDATED, page_lastmod  # noqa: E402
 from quant_trade.audit.settings import AuditSettings  # noqa: E402
@@ -160,6 +162,8 @@ def test_every_futures_guide_names_its_official_sources_and_promises_nothing() -
         for locale in LOCALES:
             tips = " ".join(guide.text[locale].tips)
             assert NOT_AFFILIATED[locale] in tips, (slug, locale)
+            # The index card prints the summary: no longer than the other guides'.
+            assert len(guide.text[locale].summary) <= 130, (slug, locale)
             for piece in _texts(slug, locale):
                 assert find_claims(piece) == [], (slug, locale, piece)
                 lowered = piece.lower()
@@ -235,12 +239,42 @@ def test_a_topstepx_file_with_one_time_column_is_refused_as_the_guide_warns() ->
     with pytest.raises(ReportFormatError) as refused:
         import_report(data, "trades.csv")
     assert "opening time" in str(refused.value)
-    for locale, phrase in (
-        ("es", "una sola columna de hora"),
-        ("en", "a single time column"),
-        ("pt", "uma só coluna de hora"),
+    # Naming the column on the form does not help: this refusal is not one the
+    # mapping page is offered for, so the guide says the file is refused instead
+    # of promising a mapping.
+    assert refused.value.code == "universal_close_time_only"
+    assert refused.value.code not in MAPPABLE_CODES
+    for columns in ({"entry_time": "Time"}, {"exit_time": "Time"}):
+        with pytest.raises(ReportFormatError) as again:
+            import_report(data, "trades.csv", columns=columns)
+        assert again.value.code == refused.value.code, columns
+    for locale, phrase, refuses, no_fix in (
+        ("es", "una sola columna de hora", "el informe lo rechaza", "no lo arregla"),
+        ("en", "a single time column", "the report refuses it", "does not fix that"),
+        ("pt", "uma só coluna de hora", "o relatório o recusa", "não resolve"),
     ):
-        assert phrase in " ".join(GUIDES_BY_SLUG["topstepx"].text[locale].tips), locale
+        tips = " ".join(GUIDES_BY_SLUG["topstepx"].text[locale].tips)
+        assert phrase in tips and refuses in tips and no_fix in tips, locale
+
+
+def test_the_sierra_chart_trades_tab_with_bp_ep_markers_is_refused_as_the_guide_warns() -> None:
+    # Saved as Sierra Chart displays it by default, every Trades row carries the
+    # BP (Begin Position) and EP (End Position) suffixes after its date-times and
+    # the importer reads no closed trade: the guide says to turn them off first.
+    rows = (FIXTURES / "sierra_chart_trades.txt").read_text(encoding="utf-8").splitlines()
+    marked = [rows[0]]
+    for row in rows[1:]:
+        cells = row.split("\t")
+        cells[2] += " BP"
+        cells[3] += " EP"
+        marked.append("\t".join(cells))
+    data = ("\n".join(marked) + "\n").encode("utf-8")
+    with pytest.raises(ReportFormatError):
+        import_report(data, "Trades.txt", columns={"quantity": "Trade Quantity"})
+    for locale in LOCALES:
+        steps = " ".join(GUIDES_BY_SLUG["sierra-chart"].text[locale].steps)
+        assert "Edit >> Include Begin/End Indicators in Trades List" in steps, locale
+        assert " BP " in steps and " EP" in steps, locale
 
 
 def test_the_sierra_chart_trades_tab_needs_its_quantity_named_as_the_guide_says() -> None:
@@ -276,7 +310,11 @@ def test_the_pages_link_the_calculator_the_rules_table_and_the_futures_firms(
             # The official pages the steps come from, under the steps, with the day.
             steps = _section(page, words["steps"])
             assert "class='muted guide-sources'" in steps, (slug, locale)
-            assert html.escape(words["source"], quote=True) in steps
+            # "Sources:" before several links, "Source:" before one.
+            label = words["sources" if len(guide.sources) > 1 else "source"]
+            assert f"guide-sources'>{html.escape(label, quote=True)} <a " in steps
+            if len(guide.sources) > 1:
+                assert f"'>{html.escape(words['source'], quote=True)} <a " not in steps
             for title, url in guide.sources:
                 link = (
                     f"<a href='{html.escape(url, quote=True)}' rel='noopener noreferrer'>"
