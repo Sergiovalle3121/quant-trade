@@ -4,12 +4,15 @@ The finite catalogue names pages, never a visitor's inputs or results. Firm
 names come from the same catalogue as the challenge pages, without logos or
 endorsements. Rendering uses trusted inline SVG only: no database, network,
 file reads or file writes. Missing Cairo remains an optional rendering failure
-so the route can serve the site's default social image.
+so the route can serve the site's default social image; a failure is
+remembered briefly so a server without Cairo does not retry on every request.
 """
 
 from __future__ import annotations
 
 import html
+import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from threading import Lock
 from types import MappingProxyType
@@ -26,6 +29,8 @@ _FIRM_NAMES = MappingProxyType(dict(FIRMS))
 _INK = "#202c36"
 _MUTED = "#4c5b67"
 _ACCENT = "#245d85"
+#: Seconds a failed render is remembered before the renderer is tried again.
+FAILURE_TTL = 30.0
 
 
 @dataclass(frozen=True)
@@ -45,7 +50,7 @@ _COPY: dict[str, dict[str, _CardText]] = {
             "Riesgo, rachas y límites del modelo",
         ),
         "reglas-prop-firm": _CardText(
-            ("Tabla de reglas", "de prop firm"),
+            ("Tabla de reglas", "de prop firms"),
             "{count} firmas, límites, fuentes y fechas",
         ),
     },
@@ -73,12 +78,12 @@ _COPY: dict[str, dict[str, _CardText]] = {
             "Risco, sequências e limites do modelo",
         ),
         "reglas-prop-firm": _CardText(
-            ("Tabela de regras", "de prop firm"),
+            ("Tabela de regras", "de prop firms"),
             "{count} empresas, limites, fontes e datas",
         ),
     },
 }
-_TOOLS = {"es": "HERRAMIENTAS", "en": "RESEARCH TOOLS", "pt": "FERRAMENTAS"}
+_TOOLS = {"es": "HERRAMIENTAS", "en": "TOOLS", "pt": "FERRAMENTAS"}
 _FIRM_DETAIL = {
     "es": "Reglas con fuente y fecha",
     "en": "Rules with sources and dates",
@@ -206,13 +211,24 @@ class ToolPNGCache:
     """Cache only successful renders from the finite published catalogue.
 
     At most three languages times (three tools plus the firm pages) can be
-    retained. A lock makes concurrent first requests share one render. Failure
-    is never cached, so installing or restoring Cairo needs no cache reset.
+    retained. A lock makes concurrent first requests share one render. A
+    failed render is remembered for ``failure_ttl`` seconds and then retried,
+    so a server without Cairo does not pay the failed import on every
+    request, while installing or restoring Cairo needs no cache reset.
     """
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        failure_ttl: float = FAILURE_TTL,
+        clock: Callable[[], float] = time.monotonic,
+    ) -> None:
+        if failure_ttl < 0:
+            raise ValueError("failure_ttl must not be negative")
         self._entries: dict[tuple[str, str, str], bytes] = {}
         self._lock = Lock()
+        self._failure_ttl = failure_ttl
+        self._clock = clock
+        self._failed_at: float | None = None
 
     def get(self, kind: str, locale: str, firm: str = "") -> bytes | None:
         """Return cached bytes, or ``None`` when the optional renderer fails."""
@@ -221,9 +237,15 @@ class ToolPNGCache:
         with self._lock:
             if key in self._entries:
                 return self._entries[key]
+            now = self._clock()
+            if self._failed_at is not None and now - self._failed_at < self._failure_ttl:
+                return None
             png = raster.card_png(tool_card_svg(kind, locale, firm))
-            if png is not None:
-                self._entries[key] = png
+            if png is None:
+                self._failed_at = now
+                return None
+            self._failed_at = None
+            self._entries[key] = png
             return png
 
     def __len__(self) -> int:
@@ -231,4 +253,11 @@ class ToolPNGCache:
             return len(self._entries)
 
 
-__all__ = ["CARD_SIZE", "TOOL_KINDS", "ToolPNGCache", "tool_card_svg", "tool_image_path"]
+__all__ = [
+    "CARD_SIZE",
+    "FAILURE_TTL",
+    "TOOL_KINDS",
+    "ToolPNGCache",
+    "tool_card_svg",
+    "tool_image_path",
+]

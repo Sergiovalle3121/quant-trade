@@ -18,12 +18,19 @@ pytest.importorskip("sqlalchemy")
 
 from fastapi.testclient import TestClient  # noqa: E402
 
-from quant_trade.audit import challenge_calc, raster, ruin_calc, rules_table  # noqa: E402
+from quant_trade.audit import (  # noqa: E402
+    challenge_calc,
+    raster,
+    ruin_calc,
+    rules_table,
+    tool_cards,
+)
 from quant_trade.audit.guard import find_claims  # noqa: E402
 from quant_trade.audit.i18n import spanish  # noqa: E402
 from quant_trade.audit.settings import AuditSettings  # noqa: E402
 from quant_trade.audit.store import make_store  # noqa: E402
 from quant_trade.audit.tool_cards import (  # noqa: E402
+    FAILURE_TTL,
     TOOL_KINDS,
     ToolPNGCache,
     tool_card_svg,
@@ -51,6 +58,16 @@ AFFILIATION = {
     "en": "Rigor is not affiliated",
     "pt": "A Rigor não é afiliada",
 }
+
+
+class _Clock:
+    """A manual monotonic clock for the cache's short memory of failures."""
+
+    def __init__(self) -> None:
+        self.now = 1000.0
+
+    def __call__(self) -> float:
+        return self.now
 
 
 def _image_path(kind: str, locale: str, firm: str = "") -> str:
@@ -268,6 +285,8 @@ def test_og_queries_do_not_render_new_cards_write_files_or_set_cookies(
 def test_og_renderer_failure_serves_default_from_memory_and_can_recover(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, locale: str, failure: str
 ) -> None:
+    clock = _Clock()
+    monkeypatch.setattr(tool_cards, "ToolPNGCache", lambda: ToolPNGCache(clock=clock))
     client = _client(tmp_path, monkeypatch)
     default = client.get(f"/static/og-{locale}.png").content
     _assert_png(default)
@@ -291,7 +310,15 @@ def test_og_renderer_failure_serves_default_from_memory_and_can_recover(
     def forbidden(*args: object, **kwargs: object) -> None:
         pytest.fail("The fallback must already be in memory")
 
+    attempts: list[str] = []
+    real_card_png = raster.card_png
+
+    def counted(svg: str) -> bytes | None:
+        attempts.append(svg)
+        return real_card_png(svg)
+
     with monkeypatch.context() as renderer_failure:
+        renderer_failure.setattr(raster, "card_png", counted)
         if failure == "missing_import":
             renderer_failure.setattr(builtins, "__import__", without_cairo)
         else:
@@ -313,7 +340,13 @@ def test_og_renderer_failure_serves_default_from_memory_and_can_recover(
             assert page.status_code == 200
             assert _meta(page.text, "og:image") == BASE + path
             assert _meta(page.text, "twitter:image") == BASE + path
+    # One failed attempt covers the whole window; the rest never retry the import.
+    assert len(attempts) == 1
     monkeypatch.setattr(raster, "card_png", lambda svg: MOCK_PNG)
+    remembered = client.get(_image_path("calculadora-ruina", locale))
+    assert remembered.content == default
+    assert remembered.headers["cache-control"] == "no-store"
+    clock.now += FAILURE_TTL
     for kind, firm in CARDS:
         recovered = client.get(_image_path(kind, locale, firm))
         assert recovered.status_code == 200
@@ -339,3 +372,91 @@ def test_og_unknown_names_are_not_dynamic_renderer_inputs(
     ):
         response = client.get(_image_path(kind, locale, firm))
         assert response.status_code == 404
+
+
+def test_og_failed_render_is_remembered_briefly_then_retried(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    clock = _Clock()
+    outcomes: list[bytes | None] = [None]
+    attempts: list[str] = []
+
+    def render(svg: str) -> bytes | None:
+        attempts.append(svg)
+        return outcomes[-1]
+
+    monkeypatch.setattr(raster, "card_png", render)
+    cache = ToolPNGCache(clock=clock)
+    for locale in LOCALES:
+        for kind, firm in CARDS:
+            assert cache.get(kind, locale, firm) is None
+    assert len(attempts) == 1
+    assert len(cache) == 0
+    clock.now += FAILURE_TTL / 2
+    assert cache.get("calculadora-ruina", "es") is None
+    assert len(attempts) == 1
+    clock.now += FAILURE_TTL / 2
+    assert cache.get("calculadora-ruina", "es") is None
+    assert len(attempts) == 2
+    # Recovery needs no reset: once the window elapses, a working renderer is used.
+    outcomes.append(MOCK_PNG)
+    clock.now += FAILURE_TTL
+    assert cache.get("calculadora-ruina", "es") is MOCK_PNG
+    assert len(attempts) == 3
+    assert len(cache) == 1
+    # A success forgets the failure, and cached cards never depend on the memory.
+    outcomes.append(None)
+    assert cache.get("reglas-prop-firm", "en") is None
+    assert cache.get("calculadora-ruina", "es") is MOCK_PNG
+    assert len(attempts) == 4
+    with pytest.raises(ValueError):
+        ToolPNGCache(failure_ttl=-1.0)
+    retry_always = ToolPNGCache(failure_ttl=0.0, clock=clock)
+    assert retry_always.get("calculadora-reto", "pt") is None
+    assert retry_always.get("calculadora-reto", "pt", "ftmo") is None
+    assert len(attempts) == 6
+
+
+def test_og_catalogue_wording_is_checked_when_the_app_starts(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr("quant_trade.audit.web.pdf_lib.available", lambda: False)
+    monkeypatch.setattr(tool_cards, "find_claims", lambda text: [{"pattern": "x"}])
+    settings = AuditSettings(database_url=f"sqlite:///{tmp_path}/audit.db", base_url=BASE)
+    store = make_store(settings.database_url)
+    try:
+        with pytest.raises(ValueError, match="unsupported wording"):
+            create_app(settings, store)
+    finally:
+        store.engine.dispose()
+
+
+def test_og_guard_disagreement_at_request_time_serves_default_not_500(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    client = _client(tmp_path, monkeypatch)
+    defaults = {locale: client.get(f"/static/og-{locale}.png").content for locale in LOCALES}
+    _forbid_external_io(client, monkeypatch)
+
+    def forbidden(svg: str) -> bytes:
+        raise AssertionError("Rejected wording must never reach the renderer")
+
+    with monkeypatch.context() as guard_hit:
+        guard_hit.setattr(tool_cards, "find_claims", lambda text: [{"pattern": "x"}])
+        guard_hit.setattr(raster, "card_png", forbidden)
+        for locale in LOCALES:
+            for kind, firm in CARDS:
+                path = _image_path(kind, locale, firm)
+                response = client.get(path, params={"ref": "reto"})
+                assert response.status_code == 200, path
+                assert response.headers["content-type"] == "image/png"
+                assert response.content == defaults[locale]
+                assert response.headers["cache-control"] == "no-store"
+                assert "set-cookie" not in response.headers
+    monkeypatch.setattr(raster, "card_png", lambda svg: MOCK_PNG)
+    recovered = client.get(_image_path("calculadora-ruina", "es"))
+    assert recovered.status_code == 200
+    assert recovered.content == MOCK_PNG
+    assert recovered.headers["cache-control"] == "public, max-age=86400"
+    client.close()
+    client.app.state.store.engine.dispose()

@@ -1311,6 +1311,10 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         for locale in REPORT_LOCALES
         for firm in (("", *challenge_calc.FIRMS) if kind == "calculadora-reto" else ("",))
     }
+    # Wording the guard rejects must fail here, when the app starts, never in
+    # a public request.
+    for kind, locale, firm in tool_png_paths.values():
+        tool_cards.tool_card_svg(kind, locale, firm)
     # Load the packaged fallback once, never from disk during an OG request.
     tool_default_images = {
         locale: (Path(__file__).with_name("static") / og_image_name("", locale)).read_bytes()
@@ -2098,7 +2102,12 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     def tool_card_png(request: Request) -> Response:
         """Fixed public tool previews; queries cannot alter the image or cache key."""
         kind, locale, firm = tool_png_paths[request.url.path]
-        png = tool_images.get(kind, locale, firm)
+        try:
+            png = tool_images.get(kind, locale, firm)
+        except ValueError:
+            # The catalogue passed the guard at start-up; a later disagreement
+            # still serves the default image, never a 500.
+            png = None
         if png is None:
             return Response(
                 content=tool_default_images[locale],
