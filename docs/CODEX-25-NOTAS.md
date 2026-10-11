@@ -10,7 +10,9 @@ Base local de las comprobaciones: `266f344`.
   con `ruin_calc.compute`; cada celda conserva la etiqueta de evidencia declarada.
 - Enlaces a las calculadoras de ruina, aciertos y reto, al artículo de rachas,
   a la subida y al informe de ejemplo. Fecha incluida en sitemap y JSON-LD.
-- La tabla usa el contenedor desplazable existente, también accesible por teclado.
+- La tabla usa el contenedor desplazable existente, también accesible por teclado;
+  en pantallas estrechas la nota va en un párrafo antes de la tabla y la primera
+  columna queda fija al desplazar (ver «Revisión» abajo).
 
 ## Supuestos e interpretación
 
@@ -80,3 +82,30 @@ la integración con `httpx`; no impide ejecutar las comprobaciones.
 No queda trabajo solicitado pendiente. No se ha hecho push ni creado PR.
 La única advertencia de las pruebas es la deprecación preexistente de Starlette
 indicada arriba; no se cambiaron dependencias para este artículo.
+
+## Revisión posterior (2026-10-11)
+
+Ajustes aplicados sobre `eee915d` tras la revisión del orquestador:
+
+- La tabla redondea como la calculadora enlazada: un decimal en probabilidades y
+  tasas (`ruin_calc._percent`) y esperanza con signo a dos decimales
+  (`ruin_calc._signed`, compartida con `ruin_pages`). Antes mostraba 0,15 % donde
+  la calculadora muestra 0,1 %, y 26,57 % frente a 26,6 %. El cero de la tercera
+  fila se explica con el conteo del motor (`RUIN_THIRD_CASE_RUINED_PATHS`, 0 de
+  4.000), porque con un decimal 0,0 % no distingue ninguna trayectoria de una.
+- La columna «Ganancia / pérdida» usa `_num(…, locale, 1)` en la página y en el
+  test, en vez de `:g` sin localizar.
+- Texto: «antes de terminar el horizonte (aquí, 500 operaciones)» en vez de «el
+  número declarado de operaciones»; «cambian las tres columnas de límite inferior»
+  en vez de «la columna de sensibilidad»; encabezado EN con comillas en «compatible
+  with the data»; en PT «limite de ruína» para el umbral y «limite inferior» para
+  el de Wilson, alineado con la calculadora.
+- Móvil (375 px): la nota sale del `<caption>` a un `<p>` antes de la tabla; el
+  envoltorio `.tscroll.ruin-scroll` es el que se desplaza (la tabla vuelve a
+  `display:table`, como `.fund-cal`), así el `tabindex` sirve también en móvil y
+  la primera columna queda fija con `position:sticky`.
+- La meta description del índice de artículos nombra el tema nuevo en es/en/pt
+  (159/155/155 caracteres).
+- Tests: `test_audit_articles_ruin.py` comprueba además que cada cifra de la tabla
+  aparece en la página de la calculadora para las mismas entradas, que la nota
+  precede a la región desplazable y que la descripción del índice nombra el tema.

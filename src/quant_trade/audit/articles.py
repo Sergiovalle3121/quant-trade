@@ -41,6 +41,7 @@ from quant_trade.audit.article_numbers import (
     RUIN_INPUTS,
     RUIN_MIN_TRADES,
     RUIN_RISK_PCT,
+    RUIN_THIRD_CASE_RUINED_PATHS,
     RUIN_THRESHOLD_PCT,
     RUIN_WINRATE_READING,
     STREAK_EXAMPLE,
@@ -630,10 +631,10 @@ RUIN_TABLE_COPY: dict[str, tuple[str, ...]] = {
         "Operações por trás",
         "Ganho / perda",
         "Esperança (R)",
-        "Tocar o limite",
+        "Tocar o limite de ruína",
         "Acerto: limite inferior",
         "Esperança: limite inferior (R)",
-        "Tocar o limite: limite inferior",
+        "Tocar o limite de ruína: limite inferior",
         "DECLARED · Entradas ilustrativas e resultados do modelo. As probabilidades "
         "são frequências de trajetórias simuladas; não são medições de um arquivo.",
     ),
@@ -764,7 +765,7 @@ ARTICLES_COPY: dict[str, dict[str, str]] = {
         "title": "Artículos sobre backtests",
         "summary": (
             "Artículos sobre backtests: costos, MT5, Sharpe deflactado, Monte Carlo, rachas, prop "
-            "firms, señales, bots con IA, % de aciertos y optimizador."
+            "firms, señales, bots con IA, % de aciertos, riesgo de ruina y optimizador."
         ),
         "intro": "Lecturas cortas sobre qué mirar en un backtest antes de confiar en él.",
         "related": "Relacionado",
@@ -784,7 +785,7 @@ ARTICLES_COPY: dict[str, dict[str, str]] = {
         "title": "Articles about backtests",
         "summary": (
             "Articles about backtests: costs, MT5, deflated Sharpe, Monte Carlo, losing streaks, "
-            "prop firms, signals, AI bots, win rate and the optimiser."
+            "prop firms, signals, AI bots, win rate, risk of ruin and the optimiser."
         ),
         "intro": "Short reads on what to look at in a backtest before you trust it.",
         "related": "Related",
@@ -804,7 +805,7 @@ ARTICLES_COPY: dict[str, dict[str, str]] = {
         "title": "Artigos sobre backtests",
         "summary": (
             "Artigos sobre backtests: custos, MT5, Sharpe deflacionado, Monte Carlo, sequências "
-            "de perdas, prop firms, sinais, robôs com IA, acerto e otimizador."
+            "de perdas, prop firms, sinais, robôs com IA, acerto, ruína e otimizador."
         ),
         "intro": "Leituras curtas sobre o que observar num backtest antes de confiar nele.",
         "related": "Relacionado",
@@ -8415,9 +8416,9 @@ ARTICLES_DATA += (
                         (
                             "La simulación con horizonte contesta una pregunta más concreta: "
                             "con estos supuestos, ¿qué fracción de trayectorias toca el umbral "
-                            "antes de terminar el número declarado de operaciones? También "
-                            "permite usar ganancias y pérdidas de distinto tamaño, donde esa "
-                            "fórmula clásica no corresponde."
+                            f"antes de terminar el horizonte (aquí, {_num(RUIN_HORIZON, 'es', 0)} "
+                            "operaciones)? También permite usar ganancias y pérdidas de distinto "
+                            "tamaño, donde esa fórmula clásica no corresponde."
                         ),
                     ],
                 },
@@ -8449,16 +8450,23 @@ ARTICLES_DATA += (
                         (
                             "Las dos primeras filas tienen idéntica esperanza y riesgo con la "
                             "tasa declarada. Más operaciones estrechan el intervalo y elevan su "
-                            "límite inferior, por eso cambia la columna de sensibilidad. En "
-                            "ambas filas ese límite todavía queda por debajo del equilibrio."
+                            "límite inferior, por eso cambian las tres columnas de límite "
+                            "inferior. En ambas filas ese límite todavía queda por debajo del "
+                            "equilibrio."
                         ),
                         (
                             "La tercera fila combina menos aciertos con una ganancia mayor que "
                             "la pérdida. La esperanza depende de ambas magnitudes, no solo del "
-                            "porcentaje de aciertos. Un cero en la probabilidad significa que "
-                            "ninguna trayectoria simulada tocó el umbral; no que el evento sea "
-                            "imposible. Más trayectorias reducirían el ruido de simulación, sin "
-                            "añadir evidencia sobre la tasa declarada."
+                            "porcentaje de aciertos. Más trayectorias reducirían el ruido de "
+                            "simulación, sin añadir evidencia sobre la tasa declarada."
+                        ),
+                        (
+                            f"DECLARED · En esa fila, con la tasa declarada, "
+                            f"{_num(RUIN_THIRD_CASE_RUINED_PATHS, 'es', 0)} de "
+                            f"{_num(ruin_calc.SAMPLES, 'es', 0)} trayectorias tocaron el umbral. "
+                            "La tabla redondea a un decimal, igual que la calculadora enlazada, y "
+                            "ese redondeo no distingue ninguna trayectoria de una sola. Un cero "
+                            "no significa que el evento sea imposible."
                         ),
                     ],
                 },
@@ -8552,8 +8560,9 @@ ARTICLES_DATA += (
                         (
                             "Simulation with a horizon answers a more specific question: under "
                             "these assumptions, what fraction of paths touches the threshold "
-                            "before the declared number of trades ends? It also handles different "
-                            "win and loss sizes, where that classic formula does not apply."
+                            f"before the horizon ends (here, {_num(RUIN_HORIZON, 'en', 0)} "
+                            "trades)? It also handles different win and loss sizes, where that "
+                            "classic formula does not apply."
                         ),
                     ],
                 },
@@ -8585,20 +8594,27 @@ ARTICLES_DATA += (
                         (
                             "The first two rows have identical expectancy and risk at the "
                             "declared rate. More trades narrow the interval and raise its lower "
-                            "bound, changing the sensitivity columns. In both rows that bound "
-                            "still lies below break-even."
+                            "bound, changing the three lower-bound columns. In both rows that "
+                            "bound still lies below break-even."
                         ),
                         (
                             "The third row combines fewer wins with a larger win than loss. "
-                            "Expectancy depends on both amounts, not just the win rate. A zero "
-                            "probability means no simulated path touched the threshold; it does "
-                            "not make the event impossible. More paths would reduce simulation "
-                            "noise without adding evidence about the declared win rate."
+                            "Expectancy depends on both amounts, not just the win rate. More "
+                            "paths would reduce simulation noise without adding evidence about "
+                            "the declared win rate."
+                        ),
+                        (
+                            f"DECLARED · In that row, at the declared rate, "
+                            f"{_num(RUIN_THIRD_CASE_RUINED_PATHS, 'en', 0)} of "
+                            f"{_num(ruin_calc.SAMPLES, 'en', 0)} paths touched the threshold. "
+                            "The table rounds to one decimal, like the linked calculator, and "
+                            "that rounding does not distinguish no path from a single one. A "
+                            "zero does not make the event impossible."
                         ),
                     ],
                 },
                 {
-                    "heading": "What compatible with the data means",
+                    "heading": "What “compatible with the data” means",
                     "paragraphs": [
                         (
                             "The Wilson interval contains rates these data do not exclude under "
@@ -8664,28 +8680,29 @@ ARTICLES_DATA += (
             ],
             "pt": [
                 {
-                    "heading": "Ruína é tocar um limite dentro de um horizonte",
+                    "heading": "Ruína é tocar um limite do saldo dentro de um horizonte",
                     "paragraphs": [
                         (
                             "Aqui ruína significa que o saldo toca ou fica abaixo de um limite "
-                            "em algum momento do horizonte. Conta mesmo que depois se recupere. "
-                            "O limite se refere ao saldo inicial; o drawdown mede a queda desde "
-                            "um máximo anterior e responde a outra pergunta."
+                            "de ruína em algum momento do horizonte. Conta mesmo que depois se "
+                            "recupere. Esse limite se refere ao saldo inicial; o drawdown mede a "
+                            "queda desde um máximo anterior e responde a outra pergunta."
                         ),
                         (
                             "Com ganho igual à perda, variações de tamanho fixo, independência "
                             "e probabilidade constante p de acerto, a fórmula clássica sem "
                             "limite de tempo é P(ruína) = (q / p)^B se p > q; se p ≤ q, é 1. "
-                            "Aqui q = 1 − p e B é a distância até o limite em unidades de perda, "
-                            "arredondada para cima. São perdas líquidas acumuladas, não "
+                            "Aqui q = 1 − p e B é a distância até o limite de ruína em unidades "
+                            "de perda, arredondada para cima. São perdas líquidas acumuladas, não "
                             "necessariamente consecutivas. Não existe barreira superior de saída."
                         ),
                         (
                             "A simulação com horizonte responde a uma pergunta mais concreta: "
-                            "sob essas hipóteses, que fração de trajetórias toca o limite antes "
-                            "de terminar o número declarado de operações? Ela também permite "
-                            "ganhos e perdas de tamanhos diferentes, caso em que essa fórmula "
-                            "clássica não se aplica."
+                            "sob essas hipóteses, que fração de trajetórias toca o limite de "
+                            "ruína antes de terminar o horizonte (aqui, "
+                            f"{_num(RUIN_HORIZON, 'pt', 0)} operações)? Ela também permite ganhos "
+                            "e perdas de tamanhos diferentes, caso em que essa fórmula clássica "
+                            "não se aplica."
                         ),
                     ],
                 },
@@ -8694,8 +8711,8 @@ ARTICLES_DATA += (
                     "paragraphs": [
                         (
                             f"DECLARED · Em todos os casos, 1R equivale a "
-                            f"{_num(RUIN_RISK_PCT, 'pt', 0)} % do saldo inicial, o limite é "
-                            f"uma queda de {_num(RUIN_THRESHOLD_PCT, 'pt', 0)} % "
+                            f"{_num(RUIN_RISK_PCT, 'pt', 0)} % do saldo inicial, o limite de "
+                            f"ruína é uma queda de {_num(RUIN_THRESHOLD_PCT, 'pt', 0)} % "
                             f"(saldo de {_num(100 - RUIN_THRESHOLD_PCT, 'pt', 0)} %) e o "
                             f"horizonte é de {_num(RUIN_HORIZON, 'pt', 0)} operações. É uma "
                             "escala ilustrativa, não uma indicação de tamanho de posição. O "
@@ -8717,16 +8734,22 @@ ARTICLES_DATA += (
                         (
                             "As primeiras duas linhas têm esperança e risco idênticos na taxa "
                             "declarada. Mais operações estreitam o intervalo e elevam seu limite "
-                            "inferior, alterando as colunas de sensibilidade. Em ambas as linhas "
-                            "esse limite ainda fica abaixo do equilíbrio."
+                            "inferior, alterando as três colunas de limite inferior. Em ambas as "
+                            "linhas esse limite ainda fica abaixo do equilíbrio."
                         ),
                         (
                             "A terceira linha combina menos acertos com um ganho maior que a "
                             "perda. A esperança depende das duas magnitudes, não só da taxa de "
-                            "acerto. Um zero na probabilidade significa que nenhuma trajetória "
-                            "simulada tocou o limite; não que o evento seja impossível. Mais "
-                            "trajetórias reduziriam o ruído da simulação sem acrescentar "
-                            "evidência sobre a taxa declarada."
+                            "acerto. Mais trajetórias reduziriam o ruído da simulação sem "
+                            "acrescentar evidência sobre a taxa declarada."
+                        ),
+                        (
+                            f"DECLARED · Nessa linha, com a taxa declarada, "
+                            f"{_num(RUIN_THIRD_CASE_RUINED_PATHS, 'pt', 0)} de "
+                            f"{_num(ruin_calc.SAMPLES, 'pt', 0)} trajetórias tocaram o limite "
+                            "de ruína. A tabela arredonda a uma casa decimal, como a calculadora "
+                            "vinculada, e esse arredondamento não distingue nenhuma trajetória "
+                            "de uma só. Um zero não significa que o evento seja impossível."
                         ),
                     ],
                 },
@@ -8751,7 +8774,7 @@ ARTICLES_DATA += (
                     ],
                 },
                 {
-                    "heading": "Quantas operações deixam o limite acima do equilíbrio",
+                    "heading": "Quantas operações deixam o limite inferior acima do equilíbrio",
                     "paragraphs": [
                         (
                             f"DECLARED · Com {_num(RUIN_INPUTS[0].win_rate_pct, 'pt', 0)} % "

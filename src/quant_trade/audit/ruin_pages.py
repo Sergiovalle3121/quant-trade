@@ -49,16 +49,6 @@ def _percent(value: float, locale: str) -> str:
     return f"{_num(value * 100, locale, 1)} %"
 
 
-def _signed(value: float, text: str) -> str:
-    """``text`` (``value`` at two decimals) with its sign, so a positive expectancy
-    reads as a gain at a glance. The sign follows the rounded value: one that
-    rounds to zero shows none, never «-0,00»."""
-    rounded = round(value, 2)
-    if rounded == 0:
-        return text.lstrip("-")
-    return "+" + text if rounded > 0 else text
-
-
 def _declared(text: str, locale: str) -> str:
     return f"<b>{_e(text)}</b> {_badge('DECLARED', locale)}"
 
@@ -86,7 +76,7 @@ def _rows(
             "expectancy_r",
             words["row_expectancy_r"],
             _declared(
-                _signed(
+                calc._signed(
                     run.expectancy_r,
                     words["r_unit"].format(n=_num(run.expectancy_r, locale, 2)),
                 ),
@@ -100,7 +90,7 @@ def _rows(
                 "expectancy_pct",
                 words["row_expectancy_pct"],
                 _declared(
-                    _signed(
+                    calc._signed(
                         run.expectancy_share * 100,
                         f"{_num(run.expectancy_share * 100, locale, 2)} %",
                     ),

@@ -5008,24 +5008,36 @@ def article_page(article: Article, *, locale: str = "es", base_url: str = "") ->
             lower = result.lower
             if lower is None:
                 raise ValueError("the ruin article requires a Wilson lower-bound scenario")
+            # The linked calculator's own rounding (one decimal, a signed
+            # expectancy at two), so a reader who follows the link meets the same
+            # figures; 4 000 paths resolve no finer than one decimal anyway.
+            r_unit = str(ruin_calc.COPY[locale]["r_unit"])
             cells = (
-                f"{_num(value.win_rate_pct, locale, 2)} %",
+                ruin_calc._percent(value.win_rate, locale),
                 _num(value.trades or 0, locale, 0),
-                f"{value.avg_win:g}R/{value.avg_loss:g}R",
-                f"{_num(result.declared.expectancy_r, locale, 3)} R",
-                f"{_num(result.declared.ruin * 100, locale, 2)} %",
-                f"{_num(lower.win_rate * 100, locale, 2)} %",
-                f"{_num(lower.expectancy_r, locale, 3)} R",
-                f"{_num(lower.ruin * 100, locale, 2)} %",
+                f"{_num(value.avg_win, locale, 1)}R/{_num(value.avg_loss, locale, 1)}R",
+                ruin_calc._signed(
+                    result.declared.expectancy_r,
+                    r_unit.format(n=_num(result.declared.expectancy_r, locale, 2)),
+                ),
+                ruin_calc._percent(result.declared.ruin, locale),
+                ruin_calc._percent(lower.win_rate, locale),
+                ruin_calc._signed(
+                    lower.expectancy_r, r_unit.format(n=_num(lower.expectancy_r, locale, 2))
+                ),
+                ruin_calc._percent(lower.ruin, locale),
             )
             ruin_rows.append(
                 f"<tr><th scope='row'>DECLARED · {_e(cells[0])}</th>"
                 + "".join(f"<td>DECLARED · {_e(cell)}</td>" for cell in cells[1:])
                 + "</tr>"
             )
+        # The note stays outside the scrolling region, where a phone shows it
+        # whole; the first column sticks so a scrolled row keeps its win rate.
         table = (
-            f"<div class='tscroll' role='region' tabindex='0' aria-label='{_e(heading)}'>"
-            f"<table class='article-ruin'><caption>{_e(note)}</caption><thead><tr>"
+            f"<p>{_e(note)}</p>"
+            f"<div class='tscroll ruin-scroll' role='region' tabindex='0' "
+            f"aria-label='{_e(heading)}'><table class='article-ruin'><thead><tr>"
             + "".join(f"<th scope='col'>{_e(column)}</th>" for column in ruin_columns)
             + "</tr></thead><tbody>"
             + "".join(ruin_rows)

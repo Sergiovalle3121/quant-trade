@@ -21,6 +21,8 @@ from quant_trade.audit import ruin_calc, winrate  # noqa: E402
 from quant_trade.audit.articles import (  # noqa: E402
     ARTICLE_PUBLICATION_DATES,
     ARTICLES_BY_KEY,
+    ARTICLES_COPY,
+    RUIN_TABLE_COPY,
     _num,
     article_url,
     articles_index_url,
@@ -55,7 +57,18 @@ def _links(page: str) -> set[str]:
 
 
 def _percent(value: float, locale: str) -> str:
-    return f"{_num(value * 100, locale, 2)} %"
+    """One decimal: the rounding of the calculator the article names as its source."""
+    return f"{_num(value * 100, locale, 1)} %"
+
+
+def _expectancy(value: float, locale: str) -> str:
+    """Two decimals with the sign, as the calculator page shows an expectancy."""
+    return ruin_calc._signed(value, f"{_num(value, locale, 2)} R")
+
+
+def _meta(page: str, name: str) -> str | None:
+    match = re.search(rf"<meta name='{name}' content='([^']*)'", page)
+    return html.unescape(match.group(1)) if match else None
 
 
 def _stored(locale: str) -> str:
@@ -103,6 +116,10 @@ def test_ruin_examples_recompute_from_the_calculator_and_wilson() -> None:
     assert first.lower is not None and second.lower is not None and third.lower is not None
     assert first.lower.ruin > second.lower.ruin > second.declared.ruin
     assert third.declared.expectancy_r == pytest.approx(0.35)
+    # The prose names the count behind the third row's zero, not a rounded share.
+    assert third.declared.ruin == 0.0
+    assert numbers.RUIN_THIRD_CASE_RUINED_PATHS == 0
+    assert first.lower.ruin * ruin_calc.SAMPLES == pytest.approx(3955)
 
 
 @pytest.mark.parametrize("locale", LOCALES)
@@ -110,9 +127,14 @@ def test_ruin_table_cells_equal_engine_results_and_keep_declared_evidence(locale
     page = article_page(ARTICLES_BY_KEY[KEY], locale=locale, base_url=BASE)
     table = re.search(r"<table class='article-ruin'>(.*?)</table>", page, re.S)
     assert table is not None
+    # The note precedes the scrolling region as a paragraph, so a phone shows it
+    # whole; the region stays keyboard-reachable and the table has no caption.
+    declared = evidence_label("DECLARED", locale)
+    note = html.escape(RUIN_TABLE_COPY[locale][-1].replace("DECLARED", declared), quote=True)
+    assert f"<p>{note}</p><div class='tscroll ruin-scroll' role='region' tabindex='0' " in page
+    assert "<caption>" not in table.group(1)
     rows = re.findall(r"<tr><th scope='row'>(.*?)</tr>", table.group(1), re.S)
     assert len(rows) == 3
-    declared = evidence_label("DECLARED", locale)
     for row, value in zip(rows, numbers.RUIN_INPUTS, strict=True):
         reading = ruin_calc.compute(value)
         assert reading.lower is not None
@@ -120,17 +142,41 @@ def test_ruin_table_cells_equal_engine_results_and_keep_declared_evidence(locale
         expected = (
             _percent(value.win_rate, locale),
             _num(value.trades, locale, 0),
-            f"{_num(value.avg_win, locale, 0)}R/{_num(value.avg_loss, locale, 0)}R",
-            f"{_num(reading.declared.expectancy_r, locale, 3)} R",
+            f"{_num(value.avg_win, locale, 1)}R/{_num(value.avg_loss, locale, 1)}R",
+            _expectancy(reading.declared.expectancy_r, locale),
             _percent(reading.declared.ruin, locale),
             _percent(reading.lower.win_rate, locale),
-            f"{_num(reading.lower.expectancy_r, locale, 3)} R",
+            _expectancy(reading.lower.expectancy_r, locale),
             _percent(reading.lower.ruin, locale),
         )
         cells = [_visible(cell) for cell in re.findall(r"(?:^|<td>)(.*?)</(?:th|td)>", row)]
         assert cells == [f"{declared} · {value}" for value in expected]
     assert evidence_label("MEASURED", locale) not in _visible(table.group(1))
     assert find_claims(_visible(table.group(1))) == []
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+def test_ruin_table_shows_the_figures_the_linked_calculator_shows(
+    client: TestClient, locale: str
+) -> None:
+    """A reader who opens the calculator with a row's inputs meets the same
+    rounded figures: one decimal for every probability, a signed expectancy.
+    A two-decimal table would show 0.15 % where the calculator shows 0.1 %."""
+    page = _visible(article_page(ARTICLES_BY_KEY[KEY], locale=locale, base_url=BASE))
+    for value in numbers.RUIN_INPUTS:
+        reading = ruin_calc.compute(value)
+        assert reading.lower is not None
+        calculator = _visible(client.get(ruin_calc.share_url(locale, value)).text)
+        for shown in (
+            _percent(value.win_rate, locale),
+            _expectancy(reading.declared.expectancy_r, locale),
+            _percent(reading.declared.ruin, locale),
+            _percent(reading.lower.win_rate, locale),
+            _expectancy(reading.lower.expectancy_r, locale),
+            _percent(reading.lower.ruin, locale),
+        ):
+            assert shown in page, shown
+            assert shown in calculator, shown
 
 
 def test_ruin_sample_sizes_follow_winrate_reader_and_distinguish_its_grid() -> None:
@@ -214,7 +260,13 @@ def test_ruin_article_is_in_index_and_sitemap_with_its_publication_date(
     client: TestClient, locale: str
 ) -> None:
     path = article_url(KEY, locale)
-    assert path in _links(client.get(articles_index_url(locale)).text)
+    index = client.get(articles_index_url(locale)).text
+    assert path in _links(index)
+    # The index description names the new topic, within the length the SEO test keeps.
+    description = _meta(index, "description")
+    assert description == ARTICLES_COPY[locale]["summary"]
+    assert {"es": "riesgo de ruina", "en": "risk of ruin", "pt": "ruína"}[locale] in description
+    assert len(description) <= 160, len(description)
     root = ElementTree.fromstring(client.get("/sitemap.xml").content)
     namespace = {"s": "http://www.sitemaps.org/schemas/sitemap/0.9"}
     dates = {

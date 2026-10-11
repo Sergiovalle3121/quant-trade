@@ -241,6 +241,10 @@ RUIN_INPUTS: tuple[ruin_calc.RuinInput, ...] = tuple(
 RUIN_READINGS: tuple[ruin_calc.RuinReading, ...] = tuple(
     ruin_calc.compute(value) for value in RUIN_INPUTS
 )
+#: Paths of the third case that touched the threshold at its declared rate.
+#: The table rounds that share to one decimal, like the calculator, so the
+#: prose states the count itself instead of reading a zero into it.
+RUIN_THIRD_CASE_RUINED_PATHS = round(RUIN_READINGS[2].declared.ruin * ruin_calc.SAMPLES)
 
 
 def _ruin_winrate_reading(trades: int | None) -> winrate.WinRateReading:
@@ -286,6 +290,7 @@ __all__ = [
     "RUIN_MIN_TRADES",
     "RUIN_READINGS",
     "RUIN_RISK_PCT",
+    "RUIN_THIRD_CASE_RUINED_PATHS",
     "RUIN_THRESHOLD_PCT",
     "RUIN_WINRATE_READING",
     "STREAK_ROWS",

@@ -98,6 +98,17 @@ def _percent(value: float, locale: str) -> str:
     return f"{_num(value * 100, locale, 1)} %"
 
 
+def _signed(value: float, text: str) -> str:
+    """``text`` (``value`` at two decimals) with its sign, so a positive expectancy
+    reads as a gain at a glance. The sign follows the rounded value: one that
+    rounds to zero shows none, never «-0,00». The calculator page and the ruin
+    article share it, so both show one figure."""
+    rounded = round(value, 2)
+    if rounded == 0:
+        return text.lstrip("-")
+    return "+" + text if rounded > 0 else text
+
+
 @dataclass(frozen=True)
 class RuinInput:
     """The declared figures, validated, as the visitor wrote them."""
