@@ -3,6 +3,7 @@ sitemap, linked from the landing, and clean under the profit-claim guard."""
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import pytest
@@ -13,8 +14,11 @@ pytest.importorskip("sqlalchemy")
 from fastapi.testclient import TestClient  # noqa: E402
 
 from quant_trade.audit.audiences import AUDIENCE_PAGES, audience_url  # noqa: E402
+from quant_trade.audit.challenge_calc import CHALLENGE_PATH  # noqa: E402
 from quant_trade.audit.guard import find_claims  # noqa: E402
-from quant_trade.audit.guides import GUIDES_BY_SLUG  # noqa: E402
+from quant_trade.audit.guides import GUIDES_BY_SLUG, guide_url  # noqa: E402
+from quant_trade.audit.ruin_calc import RUIN_PATH  # noqa: E402
+from quant_trade.audit.rules_table import RULES_TABLE_PATH  # noqa: E402
 from quant_trade.audit.settings import AuditSettings  # noqa: E402
 from quant_trade.audit.store import make_store  # noqa: E402
 from quant_trade.audit.web import create_app  # noqa: E402
@@ -206,6 +210,55 @@ def test_prop_page_names_the_firm_fit_check(tmp_path: Path) -> None:
     assert "¿Con qué firma encaja tu historial?" in es and "mejor día" in es
     assert "Which firm does your history fit?" in en and "best-day" in en
     assert find_claims(es) == [] and find_claims(en) == []
+
+
+@pytest.mark.parametrize("locale", ("es", "en", "pt"))
+def test_retos_uploads_link_each_documented_platform_guide(tmp_path: Path, locale: str) -> None:
+    audience = next(page for page in AUDIENCE_PAGES if page.slug == "retos-prop-firm")
+    uploads = audience.text[locale].uploads
+    client = _client(tmp_path)
+    response = client.get(audience_url(audience.slug, locale))
+    assert response.status_code == 200
+    page = response.text
+    for name, slug in (
+        ("Tradovate", "tradovate"),
+        ("TopstepX", "topstepx"),
+        ("Sierra Chart", "sierra-chart"),
+    ):
+        entries = [item for item, guide in uploads if guide == slug]
+        assert len(entries) == 1, (locale, slug)
+        assert name in entries[0]
+        path = guide_url(slug, locale)
+        assert page.count(f"href='{path}'") == 1
+        assert client.get(path, follow_redirects=False).status_code == 200, path
+    universal = [item for item, guide in uploads if guide == "csv-universal"]
+    assert len(universal) == 1
+    assert "CSV" in universal[0]
+    for name in ("Tradovate", "TopstepX", "Sierra Chart", "Rithmic", "cTrader"):
+        assert name not in universal[0]
+    assert "rithmic" not in page.lower()
+    # cTrader has no guide in the main branch on 2026-10-11.
+    assert "ctrader" not in page.lower()
+    universal_path = guide_url("csv-universal", locale)
+    assert page.count(f"href='{universal_path}'") == 1
+    assert client.get(universal_path, follow_redirects=False).status_code == 200
+    assert find_claims(page) == []
+
+
+@pytest.mark.parametrize("locale", ("es", "en", "pt"))
+def test_retos_links_each_free_tool_once(tmp_path: Path, locale: str) -> None:
+    client = _client(tmp_path)
+    page = client.get(audience_url("retos-prop-firm", locale)).text
+    for path in (CHALLENGE_PATH[locale], RULES_TABLE_PATH[locale], RUIN_PATH[locale]):
+        assert page.count(f"href='{path}'") == 1, path
+        assert client.get(path, follow_redirects=False).status_code == 200, path
+    if locale == "es":
+        assert "alcanzar el objetivo" in page
+    main = page.split("<main", 1)[1].split("</main>", 1)[0]
+    assert not re.search(
+        r"\b(?:verificado|certificado|garantiza|rentable|aprobar|pasar|pass)\b", main, re.I
+    )
+    assert find_claims(page) == []
 
 
 def test_prop_page_counts_firm_challenges_apart_from_the_generic_one(tmp_path: Path) -> None:
