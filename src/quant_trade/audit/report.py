@@ -1987,8 +1987,8 @@ LABELS: dict[str, dict[str, str]] = {
             "arriba muestra cuánto cambian."
         ),
         "ff_program": "Reto",
-        "ff_pass": "Pasa",
-        "ff_clean": "Pasa dentro de la regla del mejor día",
+        "ff_pass": "Alcanza el objetivo",
+        "ff_clean": "Alcanza el objetivo dentro de la regla del mejor día",
         "ff_risk": "Lo que más lo tumba",
         "ff_no_rule": "sin regla",
         "ff_risk_none": "Nada en las simulaciones",
@@ -2000,19 +2000,19 @@ LABELS: dict[str, dict[str, str]] = {
             "pérdidas abiertas."
         ),
         "ff_all_pass": (
-            "Con este historial todos los programas se pasan en al menos el 99 % de las "
-            "simulaciones: sus reglas no los distinguen."
+            "Con este historial todos los programas alcanzan el objetivo en al menos el 99 % "
+            "de las simulaciones: sus reglas no los distinguen."
         ),
         "ff_all_fail": (
-            "Con este historial casi ningún programa se pasa (1 % de las simulaciones o "
-            "menos); lo que más lo impide es {risk}."
+            "Con este historial casi ningún programa alcanza el objetivo (1 % de las "
+            "simulaciones o menos); lo que más lo impide es {risk}."
         ),
         "ff_phases": "{n} fases",
         "ff_phase": "1 fase",
         "ff_basis_columns": (
-            "«Pasa» usa la historia completa con los costos que ya trae el archivo, sin el costo "
-            "declarado o de referencia. Las columnas de fuera de muestra y con costo son los "
-            "mismos escenarios de la escalera de arriba, con cada programa."
+            "«Alcanza el objetivo» usa la historia completa con los costos que ya trae el "
+            "archivo, sin el costo declarado o de referencia. Las columnas de fuera de muestra "
+            "y con costo son los mismos escenarios de la escalera de arriba, con cada programa."
         ),
         "ff_clean_short": "dentro de la regla del mejor día",
         "ff_rules": "Reglas, fuente y fecha",
@@ -2107,12 +2107,12 @@ LABELS: dict[str, dict[str, str]] = {
             "son optimistas."
         ),
         "ff_all_pass_simulated": (
-            "Con este historial todos los programas simulados se pasan en al menos el 99 % de "
-            "las simulaciones: sus reglas no los distinguen."
+            "Con este historial todos los programas simulados alcanzan el objetivo en al menos "
+            "el 99 % de las simulaciones: sus reglas no los distinguen."
         ),
         "ff_all_fail_simulated": (
-            "Con este historial casi ningún programa simulado se pasa (1 % de las simulaciones "
-            "o menos); lo que más lo impide es {risk}."
+            "Con este historial casi ningún programa simulado alcanza el objetivo (1 % de las "
+            "simulaciones o menos); lo que más lo impide es {risk}."
         ),
         "ch_ladder_title": "¿Cuánto cambia con lo que encontró este informe?",
         "ch_ladder_intro": (
@@ -3745,8 +3745,8 @@ LABELS: dict[str, dict[str, str]] = {
             "how much they change."
         ),
         "ff_program": "Challenge",
-        "ff_pass": "Passes",
-        "ff_clean": "Passes within the best-day rule",
+        "ff_pass": "Reaches the target",
+        "ff_clean": "Reaches the target within the best-day rule",
         "ff_risk": "What stops it most",
         "ff_no_rule": "no rule",
         "ff_risk_none": "Nothing in the simulations",
@@ -3758,19 +3758,19 @@ LABELS: dict[str, dict[str, str]] = {
             "losses."
         ),
         "ff_all_pass": (
-            "With this history every program passes in at least 99 % of the simulations: their "
-            "rules do not tell them apart."
+            "With this history every program reaches the target in at least 99 % of the "
+            "simulations: their rules do not tell them apart."
         ),
         "ff_all_fail": (
-            "With this history almost no program passes (1 % of the simulations or less); "
-            "what stops it most is {risk}."
+            "With this history almost no program reaches the target (1 % of the simulations "
+            "or less); what stops it most is {risk}."
         ),
         "ff_phases": "{n} phases",
         "ff_phase": "1 phase",
         "ff_basis_columns": (
-            "'Passes' uses the full history with the costs the file already carries, without the "
-            "declared or reference cost. The out-of-sample and cost columns are the same "
-            "scenarios as the ladder above, for each program."
+            "'Reaches the target' uses the full history with the costs the file already "
+            "carries, without the declared or reference cost. The out-of-sample and cost "
+            "columns are the same scenarios as the ladder above, for each program."
         ),
         "ff_clean_short": "within the best-day rule",
         "ff_rules": "Rules, source and date",
@@ -3865,12 +3865,12 @@ LABELS: dict[str, dict[str, str]] = {
             "are optimistic."
         ),
         "ff_all_pass_simulated": (
-            "With this history every simulated program passes in at least 99 % of the "
-            "simulations: their rules do not tell them apart."
+            "With this history every simulated program reaches the target in at least 99 % of "
+            "the simulations: their rules do not tell them apart."
         ),
         "ff_all_fail_simulated": (
-            "With this history almost no simulated program passes (1 % of the simulations or "
-            "less); what stops it most is {risk}."
+            "With this history almost no simulated program reaches the target (1 % of the "
+            "simulations or less); what stops it most is {risk}."
         ),
         "ch_ladder_title": "How much does it change with what this report found?",
         "ch_ladder_intro": (

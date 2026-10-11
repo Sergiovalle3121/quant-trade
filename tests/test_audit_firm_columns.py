@@ -188,6 +188,51 @@ def _row(fit: dict[str, Any], keys: list[str]) -> dict[str, Any]:
     return next(row for row in fit["firms"] if row["keys"] == keys)
 
 
+@pytest.mark.parametrize(
+    ("locale", "target", "within_rule"),
+    [
+        ("es", "Alcanza el objetivo", "dentro de la regla del mejor día"),
+        ("en", "Reaches the target", "within the best-day rule"),
+        ("pt", "Atinge a meta", "dentro da regra do melhor dia"),
+    ],
+)
+def test_comparator_visible_text_reaches_targets_without_pass_wording(
+    ftmo: tuple[Any, AuditResult], locale: str, target: str, within_rule: str
+) -> None:
+    _, result = ftmo
+    assert result.challenge is not None
+    fit = result.challenge["firm_fit"]
+    labels = LABELS[locale]
+    assert labels["ff_pass"] == target
+    assert labels["ff_clean"] == f"{target} {within_rule}"
+    without_scenarios = {key: value for key, value in fit.items() if key != "scenarios"}
+    variants = [fit, without_scenarios]
+    for rows in (fit["firms"], [row for row in fit["firms"] if row.get("pass")]):
+        for uniform in ("all_pass", "all_fail"):
+            variants.append({**fit, "firms": rows, "uniform": uniform, "common_risk": "unfinished"})
+    for variant in variants:
+        visible = _visible(_firm_fit_html(variant, labels, locale=locale))
+        assert re.search(r"\b(?:pasa(?:n)?|pass(?:es|a|am)?)\b", visible, re.I) is None
+        assert find_claims(visible) == []
+    table = _firm_fit_html(without_scenarios, labels, locale=locale)
+    assert f"<th class='val'>{target}</th>" in table
+    assert f"<th class='val'>{target} {within_rule}</th>" in table
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+def test_firm_notes_use_targets_and_keep_existing_translations(locale: str) -> None:
+    for note in (firmfit.NOTE, firmfit.OUTCOME_NOTE):
+        text = localize(note, locale)
+        assert re.search(r"\b(?:pas\w*|pass\w*)\b", text, re.I) is None
+        assert find_claims(text) == []
+        if locale != "en":
+            assert text != note
+            legacy = note.replace("reaching the target in every phase", "passing them all")
+            legacy = legacy.replace("reaching the target in the phases", "passing the phases")
+            assert localize(legacy, locale) != legacy
+            assert find_claims(localize(legacy, locale)) == []
+
+
 # ------------------------------------------------------------ 1. the columns
 
 
