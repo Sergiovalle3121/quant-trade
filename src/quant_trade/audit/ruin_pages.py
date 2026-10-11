@@ -37,6 +37,7 @@ from quant_trade.audit.seo import (
 )
 from quant_trade.audit.sharing import COPY as SHARE_COPY
 from quant_trade.audit.theme import icon
+from quant_trade.audit.tool_cards import tool_image_path
 from quant_trade.audit.tools_hub import COPY as TOOLS_COPY
 from quant_trade.audit.tools_hub import tools_url
 
@@ -382,6 +383,7 @@ def ruin_page(
                 locale=locale,
                 paths=paths,
                 image_alt=title,
+                image_path=tool_image_path("calculadora-ruina", locale),
             ),
             base_url=base_url,
         )

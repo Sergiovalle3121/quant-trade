@@ -42,6 +42,7 @@ from quant_trade.audit.seo import (
 )
 from quant_trade.audit.sharing import COPY as SHARE_COPY
 from quant_trade.audit.theme import icon
+from quant_trade.audit.tool_cards import tool_image_path
 from quant_trade.audit.tools_hub import COPY as TOOLS_COPY
 from quant_trade.audit.tools_hub import tools_url
 
@@ -642,7 +643,14 @@ def challenge_page(
     title = f"{seo_title} · {BRAND}"
     paths = calc.page_paths(firm)
     meta = head_meta(
-        PageMeta(title=title, description=summary, locale=locale, paths=paths, image_alt=title),
+        PageMeta(
+            title=title,
+            description=summary,
+            locale=locale,
+            paths=paths,
+            image_alt=title,
+            image_path=tool_image_path("calculadora-reto", locale, firm),
+        ),
         base_url=base_url,
     ) + web_application_structured_data(
         title_text if firm else words["nav"],
@@ -914,7 +922,14 @@ def rules_table_page(
     paths = rules_table.rules_table_paths()
     base = base_url.rstrip("/")
     meta = head_meta(
-        PageMeta(title=title, description=description, locale=locale, paths=paths, image_alt=title),
+        PageMeta(
+            title=title,
+            description=description,
+            locale=locale,
+            paths=paths,
+            image_alt=title,
+            image_path=tool_image_path("reglas-prop-firm", locale),
+        ),
         base_url=base_url,
     )
     meta += dataset_structured_data(
