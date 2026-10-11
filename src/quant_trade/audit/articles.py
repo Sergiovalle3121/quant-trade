@@ -9533,10 +9533,10 @@ TRAILING_TABLE_COPY: dict[str, dict[str, str]] = {
         "daily": "Límite diario al cierre",
         "unfinished": "Sin terminar",
         "no_daily": "Sin regla diaria simulada",
-        "rules_note": "DECLARED · Ejemplos del catálogo, agrupados por la regla simulada. "
+        "rules_note": "Ejemplos del catálogo, agrupados por la regla simulada. "
         "La cifra es la distancia permitida respecto de la referencia, no el nivel del suelo. "
         "Las fuentes son lecturas fechadas, no consultas en tiempo real.",
-        "outcome_note": "DECLARED · Frecuencias sobre todas las trayectorias de cada programa. "
+        "outcome_note": "Frecuencias sobre todas las trayectorias de cada programa. "
         "Cada trayectoria termina en el primer desenlace; sus frecuencias suman el total. "
         "El objetivo no incluye la comprobación de la regla del mejor día.",
         "notes_note": "Notas del catálogo, citadas tal cual, con su fuente y fecha; «el "
@@ -9558,10 +9558,10 @@ TRAILING_TABLE_COPY: dict[str, dict[str, str]] = {
         "daily": "Daily limit at the close",
         "unfinished": "Unfinished",
         "no_daily": "No simulated daily rule",
-        "rules_note": "DECLARED · Catalog examples grouped by their simulated rule. "
+        "rules_note": "Catalog examples grouped by their simulated rule. "
         "The figure is the allowed distance from the reference, not the floor level. "
         "Sources are dated readings, not live lookups.",
-        "outcome_note": "DECLARED · Frequencies over all paths for each program. Each path "
+        "outcome_note": "Frequencies over all paths for each program. Each path "
         "stops at its first outcome; outcome frequencies cover the total. The target column does "
         "not include the best-day rule check.",
         "notes_note": "Catalog notes quoted as written, with their source and date; “the "
@@ -9583,10 +9583,10 @@ TRAILING_TABLE_COPY: dict[str, dict[str, str]] = {
         "daily": "Limite diário no fechamento",
         "unfinished": "Sem terminar",
         "no_daily": "Sem regra diária simulada",
-        "rules_note": "DECLARED · Exemplos do catálogo, agrupados pela regra simulada. "
+        "rules_note": "Exemplos do catálogo, agrupados pela regra simulada. "
         "O número é a distância permitida em relação à referência, não o nível do piso. "
         "As fontes são leituras datadas, não consultas em tempo real.",
-        "outcome_note": "DECLARED · Frequências sobre todas as trajetórias de cada programa. "
+        "outcome_note": "Frequências sobre todas as trajetórias de cada programa. "
         "Cada trajetória termina no primeiro desfecho; suas frequências cobrem o total. A coluna "
         "da meta não inclui a conferência da regra do melhor dia.",
         "notes_note": "Notas do catálogo, citadas como estão, com fonte e data; «o artigo» "
@@ -9603,16 +9603,16 @@ def _trailing_assumptions(locale: str) -> str:
     # "Up to": the longest horizon among the compared programs, read program by program.
     horizon = max(challenge_calc.horizon(item.program) for item in TRAILING_INPUTS)
     return {
-        "es": "DECLARED · {rate} % de aciertos, ganancia de {win} R, pérdida de {loss} R, "
-        "riesgo de {risk} % del balance por operación y {trades} operaciones al día. La "
-        "calculadora genera {history} días sintéticos y remuestrea por bloques "
+        "es": "Entradas declaradas: {rate} % de aciertos, ganancia de {win} R, pérdida de "
+        "{loss} R, riesgo de {risk} % del balance por operación y {trades} operaciones al día. "
+        "La calculadora genera {history} días sintéticos y remuestrea por bloques "
         "{samples} trayectorias "
         "con semilla {seed}, hasta {horizon} días hábiles en estos programas. Suma los "
         "resultados dentro del día y capitaliza entre cierres. La historia sintética usa "
         "un modelo binomial de operaciones independientes, con probabilidad y tamaños "
         "constantes, sin costos ni equity flotante. "
         "No hay tamaño de muestra declarado para estimar la incertidumbre de los aciertos.",
-        "en": "DECLARED · {rate} % win rate, a {win} R gain, a {loss} R loss, {risk} % of "
+        "en": "Declared inputs: {rate} % win rate, a {win} R gain, a {loss} R loss, {risk} % of "
         "the balance at risk per trade and {trades} trades per day. The calculator generates "
         "{history} synthetic days and resamples {samples} paths in blocks with seed {seed}, "
         "over up to {horizon} business days for these programs. It adds returns within each day "
@@ -9620,10 +9620,10 @@ def _trailing_assumptions(locale: str) -> str:
         "independent trades with constant probability and sizes, with no costs or floating "
         "equity. No sample size is declared to estimate "
         "win-rate uncertainty.",
-        "pt": "DECLARED · {rate} % de acerto, ganho de {win} R, perda de {loss} R, risco de "
-        "{risk} % do saldo por operação e {trades} operações por dia. A calculadora gera "
-        "{history} dias sintéticos e reamostra por blocos {samples} trajetórias "
-        "com semente {seed}, até "
+        "pt": "Entradas declaradas: {rate} % de acerto, ganho de {win} R, perda de "
+        "{loss} R, risco de {risk} % do saldo por operação e {trades} operações por dia. "
+        "A calculadora gera {history} dias sintéticos e reamostra por blocos "
+        "{samples} trajetórias com semente {seed}, até "
         "{horizon} dias úteis nestes programas. Soma os retornos dentro do dia e capitaliza "
         "entre fechamentos. O histórico sintético usa um modelo binomial de operações "
         "independentes com probabilidade e tamanhos constantes, sem custos nem patrimônio "

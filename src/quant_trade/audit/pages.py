@@ -5074,6 +5074,8 @@ def _trailing_article_tables(locale: str) -> dict[str, str]:
         headers = "".join(f"<th scope='col'>{_e(words[key])}</th>" for key in columns)
         # The note stays outside the scrolling region, where a phone shows it
         # whole: a <caption> is as wide as the table and scrolls away with it.
+        # Outside the table it is prose, so it carries no evidence label; the
+        # cells do.
         return (
             f"<p>{_e(note)}</p>"
             f"<div class='tscroll ruin-scroll' role='region' tabindex='0' "
@@ -5108,9 +5110,11 @@ def _trailing_article_tables(locale: str) -> dict[str, str]:
             + "".join(f"<td>{cell}</td>" for cell in cells)
             + "</tr>"
         )
+    # The quotes are prose outside the tables: no evidence label on them; the
+    # footer names the firm, the program, the source and its reading date.
     notes = "".join(
         f"<blockquote data-preset='{_e(row.key)}'><p>"
-        f"{_e('DECLARED · ' + localize(row.note, locale))}</p>"
+        f"{_e(localize(row.note, locale))}</p>"
         f"<footer>{_e(row.firm)} · {_e(row.program)} · "
         f"{source(row.firm, row.source_url, row.as_of)}</footer></blockquote>"
         for row in trailing_caveats()
