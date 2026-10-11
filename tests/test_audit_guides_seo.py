@@ -267,6 +267,7 @@ def test_every_sitemap_url_has_an_iso_lastmod_from_the_code(tmp_path: Path) -> N
         *GUIDES_PUBLISHED.values(),
     }
     assert ARTICLE_PUBLICATION_DATES["riesgo-de-ruina-intervalo-de-confianza"] == "2026-10-11"
+    assert ARTICLE_PUBLICATION_DATES["drawdown-trailing-eod-intradia"] == "2026-10-11"
     assert "2026-10-11" in known
     for url in root.findall("s:url", SITEMAP_NS):
         children = [child.tag.rsplit("}", 1)[-1] for child in url]

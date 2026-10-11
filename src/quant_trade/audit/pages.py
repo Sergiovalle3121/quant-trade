@@ -29,6 +29,9 @@ from quant_trade.audit.article_numbers import (
     consistency_examples,
     consistency_rules,
     consistency_variations,
+    trailing_caveats,
+    trailing_examples,
+    trailing_rules,
 )
 from quant_trade.audit.articles import (
     ARTICLES,
@@ -45,6 +48,8 @@ from quant_trade.audit.articles import (
     STREAK_ARTICLE_KEY,
     STREAK_TABLE_AFTER,
     STREAK_TABLE_COPY,
+    TRAILING_ARTICLE_KEY,
+    TRAILING_TABLE_COPY,
     WIN_RATE_RATES,
     WIN_RATE_TABLE_COPY,
     WIN_RATE_TRADE_COUNTS,
@@ -59,6 +64,7 @@ from quant_trade.audit.articles import (
     next_step_call,
     next_step_links,
     related_links,
+    trailing_outcome_note,
     win_rate_interval,
 )
 from quant_trade.audit.audiences import (
@@ -99,6 +105,7 @@ from quant_trade.audit.guides import (
     guide_url,
     guides_index_url,
 )
+from quant_trade.audit.i18n import localize
 from quant_trade.audit.legal import LegalText, legal_url
 from quant_trade.audit.method import CHALLENGE_SECTION, dimension_rows, method_url, references
 from quant_trade.audit.method import COPY as METHOD_COPY
@@ -138,7 +145,7 @@ from quant_trade.audit.report import (
 )
 from quant_trade.audit.report import LABELS as REPORT_LABELS
 from quant_trade.audit.rules_table import COPY as RULES_COPY
-from quant_trade.audit.rules_table import FILTER_MARKET, rules_table_url
+from quant_trade.audit.rules_table import FILTER_LOSS, FILTER_MARKET, loss_names, rules_table_url
 from quant_trade.audit.sample_publication import SamplePage, public_pages_line
 from quant_trade.audit.schema import MAX_UPLOAD_BYTES
 from quant_trade.audit.seo import (
@@ -5041,6 +5048,92 @@ def _consistency_article_tables(locale: str) -> dict[str, str]:
     }
 
 
+def _trailing_article_tables(locale: str) -> dict[str, str]:
+    """Source-dated preset rules and declared calculator outcomes, rendered together."""
+    words = TRAILING_TABLE_COPY[locale]
+    type_names = loss_names(locale)
+    source_label = challenge.COPY[locale]["source_link"]
+
+    def share(value: float) -> str:
+        # At 2,000 paths each outcome is a multiple of 0.05 %, so two decimals
+        # keep the mutually exclusive stopping outcomes adding up to 100 %.
+        return _e(f"DECLARED · {_num(value * 100, locale, 2)} %")
+
+    def loss_link(loss_type: str) -> str:
+        href = f"{rules_table_url(locale)}?{FILTER_LOSS}={loss_type}"
+        return f"<a href='{_e(href)}'>{_e(type_names[loss_type])}</a>"
+
+    def source(firm: str, url: str, as_of: str) -> str:
+        return (
+            f"<a href='{_e(url)}' rel='noopener nofollow'>"
+            f"{_e(source_label.format(firm=firm))}</a> · "
+            f"<time datetime='{_e(as_of)}'>{_e(as_of)}</time>"
+        )
+
+    def table(name: str, columns: tuple[str, ...], rows: str, note: str) -> str:
+        headers = "".join(f"<th scope='col'>{_e(words[key])}</th>" for key in columns)
+        # The note stays outside the scrolling region, where a phone shows it
+        # whole: a <caption> is as wide as the table and scrolls away with it.
+        # Outside the table it is prose, so it carries no evidence label; the
+        # cells do.
+        return (
+            f"<p>{_e(note)}</p>"
+            f"<div class='tscroll ruin-scroll' role='region' tabindex='0' "
+            f"aria-label='{_e(words[name])}'><table class='article-trailing-{name}'>"
+            f"<thead><tr>{headers}</tr></thead><tbody>{rows}</tbody></table></div>"
+        )
+
+    rule_rows = "".join(
+        f"<tr data-preset='{_e(row.key)}'><th scope='row'>"
+        f"{_e(row.firm)} · {_e(row.program)}</th>"
+        f"<td>{loss_link(row.loss_type)}</td><td>{share(row.limit)}</td>"
+        f"<td>{source(row.firm, row.source_url, row.as_of)}</td></tr>"
+        for row in trailing_rules()
+    )
+    case_rows: list[str] = []
+    for row in trailing_examples():
+        rules = PRESETS[row.inputs.program]
+        # A program whose daily limit is not simulated has no daily outcome: a
+        # zero there would present an unmodelled rule as a simulated result.
+        daily = _e(words["no_daily"]) if rules.max_daily_loss is None else share(row.daily_limit)
+        cells = (
+            share(rules.profit_target),
+            share(row.target),
+            share(row.total_limit),
+            daily,
+            share(row.unfinished),
+        )
+        case_rows.append(
+            f"<tr data-case='{_e(row.inputs.program)}'><th scope='row'>"
+            f"{_e(rules.firm)} · {_e(rules.program)}</th>"
+            f"<td>{loss_link(rules.total_loss_type)}</td>"
+            + "".join(f"<td>{cell}</td>" for cell in cells)
+            + "</tr>"
+        )
+    # The quotes are prose outside the tables: no evidence label on them; the
+    # footer names the firm, the program, the source and its reading date.
+    notes = "".join(
+        f"<blockquote data-preset='{_e(row.key)}'><p>"
+        f"{_e(localize(row.note, locale))}</p>"
+        f"<footer>{_e(row.firm)} · {_e(row.program)} · "
+        f"{source(row.firm, row.source_url, row.as_of)}</footer></blockquote>"
+        for row in trailing_caveats()
+    )
+    return {
+        words["rules"]: table(
+            "rules", ("program", "type", "limit", "source"), rule_rows, words["rules_note"]
+        ),
+        words["cases"]: table(
+            "cases",
+            ("program", "type", "target_rule", "target", "total", "daily", "unfinished"),
+            "".join(case_rows),
+            trailing_outcome_note(locale),
+        ),
+        words["notes"]: f"<p>{_e(words['notes_note'])}</p>"
+        f"<div class='article-trailing-notes'>{notes}</div>",
+    }
+
+
 def article_page(article: Article, *, locale: str = "es", base_url: str = "") -> str:
     """One article: its sections, questions, related pages and a closing call."""
     locale = _locale(locale)
@@ -5056,6 +5149,9 @@ def article_page(article: Article, *, locale: str = "es", base_url: str = "") ->
     ]
     if article.key == CONSISTENCY_ARTICLE_KEY:
         tables = _consistency_article_tables(locale)
+        sections = [(heading, body + tables.get(heading, "")) for heading, body in sections]
+    if article.key == TRAILING_ARTICLE_KEY:
+        tables = _trailing_article_tables(locale)
         sections = [(heading, body + tables.get(heading, "")) for heading, body in sections]
     if article.key in {"sharpe-deflactado-track-record", "bot-ia-backtest-suerte"}:
         heading, trials, years, luck, note = LUCK_TABLE_COPY[locale]
