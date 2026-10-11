@@ -122,7 +122,7 @@ from quant_trade.audit.report import (
 )
 from quant_trade.audit.report import LABELS as REPORT_LABELS
 from quant_trade.audit.rules_table import COPY as RULES_COPY
-from quant_trade.audit.rules_table import rules_table_url
+from quant_trade.audit.rules_table import FILTER_MARKET, rules_table_url
 from quant_trade.audit.sample_publication import SamplePage, public_pages_line
 from quant_trade.audit.schema import MAX_UPLOAD_BYTES
 from quant_trade.audit.seo import (
@@ -4645,7 +4645,9 @@ def _guide_offer(
 ) -> str:
     """ "What you get" on a guide: the report's contents and the free report as the
     sign-up panel and /precios word them, the upload button, the sample report
-    and the free tool that fits the guide (``guide_capabilities.GUIDE_TOOL``).
+    and the free tool that fits the guide (``guide_capabilities.GUIDE_TOOL``);
+    when that tool is the challenge calculator, also the rules table and its
+    futures firms.
 
     ``offer`` is the service's (``free``, ``welcome`` or ``paid``). The free first
     report comes with the limits the upload applies to it (``web._first_look``:
@@ -4696,6 +4698,16 @@ def _guide_offer(
         if guide.slug in SIGNAL_SAMPLE_GUIDES
         else ""
     )
+    rules = ""
+    if tool == "challenge":
+        # The rules behind that tool: every firm on one page with source and
+        # date, and the same table narrowed to the futures firms.
+        futures = f"{rules_table_url(locale)}?{FILTER_MARKET}=futures"
+        rules = (
+            f"<p data-guide-rules>{_e(RULES_COPY[locale]['audience_line'])} "
+            f"<a href='{_e(rules_table_url(locale))}'>{_e(RULES_COPY[locale]['nav'])}</a> · "
+            f"<a href='{_e(futures)}'>{_e(words['futures_firms'])}</a></p>"
+        )
     return (
         "".join(f"<p>{_e(line)}</p>" for line in lines)
         + f"<p><a class='btn btn-dark' href='{_e(_form_url(locale))}'>{_e(words['upload_this'])}"
@@ -4704,6 +4716,7 @@ def _guide_offer(
         f"{signal}</p>{after}"
         f"<p>{_e(words['tool'])} <a href='{_e(_tool_url(tool, locale))}'>"
         f"{_e(_tool_name(tool, locale))}</a>. {_e(TOOLS_COPY[locale][tool]['question'])}</p>"
+        f"{rules}"
     )
 
 
@@ -4735,7 +4748,17 @@ def guide_page(
     meta = _public_meta(
         title, text.seo_description or text.summary, locale, guide_url(guide.slug, locale), base_url
     )
-    steps = "".join(f"<li>{_e(step)}</li>" for step in text.steps)
+    items = "".join(f"<li>{_e(step)}</li>" for step in text.steps)
+    steps = f"<ol class='list-steps steps-guide'>{items}</ol>"
+    if guide.sources:
+        # The platform's own pages the steps were read from, and the day.
+        links = " · ".join(
+            f"<a href='{_e(url)}' rel='noopener noreferrer'>{_e(title)}</a>"
+            for title, url in guide.sources
+        )
+        read_on = words["read_on"].format(date=_plain_date(guide.read_on, locale))
+        label = words["sources" if len(guide.sources) > 1 else "source"]
+        steps += f"<p class='muted guide-sources'>{_e(label)} {links}. {_e(read_on)}</p>"
     tips = "".join(f"<li>{icon('check')}<span>{_e(tip)}</span></li>" for tip in text.tips)
     does = "".join(
         f"<li>{icon('check')}<span>{_e(point)}</span></li>"
@@ -4746,7 +4769,7 @@ def guide_page(
     )
     sections = [
         (words["file"], f"<p>{_e(text.file)}</p>"),
-        (words["steps"], f"<ol class='list-steps steps-guide'>{steps}</ol>"),
+        (words["steps"], steps),
         (
             words["upload"],
             f"<p>{_e(text.upload)}</p>"

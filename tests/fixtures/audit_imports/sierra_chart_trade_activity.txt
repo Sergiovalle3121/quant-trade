@@ -1,0 +1,7 @@
+ActivityType	DateTime	TransDateTime	Symbol	OrderActionSource	Internal Order ID	Service Order ID	Order Type	Quantity	Buy Sell	Price	Price2	Order Status	Fill Price	Filled Quantity	Trade Account	Open Close	Parent Internal Order ID	Position Quantity	Fill Execution Service ID	High During Position	Low During Position	Note	Account Balance	Exchange Order ID
+Orders	2026-09-01 09:30:00.000000	2026-09-01 09:30:00.000000	ESZ6.CME	User	1	1	Market	1	Buy	6000.00	0	Filled			Sim1		0	0					50000.00	
+Fills	2026-09-01 09:30:01.000000	2026-09-01 09:30:01.000000	ESZ6.CME	User	1	1	Market	1	Buy		0	Filled	6000.25	1	Sim1	Open	0	1					50000.00	
+Orders	2026-09-01 09:40:00.000000	2026-09-01 09:40:00.000000	ESZ6.CME	User	2	2	Market	1	Sell	6002.25	0	Filled			Sim1		0	1					50000.00	
+Fills	2026-09-01 09:40:00.000000	2026-09-01 09:40:00.000000	ESZ6.CME	User	2	2	Market	1	Sell		0	Filled	6002.25	1	Sim1	Close	0	0					50100.00	
+Fills	2026-09-02 09:30:00.000000	2026-09-02 09:30:00.000000	MNQZ6.CME	User	3	3	Market	2	Sell		0	Filled	21010.00	2	Sim1	Open	0	-2					50100.00	
+Fills	2026-09-02 09:45:00.000000	2026-09-02 09:45:00.000000	MNQZ6.CME	User	4	4	Market	2	Buy		0	Filled	21005.00	2	Sim1	Close	0	0					50120.00	

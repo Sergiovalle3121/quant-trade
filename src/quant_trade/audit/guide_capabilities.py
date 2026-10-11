@@ -84,6 +84,13 @@ GUIDE_FORMATS: dict[str, frozenset[str]] = {
     "robinhood": frozenset({ROBINHOOD_CSV}),
     # The Console Tradebook is one row per fill, read by its column names.
     "zerodha": frozenset({UNIVERSAL_FILLS_CSV}),
+    # The futures platforms' exports, read by their column names: Tradovate's
+    # Performance report is a trade list and its Orders report a fill list;
+    # TopstepX's Trades tab a trade list; Sierra Chart's Trade Activity tab a
+    # fill list and its Trades tab a trade list once the quantity column is named.
+    "tradovate": _UNIVERSAL,
+    "topstepx": frozenset({UNIVERSAL_TRADES_CSV}),
+    "sierra-chart": _UNIVERSAL,
     "csv-universal": _UNIVERSAL,
 }
 
@@ -1026,11 +1033,16 @@ GUIDE_CAPABILITIES: dict[str, tuple[str, ...]] = {
     "fxblue": ("account_money", "busiest_account", "live_compare", "no_printed_balance"),
     "robinhood": ("rh_pairing", "rh_unopened", "win_stats", "loss_streak"),
     "zerodha": ("fills_fifo", "win_stats", "recent_fade", "cost_stress"),
+    "tradovate": ("columns_shown", "futures_point", "win_stats", "loss_streak"),
+    "topstepx": ("columns_shown", "cost_stress", "win_stats", "loss_streak"),
+    "sierra-chart": ("fills_fifo", "futures_point", "win_stats", "recent_fade"),
     "csv-universal": ("columns_shown", "mapping_remembered", "fills_fifo", "futures_point"),
 }
 
 #: The free tool that fits each guide: the luck calculator for optimised
-#: backtests, the win-rate calculator for account and trade histories.
+#: backtests, the win-rate calculator for account and trade histories and the
+#: challenge calculator for the futures platforms' histories, whose page also
+#: links the rules table and its futures firms.
 GUIDE_TOOL: dict[str, str] = {
     "mt5": "calculator",
     "cuenta-proveedor": "winrate",
@@ -1046,6 +1058,9 @@ GUIDE_TOOL: dict[str, str] = {
     "fxblue": "winrate",
     "robinhood": "winrate",
     "zerodha": "winrate",
+    "tradovate": "challenge",
+    "topstepx": "challenge",
+    "sierra-chart": "challenge",
     "csv-universal": "winrate",
 }
 
@@ -1253,6 +1268,57 @@ GUIDE_PURPOSE: dict[str, dict[str, str]] = {
         "pt": (
             "Com este Tradebook, o Rigor pareia as suas compras e vendas na ordem em que "
             "aconteceram e submete as suas operações aos mesmos testes de um backtest."
+        ),
+    },
+    "tradovate": {
+        "es": (
+            "Con este CSV de Account Reports, Rigor empareja cada compra con su venta, descuenta "
+            "las comisiones que traiga el archivo y mide tu % de aciertos y tus rachas antes de "
+            "que pagues otro reto."
+        ),
+        "en": (
+            "With this Account Reports CSV, Rigor pairs each buy with its sell, subtracts the "
+            "fees the file itemises and measures your win rate and your streaks before you pay "
+            "for another challenge."
+        ),
+        "pt": (
+            "Com este CSV de Account Reports, o Rigor pareia cada compra com a venda, desconta "
+            "as comissões que o arquivo trouxer e mede a sua taxa de acerto e as suas sequências "
+            "antes de você pagar outro desafio."
+        ),
+    },
+    "topstepx": {
+        "es": (
+            "Con esta exportación de Trades, Rigor lee cada operación con su entrada y su "
+            "salida, resta las comisiones y mide si tu resultado aguanta costos más altos y "
+            "rachas de pérdidas."
+        ),
+        "en": (
+            "With this Trades export, Rigor reads each trade with its entry and its exit, "
+            "subtracts the fees and measures whether your result holds up under higher costs "
+            "and losing streaks."
+        ),
+        "pt": (
+            "Com esta exportação de Trades, o Rigor lê cada operação com a entrada e a saída, "
+            "desconta as taxas e mede se o seu resultado aguenta custos mais altos e sequências "
+            "de perdas."
+        ),
+    },
+    "sierra-chart": {
+        "es": (
+            "Con este registro, Rigor empareja tus ejecuciones por símbolo en el orden en que "
+            "ocurrieron, valora cada contrato con su valor por punto y somete tus operaciones a "
+            "las mismas pruebas que un backtest."
+        ),
+        "en": (
+            "With this log, Rigor pairs your fills per symbol in the order they happened, "
+            "prices each contract with its point value and puts your trades through the same "
+            "tests as a backtest."
+        ),
+        "pt": (
+            "Com este registro, o Rigor pareia as suas execuções por símbolo na ordem em que "
+            "aconteceram, valoriza cada contrato pelo valor do ponto e submete as suas "
+            "operações aos mesmos testes de um backtest."
         ),
     },
     "csv-universal": {

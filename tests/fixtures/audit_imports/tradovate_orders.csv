@@ -1,0 +1,6 @@
+orderId,Account,Order ID,B/S,Contract,Product,avgPrice,filledQty,Fill Time,Status
+1,SIM1,1,Buy,ESM6,ES,6000.00,1,04/13/2026 09:31:00,Filled
+2,SIM1,2,Sell,ESM6,ES,6004.00,1,04/13/2026 09:50:00,Filled
+3,SIM1,3,Sell,ESM6,ES,6010.00,0,04/13/2026 10:00:00,Canceled
+4,SIM1,4,Sell,MNQM6,MNQ,21010.00,2,04/14/2026 09:35:00,Filled
+5,SIM1,5,Buy,MNQM6,MNQ,21005.00,2,04/14/2026 09:45:00,Filled
