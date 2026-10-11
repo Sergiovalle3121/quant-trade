@@ -107,8 +107,8 @@ def test_every_guide_exists_in_every_language_and_passes_the_guard() -> None:
         assert guide.field in {"report", "optimization"}
         for text in guide.text.values():
             assert text.steps and text.tips
-    for text in _all_guide_texts():
-        assert find_claims(text) == [], text
+    for words in _all_guide_texts():
+        assert find_claims(words) == [], words
 
 
 def test_guides_cover_every_report_format_family() -> None:
@@ -260,6 +260,8 @@ def test_every_sitemap_url_has_an_iso_lastmod_from_the_code(tmp_path: Path) -> N
         OFFER_UPDATED,
         *ARTICLE_PUBLICATION_DATES.values(),
     }
+    assert ARTICLE_PUBLICATION_DATES["riesgo-de-ruina-intervalo-de-confianza"] == "2026-10-11"
+    assert "2026-10-11" in known
     for url in root.findall("s:url", SITEMAP_NS):
         children = [child.tag.rsplit("}", 1)[-1] for child in url]
         # The schema's order: <loc>, then <lastmod>, then the xhtml alternates.

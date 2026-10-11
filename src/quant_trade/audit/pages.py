@@ -21,7 +21,7 @@ from urllib.parse import quote, urlencode
 from quant_trade.audit import accounts, institutional, paid_offer, reading, ruin_calc, winrate
 from quant_trade.audit import challenge_calc as challenge
 from quant_trade.audit.accounts import FREE_PREVIEWS_PER_MONTH as _FREE
-from quant_trade.audit.article_numbers import STREAK_ROWS
+from quant_trade.audit.article_numbers import RUIN_INPUTS, RUIN_READINGS, STREAK_ROWS
 from quant_trade.audit.articles import (
     ARTICLES,
     ARTICLES_BY_KEY,
@@ -29,6 +29,9 @@ from quant_trade.audit.articles import (
     INDEPENDENT_LUCK_EXAMPLE,
     LUCK_TABLE_COPY,
     LUCK_TABLE_INPUTS,
+    RUIN_ARTICLE_KEY,
+    RUIN_TABLE_AFTER,
+    RUIN_TABLE_COPY,
     STREAK_ARTICLE_KEY,
     STREAK_TABLE_AFTER,
     STREAK_TABLE_COPY,
@@ -4997,6 +5000,38 @@ def article_page(article: Article, *, locale: str = "es", base_url: str = "") ->
         )
         # Right after the section that explains the calculation, found by its title.
         after = [name for name, _body in sections].index(STREAK_TABLE_AFTER[locale])
+        sections.insert(after + 1, (heading, table))
+    if article.key == RUIN_ARTICLE_KEY:
+        heading, *ruin_columns, note = RUIN_TABLE_COPY[locale]
+        ruin_rows: list[str] = []
+        for value, result in zip(RUIN_INPUTS, RUIN_READINGS, strict=True):
+            lower = result.lower
+            if lower is None:
+                raise ValueError("the ruin article requires a Wilson lower-bound scenario")
+            cells = (
+                f"{_num(value.win_rate_pct, locale, 2)} %",
+                _num(value.trades or 0, locale, 0),
+                f"{value.avg_win:g}R/{value.avg_loss:g}R",
+                f"{_num(result.declared.expectancy_r, locale, 3)} R",
+                f"{_num(result.declared.ruin * 100, locale, 2)} %",
+                f"{_num(lower.win_rate * 100, locale, 2)} %",
+                f"{_num(lower.expectancy_r, locale, 3)} R",
+                f"{_num(lower.ruin * 100, locale, 2)} %",
+            )
+            ruin_rows.append(
+                f"<tr><th scope='row'>DECLARED · {_e(cells[0])}</th>"
+                + "".join(f"<td>DECLARED · {_e(cell)}</td>" for cell in cells[1:])
+                + "</tr>"
+            )
+        table = (
+            f"<div class='tscroll' role='region' tabindex='0' aria-label='{_e(heading)}'>"
+            f"<table class='article-ruin'><caption>{_e(note)}</caption><thead><tr>"
+            + "".join(f"<th scope='col'>{_e(column)}</th>" for column in ruin_columns)
+            + "</tr></thead><tbody>"
+            + "".join(ruin_rows)
+            + "</tbody></table></div>"
+        )
+        after = [name for name, _body in sections].index(RUIN_TABLE_AFTER[locale])
         sections.insert(after + 1, (heading, table))
     if text.faq:
         faq = "".join(f"<h3>{_e(q)}</h3><p>{_e(a)}</p>" for q, a in text.faq)
