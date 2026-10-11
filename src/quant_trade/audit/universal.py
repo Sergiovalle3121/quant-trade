@@ -990,6 +990,31 @@ def only_fills(header: Sequence[str], rows: list[list[str]]) -> list[list[str]]:
     return [row for row in rows if "fill" in (row[kinds[0]] if kinds[0] < len(row) else "").lower()]
 
 
+UNFILLED_DEALS_WARNING = "{n} deal row(s) without a filled status excluded"
+
+
+def _closed_deal_rows(header: Sequence[str], rows: list[list[str]]) -> list[list[str]]:
+    """Respect optional cTrader Deal info statuses alongside History columns.
+
+    The Statement CSV header is undocumented; this checks column semantics,
+    not a native export signature. Other platforms' Status columns are untouched.
+    A partial fill can close its actual quantity and must remain in the list.
+    Empty or unknown statuses are excluded because no execution is established.
+    Source: https://help.ctrader.com/ctrader/trading/history/ (Deal information).
+    """
+    names = [normalise(str(name)) for name in header]
+    if not {"openingdirection", "closingquantity", "openingtime", "closingtime", "status"} <= set(
+        names
+    ):
+        return rows
+    status_at = names.index("status")
+    return [
+        row
+        for row in rows
+        if status_at < len(row) and normalise(row[status_at]) in {"filled", "partiallyfilled"}
+    ]
+
+
 #: Time columns whose dates are always day first: B3 writes Brazilian dates.
 DAY_FIRST_NAMES = frozenset({"datadonegocio"})
 
@@ -1494,6 +1519,19 @@ def parse(
             draft.metadata["column_commission"] = imp._clip(listed, 120)
         elif role in mapping.names:
             draft.metadata[f"column_{role}"] = imp._clip(mapping.names[role], 60)
+    # Count only rows with an execution status when choosing the busiest account.
+    closed_rows = _closed_deal_rows(header, rows)
+    excluded = len(rows) - len(closed_rows)
+    if excluded:
+        draft.warnings.append(UNFILLED_DEALS_WARNING.format(n=excluded))
+        draft.metadata["excluded_unfilled_deals"] = str(excluded)
+    rows = closed_rows
+    if excluded and not rows:
+        raise imp.ReportFormatError(
+            "no_closed_trades",
+            "the file has no closed trades",
+            "el archivo no contiene operaciones cerradas",
+        )
     accounts = [_cell(row, mapping.columns, "account").strip() for row in rows]
     if len(set(accounts)) > 1 and mapping.shape == UNIVERSAL_TRADES_CSV:
         closed: dict[str, int] = {}

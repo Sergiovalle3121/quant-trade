@@ -103,6 +103,7 @@ def test_every_guide_exists_in_every_language_and_passes_the_guard() -> None:
         "tradovate",
         "topstepx",
         "sierra-chart",
+        "ctrader",
         "csv-universal",
     }
     for guide in GUIDES:
@@ -279,9 +280,39 @@ def test_every_sitemap_url_has_an_iso_lastmod_from_the_code(tmp_path: Path) -> N
     for paths in LEGAL_PATHS.values():
         for path in paths.values():
             assert page_lastmod(path) == LEGAL_UPDATED, path
-    # Pages without a date of their own share the site's date; none is made up.
-    assert page_lastmod("/guias") == page_lastmod("/") == SITE_UPDATED
+    # The guide index changes with the newest guide; the landing keeps its date.
+    assert page_lastmod("/guias") == max(GUIDES_PUBLISHED.values()) == "2026-10-11"
+    assert page_lastmod("/") == SITE_UPDATED
     assert set(PAGE_DATES) <= {path for pair in PUBLIC_PAGES for path in pair.values()}
+
+
+@pytest.mark.parametrize("locale", ("es", "en", "pt"))
+def test_ctrader_public_metadata_and_publication_date(tmp_path: Path, locale: str) -> None:
+    from quant_trade.audit.seo import GUIDES_PUBLISHED, page_lastmod
+
+    client = _client(tmp_path)
+    paths = {language: guide_url("ctrader", language) for language in ("es", "en", "pt")}
+    assert paths in PUBLIC_PAGES
+    assert GUIDES_PUBLISHED["ctrader"] == "2026-10-11"
+    path = paths[locale]
+    response = client.get(path)
+    assert response.status_code == 200
+    assert _canonical(response.text) == BASE + path
+    assert _meta(response.text, "og:url") == BASE + path
+    assert _meta(response.text, "robots") == "index, follow"
+    assert find_claims(response.text) == []
+    for language, target in paths.items():
+        assert f"hreflang='{language}' href='{BASE}{target}'" in response.text
+    assert f"href='{path}'" in client.get(guides_index_url(locale)).text
+    root = ElementTree.fromstring(client.get("/sitemap.xml").content)
+    dates = {
+        url.findtext("s:loc", namespaces=SITEMAP_NS): url.findtext(
+            "s:lastmod", namespaces=SITEMAP_NS
+        )
+        for url in root.findall("s:url", SITEMAP_NS)
+    }
+    assert dates[BASE + path] == page_lastmod(path) == "2026-10-11"
+    assert dates[BASE + guides_index_url(locale)] == "2026-10-11"
 
 
 def test_verification_page_previews_class_and_date_and_nothing_private(tmp_path: Path) -> None:

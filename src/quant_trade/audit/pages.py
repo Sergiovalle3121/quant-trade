@@ -4700,13 +4700,18 @@ def _guide_offer(
     )
     rules = ""
     if tool == "challenge":
-        # The rules behind that tool: every firm on one page with source and
-        # date, and the same table narrowed to the futures firms.
+        # The rules behind that tool, with each source and date. The cTrader
+        # guide covers its statement export, without a futures-only scope.
         futures = f"{rules_table_url(locale)}?{FILTER_MARKET}=futures"
+        futures_link = (
+            f" · <a href='{_e(futures)}'>{_e(words['futures_firms'])}</a>"
+            if guide.slug != "ctrader"
+            else ""
+        )
         rules = (
             f"<p data-guide-rules>{_e(RULES_COPY[locale]['audience_line'])} "
-            f"<a href='{_e(rules_table_url(locale))}'>{_e(RULES_COPY[locale]['nav'])}</a> · "
-            f"<a href='{_e(futures)}'>{_e(words['futures_firms'])}</a></p>"
+            f"<a href='{_e(rules_table_url(locale))}'>{_e(RULES_COPY[locale]['nav'])}</a>"
+            f"{futures_link}</p>"
         )
     return (
         "".join(f"<p>{_e(line)}</p>" for line in lines)
@@ -4748,7 +4753,17 @@ def guide_page(
     meta = _public_meta(
         title, text.seo_description or text.summary, locale, guide_url(guide.slug, locale), base_url
     )
-    items = "".join(f"<li>{_e(step)}</li>" for step in text.steps)
+    items = ""
+    step_sources = guide.step_sources or (("", ""),) * len(text.steps)
+    for step, (source_title, source_url) in zip(text.steps, step_sources, strict=True):
+        source = (
+            f" <span class='muted guide-step-source'>{_e(words['source'])} "
+            f"<a href='{_e(source_url)}' rel='noopener noreferrer'>"
+            f"{_e(source_title)}</a></span>"
+            if source_url
+            else ""
+        )
+        items += f"<li>{_e(step)}{source}</li>"
     steps = f"<ol class='list-steps steps-guide'>{items}</ol>"
     if guide.sources:
         # The platform's own pages the steps were read from, and the day.

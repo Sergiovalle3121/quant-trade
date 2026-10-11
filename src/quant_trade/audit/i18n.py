@@ -550,6 +550,10 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
         "{n} fila(s) repetida(s) (la misma posición listada dos veces) se contaron una sola vez",
     ),
     (
+        "{n} deal row(s) without a filled status excluded",
+        "se excluyeron {n} fila(s) de operaciones sin estado de ejecución total o parcial",
+    ),
+    (
         "{n} credit row(s) excluded: broker credit is not the trader's balance",
         "se excluyeron {n} fila(s) de crédito: el crédito del bróker no es balance del trader",
     ),
@@ -3517,6 +3521,10 @@ _SINGULAR: dict[str, tuple[str, str]] = {
     "{n} repeated row(s) (the same position listed twice) counted once": (
         "{n} repeated row (the same position listed twice) counted once",
         "{n} fila repetida (la misma posición listada dos veces) se contó una sola vez",
+    ),
+    "{n} deal row(s) without a filled status excluded": (
+        "{n} deal row without a filled status excluded",
+        "se excluyó {n} fila de operaciones sin estado de ejecución total o parcial",
     ),
     "{n} position(s) opened in the report were not closed; excluded": (
         "{n} position opened in the report was not closed; excluded",

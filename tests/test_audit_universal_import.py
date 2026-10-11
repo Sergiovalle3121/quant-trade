@@ -1,13 +1,13 @@
 """Any trade or fill list: columns recognised by name, or mapped by the customer.
 
 Every file here is synthetic. Column names follow the publicly documented
-exports of common brokers, exchanges and journals; the rows are made up.
+tables or exports of common brokers, exchanges and journals; the rows are made up.
 """
 
 from __future__ import annotations
 
 import pytest
-from test_audit_importers import xlsx
+from test_audit_importers import fixture, xlsx
 
 from quant_trade.audit.guard import find_claims
 from quant_trade.audit.i18n import untranslated
@@ -60,6 +60,91 @@ def test_a_trade_list_from_an_unlisted_platform_is_read_by_its_column_names() ->
     assert report.metadata["column_entry_time"] == "Open Time"
     assert report.metadata["column_quantity"] == "Lots"
     assert report.initial_balance == 5_000
+    _clean(report)
+
+
+def test_ctrader_history_needs_an_explicit_monetary_result_column() -> None:
+    data = fixture("ctrader_history_columns.csv")
+    header = data.decode().splitlines()[0].split(",")
+    columns = guess_columns(header)
+    assert columns["quantity"] == header.index("Closing quantity")
+    assert columns["side"] == header.index("Opening direction")
+    assert "profit" not in columns
+    # The guide's safe preparation step: rename the account-currency gross
+    # result in a copy, preserving separate commissions and signed swaps.
+    prepared = data.replace(b"Gross (currency)", b"profit", 1)
+    report = import_report(prepared, "ctrader_universal.csv", initial_balance=10_000)
+    assert report.source_format == UNIVERSAL_TRADES_CSV
+    assert _net(report) == [48.5, -51.25, -10.5]
+    assert report.metadata["column_profit"] == "profit"
+    assert not any("no profit column" in warning for warning in report.warnings)
+    _clean(report)
+
+
+def _ctrader_with_status(*statuses: str) -> bytes:
+    # Status is documented in Deal info, not as a promised Statement header.
+    lines = fixture("ctrader_history_columns.csv").decode().splitlines()
+    rows = [f"{row},{status}" for row, status in zip(lines[1:], statuses, strict=True)]
+    return ("\n".join([f"{lines[0]},Status", *rows]) + "\n").encode()
+
+
+@pytest.mark.parametrize(
+    "status", ["Rejected", "Error", "Missed", "Internally rejected", "", "Unknown"]
+)
+def test_ctrader_nonfilled_deals_do_not_become_closed_trades(status: str) -> None:
+    report = import_report(
+        _ctrader_with_status("Filled", status, "Filled"),
+        columns={"profit": "Gross (currency)"},
+        initial_balance=10_000,
+    )
+    # The excluded row is otherwise numerically complete and has a loss.
+    assert _net(report) == [48.5, -10.5]
+    assert report.metadata["excluded_unfilled_deals"] == "1"
+    assert any("without a filled status excluded" in warning for warning in report.warnings)
+    _clean(report)
+
+
+def test_ctrader_partially_filled_deals_keep_the_documented_closing_quantity() -> None:
+    report = import_report(
+        _ctrader_with_status("Filled", "Partially filled", "Filled"),
+        columns={"profit": "Gross (currency)"},
+    )
+    assert [trade.quantity for trade in report.trades.trades] == [25_000, 25_000, 10_000]
+    assert report.metadata["column_quantity"] == "Closing quantity"
+    assert _net(report) == [48.5, -51.25, -10.5]
+    _clean(report)
+
+
+def test_ctrader_all_nonfilled_deals_report_no_closed_trades() -> None:
+    with pytest.raises(ReportFormatError) as caught:
+        import_report(
+            _ctrader_with_status("Rejected", "Error", "Missed"),
+            columns={"profit": "Gross (currency)"},
+        )
+    assert caught.value.code == "no_closed_trades"
+    assert find_claims(str(caught.value)) == []
+
+
+def test_ctrader_status_filter_does_not_change_other_platforms_closed_status() -> None:
+    lines = _trades_csv().decode().splitlines()
+    data = "\n".join([f"{lines[0]},Status", *(f"{row},Closed" for row in lines[1:])]).encode()
+    assert len(import_report(data).trades.trades) == 12
+
+
+def test_ctrader_account_selection_counts_filled_deals_only() -> None:
+    lines = _ctrader_with_status("Rejected", "Rejected", "Filled").decode().splitlines()
+    rows = [f"{row},{account}" for row, account in zip(lines[1:], ("A", "A", "B"), strict=True)]
+    data = ("\n".join([f"{lines[0]},Account", *rows]) + "\n").encode()
+    report = import_report(
+        data,
+        columns={"profit": "Gross (currency)"},
+        initial_balance=10_000,
+    )
+    # A has more rows but no executions. B's filled losing deal must remain.
+    assert _net(report) == [-10.5]
+    assert report.metadata["column_account"] == "Account"
+    assert report.metadata["excluded_unfilled_deals"] == "2"
+    assert "2 deal row(s) without a filled status excluded" in report.warnings
     _clean(report)
 
 

@@ -91,6 +91,9 @@ GUIDE_FORMATS: dict[str, frozenset[str]] = {
     "tradovate": _UNIVERSAL,
     "topstepx": frozenset({UNIVERSAL_TRADES_CSV}),
     "sierra-chart": _UNIVERSAL,
+    # cTrader documents History columns, not the statement CSV's headers.
+    # The guide maps those columns to the universal closed-trade format.
+    "ctrader": frozenset({UNIVERSAL_TRADES_CSV}),
     "csv-universal": _UNIVERSAL,
 }
 
@@ -1036,13 +1039,14 @@ GUIDE_CAPABILITIES: dict[str, tuple[str, ...]] = {
     "tradovate": ("columns_shown", "futures_point", "win_stats", "loss_streak"),
     "topstepx": ("columns_shown", "cost_stress", "win_stats", "loss_streak"),
     "sierra-chart": ("fills_fifo", "futures_point", "win_stats", "recent_fade"),
+    "ctrader": ("columns_shown", "cost_stress", "win_stats", "loss_streak"),
     "csv-universal": ("columns_shown", "mapping_remembered", "fills_fifo", "futures_point"),
 }
 
 #: The free tool that fits each guide: the luck calculator for optimised
 #: backtests, the win-rate calculator for account and trade histories and the
-#: challenge calculator for the futures platforms' histories, whose page also
-#: links the rules table and its futures firms.
+#: challenge calculator for the futures platforms' and cTrader histories,
+#: whose pages also link the rules table.
 GUIDE_TOOL: dict[str, str] = {
     "mt5": "calculator",
     "cuenta-proveedor": "winrate",
@@ -1061,6 +1065,7 @@ GUIDE_TOOL: dict[str, str] = {
     "tradovate": "challenge",
     "topstepx": "challenge",
     "sierra-chart": "challenge",
+    "ctrader": "challenge",
     "csv-universal": "winrate",
 }
 
@@ -1319,6 +1324,23 @@ GUIDE_PURPOSE: dict[str, dict[str, str]] = {
             "Com este registro, o Rigor pareia as suas execuções por símbolo na ordem em que "
             "aconteceram, valoriza cada contrato pelo valor do ponto e submete as suas "
             "operações aos mesmos testes de um backtest."
+        ),
+    },
+    "ctrader": {
+        "es": (
+            "Con las columnas del extracto asignadas al CSV universal, Rigor lee las "
+            "operaciones cerradas y mide su % de aciertos, sus rachas de pérdidas y el "
+            "efecto de costos más altos."
+        ),
+        "en": (
+            "With the statement columns mapped to the universal CSV, Rigor reads the "
+            "closed trades and measures their win rate, losing streaks and the effect "
+            "of higher costs."
+        ),
+        "pt": (
+            "Com as colunas do extrato mapeadas para o CSV universal, o Rigor lê as "
+            "operações fechadas e mede a taxa de acerto, as sequências de perdas e o "
+            "efeito de custos mais altos."
         ),
     },
     "csv-universal": {
