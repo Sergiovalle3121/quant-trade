@@ -5100,6 +5100,22 @@ CHALLENGE_ARTICLE_COPY: dict[str, tuple[str, str, str]] = {
 #: the file at hand (a ``tools_hub.TOOL_KEYS`` key).
 AUDIENCE_TOOLS: dict[str, str] = {"retos-prop-firm": "challenge"}
 
+#: The challenge audience's companion tool, using declared figures without a file.
+AUDIENCE_RUIN_COPY: dict[str, str] = {
+    "es": (
+        "La calculadora de ruina estima la frecuencia de tocar un límite de pérdida "
+        "a partir de tus cifras declaradas."
+    ),
+    "en": (
+        "The risk-of-ruin calculator estimates how often a loss threshold is touched "
+        "from your declared figures."
+    ),
+    "pt": (
+        "A calculadora de ruína estima a frequência de tocar um limite de perda "
+        "a partir dos seus números declarados."
+    ),
+}
+
 #: Articles each case page lists before the other cases (article keys, in order).
 AUDIENCE_ARTICLES: dict[str, tuple[str, ...]] = {
     "retos-prop-firm": ("cuantos-intentos-reto-prop-firm", "rachas-perdedoras"),
@@ -5219,6 +5235,10 @@ def audience_page(
         lead += (
             f"<p class='muted' data-audience-rules>{_e(RULES_COPY[locale]['audience_line'])} "
             f"<a href='{_e(rules_table_url(locale))}'>{_e(RULES_COPY[locale]['nav'])}</a></p>"
+        )
+        lead += (
+            f"<p class='muted' data-audience-ruin>{_e(AUDIENCE_RUIN_COPY[locale])} "
+            f"<a href='{_e(ruin_calc.ruin_url(locale))}'>{_e(_tool_name('ruin', locale))}</a></p>"
         )
     alternates = {lang: audience_url(audience.slug, lang) for lang in ("es", "en", "pt")}
     crumbs = f"<a href='{_e(_home(locale))}'>{_e(words['home'])}</a>" + _language_crumbs(
