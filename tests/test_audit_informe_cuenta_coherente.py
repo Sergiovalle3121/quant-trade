@@ -398,8 +398,8 @@ def test_the_challenge_says_the_open_loss_counts_first_and_folds_its_figures(
     assert {"FLOATING_LOSS_AT_END", "HIDDEN_FLOATING_DRAWDOWN"} <= codes
     assert data["inputs"]["balance_only"] and data["challenge"]["status"] == "MEASURED"
     unseen, share = unseen_open_loss(data)
-    assert unseen and share is not None
-    assert share == data["account"]["floating_share"]["value"]
+    assert unseen and share == data["account"]["floating_share"]["value"]
+    assert share is not None
     labels = LABELS[locale]
     page = _signal_page(locale)
     section = page.split(f"<h2>{html.escape(labels['challenge'], quote=True)}</h2>")[-1]

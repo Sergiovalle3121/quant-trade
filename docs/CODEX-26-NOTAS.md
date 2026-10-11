@@ -17,8 +17,10 @@ evidencia, los presets y el simulador. No modifica archivos JSON guardados ni su
   ningún test cambia los datos que utilizaba.
 - `guides_seo` ya separaba la variable `GuideText` de los fragmentos de texto en la base
   recibida; no necesitó cambios de tipado.
-- El comparador utiliza «Alcanza el objetivo», «Reaches the target» y «Atinge a meta»,
-  también en la columna de la regla del mejor día, explicaciones y resúmenes.
+- El comparador utiliza «Llega al objetivo», «Reaches the target» y «Atinge a meta»,
+  también en la columna de la regla del mejor día, explicaciones y resúmenes. En español
+  se usa «llega al objetivo», el verbo que ya tenían la escalera y la ficha del reto, para
+  que las dos cabeceras contiguas de la tabla no mezclen verbos.
 - Las dos notas visibles de `firmfit.py` también hablan de alcanzar el objetivo. Sólo
   cambia su texto en resultados nuevos; siguen existiendo las traducciones de las notas
   antiguas para leer informes previos. Las claves `pass`, `pass_within_best_day` y los
@@ -69,3 +71,13 @@ la comprobación para Windows.
 La primera ejecución simultánea de varias colas de pytest agotó memoria (`MemoryError`
 y `hashlib.scrypt: malloc failure`). Esos intentos no se consideran validaciones limpias.
 Se detuvieron las colas y se centralizaron las repeticiones secuenciales.
+
+## Revisión posterior
+
+- `tests/test_audit_funnel.py` vuelve a asignar `store.count_visit` y `store.set_account_ref`
+  directamente (con `# type: ignore[method-assign]`) en lugar de `monkeypatch.setattr`, para
+  que el cambio de tipado no altere la mecánica de las pruebas.
+- `tests/test_audit_informe_cuenta_coherente.py` conserva la aserción original
+  `assert unseen and share == ...`; el `assert share is not None` queda después, solo para
+  el estrechamiento de tipos.
+- `tests/test_audit_xls.py` vuelve al formato de ruff.

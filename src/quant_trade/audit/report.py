@@ -1987,8 +1987,8 @@ LABELS: dict[str, dict[str, str]] = {
             "arriba muestra cuánto cambian."
         ),
         "ff_program": "Reto",
-        "ff_pass": "Alcanza el objetivo",
-        "ff_clean": "Alcanza el objetivo dentro de la regla del mejor día",
+        "ff_pass": "Llega al objetivo",
+        "ff_clean": "Llega al objetivo dentro de la regla del mejor día",
         "ff_risk": "Lo que más lo tumba",
         "ff_no_rule": "sin regla",
         "ff_risk_none": "Nada en las simulaciones",
@@ -2000,17 +2000,17 @@ LABELS: dict[str, dict[str, str]] = {
             "pérdidas abiertas."
         ),
         "ff_all_pass": (
-            "Con este historial todos los programas alcanzan el objetivo en al menos el 99 % "
-            "de las simulaciones: sus reglas no los distinguen."
+            "Con este historial todos los programas llegan al objetivo en al menos el 99 % de "
+            "las simulaciones: sus reglas no los distinguen."
         ),
         "ff_all_fail": (
-            "Con este historial casi ningún programa alcanza el objetivo (1 % de las "
+            "Con este historial casi ningún programa llega al objetivo (1 % de las "
             "simulaciones o menos); lo que más lo impide es {risk}."
         ),
         "ff_phases": "{n} fases",
         "ff_phase": "1 fase",
         "ff_basis_columns": (
-            "«Alcanza el objetivo» usa la historia completa con los costos que ya trae el "
+            "«Llega al objetivo» usa la historia completa con los costos que ya trae el "
             "archivo, sin el costo declarado o de referencia. Las columnas de fuera de muestra "
             "y con costo son los mismos escenarios de la escalera de arriba, con cada programa."
         ),
@@ -2107,11 +2107,11 @@ LABELS: dict[str, dict[str, str]] = {
             "son optimistas."
         ),
         "ff_all_pass_simulated": (
-            "Con este historial todos los programas simulados alcanzan el objetivo en al menos "
+            "Con este historial todos los programas simulados llegan al objetivo en al menos "
             "el 99 % de las simulaciones: sus reglas no los distinguen."
         ),
         "ff_all_fail_simulated": (
-            "Con este historial casi ningún programa simulado alcanza el objetivo (1 % de las "
+            "Con este historial casi ningún programa simulado llega al objetivo (1 % de las "
             "simulaciones o menos); lo que más lo impide es {risk}."
         ),
         "ch_ladder_title": "¿Cuánto cambia con lo que encontró este informe?",

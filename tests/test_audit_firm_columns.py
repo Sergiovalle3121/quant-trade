@@ -191,7 +191,7 @@ def _row(fit: dict[str, Any], keys: list[str]) -> dict[str, Any]:
 @pytest.mark.parametrize(
     ("locale", "target", "within_rule"),
     [
-        ("es", "Alcanza el objetivo", "dentro de la regla del mejor día"),
+        ("es", "Llega al objetivo", "dentro de la regla del mejor día"),
         ("en", "Reaches the target", "within the best-day rule"),
         ("pt", "Atinge a meta", "dentro da regra do melhor dia"),
     ],

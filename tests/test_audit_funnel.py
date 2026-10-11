@@ -180,9 +180,7 @@ def test_unknown_tags_robots_and_other_pages_do_not_count(tmp_path: Path) -> Non
     assert _visits(client) == {("es", ""): 1}
 
 
-def test_a_slow_or_failing_database_never_touches_a_page(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_a_slow_or_failing_database_never_touches_a_page(tmp_path: Path) -> None:
     client, store = _client(tmp_path)
     calls: list[int] = []
 
@@ -190,7 +188,7 @@ def test_a_slow_or_failing_database_never_touches_a_page(
         calls.append(1)
         raise RuntimeError("database away")
 
-    monkeypatch.setattr(store, "count_visit", broken)
+    store.count_visit = broken  # type: ignore[method-assign]
     for _ in range(3):
         assert _browser(client).get("/").status_code == 200
     assert calls == []  # nothing is written during a request
@@ -428,15 +426,13 @@ def test_every_template_that_is_posted_has_its_tag() -> None:
     assert {i.lower() for i in ids} <= set(funnel.REF_TAGS)
 
 
-def test_a_failing_tag_store_never_breaks_a_sign_up(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_a_failing_tag_store_never_breaks_a_sign_up(tmp_path: Path) -> None:
     client, store = _client(tmp_path)
 
     def broken(*args: object, **kwargs: object) -> None:
         raise RuntimeError("database away")
 
-    monkeypatch.setattr(store, "set_account_ref", broken)
+    store.set_account_ref = broken  # type: ignore[method-assign]
     client.get("/?ref=f4")
     _signup(client, "ana@example.com")
     assert client.get("/cuenta", follow_redirects=False).status_code == 200
