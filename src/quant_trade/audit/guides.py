@@ -43,6 +43,10 @@ class Guide:
     #: The Portuguese path segment and platform name, when they differ.
     slug_pt: str | None = None
     platform_pt: str | None = None
+    #: The platform's official pages the steps were read from, as (title, url),
+    #: and the day they were read (ISO). The page prints them under the steps.
+    sources: tuple[tuple[str, str], ...] = ()
+    read_on: str = ""
 
     def slug_for(self, locale: str) -> str:
         if locale == "pt":
@@ -93,6 +97,9 @@ GUIDES_COPY: dict[str, dict[str, str]] = {
             "Este XML no se audita solo: el informe sale del informe HTML de la prueba con la "
             "configuración elegida, y el XML se sube junto a él (ver «{upload}»)."
         ),
+        "source": "Fuente:",
+        "read_on": "Leído el {date}.",
+        "futures_firms": "solo las firmas de futuros",
     },
     "en": {
         "title": "Guides to export your file",
@@ -128,6 +135,9 @@ GUIDES_COPY: dict[str, dict[str, str]] = {
             "This XML is not audited on its own: the report comes from the HTML report of the "
             "test with the chosen settings, and the XML is uploaded with it (see '{upload}')."
         ),
+        "source": "Source:",
+        "read_on": "Read on {date}.",
+        "futures_firms": "futures firms only",
     },
     "pt": {
         "title": "Guias para exportar o seu arquivo",
@@ -162,6 +172,9 @@ GUIDES_COPY: dict[str, dict[str, str]] = {
             "Este XML não é auditado sozinho: o relatório sai do relatório HTML do teste com a "
             "configuração escolhida, e o XML é enviado junto com ele (veja '{upload}')."
         ),
+        "source": "Fonte:",
+        "read_on": "Lido em {date}.",
+        "futures_firms": "só as empresas de futuros",
     },
 }
 
@@ -1483,6 +1496,606 @@ GUIDES: tuple[Guide, ...] = (
                     "do arquivo, sem multiplicador de lote.",
                     "Vendas de ações compradas antes da primeira data do arquivo ficam de "
                     "fora: o relatório as conta como posições abertas.",
+                ),
+            ),
+        },
+    ),
+    # The futures platforms. Every step comes from the platform's own help pages
+    # (``sources``, read on ``read_on``); none of them publishes the file's
+    # headers, so the files are read by their column names (``universal``).
+    Guide(
+        slug="tradovate",
+        platform="Tradovate",
+        field="report",
+        sources=(
+            (
+                "Tradovate Account Reports",
+                "https://support.tradovate.com/s/article/Tradovate-Account-Reports?language=en_US",
+            ),
+            (
+                "Accessing Tradovate Account Statements",
+                "https://support.tradovate.com/s/article/Accessing-Tradovate-Account-Statements"
+                "?language=en_US",
+            ),
+            (
+                "Prop Firm and Evaluation Account Inquiries",
+                "https://support.tradovate.com/s/article/"
+                "Prop-Firm-and-Evaluation-Account-Inquiries-Tradovate?language=en_US",
+            ),
+            (
+                "Changing Displayed Time Zone",
+                "https://support.tradovate.com/s/article/Changing-Displayed-Time-Zone-Tradovate"
+                "?language=en_US",
+            ),
+        ),
+        read_on="2026-10-10",
+        text={
+            "es": GuideText(
+                title="Cómo exportar tus operaciones de Tradovate",
+                seo_description=(
+                    "Descarga en CSV el informe Performance u Orders de Account Reports en la "
+                    "Tradovate Web app y súbelo para revisar tus operaciones de futuros."
+                ),
+                summary=(
+                    "Descarga en CSV el informe Performance u Orders de Account Reports de la "
+                    "Tradovate Web app, con tu cuenta Live, Demo o de evaluación en modo "
+                    "Simulation, y súbelo para revisar tus operaciones de futuros."
+                ),
+                file=(
+                    "Un .csv del informe «Performance» de Account Reports (la lista completa de "
+                    "operaciones: hora y precio de compra y de venta, cantidad emparejada, P/L y "
+                    "contrato) o del informe «Orders» (una fila por orden: lado, contrato, precio "
+                    "medio de ejecución, cantidad ejecutada y hora). El centro de ayuda de "
+                    "Tradovate no publica las cabeceras del CSV; las columnas se reconocen por su "
+                    "nombre."
+                ),
+                steps=(
+                    "Inicia sesión en la Tradovate Web app y elige el tipo de cuenta: Live para "
+                    "una cuenta de corretaje; Simulation para una demo o para una cuenta de "
+                    "evaluación de prop firm (Tradovate indica elegir siempre Simulation, nunca "
+                    "Live, para estas).",
+                    "Abre Account Reports: pulsa el botón Reports a la derecha de la pantalla, o "
+                    "haz clic en las barras de porcentaje de margen (Intraday/Initial Margin) de "
+                    "la parte superior.",
+                    "A la derecha, en Report Type, elige Performance (trae la lista completa de "
+                    "operaciones) u Orders (todas las órdenes del periodo). También existen "
+                    "Position History, Fills, Cash History y Account Balance History.",
+                    "Elige el rango de fechas (Date Range), añade los filtros que quieras y pulsa "
+                    "GO para generar el informe en pantalla.",
+                    "Con el informe en pantalla, pulsa la opción de descarga CSV (no PDF): el "
+                    "archivo se guarda directamente en tu equipo.",
+                ),
+                upload="En el campo «Informe de tu plataforma», tal cual.",
+                tips=(
+                    "Rigor no está afiliado a Tradovate ni a ninguna prop firm. Los pasos salen "
+                    "del centro de ayuda de Tradovate, leído en octubre de 2026; si la app "
+                    "cambia, manda lo que veas en pantalla.",
+                    "Performance se lee como una fila por operación cerrada y Orders como una "
+                    "fila por ejecución; en Orders, las órdenes canceladas o sin cantidad "
+                    "ejecutada quedan fuera. Como la ayuda no publica las cabeceras, si alguna "
+                    "columna no se reconoce la subida te muestra las de tu archivo para que "
+                    "indiques cuál es cuál.",
+                    "La Tradovate Web app solo muestra la hora local de tu equipo o la hora "
+                    "Central de EE. UU., y el CSV no dice cuál lleva: el informe lee las horas "
+                    "tal cual, así que no mezcles archivos exportados con distinta "
+                    "configuración.",
+                    "Client Statements (estados de cuenta en PDF) solo existe en modo Live y no "
+                    "se sube: usa el CSV de Account Reports. Las cuentas de prop firm basadas en "
+                    "Rithmic no funcionan en Tradovate Web.",
+                    "Si operas un reto, en el formulario, en «Añadir más archivos», eliges la "
+                    "firma y el programa a simular con sus reglas publicadas.",
+                    _BALANCE_ES,
+                    _FLOATING_ES,
+                ),
+            ),
+            "en": GuideText(
+                title="How to export your Tradovate trades",
+                seo_description=(
+                    "Download the Performance or Orders report from Account Reports in the "
+                    "Tradovate Web app as CSV and upload it to review your futures trades."
+                ),
+                summary=(
+                    "Download the Performance or Orders report from Account Reports in the "
+                    "Tradovate Web app as CSV, from your Live, Demo or evaluation account in "
+                    "Simulation mode, and upload it to review your futures trades."
+                ),
+                file=(
+                    "A .csv of the 'Performance' report from Account Reports (the full list of "
+                    "trades: buy and sell time and price, paired quantity, P/L and contract) or "
+                    "of the 'Orders' report (one row per order: side, contract, average fill "
+                    "price, filled quantity and time). Tradovate's help centre does not publish "
+                    "the CSV headers; the columns are recognised by their names."
+                ),
+                steps=(
+                    "Log in to the Tradovate Web app and select your account type: Live for a "
+                    "brokerage account; Simulation for a demo or for a prop-firm evaluation "
+                    "account (Tradovate says to always choose Simulation, not Live, for those).",
+                    "Open Account Reports: select the Reports button on the right side of the "
+                    "page, or click the Intraday/Initial Margin percentage bars at the top of "
+                    "the screen.",
+                    "On the right, under Report Type, choose Performance (it includes the full "
+                    "list of trades) or Orders (every order of the period). Position History, "
+                    "Fills, Cash History and Account Balance History also exist.",
+                    "Choose the Date Range, add any filters you like and click GO to generate "
+                    "the report on the page.",
+                    "With the report on the page, select the CSV download option (not PDF): the "
+                    "file downloads directly to your computer.",
+                ),
+                upload="In the field 'Your platform report', as it is.",
+                tips=(
+                    "Rigor is not affiliated with Tradovate or with any prop firm. The steps "
+                    "come from Tradovate's help centre, read in October 2026; if the app "
+                    "changes, go by what you see on screen.",
+                    "Performance is read as one row per closed trade and Orders as one row per "
+                    "fill; in Orders, cancelled orders and orders with no filled quantity are "
+                    "left out. As the help centre does not publish the headers, if a column is "
+                    "not recognised the upload shows you your file's columns so you can say "
+                    "which is which.",
+                    "The Tradovate Web app only shows your computer's local time or US Central "
+                    "Time, and the CSV does not say which one it carries: the report reads the "
+                    "times as they are, so do not mix files exported with different settings.",
+                    "Client Statements (PDF account statements) only exist in Live mode and are "
+                    "not uploaded: use the CSV from Account Reports. Rithmic-based prop-firm "
+                    "accounts cannot be used on Tradovate Web.",
+                    "If you trade a challenge, on the form, under 'Add more files', you choose "
+                    "the firm and the program to simulate with its published rules.",
+                    _BALANCE_EN,
+                    _FLOATING_EN,
+                ),
+            ),
+            "pt": GuideText(
+                title="Como exportar suas operações do Tradovate",
+                seo_description=(
+                    "Baixe em CSV o relatório Performance ou Orders de Account Reports no "
+                    "Tradovate Web app e envie para revisar suas operações de futuros."
+                ),
+                summary=(
+                    "Baixe em CSV o relatório Performance ou Orders de Account Reports do "
+                    "Tradovate Web app, com sua conta Live, Demo ou de avaliação em modo "
+                    "Simulation, e envie para revisar suas operações de futuros."
+                ),
+                file=(
+                    "Um .csv do relatório 'Performance' de Account Reports (a lista completa de "
+                    "operações: hora e preço de compra e de venda, quantidade pareada, P/L e "
+                    "contrato) ou do relatório 'Orders' (uma linha por ordem: lado, contrato, "
+                    "preço médio de execução, quantidade executada e hora). A central de ajuda "
+                    "do Tradovate não publica os cabeçalhos do CSV; as colunas são reconhecidas "
+                    "pelo nome."
+                ),
+                steps=(
+                    "Entre no Tradovate Web app e escolha o tipo de conta: Live para uma conta "
+                    "de corretagem; Simulation para uma demo ou para uma conta de avaliação de "
+                    "prop firm (o Tradovate indica escolher sempre Simulation, nunca Live, para "
+                    "essas).",
+                    "Abra Account Reports: toque no botão Reports à direita da tela, ou clique "
+                    "nas barras de porcentagem de margem (Intraday/Initial Margin) na parte de "
+                    "cima.",
+                    "À direita, em Report Type, escolha Performance (traz a lista completa de "
+                    "operações) ou Orders (todas as ordens do período). Também existem Position "
+                    "History, Fills, Cash History e Account Balance History.",
+                    "Escolha o período (Date Range), acrescente os filtros que quiser e toque em "
+                    "GO para gerar o relatório na tela.",
+                    "Com o relatório na tela, toque na opção de download CSV (não PDF): o "
+                    "arquivo é salvo direto no seu computador.",
+                ),
+                upload="No campo 'Relatório da sua plataforma', do jeito que vier.",
+                tips=(
+                    "O Rigor não é afiliado ao Tradovate nem a nenhuma prop firm. Os passos saem "
+                    "da central de ajuda do Tradovate, lida em outubro de 2026; se o app mudar, "
+                    "siga o que aparece na tela.",
+                    "Performance é lido como uma linha por operação fechada e Orders como uma "
+                    "linha por execução; em Orders, as ordens canceladas ou sem quantidade "
+                    "executada ficam de fora. Como a ajuda não publica os cabeçalhos, se alguma "
+                    "coluna não for reconhecida o envio mostra as do seu arquivo para você "
+                    "indicar qual é qual.",
+                    "O Tradovate Web app só mostra a hora local do seu computador ou a hora "
+                    "Central dos EUA, e o CSV não diz qual delas leva: o relatório lê as horas "
+                    "como estão, então não misture arquivos exportados com configurações "
+                    "diferentes.",
+                    "Client Statements (extratos em PDF) só existe no modo Live e não é "
+                    "enviado: use o CSV de Account Reports. Contas de prop firm baseadas em "
+                    "Rithmic não funcionam no Tradovate Web.",
+                    "Se você opera um desafio, no formulário, em 'Adicionar mais arquivos', você "
+                    "escolhe a empresa e o programa a simular com as regras publicadas.",
+                    _BALANCE_PT,
+                    _FLOATING_PT,
+                ),
+            ),
+        },
+    ),
+    Guide(
+        slug="topstepx",
+        platform="TopstepX",
+        field="report",
+        sources=(
+            ("TopstepX", "https://help.topstep.com/en/articles/14434175-topstepx"),
+            (
+                "General Platform Troubleshooting",
+                "https://help.topstep.com/en/articles/8284136-general-platform-troubleshooting",
+            ),
+            (
+                "Trading Combine Parameters",
+                "https://help.topstep.com/en/articles/8284197-trading-combine-parameters",
+            ),
+        ),
+        read_on="2026-10-10",
+        text={
+            "es": GuideText(
+                title="Cómo exportar tus operaciones de TopstepX",
+                seo_description=(
+                    "Exporta en CSV la pestaña Trades de TopstepX, la plataforma de Topstep, y "
+                    "súbela para revisar las operaciones de tu Trading Combine o cuenta Practice."
+                ),
+                summary=(
+                    "Exporta en CSV la pestaña Trades de TopstepX, la plataforma web de Topstep, "
+                    "desde tu cuenta Practice, Trading Combine o Express Funded, y súbela para "
+                    "revisar tus operaciones de futuros."
+                ),
+                file=(
+                    "Un .csv de la pestaña Trades (operaciones redondas completas: símbolo, "
+                    "tamaño, hora, precio de entrada y de salida, P&L y comisiones) o de la "
+                    "pestaña Orders (órdenes abiertas, ejecutadas, canceladas o rechazadas). La "
+                    "ayuda de Topstep no publica las cabeceras del archivo; las columnas se "
+                    "reconocen por su nombre."
+                ),
+                steps=(
+                    "Entra en TopstepX (topstepx.com/trade o desde tu Dashboard de Topstep) y "
+                    "elige la cuenta en el selector de arriba a la izquierda.",
+                    "Pulsa la pestaña Trades (o Orders) en la barra inferior de la plataforma.",
+                    "Pulsa Export, abajo a la derecha del módulo.",
+                    "Elige el rango de fechas y confirma con Export.",
+                    "Espera la confirmación en la esquina inferior izquierda: el archivo "
+                    "descargado es un CSV, que puedes abrir en Excel o Google Sheets o subir tal "
+                    "cual.",
+                ),
+                upload="En el campo «Informe de tu plataforma», tal cual.",
+                tips=(
+                    "Rigor no está afiliado a Topstep ni a TopstepX. Los pasos salen del centro "
+                    "de ayuda de Topstep, leído en octubre de 2026; si la plataforma cambia, "
+                    "manda lo que veas en pantalla.",
+                    "Para el informe exporta Trades, no Orders: cada fila de Trades es una "
+                    "operación cerrada con su entrada y su salida; Orders lista órdenes, también "
+                    "las canceladas o rechazadas.",
+                    "La ayuda no publica las cabeceras del CSV: Rigor reconoce las columnas por "
+                    "su nombre (símbolo, tamaño, hora de entrada y de salida, precio de entrada "
+                    "y de salida, P&L y comisiones). Si tu archivo trae una sola columna de hora "
+                    "o alguna no se reconoce, la subida te muestra sus columnas para que "
+                    "indiques cuál es cuál.",
+                    "La ayuda tampoco dice en qué zona horaria van las horas del CSV (el día de "
+                    "trading de Topstep va de las 17:00 a las 15:10 hora Central). Las horas con "
+                    "desfase escrito (+02:00) se convierten; las demás se leen tal cual.",
+                    "La exportación está documentada para la plataforma sin distinguir cuentas "
+                    "Practice, Trading Combine o Express Funded; el Performance Dashboard (solo "
+                    "escritorio) no tiene exportación propia.",
+                    "En el formulario, en «Añadir más archivos», eliges el Trading Combine de "
+                    "Topstep u otro reto a simular con sus reglas publicadas.",
+                    _BALANCE_ES,
+                    _FLOATING_ES,
+                ),
+            ),
+            "en": GuideText(
+                title="How to export your TopstepX trades",
+                seo_description=(
+                    "Export the Trades tab of TopstepX, Topstep's platform, as CSV and upload it "
+                    "to review the trades of your Trading Combine or Practice account."
+                ),
+                summary=(
+                    "Export the Trades tab of TopstepX, Topstep's web platform, as CSV from your "
+                    "Practice, Trading Combine or Express Funded account and upload it to review "
+                    "your futures trades."
+                ),
+                file=(
+                    "A .csv of the Trades tab (completed round-trip trades: symbol, size, time, "
+                    "entry and exit price, P&L and fees) or of the Orders tab (open, filled, "
+                    "cancelled or rejected orders). Topstep's help centre does not publish the "
+                    "file's headers; the columns are recognised by their names."
+                ),
+                steps=(
+                    "Open TopstepX (topstepx.com/trade or from your Topstep Dashboard) and "
+                    "select your account in the top-left selector.",
+                    "Click the Trades (or Orders) tab at the bottom of the page.",
+                    "Click Export, on the bottom right of the module.",
+                    "Select your date range and click Export.",
+                    "Wait for the confirmation at the bottom-left of your screen: the downloaded "
+                    "file is a CSV, which you can open in Excel or Google Sheets or upload as it "
+                    "is.",
+                ),
+                upload="In the field 'Your platform report', as it is.",
+                tips=(
+                    "Rigor is not affiliated with Topstep or TopstepX. The steps come from "
+                    "Topstep's help centre, read in October 2026; if the platform changes, go "
+                    "by what you see on screen.",
+                    "For the report export Trades, not Orders: each Trades row is a closed trade "
+                    "with its entry and its exit; Orders lists orders, cancelled and rejected "
+                    "ones included.",
+                    "The help centre does not publish the CSV headers: Rigor recognises the "
+                    "columns by their names (symbol, size, entry and exit time, entry and exit "
+                    "price, P&L and fees). If your file has a single time column or a column is "
+                    "not recognised, the upload shows you its columns so you can say which is "
+                    "which.",
+                    "Nor does the help centre say which time zone the CSV times are in "
+                    "(Topstep's trading day runs from 5:00 PM to 3:10 PM Central Time). Times "
+                    "with a written offset (+02:00) are converted; the rest are read as they "
+                    "are.",
+                    "The export is documented for the platform without distinguishing Practice, "
+                    "Trading Combine or Express Funded accounts; the Performance Dashboard "
+                    "(desktop only) has no export of its own.",
+                    "On the form, under 'Add more files', you choose Topstep's Trading Combine "
+                    "or another challenge to simulate with its published rules.",
+                    _BALANCE_EN,
+                    _FLOATING_EN,
+                ),
+            ),
+            "pt": GuideText(
+                title="Como exportar suas operações do TopstepX",
+                seo_description=(
+                    "Exporte em CSV a aba Trades do TopstepX, a plataforma da Topstep, e envie "
+                    "para revisar as operações do seu Trading Combine ou conta Practice."
+                ),
+                summary=(
+                    "Exporte em CSV a aba Trades do TopstepX, a plataforma web da Topstep, da "
+                    "sua conta Practice, Trading Combine ou Express Funded, e envie para revisar "
+                    "suas operações de futuros."
+                ),
+                file=(
+                    "Um .csv da aba Trades (operações completas de ida e volta: símbolo, "
+                    "tamanho, hora, preço de entrada e de saída, P&L e taxas) ou da aba Orders "
+                    "(ordens abertas, executadas, canceladas ou rejeitadas). A ajuda da Topstep "
+                    "não publica os cabeçalhos do arquivo; as colunas são reconhecidas pelo "
+                    "nome."
+                ),
+                steps=(
+                    "Entre no TopstepX (topstepx.com/trade ou pelo seu Dashboard da Topstep) e "
+                    "escolha a conta no seletor do canto superior esquerdo.",
+                    "Toque na aba Trades (ou Orders) na barra inferior da plataforma.",
+                    "Toque em Export, no canto inferior direito do módulo.",
+                    "Escolha o período e confirme com Export.",
+                    "Espere a confirmação no canto inferior esquerdo: o arquivo baixado é um "
+                    "CSV, que você pode abrir no Excel ou no Google Sheets ou enviar do jeito "
+                    "que vier.",
+                ),
+                upload="No campo 'Relatório da sua plataforma', do jeito que vier.",
+                tips=(
+                    "O Rigor não é afiliado à Topstep nem ao TopstepX. Os passos saem da central "
+                    "de ajuda da Topstep, lida em outubro de 2026; se a plataforma mudar, siga o "
+                    "que aparece na tela.",
+                    "Para o relatório exporte Trades, não Orders: cada linha de Trades é uma "
+                    "operação fechada com a entrada e a saída; Orders lista ordens, inclusive as "
+                    "canceladas ou rejeitadas.",
+                    "A ajuda não publica os cabeçalhos do CSV: o Rigor reconhece as colunas pelo "
+                    "nome (símbolo, tamanho, hora de entrada e de saída, preço de entrada e de "
+                    "saída, P&L e taxas). Se o seu arquivo tiver uma só coluna de hora ou alguma "
+                    "não for reconhecida, o envio mostra as colunas para você indicar qual é "
+                    "qual.",
+                    "A ajuda também não diz em que fuso horário estão as horas do CSV (o dia de "
+                    "negociação da Topstep vai das 17h às 15h10 no horário Central). Horas com "
+                    "deslocamento escrito (+02:00) são convertidas; as outras são lidas como "
+                    "estão.",
+                    "A exportação está documentada para a plataforma sem distinguir contas "
+                    "Practice, Trading Combine ou Express Funded; o Performance Dashboard (só "
+                    "desktop) não tem exportação própria.",
+                    "No formulário, em 'Adicionar mais arquivos', você escolhe o Trading Combine "
+                    "da Topstep ou outro desafio a simular com as regras publicadas.",
+                    _BALANCE_PT,
+                    _FLOATING_PT,
+                ),
+            ),
+        },
+    ),
+    Guide(
+        slug="sierra-chart",
+        platform="Sierra Chart",
+        field="report",
+        sources=(
+            (
+                "Trade Activity Log",
+                "https://www.sierrachart.com/index.php?page=doc/TradeActivityLog.php",
+            ),
+            (
+                "Saving the Trade Activity Log to a Text File",
+                "https://www.sierrachart.com/index.php?page=doc/TradeActivityLog.php#SaveToText",
+            ),
+            (
+                "Importing and Exporting Trade Activity Data",
+                "https://www.sierrachart.com/index.php?page=doc/TradeActivityLog.php"
+                "#ImportingExportingData",
+            ),
+        ),
+        read_on="2026-10-10",
+        text={
+            "es": GuideText(
+                title="Cómo exportar el Trade Activity Log de Sierra Chart",
+                seo_description=(
+                    "Guarda el Trade Activity Log de Sierra Chart con File >> Save Log As (texto "
+                    "con tabuladores) y súbelo para revisar tus operaciones de futuros."
+                ),
+                summary=(
+                    "Guarda la pestaña Trade Activity o Trades del Trade Activity Log de Sierra "
+                    "Chart con File >> Save Log As, un archivo de texto con tabuladores, y "
+                    "súbelo para revisar tus operaciones de futuros."
+                ),
+                file=(
+                    "Un archivo de texto con campos separados por tabulador (Sierra Chart no "
+                    "ofrece CSV ni XLSX), guardado en la subcarpeta SavedTradeActivity de la "
+                    "instalación. La pestaña Trade Activity trae una fila por ejecución u orden "
+                    "(ActivityType, DateTime, Symbol, Quantity, Buy Sell, Fill Price, Filled "
+                    "Quantity, Trade Account, entre otras); la pestaña Trades, una fila por "
+                    "operación casada (Symbol, Trade Type, Entry Date Time, Exit Date Time, "
+                    "Entry Price, Exit Price, Trade Quantity, Profit/Loss, Commission)."
+                ),
+                steps=(
+                    "En el menú principal abre Trade >> Trade Activity Log.",
+                    "Elige la pestaña que quieres guardar: Trade Activity (una fila por "
+                    "ejecución) o Trades (operaciones casadas con P/L y comisión).",
+                    "Pulsa DisplaySettings y fija los filtros: Trade Activity Type = Fills, "
+                    "Symbol o All Symbols, Trade Account o All Accounts, Simulation State y Date "
+                    "Range to Display (From Date|From Time y To Date|To Time). Solo lo que se ve "
+                    "en la pestaña se guarda.",
+                    "El From Date and Time debe caer en un momento en que la posición estaba "
+                    "plana; si no, los Trades y el P/L salen mal. Para que la columna Commission "
+                    "traiga valores, activa Use Commission y define Round Turn Commission en "
+                    "Global Settings >> Symbol Settings.",
+                    "En el menú de la ventana elige File >> Save Log As, escribe el nombre en "
+                    "Filename y pulsa Save: las fechas salen en la zona horaria global de Sierra "
+                    "Chart y los precios como en pantalla.",
+                ),
+                upload=(
+                    "En el campo «Informe de tu plataforma», tal cual (un .txt con tabuladores)."
+                ),
+                tips=(
+                    "Rigor no está afiliado a Sierra Chart. Los pasos salen de su documentación "
+                    "oficial del Trade Activity Log, leída en octubre de 2026; si la ventana "
+                    "cambia, manda lo que veas en pantalla.",
+                    "La pestaña Trade Activity se lee tal cual: Rigor se queda con las filas "
+                    "Fills y empareja compras y ventas por símbolo en orden de llegada. La "
+                    "pestaña Trades se lee si en el formulario indicas que Trade Quantity es la "
+                    "cantidad; las demás columnas se reconocen por su nombre.",
+                    "No uses File >> Export para subir: está pensado para reimportar en Sierra "
+                    "Chart, con fechas en UTC y precios sin ajustar (el formato nativo del "
+                    "exchange, por ejemplo con Teton o Rithmic).",
+                    "Con Teton Order Routing o el Trading Evaluator de Sierra Chart el servidor "
+                    "descarga unas tres semanas de ejecuciones (Global Settings >> Sierra Chart "
+                    "Server Settings >> Max Historical Order Fills Days to Download); con otros "
+                    "servicios, como Rithmic, suele ser solo el día en curso: lo que exportas es "
+                    "lo que el log local haya guardado. Revisa que «Automatically Delete Trade "
+                    "Activity Files on Startup Older than Days» no borre lo que quieres subir.",
+                    "La documentación de Sierra Chart no describe ninguna exportación específica "
+                    "para cuentas de evaluación de prop firm; las cuentas simuladas aparecen "
+                    "como Sim#. Si operas un reto, en el formulario, en «Añadir más archivos», "
+                    "eliges la firma y el programa a simular con sus reglas publicadas.",
+                    _BALANCE_ES,
+                    _FLOATING_ES,
+                ),
+            ),
+            "en": GuideText(
+                title="How to export the Sierra Chart Trade Activity Log",
+                seo_description=(
+                    "Save the Sierra Chart Trade Activity Log (Trade >> Trade Activity Log, "
+                    "File >> Save Log As) as a tab-delimited text file and upload it to review "
+                    "your trades."
+                ),
+                summary=(
+                    "Save the Trade Activity or Trades tab of the Sierra Chart Trade Activity "
+                    "Log with File >> Save Log As, a tab-delimited text file, and upload it to "
+                    "review your futures trades."
+                ),
+                file=(
+                    "A text file with tab-separated fields (Sierra Chart offers no CSV or XLSX), "
+                    "saved in the SavedTradeActivity subfolder of the installation. The Trade "
+                    "Activity tab holds one row per fill or order (ActivityType, DateTime, "
+                    "Symbol, Quantity, Buy Sell, Fill Price, Filled Quantity, Trade Account, "
+                    "among others); the Trades tab, one row per matched trade (Symbol, Trade "
+                    "Type, Entry Date Time, Exit Date Time, Entry Price, Exit Price, Trade "
+                    "Quantity, Profit/Loss, Commission)."
+                ),
+                steps=(
+                    "On the main menu select Trade >> Trade Activity Log.",
+                    "Select the tab you want to save: Trade Activity (one row per fill) or "
+                    "Trades (matched trades with P/L and commission).",
+                    "Press DisplaySettings and set the filters: Trade Activity Type = Fills, "
+                    "Symbol or All Symbols, Trade Account or All Accounts, Simulation State and "
+                    "Date Range to Display (From Date|From Time and To Date|To Time). Only what "
+                    "is displayed on the tab is saved.",
+                    "The From Date and Time must fall at a moment when the position was flat; "
+                    "otherwise the Trades and the P/L come out wrong. For the Commission column "
+                    "to carry values, enable Use Commission and set Round Turn Commission in "
+                    "Global Settings >> Symbol Settings.",
+                    "On the window's menu select File >> Save Log As, enter the name in Filename "
+                    "and press Save: the dates come in Sierra Chart's global time zone and the "
+                    "prices as displayed.",
+                ),
+                upload="In the field 'Your platform report', as it is (a tab-delimited .txt).",
+                tips=(
+                    "Rigor is not affiliated with Sierra Chart. The steps come from its official "
+                    "Trade Activity Log documentation, read in October 2026; if the window "
+                    "changes, go by what you see on screen.",
+                    "The Trade Activity tab is read as it is: Rigor keeps the Fills rows and "
+                    "pairs buys and sells per symbol in the order they happened. The Trades tab "
+                    "is read once you say on the form that Trade Quantity is the quantity; the "
+                    "other columns are recognised by their names.",
+                    "Do not use File >> Export for the upload: it is meant for importing back "
+                    "into Sierra Chart, with dates in UTC and unadjusted prices (the exchange's "
+                    "native format, with Teton or Rithmic for example).",
+                    "With Teton Order Routing or the Sierra Chart Trading Evaluator the server "
+                    "downloads about three weeks of fills (Global Settings >> Sierra Chart "
+                    "Server Settings >> Max Historical Order Fills Days to Download); with other "
+                    "services, such as Rithmic, usually only the current day: what you export is "
+                    "what the local log has kept. Check that 'Automatically Delete Trade "
+                    "Activity Files on Startup Older than Days' does not delete what you want to "
+                    "upload.",
+                    "Sierra Chart's documentation describes no specific export for prop-firm "
+                    "evaluation accounts; simulated accounts appear as Sim#. If you trade a "
+                    "challenge, on the form, under 'Add more files', you choose the firm and the "
+                    "program to simulate with its published rules.",
+                    _BALANCE_EN,
+                    _FLOATING_EN,
+                ),
+            ),
+            "pt": GuideText(
+                title="Como exportar o Trade Activity Log do Sierra Chart",
+                seo_description=(
+                    "Salve o Trade Activity Log do Sierra Chart (Trade >> Trade Activity Log, "
+                    "File >> Save Log As) como texto com tabulações e envie para revisar suas "
+                    "operações."
+                ),
+                summary=(
+                    "Salve a aba Trade Activity ou Trades do Trade Activity Log do Sierra Chart "
+                    "com File >> Save Log As, um arquivo de texto com tabulações, e envie para "
+                    "revisar suas operações de futuros."
+                ),
+                file=(
+                    "Um arquivo de texto com campos separados por tabulação (o Sierra Chart não "
+                    "oferece CSV nem XLSX), salvo na subpasta SavedTradeActivity da instalação. "
+                    "A aba Trade Activity traz uma linha por execução ou ordem (ActivityType, "
+                    "DateTime, Symbol, Quantity, Buy Sell, Fill Price, Filled Quantity, Trade "
+                    "Account, entre outras); a aba Trades, uma linha por operação casada "
+                    "(Symbol, Trade Type, Entry Date Time, Exit Date Time, Entry Price, Exit "
+                    "Price, Trade Quantity, Profit/Loss, Commission)."
+                ),
+                steps=(
+                    "No menu principal abra Trade >> Trade Activity Log.",
+                    "Escolha a aba que quer salvar: Trade Activity (uma linha por execução) ou "
+                    "Trades (operações casadas com P/L e comissão).",
+                    "Toque em DisplaySettings e defina os filtros: Trade Activity Type = Fills, "
+                    "Symbol ou All Symbols, Trade Account ou All Accounts, Simulation State e "
+                    "Date Range to Display (From Date|From Time e To Date|To Time). Só o que "
+                    "aparece na aba é salvo.",
+                    "O From Date and Time deve cair num momento em que a posição estava zerada; "
+                    "senão, os Trades e o P/L saem errados. Para a coluna Commission trazer "
+                    "valores, ative Use Commission e defina Round Turn Commission em Global "
+                    "Settings >> Symbol Settings.",
+                    "No menu da janela escolha File >> Save Log As, escreva o nome em Filename e "
+                    "toque em Save: as datas saem no fuso horário global do Sierra Chart e os "
+                    "preços como na tela.",
+                ),
+                upload=(
+                    "No campo 'Relatório da sua plataforma', do jeito que vier (um .txt com "
+                    "tabulações)."
+                ),
+                tips=(
+                    "O Rigor não é afiliado ao Sierra Chart. Os passos saem da documentação "
+                    "oficial do Trade Activity Log, lida em outubro de 2026; se a janela mudar, "
+                    "siga o que aparece na tela.",
+                    "A aba Trade Activity é lida como está: o Rigor fica com as linhas Fills e "
+                    "pareia compras e vendas por símbolo na ordem de chegada. A aba Trades é "
+                    "lida quando você indica no formulário que Trade Quantity é a quantidade; as "
+                    "outras colunas são reconhecidas pelo nome.",
+                    "Não use File >> Export para enviar: ele serve para reimportar no Sierra "
+                    "Chart, com datas em UTC e preços sem ajuste (o formato nativo da bolsa, por "
+                    "exemplo com Teton ou Rithmic).",
+                    "Com Teton Order Routing ou o Trading Evaluator do Sierra Chart o servidor "
+                    "baixa cerca de três semanas de execuções (Global Settings >> Sierra Chart "
+                    "Server Settings >> Max Historical Order Fills Days to Download); com outros "
+                    "serviços, como Rithmic, costuma ser só o dia atual: o que você exporta é o "
+                    "que o log local guardou. Confira se 'Automatically Delete Trade Activity "
+                    "Files on Startup Older than Days' não apaga o que você quer enviar.",
+                    "A documentação do Sierra Chart não descreve nenhuma exportação específica "
+                    "para contas de avaliação de prop firm; as contas simuladas aparecem como "
+                    "Sim#. Se você opera um desafio, no formulário, em 'Adicionar mais "
+                    "arquivos', você escolhe a empresa e o programa a simular com as regras "
+                    "publicadas.",
+                    _BALANCE_PT,
+                    _FLOATING_PT,
                 ),
             ),
         },
