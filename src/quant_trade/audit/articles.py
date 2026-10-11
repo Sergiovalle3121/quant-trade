@@ -615,7 +615,7 @@ RUIN_TABLE_COPY: dict[str, tuple[str, ...]] = {
         "Aciertos: límite inferior",
         "Esperanza: límite inferior (R)",
         "Tocar el umbral: límite inferior",
-        "DECLARED · Entradas ilustrativas y resultados del modelo. Las probabilidades "
+        "Entradas ilustrativas y resultados del modelo. Las probabilidades "
         "son frecuencias de trayectorias simuladas; no son mediciones de un archivo.",
     ),
     "en": (
@@ -628,7 +628,7 @@ RUIN_TABLE_COPY: dict[str, tuple[str, ...]] = {
         "Win rate: lower bound",
         "Expectancy: lower bound (R)",
         "Touch the threshold: lower bound",
-        "DECLARED · Illustrative inputs and model results. Probabilities are frequencies "
+        "Illustrative inputs and model results. Probabilities are frequencies "
         "of simulated paths; they are not measurements of a file.",
     ),
     "pt": (
@@ -641,7 +641,7 @@ RUIN_TABLE_COPY: dict[str, tuple[str, ...]] = {
         "Acerto: limite inferior",
         "Esperança: limite inferior (R)",
         "Tocar o limite de ruína: limite inferior",
-        "DECLARED · Entradas ilustrativas e resultados do modelo. As probabilidades "
+        "Entradas ilustrativas e resultados do modelo. As probabilidades "
         "são frequências de trajetórias simuladas; não são medições de um arquivo.",
     ),
 }
@@ -8445,7 +8445,7 @@ def _consistency_assumptions(locale: str) -> str:
     value = CONSISTENCY_INPUTS[0]
     return {
         "es": (
-            "DECLARED · {rate} % de aciertos, ganancia de {win} R por operación "
+            "Entradas declaradas: {rate} % de aciertos, ganancia de {win} R por operación "
             "ganadora, pérdida de {loss} R por operación perdedora, riesgo de {risk} % del "
             "balance por operación y {per_day} operaciones al día. Son operaciones "
             "independientes con probabilidad y tamaños constantes; se suman dentro del día y "
@@ -8457,7 +8457,7 @@ def _consistency_assumptions(locale: str) -> str:
             "probabilidades personales."
         ),
         "en": (
-            "DECLARED · {rate} % win rate, a gain of {win} R per winning trade, a "
+            "Declared inputs: {rate} % win rate, a gain of {win} R per winning trade, a "
             "loss of {loss} R per losing trade, risk of {risk} % of the balance per trade and "
             "{per_day} trades per day. Trades are independent with constant probability and "
             "sizes; returns add within each day and the balance compounds between closes. "
@@ -8468,7 +8468,7 @@ def _consistency_assumptions(locale: str) -> str:
             "personal probabilities."
         ),
         "pt": (
-            "DECLARED · {rate} % de acerto, ganho de {win} R por operação "
+            "Entradas declaradas: {rate} % de acerto, ganho de {win} R por operação "
             "ganhadora, perda de {loss} R por operação perdedora, risco de {risk} % do saldo "
             "por operação e {per_day} operações por dia. As operações são independentes com "
             "probabilidade e tamanhos constantes; os retornos se somam dentro do dia e o "
@@ -8497,16 +8497,16 @@ def consistency_worked_example(locale: str) -> str:
     rules = challenge_calc.PRESETS[example.inputs.program]
     assert rules.best_day_limit is not None and example.target_rule_cap is not None
     return {
-        "es": "DECLARED · En este caso, el {limit} del objetivo de {target} permite un mejor "
+        "es": "En este caso, el {limit} del objetivo de {target} permite un mejor "
         "día de hasta {cap} del balance inicial. El mayor día sintético, si empieza con ese "
         "balance, suma {day}. Una trayectoria puede alcanzar el objetivo y quedar fuera "
         "de la regla. Al "
         "capitalizar los cierres, la ganancia monetaria del mismo tipo de día también cambia.",
-        "en": "DECLARED · Here, {limit} of the {target} target allows a best day of at most "
+        "en": "Here, {limit} of the {target} target allows a best day of at most "
         "{cap} of the initial balance. The largest synthetic day, when starting at that "
         "balance, adds {day}. A path can reach the target while outside the rule. As daily "
         "closes compound, the monetary gain of the same kind of day also changes.",
-        "pt": "DECLARED · Neste caso, {limit} da meta de {target} permite um melhor dia "
+        "pt": "Neste caso, {limit} da meta de {target} permite um melhor dia "
         "de até {cap} do saldo inicial. O maior dia sintético, se começa com esse saldo, "
         "soma {day}. Uma trajetória pode atingir a meta e ficar fora da regra. Ao "
         "capitalizar os fechamentos, o ganho monetário do mesmo tipo de dia também muda.",
@@ -8531,15 +8531,15 @@ def consistency_programs_note(locale: str) -> str:
     if without_rule.daily_limit != 0.0 or outcome(with_rule) != outcome(without_rule):
         raise ValueError("the programs note expects both rows to coincide except for the rule")
     return {
-        "es": "DECLARED · Con estas entradas, el límite diario de {program} ({daily} del balance "
+        "es": "Con estas entradas, el límite diario de {program} ({daily} del balance "
         "inicial) no se activa: el peor día sintético pierde {worst} si empieza con ese "
         "balance. Las demás condiciones simuladas producen el mismo recuento; por eso ambas "
         "filas coinciden salvo en la regla.",
-        "en": "DECLARED · With these inputs, the {program} daily limit ({daily} of the initial "
+        "en": "With these inputs, the {program} daily limit ({daily} of the initial "
         "balance) is not triggered: the worst synthetic day loses {worst} when starting at "
         "that balance. The other simulated conditions produce the same count; that is why "
         "both rows coincide except for the rule.",
-        "pt": "DECLARED · Com estas entradas, o limite diário do {program} ({daily} do saldo "
+        "pt": "Com estas entradas, o limite diário do {program} ({daily} do saldo "
         "inicial) não é acionado: o pior dia sintético perde {worst} se começa com esse saldo. "
         "As demais condições simuladas produzem a mesma contagem; por isso as duas linhas "
         "coincidem exceto na regra.",
@@ -8589,15 +8589,15 @@ def consistency_sensitivity_note(locale: str) -> str:
         for row in variations
     )
     return {
-        "es": "DECLARED · El tope de {cap} del balance inicial se compara con el mayor día "
+        "es": "El tope de {cap} del balance inicial se compara con el mayor día "
         "sintético de cada fila: {items}. Ninguno alcanza el tope, tampoco tras capitalizar "
         "los cierres hasta el objetivo; por eso en esas filas alcanzar el objetivo y "
         "alcanzarlo dentro de la regla coinciden.",
-        "en": "DECLARED · The {cap} cap of the initial balance is compared with each row's "
+        "en": "The {cap} cap of the initial balance is compared with each row's "
         "largest synthetic day: {items}. None reaches the cap, not even after compounding the "
         "closes up to the target; that is why reaching the target and reaching it within the "
         "rule coincide in those rows.",
-        "pt": "DECLARED · O teto de {cap} do saldo inicial é comparado com o maior dia "
+        "pt": "O teto de {cap} do saldo inicial é comparado com o maior dia "
         "sintético de cada linha: {items}. Nenhum alcança o teto, nem depois de capitalizar os "
         "fechamentos até a meta; por isso nessas linhas atingir a meta e atingi-la dentro da "
         "regra coincidem.",
@@ -9055,7 +9055,7 @@ ARTICLES_DATA += (
                     "heading": RUIN_TABLE_AFTER["es"],
                     "paragraphs": [
                         (
-                            f"DECLARED · En todos los casos, 1R equivale al "
+                            f"En todos los casos, 1R equivale al "
                             f"{_num(RUIN_RISK_PCT, 'es', 0)} % del balance inicial, el umbral "
                             f"es una caída del {_num(RUIN_THRESHOLD_PCT, 'es', 0)} % "
                             f"(saldo del {_num(100 - RUIN_THRESHOLD_PCT, 'es', 0)} %) y el "
@@ -9064,7 +9064,7 @@ ARTICLES_DATA += (
                             "El número de operaciones detrás de la tasa es distinto del horizonte."
                         ),
                         (
-                            "DECLARED · La esperanza por operación es E = p × ganancia − "
+                            "La esperanza por operación es E = p × ganancia − "
                             "(1 − p) × pérdida, en R. Cada probabilidad se calcula con "
                             f"{_num(ruin_calc.SAMPLES, 'es', 0)} trayectorias y semilla "
                             f"{ruin_calc.SEED}, usando la misma calculadora de ruina enlazada. "
@@ -9090,7 +9090,7 @@ ARTICLES_DATA += (
                             "simulación, sin añadir evidencia sobre la tasa declarada."
                         ),
                         (
-                            f"DECLARED · En esa fila, con la tasa declarada, "
+                            f"En esa fila, con la tasa declarada, "
                             f"{_num(RUIN_THIRD_CASE_RUINED_PATHS, 'es', 0)} de "
                             f"{_num(ruin_calc.SAMPLES, 'es', 0)} trayectorias tocaron el umbral. "
                             "La tabla redondea a un decimal, igual que la calculadora enlazada, y "
@@ -9124,7 +9124,7 @@ ARTICLES_DATA += (
                     "heading": "Cuántas operaciones dejan el límite por encima del equilibrio",
                     "paragraphs": [
                         (
-                            f"DECLARED · Con {_num(RUIN_INPUTS[0].win_rate_pct, 'es', 0)} % "
+                            f"Con {_num(RUIN_INPUTS[0].win_rate_pct, 'es', 0)} % "
                             "de aciertos y ganancia igual a pérdida, el equilibrio antes de "
                             f"costos es {_pct(RUIN_WINRATE_READING.breakeven or 0.0, 'es')}. "
                             "Al evaluar cada tamaño entero con la calculadora de aciertos, el "
@@ -9134,7 +9134,7 @@ ARTICLES_DATA += (
                             "redondeada, no una reconstrucción del número de aciertos."
                         ),
                         (
-                            "DECLARED · Si la tasa debe corresponder exactamente a un número "
+                            "Si la tasa debe corresponder exactamente a un número "
                             "entero de aciertos, el primer tamaño compatible que cumple la "
                             f"condición es {_num(RUIN_EXACT_RATE_TRADES, 'es', 0)}. La "
                             "calculadora muestra "
@@ -9199,7 +9199,7 @@ ARTICLES_DATA += (
                     "heading": RUIN_TABLE_AFTER["en"],
                     "paragraphs": [
                         (
-                            f"DECLARED · In every case, 1R is "
+                            f"In every case, 1R is "
                             f"{_num(RUIN_RISK_PCT, 'en', 0)} % of the initial balance, the "
                             f"threshold is a {_num(RUIN_THRESHOLD_PCT, 'en', 0)} % fall "
                             f"(a balance of {_num(100 - RUIN_THRESHOLD_PCT, 'en', 0)} %) and "
@@ -9208,7 +9208,7 @@ ARTICLES_DATA += (
                             "behind the rate is separate from the horizon."
                         ),
                         (
-                            "DECLARED · Expectancy per trade is E = p × win − (1 − p) × loss, "
+                            "Expectancy per trade is E = p × win − (1 − p) × loss, "
                             "in R. Each probability uses "
                             f"{_num(ruin_calc.SAMPLES, 'en', 0)} paths and seed "
                             f"{ruin_calc.SEED}, computed by the linked risk-of-ruin calculator. "
@@ -9233,7 +9233,7 @@ ARTICLES_DATA += (
                             "the declared win rate."
                         ),
                         (
-                            f"DECLARED · In that row, at the declared rate, "
+                            f"In that row, at the declared rate, "
                             f"{_num(RUIN_THIRD_CASE_RUINED_PATHS, 'en', 0)} of "
                             f"{_num(ruin_calc.SAMPLES, 'en', 0)} paths touched the threshold. "
                             "The table rounds to one decimal, like the linked calculator, and "
@@ -9265,7 +9265,7 @@ ARTICLES_DATA += (
                     "heading": "How many trades put the lower bound above break-even",
                     "paragraphs": [
                         (
-                            f"DECLARED · At a {_num(RUIN_INPUTS[0].win_rate_pct, 'en', 0)} % "
+                            f"At a {_num(RUIN_INPUTS[0].win_rate_pct, 'en', 0)} % "
                             "win rate with equal win and loss sizes, break-even before costs is "
                             f"{_pct(RUIN_WINRATE_READING.breakeven or 0.0, 'en')}. Evaluating "
                             "each integer sample size with the win-rate calculator gives the "
@@ -9275,7 +9275,7 @@ ARTICLES_DATA += (
                             "it does not reconstruct an integer win count."
                         ),
                         (
-                            "DECLARED · If the rate must correspond exactly to an integer win "
+                            "If the rate must correspond exactly to an integer win "
                             "count, the first compatible sample size meeting the condition is "
                             f"{_num(RUIN_EXACT_RATE_TRADES, 'en', 0)}. The calculator shows "
                             f"{_num(RUIN_WINRATE_READING.trades_needed or 0, 'en', 0)} because "
@@ -9339,7 +9339,7 @@ ARTICLES_DATA += (
                     "heading": RUIN_TABLE_AFTER["pt"],
                     "paragraphs": [
                         (
-                            f"DECLARED · Em todos os casos, 1R equivale a "
+                            f"Em todos os casos, 1R equivale a "
                             f"{_num(RUIN_RISK_PCT, 'pt', 0)} % do saldo inicial, o limite de "
                             f"ruína é uma queda de {_num(RUIN_THRESHOLD_PCT, 'pt', 0)} % "
                             f"(saldo de {_num(100 - RUIN_THRESHOLD_PCT, 'pt', 0)} %) e o "
@@ -9348,7 +9348,7 @@ ARTICLES_DATA += (
                             "número de operações por trás da taxa é diferente do horizonte."
                         ),
                         (
-                            "DECLARED · A esperança por operação é E = p × ganho − "
+                            "A esperança por operação é E = p × ganho − "
                             "(1 − p) × perda, em R. Cada probabilidade usa "
                             f"{_num(ruin_calc.SAMPLES, 'pt', 0)} trajetórias e semente "
                             f"{ruin_calc.SEED}, calculadas pela calculadora de ruína vinculada. "
@@ -9373,7 +9373,7 @@ ARTICLES_DATA += (
                             "acrescentar evidência sobre a taxa declarada."
                         ),
                         (
-                            f"DECLARED · Nessa linha, com a taxa declarada, "
+                            f"Nessa linha, com a taxa declarada, "
                             f"{_num(RUIN_THIRD_CASE_RUINED_PATHS, 'pt', 0)} de "
                             f"{_num(ruin_calc.SAMPLES, 'pt', 0)} trajetórias tocaram o limite "
                             "de ruína. A tabela arredonda a uma casa decimal, como a calculadora "
@@ -9406,7 +9406,7 @@ ARTICLES_DATA += (
                     "heading": "Quantas operações deixam o limite inferior acima do equilíbrio",
                     "paragraphs": [
                         (
-                            f"DECLARED · Com {_num(RUIN_INPUTS[0].win_rate_pct, 'pt', 0)} % "
+                            f"Com {_num(RUIN_INPUTS[0].win_rate_pct, 'pt', 0)} % "
                             "de acerto e ganho igual à perda, o equilíbrio antes de custos é "
                             f"{_pct(RUIN_WINRATE_READING.breakeven or 0.0, 'pt')}. Avaliando "
                             "cada tamanho inteiro com a calculadora de acerto, o primeiro "
@@ -9416,7 +9416,7 @@ ARTICLES_DATA += (
                             "arredondada, não uma reconstrução do número de acertos."
                         ),
                         (
-                            "DECLARED · Se a taxa deve corresponder exatamente a um número "
+                            "Se a taxa deve corresponder exatamente a um número "
                             "inteiro de acertos, o primeiro tamanho compatível que cumpre a "
                             f"condição é {_num(RUIN_EXACT_RATE_TRADES, 'pt', 0)}. A "
                             "calculadora mostra "
