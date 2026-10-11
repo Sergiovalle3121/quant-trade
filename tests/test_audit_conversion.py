@@ -27,6 +27,7 @@ pytest.importorskip("sqlalchemy")
 from fastapi.testclient import TestClient  # noqa: E402
 
 from quant_trade.audit import account_pages, paid_offer, web  # noqa: E402
+from quant_trade.audit.article_numbers import RUIN_INPUTS  # noqa: E402
 from quant_trade.audit.articles import (  # noqa: E402
     ARTICLE_NEXT_STEPS,
     ARTICLES,
@@ -62,6 +63,7 @@ from quant_trade.audit.report import (  # noqa: E402
     sample_cta_band,
     sample_signup_href,
 )
+from quant_trade.audit.ruin_calc import RUIN_PATH, share_values  # noqa: E402
 from quant_trade.audit.sample_publication import sample_public_path  # noqa: E402
 from quant_trade.audit.schema import DeclaredMetadata, build_inputs  # noqa: E402
 from quant_trade.audit.seo import CHECK_PATH, SIGNAL_SAMPLE_PATHS  # noqa: E402
@@ -113,6 +115,9 @@ EXPECTED_STEPS: dict[str, tuple[dict[str, str], ...]] = {
     "auditar-cartera-modelo-senales": ({"kind": "audit"}, {"kind": "sample"}),
     "monte-carlo-backtest": ({"kind": "audit"}, {"kind": "sample"}),
     "rachas-perdedoras": ({"kind": "winrate", "example": "win-rate"},),
+    "regla-de-consistencia-prop-firm": ({"kind": "audience", "slug": "retos-prop-firm"},),
+    "riesgo-de-ruina-intervalo-de-confianza": ({"kind": "ruin", "example": "ruin"},),
+    "drawdown-trailing-eod-intradia": ({"kind": "audience", "slug": "retos-prop-firm"},),
 }
 PRICING_KEYS = (
     "start_title",
@@ -624,6 +629,16 @@ def test_the_calculators_open_with_the_articles_own_example(site: TestClient, lo
     assert page.status_code == 200
     for name, (value,) in query.items():
         assert re.search(rf"id='w-{name}'[^>]*value='{value}'", page.text), name
+    # The ruin article: its first declared case, through the calculator, without a share tag.
+    href = next_step_links(ARTICLES_BY_KEY["riesgo-de-ruina-intervalo-de-confianza"], locale)[0][1]
+    assert urlsplit(href).path == RUIN_PATH[locale]
+    query = parse_qs(urlsplit(href).query)
+    assert query == {name: [value] for name, value in share_values(RUIN_INPUTS[0]).items()}
+    page = site.get(href)
+    assert page.status_code == 200
+    for name, (value,) in query.items():
+        if name != "unit":  # a select, not a number field
+            assert re.search(rf"id='ru-{name}'[^>]*value='{value}'", page.text), name
 
 
 @pytest.mark.parametrize("locale", LOCALES)
