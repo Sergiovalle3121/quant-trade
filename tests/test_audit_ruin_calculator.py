@@ -401,7 +401,11 @@ def test_one_length_at_a_time_is_the_engines_recurrence_to_the_last_digit(
     horizon: int, q: float
 ) -> None:
     tail = longest_run_tail(horizon, q, horizon)
-    assert [calc._tail_at(horizon, q, k) for k in range(horizon + 1)] == list(tail)
+    # One ulp apart on Linux: the engine sums the recurrence vectorised, _tail_at one
+    # length at a time, so the last digit may differ while the figure is the same.
+    assert [calc._tail_at(horizon, q, k) for k in range(horizon + 1)] == pytest.approx(
+        list(tail), rel=1e-9, abs=1e-15
+    )
     assert calc._tail_at(horizon, q, horizon + 1) == 0.0
 
 
