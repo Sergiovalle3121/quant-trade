@@ -37,6 +37,14 @@ from quant_trade.audit.article_numbers import (
     MC_SHUFFLE,
     MC_SHUFFLE_SEED,
     MC_THRESHOLD,
+    RUIN_EXACT_RATE_TRADES,
+    RUIN_HORIZON,
+    RUIN_INPUTS,
+    RUIN_MIN_TRADES,
+    RUIN_RISK_PCT,
+    RUIN_THIRD_CASE_RUINED_PATHS,
+    RUIN_THRESHOLD_PCT,
+    RUIN_WINRATE_READING,
     STREAK_EXAMPLE,
     STREAK_MEDIAN,
     STREAK_RARE,
@@ -589,6 +597,55 @@ STREAK_REPORT: dict[str, tuple[str, str]] = {
 }
 
 
+RUIN_ARTICLE_KEY = "riesgo-de-ruina-intervalo-de-confianza"
+RUIN_TABLE_AFTER: dict[str, str] = {
+    "es": "Cómo se calculan los tres casos",
+    "en": "How the three cases are calculated",
+    "pt": "Como os três casos são calculados",
+}
+RUIN_TABLE_COPY: dict[str, tuple[str, ...]] = {
+    "es": (
+        "Tabla: tasa declarada y límite inferior de Wilson",
+        "Aciertos",
+        "Operaciones detrás",
+        "Ganancia / pérdida",
+        "Esperanza (R)",
+        "Tocar el umbral",
+        "Aciertos: límite inferior",
+        "Esperanza: límite inferior (R)",
+        "Tocar el umbral: límite inferior",
+        "DECLARED · Entradas ilustrativas y resultados del modelo. Las probabilidades "
+        "son frecuencias de trayectorias simuladas; no son mediciones de un archivo.",
+    ),
+    "en": (
+        "Table: declared win rate and Wilson lower bound",
+        "Win rate",
+        "Trades behind it",
+        "Win / loss",
+        "Expectancy (R)",
+        "Touch the threshold",
+        "Win rate: lower bound",
+        "Expectancy: lower bound (R)",
+        "Touch the threshold: lower bound",
+        "DECLARED · Illustrative inputs and model results. Probabilities are frequencies "
+        "of simulated paths; they are not measurements of a file.",
+    ),
+    "pt": (
+        "Tabela: taxa declarada e limite inferior de Wilson",
+        "Acerto",
+        "Operações por trás",
+        "Ganho / perda",
+        "Esperança (R)",
+        "Tocar o limite de ruína",
+        "Acerto: limite inferior",
+        "Esperança: limite inferior (R)",
+        "Tocar o limite de ruína: limite inferior",
+        "DECLARED · Entradas ilustrativas e resultados do modelo. As probabilidades "
+        "são frequências de trajetórias simuladas; não são medições de um arquivo.",
+    ),
+}
+
+
 #: Editorial dates, not generated at request time. Existing prose was published
 #: on 2026-10-05; the institutional articles are dated to this brief.
 ARTICLE_PUBLICATION_DATES = {
@@ -607,6 +664,7 @@ ARTICLE_PUBLICATION_DATES = {
     "monte-carlo-backtest": "2026-10-08",
     "rachas-perdedoras": "2026-10-08",
     "regla-de-consistencia-prop-firm": "2026-10-11",
+    RUIN_ARTICLE_KEY: "2026-10-11",
 }
 
 
@@ -713,7 +771,7 @@ ARTICLES_COPY: dict[str, dict[str, str]] = {
         "title": "Artículos sobre backtests",
         "summary": (
             "Artículos sobre backtests: costos, MT5, Sharpe deflactado, Monte Carlo, rachas, prop "
-            "firms, señales, bots con IA, % de aciertos y optimizador."
+            "firms, señales, bots con IA, % de aciertos, riesgo de ruina y optimizador."
         ),
         "intro": "Lecturas cortas sobre qué mirar en un backtest antes de confiar en él.",
         "related": "Relacionado",
@@ -733,7 +791,7 @@ ARTICLES_COPY: dict[str, dict[str, str]] = {
         "title": "Articles about backtests",
         "summary": (
             "Articles about backtests: costs, MT5, deflated Sharpe, Monte Carlo, losing streaks, "
-            "prop firms, signals, AI bots, win rate and the optimiser."
+            "prop firms, signals, AI bots, win rate, risk of ruin and the optimiser."
         ),
         "intro": "Short reads on what to look at in a backtest before you trust it.",
         "related": "Related",
@@ -753,7 +811,7 @@ ARTICLES_COPY: dict[str, dict[str, str]] = {
         "title": "Artigos sobre backtests",
         "summary": (
             "Artigos sobre backtests: custos, MT5, Sharpe deflacionado, Monte Carlo, sequências "
-            "de perdas, prop firms, sinais, robôs com IA, acerto e otimizador."
+            "de perdas, prop firms, sinais, robôs com IA, acerto, ruína e otimizador."
         ),
         "intro": "Leituras curtas sobre o que observar num backtest antes de confiar nele.",
         "related": "Relacionado",
@@ -805,6 +863,7 @@ ARTICLE_NEXT_STEPS: dict[str, tuple[dict[str, str], ...]] = {
     # Streaks follow from the win rate: its free calculator comes first.
     "rachas-perdedoras": ({"kind": "winrate", "example": "win-rate"},),
     "regla-de-consistencia-prop-firm": ({"kind": "audit"}, {"kind": "sample"}),
+    RUIN_ARTICLE_KEY: ({"kind": "audit"}, {"kind": "sample"}),
 }
 #: An article missing from the table keeps the old closing call.
 DEFAULT_NEXT_STEP: tuple[dict[str, str], ...] = ({"kind": "calculator"}, {"kind": "audit"})
@@ -5860,9 +5919,6 @@ ARTICLES_DATA: tuple[dict[str, Any], ...] = (
             },
         ],
     },
-)
-
-ARTICLES_DATA += (
     {
         "key": "que-hacer-despues-del-backtest",
         "slug": {
@@ -8903,6 +8959,555 @@ ARTICLES_DATA += (
             {"kind": "rules"},
             {"kind": "audience", "slug": "retos-prop-firm"},
             {"kind": "article", "key": "cuantos-intentos-reto-prop-firm"},
+            {"kind": "sample"},
+        ],
+    },
+)
+
+ARTICLES_DATA += (
+    {
+        "key": RUIN_ARTICLE_KEY,
+        "slug": {
+            "es": "riesgo-de-ruina-intervalo-de-confianza",
+            "en": "risk-of-ruin-confidence-interval",
+            "pt": "risco-de-ruina-intervalo-de-confianca",
+        },
+        "title": {
+            "es": (
+                "Riesgo de ruina: la cifra cambia según cuántas operaciones hay detrás "
+                "de tu tasa de acierto"
+            ),
+            "en": "Risk of ruin: the number changes with the trades behind your win rate",
+            "pt": "Risco de ruína: o número muda com as operações por trás da sua taxa de acerto",
+        },
+        "seo_title": {
+            "es": "Riesgo de ruina e intervalo de confianza: tres casos",
+            "en": "Risk of ruin and confidence intervals: three cases",
+            "pt": "Risco de ruína e intervalo de confiança: três casos",
+        },
+        "summary": {
+            "es": (
+                "Tres casos calculados de riesgo de ruina: cómo cambian la esperanza y la "
+                "probabilidad de tocar un umbral al usar el límite inferior de Wilson."
+            ),
+            "en": (
+                "Three computed risk-of-ruin cases: how expectancy and the chance of touching "
+                "a balance threshold change at Wilson's lower confidence bound."
+            ),
+            "pt": (
+                "Três casos calculados de risco de ruína: como a esperança e a chance de tocar "
+                "um limite mudam ao usar o limite inferior de Wilson."
+            ),
+        },
+        "intro": {
+            "es": (
+                "Una tasa de acierto resume lo observado, pero su precisión depende de cuántas "
+                "operaciones la sostienen. Si introduces esa tasa como si fuera conocida, la "
+                "calculadora de ruina devuelve una cifra que oculta esa incertidumbre. Comparar "
+                "la tasa declarada con el extremo inferior de su intervalo muestra cuánto "
+                "depende el resultado de ese supuesto."
+            ),
+            "en": (
+                "A win rate summarises what was observed, but its precision depends on how "
+                "many trades support it. Entering that rate as if it were known gives a ruin "
+                "estimate that hides this uncertainty. Comparing the declared rate with the "
+                "lower end of its interval shows how much the result depends on that assumption."
+            ),
+            "pt": (
+                "Uma taxa de acerto resume o observado, mas sua precisão depende de quantas "
+                "operações a sustentam. Usar essa taxa como se fosse conhecida produz uma "
+                "estimativa de ruína que oculta essa incerteza. Comparar a taxa declarada com "
+                "o extremo inferior do intervalo mostra quanto o resultado depende dessa hipótese."
+            ),
+        },
+        "sections": {
+            "es": [
+                {
+                    "heading": "Ruina es tocar un umbral dentro de un horizonte",
+                    "paragraphs": [
+                        (
+                            "Aquí ruina significa que el balance toca o cae por debajo de un "
+                            "umbral en algún momento del horizonte. Cuenta aunque después se "
+                            "recupere. El umbral se refiere al balance inicial; el drawdown mide "
+                            "la caída desde un máximo previo y responde a otra pregunta."
+                        ),
+                        (
+                            "Con ganancia igual a pérdida, pasos de tamaño fijo, independencia "
+                            "y probabilidad constante p de acierto, la fórmula clásica sin "
+                            "límite de tiempo es P(ruina) = (q / p)^B si p > q; si p ≤ q, es 1. "
+                            "Aquí q = 1 − p y B es la distancia al umbral en unidades de pérdida, "
+                            "redondeada hacia arriba. Son pérdidas netas acumuladas, no "
+                            "necesariamente consecutivas. No hay una barrera superior de salida."
+                        ),
+                        (
+                            "La simulación con horizonte contesta una pregunta más concreta: "
+                            "con estos supuestos, ¿qué fracción de trayectorias toca el umbral "
+                            f"antes de terminar el horizonte (aquí, {_num(RUIN_HORIZON, 'es', 0)} "
+                            "operaciones)? También permite usar ganancias y pérdidas de distinto "
+                            "tamaño, donde esa fórmula clásica no corresponde."
+                        ),
+                    ],
+                },
+                {
+                    "heading": RUIN_TABLE_AFTER["es"],
+                    "paragraphs": [
+                        (
+                            f"DECLARED · En todos los casos, 1R equivale al "
+                            f"{_num(RUIN_RISK_PCT, 'es', 0)} % del balance inicial, el umbral "
+                            f"es una caída del {_num(RUIN_THRESHOLD_PCT, 'es', 0)} % "
+                            f"(saldo del {_num(100 - RUIN_THRESHOLD_PCT, 'es', 0)} %) y el "
+                            f"horizonte es de {_num(RUIN_HORIZON, 'es', 0)} operaciones. "
+                            "Es una escala ilustrativa, no una indicación de tamaño de posición. "
+                            "El número de operaciones detrás de la tasa es distinto del horizonte."
+                        ),
+                        (
+                            "DECLARED · La esperanza por operación es E = p × ganancia − "
+                            "(1 − p) × pérdida, en R. Cada probabilidad se calcula con "
+                            f"{_num(ruin_calc.SAMPLES, 'es', 0)} trayectorias y semilla "
+                            f"{ruin_calc.SEED}, usando la misma calculadora de ruina enlazada. "
+                            "La segunda lectura repite el cálculo en el límite inferior del "
+                            "intervalo bilateral de Wilson al 95 %, sin cambiar los otros datos."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Cómo leer la diferencia entre las filas",
+                    "paragraphs": [
+                        (
+                            "Las dos primeras filas tienen idéntica esperanza y riesgo con la "
+                            "tasa declarada. Más operaciones estrechan el intervalo y elevan su "
+                            "límite inferior, por eso cambian las tres columnas de límite "
+                            "inferior. En ambas filas ese límite todavía queda por debajo del "
+                            "equilibrio."
+                        ),
+                        (
+                            "La tercera fila combina menos aciertos con una ganancia mayor que "
+                            "la pérdida. La esperanza depende de ambas magnitudes, no solo del "
+                            "porcentaje de aciertos. Más trayectorias reducirían el ruido de "
+                            "simulación, sin añadir evidencia sobre la tasa declarada."
+                        ),
+                        (
+                            f"DECLARED · En esa fila, con la tasa declarada, "
+                            f"{_num(RUIN_THIRD_CASE_RUINED_PATHS, 'es', 0)} de "
+                            f"{_num(ruin_calc.SAMPLES, 'es', 0)} trayectorias tocaron el umbral. "
+                            "La tabla redondea a un decimal, igual que la calculadora enlazada, y "
+                            "ese redondeo no distingue ninguna trayectoria de una sola. Un cero "
+                            "no significa que el evento sea imposible."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Qué significa que una tasa sea compatible con los datos",
+                    "paragraphs": [
+                        (
+                            "El intervalo de Wilson contiene tasas que estos datos no excluyen "
+                            "con ese procedimiento y bajo el modelo de operaciones independientes. "
+                            "El límite inferior es una de esas tasas compatibles, no una nueva "
+                            "medición ni la tasa que necesariamente tendrá el próximo historial. "
+                            "La tasa declarada sigue siendo el centro de la comparación."
+                        ),
+                        (
+                            "La confianza describe la cobertura aproximada del procedimiento al "
+                            "repetir muestras, no una probabilidad sobre la tasa verdadera de este "
+                            "historial. Las dos probabilidades de ruina de la tabla son "
+                            "escenarios; no forman un intervalo de confianza del riesgo de ruina. "
+                            "Solo varía "
+                            "la tasa: la incertidumbre de las ganancias, pérdidas y dependencias "
+                            "queda fuera."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Cuántas operaciones dejan el límite por encima del equilibrio",
+                    "paragraphs": [
+                        (
+                            f"DECLARED · Con {_num(RUIN_INPUTS[0].win_rate_pct, 'es', 0)} % "
+                            "de aciertos y ganancia igual a pérdida, el equilibrio antes de "
+                            f"costos es {_pct(RUIN_WINRATE_READING.breakeven or 0.0, 'es')}. "
+                            "Al evaluar cada tamaño entero con la calculadora de aciertos, el "
+                            "primer límite inferior estrictamente superior al equilibrio aparece "
+                            f"en {_num(RUIN_MIN_TRADES, 'es', 0)} operaciones, manteniendo fija "
+                            "la tasa declarada. Es un cálculo sobre una proporción posiblemente "
+                            "redondeada, no una reconstrucción del número de aciertos."
+                        ),
+                        (
+                            "DECLARED · Si la tasa debe corresponder exactamente a un número "
+                            "entero de aciertos, el primer tamaño compatible que cumple la "
+                            f"condición es {_num(RUIN_EXACT_RATE_TRADES, 'es', 0)}. La "
+                            "calculadora muestra "
+                            f"{_num(RUIN_WINRATE_READING.trades_needed or 0, 'es', 0)} "
+                            "porque recorre una cuadrícula de tamaños, no todos los enteros. "
+                            "Estas cifras suponen conservar la misma tasa al añadir datos; "
+                            "no son un requisito universal ni una predicción de lo que ocurrirá."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Lo que añade un historial real",
+                    "paragraphs": [
+                        (
+                            "El modelo supone operaciones independientes, la misma tasa durante "
+                            "todo el horizonte y ganancias y pérdidas de tamaño fijo sobre el "
+                            "balance inicial, sin reinversión. No añade comisiones, deslizamiento, "
+                            "saltos de precio ni cambios de régimen. Las posiciones "
+                            "correlacionadas y las pérdidas agrupadas pueden cambiar mucho "
+                            "el resultado."
+                        ),
+                        (
+                            "Con las operaciones en su orden real, el informe puede medir las "
+                            "rachas y el drawdown de la serie aportada, en vez de inferirlos solo "
+                            "de una tasa. Un historial incompleto limita esas mediciones; medir "
+                            "el pasado tampoco convierte la simulación en un pronóstico. Usa los "
+                            "enlaces de subida y del informe de ejemplo con datos sintéticos para "
+                            "ver qué evidencia aporta cada dato. La calculadora de reto añade "
+                            "objetivos y límites propios de ese modelo."
+                        ),
+                    ],
+                },
+            ],
+            "en": [
+                {
+                    "heading": "Ruin means touching a threshold within a horizon",
+                    "paragraphs": [
+                        (
+                            "Here ruin means the balance touches or falls below a threshold at "
+                            "any point within the horizon. It counts even if the balance later "
+                            "recovers. The threshold is relative to the initial balance; drawdown "
+                            "measures a fall from a previous peak and answers a different question."
+                        ),
+                        (
+                            "With equal wins and losses, fixed steps, independence and a constant "
+                            "win probability p, the classic formula without a time limit is "
+                            "P(ruin) = (q / p)^B when p > q; when p ≤ q, it is 1. Here q = 1 − p "
+                            "and B is the distance to the threshold in loss units, rounded up. "
+                            "These are accumulated net losses, not necessarily consecutive ones. "
+                            "There is no upper exit barrier."
+                        ),
+                        (
+                            "Simulation with a horizon answers a more specific question: under "
+                            "these assumptions, what fraction of paths touches the threshold "
+                            f"before the horizon ends (here, {_num(RUIN_HORIZON, 'en', 0)} "
+                            "trades)? It also handles different win and loss sizes, where that "
+                            "classic formula does not apply."
+                        ),
+                    ],
+                },
+                {
+                    "heading": RUIN_TABLE_AFTER["en"],
+                    "paragraphs": [
+                        (
+                            f"DECLARED · In every case, 1R is "
+                            f"{_num(RUIN_RISK_PCT, 'en', 0)} % of the initial balance, the "
+                            f"threshold is a {_num(RUIN_THRESHOLD_PCT, 'en', 0)} % fall "
+                            f"(a balance of {_num(100 - RUIN_THRESHOLD_PCT, 'en', 0)} %) and "
+                            f"the horizon is {_num(RUIN_HORIZON, 'en', 0)} trades. This is an "
+                            "illustrative scale, not position sizing advice. The trade count "
+                            "behind the rate is separate from the horizon."
+                        ),
+                        (
+                            "DECLARED · Expectancy per trade is E = p × win − (1 − p) × loss, "
+                            "in R. Each probability uses "
+                            f"{_num(ruin_calc.SAMPLES, 'en', 0)} paths and seed "
+                            f"{ruin_calc.SEED}, computed by the linked risk-of-ruin calculator. "
+                            "The second reading repeats the calculation at the lower bound of "
+                            "the two-sided 95 % Wilson interval, keeping all other inputs fixed."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "How to read the differences between rows",
+                    "paragraphs": [
+                        (
+                            "The first two rows have identical expectancy and risk at the "
+                            "declared rate. More trades narrow the interval and raise its lower "
+                            "bound, changing the three lower-bound columns. In both rows that "
+                            "bound still lies below break-even."
+                        ),
+                        (
+                            "The third row combines fewer wins with a larger win than loss. "
+                            "Expectancy depends on both amounts, not just the win rate. More "
+                            "paths would reduce simulation noise without adding evidence about "
+                            "the declared win rate."
+                        ),
+                        (
+                            f"DECLARED · In that row, at the declared rate, "
+                            f"{_num(RUIN_THIRD_CASE_RUINED_PATHS, 'en', 0)} of "
+                            f"{_num(ruin_calc.SAMPLES, 'en', 0)} paths touched the threshold. "
+                            "The table rounds to one decimal, like the linked calculator, and "
+                            "that rounding does not distinguish no path from a single one. A "
+                            "zero does not make the event impossible."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "What “compatible with the data” means",
+                    "paragraphs": [
+                        (
+                            "The Wilson interval contains rates these data do not exclude under "
+                            "that procedure and the independent-trade model. Its lower bound is "
+                            "one such compatible rate, not a new measurement or the rate the next "
+                            "history will necessarily have. The declared rate remains the "
+                            "reference for the comparison."
+                        ),
+                        (
+                            "Confidence describes the procedure's approximate coverage over "
+                            "repeated samples, not a probability about this history's true rate. "
+                            "The table's two ruin probabilities are scenarios; they do not form "
+                            "a confidence interval for ruin risk. Only the rate changes: "
+                            "uncertainty about win sizes, loss sizes and dependence is left out."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "How many trades put the lower bound above break-even",
+                    "paragraphs": [
+                        (
+                            f"DECLARED · At a {_num(RUIN_INPUTS[0].win_rate_pct, 'en', 0)} % "
+                            "win rate with equal win and loss sizes, break-even before costs is "
+                            f"{_pct(RUIN_WINRATE_READING.breakeven or 0.0, 'en')}. Evaluating "
+                            "each integer sample size with the win-rate calculator gives the "
+                            "first lower bound strictly above break-even at "
+                            f"{_num(RUIN_MIN_TRADES, 'en', 0)} trades, holding the declared "
+                            "rate fixed. This calculation uses a possibly rounded proportion; "
+                            "it does not reconstruct an integer win count."
+                        ),
+                        (
+                            "DECLARED · If the rate must correspond exactly to an integer win "
+                            "count, the first compatible sample size meeting the condition is "
+                            f"{_num(RUIN_EXACT_RATE_TRADES, 'en', 0)}. The calculator shows "
+                            f"{_num(RUIN_WINRATE_READING.trades_needed or 0, 'en', 0)} because "
+                            "it checks a grid of sizes, not every integer. These figures assume "
+                            "the same rate as data are added; they are not a universal minimum "
+                            "or a prediction of what will happen."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "What an actual history adds",
+                    "paragraphs": [
+                        (
+                            "The model assumes independent trades, the same rate throughout "
+                            "the horizon and fixed win and loss sizes on the initial balance, "
+                            "without compounding. It adds no commissions, slippage, price gaps "
+                            "or regime changes. Correlated positions and clustered losses can "
+                            "substantially change the result."
+                        ),
+                        (
+                            "With trades in their actual order, the report can measure streaks "
+                            "and drawdown in the supplied series instead of inferring them only "
+                            "from a rate. An incomplete history limits those measurements; "
+                            "measuring the past does not turn simulation into a forecast. Use "
+                            "the upload and synthetic sample report links to see the evidence "
+                            "each input provides. The challenge calculator adds targets and "
+                            "limits specific to that model."
+                        ),
+                    ],
+                },
+            ],
+            "pt": [
+                {
+                    "heading": "Ruína é tocar um limite do saldo dentro de um horizonte",
+                    "paragraphs": [
+                        (
+                            "Aqui ruína significa que o saldo toca ou fica abaixo de um limite "
+                            "de ruína em algum momento do horizonte. Conta mesmo que depois se "
+                            "recupere. Esse limite se refere ao saldo inicial; o drawdown mede a "
+                            "queda desde um máximo anterior e responde a outra pergunta."
+                        ),
+                        (
+                            "Com ganho igual à perda, variações de tamanho fixo, independência "
+                            "e probabilidade constante p de acerto, a fórmula clássica sem "
+                            "limite de tempo é P(ruína) = (q / p)^B se p > q; se p ≤ q, é 1. "
+                            "Aqui q = 1 − p e B é a distância até o limite de ruína em unidades "
+                            "de perda, arredondada para cima. São perdas líquidas acumuladas, não "
+                            "necessariamente consecutivas. Não existe barreira superior de saída."
+                        ),
+                        (
+                            "A simulação com horizonte responde a uma pergunta mais concreta: "
+                            "sob essas hipóteses, que fração de trajetórias toca o limite de "
+                            "ruína antes de terminar o horizonte (aqui, "
+                            f"{_num(RUIN_HORIZON, 'pt', 0)} operações)? Ela também permite ganhos "
+                            "e perdas de tamanhos diferentes, caso em que essa fórmula clássica "
+                            "não se aplica."
+                        ),
+                    ],
+                },
+                {
+                    "heading": RUIN_TABLE_AFTER["pt"],
+                    "paragraphs": [
+                        (
+                            f"DECLARED · Em todos os casos, 1R equivale a "
+                            f"{_num(RUIN_RISK_PCT, 'pt', 0)} % do saldo inicial, o limite de "
+                            f"ruína é uma queda de {_num(RUIN_THRESHOLD_PCT, 'pt', 0)} % "
+                            f"(saldo de {_num(100 - RUIN_THRESHOLD_PCT, 'pt', 0)} %) e o "
+                            f"horizonte é de {_num(RUIN_HORIZON, 'pt', 0)} operações. É uma "
+                            "escala ilustrativa, não uma indicação de tamanho de posição. O "
+                            "número de operações por trás da taxa é diferente do horizonte."
+                        ),
+                        (
+                            "DECLARED · A esperança por operação é E = p × ganho − "
+                            "(1 − p) × perda, em R. Cada probabilidade usa "
+                            f"{_num(ruin_calc.SAMPLES, 'pt', 0)} trajetórias e semente "
+                            f"{ruin_calc.SEED}, calculadas pela calculadora de ruína vinculada. "
+                            "A segunda leitura repete o cálculo no limite inferior do intervalo "
+                            "bilateral de Wilson de 95 %, mantendo os demais dados fixos."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Como ler a diferença entre as linhas",
+                    "paragraphs": [
+                        (
+                            "As primeiras duas linhas têm esperança e risco idênticos na taxa "
+                            "declarada. Mais operações estreitam o intervalo e elevam seu limite "
+                            "inferior, alterando as três colunas de limite inferior. Em ambas as "
+                            "linhas esse limite ainda fica abaixo do equilíbrio."
+                        ),
+                        (
+                            "A terceira linha combina menos acertos com um ganho maior que a "
+                            "perda. A esperança depende das duas magnitudes, não só da taxa de "
+                            "acerto. Mais trajetórias reduziriam o ruído da simulação sem "
+                            "acrescentar evidência sobre a taxa declarada."
+                        ),
+                        (
+                            f"DECLARED · Nessa linha, com a taxa declarada, "
+                            f"{_num(RUIN_THIRD_CASE_RUINED_PATHS, 'pt', 0)} de "
+                            f"{_num(ruin_calc.SAMPLES, 'pt', 0)} trajetórias tocaram o limite "
+                            "de ruína. A tabela arredonda a uma casa decimal, como a calculadora "
+                            "vinculada, e esse arredondamento não distingue nenhuma trajetória "
+                            "de uma só. Um zero não significa que o evento seja impossível."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "O que significa uma taxa compatível com os dados",
+                    "paragraphs": [
+                        (
+                            "O intervalo de Wilson contém taxas que esses dados não excluem "
+                            "com esse procedimento e sob o modelo de operações independentes. "
+                            "O limite inferior é uma dessas taxas compatíveis, não uma nova "
+                            "medição nem a taxa que o próximo histórico necessariamente terá. "
+                            "A taxa declarada continua sendo a referência da comparação."
+                        ),
+                        (
+                            "A confiança descreve a cobertura aproximada do procedimento ao "
+                            "repetir amostras, não uma probabilidade sobre a taxa verdadeira "
+                            "deste histórico. As duas probabilidades de ruína da tabela são "
+                            "cenários; não formam um intervalo de confiança do risco de ruína. "
+                            "Só a taxa varia: a incerteza dos ganhos, das perdas e das "
+                            "dependências fica de fora."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "Quantas operações deixam o limite inferior acima do equilíbrio",
+                    "paragraphs": [
+                        (
+                            f"DECLARED · Com {_num(RUIN_INPUTS[0].win_rate_pct, 'pt', 0)} % "
+                            "de acerto e ganho igual à perda, o equilíbrio antes de custos é "
+                            f"{_pct(RUIN_WINRATE_READING.breakeven or 0.0, 'pt')}. Avaliando "
+                            "cada tamanho inteiro com a calculadora de acerto, o primeiro "
+                            "limite inferior estritamente acima do equilíbrio aparece em "
+                            f"{_num(RUIN_MIN_TRADES, 'pt', 0)} operações, mantendo a taxa "
+                            "declarada fixa. É um cálculo sobre uma proporção possivelmente "
+                            "arredondada, não uma reconstrução do número de acertos."
+                        ),
+                        (
+                            "DECLARED · Se a taxa deve corresponder exatamente a um número "
+                            "inteiro de acertos, o primeiro tamanho compatível que cumpre a "
+                            f"condição é {_num(RUIN_EXACT_RATE_TRADES, 'pt', 0)}. A "
+                            "calculadora mostra "
+                            f"{_num(RUIN_WINRATE_READING.trades_needed or 0, 'pt', 0)} "
+                            "porque percorre uma grade de tamanhos, não todos os inteiros. "
+                            "Esses números supõem manter a mesma taxa ao adicionar dados; "
+                            "não são um requisito universal nem uma previsão do que acontecerá."
+                        ),
+                    ],
+                },
+                {
+                    "heading": "O que um histórico real acrescenta",
+                    "paragraphs": [
+                        (
+                            "O modelo supõe operações independentes, a mesma taxa durante "
+                            "todo o horizonte e ganhos e perdas de tamanho fixo sobre o saldo "
+                            "inicial, sem reinvestimento. Não acrescenta comissões, derrapagem, "
+                            "saltos de preço nem mudanças de regime. Posições correlacionadas "
+                            "e perdas agrupadas podem alterar muito o resultado."
+                        ),
+                        (
+                            "Com as operações na ordem real, o relatório pode medir as "
+                            "sequências e o drawdown da série fornecida, em vez de inferi-los "
+                            "somente de uma taxa. Um histórico incompleto limita essas "
+                            "medições; medir o histórico também não transforma a simulação em "
+                            "previsão. Use os links de envio e do relatório de exemplo com "
+                            "dados sintéticos para ver a evidência de cada dado. A calculadora "
+                            "de desafio acrescenta objetivos e limites próprios desse modelo."
+                        ),
+                    ],
+                },
+            ],
+        },
+        "faq": {
+            "es": [
+                {
+                    "q": "¿El límite inferior de Wilson es el peor caso posible?",
+                    "a": (
+                        "Es un escenario compatible bajo los supuestos del intervalo. Fuera "
+                        "del modelo pueden cambiar la tasa, el tamaño de las pérdidas y su "
+                        "dependencia. La tabla no cubre todos esos escenarios."
+                    ),
+                },
+                {
+                    "q": "¿Por qué una esperanza positiva no elimina el riesgo de ruina?",
+                    "a": (
+                        "La esperanza es un promedio del modelo por operación. Una trayectoria "
+                        "puede acumular pérdidas y tocar el umbral antes del final del horizonte, "
+                        "aunque ese promedio sea positivo. El orden de los resultados importa."
+                    ),
+                },
+            ],
+            "en": [
+                {
+                    "q": "Is Wilson's lower bound the worst possible case?",
+                    "a": (
+                        "It is a compatible scenario under the interval's assumptions. Outside "
+                        "the model, the rate, loss sizes and dependence can change. The table "
+                        "does not cover all those scenarios."
+                    ),
+                },
+                {
+                    "q": "Why does positive expectancy not remove the risk of ruin?",
+                    "a": (
+                        "Expectancy is the model's average per trade. A path can accumulate "
+                        "losses and touch the threshold before the horizon ends even when that "
+                        "average is positive. The order of outcomes matters."
+                    ),
+                },
+            ],
+            "pt": [
+                {
+                    "q": "O limite inferior de Wilson é o pior caso possível?",
+                    "a": (
+                        "É um cenário compatível sob as hipóteses do intervalo. Fora do modelo "
+                        "podem mudar a taxa, o tamanho das perdas e sua dependência. A tabela "
+                        "não cobre todos esses cenários."
+                    ),
+                },
+                {
+                    "q": "Por que uma esperança positiva não elimina o risco de ruína?",
+                    "a": (
+                        "A esperança é a média do modelo por operação. Uma trajetória pode "
+                        "acumular perdas e tocar o limite antes do fim do horizonte, mesmo "
+                        "com essa média positiva. A ordem dos resultados importa."
+                    ),
+                },
+            ],
+        },
+        "related": [
+            {"kind": "ruin"},
+            {"kind": "winrate"},
+            {"kind": "article", "key": STREAK_ARTICLE_KEY},
+            {"kind": "challenge"},
             {"kind": "sample"},
         ],
     },

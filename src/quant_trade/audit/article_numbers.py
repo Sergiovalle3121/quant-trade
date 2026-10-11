@@ -1,4 +1,4 @@
-"""Declared teaching figures for the resampling, streak and consistency articles.
+"""Declared teaching figures for the resampling, streak, consistency and ruin articles.
 
 Every figure here comes from the engine's own functions on inputs fixed in
 this module: ``streaks.longest_run_tail`` for the losing-streak table and
@@ -8,6 +8,8 @@ below, and both resampling functions take an explicit seed, so running this
 module again gives the same numbers byte for byte (the tests do exactly that).
 The best-day examples use ``challenge_calc.compute`` with declared inputs;
 their source-dated rule rows come directly from ``prop_presets.PRESETS``.
+The ruin examples use ``ruin_calc.compute`` unchanged, and their sample-size
+comparison uses the same ``winrate.read`` as the win-rate calculator.
 
 None of it is a measurement of a client's file: every displayed figure keeps
 DECLARED and the assumption it rests on. Nothing here changes the engine, a
@@ -17,11 +19,13 @@ threshold, the report or the class.
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
+from fractions import Fraction
 from functools import lru_cache
 from typing import Any
 
 import numpy as np
 
+from quant_trade.audit import ruin_calc, winrate
 from quant_trade.audit.analytics import (
     SHUFFLE_SAMPLES,
     SHUFFLE_SEED,
@@ -30,6 +34,7 @@ from quant_trade.audit.analytics import (
 )
 from quant_trade.audit.challenge_calc import ChallengeInput, compute
 from quant_trade.audit.prop_presets import PRESETS, BestDayBasis
+from quant_trade.audit.public_card import PublicClaim
 from quant_trade.audit.streaks import RARE, longest_run_tail
 
 # ---------------------------------------------------------------------------
@@ -365,6 +370,69 @@ def consistency_variations() -> tuple[ConsistencyExample, ...]:
     return tuple(consistency_example(inputs) for inputs in CONSISTENCY_VARIATION_INPUTS)
 
 
+# ---------------------------------------------------------------------------
+# Ruin: declared rates versus their Wilson lower bounds on identical paths
+# ---------------------------------------------------------------------------
+
+#: Illustration only: one R is a fixed share of the INITIAL balance, not a
+#: position-sizing recommendation. The threshold means a fall, not balance left.
+RUIN_RISK_PCT = 1.0
+RUIN_THRESHOLD_PCT = 30.0
+RUIN_HORIZON = 500
+RUIN_INPUTS: tuple[ruin_calc.RuinInput, ...] = tuple(
+    ruin_calc.RuinInput(
+        win_rate_pct=rate,
+        unit="r",
+        avg_win=win,
+        avg_loss=1.0,
+        risk=RUIN_RISK_PCT,
+        ruin_pct=RUIN_THRESHOLD_PCT,
+        horizon=RUIN_HORIZON,
+        trades=trades,
+    )
+    for rate, win, trades in ((55.0, 1.0, 60), (55.0, 1.0, 300), (45.0, 2.0, 100))
+)
+RUIN_READINGS: tuple[ruin_calc.RuinReading, ...] = tuple(
+    ruin_calc.compute(value) for value in RUIN_INPUTS
+)
+#: Paths of the third case that touched the threshold at its declared rate.
+#: The table rounds that share to one decimal, like the calculator, so the
+#: prose states the count itself instead of reading a zero into it.
+RUIN_THIRD_CASE_RUINED_PATHS = round(RUIN_READINGS[2].declared.ruin * ruin_calc.SAMPLES)
+
+
+def _ruin_winrate_reading(trades: int | None) -> winrate.WinRateReading:
+    """Read the first example's rate and payoffs at the given sample size."""
+    value = RUIN_INPUTS[0]
+    return winrate.read(
+        PublicClaim(
+            trades=trades,
+            win_rate=value.win_rate,
+            target_r=value.avg_win,
+            stop_r=value.avg_loss,
+        )
+    )
+
+
+#: The calculator reports the first qualifying size in its discrete TRADE_GRID.
+RUIN_WINRATE_READING = _ruin_winrate_reading(RUIN_INPUTS[0].trades)
+#: Check every integer as well: the declared rate is treated as a proportion,
+#: exactly as in winrate.read, without reconstructing an integer count of wins.
+RUIN_MIN_TRADES = next(
+    trades
+    for trades in range(1, max(winrate.TRADE_GRID) + 1)
+    if _ruin_winrate_reading(trades).position == "above"
+)
+#: An observed rate of exactly 55 % needs a multiple of 20 trades. This distinct
+#: result keeps the proportion calculation separate from integer observations.
+_RUIN_RATE_DENOMINATOR = Fraction(str(RUIN_INPUTS[0].win_rate)).denominator
+RUIN_EXACT_RATE_TRADES = next(
+    trades
+    for trades in range(_RUIN_RATE_DENOMINATOR, max(winrate.TRADE_GRID) + 1, _RUIN_RATE_DENOMINATOR)
+    if _ruin_winrate_reading(trades).position == "above"
+)
+
+
 __all__ = [
     "CONSISTENCY_INPUTS",
     "CONSISTENCY_VARIATION_INPUTS",
@@ -372,6 +440,15 @@ __all__ = [
     "MC_RISK",
     "MC_SEARCH_RISK",
     "MC_SHUFFLE",
+    "RUIN_EXACT_RATE_TRADES",
+    "RUIN_HORIZON",
+    "RUIN_INPUTS",
+    "RUIN_MIN_TRADES",
+    "RUIN_READINGS",
+    "RUIN_RISK_PCT",
+    "RUIN_THIRD_CASE_RUINED_PATHS",
+    "RUIN_THRESHOLD_PCT",
+    "RUIN_WINRATE_READING",
     "STREAK_ROWS",
     "ConsistencyExample",
     "ConsistencyRuleRow",

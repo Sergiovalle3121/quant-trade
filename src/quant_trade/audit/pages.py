@@ -22,6 +22,8 @@ from quant_trade.audit import accounts, institutional, paid_offer, reading, ruin
 from quant_trade.audit import challenge_calc as challenge
 from quant_trade.audit.accounts import FREE_PREVIEWS_PER_MONTH as _FREE
 from quant_trade.audit.article_numbers import (
+    RUIN_INPUTS,
+    RUIN_READINGS,
     STREAK_ROWS,
     ConsistencyExample,
     consistency_examples,
@@ -37,6 +39,9 @@ from quant_trade.audit.articles import (
     INDEPENDENT_LUCK_EXAMPLE,
     LUCK_TABLE_COPY,
     LUCK_TABLE_INPUTS,
+    RUIN_ARTICLE_KEY,
+    RUIN_TABLE_AFTER,
+    RUIN_TABLE_COPY,
     STREAK_ARTICLE_KEY,
     STREAK_TABLE_AFTER,
     STREAK_TABLE_COPY,
@@ -5114,6 +5119,50 @@ def article_page(article: Article, *, locale: str = "es", base_url: str = "") ->
         )
         # Right after the section that explains the calculation, found by its title.
         after = [name for name, _body in sections].index(STREAK_TABLE_AFTER[locale])
+        sections.insert(after + 1, (heading, table))
+    if article.key == RUIN_ARTICLE_KEY:
+        heading, *ruin_columns, note = RUIN_TABLE_COPY[locale]
+        ruin_rows: list[str] = []
+        for value, result in zip(RUIN_INPUTS, RUIN_READINGS, strict=True):
+            lower = result.lower
+            if lower is None:
+                raise ValueError("the ruin article requires a Wilson lower-bound scenario")
+            # The linked calculator's own rounding (one decimal, a signed
+            # expectancy at two), so a reader who follows the link meets the same
+            # figures; 4 000 paths resolve no finer than one decimal anyway.
+            r_unit = str(ruin_calc.COPY[locale]["r_unit"])
+            cells = (
+                ruin_calc._percent(value.win_rate, locale),
+                _num(value.trades or 0, locale, 0),
+                f"{_num(value.avg_win, locale, 1)}R/{_num(value.avg_loss, locale, 1)}R",
+                ruin_calc._signed(
+                    result.declared.expectancy_r,
+                    r_unit.format(n=_num(result.declared.expectancy_r, locale, 2)),
+                ),
+                ruin_calc._percent(result.declared.ruin, locale),
+                ruin_calc._percent(lower.win_rate, locale),
+                ruin_calc._signed(
+                    lower.expectancy_r, r_unit.format(n=_num(lower.expectancy_r, locale, 2))
+                ),
+                ruin_calc._percent(lower.ruin, locale),
+            )
+            ruin_rows.append(
+                f"<tr><th scope='row'>DECLARED · {_e(cells[0])}</th>"
+                + "".join(f"<td>DECLARED · {_e(cell)}</td>" for cell in cells[1:])
+                + "</tr>"
+            )
+        # The note stays outside the scrolling region, where a phone shows it
+        # whole; the first column sticks so a scrolled row keeps its win rate.
+        table = (
+            f"<p>{_e(note)}</p>"
+            f"<div class='tscroll ruin-scroll' role='region' tabindex='0' "
+            f"aria-label='{_e(heading)}'><table class='article-ruin'><thead><tr>"
+            + "".join(f"<th scope='col'>{_e(column)}</th>" for column in ruin_columns)
+            + "</tr></thead><tbody>"
+            + "".join(ruin_rows)
+            + "</tbody></table></div>"
+        )
+        after = [name for name, _body in sections].index(RUIN_TABLE_AFTER[locale])
         sections.insert(after + 1, (heading, table))
     if text.faq:
         faq = "".join(f"<h3>{_e(q)}</h3><p>{_e(a)}</p>" for q, a in text.faq)
