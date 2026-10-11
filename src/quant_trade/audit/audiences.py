@@ -728,9 +728,18 @@ AUDIENCE_PAGES: tuple[Audience, ...] = (
                     ("Tu lista de operaciones de TradingView.", "tradingview"),
                     ("Tu CSV de NinjaTrader 8 (futuros).", "ninjatrader"),
                     (
-                        "O el historial de operaciones de tu plataforma en CSV o Excel: Rigor "
-                        "reconoce el formato de Tradovate, TopstepX, Rithmic, cTrader y Sierra "
-                        "Chart, entre otros.",
+                        "Tu CSV de Tradovate (Performance u Orders de Account Reports).",
+                        "tradovate",
+                    ),
+                    ("El archivo de la pestaña Trades de TopstepX.", "topstepx"),
+                    (
+                        "Tu Trade Activity Log de Sierra Chart, guardado como texto con "
+                        "tabuladores.",
+                        "sierra-chart",
+                    ),
+                    (
+                        "O tu historial de operaciones en CSV o Excel para el importador "
+                        "universal.",
                         "csv-universal",
                     ),
                     (
@@ -818,9 +827,16 @@ AUDIENCE_PAGES: tuple[Audience, ...] = (
                     ("Your TradingView list of trades.", "tradingview"),
                     ("Your NinjaTrader 8 CSV (futures).", "ninjatrader"),
                     (
-                        "Or your platform's trade history as CSV or Excel: Rigor recognises the "
-                        "format of Tradovate, TopstepX, Rithmic, cTrader and Sierra Chart, among "
-                        "others.",
+                        "Your Tradovate CSV (Performance or Orders from Account Reports).",
+                        "tradovate",
+                    ),
+                    ("The file exported from TopstepX's Trades tab.", "topstepx"),
+                    (
+                        "Your Sierra Chart Trade Activity Log, saved as tab-separated text.",
+                        "sierra-chart",
+                    ),
+                    (
+                        "Or your trade history as CSV or Excel for the universal importer.",
                         "csv-universal",
                     ),
                     (
@@ -908,9 +924,18 @@ AUDIENCE_PAGES: tuple[Audience, ...] = (
                     ("A sua lista de operações do TradingView.", "tradingview"),
                     ("O seu CSV do NinjaTrader 8 (futuros).", "ninjatrader"),
                     (
-                        "Ou o histórico de operações da sua plataforma em CSV ou Excel: o Rigor "
-                        "reconhece o formato do Tradovate, TopstepX, Rithmic, cTrader e Sierra "
-                        "Chart, entre outros.",
+                        "O seu CSV do Tradovate (Performance ou Orders de Account Reports).",
+                        "tradovate",
+                    ),
+                    ("O arquivo da aba Trades do TopstepX.", "topstepx"),
+                    (
+                        "O seu Trade Activity Log do Sierra Chart, salvo como texto separado "
+                        "por tabulações.",
+                        "sierra-chart",
+                    ),
+                    (
+                        "Ou o seu histórico de operações em CSV ou Excel para o importador "
+                        "universal.",
                         "csv-universal",
                     ),
                     (

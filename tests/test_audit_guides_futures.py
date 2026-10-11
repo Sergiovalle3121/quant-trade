@@ -5,8 +5,8 @@ under the steps with the day they were read (``Guide.sources``,
 ``Guide.read_on``). None of those pages publishes the file's headers, so each
 file is read by its column names (``audit/universal.py``): a synthetic fixture
 per file shape goes through the importer here, and the shapes the importer
-refuses (a single time column, the Trades tab with its default BP/EP markers or
-without its quantity named) are refused the way the guide warns. The pages link
+refuses (a single time column, the Trades tab with its default BP/EP markers)
+are refused the way the guide warns. The pages link
 the challenge calculator, the rules table and its futures firms, carry their
 publication date in the sitemap, and promise nothing. Rithmic's R | Trader Pro has no guide: its
 official pages describe no export (``docs/AUDIT_SAAS.md``).
@@ -111,7 +111,7 @@ FILE_SHAPES = [
     pytest.param(
         "sierra-chart",
         "sierra_chart_trades.txt",
-        {"quantity": "Trade Quantity"},
+        None,
         UNIVERSAL_TRADES_CSV,
         ["long", "short"],
         [100.0, 20.0],
@@ -196,7 +196,7 @@ def test_the_sierra_chart_guide_names_every_column_the_importer_reads() -> None:
     guide = GUIDES_BY_SLUG["sierra-chart"]
     for name, columns in (
         ("sierra_chart_trade_activity.txt", None),
-        ("sierra_chart_trades.txt", {"quantity": "Trade Quantity"}),
+        ("sierra_chart_trades.txt", None),
     ):
         report = import_report((FIXTURES / name).read_bytes(), name, columns=columns)
         read = {value for key, value in report.metadata.items() if key.startswith("column_")}
@@ -270,20 +270,27 @@ def test_the_sierra_chart_trades_tab_with_bp_ep_markers_is_refused_as_the_guide_
         marked.append("\t".join(cells))
     data = ("\n".join(marked) + "\n").encode("utf-8")
     with pytest.raises(ReportFormatError):
-        import_report(data, "Trades.txt", columns={"quantity": "Trade Quantity"})
+        import_report(data, "Trades.txt")
     for locale in LOCALES:
         steps = " ".join(GUIDES_BY_SLUG["sierra-chart"].text[locale].steps)
         assert "Edit >> Include Begin/End Indicators in Trades List" in steps, locale
         assert " BP " in steps and " EP" in steps, locale
 
 
-def test_the_sierra_chart_trades_tab_needs_its_quantity_named_as_the_guide_says() -> None:
+def test_the_sierra_chart_trades_tab_is_read_by_its_column_names_as_the_guide_says() -> None:
+    # The Trades tab names its size "Trade Quantity" (its other quantity columns
+    # are the maximum open and closed quantities); the importer knows that name,
+    # so the file needs no mapping and the guide asks for none.
     data = (FIXTURES / "sierra_chart_trades.txt").read_bytes()
-    with pytest.raises(ReportFormatError) as refused:
-        import_report(data, "Trades.txt")
-    assert "quantity" in str(refused.value) and "Trade Quantity" in str(refused.value)
+    report = import_report(data, "Trades.txt")
+    assert report.source_format == UNIVERSAL_TRADES_CSV
+    assert report.metadata["column_quantity"] == "Trade Quantity"
+    assert report.metadata["column_entry_time"] == "Entry Date Time"
+    assert report.metadata["column_exit_time"] == "Exit Date Time"
     for locale in LOCALES:
-        assert "Trade Quantity" in " ".join(GUIDES_BY_SLUG["sierra-chart"].text[locale].tips)
+        tips = " ".join(GUIDES_BY_SLUG["sierra-chart"].text[locale].tips)
+        assert "Trade Quantity" in tips, locale
+        assert "formulario que Trade" not in tips and "say on the form" not in tips, locale
 
 
 def test_the_pages_link_the_calculator_the_rules_table_and_the_futures_firms(

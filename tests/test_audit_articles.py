@@ -101,6 +101,8 @@ def test_the_data_has_the_shape_the_writer_pastes() -> None:
         "lo-eligio-el-optimizador",
         "monte-carlo-backtest",
         "rachas-perdedoras",
+        "regla-de-consistencia-prop-firm",
+        "riesgo-de-ruina-intervalo-de-confianza",
     ]
     for entry in ARTICLES_DATA:
         assert DATA_KEYS <= set(entry) <= DATA_KEYS | {"seo_title"}, entry["key"]
@@ -125,6 +127,8 @@ def test_the_data_has_the_shape_the_writer_pastes() -> None:
                 "article",
                 "winrate",
                 "ruin",
+                "challenge",
+                "rules",
             }
             assert ("slug" in link) == (link["kind"] in {"guide", "audience"})
             assert ("key" in link) == (link["kind"] == "article")
@@ -203,6 +207,16 @@ def test_every_article_exists_in_every_language_and_passes_the_guard() -> None:
             "es": "rachas-perdedoras",
             "en": "losing-streaks-how-many-are-normal",
             "pt": "sequencias-de-perdas",
+        },
+        "regla-de-consistencia-prop-firm": {
+            "es": "regla-de-consistencia-prop-firm",
+            "en": "prop-firm-consistency-rule-numbers",
+            "pt": "regra-de-consistencia-prop-firm",
+        },
+        "riesgo-de-ruina-intervalo-de-confianza": {
+            "es": "riesgo-de-ruina-intervalo-de-confianza",
+            "en": "risk-of-ruin-confidence-interval",
+            "pt": "risco-de-ruina-intervalo-de-confianca",
         },
     }
     for article in ARTICLES:
@@ -391,6 +405,7 @@ def test_the_index_description_names_the_current_topics_within_limits(
 ) -> None:
     page = _client(tmp_path).get(articles_index_url(locale)).text
     description = _meta(page, "description")
+    assert description is not None
     assert description == ARTICLES_COPY[locale]["summary"]
     assert 50 <= len(description) <= 160, len(description)
     assert find_claims(description) == []
