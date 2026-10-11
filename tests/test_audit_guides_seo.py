@@ -247,6 +247,7 @@ def test_every_sitemap_url_has_an_iso_lastmod_from_the_code(tmp_path: Path) -> N
         rules_table_lastmod,
     )
 
+    assert ARTICLE_PUBLICATION_DATES["regla-de-consistencia-prop-firm"] == "2026-10-11"
     response = _client(tmp_path).get("/sitemap.xml")
     assert response.status_code == 200
     root = ElementTree.fromstring(response.content)

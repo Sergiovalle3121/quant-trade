@@ -21,11 +21,19 @@ from urllib.parse import quote, urlencode
 from quant_trade.audit import accounts, institutional, paid_offer, reading, ruin_calc, winrate
 from quant_trade.audit import challenge_calc as challenge
 from quant_trade.audit.accounts import FREE_PREVIEWS_PER_MONTH as _FREE
-from quant_trade.audit.article_numbers import STREAK_ROWS
+from quant_trade.audit.article_numbers import (
+    STREAK_ROWS,
+    ConsistencyExample,
+    consistency_examples,
+    consistency_rules,
+    consistency_variations,
+)
 from quant_trade.audit.articles import (
     ARTICLES,
     ARTICLES_BY_KEY,
     ARTICLES_COPY,
+    CONSISTENCY_ARTICLE_KEY,
+    CONSISTENCY_TABLE_COPY,
     INDEPENDENT_LUCK_EXAMPLE,
     LUCK_TABLE_COPY,
     LUCK_TABLE_INPUTS,
@@ -40,6 +48,7 @@ from quant_trade.audit.articles import (
     article_url,
     articles_index_faq,
     articles_index_url,
+    consistency_worked_example,
     next_step_call,
     next_step_links,
     related_links,
@@ -4922,6 +4931,74 @@ def articles_index_page(*, locale: str = "es", base_url: str = "") -> str:
     return _page(title, locale, body, meta_html=meta, alternates=alternates, solid_nav=True)
 
 
+def _consistency_article_tables(locale: str) -> dict[str, str]:
+    """Tables from the declared calculator examples and the published preset rows."""
+    words = CONSISTENCY_TABLE_COPY[locale]
+
+    def declared(value: str) -> str:
+        return _e(f"DECLARED · {value}")
+
+    def table(name: str, columns: tuple[str, ...], rows: str, note: str) -> str:
+        headers = "".join(f"<th scope='col'>{_e(words[key])}</th>" for key in columns)
+        return (
+            f"<table class='article-consistency-{name}'><caption>{_e(words[note])}</caption>"
+            f"<thead><tr>{headers}</tr></thead><tbody>{rows}</tbody></table>"
+        )
+
+    def outcomes(row: ConsistencyExample) -> str:
+        within = (
+            _e(words["no_rule"])
+            if row.within_best_day is None
+            else declared(f"{_num(row.within_best_day * 100, locale, 1)} %")
+        )
+        days = (
+            "NOT_MEASURED"
+            if row.median_days is None
+            else declared(_num(row.median_days, locale, 0))
+        )
+        cells = (
+            declared(f"{_num(row.target * 100, locale, 1)} %"),
+            within,
+            declared(f"{_num((row.daily_limit + row.total_limit) * 100, locale, 1)} %"),
+            declared(f"{_num(row.unfinished * 100, locale, 1)} %"),
+            days,
+        )
+        return "".join(f"<td>{cell}</td>" for cell in cells)
+
+    columns = ("target", "within", "loss", "unfinished", "days")
+    case_rows = "".join(
+        f"<tr data-case='{_e(row.inputs.program)}'><th scope='row'>"
+        f"{_e(PRESETS[row.inputs.program].firm)} · {_e(PRESETS[row.inputs.program].program)}"
+        f"</th>{outcomes(row)}</tr>"
+        for row in consistency_examples()
+    )
+    variation_rows = "".join(
+        f"<tr data-case='{index}'><th scope='row'>"
+        f"{declared(_num(row.inputs.per_day, locale, 0))}</th>"
+        f"<td>{declared(_num(row.inputs.risk or 0, locale, 2) + ' %')}</td>"
+        f"{outcomes(row)}</tr>"
+        for index, row in enumerate(consistency_variations())
+    )
+    rule_rows = "".join(
+        f"<tr data-preset='{_e(row.key)}'><th scope='row'>"
+        f"{_e(row.firm)} · {_e(row.program)}</th>"
+        f"<td>{declared(_num(row.limit * 100, locale, 0) + ' %')}</td>"
+        f"<td>{_e(words[row.basis])}</td>"
+        f"<td><a href='{_e(row.source_url)}'>{declared(row.as_of)}</a></td></tr>"
+        for row in consistency_rules()
+    )
+    return {
+        words["rules"]: table(
+            "rules", ("program", "limit", "basis", "source"), rule_rows, "rules_note"
+        ),
+        words["cases"]: f"<p>{_e(consistency_worked_example(locale))}</p>"
+        + table("cases", ("program", *columns), case_rows, "outcome_note"),
+        words["sensitivity"]: table(
+            "sensitivity", ("per_day", "risk", *columns), variation_rows, "outcome_note"
+        ),
+    }
+
+
 def article_page(article: Article, *, locale: str = "es", base_url: str = "") -> str:
     """One article: its sections, questions, related pages and a closing call."""
     locale = _locale(locale)
@@ -4935,6 +5012,9 @@ def article_page(article: Article, *, locale: str = "es", base_url: str = "") ->
         (section.heading, "".join(f"<p>{_e(paragraph)}</p>" for paragraph in section.paragraphs))
         for section in text.sections
     ]
+    if article.key == CONSISTENCY_ARTICLE_KEY:
+        tables = _consistency_article_tables(locale)
+        sections = [(heading, body + tables.get(heading, "")) for heading, body in sections]
     if article.key in {"sharpe-deflactado-track-record", "bot-ia-backtest-suerte"}:
         heading, trials, years, luck, note = LUCK_TABLE_COPY[locale]
         rows = "".join(

@@ -101,6 +101,7 @@ def test_the_data_has_the_shape_the_writer_pastes() -> None:
         "lo-eligio-el-optimizador",
         "monte-carlo-backtest",
         "rachas-perdedoras",
+        "regla-de-consistencia-prop-firm",
     ]
     for entry in ARTICLES_DATA:
         assert DATA_KEYS <= set(entry) <= DATA_KEYS | {"seo_title"}, entry["key"]
@@ -125,6 +126,8 @@ def test_the_data_has_the_shape_the_writer_pastes() -> None:
                 "article",
                 "winrate",
                 "ruin",
+                "challenge",
+                "rules",
             }
             assert ("slug" in link) == (link["kind"] in {"guide", "audience"})
             assert ("key" in link) == (link["kind"] == "article")
@@ -203,6 +206,11 @@ def test_every_article_exists_in_every_language_and_passes_the_guard() -> None:
             "es": "rachas-perdedoras",
             "en": "losing-streaks-how-many-are-normal",
             "pt": "sequencias-de-perdas",
+        },
+        "regla-de-consistencia-prop-firm": {
+            "es": "regla-de-consistencia-prop-firm",
+            "en": "prop-firm-consistency-rule-numbers",
+            "pt": "regra-de-consistencia-prop-firm",
         },
     }
     for article in ARTICLES:
