@@ -7,6 +7,7 @@ import json
 import re
 from collections.abc import Iterator
 from pathlib import Path
+from urllib.parse import parse_qsl, urlsplit
 
 import pytest
 
@@ -15,13 +16,28 @@ pytest.importorskip("sqlalchemy")
 
 from fastapi.testclient import TestClient  # noqa: E402
 
-from quant_trade.audit import reading, seo  # noqa: E402
-from quant_trade.audit.articles import article_url, articles_index_url  # noqa: E402
+from quant_trade.audit import (  # noqa: E402
+    calculator,
+    challenge_calc,
+    public_card,
+    reading,
+    ruin_calc,
+    rules_table,
+    seo,
+    tools_examples,
+    winrate,
+)
+from quant_trade.audit.articles import (  # noqa: E402
+    article_url,
+    articles_index_url,
+    win_rate_interval,
+)
 from quant_trade.audit.audiences import audience_url  # noqa: E402
 from quant_trade.audit.calculator import calculator_url  # noqa: E402
 from quant_trade.audit.examples import EXAMPLES_PATH  # noqa: E402
 from quant_trade.audit.guard import find_claims  # noqa: E402
 from quant_trade.audit.guides import guides_index_url  # noqa: E402
+from quant_trade.audit.i18n import localize  # noqa: E402
 from quant_trade.audit.pages import _sample_url, audit_path, landing  # noqa: E402
 from quant_trade.audit.settings import AuditSettings  # noqa: E402
 from quant_trade.audit.store import make_store  # noqa: E402
@@ -271,3 +287,240 @@ def test_every_listed_case_article_exists(client: TestClient, locale: str) -> No
         for key in keys:
             assert article_url(key, locale) in hrefs
             assert client.get(article_url(key, locale)).status_code == 200
+
+
+def _example_paragraph(page: str, key: str) -> str:
+    found = re.search(rf"<p\b[^>]*data-tool-example='{key}'[^>]*>(.*?)</p>", page, re.S)
+    assert found is not None, key
+    return found.group(1)
+
+
+def _example_link(page: str, key: str) -> str:
+    found = re.search(rf"<a\b[^>]*data-tool-example-link='{key}'[^>]*>.*?</a>", page, re.S)
+    assert found is not None, key
+    links = _hrefs(found.group(0))
+    assert len(links) == 1
+    return links.pop()
+
+
+def _number(value: float, locale: str, decimals: int = 1) -> str:
+    text = f"{value:.{decimals}f}"
+    return text if locale == "en" else text.replace(".", ",")
+
+
+def _percent(value: float, locale: str) -> str:
+    return f"{_number(value * 100, locale)} %"
+
+
+def _table(page: str, attributes: str) -> str:
+    found = re.search(rf"<table {attributes}>.*?</table>", page, re.S)
+    assert found is not None, attributes
+    return _visible_text(found.group(0))
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+def test_tools_examples_have_declared_evidence_and_localized_links(
+    client: TestClient, locale: str
+) -> None:
+    assert TOOL_KEYS == ("calculator", "winrate", "challenge", "ruin", "reading", "check")
+    examples = tools_examples.examples(locale)
+    assert set(examples) == {*TOOL_KEYS, "rules_table"}
+    page = client.get(tools_url(locale)).text
+    main = _main(page)
+    forbidden = re.compile(
+        r"\b(?:verificado|certificado|garantiza|rentable|aprobar|pasar|pass)\b", re.I
+    )
+    for key, example in examples.items():
+        paragraph = _example_paragraph(main, key)
+        visible = _visible_text(paragraph)
+        assert example.evidence == "DECLARED"
+        assert "badge DECLARED" in paragraph
+        assert example.text in visible
+        assert COPY[locale]["example"] in visible
+        if key != "check":
+            assert COPY[locale]["example_evidence"] in visible
+        assert _example_link(main, key) == example.url
+        assert find_claims(visible) == []
+        assert forbidden.search(visible) is None
+        assert main.count(f"data-tool-example='{key}'") == 1
+        assert main.count(f"data-tool-example-link='{key}'") == 1
+    assert main.count(COPY[locale]["example_open"]) == len(examples)
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+def test_tools_luck_example_recalculates_from_its_link(client: TestClient, locale: str) -> None:
+    example = tools_examples.examples(locale)["calculator"]
+    assert example.url == calculator.share_url(locale, tools_examples.CALCULATOR_INPUT)
+    values = dict(parse_qsl(urlsplit(example.url).query))
+    value = calculator.read_input(
+        values.get("sharpe"),
+        values.get("years"),
+        values.get("trials"),
+        values.get("periods_per_year"),
+    )
+    assert value == tools_examples.CALCULATOR_INPUT
+    assert isinstance(value, calculator.CalculatorInput)
+    result = calculator.compute(value)
+    expected = _number(result["luck_sharpe"]["value"], locale, 2)
+    assert expected in example.text
+    response = client.get(example.url)
+    assert response.status_code == 200
+    assert expected in _table(response.text, "class='calc-result'")
+    assert "data-calc-verdict" in response.text
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+def test_tools_winrate_example_recalculates_from_its_link(client: TestClient, locale: str) -> None:
+    example = tools_examples.examples(locale)["winrate"]
+    assert example.url == winrate.share_url(locale, tools_examples.WINRATE_VALUES)
+    values = dict(parse_qsl(urlsplit(example.url).query))
+    claim = winrate.parse(values, locale)
+    assert claim == winrate.parse(tools_examples.WINRATE_VALUES, locale)
+    interval = winrate.read(claim).interval
+    assert interval is not None
+    response = client.get(example.url)
+    assert response.status_code == 200
+    result = _table(response.text, "class='calc-result'")
+    for bound in interval:
+        expected = _percent(bound, locale)
+        assert expected in example.text
+    # The destination's editorial interval places one percent sign after both bounds.
+    assert claim.win_rate is not None and claim.trades is not None
+    assert win_rate_interval(claim.win_rate, claim.trades, locale) in result
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+def test_tools_challenge_example_recalculates_from_its_link(
+    client: TestClient, locale: str
+) -> None:
+    example = tools_examples.examples(locale)["challenge"]
+    assert example.url == challenge_calc.share_url(locale, tools_examples.CHALLENGE_INPUT)
+    values = dict(parse_qsl(urlsplit(example.url).query))
+    parsed = challenge_calc.parse(values)
+    assert parsed.value == tools_examples.CHALLENGE_INPUT
+    assert parsed.value is not None
+    result = challenge_calc.compute(parsed.value)
+    expected = _percent(result.declared.outcome["pass"]["value"], locale)
+    assert expected in example.text
+    response = client.get(example.url)
+    assert response.status_code == 200
+    assert expected in _table(response.text, "class='calc-result' data-challenge-result")
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+def test_tools_ruin_example_recalculates_both_rates_from_its_link(
+    client: TestClient, locale: str
+) -> None:
+    example = tools_examples.examples(locale)["ruin"]
+    assert example.url == ruin_calc.share_url(locale, tools_examples.RUIN_INPUT)
+    values = dict(parse_qsl(urlsplit(example.url).query))
+    parsed = ruin_calc.parse(values)
+    assert parsed.value == tools_examples.RUIN_INPUT
+    assert parsed.value is not None
+    result = ruin_calc.compute(parsed.value)
+    assert result.lower is not None
+    assert result.interval is not None
+    response = client.get(example.url)
+    assert response.status_code == 200
+    declared = _percent(result.declared.ruin, locale)
+    lower = _percent(result.lower.ruin, locale)
+    assert declared in example.text
+    assert lower in example.text
+    assert _percent(result.lower.win_rate, locale) in example.text
+    assert declared in _table(response.text, "class='calc-result' data-ruin-result")
+    assert lower in _table(response.text, "class='ruin-lower'")
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+def test_tools_reader_example_recalculates_from_its_link(client: TestClient, locale: str) -> None:
+    example = tools_examples.examples(locale)["reading"]
+    assert example.url == reading.reading_url(locale, tools_examples.READING_VALUES)
+    values = dict(parse_qsl(urlsplit(example.url).query))
+    claim = reading.claim_from_query(values, locale)
+    assert claim == reading.claim_from_query(tools_examples.READING_VALUES, locale)
+    response = client.get(example.url)
+    assert response.status_code == 200
+    found = re.search(r"<div class='public-card-preview'>(.*?)</div>", response.text, re.S)
+    assert found is not None
+    result = _visible_text(found.group(1))
+    for key, value, _note in public_card._readings(claim):
+        if key in ("wilson", "luck", "breakeven"):
+            assert value is not None
+            assert value in example.text
+            assert value in result
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+def test_tools_rules_example_counts_programs_and_most_recent_source(
+    client: TestClient, locale: str
+) -> None:
+    example = tools_examples.examples(locale)["rules_table"]
+    rows = rules_table.rows()
+    firms = len({row.firm for row in rows})
+    programs = len({row.program for row in rows})
+    latest = max(row.rules.as_of for row in rows)
+    assert f"{firms} " in example.text
+    assert f"{programs} " in example.text
+    assert latest in example.text
+    assert example.url == rules_table.rules_table_url(locale)
+    response = client.get(example.url)
+    assert response.status_code == 200
+    assert latest in _visible_text(_main(response.text))
+    for row in rows:
+        assert row.rules.source_url in _hrefs(response.text)
+    hub = client.get(tools_url(locale)).text
+    assert f"href='{example.url}' data-rules-table" in hub
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+def test_tools_check_example_opens_the_file_form_without_fabricating_a_result(
+    client: TestClient, locale: str
+) -> None:
+    # Check accepts a local file by POST, so its example cannot preload a file in a GET URL.
+    example = tools_examples.examples(locale)["check"]
+    assert example.url == seo.CHECK_PATH[locale]
+    assert urlsplit(example.url).query == ""
+    response = client.get(example.url)
+    assert response.status_code == 200
+    main = _main(response.text)
+    assert "method='post'" in main
+    assert "type='file' name='report'" in main
+    assert "class='chk-result" not in main
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+def test_tools_examples_do_not_add_results_to_structured_data(
+    client: TestClient, locale: str
+) -> None:
+    page = client.get(tools_url(locale)).text
+    blocks = re.findall(r"<script type='application/ld\+json'>(.*?)</script>", page, re.S)
+    data = [json.loads(block) for block in blocks]
+    assert [item["@type"] for item in data] == ["ItemList"]
+    items = data[0]["itemListElement"]
+    assert len(items) == len(TOOL_KEYS)
+    for key, entry in zip(TOOL_KEYS, items, strict=True):
+        item = entry["item"]
+        assert item["description"] == COPY[locale][key]["question"]
+        assert urlsplit(item["url"]).query == ""
+        assert set(item) == {
+            "@type",
+            "name",
+            "description",
+            "url",
+            "applicationCategory",
+            "operatingSystem",
+            "isAccessibleForFree",
+            "inLanguage",
+            "offers",
+            "publisher",
+        }
+    for example in tools_examples.examples(locale).values():
+        assert example.text not in "".join(blocks)
+
+
+def test_tools_example_notes_have_explicit_spanish_translations() -> None:
+    assert localize(COPY["en"]["example_evidence"], "es") == COPY["es"]["example_evidence"]
+    assert (
+        localize(tools_examples.examples("en")["check"].text, "es")
+        == tools_examples.examples("es")["check"].text
+    )

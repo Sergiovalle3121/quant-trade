@@ -118,6 +118,12 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
             ),
         )
     ),
+    # Tools hub evidence note also has native ES/PT page copy.
+    ("calculated from declared figures", "calculado a partir de lo declarado"),
+    (
+        "Sample JSON report → choose the file to compare its fingerprint.",
+        "Informe JSON de ejemplo → para comparar su huella hay que elegir el archivo.",
+    ),
     # Public figure reader notes (reading.COPY); keep the Spanish rules explicit.
     (
         "The PNG image is temporarily unavailable.",

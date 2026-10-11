@@ -6,7 +6,8 @@ no import cycle can start here.
 
 Every tool on the page uses figures the visitor declares and shows its
 assumptions. None of them is an audit: no file is read and no A to D class is
-given. The page shows no figure of its own.
+given. ``tools_examples`` computes the page's declared examples with the same
+functions and links as the destination tools.
 """
 
 from __future__ import annotations
@@ -42,6 +43,9 @@ COPY: dict[str, dict[str, Any]] = {
         "returns": "Qué devuelve",
         "no_account": "Sin registro",
         "open": "Abrir",
+        "example": "Ejemplo:",
+        "example_open": "Ver este ejemplo",
+        "example_evidence": "calculado a partir de lo declarado",
         "calculator": {
             "question": (
                 "¿Cuánto de tu Sharpe podría explicar la suerte de haber probado muchas "
@@ -145,6 +149,9 @@ COPY: dict[str, dict[str, Any]] = {
         "returns": "What you get",
         "no_account": "No signup",
         "open": "Open",
+        "example": "Example:",
+        "example_open": "View this example",
+        "example_evidence": "calculated from declared figures",
         "calculator": {
             "question": (
                 "How much of your Sharpe could the luck of trying many configurations explain?"
@@ -241,6 +248,9 @@ COPY: dict[str, dict[str, Any]] = {
         "returns": "O que devolve",
         "no_account": "Sem cadastro",
         "open": "Abrir",
+        "example": "Exemplo:",
+        "example_open": "Ver este exemplo",
+        "example_evidence": "calculado a partir do declarado",
         "calculator": {
             "question": (
                 "Quanto do seu Sharpe a sorte de testar muitas configurações poderia explicar?"
