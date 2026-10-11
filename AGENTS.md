@@ -84,3 +84,8 @@ Data lake code is research/backtesting only. Do not commit generated datasets, s
 - Prop-firm presets carry their source URL and `as_of` date.
 - Access codes are stored only as a hash and printed once; nothing lists or logs a clear code.
 - The terms and privacy pages (`audit/legal.py`) must pass the guard; operator details come from the environment with no real-looking default. Every privacy promise needs a command that keeps it and a test.
+
+## Provenance guard (artifacts and docs)
+
+- `tests/test_provenance_guard.py` runs `quant_trade.evidence.provenance_guard` over `artifacts/v7..v9/*.json` and every `docs/**/*.md`, and caps the outstanding findings (`PROVENANCE_DEBT_CEILING`): a new undeclared claim or an unresolvable digest fails CI. Do not raise the ceiling to make room.
+- Every 64-hex SHA-256 written in `docs/` (session notes such as `docs/CODEX-NN-NOTAS.md` included) must hash to a committed file, be a digest the guard recomputes from code, or be registered with its reason in `configs/provenance/unverifiable_digests.json`. A digest that cannot be resolved or registered does not belong in the document.
