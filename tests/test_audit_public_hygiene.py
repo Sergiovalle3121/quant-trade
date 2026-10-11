@@ -33,6 +33,19 @@ PUBLIC_URLS = [
 ]
 PAGE_CASES = [pytest.param(locale, path, id=path) for locale, path in PUBLIC_URLS]
 SITEMAP_NS = {"s": "http://www.sitemaps.org/schemas/sitemap/0.9"}
+# These three audience titles deliberately answer the complete search question.
+# Keep the exception exact; every other public title retains the 65-character cap.
+SIGNAL_QUESTION_TITLES = {
+    "/para/copiar-senales": (
+        "¿Cómo elijo un proveedor de señales para copiar sin que me barran? · Rigor"
+    ),
+    "/for/signal-copiers": (
+        "How do I pick a signal provider to copy without getting wiped out? · Rigor"
+    ),
+    "/pt/para/copiar-sinais": (
+        "Como escolher um fornecedor de sinais para copiar sem quebrar a conta? · Rigor"
+    ),
+}
 
 
 class PublicHTML(HTMLParser):
@@ -183,7 +196,10 @@ def test_public_metadata_lengths(public_site: PublicSite, locale: str, path: str
     page = public_site.pages[path]
     assert len(page.titles) == len(page.descriptions) == 1
     title, description = page.titles[0].strip(), page.descriptions[0].strip()
-    assert 15 <= len(title) <= 65, f"{len(title)} characters: {title}"
+    if path in SIGNAL_QUESTION_TITLES:
+        assert title == SIGNAL_QUESTION_TITLES[path]
+    else:
+        assert 15 <= len(title) <= 65, f"{len(title)} characters: {title}"
     assert 50 <= len(description) <= 160, f"{len(description)} characters: {description}"
 
 

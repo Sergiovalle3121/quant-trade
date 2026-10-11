@@ -3,6 +3,8 @@ sitemap, linked from the landing, and clean under the profit-claim guard."""
 
 from __future__ import annotations
 
+import html
+import json
 import re
 from pathlib import Path
 
@@ -13,15 +15,25 @@ pytest.importorskip("sqlalchemy")
 
 from fastapi.testclient import TestClient  # noqa: E402
 
-from quant_trade.audit.audiences import AUDIENCE_PAGES, audience_url  # noqa: E402
+from quant_trade.audit.audience_numbers import signal_copier_values  # noqa: E402
+from quant_trade.audit.audiences import AUDIENCE_COPY, AUDIENCE_PAGES, audience_url  # noqa: E402
 from quant_trade.audit.challenge_calc import CHALLENGE_PATH  # noqa: E402
 from quant_trade.audit.guard import find_claims  # noqa: E402
 from quant_trade.audit.guides import GUIDES_BY_SLUG, guide_url  # noqa: E402
+from quant_trade.audit.reading import READING_PATH  # noqa: E402
+from quant_trade.audit.report import SIGNAL_SAMPLE_PATHS  # noqa: E402
 from quant_trade.audit.ruin_calc import RUIN_PATH  # noqa: E402
 from quant_trade.audit.rules_table import RULES_TABLE_PATH  # noqa: E402
 from quant_trade.audit.settings import AuditSettings  # noqa: E402
 from quant_trade.audit.store import make_store  # noqa: E402
 from quant_trade.audit.web import create_app  # noqa: E402
+from quant_trade.audit.winrate import WINRATE_PATH  # noqa: E402
+
+SIGNAL_QUESTIONS = {
+    "es": "¿Cómo elijo un proveedor de señales para copiar sin que me barran?",
+    "en": "How do I pick a signal provider to copy without getting wiped out?",
+    "pt": "Como escolher um fornecedor de sinais para copiar sem quebrar a conta?",
+}
 
 
 def _client(tmp_path: Path, **overrides) -> TestClient:
@@ -180,6 +192,133 @@ def test_signal_copiers_have_their_own_page(
     # The other case pages link to it too.
     other = client.get(audience_url("compradores-de-robots", locale)).text
     assert f"href='{path}'" in other
+
+
+@pytest.mark.parametrize("locale", ("es", "en", "pt"))
+def test_signal_copiers_answer_the_search_question_with_seven_checks(
+    tmp_path: Path, locale: str
+) -> None:
+    client = _client(tmp_path)
+    response = client.get(audience_url("copiar-senales", locale))
+    assert response.status_code == 200
+    page = response.text
+    question = SIGNAL_QUESTIONS[locale]
+    headings = [html.unescape(item) for item in re.findall(r"<h2\b[^>]*>(.*?)</h2>", page)]
+    assert question in headings
+    assert f"<title>{html.escape(question)} · Rigor</title>" in page
+    description = re.search(r"<meta name='description' content='([^']*)'>", page)
+    assert description is not None
+    assert question in html.unescape(description.group(1))
+    checklist = re.search(r"<ol\b[^>]*\bdata-signal-checklist[^>]*>(.*?)</ol>", page, re.S)
+    assert checklist is not None
+    entries = re.findall(r"<li\b[^>]*>(.*?)</li>", checklist.group(1), re.S)
+    assert len(entries) == 7
+    figures = signal_copier_values(locale)
+    numeric_fields = (
+        ("months", "sharpe", "trials", "luck_months", "luck_frequency"),
+        ("rate", "trades", "wilson_low", "wilson_high"),
+        ("drawdown", "floating_warn"),
+        ("inflated_min_gain", "inflated_share", "top_up_drawdown"),
+        ("martingale_ratio", "martingale_min", "grid_min", "grid_share"),
+        ("ruin_limit", "rate", "wilson_low"),
+        ("months", "trades"),
+    )
+    for entry, fields in zip(entries, numeric_fields, strict=True):
+        assert re.search(r"\d", re.sub(r"<[^>]+>", "", entry)), entry
+        assert re.search(r"href=['\"]/[^'\"]+['\"]", entry), entry
+        for field in fields:
+            assert figures[field] in html.unescape(entry), (locale, field)
+    # The audience retains its established problems, uploads, checks and limits.
+    for section in ("pains", "uploads", "checks", "limits", "faq"):
+        assert AUDIENCE_COPY[locale][section] in headings
+    main = html.unescape(page.split("<main", 1)[1].split("</main>", 1)[0])
+    assert not re.search(
+        r"\b(?:verificado|certificado|garantiza|rentable|aprobar|pasar|pass|approved)\b",
+        main,
+        re.I,
+    )
+    assert find_claims(html.unescape(page)) == []
+
+
+@pytest.mark.parametrize("locale", ("es", "en", "pt"))
+def test_signal_copiers_link_free_tools_sample_and_export_guides(
+    tmp_path: Path, locale: str
+) -> None:
+    client = _client(tmp_path)
+    page = client.get(audience_url("copiar-senales", locale)).text
+    for path in (
+        READING_PATH[locale],
+        WINRATE_PATH[locale],
+        RUIN_PATH[locale],
+        SIGNAL_SAMPLE_PATHS[locale],
+        guide_url("myfxbook", locale),
+        guide_url("mql5-signal", locale),
+    ):
+        assert f"href='{path}'" in page, (locale, path)
+        assert client.get(path, follow_redirects=False).status_code == 200, path
+
+
+@pytest.mark.parametrize("locale", ("es", "en", "pt"))
+def test_signal_copiers_example_shows_calculated_declared_figures(
+    tmp_path: Path, locale: str
+) -> None:
+    client = _client(tmp_path)
+    page = client.get(audience_url("copiar-senales", locale)).text
+    matched = re.search(r"<div\b[^>]*\bdata-signal-example[^>]*>(.*?)</div>", page, re.S)
+    assert matched is not None
+    example = html.unescape(matched.group(1))
+    values = signal_copier_values(locale)
+    for key in (
+        "rate",
+        "trades",
+        "gain",
+        "months",
+        "drawdown",
+        "wilson_low",
+        "wilson_high",
+        "win",
+        "loss",
+        "ruin_limit",
+        "horizon",
+        "samples",
+        "ruin",
+        "ruin_low",
+    ):
+        assert values[key] in example, (locale, key, values[key])
+    assert {"es": "Declarado", "en": "Declared", "pt": "Declarado"}[locale] in example
+    assert "++" not in example
+    assert not re.search(r"\bMEASURED\b", example)
+
+
+@pytest.mark.parametrize("locale", ("es", "en", "pt"))
+def test_signal_copiers_faq_schema_matches_three_visible_questions(
+    tmp_path: Path, locale: str
+) -> None:
+    client = _client(tmp_path)
+    page = client.get(audience_url("copiar-senales", locale)).text
+    audience = next(item for item in AUDIENCE_PAGES if item.slug == "copiar-senales")
+    faqs = audience.text[locale].faq
+    assert len(faqs) == 3
+    scripts = re.findall(r"<script type='application/ld\+json'>(.*?)</script>", page, re.S)
+    structured = [json.loads(script) for script in scripts]
+    faq_pages = [item for item in structured if item.get("@type") == "FAQPage"]
+    assert len(faq_pages) == 1
+    assert faq_pages[0]["@context"] == "https://schema.org"
+    assert faq_pages[0]["mainEntity"] == [
+        {
+            "@type": "Question",
+            "name": question,
+            "acceptedAnswer": {"@type": "Answer", "text": answer},
+        }
+        for question, answer in faqs
+    ]
+    for question, answer in faqs:
+        assert html.escape(question) in page
+        assert html.escape(answer) in page
+    if locale == "es":
+        faq_text = " ".join(f"{question} {answer}" for question, answer in faqs).casefold()
+        for words in ("me barrieron", "cuenta quemada", "señal de telegram"):
+            assert words in faq_text
 
 
 @pytest.mark.parametrize(

@@ -133,6 +133,7 @@ from quant_trade.audit.seo import (
     PageMeta,
     article_structured_data,
     articles_faq_structured_data,
+    faq_structured_data,
     head_meta,
     page_paths,
     private_meta,
@@ -143,6 +144,7 @@ from quant_trade.audit.series_ui import series_fields
 from quant_trade.audit.settings import PACK_CREDITS
 from quant_trade.audit.sharing import COPY as SHARING_COPY
 from quant_trade.audit.sharing import share_block
+from quant_trade.audit.signal_copiers import checklist_sections
 from quant_trade.audit.theme import (
     CLASS_COLOURS,
     SCRIPT_TAG,
@@ -5244,11 +5246,16 @@ def audience_page(
     crumbs = f"<a href='{_e(_home(locale))}'>{_e(words['home'])}</a>" + _language_crumbs(
         alternates, locale
     )
+    checklist = []
+    if audience.slug == "copiar-senales":
+        checklist = checklist_sections(locale, text.seo_title, audit_url=start, sample_url=sample)
+        meta += faq_structured_data(text.faq)
     body = (
         _page_hero(words["eyebrow"], text.title, summary, crumbs)
         + "<div class='paper page-main'><div class='wrap'>"
         + _doc(
             [
+                *checklist,
                 (words["pains"], f"<ul class='checks aud-pains'>{pains}</ul>"),
                 (words["uploads"], f"<ul class='checks'>{uploads}</ul>"),
                 (words["checks"], f"<ul class='checks aud-checks'>{checks}</ul>"),
