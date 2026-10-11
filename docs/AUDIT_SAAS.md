@@ -4250,6 +4250,23 @@ customers" without any third-party analytics.
   it reads, and shutdown flushes the rest, so a slow or failing database
   never holds up a page. Counts that fail to write are kept for the next
   flush.
+- **Entry pages.** The same visit also increments `funnel_page_visits`, keyed
+  only by day, language, tag and an allow-listed page group. The original
+  and page counters update atomically. The additive table is created on
+  startup on SQLite and PostgreSQL; existing totals remain unchanged and
+  their historical page group is `NOT_MEASURED`. Groups cover the landing,
+  free tools, firm challenge pages, published guide/article/audience slugs,
+  institutional review and public verification. The existing examples index
+  remains counted as `ejemplos`. Translations share canonical Spanish groups;
+  query parameters and report identifiers never form part of a group. Both
+  synthetic verification samples count as `v/ejemplo`; real publications
+  count as `v/publicacion`. Guide/article indexes remain outside the visit
+  paths. The owner's **Páginas** table uses the last 7 and 28 UTC days,
+  including today, ordered by the 28-day count, then the 7-day count and name.
+  Firm subtotals are included in `calculadora-reto`, never added twice.
+  The ref table shows the most frequent measured entry group in its existing
+  30-day window, with alphabetical tie-breaking. The daily cookie is unchanged:
+  these are first counted entries per browser/day, not all page views or people.
 - **The other stages** are read from the tables the service already keeps
   (`accounts`, `welcome_reports`, `free_previews`, and paid `audits` with
   their payment reference), with the language and tag of the account

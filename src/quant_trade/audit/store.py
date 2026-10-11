@@ -1020,15 +1020,25 @@ class Store(OpsStoreMixin):
             sa.Column("key_sha256", sa.String(64), nullable=False, index=True),
             sa.Column("at", sa.String(40), nullable=False, index=True),
         )
-        #: The owner's funnel (``audit/funnel.py``): visits to the landing and
-        #: case pages as bare counters per day, language and tag, with no
-        #: address, cookie or user agent.
+        #: The owner's funnel (``audit/funnel.py``): bare counters per day,
+        #: language and tag, with no address, cookie or user agent.
         self.funnel_visits = sa.Table(
             "funnel_visits",
             self.metadata,
             sa.Column("day", sa.String(10), primary_key=True),
             sa.Column("locale", sa.String(8), primary_key=True),
             sa.Column("ref", sa.String(24), primary_key=True),
+            sa.Column("visits", sa.Integer, nullable=False, default=0),
+        )
+        #: Additive page counters preserve the original funnel and leave old
+        #: visits unattributed. Only allow-listed groups, never URLs or ids.
+        self.funnel_page_visits = sa.Table(
+            "funnel_page_visits",
+            self.metadata,
+            sa.Column("day", sa.String(10), primary_key=True),
+            sa.Column("locale", sa.String(8), primary_key=True),
+            sa.Column("ref", sa.String(24), primary_key=True),
+            sa.Column("page_group", sa.String(96), primary_key=True),
             sa.Column("visits", sa.Integer, nullable=False, default=0),
         )
         #: The listed tag of the link that brought an account, if any; it
@@ -5924,28 +5934,62 @@ class Store(OpsStoreMixin):
             return False
 
     # -- the owner's funnel ------------------------------------------------
-    def count_visit(self, *, day: str, locale: str, ref: str, amount: int = 1) -> None:
-        """Add ``amount`` visits to the counter of ``(day, locale, ref)``."""
-        sa = self._sa
-        table = self.funnel_visits
-        key = (table.c.day == day) & (table.c.locale == locale[:8]) & (table.c.ref == ref[:24])
-        for _ in range(2):
-            with self.engine.begin() as conn:
-                bumped = conn.execute(
-                    table.update().where(key).values(visits=table.c.visits + amount)
-                ).rowcount
-                if bumped:
-                    return
-            try:
-                with self.engine.begin() as conn:
-                    conn.execute(
-                        table.insert().values(
-                            day=day, locale=locale[:8], ref=ref[:24], visits=amount
-                        )
+    def count_visit(
+        self, *, day: str, locale: str, ref: str, amount: int = 1, page_group: str = ""
+    ) -> None:
+        """Atomically add a visit batch to the original and optional page counters.
+
+        A failed page write rolls the original count back, so the in-memory
+        counter can retry the whole batch without counting it twice.
+        """
+        if page_group:
+            from quant_trade.audit.funnel import clean_page_group
+
+            if clean_page_group(page_group) != page_group:
+                raise ValueError("invalid visit page group")
+        values = {"day": day, "locale": locale[:8], "ref": ref[:24], "visits": amount}
+        with self.engine.begin() as conn:
+            table = self.funnel_visits
+            conn.execute(
+                self._ops_insert(table)
+                .values(**values)
+                .on_conflict_do_update(
+                    index_elements=[table.c.day, table.c.locale, table.c.ref],
+                    set_={"visits": table.c.visits + amount},
+                )
+            )
+            if page_group:
+                table = self.funnel_page_visits
+                conn.execute(
+                    self._ops_insert(table)
+                    .values(**values, page_group=page_group)
+                    .on_conflict_do_update(
+                        index_elements=[
+                            table.c.day,
+                            table.c.locale,
+                            table.c.ref,
+                            table.c.page_group,
+                        ],
+                        set_={"visits": table.c.visits + amount},
                     )
-                return
-            except sa.exc.IntegrityError:  # pragma: no cover - another request inserted it
-                continue
+                )
+
+    def page_visit_rows(self, since_day: str) -> list[tuple[str, str, str, str, int]]:
+        """Aggregate ``(day, locale, ref, page_group, visits)`` rows, never people."""
+        sa = self._sa
+        table = self.funnel_page_visits
+        with self.engine.connect() as conn:
+            rows = conn.execute(
+                sa.select(
+                    table.c.day, table.c.locale, table.c.ref, table.c.page_group, table.c.visits
+                )
+                .where(table.c.day >= since_day)
+                .order_by(table.c.day, table.c.locale, table.c.ref, table.c.page_group)
+            ).all()
+        return [
+            (str(day), str(locale), str(ref), str(group), int(count))
+            for day, locale, ref, group, count in rows
+        ]
 
     def set_account_ref(self, account_id: str, ref: str, *, at: datetime) -> None:
         """Keep the tag that brought a new account; the first one stays."""

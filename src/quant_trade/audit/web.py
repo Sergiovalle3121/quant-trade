@@ -73,7 +73,7 @@ from quant_trade.audit import passkeys as pk
 from quant_trade.audit import pdf as pdf_lib
 from quant_trade.audit import strategies as strategies_lib
 from quant_trade.audit.about import ABOUT_ALIASES, ABOUT_PATH, about_page
-from quant_trade.audit.articles import article_url, find_article
+from quant_trade.audit.articles import ARTICLES, article_url, find_article
 from quant_trade.audit.audiences import AUDIENCES_BY_PATH, audience_url
 from quant_trade.audit.calculator import (
     CALCULATOR_PATH,
@@ -1443,28 +1443,47 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     )
     app.add_middleware(OpsMiddleware, counter=operations)
 
-    #: Where a visit counts for the owner's funnel, and in which language.
-    visit_paths: dict[str, str] = {path: loc for loc, path in LANDING_PATHS.items()}
+    #: Exact public routes map to a language and a fixed, language-independent group.
+    visit_paths: dict[str, tuple[str, str]] = {
+        path: (loc, "landing") for loc, path in LANDING_PATHS.items()
+    }
     for audience_locale, pages_by_slug in AUDIENCES_BY_PATH.items():
-        for audience_slug in pages_by_slug:
-            visit_paths[audience_url(audience_slug, audience_locale)] = audience_locale
-    # The free calculator is a landing of its own: links on X and from creators point at it.
-    visit_paths.update({path: loc for loc, path in CALCULATOR_PATH.items()})
-    visit_paths.update({path: loc for loc, path in EXAMPLES_PATH.items()})
-    # The figures card and the tools page are free tools too (privacy policy names them).
-    visit_paths.update({path: loc for loc, path in reading.READING_PATH.items()})
-    visit_paths.update({path: loc for loc, path in TOOLS_PATH.items()})
-    visit_paths.update({path: loc for loc, path in winrate.WINRATE_PATH.items()})
-    # The challenge calculator and its firm pages, like the other free tools.
-    visit_paths.update({path: loc for path, (loc, _firm) in challenge_calc.PAGES.items()})
-    visit_paths.update({path: loc for loc, path in ruin_calc.RUIN_PATH.items()})
-    # The public table of every firm's rules, built from the same presets.
-    visit_paths.update({path: loc for loc, path in RULES_TABLE_PATH.items()})
+        for audience in pages_by_slug.values():
+            visit_paths[audience_url(audience.slug, audience_locale)] = (
+                audience_locale,
+                f"audiencia/{audience.slug}",
+            )
+    for group, localized_paths in (
+        ("calculadora-suerte", CALCULATOR_PATH),
+        ("ejemplos", EXAMPLES_PATH),
+        ("lectura", reading.READING_PATH),
+        ("herramientas", TOOLS_PATH),
+        ("calculadora-aciertos", winrate.WINRATE_PATH),
+        ("calculadora-ruina", ruin_calc.RUIN_PATH),
+        ("reglas-prop-firm", RULES_TABLE_PATH),
+        ("revision-institucional", institutional.REVIEW_PATHS),
+    ):
+        visit_paths.update({path: (loc, group) for loc, path in localized_paths.items()})
+    visit_paths.update(
+        {
+            path: (loc, f"calculadora-reto/{firm}" if firm else "calculadora-reto")
+            for path, (loc, firm) in challenge_calc.PAGES.items()
+        }
+    )
+    for guide_locale, guides_by_slug in GUIDES_BY_PATH.items():
+        for guide in guides_by_slug.values():
+            visit_paths[guide_url(guide.slug, guide_locale)] = (guide_locale, f"guias/{guide.slug}")
+    for article in ARTICLES:
+        for article_locale in article.slug:
+            visit_paths[article_url(article.key, article_locale)] = (
+                article_locale,
+                f"articulos/{article.slug_for('es')}",
+            )
 
     def _funnel_visit(request: Request, response: Any) -> None:
         """Count a person's visit to the landing or a case page; remember its tag.
 
-        Only a counter per day, language and tag is kept, in memory until
+        Only a counter per day, language, tag and page group is kept, in memory until
         the background flush: nothing here waits on the database. A browser
         counts once a day (a cookie holds only the date), and the tag of the
         first listed link it arrives with is kept in a cookie that holds
@@ -1479,12 +1498,15 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         arrived = funnel.clean_ref(request.query_params.get("ref"))
         if arrived and not kept:
             _cookie(response, funnel.REF_COOKIE, arrived, max_age=funnel.REF_DAYS * 86400)
-        locale = visit_paths.get(path)
+        page = visit_paths.get(path)
         # Only the active HTML publication is a visit; previews are not people.
         if re.fullmatch(r"/v/[^/]+", path):
-            locale = _report_locale(request.query_params.get("lang"))
-        if locale is None or not funnel.is_person(request.headers.get("user-agent")):
+            public_id = path.removeprefix("/v/")
+            group = "v/ejemplo" if public_id in SAMPLE_KIND_BY_PUBLIC_ID else "v/publicacion"
+            page = (_report_locale(request.query_params.get("lang")), group)
+        if page is None or not funnel.is_person(request.headers.get("user-agent")):
             return
+        locale, page_group = page
         if request.headers.get("sec-purpose") or request.headers.get("purpose"):
             return  # a prefetch, not a visit
         today = funnel.day_of(datetime.now(UTC))
@@ -1494,7 +1516,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         # "/" renders Spanish or English; Portuguese lives at /pt.
         if path == "/" and request.query_params.get("lang") in ("es", "en"):
             locale = request.query_params["lang"]
-        visits.add(day=today, locale=locale, ref=kept or arrived)
+        visits.add(day=today, locale=locale, ref=kept or arrived, page_group=page_group)
 
     canonical_host = urlsplit(cfg.base_url).netloc.lower()
     www_host = f"www.{canonical_host}"
@@ -1996,6 +2018,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                     example=f"{_site_url(request)}{audience_url('retos-prop-firm', 'es')}?ref=f6",
                     country_rows=db.funnel_country_events(funnel.since_day(now)),
                     anon_previews=cfg.anon_preview,
+                    page_rows=db.page_visit_rows(start_day),
+                    at=now,
                 )
                 + attempts_html,
                 panel_path=app.state.panel_path,

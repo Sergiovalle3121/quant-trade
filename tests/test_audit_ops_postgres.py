@@ -221,6 +221,46 @@ def test_postgres_same_counter_concurrent_upserts(local_databases, workers: int)
     )
 
 
+def test_postgres_page_visit_upserts_and_atomic_retry(local_databases) -> None:
+    _, store = local_databases()
+    assert store is not None
+    day = "2026-10-05"
+    workers = 4
+    barrier = threading.Barrier(workers)
+
+    def count(index: int) -> None:
+        group = "landing" if index % 2 else "calculadora-reto/ftmo"
+        barrier.wait(timeout=30)
+        for _ in range(25):
+            store.count_visit(day=day, locale="es", ref="f6", page_group=group)
+
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        list(pool.map(count, range(workers)))
+    assert store.funnel_events(day)["visits"] == [(day, "es", "f6", 100)]
+    assert store.page_visit_rows(day) == [
+        (day, "es", "f6", "calculadora-reto/ftmo", 50),
+        (day, "es", "f6", "landing", 50),
+    ]
+
+    def fail_page_write(
+        _conn: Any, _cursor: Any, statement: str, _parameters: Any, _context: Any, _many: Any
+    ) -> None:
+        if statement.startswith("INSERT INTO funnel_page_visits"):
+            raise RuntimeError("synthetic page counter failure")
+
+    sa.event.listen(store.engine, "before_cursor_execute", fail_page_write)
+    try:
+        with pytest.raises(RuntimeError, match="synthetic page counter failure"):
+            store.count_visit(day=day, locale="es", ref="f6", page_group="landing", amount=3)
+    finally:
+        sa.event.remove(store.engine, "before_cursor_execute", fail_page_write)
+    assert store.funnel_events(day)["visits"] == [(day, "es", "f6", 100)]
+    assert store.page_visit_rows(day)[1][-1] == 50
+    store.count_visit(day=day, locale="es", ref="f6", page_group="landing", amount=3)
+    assert store.funnel_events(day)["visits"] == [(day, "es", "f6", 103)]
+    assert store.page_visit_rows(day)[1][-1] == 53
+
+
 @pytest.mark.parametrize("workers", [1, 2, 4, 8])
 def test_postgres_credit_contention_loses_no_credits(local_databases, workers: int) -> None:
     _, store = local_databases()
@@ -295,7 +335,8 @@ def test_postgres_additive_schema_preserves_populated_existing_tables(local_data
     assert account is not None
     _, code = store.create_access_code(credits=3, note="synthetic upgrade", at=now)
     store.link_code(account.id, code.id, at=now)
-    new_tables = {"ops_counters", "ops_jobs", "commercial_costs"}
+    store.count_visit(day="2026-10-05", locale="es", ref="f6", amount=9)
+    new_tables = {"ops_counters", "ops_jobs", "commercial_costs", "funnel_page_visits"}
     before = {name: rows for name, rows in _snapshot(store).items() if name not in new_tables}
     # Simulate the old schema in this disposable database, then restart Store.
     with store.engine.begin() as conn:
@@ -308,6 +349,11 @@ def test_postgres_additive_schema_preserves_populated_existing_tables(local_data
         assert new_tables.issubset(after)
         assert all(after[name]["rows"] == 0 for name in new_tables)
         assert upgraded.account_credits(account.id, now) == 3
+        assert upgraded.funnel_events("2026-10-05")["visits"] == [("2026-10-05", "es", "f6", 9)]
+        assert upgraded.page_visit_rows("2026-10-05") == []
+        upgraded.count_visit(day="2026-10-05", locale="es", ref="f6", page_group="landing")
+        assert upgraded.funnel_events("2026-10-05")["visits"] == [("2026-10-05", "es", "f6", 10)]
+        assert upgraded.page_visit_rows("2026-10-05") == [("2026-10-05", "es", "f6", "landing", 1)]
         _evidence(
             "postgres-schema-upgrade",
             {
