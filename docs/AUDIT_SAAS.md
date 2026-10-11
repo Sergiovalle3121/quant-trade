@@ -4450,22 +4450,39 @@ synthetic `tests/fixtures/audit_imports/ctrader_history_columns.csv` uses
 documented History names, without claiming to be a real Statement header.
 In a working copy, map `Gross (currency)` to `profit`, retaining `Commissions`
 and `Swap` separately and using the same currency throughout; the original
-names do not give the universal reader the monetary result. `Net (currency)`
-already includes costs and must not be treated as gross with those costs
-deducted again. The guide links the challenge calculator and the complete
-rules table, with no futures filter. The guide and updated index carry
-2026-10-11 in the sitemap (`seo.GUIDES_PUBLISHED`). Tests cover the mapping,
-the documented limits, the three translations, the links and the claim guard.
+names do not give the universal reader the monetary result, and without the
+mapping it works the result out as price move times lots with no contract
+size (a warning says so), which the guide calls unusable rather than optional.
+`Net (currency)` already includes costs and must not be treated as gross with
+those costs deducted again. The Desktop column list is Desktop's; the
+[Mac Trade Watch page](https://help.ctrader.com/ctrader-mac/trade/trade-watch/)
+(read 2026-10-11) names `Swaps`, `Broker commission`, `Conversion fee`, `Gross
+(currency)`, `Net (currency)`, `Gross USD` and `Net USD`. The universal reader
+knows `broker commission` and `conversion fee` as cost columns (added up as
+commissions, `universal.SYNONYMS["commission"]`) and `swaps` as the swap; the
+only result name it knows unmapped is `Net USD`, so the guide says to drop the
+USD copies. The guide links the challenge calculator and the complete rules
+table, with no futures filter. The guide and updated index carry 2026-10-11 in
+the sitemap (`seo.GUIDES_PUBLISHED`). Tests cover the mapping, the documented
+limits, the three translations, the links and the claim guard.
 
 The universal reader's gross/net interpretation is heuristic; compare the
-prepared copy's values and totals with the original statement. With the
-distinctive History columns and an optional `Status` from Deal info, it keeps
-only `Filled` or `Partially filled`, excluding rejected, empty or unknown
-statuses before calculating closed trades. This adds an exclusion warning
-(translated in es/en/pt) and `excluded_unfilled_deals` metadata; it does not
-add a report dimension or red flag. `Status` is not asserted to be a CSV
-header. Tests add it to the synthetic fixture, retain partial closes and
-losses, and check that unrelated platforms' status columns are unchanged.
+prepared copy's values and totals with the original statement. The
+[Desktop History page](https://help.ctrader.com/ctrader/trading/history/)
+(read 2026-10-11, "Deal information") documents the deal statuses `Filled`,
+`Partially filled`, `Rejected`, `Error`, `Missed` and `Internally rejected`.
+With the distinctive History columns and an optional `Status` column, the
+reader leaves out the four documented non-executions
+(`universal.UNEXECUTED_DEAL_STATUSES`) before choosing the busiest account and
+keeps every other value, empty or undocumented included: an unknown vocabulary
+says nothing about execution and must not delete deals. This adds an exclusion
+warning (translated in es/en/pt) and `excluded_unfilled_deals` metadata; it
+does not add a report dimension or red flag. When every row is left out the
+refusal `deals_without_execution` names the statuses seen (es/en/pt) instead
+of the generic "no closed trades". Totals rows and repeated headers are not
+counted as deals. `Status` is not asserted to be a CSV header. Tests add it to
+the synthetic fixture, retain partial closes and losses, and check that
+unrelated platforms' status columns are unchanged.
 
 `audit/seo.py` gives every public page (landing, sample, guides, terms,
 privacy, in both languages) a title, a meta description, a canonical URL,

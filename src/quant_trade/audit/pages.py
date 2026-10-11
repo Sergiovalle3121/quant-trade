@@ -4646,8 +4646,9 @@ def _guide_offer(
     """ "What you get" on a guide: the report's contents and the free report as the
     sign-up panel and /precios word them, the upload button, the sample report
     and the free tool that fits the guide (``guide_capabilities.GUIDE_TOOL``);
-    when that tool is the challenge calculator, also the rules table and its
-    futures firms.
+    when that tool is the challenge calculator, also the rules table, plus its
+    futures firms for the futures platforms' guides (not cTrader, whose
+    statement is not futures-only).
 
     ``offer`` is the service's (``free``, ``welcome`` or ``paid``). The free first
     report comes with the limits the upload applies to it (``web._first_look``:

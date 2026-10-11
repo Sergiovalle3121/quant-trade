@@ -68,12 +68,12 @@ GUIDES_COPY: dict[str, dict[str, str]] = {
     "es": {
         "title": "Guías para exportar tu archivo",
         "summary": (
-            "Guías de exportación para cTrader, Tradovate, TopstepX, Sierra Chart, MetaTrader "
-            "y otras plataformas: archivos, columnas y límites para revisar tus operaciones."
+            "Cómo exportar el archivo de MetaTrader, TradingView, NinjaTrader, cTrader, "
+            "Tradovate y otras plataformas para revisar tus backtests y operaciones."
         ),
         "intro": (
-            "Elige tu plataforma y sigue los pasos para exportar el archivo y, cuando haga "
-            "falta, adaptar sus columnas al CSV universal."
+            "Sube el archivo tal como lo guarda tu plataforma; en cTrader, renombra antes la "
+            "columna del resultado como indica su guía. Elige la tuya y sigue los pasos."
         ),
         "file": "Qué archivo obtienes",
         "steps": "Pasos",
@@ -108,12 +108,12 @@ GUIDES_COPY: dict[str, dict[str, str]] = {
     "en": {
         "title": "Guides to export your file",
         "summary": (
-            "Export guides for cTrader, Tradovate, TopstepX, Sierra Chart, MetaTrader and other "
-            "platforms: files, columns and limits for reviewing your trades."
+            "How to export the file from MetaTrader, TradingView, NinjaTrader, cTrader, "
+            "Tradovate and other platforms to review your backtests and trades."
         ),
         "intro": (
-            "Choose your platform and follow the steps to export the file and, when needed, "
-            "adapt its columns to the universal CSV."
+            "Upload the file exactly as your platform saves it; for cTrader, rename the result "
+            "column first, as its guide says. Pick yours and follow the steps."
         ),
         "file": "The file you get",
         "steps": "Steps",
@@ -148,12 +148,12 @@ GUIDES_COPY: dict[str, dict[str, str]] = {
     "pt": {
         "title": "Guias para exportar o seu arquivo",
         "summary": (
-            "Guias de exportação para cTrader, Tradovate, TopstepX, Sierra Chart, MetaTrader "
-            "e outras plataformas: arquivos, colunas e limites para revisar suas operações."
+            "Como exportar o arquivo do MetaTrader, TradingView, NinjaTrader, cTrader, "
+            "Tradovate e outras plataformas para revisar seus backtests e operações."
         ),
         "intro": (
-            "Escolha sua plataforma e siga os passos para exportar o arquivo e, quando "
-            "necessário, adaptar suas colunas ao CSV universal."
+            "Envie o arquivo do jeito que a sua plataforma o salva; no cTrader, renomeie antes "
+            "a coluna do resultado, como indica o guia. Escolha a sua e siga os passos."
         ),
         "file": "Que arquivo você obtém",
         "steps": "Passos",
@@ -237,11 +237,18 @@ _OPT_PT = (
     "tentativas deixa de ser uma declaração e passa a ser MEASURED."
 )
 
-_CTRADER_HISTORY = ("cTrader Desktop — History", "https://help.ctrader.com/ctrader/trading/history/")
+_CTRADER_HISTORY = (
+    "cTrader Desktop — History",
+    "https://help.ctrader.com/ctrader/trading/history/",
+)
 _CTRADER_FAQ = ("cTrader — FAQ", "https://help.ctrader.com/ctrader/faq/")
 _CTRADER_TIME = (
     "cTrader — User time offset",
     "https://help.ctrader.com/ctrader/interface/user-time-offset/",
+)
+_CTRADER_TIME_WEB = (
+    "cTrader Web — User time offset",
+    "https://help.ctrader.com/ctrader-web/interface/user-time-offset/",
 )
 _CTRADER_WEB = (
     "cTrader Web — History",
@@ -2156,6 +2163,7 @@ GUIDES: tuple[Guide, ...] = (
             _CTRADER_HISTORY,
             _CTRADER_FAQ,
             _CTRADER_TIME,
+            _CTRADER_TIME_WEB,
             _CTRADER_WEB,
             _CTRADER_MAC,
             _CTRADER_MOBILE,
@@ -2175,27 +2183,30 @@ GUIDES: tuple[Guide, ...] = (
             "es": GuideText(
                 title="Cómo exportar tus operaciones de cTrader",
                 seo_description=(
-                    "Exporta el extracto CSV de cTrader con History > Statement > Save en "
-                    "Desktop, Web o Mac y prepara sus columnas para el CSV universal de Rigor."
+                    "Exporta el extracto CSV de cTrader desde History > Statement en Desktop, "
+                    "Web o Mac y prepara sus columnas para el CSV universal de Rigor."
                 ),
                 summary=(
-                    "Guarda el extracto CSV de cTrader desde History > Statement > Save y "
-                    "prepara sus columnas para revisar tus operaciones."
+                    "Guarda el extracto CSV de cTrader desde History > Statement y prepara "
+                    "sus columnas para revisar tus operaciones."
                 ),
                 file=(
                     "Un .csv guardado desde la página del extracto (Statement). Desktop "
-                    "documenta un extracto en HTML o .xlsx; Web y Mac, en HTML. En los tres, "
-                    "Save guarda el CSV. La ayuda enumera las columnas de la pestaña History, "
-                    "no la cabecera exacta del CSV: Symbol, Opening direction, Opening time, "
-                    "Closing time, Entry price, Closing price, Closing quantity (lotes), "
-                    "Commissions, Swap, Gross (currency) y Net (currency), entre otras. "
+                    "documenta un extracto en HTML o .xlsx; Web y Mac, en HTML. Desktop y Web "
+                    "nombran el botón Save; Mac, guardarlo como CSV desde esa página. La ayuda "
+                    "enumera columnas de la pestaña History, no la cabecera exacta del CSV. La "
+                    "de Desktop: Symbol, Opening direction, Opening time, Closing time, Entry "
+                    "price, Closing price, Closing quantity (lotes), Commissions, Swap, Gross "
+                    "(currency) y Net (currency), entre otras. La de Mac nombra las mismas "
+                    "columnas de operación y, en costes y resultados, Swaps, Broker commission, "
+                    "Conversion fee, Gross (currency), Net (currency), Gross USD y Net USD. "
                     "Comprueba qué columnas y moneda contiene tu archivo antes de adaptarlo."
                 ),
                 steps=(
-                    "Antes de exportar en Desktop, pulsa Current time abajo a la derecha y "
-                    "elige el desfase horario de usuario. La ayuda dice que cambia las fechas "
-                    "y horas mostradas en gráficos y detalles de operaciones; no especifica "
-                    "la zona horaria del archivo exportado.",
+                    "Antes de exportar en Desktop o Web, pulsa Current time abajo a la derecha "
+                    "y elige el desfase horario de usuario. La ayuda (igual en Desktop y Web) "
+                    "dice que cambia las fechas y horas mostradas en gráficos y detalles de "
+                    "operaciones; no especifica la zona horaria del archivo exportado.",
                     "Abre Trade Watch, en la parte inferior de cTrader, y entra en History.",
                     "Opcional: usa los campos sobre la lista para filtrar History por periodos "
                     "estándar o personalizados. La ayuda no dice si Statement respeta ese "
@@ -2203,7 +2214,8 @@ GUIDES: tuple[Guide, ...] = (
                     "Opcional: haz clic derecho en un encabezado para mostrar u ocultar "
                     "columnas de History. No todas se muestran por defecto; la ayuda no dice "
                     "que esta selección cambie las columnas del extracto.",
-                    "Pulsa Statement, arriba a la derecha de la pestaña History.",
+                    "Pulsa Statement; en Desktop, la ayuda lo sitúa arriba a la derecha de la "
+                    "pestaña History.",
                     "En Desktop, Statement abre el extracto en HTML o .xlsx en una pestaña "
                     "nueva. En la página del extracto, pulsa Save para guardarlo como .csv.",
                     "En cTrader Web, usa Trade Watch > History > Statement: abre un extracto "
@@ -2217,26 +2229,37 @@ GUIDES: tuple[Guide, ...] = (
                     "universal. Si el archivo usa los nombres de History, conserva Symbol "
                     "(instrumento), Opening direction (dirección de apertura), Opening time "
                     "y Closing time (fechas), Entry price y Closing price (precios), Closing "
-                    "quantity (cantidad cerrada), Commissions y Swap: el lector los reconoce. "
-                    "Renombra la columna del resultado bruto monetario, por ejemplo Gross "
-                    "(currency), a profit; no uses Net ni Pips como resultado bruto. Conserva "
-                    "comisiones y swap en esa misma moneda, sin duplicar columnas en USD. "
-                    "Comprueba los valores y totales de la copia con el extracto original."
+                    "quantity (cantidad cerrada), Commissions y Swap: el lector los reconoce, "
+                    "igual que Swaps, Broker commission y Conversion fee de Mac (las dos "
+                    "últimas las suma como comisiones). Renombra la columna del resultado "
+                    "bruto en la moneda de la cuenta, Gross (currency), a profit; no uses Net "
+                    "ni Pips como resultado bruto. Quita Gross USD y Net USD (o Gross (USD) y "
+                    "Net (USD)): sin tu mapeo, el lector tomaría Net USD como resultado, en "
+                    "USD y neto de costes. Conserva comisiones y swap en la moneda de la "
+                    "cuenta. Comprueba los valores y totales de la copia con el extracto "
+                    "original."
                 ),
                 tips=(
                     "Rigor no está afiliado a cTrader ni a Spotware. Los pasos proceden de "
                     "las páginas oficiales citadas, leídas el 11 de octubre de 2026.",
-                    "No hay un lector específico de cTrader. Sin renombrar Gross (currency) "
-                    "a profit, el lector universal puede calcular el resultado desde precios "
-                    "y cantidad y emitir un aviso, sin abrir el selector de columnas. Con "
-                    "otras cabeceras, adapta la copia según el significado de cada columna; "
-                    "no inventes fechas, costes o resultados que falten.",
+                    "No hay un lector específico de cTrader. Si no renombras Gross (currency) "
+                    "a profit ni la asignas como resultado en el formulario, el lector "
+                    "universal no abre el selector de columnas: calcula el resultado como la "
+                    "variación de precio por los lotes, sin el tamaño del contrato, y lo "
+                    "avisa; un valor inservible aunque venga avisado. Por eso renombrar o "
+                    "mapear el resultado no es opcional. Con otras cabeceras, adapta la copia "
+                    "según el significado de cada columna; no inventes fechas, costes o "
+                    "resultados que falten.",
                     "History incluye intentos de ejecución fallidos. Conserva una fila por "
                     "deal de cierre, incluidos los cierres parciales con su cantidad cerrada; "
                     "no sumes además la posición completa. Excluye intentos sin ejecución. "
-                    "Si tu copia conserva las columnas de History y añade Status, el lector "
-                    "solo conserva Filled y Partially filled; excluye también estados vacíos "
-                    "o desconocidos. Status no es una cabecera CSV documentada.",
+                    "Si tu copia conserva las columnas de History y añade Status con los "
+                    "valores de la ficha Deal information de History (Filled, Partially "
+                    "filled, Rejected, Error, Missed e Internally rejected), el lector excluye "
+                    "las filas Rejected, Error, Missed e Internally rejected y conserva las "
+                    "demás, incluidas Filled y Partially filled; con otros valores, o sin "
+                    "valor, no excluye nada. Si todas las filas quedan excluidas, lo dice "
+                    "nombrando los estados. Status no es una cabecera CSV documentada.",
                     "Compara las horas del CSV con la app y declara el desfase observado en "
                     "la descripción al importar. Ajustar Current time no demuestra qué zona "
                     "usa Save; la declaración no convierte las horas del archivo.",
@@ -2257,27 +2280,30 @@ GUIDES: tuple[Guide, ...] = (
             "en": GuideText(
                 title="How to export your cTrader trades",
                 seo_description=(
-                    "Export a cTrader CSV statement with History > Statement > Save on Desktop, "
-                    "Web or Mac and prepare its columns for Rigor's universal CSV."
+                    "Export a cTrader CSV statement from History > Statement on Desktop, Web "
+                    "or Mac and prepare its columns for Rigor's universal CSV."
                 ),
                 summary=(
-                    "Save a cTrader CSV statement through History > Statement > Save and "
-                    "prepare its columns to review your trades."
+                    "Save a cTrader CSV statement from History > Statement and prepare its "
+                    "columns to review your trades."
                 ),
                 file=(
                     "A .csv saved from the statement page. Desktop documents an HTML or .xlsx "
-                    "statement; Web and Mac document HTML. Save stores the CSV on all three. "
-                    "The help lists the History tab's columns, not the exact CSV headers: "
-                    "Symbol, Opening direction, Opening time, Closing time, Entry price, "
-                    "Closing price, Closing quantity (lots), Commissions, Swap, Gross "
-                    "(currency) and Net (currency), among others. Check the columns and "
-                    "currency in your file before adapting it."
+                    "statement; Web and Mac document HTML. Desktop and Web name a Save button; "
+                    "Mac, saving it as CSV from that page. The help lists History tab columns, "
+                    "not the exact CSV headers. Desktop's: Symbol, Opening direction, Opening "
+                    "time, Closing time, Entry price, Closing price, Closing quantity (lots), "
+                    "Commissions, Swap, Gross (currency) and Net (currency), among others. "
+                    "Mac's names the same trade columns and, for costs and results, Swaps, "
+                    "Broker commission, Conversion fee, Gross (currency), Net (currency), "
+                    "Gross USD and Net USD. Check the columns and currency in your file "
+                    "before adapting it."
                 ),
                 steps=(
-                    "Before exporting on Desktop, click Current time at the bottom right and "
-                    "choose the user time offset. The help says this changes the dates and "
-                    "times displayed in charts and trade details; it does not specify the "
-                    "exported file's time zone.",
+                    "Before exporting on Desktop or Web, click Current time at the bottom "
+                    "right and choose the user time offset. The help (the same on Desktop and "
+                    "Web) says this changes the dates and times displayed in charts and trade "
+                    "details; it does not specify the exported file's time zone.",
                     "Open Trade Watch at the bottom of cTrader and select History.",
                     "Optional: use the fields above the list to filter History by standard "
                     "or custom periods. The help does not say whether Statement follows that "
@@ -2285,7 +2311,8 @@ GUIDES: tuple[Guide, ...] = (
                     "Optional: right-click a heading to show or hide History columns. Not "
                     "all are shown by default; the help does not say this selection changes "
                     "the statement's columns.",
-                    "Click Statement at the upper right of the History tab.",
+                    "Click Statement; on Desktop, the help places it at the upper right of "
+                    "the History tab.",
                     "On Desktop, Statement opens an HTML or .xlsx statement in a new tab. "
                     "On the statement page, click Save to store it as .csv.",
                     "On cTrader Web, use Trade Watch > History > Statement: it opens an HTML "
@@ -2299,25 +2326,35 @@ GUIDES: tuple[Guide, ...] = (
                     "CSV. If the file uses History's names, keep Symbol (instrument), Opening "
                     "direction (opening side), Opening time and Closing time (dates), Entry "
                     "price and Closing price (prices), Closing quantity (closed quantity), "
-                    "Commissions and Swap: the reader recognises them. Rename the gross "
-                    "monetary result column, for example Gross (currency), to profit; do not "
-                    "use Net or Pips as the gross result. Keep commissions and swap in that "
-                    "same currency, without duplicate USD columns. Compare the copy's values "
-                    "and totals with the original statement."
+                    "Commissions and Swap: the reader recognises them, as it does Mac's "
+                    "Swaps, Broker commission and Conversion fee (the last two are added up "
+                    "as commissions). Rename the gross result column in the account "
+                    "currency, Gross (currency), to profit; do not use Net or Pips as the "
+                    "gross result. Remove Gross USD and Net USD (or Gross (USD) and Net "
+                    "(USD)): without your mapping the reader would take Net USD as the "
+                    "result, in USD and net of costs. Keep commissions and swap in the "
+                    "account currency. Compare the copy's values and totals with the "
+                    "original statement."
                 ),
                 tips=(
                     "Rigor is not affiliated with cTrader or Spotware. The steps come from "
                     "the cited official pages, read on 11 October 2026.",
-                    "There is no dedicated cTrader reader. Without renaming Gross (currency) "
-                    "to profit, the universal reader may calculate the result from prices "
-                    "and quantity and issue a warning without opening the column selector. "
-                    "For other headers, adapt the copy according to each column's meaning; "
-                    "do not invent missing dates, costs or results.",
+                    "There is no dedicated cTrader reader. If you neither rename Gross "
+                    "(currency) to profit nor map it as the result on the form, the universal "
+                    "reader does not open the column selector: it works out the result as "
+                    "the price move times the lots, with no contract size, and warns you; a "
+                    "value of no use even with the warning. That is why renaming or mapping "
+                    "the result is not optional. For other headers, adapt the copy according "
+                    "to each column's meaning; do not invent missing dates, costs or results.",
                     "History includes failed execution attempts. Keep one row per closing "
                     "deal, including partial closes with their closed quantity; do not also "
                     "count the whole position. Exclude attempts without execution. If your "
-                    "copy keeps History's columns and adds Status, the reader keeps only "
-                    "Filled and Partially filled; it also excludes empty or unknown statuses. "
+                    "copy keeps History's columns and adds Status with the values of "
+                    "History's Deal information panel (Filled, Partially filled, Rejected, "
+                    "Error, Missed and Internally rejected), the reader excludes the "
+                    "Rejected, Error, Missed and Internally rejected rows and keeps the rest, "
+                    "Filled and Partially filled included; other values, or none, exclude "
+                    "nothing. If every row is excluded, it says so and names the statuses. "
                     "Status is not a documented CSV header.",
                     "Compare the CSV times with the app and declare the observed offset in "
                     "the description when importing. Setting Current time does not establish "
@@ -2340,27 +2377,31 @@ GUIDES: tuple[Guide, ...] = (
             "pt": GuideText(
                 title="Como exportar suas operações do cTrader",
                 seo_description=(
-                    "Exporte o extrato CSV do cTrader com History > Statement > Save no "
-                    "Desktop, Web ou Mac e prepare as colunas para o CSV universal do Rigor."
+                    "Exporte o extrato CSV do cTrader em History > Statement no Desktop, Web "
+                    "ou Mac e prepare as colunas para o CSV universal do Rigor."
                 ),
                 summary=(
-                    "Salve o extrato CSV do cTrader em History > Statement > Save e prepare "
-                    "suas colunas para revisar suas operações."
+                    "Salve o extrato CSV do cTrader em History > Statement e prepare suas "
+                    "colunas para revisar suas operações."
                 ),
                 file=(
                     "Um .csv salvo na página do extrato (Statement). Desktop documenta um "
-                    "extrato em HTML ou .xlsx; Web e Mac, em HTML. Nos três, Save salva o CSV. "
-                    "A ajuda enumera as colunas da aba History, não o cabeçalho exato do CSV: "
-                    "Symbol, Opening direction, Opening time, Closing time, Entry price, "
-                    "Closing price, Closing quantity (lotes), Commissions, Swap, Gross "
-                    "(currency) e Net (currency), entre outras. Confira as colunas e a moeda "
-                    "do seu arquivo antes de adaptá-lo."
+                    "extrato em HTML ou .xlsx; Web e Mac, em HTML. Desktop e Web nomeiam o "
+                    "botão Save; Mac, salvá-lo como CSV nessa página. A ajuda enumera colunas "
+                    "da aba History, não o cabeçalho exato do CSV. A do Desktop: Symbol, "
+                    "Opening direction, Opening time, Closing time, Entry price, Closing "
+                    "price, Closing quantity (lotes), Commissions, Swap, Gross (currency) e "
+                    "Net (currency), entre outras. A do Mac nomeia as mesmas colunas de "
+                    "operação e, em custos e resultados, Swaps, Broker commission, Conversion "
+                    "fee, Gross (currency), Net (currency), Gross USD e Net USD. Confira as "
+                    "colunas e a moeda do seu arquivo antes de adaptá-lo."
                 ),
                 steps=(
-                    "Antes de exportar no Desktop, clique em Current time no canto inferior "
-                    "direito e escolha o deslocamento de horário do usuário. A ajuda diz que "
-                    "isso altera as datas e horas exibidas nos gráficos e detalhes das "
-                    "operações; não especifica o fuso horário do arquivo exportado.",
+                    "Antes de exportar no Desktop ou no Web, clique em Current time no canto "
+                    "inferior direito e escolha o deslocamento de horário do usuário. A ajuda "
+                    "(igual no Desktop e no Web) diz que isso altera as datas e horas exibidas "
+                    "nos gráficos e detalhes das operações; não especifica o fuso horário do "
+                    "arquivo exportado.",
                     "Abra Trade Watch, na parte inferior do cTrader, e entre em History.",
                     "Opcional: use os campos acima da lista para filtrar History por períodos "
                     "padrão ou personalizados. A ajuda não diz se Statement respeita esse "
@@ -2368,7 +2409,8 @@ GUIDES: tuple[Guide, ...] = (
                     "Opcional: clique com o botão direito em um cabeçalho para mostrar ou "
                     "ocultar colunas de History. Nem todas aparecem por padrão; a ajuda não "
                     "diz que essa seleção altera as colunas do extrato.",
-                    "Clique em Statement, no canto superior direito da aba History.",
+                    "Clique em Statement; no Desktop, a ajuda o situa no canto superior "
+                    "direito da aba History.",
                     "No Desktop, Statement abre o extrato em HTML ou .xlsx em uma nova aba. "
                     "Na página do extrato, clique em Save para salvá-lo como .csv.",
                     "No cTrader Web, use Trade Watch > History > Statement: abre um extrato "
@@ -2382,26 +2424,36 @@ GUIDES: tuple[Guide, ...] = (
                     "universal. Se o arquivo usa os nomes de History, mantenha Symbol "
                     "(instrumento), Opening direction (direção de abertura), Opening time "
                     "e Closing time (datas), Entry price e Closing price (preços), Closing "
-                    "quantity (quantidade fechada), Commissions e Swap: o leitor os reconhece. "
-                    "Renomeie a coluna do resultado bruto monetário, por exemplo Gross "
-                    "(currency), para profit; não use Net nem Pips como resultado bruto. "
-                    "Mantenha comissões e swap na mesma moeda, sem duplicar colunas em USD. "
-                    "Compare os valores e totais da cópia com o extrato original."
+                    "quantity (quantidade fechada), Commissions e Swap: o leitor os reconhece, "
+                    "assim como Swaps, Broker commission e Conversion fee do Mac (as duas "
+                    "últimas somadas como comissões). Renomeie a coluna do resultado bruto na "
+                    "moeda da conta, Gross (currency), para profit; não use Net nem Pips como "
+                    "resultado bruto. Remova Gross USD e Net USD (ou Gross (USD) e Net (USD)): "
+                    "sem o seu mapeamento, o leitor tomaria Net USD como resultado, em USD e "
+                    "líquido de custos. Mantenha comissões e swap na moeda da conta. Compare "
+                    "os valores e totais da cópia com o extrato original."
                 ),
                 tips=(
                     "O Rigor não é afiliado ao cTrader nem à Spotware. Os passos vêm das "
                     "páginas oficiais citadas, lidas em 11 de outubro de 2026.",
-                    "Não há um leitor específico de cTrader. Sem renomear Gross (currency) "
-                    "para profit, o leitor universal pode calcular o resultado pelos preços "
-                    "e pela quantidade e emitir um aviso, sem abrir o seletor de colunas. "
-                    "Com outros cabeçalhos, adapte a cópia conforme o significado de cada "
-                    "coluna; não invente datas, custos ou resultados ausentes.",
+                    "Não há um leitor específico de cTrader. Se você não renomear Gross "
+                    "(currency) para profit nem a mapear como resultado no formulário, o "
+                    "leitor universal não abre o seletor de colunas: calcula o resultado como "
+                    "a variação de preço vezes os lotes, sem o tamanho do contrato, e avisa; "
+                    "um valor sem utilidade mesmo com o aviso. Por isso renomear ou mapear o "
+                    "resultado não é opcional. Com outros cabeçalhos, adapte a cópia conforme "
+                    "o significado de cada coluna; não invente datas, custos ou resultados "
+                    "ausentes.",
                     "History inclui tentativas de execução malsucedidas. Mantenha uma linha "
                     "por deal de fechamento, incluindo fechamentos parciais com sua quantidade "
                     "fechada; não conte também a posição inteira. Exclua tentativas sem "
-                    "execução. Se a cópia mantém as colunas de History e acrescenta Status, "
-                    "o leitor mantém apenas Filled e Partially filled; também exclui estados "
-                    "vazios ou desconhecidos. Status não é um cabeçalho CSV documentado.",
+                    "execução. Se a cópia mantém as colunas de History e acrescenta Status com "
+                    "os valores da ficha Deal information de History (Filled, Partially "
+                    "filled, Rejected, Error, Missed e Internally rejected), o leitor exclui "
+                    "as linhas Rejected, Error, Missed e Internally rejected e mantém as "
+                    "demais, inclusive Filled e Partially filled; outros valores, ou nenhum, "
+                    "não excluem nada. Se todas as linhas ficarem excluídas, ele diz isso e "
+                    "nomeia os estados. Status não é um cabeçalho CSV documentado.",
                     "Compare as horas do CSV com o app e declare o deslocamento observado na "
                     "descrição ao importar. Ajustar Current time não estabelece qual fuso "
                     "Save usa; a declaração não converte as horas do arquivo.",

@@ -437,6 +437,13 @@ def test_provider_guide_has_an_english_path_and_the_old_one_redirects(tmp_path: 
     assert client.get("/guides/mt5").status_code == 200
 
 
+def test_the_guides_index_description_leaves_room_under_the_hygiene_ceiling() -> None:
+    # The index's summary is its meta description; the hygiene test caps one at
+    # 160 characters, so a one-word retouch must not be what breaks it.
+    for locale, copy in GUIDES_COPY.items():
+        assert 50 <= len(copy["summary"]) <= 150, (locale, len(copy["summary"]))
+
+
 def test_the_guides_index_names_the_platforms_the_universal_reader_knows() -> None:
     from quant_trade.audit.pages import guides_index_page
 

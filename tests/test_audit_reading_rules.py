@@ -522,7 +522,32 @@ FROZEN: dict[str, tuple[Any, ...]] = {
         "WK/WK/PS/ND/FL/ND",
         "FORENSIC_BALANCE_CHAIN_SIGNAL,HIDDEN_FLOATING_DRAWDOWN,IMPLAUSIBLE_SHARPE,"
         "MONETARY_RECONCILIATION_MISMATCH,TOO_FEW_OBSERVATIONS"),
+    # The export guides' synthetic files (#500 and the cTrader guide), frozen as
+    # read on 2026-10-11, the tool's clock at ``NOW``. The tool maps no column,
+    # so the Sierra Chart and cTrader files are read as the guides warn: the
+    # Trades tab is refused (``REFUSED``) and the History columns give a result
+    # of price move times lots, with no contract size.
+    "fixtures/sierra_chart_trade_activity.txt": (
+        "D", "2026-08-31", "2026-09-02", 3, 0.012, 0.0, None, 0.108379,
+        "ND/ND/FL/ND/FL/ND", "TOO_FEW_OBSERVATIONS,ZERO_DECLARED_COSTS"),
+    "fixtures/tradovate_orders.csv": (
+        "D", "2026-04-10", "2026-04-14", 3, 0.022, 0.0, None, 0.172378,
+        "ND/ND/FL/ND/FL/ND", "INVALID_TRADE_ROWS,TOO_FEW_OBSERVATIONS,ZERO_DECLARED_COSTS"),
+    "fixtures/tradovate_performance.csv": (
+        "D", "2026-04-08", "2026-04-13", 4, 0.0206, -0.001995, 8.763809, 0.171653,
+        "WK/WK/FL/ND/FL/ND", "IMPLAUSIBLE_SHARPE,TOO_FEW_OBSERVATIONS,ZERO_DECLARED_COSTS"),
+    "fixtures/ctrader_history_columns.csv": (
+        "D", "2026-08-31", "2026-09-03", 4, -0.000325, -0.000325, -39.806045, 0.000994,
+        "FL/FL/FL/ND/FL/ND", "HIDDEN_FLOATING_DRAWDOWN,TOO_FEW_OBSERVATIONS"),
 }  # fmt: skip
+
+#: Files the tool refuses as it stands, with the refusal's code: the Sierra
+#: Chart Trades tab needs its quantity named on the form (the guide says so,
+#: ``test_audit_guides_futures``) and the TopstepX file is dated after ``NOW``.
+REFUSED: dict[str, str] = {
+    "fixtures/sierra_chart_trades.txt": "universal_columns_missing",
+    "fixtures/topstepx_trades.csv": "future_dates",
+}
 
 CASES = {
     case["name"]: case
@@ -532,7 +557,15 @@ CASES = {
 
 
 def test_every_file_of_the_repository_is_frozen() -> None:
-    assert sorted(CASES) == sorted(FROZEN)
+    assert not set(FROZEN) & set(REFUSED)
+    assert sorted(CASES) == sorted([*FROZEN, *REFUSED])
+
+
+@pytest.mark.parametrize("name", sorted(REFUSED))
+def test_files_the_tool_refuses_are_refused_for_the_same_reason(name: str) -> None:
+    record = TOOL.run_case(CASES[name])
+    assert record["outcome"] == "refused"
+    assert record["headline"]["code"] == REFUSED[name]
 
 
 @pytest.mark.parametrize("name", sorted(FROZEN))
