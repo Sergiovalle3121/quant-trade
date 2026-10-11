@@ -832,13 +832,17 @@ ARTICLES_COPY: dict[str, dict[str, str]] = {
 
 #: The kinds of next step: the upload form (``audit``), an export guide by its
 #: Spanish slug (``guide``), the sample report (``sample``), an audience page by
-#: its Spanish slug (``audience``) and the two free calculators (``calculator``,
-#: ``winrate``), which open with the article's declared example when the step
-#: names it (``NEXT_STEP_EXAMPLES``).
+#: its Spanish slug (``audience``) and the three free calculators (``calculator``,
+#: ``winrate``, ``ruin``), which open with the article's declared example when the
+#: step names it (``NEXT_STEP_EXAMPLES``).
 NEXT_STEP_KINDS: frozenset[str] = frozenset(
-    {"audit", "guide", "sample", "audience", "calculator", "winrate"}
+    {"audit", "guide", "sample", "audience", "calculator", "winrate", "ruin"}
 )
-NEXT_STEP_EXAMPLES: dict[str, str] = {"calculator": "luck", "winrate": "win-rate"}
+NEXT_STEP_EXAMPLES: dict[str, str] = {
+    "calculator": "luck",
+    "winrate": "win-rate",
+    "ruin": "ruin",
+}
 
 #: Each article's own next step, chosen for whoever reads it: the first entry is
 #: the side button and the closing call's button, the others are links of the
@@ -864,9 +868,12 @@ ARTICLE_NEXT_STEPS: dict[str, tuple[dict[str, str], ...]] = {
     "monte-carlo-backtest": ({"kind": "audit"}, {"kind": "sample"}),
     # Streaks follow from the win rate: its free calculator comes first.
     "rachas-perdedoras": ({"kind": "winrate", "example": "win-rate"},),
-    "regla-de-consistencia-prop-firm": ({"kind": "audit"}, {"kind": "sample"}),
-    RUIN_ARTICLE_KEY: ({"kind": "audit"}, {"kind": "sample"}),
-    "drawdown-trailing-eod-intradia": ({"kind": "audit"}, {"kind": "sample"}),
+    # Two more readers of prop-firm challenges: the audience page that simulates
+    # the challenge with their own history, as ``cuantos-intentos-reto-prop-firm``.
+    "regla-de-consistencia-prop-firm": ({"kind": "audience", "slug": "retos-prop-firm"},),
+    "drawdown-trailing-eod-intradia": ({"kind": "audience", "slug": "retos-prop-firm"},),
+    # The ruin calculator opened with the article's first declared case.
+    RUIN_ARTICLE_KEY: ({"kind": "ruin", "example": "ruin"},),
 }
 #: An article missing from the table keeps the old closing call.
 DEFAULT_NEXT_STEP: tuple[dict[str, str], ...] = ({"kind": "calculator"}, {"kind": "audit"})
@@ -880,6 +887,7 @@ NEXT_STEP_COPY: dict[str, dict[str, str]] = {
         "guide": "Guía de exportación: {platform}",
         "calculator_example": "Abrir la calculadora de suerte con este ejemplo",
         "winrate_example": "Abrir la calculadora de % de aciertos con este ejemplo",
+        "ruin_example": "Abrir la calculadora de riesgo de ruina con este ejemplo",
         "audience:retos-prop-firm": "Simular un reto con mi historial",
         "title_audit": "Ponlo a prueba con tu archivo",
         "text_audit": (
@@ -903,6 +911,12 @@ NEXT_STEP_COPY: dict[str, dict[str, str]] = {
             "cámbialo por tus cifras. Es gratis y no pide registro. Con tu cuenta, el primer "
             "informe completo también es gratis."
         ),
+        "title_ruin_example": "Ponlo a prueba con tus cifras",
+        "text_ruin_example": (
+            "La calculadora de riesgo de ruina abre con el primer caso declarado de este "
+            "artículo; cámbialo por tus cifras. Es gratis y no pide registro. Con tu cuenta, el "
+            "primer informe completo también es gratis."
+        ),
         "title_audience": "Simula el reto con tu historial",
         "text_audience": (
             "La página sobre retos de prop firms explica qué subir para ver con qué frecuencia "
@@ -915,6 +929,7 @@ NEXT_STEP_COPY: dict[str, dict[str, str]] = {
         "guide": "Export guide: {platform}",
         "calculator_example": "Open the luck calculator with this example",
         "winrate_example": "Open the win rate calculator with this example",
+        "ruin_example": "Open the risk of ruin calculator with this example",
         "audience:retos-prop-firm": "Simulate a challenge with my history",
         "title_audit": "Put it to the test with your file",
         "text_audit": (
@@ -938,6 +953,12 @@ NEXT_STEP_COPY: dict[str, dict[str, str]] = {
             "with your figures. It is free and needs no sign-up. With an account, your first "
             "full report is free too."
         ),
+        "title_ruin_example": "Put it to the test with your figures",
+        "text_ruin_example": (
+            "The risk of ruin calculator opens with this article's first declared case; "
+            "replace it with your figures. It is free and needs no sign-up. With an account, "
+            "your first full report is free too."
+        ),
         "title_audience": "Simulate the challenge with your history",
         "text_audience": (
             "The prop-firm challenge page explains what to upload to see how often you would "
@@ -950,6 +971,7 @@ NEXT_STEP_COPY: dict[str, dict[str, str]] = {
         "guide": "Guia de exportação: {platform}",
         "calculator_example": "Abrir a calculadora de sorte com este exemplo",
         "winrate_example": "Abrir a calculadora de taxa de acerto com este exemplo",
+        "ruin_example": "Abrir a calculadora de risco de ruína com este exemplo",
         "audience:retos-prop-firm": "Simular um desafio com o meu histórico",
         "title_audit": "Coloque à prova com o seu arquivo",
         "text_audit": (
@@ -970,6 +992,12 @@ NEXT_STEP_COPY: dict[str, dict[str, str]] = {
         "title_winrate_example": "Coloque à prova com os seus números",
         "text_winrate_example": (
             "A calculadora de taxa de acerto abre com o exemplo declarado deste artigo; "
+            "troque-o pelos seus números. É grátis e não pede cadastro. Com a sua conta, o "
+            "primeiro relatório completo também é grátis."
+        ),
+        "title_ruin_example": "Coloque à prova com os seus números",
+        "text_ruin_example": (
+            "A calculadora de risco de ruína abre com o primeiro caso declarado deste artigo; "
             "troque-o pelos seus números. É grátis e não pede cadastro. Com a sua conta, o "
             "primeiro relatório completo também é grátis."
         ),
@@ -10249,6 +10277,13 @@ def next_step_links(article: Article, locale: str) -> tuple[tuple[str, str], ...
             links.append((words["winrate_example"], f"{winrate.WINRATE_PATH[locale]}?{query}"))
         elif kind == "winrate":
             links.append((winrate.COPY[locale]["nav"], winrate.WINRATE_PATH[locale]))
+        elif kind == "ruin" and example:
+            # The article's first declared case, through the same calculator; no
+            # share tag, so /panel does not count the click as a share.
+            query = urlencode(ruin_calc.share_values(RUIN_INPUTS[0]))
+            links.append((words["ruin_example"], f"{ruin_calc.ruin_url(locale)}?{query}"))
+        elif kind == "ruin":
+            links.append((ruin_calc.COPY[locale]["nav"], ruin_calc.ruin_url(locale)))
         else:
             page = next(p for p in AUDIENCE_PAGES if p.slug == step["slug"])
             label = words.get(f"audience:{page.slug}", page.text[locale].title)

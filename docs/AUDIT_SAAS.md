@@ -6157,7 +6157,12 @@ account, payment, credit, e-mail, legal or engine rule changed.
   `bot-ia-backtest-suerte`: the luck calculator opened with
   `LUCK_EXAMPLE_INPUT`, the example both articles print.
   `auditoria-independiente-backtest`, `que-hacer-despues-del-backtest` and
-  `auditar-cartera-modelo-senales`: form and sample report. `Article.from_dict`
+  `auditar-cartera-modelo-senales`: form and sample report.
+  `regla-de-consistencia-prop-firm` and `drawdown-trailing-eod-intradia`:
+  `/para/retos-prop-firm`, like the other challenge article.
+  `riesgo-de-ruina-intervalo-de-confianza`: the risk-of-ruin calculator opened
+  with the article's first declared case (`article_numbers.RUIN_INPUTS[0]`,
+  without the share tag). `Article.from_dict`
   refuses an unknown kind, guide, audience page or example at import.
 
 `tests/test_audit_conversion.py` reads every page over HTTP with

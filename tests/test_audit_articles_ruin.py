@@ -6,7 +6,7 @@ import html
 import json
 import re
 from dataclasses import replace
-from urllib.parse import urlsplit
+from urllib.parse import parse_qs, urlsplit
 from xml.etree import ElementTree
 
 import pytest
@@ -243,11 +243,14 @@ def test_ruin_links_reach_calculators_history_upload_and_example(
         SAMPLE_PAGE_PATHS[locale],
     }
     assert {href for _label, href in related_links(article, locale)} == expected
-    assert {href for _label, href in next_step_links(article, locale)} == {
-        audit_path(locale),
-        SAMPLE_PAGE_PATHS[locale],
+    # The next step: the ruin calculator opened with the first declared case; the
+    # form stays among the closing links.
+    ((_label, step),) = next_step_links(article, locale)
+    assert urlsplit(step).path == ruin_calc.ruin_url(locale)
+    assert parse_qs(urlsplit(step).query) == {
+        name: [value] for name, value in ruin_calc.share_values(numbers.RUIN_INPUTS[0]).items()
     }
-    assert expected | {audit_path(locale)} <= _links(page)
+    assert expected | {audit_path(locale), step} <= _links(page)
     for target in expected | {audit_path(locale)}:
         assert client.get(target).status_code == 200, target
     for link in _links(page):
