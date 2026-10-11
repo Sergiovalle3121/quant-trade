@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -158,7 +159,7 @@ def test_the_runbook_never_asks_for_a_secret() -> None:
 
 
 def _risk(**overrides) -> InstrumentRisk:
-    payload = {
+    payload: dict[str, Any] = {
         "venue": "bybit",
         "instrument": "BTCUSDT",
         "tiers": (RiskTier(1_000_000.0, 0.10, 0.005),),
@@ -172,7 +173,7 @@ def _risk(**overrides) -> InstrumentRisk:
 
 
 def _scenario(capital: float, **overrides):
-    payload = {
+    payload: dict[str, Any] = {
         "risk": _risk(),
         "price": 64_000.0,
         "spot_taker_bps": 10.0,
@@ -292,6 +293,11 @@ def test_the_distribution_is_a_spread_not_a_projection() -> None:
     )
     scenario = curve.scenarios[0]
     assert scenario.p05_return_on_capital is not None
+    assert scenario.p50_return_on_capital is not None
+    assert scenario.p95_return_on_capital is not None
+    assert scenario.probability_of_loss is not None
+    assert scenario.probability_of_ruin is not None
+    assert scenario.max_drawdown is not None
     assert (
         scenario.p05_return_on_capital
         <= scenario.p50_return_on_capital
@@ -334,6 +340,7 @@ def test_a_ruinous_series_produces_a_ruin_probability() -> None:
     )
     scenario = curve.scenarios[0]
     assert scenario.probability_of_loss == pytest.approx(1.0)
+    assert scenario.max_drawdown is not None
     assert scenario.max_drawdown <= -RUIN_DRAWDOWN
 
 

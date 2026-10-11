@@ -139,7 +139,7 @@ def test_the_sample_report_reads_in_portuguese() -> None:
     assert page.startswith("<!doctype html><html lang='pt'>")
     assert find_claims(page) == []
     assert report.LABELS["pt"]["verdict"] in page
-    assert "Passa" in page and "Fora da amostra" in page
+    assert "Atinge a meta" in page and "Fora da amostra" in page
     assert untranslated(data, "pt") == []
     # No English-only sentence is left: every text the English page shows and the
     # Spanish one does not is gone from the Portuguese page.

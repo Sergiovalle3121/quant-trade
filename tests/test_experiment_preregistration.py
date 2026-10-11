@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -20,7 +21,7 @@ from quant_trade.research.preregistration import (
 
 
 def _prereg(**overrides) -> ExperimentPreregistration:
-    payload = {
+    payload: dict[str, Any] = {
         "experiment_id": "lowcap-momentum-2026Q3",
         "hypothesis": "cross-sectional momentum on low-cap crypto beats equal weight net of costs",
         "universe": ["AAA", "BBB", "CCC"],

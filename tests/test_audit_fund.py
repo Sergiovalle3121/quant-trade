@@ -180,7 +180,7 @@ def test_an_excel_factsheet_with_fractions_reads_too() -> None:
     assert any("values taken as fractions" in w for w in series.warnings)
 
 
-def _codes(result) -> set[str]:  # type: ignore[no-untyped-def]
+def _codes(result) -> set[str]:
     return {flag["code"] for flag in result.red_flags}
 
 
@@ -230,7 +230,7 @@ def test_a_monthly_curve_with_trades_keeps_the_cost_check() -> None:
     assert "ZERO_DECLARED_COSTS" in _codes(run_audit(inputs, bootstrap_samples=200))
 
 
-def test_the_upload_form_offers_the_declaration(tmp_path) -> None:  # type: ignore[no-untyped-def]
+def test_the_upload_form_offers_the_declaration(tmp_path) -> None:
     from fastapi.testclient import TestClient
 
     from quant_trade.audit.settings import AuditSettings
@@ -345,7 +345,7 @@ def test_footnotes_and_blank_rows_are_skipped() -> None:
         (lambda t: t.append(t[1]), "grid_duplicate_year", "2016 more than once"),
     ],
 )
-def test_a_grid_without_a_year_or_with_one_twice_says_so(edit, code, words) -> None:  # type: ignore[no-untyped-def]
+def test_a_grid_without_a_year_or_with_one_twice_says_so(edit, code, words) -> None:
     from quant_trade.audit.schema import ParseError
 
     text = _grid_csv(_returns(24)).decode().splitlines()

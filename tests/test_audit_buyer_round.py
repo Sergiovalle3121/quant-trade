@@ -42,7 +42,7 @@ def test_platform_equity_drawdown_takes_the_deepest_percentage() -> None:
     assert platform_equity_drawdown({"declared_equity_drawdown_maximal": "0.00 (0.00%)"}) is None
 
 
-def _audit(metadata: dict[str, str] | None = None, **declared: object):  # type: ignore[no-untyped-def]
+def _audit(metadata: dict[str, str] | None = None, **declared: object):
     inputs = build_inputs(
         None,
         DeclaredMetadata(**declared),

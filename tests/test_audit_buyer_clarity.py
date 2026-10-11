@@ -5,6 +5,7 @@ already uploaded. From a non-technical buyer's read of /ejemplo."""
 from __future__ import annotations
 
 from functools import lru_cache
+from typing import Any
 
 from quant_trade.audit import sample as sample_module
 from quant_trade.audit.report import render_html
@@ -220,7 +221,7 @@ def test_seller_questions_follow_the_report_s_findings() -> None:
     from quant_trade.audit.analytics import vendor_questions
     from quant_trade.audit.guard import assert_report_clean
 
-    base = {
+    base: dict[str, Any] = {
         "has_trades": True,
         "trials_measured": True,
         "has_out_of_sample": True,

@@ -6,6 +6,7 @@ import ast
 from html import unescape
 from html.parser import HTMLParser
 from pathlib import Path
+from typing import SupportsIndex, overload
 
 import pytest
 
@@ -387,7 +388,13 @@ def test_accepted_or_inconclusive_headers_still_reach_existing_readers(
 
 def test_signature_sniff_is_bounded_and_cannot_find_later_images() -> None:
     class PrefixOnly(bytes):
-        def __getitem__(self, key: int | slice) -> bytes:
+        @overload
+        def __getitem__(self, key: SupportsIndex, /) -> int: ...
+
+        @overload
+        def __getitem__(self, key: slice, /) -> bytes: ...
+
+        def __getitem__(self, key: SupportsIndex | slice, /) -> int | bytes:
             assert isinstance(key, slice) and key.start is None and key.stop == HEADER_BYTES
             return bytes(super().__getitem__(key))
 

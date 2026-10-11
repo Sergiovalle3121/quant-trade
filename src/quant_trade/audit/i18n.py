@@ -1223,6 +1223,16 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
     (
         "every published preset simulated on the same resampled daily paths, rules as each "
         "firm's page stated them on its as_of date; a program's phases are taken as fresh "
+        "starts, so the chance of reaching the target in every phase is the product of "
+        "each phase's",
+        "cada reto publicado simulado sobre los mismos recorridos diarios remuestreados, con "
+        "las reglas que la página de cada firma indicaba en su fecha; las fases de un "
+        "programa se toman como comienzos nuevos, así que la probabilidad de alcanzar el "
+        "objetivo en todas las fases es el producto de la de cada fase",
+    ),
+    (
+        "every published preset simulated on the same resampled daily paths, rules as each "
+        "firm's page stated them on its as_of date; a program's phases are taken as fresh "
         "starts, so the chance of passing them all is the product of each phase's",
         "cada reto publicado simulado sobre los mismos recorridos diarios remuestreados, con "
         "las reglas que la página de cada firma indicaba en su fecha; las fases de un "
@@ -1362,6 +1372,12 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
         "are measured on it, so 1x scales with it",
         "supuesto porque el archivo no indica un balance inicial; los porcentajes diarios a 1x "
         "se miden sobre él, así que 1x escala con él",
+    ),
+    (
+        "share of the resampled paths that end the program this way: each phase is a fresh "
+        "start reached only by reaching the target in the phases before it",
+        "proporción de los recorridos remuestreados que terminan el programa así: cada fase es "
+        "un comienzo nuevo al que solo se llega alcanzando el objetivo en las anteriores",
     ),
     (
         "share of the resampled paths that end the program this way: each phase is a fresh "

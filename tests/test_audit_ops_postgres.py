@@ -434,8 +434,10 @@ def test_postgres_dump_restore_preserves_synthetic_ledger_and_session(
     try:
         assert _snapshot(restored) == before
         assert restored.account_credits(account.id, now) == 2
-        assert restored.get_checkout_order(order.id).status == "delivered"
-        assert restored.get_audit("restore-report", with_blobs=True).equity_csv is not None
+        restored_order = restored.get_checkout_order(order.id)
+        assert restored_order is not None and restored_order.status == "delivered"
+        restored_audit = restored.get_audit("restore-report", with_blobs=True)
+        assert restored_audit is not None and restored_audit.equity_csv is not None
         with TestClient(
             create_app(AuditSettings(database_url=str(target_url)), restored)
         ) as client:
@@ -764,7 +766,8 @@ def test_postgres_bounded_upload_load_1_2_4_8(local_databases, tmp_path: Path) -
                 try:
                     assert _snapshot(restored) == before
                     assert restored.account_credits(account.id, now) == 13
-                    assert restored.get_checkout_order(order.id).status == "delivered"
+                    restored_order = restored.get_checkout_order(order.id)
+                    assert restored_order is not None and restored_order.status == "delivered"
                     restore_app = create_app(
                         replace(
                             settings, database_url=target_url.render_as_string(hide_password=False)
@@ -781,8 +784,10 @@ def test_postgres_bounded_upload_load_1_2_4_8(local_databases, tmp_path: Path) -
                     audit_id = locations[0].split("/audits/", 1)[1].split("?", 1)[0]
                     record = restored.get_audit(audit_id, with_blobs=True)
                     original = store.get_audit(audit_id, with_blobs=True)
+                    assert record is not None and original is not None
                     assert record.report_html == original.report_html
                     assert record.equity_csv == original.equity_csv
+                    assert record.report_html is not None
                     html_bytes = record.report_html.encode("utf-8")
                     directory = Path(os.environ.get("QA_REPORT_DIR", str(tmp_path)))
                     directory.mkdir(parents=True, exist_ok=True)

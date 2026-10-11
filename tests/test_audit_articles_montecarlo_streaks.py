@@ -563,7 +563,9 @@ def test_portuguese_copy_has_no_spanish_words() -> None:
         for text in _stored(key, "pt"):
             for spanish in ("archivo", "informe", "artículo", "Sube ", "Precios", "racha"):
                 assert spanish not in text, (key, spanish)
-    for item in METHOD_COPY["pt"]["resampling"]:
+    resampling = METHOD_COPY["pt"]["resampling"]
+    assert isinstance(resampling, (list, tuple))
+    for item in resampling:
         assert "informe" not in item and "archivo" not in item
 
 

@@ -1,11 +1,12 @@
 import json
+from typing import Any
 
 from quant_trade.research.candidate import CandidateStrategy
 from quant_trade.research.promotion import evaluate_promotion
 
 
 def _candidate(**overrides):
-    values = {
+    values: dict[str, Any] = {
         "candidate_id": "candidate-1",
         "name": "candidate",
         "strategy_name": "time_series_momentum",

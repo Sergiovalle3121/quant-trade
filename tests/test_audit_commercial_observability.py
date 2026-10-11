@@ -559,7 +559,9 @@ def test_the_first_screen_no_longer_carries_the_confirmation_and_card_note() -> 
         for free_mode in (True, False):
             page = landing(locale=locale, free_mode=free_mode, email_confirmation=True)
             assert "welcome-confirmation" not in page
-            assert english not in page and spanish(english) not in page
+            translated = spanish(english)
+            assert translated is not None
+            assert english not in page and translated not in page
             assert find_claims(page) == []
 
 

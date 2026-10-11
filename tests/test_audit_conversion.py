@@ -292,7 +292,7 @@ def test_pricing_close_follows_the_configuration(tmp_path: Path, locale: str) ->
 def _real_result(locale: str) -> Any:
     inputs = build_inputs(
         csv_bytes(positive_drift(600)),
-        DeclaredMetadata(trials=4, cost_bps_per_side=5, locale=locale),  # type: ignore[arg-type]
+        DeclaredMetadata(trials=4, cost_bps_per_side=5, locale=locale),
         trades_bytes=csv_bytes(trades_frame(20)),
     )
     return run_audit(inputs, now=NOW, audit_id="abc123", bootstrap_samples=200)

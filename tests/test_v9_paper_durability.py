@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -60,7 +61,7 @@ def _tick(
 
 
 def _config(**overrides) -> SessionConfig:
-    payload = {
+    payload: dict[str, Any] = {
         "session_id": "s1",
         "candidate_id": "H1-v1",
         "manifest_sha256": "a" * 64,

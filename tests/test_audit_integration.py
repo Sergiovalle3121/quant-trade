@@ -354,7 +354,7 @@ def test_locked_report_keeps_verdict_charts_and_meaning_but_sends_no_detail() ->
     assert stats is not None
     factor = f"<td class='val'>{stats['profit_factor']['value']:.2f}</td>"
     assert factor in paid and factor not in unpaid
-    probability = result.challenge["probability"]["pass"]["value"]  # type: ignore[index]
+    probability = result.challenge["probability"]["pass"]["value"]
     assert f"{probability:.2%}" in paid
     assert "Llega al objetivo" in paid and "Llega al objetivo" not in unpaid
     assert "Tasa de acierto, operación media y rachas" in unpaid  # listed as a locked gain

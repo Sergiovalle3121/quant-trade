@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from typing import Any
 
 import pytest
 from typer.testing import CliRunner
@@ -27,7 +28,7 @@ runner = CliRunner()
 
 
 def _obs(**overrides) -> FundingObservation:
-    base = dict(
+    base: dict[str, Any] = dict(
         venue="binance",
         symbol="BTC",
         captured_at_utc="2026-07-20T00:00:05Z",

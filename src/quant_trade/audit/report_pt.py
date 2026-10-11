@@ -1179,8 +1179,8 @@ REPORT: dict[str, Any] = {
             "mostra quanto mudam."
         ),
         "ff_program": "Desafio",
-        "ff_pass": "Passa",
-        "ff_clean": "Passa dentro da regra do melhor dia",
+        "ff_pass": "Atinge a meta",
+        "ff_clean": "Atinge a meta dentro da regra do melhor dia",
         "ff_risk": "O que mais o derruba",
         "ff_no_rule": "sem regra",
         "ff_risk_none": "Nada nas simulações",
@@ -1192,19 +1192,19 @@ REPORT: dict[str, Any] = {
             "perdas abertas."
         ),
         "ff_all_pass": (
-            "Com este histórico todos os programas passam em pelo menos 99 % das simulações: "
-            "suas regras não os distinguem."
+            "Com este histórico todos os programas atingem a meta em pelo menos 99 % das "
+            "simulações: suas regras não os distinguem."
         ),
         "ff_all_fail": (
-            "Com este histórico quase nenhum programa passa (1 % das simulações ou menos); o que "
-            "mais impede é {risk}."
+            "Com este histórico quase nenhum programa atinge a meta (1 % das simulações ou "
+            "menos); o que mais impede é {risk}."
         ),
         "ff_phases": "{n} fases",
         "ff_phase": "1 fase",
         "ff_basis_columns": (
-            "«Passa» usa o histórico completo com os custos que o arquivo já traz, sem o custo "
-            "declarado ou de referência. As colunas de fora da amostra e com custo são os mesmos "
-            "cenários da escada acima, com cada programa."
+            "«Atinge a meta» usa o histórico completo com os custos que o arquivo já traz, "
+            "sem o custo declarado ou de referência. As colunas de fora da amostra e com custo "
+            "são os mesmos cenários da escada acima, com cada programa."
         ),
         "ff_clean_short": "dentro da regra do melhor dia",
         "ff_rules": "Regras, fonte e data",
@@ -1298,12 +1298,12 @@ REPORT: dict[str, Any] = {
             "são otimistas."
         ),
         "ff_all_pass_simulated": (
-            "Com este histórico todos os programas simulados passam em pelo menos 99 % das "
-            "simulações: suas regras não os distinguem."
+            "Com este histórico todos os programas simulados atingem a meta em pelo menos 99 % "
+            "das simulações: suas regras não os distinguem."
         ),
         "ff_all_fail_simulated": (
-            "Com este histórico quase nenhum programa simulado passa (1 % das simulações ou "
-            "menos); o que mais impede é {risk}."
+            "Com este histórico quase nenhum programa simulado atinge a meta (1 % das "
+            "simulações ou menos); o que mais impede é {risk}."
         ),
         "ch_ladder_title": "Quanto muda com o que este relatório encontrou?",
         "ch_ladder_intro": (
@@ -4333,6 +4333,20 @@ RULES: tuple[tuple[str, str], ...] = (
         (
             "every published preset simulated on the same resampled daily paths, rules as each "
             "firm's page stated them on its as_of date; a program's phases are taken as fresh "
+            "starts, so the chance of reaching the target in every phase is the product of "
+            "each phase's"
+        ),
+        (
+            "cada desafio publicado simulado sobre os mesmos percursos diários reamostrados, com "
+            "as regras que a página de cada firma indicava na sua data; as fases de um programa "
+            "são tomadas como recomeços, então a probabilidade de atingir a meta em todas as "
+            "fases é o produto da de cada fase"
+        ),
+    ),
+    (
+        (
+            "every published preset simulated on the same resampled daily paths, rules as each "
+            "firm's page stated them on its as_of date; a program's phases are taken as fresh "
             "starts, so the chance of passing them all is the product of each phase's"
         ),
         (
@@ -4486,6 +4500,16 @@ RULES: tuple[tuple[str, str], ...] = (
         "are measured on it, so 1x scales with it",
         "suposto porque o arquivo não indica um saldo inicial; as porcentagens diárias a 1x "
         "são medidas sobre ele, então 1x escala com ele",
+    ),
+    (
+        (
+            "share of the resampled paths that end the program this way: each phase is a fresh "
+            "start reached only by reaching the target in the phases before it"
+        ),
+        (
+            "proporção dos percursos reamostrados que terminam o programa assim: cada fase é um "
+            "recomeço ao qual só se chega atingindo a meta nas anteriores"
+        ),
     ),
     (
         (

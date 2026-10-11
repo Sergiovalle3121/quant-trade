@@ -200,8 +200,9 @@ def test_tester_rows_are_classified() -> None:
     assert mt4.family == families.MT4_TESTER
     assert len(mt4.kind("mt4_tester")) == 12
     assert mt4.label("Initial deposit") == "10000.00"
-    assert read_header(mt4).report_date is not None
-    assert read_header(mt4).report_date.isoformat() == "2024-01-06T00:00:00"
+    report_date = read_header(mt4).report_date
+    assert report_date is not None
+    assert report_date.isoformat() == "2024-01-06T00:00:00"
 
 
 def test_csv_rows_keep_the_header() -> None:
@@ -306,10 +307,15 @@ def test_tradingview_workbook_uses_the_trades_sheet(monkeypatch: pytest.MonkeyPa
 def test_old_statement_header_date_with_suffix() -> None:
     from quant_trade.audit.forensics import header
 
-    assert header._mt4_date("2006.08.01 05:04 (local time)") is not None
-    assert header._mt4_date("2006.08.01 05:04 (local time)").isoformat() == "2006-08-01T05:04:00"
-    assert header._mt4_date("2006.08.01 05:04:33").isoformat() == "2006-08-01T05:04:33"
-    assert header._mt4_date("2024 March 8, 18:30").isoformat() == "2024-03-08T18:30:00"
+    local_time = header._mt4_date("2006.08.01 05:04 (local time)")
+    assert local_time is not None
+    assert local_time.isoformat() == "2006-08-01T05:04:00"
+    seconds = header._mt4_date("2006.08.01 05:04:33")
+    assert seconds is not None
+    assert seconds.isoformat() == "2006-08-01T05:04:33"
+    month_name = header._mt4_date("2024 March 8, 18:30")
+    assert month_name is not None
+    assert month_name.isoformat() == "2024-03-08T18:30:00"
     assert header._mt4_date("Account: 12345678") is None
 
 

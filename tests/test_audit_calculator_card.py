@@ -96,7 +96,7 @@ def _links(page: str) -> list[str]:
 def _mark(text: str, locale: str) -> str:
     """``text`` written with a point, in the page's typography: a decimal comma (and a
     point between thousands) in es and pt, unchanged in en."""
-    return text if locale == "en" else text.translate(str.maketrans({",": ".", ".": ","}))
+    return text if locale == "en" else text.translate(str.maketrans(",.", ".,"))
 
 
 def _figures(result: dict, locale: str) -> tuple[str, str, str, str]:

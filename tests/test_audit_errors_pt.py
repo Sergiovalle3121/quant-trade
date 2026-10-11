@@ -8,6 +8,7 @@ import io
 import re
 import zipfile
 from pathlib import Path
+from typing import cast
 
 import pytest
 from audit_fixtures import csv_bytes, positive_drift
@@ -47,7 +48,8 @@ def _template(node: ast.expr) -> str | None:
         return node.value
     if isinstance(node, ast.JoinedStr):
         return "".join(
-            part.value if isinstance(part, ast.Constant) else "{x}" for part in node.values
+            cast(str, part.value) if isinstance(part, ast.Constant) else "{x}"
+            for part in node.values
         )
     if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Add):
         left, right = _template(node.left), _template(node.right)

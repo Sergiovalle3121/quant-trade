@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import cast
 
 import pytest
 
@@ -188,8 +189,8 @@ def test_a_stored_choice_is_kept_to_known_fields_and_real_columns() -> None:
     table = mapping.read_table(_journal())
     assert table is not None
     kept = mapping.usable_mapping(
-        {"profit": "Neto", "entry_time": "Nope", "evil": "Neto", "side": 3},
-        table,  # type: ignore[dict-item]
+        cast(dict[str, str], {"profit": "Neto", "entry_time": "Nope", "evil": "Neto", "side": 3}),
+        table,
     )
     assert kept == {"profit": "Neto"}
     assert mapping.loads("not json") == {} and mapping.loads("[1]") == {}

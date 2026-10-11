@@ -114,7 +114,7 @@ def test_unknown_files_are_not_detected() -> None:
 
 
 @pytest.mark.parametrize("encode", [lambda data: data, utf16], ids=["utf8", "utf16"])
-def test_mt5_tester_pairs_partial_closes_hedges_and_reversals(encode) -> None:  # type: ignore[no-untyped-def]
+def test_mt5_tester_pairs_partial_closes_hedges_and_reversals(encode) -> None:
     report = import_report(encode(fixture("mt5_tester.html")))
     assert report.source_format == MT5_TESTER_HTML
     # One trade per closing deal, as the tester counts "Total Trades": a

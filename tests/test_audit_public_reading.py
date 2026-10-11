@@ -7,6 +7,7 @@ import re
 import socket
 from datetime import UTC, datetime, timedelta, tzinfo
 from pathlib import Path
+from typing import Self, cast
 from urllib.parse import parse_qs, urlsplit
 from xml.etree import ElementTree as ET
 
@@ -348,8 +349,10 @@ def test_limit_is_per_ip_expires_and_does_not_trust_spoofed_forwarding(
 
     class Clock(datetime):
         @classmethod
-        def now(cls, tz: tzinfo | None = None) -> datetime:
-            return current.astimezone(tz) if tz is not None else current.replace(tzinfo=None)
+        def now(cls, tz: tzinfo | None = None) -> Self:
+            return cast(
+                Self, current.astimezone(tz) if tz is not None else current.replace(tzinfo=None)
+            )
 
     assert client.app.state.settings.trusted_proxy_hops == 0
     monkeypatch.setattr("quant_trade.audit.web.datetime", Clock)

@@ -222,7 +222,7 @@ def test_capital_requirement_includes_a_margin_buffer() -> None:
 # --- holdout --------------------------------------------------------------------
 
 
-def _rows(count: int) -> list[dict[str, int]]:
+def _rows(count: int) -> list[dict[str, int | str]]:
     return [{"start_ms": i, "timestamp_utc": f"t{i:04d}"} for i in range(count)]
 
 

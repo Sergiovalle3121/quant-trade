@@ -42,7 +42,7 @@ LEGAL_AND_CONTACT = (
 )
 
 
-def _app(tmp_path: Path, **overrides: object):  # type: ignore[no-untyped-def]
+def _app(tmp_path: Path, **overrides: object):
     settings = AuditSettings(
         database_url=f"sqlite:///{tmp_path}/audit.db",
         bootstrap_samples=100,

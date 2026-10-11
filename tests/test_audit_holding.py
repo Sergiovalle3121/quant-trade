@@ -94,7 +94,12 @@ def test_markets_without_a_licensed_source_are_never_read() -> None:
     """FRED's S&P 500, Nasdaq 100 and Coinbase copies need the owner's written
     permission for any reproduction: recognised, never downloaded."""
     asked: list[str] = []
-    data = MarketData(lambda s: asked.append(s) or "DATE,V\n2024-01-02,10\n2024-01-03,11\n")
+
+    def fetch(series: str) -> str:
+        asked.append(series)
+        return "DATE,V\n2024-01-02,10\n2024-01-03,11\n"
+
+    data = MarketData(fetch)
     for asset in market_lib.ASSETS:
         assert not asset.licensed and asset.key not in market_lib.SERIES
         assert data.refresh(asset.key) is False and data.closes(asset.key) is None
@@ -253,7 +258,7 @@ def test_too_few_shared_days_is_not_measured() -> None:
     assert out["status"] == "NOT_MEASURED"
 
 
-def _inputs(locale: str, symbol: str):  # type: ignore[no-untyped-def]
+def _inputs(locale: str, symbol: str):
     closes = _market(600, seed=3)
     moves = np.r_[0.0, closes.pct_change().dropna().to_numpy()]
     curve = _curve(1.5 * moves, closes.index)
@@ -262,6 +267,7 @@ def _inputs(locale: str, symbol: str):  # type: ignore[no-untyped-def]
         DeclaredMetadata(locale=locale),
         trades_bytes=csv_bytes(trades_following(curve, every=10)),
     )
+    assert inputs.trades is not None
     count = len(inputs.trades.trades)
     return dataclasses.replace(inputs, trade_symbols=[symbol] * count), closes
 
@@ -329,9 +335,12 @@ def test_without_market_data_or_a_known_market_there_is_no_section() -> None:
     assert LABELS["es"]["holding"] not in html
     fx, _ = _inputs("es", "EURUSD")
     called: list[str] = []
-    result = run_audit(
-        fx, bootstrap_samples=200, risk_samples=300, market=lambda k: called.append(k) or closes
-    )
+
+    def market(key: str) -> pd.Series:
+        called.append(key)
+        return closes
+
+    result = run_audit(fx, bootstrap_samples=200, risk_samples=300, market=market)
     assert result.holding is None and [k for k in called if k in market_lib.BY_KEY] == []
 
 
@@ -425,7 +434,7 @@ class _Trickle(http.server.BaseHTTPRequestHandler):
 
 
 @pytest.fixture
-def local_fred(monkeypatch: pytest.MonkeyPatch):  # type: ignore[no-untyped-def]
+def local_fred(monkeypatch: pytest.MonkeyPatch):
     """A fake FRED on the loopback address (no network): trickles or redirects."""
     server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), _Trickle)
     server.daemon_threads = True
@@ -476,7 +485,12 @@ def test_a_failure_is_not_retried_at_once_and_nobody_waits() -> None:
 
 def test_warm_downloads_every_series_in_the_background() -> None:
     asked: list[str] = []
-    data = MarketData(lambda s: asked.append(s) or "DATE,V\n2024-01-02,10\n2024-01-03,11\n")
+
+    def fetch(series: str) -> str:
+        asked.append(series)
+        return "DATE,V\n2024-01-02,10\n2024-01-03,11\n"
+
+    data = MarketData(fetch)
     data.warm().join(timeout=5)
     assert sorted(asked) == sorted(asset.series for asset in market_lib.SERIES.values())
 

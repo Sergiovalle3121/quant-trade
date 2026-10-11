@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import pytest
 
 from quant_trade.audit.costs import RecostRow
@@ -32,7 +34,7 @@ from quant_trade.audit.verdict import (
 def _dims(**statuses: str) -> list[Dimension]:
     base = {name: "PASS" for name in DIMENSION_ORDER}
     base.update(statuses)
-    return [Dimension(name=name, status=status) for name, status in base.items()]  # type: ignore[arg-type]
+    return [Dimension(name=name, status=status) for name, status in base.items()]
 
 
 @pytest.mark.parametrize(
@@ -110,7 +112,7 @@ def _rows(net_1x: float, net_3x: float) -> list[RecostRow]:
 
 
 def test_cost_boundaries() -> None:
-    kw = {"reference_bps": 5.0, "reference_is_assumption": False}
+    kw: dict[str, Any] = {"reference_bps": 5.0, "reference_is_assumption": False}
     assert assess_costs(rows=_rows(50.0, 10.0), **kw).status == "PASS"
     assert assess_costs(rows=_rows(50.0, 0.0), **kw).status == "WEAK"
     assert assess_costs(rows=_rows(0.0, -50.0), **kw).status == "FAIL"
@@ -150,7 +152,7 @@ def test_data_quality_uses_severity() -> None:
 
 
 def test_benchmark_boundaries() -> None:
-    kw = {"applicable": True, "not_measured_reason": None}
+    kw: dict[str, Any] = {"applicable": True, "not_measured_reason": None}
     assert (
         assess_benchmark(excess_return=0.1, drawdown_ratio=1.0, information_ratio=0.2, **kw).status
         == "PASS"
@@ -241,7 +243,7 @@ def _undeclared_dimensions(multiplicity_status: str = "NOT_MEASURED") -> list[Di
     ]
     multiplicity = Dimension(
         name=MULTIPLICITY,
-        status=multiplicity_status,  # type: ignore[arg-type]
+        status=multiplicity_status,
         inputs={
             "dsr_at_trials_used": measured(0.99),
             "trials_used": {"value": 1, "evidence": "NOT_MEASURED", "note": ""},

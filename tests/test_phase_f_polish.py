@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import csv
 from pathlib import Path
+from typing import Any, cast
 
 import numpy as np
 import pandas as pd
@@ -60,8 +61,8 @@ def test_cost_calibration_suggests_conservative_parameters(tmp_path):
     _write_orders_and_fills(tmp_path)
     suggestion = calibrate_cost_model(analyze_fills(tmp_path))
     assert suggestion["status"] == "ok"
-    assert suggestion["suggested_slippage_bps"] >= 2.0  # p75 of adverse slippage
-    assert suggestion["suggested_percentage_commission"] > 0
+    assert cast(float, suggestion["suggested_slippage_bps"]) >= 2.0  # p75 of adverse slippage
+    assert cast(float, suggestion["suggested_percentage_commission"]) > 0
     empty = calibrate_cost_model(FillAnalysis())
     assert empty["status"] == "insufficient_data"
 
@@ -97,7 +98,7 @@ def _panel(n: int = 200, seed: int = 4, sync_crash: bool = False) -> pd.DataFram
 
 def test_ensemble_combines_components_and_respects_gross_cap():
     data = _panel()
-    params = {
+    params: dict[str, Any] = {
         "components": [
             {"name": "time_series_momentum", "params": {"lookback_days": 21}, "weight": 2.0},
             {"name": "moving_average_trend_filter", "params": {"sma_window": 30}, "weight": 1.0},

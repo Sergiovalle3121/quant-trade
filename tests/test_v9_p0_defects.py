@@ -224,7 +224,7 @@ def test_defect_b_advance_accepts_market_data_only(tmp_path: Path) -> None:
 def test_defect_b_a_yield_bearing_event_is_not_accepted(tmp_path: Path) -> None:
     session, _clock = _session(tmp_path)
     with pytest.raises((TypeError, AttributeError, PaperEngineError)):
-        session.advance([{"kind": "paper_fill", "cash_yield_daily": 0.5}])  # type: ignore[list-item]
+        session.advance([{"kind": "paper_fill", "cash_yield_daily": 0.5}])
 
 
 def test_defect_b_a_fill_requires_an_order(tmp_path: Path) -> None:

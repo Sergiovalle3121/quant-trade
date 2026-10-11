@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
 
 from quant_trade.evidence.canonical_json import load_json, sha256_of_file
 from quant_trade.v7_artifacts import ARTIFACT_NAMES, generate_v7_artifacts
@@ -12,7 +13,7 @@ from quant_trade.v7_artifacts import ARTIFACT_NAMES, generate_v7_artifacts
 def test_v7_artifacts_regenerate_byte_identically(tmp_path) -> None:
     first = tmp_path / "first"
     second = tmp_path / "second"
-    kwargs = {
+    kwargs: dict[str, Any] = {
         "repo_root": Path("."),
         "source_commit_sha": "11" * 20,
     }

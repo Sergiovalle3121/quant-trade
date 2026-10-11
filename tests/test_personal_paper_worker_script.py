@@ -7,6 +7,7 @@ import shutil
 import stat
 import subprocess
 from pathlib import Path
+from typing import cast
 
 import pytest
 
@@ -46,10 +47,11 @@ def _fake_python(directory: Path) -> Path:
     return fake
 
 
-@pytest.mark.parametrize("shell", _shells() or [None])
+@pytest.mark.parametrize("shell", cast(list[str | None], _shells()) or [None])
 def test_stderr_from_the_worker_does_not_abort_the_wrapper(tmp_path: Path, shell: str | None):
     if shell is None:
         pytest.skip("no PowerShell available")
+    assert shell is not None
     repository, state = tmp_path / "repo", tmp_path / "state"
     repository.mkdir()
     completed = subprocess.run(

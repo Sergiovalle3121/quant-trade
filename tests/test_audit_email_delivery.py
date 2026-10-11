@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import Any, cast
 from urllib.parse import parse_qs, urlsplit
 
 import pytest
@@ -18,7 +19,7 @@ from fastapi.testclient import TestClient  # noqa: E402
 from quant_trade.audit import account_pages, mail  # noqa: E402
 from quant_trade.audit.accounts import verify_password  # noqa: E402
 from quant_trade.audit.settings import AuditSettings  # noqa: E402
-from quant_trade.audit.store import make_store  # noqa: E402
+from quant_trade.audit.store import AuditRecord, Store, make_store  # noqa: E402
 from quant_trade.audit.web import create_app  # noqa: E402
 
 CSRF = re.compile(r"name='csrf' value='([^']+)'")
@@ -66,7 +67,7 @@ def _upload(client: TestClient, seed: int) -> tuple[str, str]:
     return parts.path.rsplit("/", 1)[1], parse_qs(parts.query)["token"][0]
 
 
-def _mail_link(store: object, cfg: AuditSettings, recipient: str) -> str:
+def _mail_link(store: Store, cfg: AuditSettings, recipient: str) -> str:
     messages = []
     assert mail.deliver_pending(store, cfg, sender=lambda msg, _: messages.append(msg)) >= 1
     selected = [m for m in messages if m["To"] == recipient]
@@ -185,7 +186,7 @@ def test_signup_outbox_survives_restart_and_checkout_waits_for_post(tmp_path: Pa
     assert account is not None and not store.email_verified(account.id)
     first_id, first_token = _upload(client, 301)
     # The free first report waits for a confirmed address: one per person.
-    assert not store.get_audit(first_id).paid
+    assert not cast(AuditRecord, store.get_audit(first_id)).paid
     second_id, token = _upload(client, 302)
     denied = client.post(f"/audits/{second_id}/checkout?token={token}", follow_redirects=False)
     assert denied.status_code == 403
@@ -206,14 +207,16 @@ def test_signup_outbox_survives_restart_and_checkout_waits_for_post(tmp_path: Pa
     assert restarted.email_verified(account.id)
     # Confirming opens the most recent upload as the free first report; the
     # earlier one stays a preview, which can now be bought.
-    assert restarted.get_audit(second_id).paid
-    assert not restarted.get_audit(first_id).paid
+    assert cast(AuditRecord, restarted.get_audit(second_id)).paid
+    assert not cast(AuditRecord, restarted.get_audit(first_id)).paid
 
     observed = []
-    app.state.checkout_factory = lambda *_args, **kwargs: (
-        observed.append(kwargs),
-        "https://checkout.stripe.test/email",
-    )[1]
+
+    def checkout(*_args: object, **kwargs: Any) -> str:
+        observed.append(kwargs)
+        return "https://checkout.stripe.test/email"
+
+    app.state.checkout_factory = checkout
     allowed = client.post(
         f"/audits/{first_id}/checkout?token={first_token}",
         data={"billing_country": "MX", "final_sale": "yes"},
@@ -233,7 +236,10 @@ def test_verified_owner_must_be_the_signed_in_checkout_buyer(tmp_path: Path) -> 
     # Confirming opens the most recent upload as the free first report.
     free_id, _ = _upload(owner, 702)
     _confirm(owner, _mail_link(store, cfg, "owner@example.com"))
-    assert store.get_audit(free_id).paid and not store.get_audit(audit_id).paid
+    assert (
+        cast(AuditRecord, store.get_audit(free_id)).paid
+        and not cast(AuditRecord, store.get_audit(audit_id)).paid
+    )
 
     path = f"/audits/{audit_id}/checkout?token={token}"
     anonymous = TestClient(app, base_url=cfg.base_url)
@@ -334,10 +340,10 @@ def test_referral_waits_until_both_addresses_are_confirmed(tmp_path: Path) -> No
     _signup(friend, "friend@example.com", invite)
     friend_link = _mail_link(store, cfg, "friend@example.com")
     first_id, _ = _upload(friend, 410)
-    assert not store.get_audit(first_id).paid  # unconfirmed: a preview
+    assert not cast(AuditRecord, store.get_audit(first_id)).paid  # unconfirmed: a preview
     _confirm(friend, friend_link)
     # Confirming opens that same upload as the free first report.
-    assert store.get_audit(first_id).paid
+    assert cast(AuditRecord, store.get_audit(first_id)).paid
     assert store.account_credits(account.id, datetime.now(UTC)) == 0
     _confirm(inviter, inviter_link)
     assert store.account_credits(account.id, datetime.now(UTC)) == 1
@@ -370,7 +376,7 @@ def test_failed_smtp_stays_queued_and_retries_without_a_new_token(tmp_path: Path
         == 1
     )
     assert len(messages) == 1
-    token = parse_qs(urlsplit(re.search(r"https://\S+", messages[0].get_content()).group()).query)[
-        "token"
-    ][0]
+    match = re.search(r"https://\S+", messages[0].get_content())
+    assert match is not None
+    token = parse_qs(urlsplit(match.group()).query)["token"][0]
     assert mail.challenge_from_token(token, cfg.email_token_secret) == row["id"]

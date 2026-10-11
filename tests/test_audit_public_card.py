@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
+from typing import Literal
 from xml.etree import ElementTree as ET
 
 import pytest
@@ -39,9 +40,11 @@ def test_hand_checked_arithmetic_preserves_the_declared_rate() -> None:
 
 
 @pytest.mark.parametrize(("locale", "mark"), [("es", ","), ("en", "."), ("pt", ",")])
-def test_card_figures_use_the_languages_decimal_mark(locale: str, mark: str) -> None:
+def test_card_figures_use_the_languages_decimal_mark(
+    locale: Literal["es", "en", "pt"], mark: str
+) -> None:
     """The same values in each language's typography: a decimal comma in es and pt."""
-    claim = replace(FULL, locale=locale)  # type: ignore[arg-type]
+    claim = replace(FULL, locale=locale)
     results = {key: value for key, value, _ in _readings(claim)}
     assert results == {
         "wilson": f"56{mark}5 % – 82{mark}2 %",
@@ -61,6 +64,7 @@ def test_card_figures_use_the_languages_decimal_mark(locale: str, mark: str) -> 
     assert shown["trades"] == "45" and shown["trials"] == "100"
     other = "." if mark == "," else ","
     for key, value in results.items():
+        assert value is not None
         assert other not in value, key
 
 
@@ -82,7 +86,9 @@ def test_luck_without_declared_sharpe_discloses_null_dispersion() -> None:
 @pytest.mark.parametrize(
     "claim", [FULL, PublicClaim(), PublicClaim(trades=5, years=0.01, trials=2)]
 )
-def test_translations_accessibility_evidence_and_guard(locale: str, claim: PublicClaim) -> None:
+def test_translations_accessibility_evidence_and_guard(
+    locale: Literal["es", "en", "pt"], claim: PublicClaim
+) -> None:
     svg = public_card_svg(replace(claim, locale=locale))
     root = ET.fromstring(svg)
     assert (root.get("width"), root.get("height")) == ("1200", "675")
@@ -99,13 +105,13 @@ def test_translations_accessibility_evidence_and_guard(locale: str, claim: Publi
     assert len(fields) == 8 and len(readings) == 4
     for node in fields + readings:
         assert node.get("data-evidence") in ("DECLARED", "NOT_MEASURED")
-        assert node.get("data-evidence") in " ".join(node.itertext())
+        assert node.attrib["data-evidence"] in " ".join(node.itertext())
     assert COPY[locale]["footer"] in svg and COPY[locale]["cta"] in svg
     assert 'data-evidence="MEASURED"' not in svg
 
 
 @pytest.mark.parametrize("locale", ["es", "en", "pt"])
-def test_missing_readings_all_explain_the_absent_inputs(locale: str) -> None:
+def test_missing_readings_all_explain_the_absent_inputs(locale: Literal["es", "en", "pt"]) -> None:
     root = ET.fromstring(public_card_svg(PublicClaim(locale=locale)))
     for node in root.findall(".//s:g[@data-reading]", NS):
         assert node.get("data-evidence") == "NOT_MEASURED"
@@ -132,7 +138,7 @@ def test_missing_readings_all_explain_the_absent_inputs(locale: str) -> None:
     ],
 )
 def test_only_present_sources_or_one_fixed_attribution_are_shown(
-    locale: str, fallback: str, handle: str, url: str
+    locale: Literal["es", "en", "pt"], fallback: str, handle: str, url: str
 ) -> None:
     svg = public_card_svg(PublicClaim(locale=locale, source_handle=handle, source_url=url))
     root = ET.fromstring(svg)
@@ -143,8 +149,11 @@ def test_only_present_sources_or_one_fixed_attribution_are_shown(
         if sources
         else [f"DECLARED · {fallback}"]
     )
-    assert [node.find("s:text", NS).text for node in groups] == expected
-    assert [node.find("s:title", NS).text for node in groups] == (sources or [fallback])
+    text_nodes = [node.find("s:text", NS) for node in groups]
+    title_nodes = [node.find("s:title", NS) for node in groups]
+    assert all(node is not None for node in text_nodes + title_nodes)
+    assert [node.text for node in text_nodes if node is not None] == expected
+    assert [node.text for node in title_nodes if node is not None] == (sources or [fallback])
     assert f"NOT_MEASURED · {COPY[locale]['source']}" not in svg
     assert find_claims(" ".join(root.itertext())) == []
     assert root.findall(".//s:script", NS) == []
@@ -161,7 +170,7 @@ def test_only_present_sources_or_one_fixed_attribution_are_shown(
 )
 @pytest.mark.parametrize("claim", [FULL, PublicClaim()])
 def test_reader_brand_and_link_fit_inside_the_social_image_height(
-    locale: str, url: str, claim: PublicClaim
+    locale: Literal["es", "en", "pt"], url: str, claim: PublicClaim
 ) -> None:
     root = ET.fromstring(public_card_svg(replace(claim, locale=locale)))
     footers = [node for node in root.findall("s:text", NS) if node.text == url]
@@ -171,6 +180,7 @@ def test_reader_brand_and_link_fit_inside_the_social_image_height(
     assert int(footer.attrib["x"]) == 1160
     assert 570 < int(footer.attrib["y"]) < 630
     assert int(footer.attrib["y"]) + int(footer.attrib["font-size"]) <= 630
+    assert footer.text is not None
     assert find_claims(footer.text) == []
 
 
@@ -215,6 +225,7 @@ def test_wide_attribution_fits_inside_the_card() -> None:
     lines = [node for node in root.findall(".//s:text", NS) if source in (node.text or "")]
     assert len(lines) == 2
     for node in lines:
+        assert node.text is not None
         assert len(node.text) * int(node.attrib["font-size"]) <= 1120
 
 

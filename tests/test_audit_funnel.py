@@ -19,7 +19,7 @@ from quant_trade.audit import funnel  # noqa: E402
 from quant_trade.audit.guard import find_claims  # noqa: E402
 from quant_trade.audit.legal import LegalContext, privacy_text  # noqa: E402
 from quant_trade.audit.settings import AuditSettings  # noqa: E402
-from quant_trade.audit.store import make_store  # noqa: E402
+from quant_trade.audit.store import Store, make_store  # noqa: E402
 from quant_trade.audit.web import create_app  # noqa: E402
 
 KEY = "k" * 40
@@ -29,7 +29,7 @@ CSRF_FIELD = re.compile(r"name='csrf' value='([^']+)'")
 PLAYBOOK = Path(__file__).resolve().parents[1] / "docs" / "AUDIT_LAUNCH_PLAYBOOK.md"
 
 
-def _client(tmp_path: Path) -> tuple[TestClient, object]:
+def _client(tmp_path: Path) -> tuple[TestClient, Store]:
     settings = AuditSettings(
         database_url=f"sqlite:///{tmp_path}/audit.db",
         bootstrap_samples=100,
@@ -46,8 +46,8 @@ def _today() -> str:
 
 
 def _visits(client: TestClient) -> dict[tuple[str, str], int]:
-    client.app.state.visits.flush()  # type: ignore[attr-defined]
-    rows = client.app.state.store.funnel_events(_today())["visits"]  # type: ignore[attr-defined]
+    client.app.state.visits.flush()
+    rows = client.app.state.store.funnel_events(_today())["visits"]
     return {(locale, ref): count for _, locale, ref, count in rows}
 
 
@@ -130,7 +130,7 @@ def test_visits_are_bare_counters_per_day_language_and_tag(tmp_path: Path) -> No
         ("pt", "f6"): 1,
         ("en", ""): 2,
     }
-    columns = {column.name for column in store.funnel_visits.columns}  # type: ignore[attr-defined]
+    columns = {column.name for column in store.funnel_visits.columns}
     assert columns == {"day", "locale", "ref", "visits"}
 
 
@@ -188,13 +188,13 @@ def test_a_slow_or_failing_database_never_touches_a_page(tmp_path: Path) -> None
         calls.append(1)
         raise RuntimeError("database away")
 
-    store.count_visit = broken  # type: ignore[attr-defined]
+    store.count_visit = broken  # type: ignore[method-assign]
     for _ in range(3):
         assert _browser(client).get("/").status_code == 200
     assert calls == []  # nothing is written during a request
-    client.app.state.visits.flush()  # type: ignore[attr-defined]
+    client.app.state.visits.flush()
     assert calls == [1]  # one batched write, which failed and is kept
-    del store.count_visit  # type: ignore[attr-defined]
+    del store.count_visit
     assert _visits(client) == {("es", ""): 3}
 
 
@@ -202,19 +202,18 @@ def test_accounts_reports_and_payments_follow_their_tag(tmp_path: Path) -> None:
     client, store = _client(tmp_path)
     client.get("/para/retos-prop-firm?ref=f6")
     _signup(client, "ana@example.com")
-    account = store.find_account("ana@example.com")  # type: ignore[attr-defined]
+    account = store.find_account("ana@example.com")
+    assert account is not None
     _upload(client)  # the free first full report
     preview_id = _upload(client)  # a free preview
-    code, _ = store.create_access_code(  # type: ignore[attr-defined]
-        credits=1, note="", at=datetime.now(UTC)
-    )
-    assert store.redeem_for_audit(preview_id, code, at=datetime.now(UTC))  # type: ignore[attr-defined]
+    code, _ = store.create_access_code(credits=1, note="", at=datetime.now(UTC))
+    assert store.redeem_for_audit(preview_id, code, at=datetime.now(UTC))
 
     other = _browser(client)
     _signup(other, "bea@example.com")
 
-    client.app.state.visits.flush()  # type: ignore[attr-defined]
-    built = funnel.build(store.funnel_events(_today()))  # type: ignore[attr-defined]
+    client.app.state.visits.flush()
+    built = funnel.build(store.funnel_events(_today()))
     f6 = built.by_ref["f6"].counts
     assert f6 == {
         "visits": 1,
@@ -242,8 +241,8 @@ def test_accounts_reports_and_payments_follow_their_tag(tmp_path: Path) -> None:
     assert built.by_day[(_today(), "es")].counts["signups"] == 2
 
     # The tag goes with the account.
-    store.delete_account(account.id)  # type: ignore[attr-defined]
-    left = store.funnel_events(_today())["signups"]  # type: ignore[attr-defined]
+    store.delete_account(account.id)
+    left = store.funnel_events(_today())["signups"]
     assert all(ref != "f6" for _, _, ref, _ in left)
 
 
@@ -252,44 +251,44 @@ def test_observed_funnel_stages_keep_checkout_distinct_from_charge(tmp_path: Pat
     now = datetime.now(UTC)
     client.get("/?ref=f4")
     _signup(client, "buyer@example.com")
-    buyer = store.find_account("buyer@example.com")  # type: ignore[attr-defined]
+    buyer = store.find_account("buyer@example.com")
     assert buyer is not None
-    with store.engine.begin() as conn:  # type: ignore[attr-defined]
+    with store.engine.begin() as conn:
         conn.execute(
-            store.verified_emails.insert().values(  # type: ignore[attr-defined]
+            store.verified_emails.insert().values(
                 account_id=buyer.id, email=buyer.email, verified_at=now.isoformat()
             )
         )
     _upload(client)  # full welcome report
     audit_id = _upload(client)  # persisted preview, not a paid delivery
 
-    invitee = store.create_account(  # type: ignore[attr-defined]
+    invitee = store.create_account(
         email="invitee@example.com", password_hash="unused", locale="es", at=now
     )
     assert invitee is not None
-    assert store.record_referral(invitee.id, buyer.id, device_sha256="", at=now)  # type: ignore[attr-defined]
+    assert store.record_referral(invitee.id, buyer.id, device_sha256="", at=now)
 
-    order = store.reserve_checkout(  # type: ignore[attr-defined]
+    order = store.reserve_checkout(
         audit_id, account_id=buyer.id, plan="single", amount_cents=2900, currency="usd", at=now
     )
-    before = funnel.build(store.funnel_events(_today())).total.counts  # type: ignore[attr-defined]
+    before = funnel.build(store.funnel_events(_today())).total.counts
     assert before["email_verified"] == 1
     assert before["uploads"] == 2
     assert before["referrals_accepted"] == 1
     assert before["checkout_started"] == 0  # reservation alone never reached Checkout
     assert before["deliveries"] == before["purchases"] == 0
 
-    store.attach_checkout_session(  # type: ignore[attr-defined]
+    store.attach_checkout_session(
         order.id,
         session_id="cs_live_funnel",
         checkout_url="https://checkout.stripe.test/funnel",
         expires_at=None,
     )
-    opened = funnel.build(store.funnel_events(_today())).total.counts  # type: ignore[attr-defined]
+    opened = funnel.build(store.funnel_events(_today())).total.counts
     assert opened["checkout_started"] == 1
     assert opened["purchases"] == opened["deliveries"] == 0
 
-    store.settle_card_payment(  # type: ignore[attr-defined]
+    store.settle_card_payment(
         order_id=order.id,
         session_id="cs_live_funnel",
         audit_id=audit_id,
@@ -301,7 +300,7 @@ def test_observed_funnel_stages_keep_checkout_distinct_from_charge(tmp_path: Pat
         at=now,
         payment_livemode=True,
     )
-    paid = funnel.build(store.funnel_events(_today()))  # type: ignore[attr-defined]
+    paid = funnel.build(store.funnel_events(_today()))
     assert paid.total.counts["checkout_started"] == 1
     assert paid.total.counts["purchases"] == paid.total.counts["deliveries"] == 1
     assert paid.total.counts["gross_usd_cents"] == 2900
@@ -433,7 +432,7 @@ def test_a_failing_tag_store_never_breaks_a_sign_up(tmp_path: Path) -> None:
     def broken(*args: object, **kwargs: object) -> None:
         raise RuntimeError("database away")
 
-    store.set_account_ref = broken  # type: ignore[attr-defined]
+    store.set_account_ref = broken  # type: ignore[method-assign]
     client.get("/?ref=f4")
     _signup(client, "ana@example.com")
     assert client.get("/cuenta", follow_redirects=False).status_code == 200
@@ -465,5 +464,5 @@ def test_the_background_writer_flushes_on_shutdown(tmp_path: Path) -> None:
     settings = AuditSettings(database_url=f"sqlite:///{tmp_path}/audit.db", admin_key=KEY)
     with TestClient(create_app(settings, store), headers=BROWSER) as client:
         assert client.get("/").status_code == 200
-    rows = store.funnel_events(_today())["visits"]  # type: ignore[attr-defined]
+    rows = store.funnel_events(_today())["visits"]
     assert [(locale, ref, count) for _, locale, ref, count in rows] == [("es", "", 1)]

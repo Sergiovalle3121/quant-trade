@@ -14,7 +14,7 @@ from test_audit_importers import xlsx
 from quant_trade.audit import universal
 from quant_trade.audit.importers import ReportFormatError, import_report
 
-INFERRED = [
+INFERRED: list[object] = [
     "Data do Negócio", "Tipo de Movimentação", "Mercado", "Prazo/Vencimento", "Instituição",
     "Código de Negociação", "Quantidade", "Preço", "Valor",
 ]  # fmt: skip
@@ -46,7 +46,7 @@ def test_the_confirmed_names_are_read_with_dates_day_first() -> None:
 
 
 def test_the_inferred_layout_reads_the_ticker_not_the_market() -> None:
-    rows = [
+    rows: list[list[object]] = [
         INFERRED,
         _row("14/08/2026", "Venda", "Mercado à Vista", "PETR4", 100, 38.5),
         _row("12/08/2026", "Venda", "Mercado à Vista", "VALE3", 5, 62.0),

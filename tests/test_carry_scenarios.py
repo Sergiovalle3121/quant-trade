@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from quant_trade.carry.models import CarryCostModel, CarryPolicy, CarryPosition, CarrySnapshot
 from quant_trade.carry.scenarios import (
     CarryScenario,
@@ -12,7 +14,7 @@ from quant_trade.carry.scenarios import (
 
 
 def _snap(**overrides) -> CarrySnapshot:
-    base = dict(
+    base: dict[str, Any] = dict(
         symbol="BTC",
         exchange="venue",
         captured_at_utc="2024-01-01T00:00:00Z",

@@ -1,5 +1,6 @@
 import json
 from itertools import combinations
+from typing import Any
 
 import numpy as np
 import pytest
@@ -157,7 +158,7 @@ def test_conservative_selection_can_require_matching_overfitting_evidence():
         max_walk_forward_pbo=0.50,
         min_walk_forward_windows=4,
     )
-    result = {
+    result: dict[str, Any] = {
         "strategy": "time_series_momentum",
         "dataset_binding": {"data_sha256": "abc"},
         "overfitting_evidence": {

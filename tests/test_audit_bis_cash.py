@@ -26,7 +26,7 @@ from quant_trade.audit.market import (
 )
 from quant_trade.audit.pages import method_page
 from quant_trade.audit.report import LABELS, render
-from quant_trade.audit.schema import DeclaredMetadata, build_inputs
+from quant_trade.audit.schema import AuditInputs, DeclaredMetadata, build_inputs
 
 DAYS = pd.bdate_range("2023-01-02", periods=300)
 
@@ -68,7 +68,7 @@ def test_a_bis_reply_is_read_on_month_ends_and_a_reply_out_of_range_is_refused()
     assert MAX_LOCAL_RATE < 900 and broken.refresh("cash_try") is False
 
 
-def _account(currency: str, locale: str) -> tuple[object, dict[str, pd.Series]]:
+def _account(currency: str, locale: str) -> tuple[AuditInputs, dict[str, pd.Series]]:
     key = LOCAL[currency].asset.key
     start = (DAYS[0] - pd.Timedelta(days=62)).to_period("M")
     months = pd.period_range(start, DAYS[-1].to_period("M"), freq="M")

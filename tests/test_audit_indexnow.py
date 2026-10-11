@@ -8,8 +8,9 @@ from pathlib import Path
 
 import pytest
 
-httpx = pytest.importorskip("httpx")
+pytest.importorskip("httpx")
 pytest.importorskip("fastapi")
+import httpx  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 from typer.testing import CliRunner  # noqa: E402
 
@@ -193,7 +194,7 @@ def test_each_documented_answer_is_named(status: int, accepted: bool, name: str)
 
 
 @pytest.mark.parametrize("error", [httpx.ConnectError, httpx.ReadTimeout])
-def test_a_network_failure_is_an_error_without_its_details(error: type[Exception]) -> None:
+def test_a_network_failure_is_an_error_without_its_details(error: type[httpx.RequestError]) -> None:
     secret = f"secret {SITE}/a {KEY}"
 
     def fail(request: httpx.Request) -> httpx.Response:

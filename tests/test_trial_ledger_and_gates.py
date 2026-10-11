@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -115,7 +116,7 @@ def test_statistical_gates_reject_thin_or_unproven_evidence(tmp_path):
     _panel().to_csv(data_path, index=False)
     _run_research(tmp_path, data_path)
     outputs = tmp_path / "outputs"
-    base = dict(
+    base: dict[str, Any] = dict(
         min_test_sharpe=-10.0,
         min_excess_return=-10.0,
         max_test_drawdown=1.0,

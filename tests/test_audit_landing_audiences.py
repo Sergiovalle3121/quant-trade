@@ -116,7 +116,7 @@ def test_pricing_offers_the_free_account_that_the_preview_needs() -> None:
         assert find_claims(html.unescape(card)) == []
 
 
-def test_account_note_links_a_live_sign_up_page(tmp_path) -> None:  # type: ignore[no-untyped-def]
+def test_account_note_links_a_live_sign_up_page(tmp_path) -> None:
     from fastapi.testclient import TestClient
 
     from quant_trade.audit.settings import AuditSettings

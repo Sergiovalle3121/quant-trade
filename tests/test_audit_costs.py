@@ -60,7 +60,9 @@ def test_break_even_is_exact() -> None:
     rows = recost_trades(trades, sides, be, multipliers=(1.0,))
     assert rows[0].net_pnl == pytest.approx(0.0, abs=1e-9)
     losing = [_trade(100.0, 99.0)]
-    assert break_even_bps(losing, ["long"]) < 0
+    losing_be = break_even_bps(losing, ["long"])
+    assert losing_be is not None
+    assert losing_be < 0
     assert break_even_bps([], []) is None
 
 
@@ -90,6 +92,7 @@ def test_reported_costs_sit_in_every_row_and_the_break_even() -> None:
     # Extra bps on top of the reported fees at which the ledger nets zero.
     trades = [_trade(100.0, 102.0)]
     be = break_even_bps(trades, ["long"], reported_costs=[5.0])
+    assert be is not None
     assert be == pytest.approx(10_000.0 * (20.0 - 5.0) / (1_000.0 + 1_020.0))
     at_be = recost_trades(trades, ["long"], be, multipliers=(1.0,), reported_costs=[5.0])
     assert at_be[0].net_pnl == pytest.approx(0.0, abs=1e-9)

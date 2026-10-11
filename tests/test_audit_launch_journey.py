@@ -7,7 +7,7 @@ import re
 import time
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 from urllib.parse import parse_qs, urlsplit
 
 import pytest
@@ -21,7 +21,7 @@ from fastapi.testclient import TestClient  # noqa: E402
 from quant_trade.audit import account_pages, funnel  # noqa: E402
 from quant_trade.audit import pdf as pdf_lib
 from quant_trade.audit.settings import AuditSettings  # noqa: E402
-from quant_trade.audit.store import make_store  # noqa: E402
+from quant_trade.audit.store import AuditRecord, make_store  # noqa: E402
 from quant_trade.audit.web import create_app, sign_stripe_payload  # noqa: E402
 
 _CSRF = re.compile(r"name='csrf' value='([^']+)'")
@@ -105,8 +105,10 @@ def test_registration_referral_checkout_credit_pdf_and_help(
     assert owner_account is not None
 
     welcome_id, welcome_token = _upload(owner, locale, 101)
-    assert store.get_audit(welcome_id).paid
-    assert store.get_audit(welcome_id).stripe_session_id.startswith("welcome:")
+    assert cast(AuditRecord, store.get_audit(welcome_id)).paid
+    assert cast(str, cast(AuditRecord, store.get_audit(welcome_id)).stripe_session_id).startswith(
+        "welcome:"
+    )
     assert owner.get(f"/audits/{welcome_id}?token={welcome_token}&lang={locale}").status_code == 200
 
     account_page = owner.get(account_pages.path("account", locale)).text
@@ -118,19 +120,21 @@ def test_registration_referral_checkout_credit_pdf_and_help(
     friend = TestClient(app, base_url="https://rigor.example")
     _signup(friend, locale, f"friend-{locale}@example.com", invite=invite)
     friend_id, _ = _upload(friend, locale, 102)
-    assert store.get_audit(friend_id).paid
+    assert cast(AuditRecord, store.get_audit(friend_id)).paid
     assert store.invite_summary(owner_account.id, datetime.now(UTC)).credited == 1
     assert store.account_credits(owner_account.id, datetime.now(UTC)) == 1
 
     referral_id, referral_token = _upload(owner, locale, 103)
-    assert not store.get_audit(referral_id).paid
+    assert not cast(AuditRecord, store.get_audit(referral_id)).paid
     _redeem_credit(owner, referral_id, referral_token, locale)
-    assert store.get_audit(referral_id).paid
-    assert store.get_audit(referral_id).stripe_session_id.startswith("code:")
+    assert cast(AuditRecord, store.get_audit(referral_id)).paid
+    assert cast(str, cast(AuditRecord, store.get_audit(referral_id)).stripe_session_id).startswith(
+        "code:"
+    )
     assert store.account_credits(owner_account.id, datetime.now(UTC)) == 0
 
     priced_id, priced_token = _upload(owner, locale, 104)
-    assert not store.get_audit(priced_id).paid
+    assert not cast(AuditRecord, store.get_audit(priced_id)).paid
     session_id = f"cs_journey_{locale}"
     observed: list[tuple[str, int]] = []
 
@@ -181,7 +185,7 @@ def test_registration_referral_checkout_credit_pdf_and_help(
         ).status_code
         == 200
     )
-    assert store.get_audit(priced_id).paid
+    assert cast(AuditRecord, store.get_audit(priced_id)).paid
     assert store.account_credits(owner_account.id, datetime.now(UTC)) == 2
     assert (
         "class='lockbox'"
@@ -189,9 +193,9 @@ def test_registration_referral_checkout_credit_pdf_and_help(
     )
 
     credit_id, credit_token = _upload(owner, locale, 105)
-    assert not store.get_audit(credit_id).paid
+    assert not cast(AuditRecord, store.get_audit(credit_id)).paid
     _redeem_credit(owner, credit_id, credit_token, locale)
-    assert store.get_audit(credit_id).paid
+    assert cast(AuditRecord, store.get_audit(credit_id)).paid
     assert store.account_credits(owner_account.id, datetime.now(UTC)) == 1
     pdf = owner.get(f"/audits/{credit_id}/pdf?token={credit_token}&lang={locale}")
     if pdf_lib.available():

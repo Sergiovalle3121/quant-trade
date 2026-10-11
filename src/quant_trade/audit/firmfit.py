@@ -52,14 +52,14 @@ REPEATS = {"the5ers-bootcamp-step": 3, "fxify-3phase-step": 3, "maven-3step-step
 NOTE = (
     "every published preset simulated on the same resampled daily paths, rules as each "
     "firm's page stated them on its as_of date; a program's phases are taken as fresh "
-    "starts, so the chance of passing them all is the product of each phase's"
+    "starts, so the chance of reaching the target in every phase is the product of each phase's"
 )
 
 _FAILS = ("fail_daily_loss", "fail_total_loss", "unfinished")
 #: How a program ends, phase by phase, for :func:`program_outcomes`.
 OUTCOME_NOTE = (
     "share of the resampled paths that end the program this way: each phase is a fresh "
-    "start reached only by passing the phases before it"
+    "start reached only by reaching the target in the phases before it"
 )
 
 

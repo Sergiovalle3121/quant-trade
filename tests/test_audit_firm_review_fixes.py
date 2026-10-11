@@ -166,7 +166,9 @@ def test_the_lots_are_the_file_balance_and_scale_to_the_program_account(
 def test_no_account_lot_without_a_measured_lot_an_account_or_a_known_balance() -> None:
     lot = {"value": 0.5, "evidence": "MEASURED", "note": "x"}
     balance = {"value": 10_000.0, "evidence": "DECLARED", "note": "x"}
-    assert engine._account_lot(lot, balance, 100_000.0)["value"] == 5.0
+    account_lot = engine._account_lot(lot, balance, 100_000.0)
+    assert account_lot is not None
+    assert account_lot["value"] == 5.0
     # An assumed balance makes the proportion a guess: no figure.
     assumed = {**balance, "evidence": "NOT_MEASURED"}
     assert engine._account_lot(lot, assumed, 100_000.0) is None

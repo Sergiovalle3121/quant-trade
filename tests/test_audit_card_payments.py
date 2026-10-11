@@ -1256,9 +1256,12 @@ def test_checkout_needs_the_signed_in_account_that_owns_the_report(tmp_path: Pat
     client = _client(tmp_path)
     audit_id, token = _upload(client)
     calls: list[str] = []
-    client.app.state.checkout_factory = lambda *_args, **_kwargs: (
-        calls.append("x") or "https://checkout.stripe.test/s"
-    )
+
+    def checkout(*_args: object, **_kwargs: object) -> str:
+        calls.append("x")
+        return "https://checkout.stripe.test/s"
+
+    client.app.state.checkout_factory = checkout
     url = f"/audits/{audit_id}/checkout?token={token}&lang=es"
     form = {"plan": "single", "billing_country": "MX", "final_sale": "yes"}
 

@@ -6,6 +6,7 @@ import sqlite3
 from itertools import permutations
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -475,7 +476,7 @@ def test_post_fee_position_gross_cash_caps_hold(strategy, cap, multiplier, tmp_p
 
 
 def test_partial_risk_reduction_blocks_new_buys_even_with_five_point_band(tmp_path):
-    book = {
+    book: dict[str, Any] = {
         "portfolio": "inverse_volatility",
         "cost_multiplier": 3,
         "cash_usd": 550.0,

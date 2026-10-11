@@ -92,6 +92,8 @@ def test_walk_forward(tmp_path):
 
 def test_legacy_signal_dataframe_backtest_compatibility():
     data = load_ohlcv(DATA)
-    signals = get_strategy("buy_and_hold")(data)
+    strategy = get_strategy("buy_and_hold")
+    assert callable(strategy)
+    signals = strategy(data)
     result = run_backtest(data, signals, 10000)
     assert result.metrics["trade_count"] == 0

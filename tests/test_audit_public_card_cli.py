@@ -8,6 +8,7 @@ import re
 import sys
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Any
 
 import pytest
 from typer.testing import CliRunner
@@ -153,7 +154,7 @@ def test_public_card_reads_only_requested_json(
     original = Path.read_text
     reads: list[Path] = []
 
-    def read_text(path: Path, *args: object, **kwargs: object) -> str:
+    def read_text(path: Path, *args: Any, **kwargs: Any) -> str:
         assert path == claim
         reads.append(path)
         return original(path, *args, **kwargs)
@@ -171,7 +172,7 @@ def test_public_card_keeps_svg_without_rasterizer(
     if native_missing:
         original = builtins.__import__
 
-        def no_cairo(name: str, *args: object, **kwargs: object):
+        def no_cairo(name: str, *args: Any, **kwargs: Any):
             if name == "cairosvg":
                 raise OSError("guaranteed profit: untrusted native error")
             return original(name, *args, **kwargs)

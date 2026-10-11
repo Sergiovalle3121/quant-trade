@@ -59,7 +59,7 @@ COMMA_DECIMAL = re.compile(r"(?<![\d.,])\d+,\d{1,2}(?![\d.,])")
 def _mark(text: str, locale: str) -> str:
     """``text`` written with a point, in the page's typography (written here on its own,
     not with the code under test): unchanged in en, comma and point swapped in es/pt."""
-    return text if locale == "en" else text.translate(str.maketrans({",": ".", ".": ","}))
+    return text if locale == "en" else text.translate(str.maketrans(",.", ".,"))
 
 
 def _value(text: str, locale: str) -> float:

@@ -198,6 +198,7 @@ def test_fund_track_record_reads_as_a_fund(tmp_path: Path, monkeypatch: pytest.M
     monkeypatch.setattr(raster, "card_png", lambda svg: None)
     client, store, audit_id, _, public_id = _published_history(tmp_path, "fund")
     record = store.get_audit(audit_id)
+    assert record is not None and record.result_json is not None
     data = json.loads(record.result_json)
     overall = data["verdict"]["overall"]
     for locale in LOCALES:

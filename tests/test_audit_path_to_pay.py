@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import html
 import re
+from typing import Any
 
 import pytest
 
@@ -45,7 +46,12 @@ def test_every_start_button_opens_the_upload_page(locale: str) -> None:
         {"free_mode": False, "signed_in": True},
         {"free_mode": True, "signed_in": False},
     ):
-        page = landing(locale=locale, access_codes=True, **kwargs)
+        page = landing(
+            locale=locale,
+            access_codes=True,
+            free_mode=kwargs["free_mode"],
+            signed_in=kwargs["signed_in"],
+        )
         assert "#subir'" not in page and "action='/audits'" not in page
         # Hero, prices (one card free, two paid), the closing call, the top bar and the
         # phone menu.
@@ -202,7 +208,12 @@ def test_the_fund_page_says_its_own_index_cannot_make_an_a(locale: str) -> None:
 
 @pytest.mark.parametrize("locale", sorted(SIGNUP))
 def test_the_landing_says_a_pdf_statement_is_accepted(locale: str) -> None:
-    options = {"locale": locale, "free_mode": False, "price_usd": 29, "access_codes": True}
+    options: dict[str, Any] = {
+        "locale": locale,
+        "free_mode": False,
+        "price_usd": 29,
+        "access_codes": True,
+    }
     # The landing or the upload page says it; the upload page accepts the file.
     page = html.unescape(landing(**options) + upload_page(**options))
     phrase = {

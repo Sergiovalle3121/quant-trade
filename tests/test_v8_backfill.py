@@ -164,7 +164,7 @@ def test_blocked_network_records_the_verbatim_error_and_host(tmp_path: Path) -> 
     since, until = _window(2)
     request = BackfillRequest(venue="okx", symbol="BTC", since_ms=since, until_ms=until)
 
-    def blocked(_url: str) -> tuple[int, bytes, dict[str, str]]:
+    def blocked(url: str) -> tuple[int, bytes, dict[str, str]]:
         raise OSError("CONNECT tunnel failed, response 403")
 
     result = run_backfill(

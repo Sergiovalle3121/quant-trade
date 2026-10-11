@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 import pytest
 from audit_fixtures import csv_bytes, positive_drift, signed_in
@@ -17,7 +18,7 @@ from quant_trade.audit.settings import AuditSettings  # noqa: E402
 from quant_trade.audit.store import make_store  # noqa: E402
 from quant_trade.audit.web import create_app  # noqa: E402
 
-SELLING = {
+SELLING: dict[str, Any] = {
     "free_mode": False,
     "access_codes": True,
     "contact_url": "https://wa.me/000",

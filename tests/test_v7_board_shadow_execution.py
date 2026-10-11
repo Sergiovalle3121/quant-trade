@@ -6,7 +6,7 @@ import json
 
 import pytest
 
-from quant_trade.execution.broker import BrokerAccount, BrokerOrderRequest
+from quant_trade.execution.broker import BrokerAccount, BrokerOrder, BrokerOrderRequest
 from quant_trade.execution.config import BrokerConfig
 from quant_trade.execution.exceptions import BrokerSafetyError
 from quant_trade.execution.safety import validate_order_safety
@@ -228,6 +228,8 @@ def test_simulated_broker_is_idempotent_by_client_order_id() -> None:
     request = BrokerOrderRequest("SPY", "buy", 1.0, "market", "day", "stable-key")
     first = broker.submit_order(request)
     second = broker.submit_order(request)
+    assert isinstance(first, BrokerOrder)
+    assert isinstance(second, BrokerOrder)
     assert first.broker_order_id == second.broker_order_id
     assert len(broker.orders) == 1
 

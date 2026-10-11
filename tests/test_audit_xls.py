@@ -23,7 +23,15 @@ from quant_trade.audit.importers import (
 )
 from quant_trade.audit.schema import parse_equity_csv
 
-HEADER = ["Symbol", "Side", "Quantity", "Open Time", "Open Price", "Close Time", "Close Price"]
+HEADER: list[object] = [
+    "Symbol",
+    "Side",
+    "Quantity",
+    "Open Time",
+    "Open Price",
+    "Close Time",
+    "Close Price",
+]
 
 
 def _trades() -> list[list[object]]:
@@ -56,14 +64,17 @@ def test_a_trade_list_saved_as_xls_is_read_like_a_workbook() -> None:
 
 
 def test_dates_come_back_as_text_and_blank_cells_are_trimmed() -> None:
-    rows = [["Fecha", "Saldo", "Nota"], [datetime(2026, 8, 1, 9, 30), 1.25, None]]
+    rows: list[list[object]] = [
+        ["Fecha", "Saldo", "Nota"],
+        [datetime(2026, 8, 1, 9, 30), 1.25, None],
+    ]
     assert read_xlsx(xls({"Hoja1": rows})) == {
         "Hoja1": [["Fecha", "Saldo", "Nota"], ["2026-08-01 09:30:00", 1.25]]
     }
 
 
 def test_the_column_screen_offers_an_xls_sheet() -> None:
-    rows = [
+    rows: list[list[object]] = [
         ["Fecha", "Resultado", "Nota"],
         *([f"2026-01-{d:02d}", d - 10, "x"] for d in range(2, 20)),
     ]
@@ -72,9 +83,8 @@ def test_the_column_screen_offers_an_xls_sheet() -> None:
 
 
 def test_an_equity_curve_saved_as_xls_is_read() -> None:
-    rows = [["timestamp", "equity"]] + [
-        [datetime(2026, 1, day), 10_000 + 10 * day] for day in range(1, 29)
-    ]
+    rows: list[list[object]] = [["timestamp", "equity"]]
+    rows += [[datetime(2026, 1, day), 10_000 + 10 * day] for day in range(1, 29)]
     series = parse_equity_csv(xls({"Curva": rows}))
     assert len(series.frame) == 28
     assert float(series.frame["equity"].iloc[-1]) == 10_280

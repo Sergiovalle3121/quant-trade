@@ -76,7 +76,7 @@ def test_the_landing_mock_is_a_class_the_rules_can_give() -> None:
     from quant_trade.audit.verdict import Thresholds, overall_class
 
     dimensions = [
-        Dimension(name=name, status=status, reasons=[], inputs={})  # type: ignore[arg-type]
+        Dimension(name=name, status=status, reasons=[], inputs={})
         for name, status in _MOCK_STATUSES
     ]
     assert overall_class(dimensions) == "B"

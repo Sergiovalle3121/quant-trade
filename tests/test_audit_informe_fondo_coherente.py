@@ -256,7 +256,7 @@ def test_the_fixture_is_a_fund_with_its_class_and_tags_as_the_engine_wrote_them(
         # A declared voice changes no figure, no class and no tag.
         fund, index = _pair()
         voiced = _run(_dated(fund, index), locale, ownership="provider", **TRIALS[trials])
-        stored = voiced.model_dump(mode="json")  # type: ignore[attr-defined]
+        stored = voiced.model_dump(mode="json")
         for key in ("verdict", "multiplicity", "luck", "cscv", "performance", "significance"):
             assert stored[key] == data[key], key
 

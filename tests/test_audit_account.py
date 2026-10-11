@@ -94,7 +94,7 @@ TOPPED_UP = [
 ]
 
 
-def _audit(data: bytes, locale: str = "es"):  # type: ignore[no-untyped-def]
+def _audit(data: bytes, locale: str = "es"):
     inputs = build_inputs(
         None,
         DeclaredMetadata(locale=locale),
@@ -209,7 +209,7 @@ def test_account_uploaded_as_live_is_reviewed_without_touching_the_class() -> No
     backtest = (FIXTURES / "mt5_tester.html").read_bytes()
     statement = _statement(TOPPED_UP, floating=-3_000.0, balance=19_500.0)
 
-    def audit(live: bytes | None):  # type: ignore[no-untyped-def]
+    def audit(live: bytes | None):
         inputs = build_inputs(
             None,
             DeclaredMetadata(),

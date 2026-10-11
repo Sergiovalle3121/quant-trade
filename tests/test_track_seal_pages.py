@@ -351,7 +351,7 @@ def test_open_upload_publish_and_the_public_page(
         ).hexdigest()
         assert digest == entry["hash"]
         previous = digest
-    assert previous == payload["head_hash"] == record.head_hash  # type: ignore[union-attr]
+    assert previous == payload["head_hash"] == record.head_hash
     for private in PRIVATE_TEXT:
         assert private not in chain.text
 

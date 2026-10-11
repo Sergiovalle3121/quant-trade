@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 from quant_trade.paper.parity import (
     ExecutionRecord,
@@ -19,7 +20,7 @@ from quant_trade.paper.readiness import (
 
 
 def _record(source: str, **overrides) -> ExecutionRecord:
-    base = dict(
+    base: dict[str, Any] = dict(
         source=source,
         target_weights={"AAA": 0.5, "BBB": 0.5},
         order_quantities={"AAA": 10.0, "BBB": 5.0},
@@ -127,7 +128,7 @@ def _record_all_drills(evidence_dir, executed_at: str = "2026-07-20T00:00:00Z") 
 
 
 def _ready_config(evidence_dir=None, **overrides) -> dict:
-    base = dict(
+    base: dict[str, Any] = dict(
         broker_mode="paper",
         broker_endpoint="https://paper-api.alpaca.markets",
         live_trading=False,

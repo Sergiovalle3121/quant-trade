@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 from datetime import UTC, datetime
+from typing import cast
 
 import pytest
 from audit_fixtures import (
@@ -38,7 +39,7 @@ def _result(locale: str = "es", description: str = "", **files):
             trials=4,
             cost_bps_per_side=5,
             locale=locale,
-            description=description,  # type: ignore[arg-type]
+            description=description,
         ),
         **files,
     )
@@ -158,7 +159,7 @@ def test_rendered_reports_pass_the_guard(locale: str) -> None:
     for frame in (positive_drift(600), spiked(spikes=5), winner):
         inputs = build_inputs(
             csv_bytes(frame),
-            DeclaredMetadata(trials=30, locale=locale, description="makes money"),  # type: ignore[arg-type]
+            DeclaredMetadata(trials=30, locale=locale, description="makes money"),
             trades_bytes=csv_bytes(trades_frame(15)),
         )
         result = run_audit(inputs, now=NOW, audit_id="x", bootstrap_samples=100)
@@ -333,7 +334,7 @@ def test_reconciliation_and_forensic_signal_remain_visible_in_every_language() -
         **recon,
         "currency": "UNKNOWN",
         "coverage": {
-            **recon["coverage"],
+            **cast(dict[str, str], recon["coverage"]),
             "curve": "separate upload",
             "currency": "not stated; same units assumed",
             "trade_currency": "USD",

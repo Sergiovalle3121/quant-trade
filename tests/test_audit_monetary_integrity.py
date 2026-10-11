@@ -19,7 +19,7 @@ MT5 = Path(__file__).parent / "fixtures" / "audit_imports" / "mt5_tester.html"
 MT5_HISTORY = MT5.with_name("mt5_history.html")
 
 
-def _run(inputs):  # type: ignore[no-untyped-def]
+def _run(inputs):
     return run_audit(
         inputs,
         now=NOW,

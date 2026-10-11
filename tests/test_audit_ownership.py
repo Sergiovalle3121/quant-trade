@@ -16,6 +16,7 @@ import re
 from datetime import UTC, datetime
 from functools import lru_cache
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import pytest
@@ -182,7 +183,7 @@ def test_the_answer_changes_no_figure_class_or_tag_of_the_result() -> None:
 # Over HTTP ---------------------------------------------------------------------
 
 
-def _client(tmp_path: Path):  # type: ignore[no-untyped-def]
+def _client(tmp_path: Path):
     pytest.importorskip("fastapi")
     pytest.importorskip("sqlalchemy")
     from fastapi.testclient import TestClient
@@ -195,7 +196,7 @@ def _client(tmp_path: Path):  # type: ignore[no-untyped-def]
     return signed_in(TestClient(create_app(settings, make_store(settings.database_url))))
 
 
-def _post(client, **data):  # type: ignore[no-untyped-def]
+def _post(client, **data):
     files = {"equity": ("equity.csv", csv_bytes(positive_drift(500)), "text/csv")}
     payload = {"trials": "3", "cost_bps": "5", **data}
     return client.post("/audits", files=files, data=payload, follow_redirects=False)
@@ -787,7 +788,7 @@ def test_the_public_page_and_its_card_never_show_the_answer() -> None:
         view, _ = public_view(_with_role(_sample("es"), role).model_dump_json())
         assert set(view["declared"]) == {"trials"}
         for locale in LOCALES:
-            kwargs = {
+            kwargs: dict[str, Any] = {
                 "public_id": "abc123",
                 "published_at": "2026-10-01T00:00:00Z",
                 "result_sha256": "0" * 64,

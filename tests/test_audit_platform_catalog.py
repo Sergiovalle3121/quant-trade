@@ -492,7 +492,9 @@ def test_xtb_xlsx_with_account_rows_and_an_empty_first_column() -> None:
 
     top: list[list[object]] = [[None, "Name and surname", "Demo"], [None, "Account", "123"]]
     top += [[None]] * 10
-    sheet = [*top, [None, *XTB_HEADER.split(",")], *[[None, *row] for row in XTB_ROWS]]
+    sheet: list[list[object]] = [
+        *top, [None, *XTB_HEADER.split(",")], *[[None, *row] for row in XTB_ROWS]
+    ]
     sheet.append([None, "Total", *[None] * 14, -2, -0.5, -0.25, 100])
     data = xlsx({"CLOSED POSITION HISTORY": sheet, "CASH OPERATION HISTORY": [["ID"]]})
     report = import_report(data, "account_123_xStation5.xlsx", initial_balance=25_000)
