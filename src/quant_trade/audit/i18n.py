@@ -158,30 +158,32 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
         "decimal. Quita las columnas net_return o benchmark si no tienes esas series.",
     ),
     (
-        "I sign a mutual NDA before you send anything; you can send yours.",
-        "Firmo un NDA mutuo antes de que manden nada; pueden mandar el suyo.",
+        "We sign a mutual NDA before you send anything; you are welcome to send your own.",
+        "Firmamos un NDA mutuo antes de que nos mandes nada; puedes mandar el tuyo.",
     ),
     (
-        "The first report is not published and the company is not mentioned without "
-        "written permission.",
-        "El primer informe no se publica ni se menciona a la empresa sin permiso escrito.",
+        "Without your written permission, no report is published, the first one included, "
+        "and the company is not named.",
+        "Ningún informe, tampoco el primero, se publica ni se menciona a la empresa sin "
+        "permiso escrito.",
     ),
     (
-        "It does not reconcile figures with the broker or administrator, is not "
-        "operational due diligence and is not a GIPS presentation.",
-        "No concilia las cifras con el bróker ni con el administrador, no es diligencia "
-        "operativa y no es una presentación GIPS.",
+        "The review does not reconcile the figures with your broker or fund administrator, "
+        "is not operational due diligence and is not a GIPS presentation.",
+        "La revisión no concilia las cifras con el bróker ni con el administrador, no es "
+        "diligencia operativa y no es una presentación GIPS.",
     ),
     (
-        "We will write within 1 business day. I sign the mutual NDA before receiving your files.",
-        "Te escribimos en 1 día hábil. Firmo el NDA mutuo antes de recibir tus archivos.",
+        "We will write within 1 business day. We sign the mutual NDA before receiving your files.",
+        "Te escribimos en 1 día hábil. Firmamos el NDA mutuo antes de recibir tus archivos.",
     ),
     (
         "These details carry the DECLARED label: they are supplied by the person requesting "
-        "the review. This form has no attachments; upload the series later through the usual "
-        "flow.",
+        "the review. This form has no attachments and needs no confidential data: the series "
+        "and the details come after the NDA, through the usual flow.",
         "Estos datos llevan la etiqueta «DECLARED»: los aporta quien solicita la "
-        "revisión. Aquí no se adjuntan archivos; la serie se sube después por el flujo habitual.",
+        "revisión. Aquí no se adjuntan archivos ni hace falta escribir datos confidenciales: la "
+        "serie y los detalles van después del NDA, por el flujo habitual.",
     ),
     (
         "Check the fields. Use text without HTML and a valid email address.",

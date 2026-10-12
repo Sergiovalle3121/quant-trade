@@ -102,10 +102,13 @@ COPY: dict[str, dict[str, Any]] = {
         "choose": "Selecciona una opción",
         "submit": "Enviar solicitud",
         "note": "Estos datos llevan la etiqueta «DECLARED»: los aporta quien solicita la "
-        "revisión. Aquí no se adjuntan archivos; la serie se sube después por el flujo habitual.",
+        "revisión. Aquí no se adjuntan archivos ni hace falta escribir datos confidenciales: la "
+        "serie y los detalles van después del NDA, por el flujo habitual.",
         "privacy": "Privacidad",
         "received": "Solicitud recibida",
-        "next": "Te escribimos en 1 día hábil. Firmo el NDA mutuo antes de recibir tus archivos.",
+        "next": (
+            "Te escribimos en 1 día hábil. Firmamos el NDA mutuo antes de recibir tus archivos."
+        ),
         "back": "Volver al inicio",
         "invalid": "Revisa los campos. Usa texto sin HTML y un correo válido.",
         "limited": "Se alcanzó el límite de solicitudes. Inténtalo dentro de una hora.",
@@ -135,13 +138,13 @@ COPY: dict[str, dict[str, Any]] = {
         "choose": "Choose an option",
         "submit": "Send request",
         "note": "These details carry the DECLARED label: they are supplied by the person "
-        "requesting the review. This form has no attachments; upload the series later through "
-        "the usual flow.",
+        "requesting the review. This form has no attachments and needs no confidential data: "
+        "the series and the details come after the NDA, through the usual flow.",
         "privacy": "Privacy",
         "received": "Request received",
         "next": (
             "We will write within 1 business day. "
-            "I sign the mutual NDA before receiving your files."
+            "We sign the mutual NDA before receiving your files."
         ),
         "back": "Back to home",
         "invalid": "Check the fields. Use text without HTML and a valid email address.",
@@ -172,11 +175,11 @@ COPY: dict[str, dict[str, Any]] = {
         "choose": "Selecione uma opção",
         "submit": "Enviar solicitação",
         "note": "Estes dados levam a etiqueta «DECLARED»: são fornecidos por quem solicita a "
-        "revisão. Este formulário não recebe arquivos; a série será enviada depois pelo fluxo "
-        "habitual.",
+        "revisão. Este formulário não recebe arquivos nem precisa de dados confidenciais: a "
+        "série e os detalhes vêm depois do NDA, pelo fluxo habitual.",
         "privacy": "Privacidade",
         "received": "Solicitação recebida",
-        "next": "Escrevemos em 1 dia útil. Assino o NDA mútuo antes de receber seus arquivos.",
+        "next": "Escrevemos em 1 dia útil. Assinamos o NDA mútuo antes de receber seus arquivos.",
         "back": "Voltar ao início",
         "invalid": "Revise os campos. Use texto sem HTML e um e-mail válido.",
         "limited": "O limite de solicitações foi atingido. Tente novamente em uma hora.",
@@ -357,17 +360,20 @@ OFFER_COPY: dict[str, dict[str, Any]] = {
         ),
         "send_title": "Qué mandar",
         "send_items": (
-            "Retornos de la cartera modelo, mensuales o diarios, en un CSV de dos columnas "
-            "(date,return), o una serie de NAV (date,nav). Bruto y neto de costos si tienes "
-            "ambos; si no, bruto más el supuesto de costos.",
-            "Índice de referencia: su serie en el mismo formato, o solo su nombre si es un "
-            "índice estándar.",
+            "Retornos de la cartera modelo, mensuales o diarios, en un CSV con una columna de "
+            "fecha y una de retorno (date,return), o una serie de NAV (date,nav). Si tienes "
+            "bruto y neto de costos, van como retornos en dos columnas del mismo CSV "
+            "(gross_return y net_return), como en la plantilla: una serie de NAV lleva una sola "
+            "columna. Si no, bruto más el supuesto de costos.",
+            "Índice de referencia: su serie en el mismo formato (en un CSV aparte o como columna "
+            "benchmark del mismo CSV), o solo su nombre si es un índice estándar.",
             "Cuántas variantes probaste antes de fijar las reglas. Si tienes sus series, "
             "envíalas en un CSV aparte con una columna de fecha y una por variante "
-            "(date,variant_1,variant_2), con las mismas fechas que la cartera. Si no, basta "
+            "(date,variant_1,variant_2), con las mismas fechas que la cartera: al menos 2 "
+            "variantes y 16 fechas, hasta 500 variantes y 5 MB, sin celdas vacías. Si no, basta "
             "el número y el informe lo marca como declarado.",
-            "Periodo reservado: la fecha desde la que las reglas quedaron fijas y si la "
-            "serie anterior se usó para elegirlas.",
+            "Periodo reservado (fuera de muestra): la fecha desde la que las reglas quedaron "
+            "fijas y si la serie anterior se usó para elegirlas.",
             "Supuestos de costos: rotación de la cartera y costo por rebalanceo expresado en "
             "puntos básicos (pb).",
         ),
@@ -379,13 +385,14 @@ OFFER_COPY: dict[str, dict[str, Any]] = {
             "completo. Usa fechas AAAA-MM-DD y retornos en fracciones (0.01 = 1 %), con punto "
             "decimal. Quita las columnas net_return o benchmark si no tienes esas series."
         ),
-        "nda": "Firmo un NDA mutuo antes de que manden nada; pueden mandar el suyo.",
+        "nda": "Firmamos un NDA mutuo antes de que nos mandes nada; puedes mandar el tuyo.",
         "publication_note": (
-            "El primer informe no se publica ni se menciona a la empresa sin permiso escrito."
+            "Ningún informe, tampoco el primero, se publica ni se menciona a la empresa sin "
+            "permiso escrito."
         ),
         "scope_limit": (
-            "No concilia las cifras con el bróker ni con el administrador, no es diligencia "
-            "operativa y no es una presentación GIPS."
+            "La revisión no concilia las cifras con el bróker ni con el administrador, no es "
+            "diligencia operativa y no es una presentación GIPS."
         ),
         "timeline_title": "Plazos",
         "timeline": (
@@ -475,16 +482,20 @@ OFFER_COPY: dict[str, dict[str, Any]] = {
         ),
         "send_title": "What to send",
         "send_items": (
-            "Monthly or daily model portfolio returns in a two-column CSV (date,return), "
-            "or a NAV series (date,nav). Gross and net of costs if you have both; otherwise, "
+            "Monthly or daily model portfolio returns in a CSV with a date column and a return "
+            "column (date,return), or a NAV series (date,nav). If you have returns gross and "
+            "net of costs, send them as two columns of the same CSV (gross_return and "
+            "net_return), as in the template: a NAV series holds a single column. Otherwise, "
             "gross returns plus the cost assumption.",
-            "Benchmark: its series in the same format, or just its name if it is a standard index.",
-            "How many variants you tested before fixing the rules. If you have their series, "
+            "Benchmark: its series in the same format (in a separate CSV or as a benchmark "
+            "column of the same CSV), or just its name if it is a standard index.",
+            "How many variants you tested before freezing the rules. If you have their series, "
             "send them in a separate CSV with a date column and one column per variant "
-            "(date,variant_1,variant_2), using the same dates as the portfolio. Otherwise, "
-            "the count is enough and the report marks it as declared.",
-            "Reserved period: the date from which the rules were fixed, and whether the "
-            "earlier series was used to choose them.",
+            "(date,variant_1,variant_2), using the same dates as the portfolio: at least 2 "
+            "variants and 16 dates, up to 500 variants and 5 MB, with no empty cells. "
+            "Otherwise, the count is enough and the report marks it as declared.",
+            "Out-of-sample (holdout) period: the date from which the rules have stayed fixed, "
+            "and whether the earlier data was used to choose them.",
             "Cost assumptions: portfolio turnover and cost per rebalance expressed in "
             "basis points (bps).",
         ),
@@ -496,14 +507,14 @@ OFFER_COPY: dict[str, dict[str, Any]] = {
             "Use YYYY-MM-DD dates and fractional returns (0.01 = 1 %), with a decimal point. "
             "Remove the net_return or benchmark columns if you do not have those series."
         ),
-        "nda": "I sign a mutual NDA before you send anything; you can send yours.",
+        "nda": "We sign a mutual NDA before you send anything; you are welcome to send your own.",
         "publication_note": (
-            "The first report is not published and the company is not mentioned without "
-            "written permission."
+            "Without your written permission, no report is published, the first one included, "
+            "and the company is not named."
         ),
         "scope_limit": (
-            "It does not reconcile figures with the broker or administrator, is not "
-            "operational due diligence and is not a GIPS presentation."
+            "The review does not reconcile the figures with your broker or fund administrator, "
+            "is not operational due diligence and is not a GIPS presentation."
         ),
         "timeline_title": "Timeline",
         "timeline": (
@@ -592,17 +603,20 @@ OFFER_COPY: dict[str, dict[str, Any]] = {
         ),
         "send_title": "O que enviar",
         "send_items": (
-            "Retornos mensais ou diários da carteira modelo em um CSV de duas colunas "
-            "(date,return), ou uma série de NAV (date,nav). Brutos e líquidos de custos se "
-            "tiver ambos; caso contrário, brutos mais a premissa de custos.",
-            "Índice de referência: sua série no mesmo formato, ou apenas o nome se for um "
-            "índice padrão.",
-            "Quantas variantes você testou antes de fixar as regras. Se tiver suas séries, "
-            "envie-as em um CSV separado com uma coluna de data e uma por variante "
-            "(date,variant_1,variant_2), com as mesmas datas da carteira. Caso contrário, "
-            "basta o número e o relatório o marca como declarado.",
-            "Período reservado: a data a partir da qual as regras ficaram fixas e se a "
-            "série anterior foi usada para escolhê-las.",
+            "Retornos mensais ou diários da carteira modelo em um CSV com uma coluna de data e "
+            "uma de retorno (date,return), ou uma série de NAV (date,nav). Se tiver retornos "
+            "brutos e líquidos de custos, envie-os como duas colunas do mesmo CSV (gross_return "
+            "e net_return), como no modelo: uma série de NAV tem uma só coluna. Caso contrário, "
+            "brutos mais a premissa de custos.",
+            "Índice de referência: sua série no mesmo formato (em um CSV separado ou como coluna "
+            "benchmark do mesmo CSV), ou apenas o nome se for um índice padrão.",
+            "Quantas variantes você testou antes de fixar as regras. Se tiver as séries das "
+            "variantes, envie-as em um CSV separado com uma coluna de data e uma por variante "
+            "(date,variant_1,variant_2), com as mesmas datas da carteira: pelo menos 2 "
+            "variantes e 16 datas, até 500 variantes e 5 MB, sem células vazias. Caso "
+            "contrário, basta o número e o relatório o marca como declarado.",
+            "Período reservado (fora da amostra): a data a partir da qual as regras ficaram "
+            "fixas e se a série anterior foi usada para escolhê-las.",
             "Premissas de custos: giro da carteira e custo por rebalanceamento expresso em "
             "pontos-base (bps).",
         ),
@@ -614,14 +628,14 @@ OFFER_COPY: dict[str, dict[str, Any]] = {
             "completo. Use datas AAAA-MM-DD e retornos em frações (0.01 = 1 %), com ponto "
             "decimal. Remova as colunas net_return ou benchmark se não tiver essas séries."
         ),
-        "nda": "Assino um NDA mútuo antes de vocês enviarem qualquer dado; podem enviar o seu.",
+        "nda": "Assinamos um NDA mútuo antes de você enviar qualquer dado; pode enviar o seu.",
         "publication_note": (
-            "O primeiro relatório não é publicado nem a empresa é mencionada sem permissão "
-            "por escrito."
+            "Sem permissão por escrito, nenhum relatório, nem o primeiro, é publicado e a "
+            "empresa não é mencionada."
         ),
         "scope_limit": (
-            "Não concilia os números com a corretora nem com o administrador, não é "
-            "diligência operacional e não é uma apresentação GIPS."
+            "A revisão não concilia os números com a corretora nem com o administrador, não é "
+            "uma due diligence operacional e não é uma apresentação GIPS."
         ),
         "timeline_title": "Prazos",
         "timeline": (

@@ -17,7 +17,7 @@ Fecha: 2026-10-11. Rama: `feat/institucional-que-mandar`.
   filas ficticias, con fechas mensuales, retornos positivos, negativos y cero.
   El enlace, la explicación y el nombre del archivo identifican el ejemplo ficticio.
   Responde con `text/csv`, `Content-Disposition: attachment` y
-  `X-Robots-Tag: noindex, nofollow`. Permite rastreo para leer el encabezado y no
+  `X-Robots-Tag: noindex`. Permite rastreo para leer el encabezado y no
   entra en el sitemap. Se actualiza la fecha de la oferta a 2026-10-11.
 - Se mantienen los precios, `legal.py` y la política de privacidad. No cambian
   importadores, cálculos ni criterios estadísticos. La copia nueva no lleva
@@ -38,6 +38,8 @@ sustituir las cuatro filas por el historial completo y quitar las columnas de ne
 o benchmark si no se dispone de esas series. Cuatro filas ilustran el formato;
 no constituyen evidencia suficiente para una revisión estadística. El importador
 de variantes requiere al menos 16 observaciones. No se amplía ese umbral.
+La página dice esos límites del importador: al menos 2 variantes y 16 fechas,
+hasta 500 variantes y 5 MB, sin celdas vacías.
 
 No fue necesario cambiar contadores fijos de claves o rutas en tests: las claves
 siguen siendo iguales entre idiomas y el inventario HTML conserva sus páginas.
@@ -67,6 +69,38 @@ temporales creadas bajo el prefijo solicitado `scratchpad\bt-codex38-`.
 - `ruff format --check` sobre los cuatro archivos Python modificados: sin cambios
   necesarios. Archivos modificados con LF; `git diff --check` sin incidencias.
 - `mypy --follow-imports=silent --platform linux src`: sin errores en 445 archivos.
+
+## Correcciones tras la revisión
+
+- Punto 1: si hay bruto y neto, van como retornos en las columnas `gross_return`
+  y `net_return` del mismo CSV, como en la plantilla; una serie de NAV lleva una
+  sola columna (`schema.parse_equity_csv` lee una sola `nav`). Punto 2: el índice
+  puede ir aparte o como columna `benchmark` del mismo CSV (también al lado de un
+  NAV).
+- Punto 3: límites de `_parse_variants_csv` y de subida (2 variantes, 16 filas,
+  500 columnas, 5 MB, sin celdas vacías). Un test nuevo sube una cartera con los
+  encabezados de la plantilla y un CSV `date,variant_1,variant_2` de 20 fechas:
+  `variants.shape == (20, 2)` y `variant_validation["status"] == "MEASURED"`; otro
+  liga las cifras de la página con `MAX_VARIANTS`, `MAX_UPLOAD_BYTES` y los
+  rechazos `too_few_variants` y `too_few_variant_rows`.
+- Persona: la página usa «nosotros + tú»; la línea del NDA y la confirmación del
+  formulario pasan a «Firmamos… antes de que nos mandes nada; puedes mandar el
+  tuyo» (en/pt equivalentes). El sentido del correo se mantiene; solo cambia la
+  persona gramatical.
+- La nota del formulario aclara que no hace falta escribir datos confidenciales:
+  la serie y los detalles van después del NDA.
+- «Periodo reservado (fuera de muestra)», «Out-of-sample (holdout) period» y
+  «Período reservado (fora da amostra)», como el campo del formulario de subida.
+  En inglés, «before freezing the rules» y «the rules have stayed fixed».
+- Publicación: «Ningún informe, tampoco el primero, se publica…», para no sugerir
+  que los informes siguientes sí podrían publicarse.
+- Límites con sujeto: «La revisión no concilia…». En portugués, «due diligence
+  operacional» y «Se tiver as séries das variantes».
+- La plantilla envía `X-Robots-Tag: noindex`, el literal de los demás adjuntos del
+  sitio. Los PDF públicos de ejemplo no llevan esa cabecera porque son muestras
+  que se enlazan; la plantilla es un archivo ficticio sin contenido que buscar.
+- El `Cache-Control: public, max-age=3600` de la ruta lo reemplaza el middleware
+  por `no-store`, igual que en los PDF de ejemplo. No se cambia aquí.
 
 ## Limitación de mypy en Windows
 

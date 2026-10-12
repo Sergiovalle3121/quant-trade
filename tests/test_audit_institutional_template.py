@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import calendar
 import csv
 import html
 import io
@@ -21,8 +22,14 @@ from quant_trade.audit import institutional  # noqa: E402
 from quant_trade.audit.guard import find_claims  # noqa: E402
 from quant_trade.audit.i18n import spanish  # noqa: E402
 from quant_trade.audit.importers import import_return_series  # noqa: E402
-from quant_trade.audit.schema import DeclaredMetadata, build_inputs  # noqa: E402
-from quant_trade.audit.seo import NOINDEX  # noqa: E402
+from quant_trade.audit.schema import (  # noqa: E402
+    MAX_UPLOAD_BYTES,
+    MAX_VARIANTS,
+    AuditInputs,
+    DeclaredMetadata,
+    ParseError,
+    build_inputs,
+)
 from quant_trade.audit.settings import AuditSettings  # noqa: E402
 from quant_trade.audit.store import make_store  # noqa: E402
 from quant_trade.audit.web import create_app  # noqa: E402
@@ -118,7 +125,7 @@ def test_the_five_items_keep_the_data_request_in_each_language(
 
 def test_nda_accepts_the_clients_document_before_any_data_is_sent() -> None:
     assert institutional.offer_text("es", "nda") == (
-        "Firmo un NDA mutuo antes de que manden nada; pueden mandar el suyo."
+        "Firmamos un NDA mutuo antes de que nos mandes nada; puedes mandar el tuyo."
     )
     for locale in SEND_TITLES:
         assert "NDA" in institutional.offer_text(locale, "nda")
@@ -139,7 +146,8 @@ def test_template_download_is_an_attachment_outside_the_sitemap(tmp_path: Path) 
     assert response.headers["content-disposition"] == (
         'attachment; filename="institutional-fictional-template.csv"'
     )
-    assert response.headers["x-robots-tag"] == NOINDEX
+    # The literal the site's other attachments carry.
+    assert response.headers["x-robots-tag"] == "noindex"
     assert response.content == institutional.TEMPLATE_CSV
     assert b"\r" not in response.content
     assert institutional.TEMPLATE_PATH not in client.get("/sitemap.xml").text
@@ -181,3 +189,59 @@ def test_downloaded_template_preserves_all_series_in_the_sites_importer(tmp_path
     assert inputs.equity.benchmark.equals(series.benchmark)
     assert inputs.variants is None and inputs.report_variants is None
     assert inputs.declared.trials == 7
+
+
+def _month_ends(count: int) -> list[str]:
+    days = []
+    for index in range(count):
+        year, month = 2000 + index // 12, index % 12 + 1
+        days.append(f"{year}-{month:02d}-{calendar.monthrange(year, month)[1]:02d}")
+    return days
+
+
+def _fictional_files(rows: int, variants: int = 2) -> tuple[bytes, bytes]:
+    """A portfolio with the template's headers and its variants on the same dates."""
+    names = ",".join(f"variant_{number}" for number in range(1, variants + 1))
+    portfolio = ["date,gross_return,net_return,benchmark"]
+    matrix = [f"date,{names}"]
+    for index, day in enumerate(_month_ends(rows)):
+        gross = 0.005 * (index % 5 - 2)
+        portfolio.append(f"{day},{gross:.4f},{gross - 0.001:.4f},{gross / 2:.4f}")
+        cells = ",".join(f"{gross + 0.002 * number:.4f}" for number in range(1, variants + 1))
+        matrix.append(f"{day},{cells}")
+    return ("\n".join(portfolio) + "\n").encode(), ("\n".join(matrix) + "\n").encode()
+
+
+def _inputs(portfolio: bytes, variants: bytes) -> AuditInputs:
+    return build_inputs(
+        portfolio,
+        DeclaredMetadata(trials=2, return_frequency="monthly", return_unit="fraction"),
+        variants_bytes=variants,
+        now=datetime(2003, 1, 1, tzinfo=UTC),
+    )
+
+
+def test_the_variants_csv_the_page_asks_for_reads_beside_the_template() -> None:
+    portfolio, variants = _fictional_files(20)
+    assert variants.splitlines()[0] == b"date,variant_1,variant_2"
+    inputs = _inputs(portfolio, variants)
+    assert inputs.variants is not None
+    assert inputs.variants.shape == (20, 2)
+    assert inputs.variant_validation is not None
+    assert inputs.variant_validation["status"] == "MEASURED"
+    assert inputs.equity.frame["net_ret"].size == 20
+
+
+def test_the_variants_limits_on_the_page_are_the_importers() -> None:
+    assert MAX_VARIANTS == 500
+    assert MAX_UPLOAD_BYTES == 5_000_000
+    for locale in SEND_TITLES:
+        item = institutional.offer_lines(locale, "send_items")[2]
+        for limit in ("2 ", "16 ", "500 ", "5 MB"):
+            assert limit in item, (locale, limit)
+    with pytest.raises(ParseError) as one_variant:
+        _inputs(*_fictional_files(20, variants=1))
+    assert one_variant.value.code == "too_few_variants"
+    with pytest.raises(ParseError) as short:
+        _inputs(*_fictional_files(15))
+    assert short.value.code == "too_few_variant_rows"

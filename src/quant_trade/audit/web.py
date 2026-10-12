@@ -2405,7 +2405,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             headers={
                 "Content-Disposition": f'attachment; filename="{institutional.TEMPLATE_FILENAME}"',
                 "Cache-Control": "public, max-age=3600",
-                "X-Robots-Tag": NOINDEX,
+                "X-Robots-Tag": "noindex",
             },
         )
 
