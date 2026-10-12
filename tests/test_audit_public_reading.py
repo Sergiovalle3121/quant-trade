@@ -432,7 +432,7 @@ def test_generation_does_not_use_network_database_or_create_files(
     store = client.app.state.store
     monkeypatch.setattr(store.engine, "begin", forbidden)
     monkeypatch.setattr(store.engine, "connect", forbidden)
-    # A visit to a free tool is counted in memory (privacy policy): day, language and tag only.
+    # Only daily aggregate dimensions enter memory, never the reader's figures.
     counted: list[dict[str, str]] = []
     monkeypatch.setattr(client.app.state.visits, "add", lambda **kw: counted.append(kw))
     monkeypatch.setattr(socket, "create_connection", forbidden)
@@ -454,5 +454,7 @@ def test_generation_does_not_use_network_database_or_create_files(
         if path.is_file()
     }
     assert after == before
-    assert all(set(visit) == {"day", "locale", "ref"} for visit in counted)
+    assert counted
+    assert all(set(visit) == {"day", "locale", "ref", "page_group"} for visit in counted)
+    assert {visit["page_group"] for visit in counted} == {"lectura"}
     assert not {value for visit in counted for value in visit.values()} & set(FIGURES.values())
