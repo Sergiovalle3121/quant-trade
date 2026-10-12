@@ -2843,51 +2843,71 @@ weekly sample cannot stand in for the whole history. The reason tells the client
 whose closed trades end with a net loss after fees gets no capital figures
 (NOT_MEASURED): a size at which a losing history may be run is not given.
 
-### Tamaños del archivo y multiplicador de copia
+### File sizes and the copy multiplier
 
-El informe completo HTML y su PDF muestran la mediana de los volúmenes
-originales del archivo, multiplicada por la fracción de tamaño de cada límite
-de pérdida. Los importadores conservan ese volumen antes de convertir
-`Trade.quantity` a unidades económicas. MetaTrader y columnas de lotes
-reconocidas, incluidas las de cTrader, usan lotes; los símbolos de futuros
-reconocidos usan contratos. Símbolos ambiguos o mezclas de instrumentos se
-mantienen como unidades del archivo, sin atribuirles un contrato económico.
+The complete HTML report and its PDF show the median of the file's original
+trade volumes and that median times each loss limit's size share. Importers
+keep those volumes before `Trade.quantity` is turned into economic units
+(`ImportedReport.trade_quantities`, `quantity_unit`). MetaTrader reports,
+MQL5 signal and FX Blue exports, a Myfxbook "Lots" column, a column whose
+header names lots ("Lots", "Volume (lots)", "Lotes") and quantity cells that
+end in "Lots" are in lots; a cTrader "Closing quantity" without that suffix
+counts as lots only when every symbol's money per price unit is not 1 (units
+such as 25 000 EUR leave it at 1). A header naming two units ("Units/Lots")
+stays in the file's units. Recognised futures codes are in contracts,
+including `ESZ25-CME`, `ESZ25_FUT_CME`, `/ESZ6`, the ProjectX ids
+`CON.F.US.MNQ.Z26` and the CQG codes `F.US.EPZ25` (EP is ES, ENQ is NQ).
+Ambiguous symbols or a mix of futures and other instruments stay in the
+file's units, with no economic contract attributed to them.
 
-Los lotes se redondean hacia abajo en pasos de 0.01 y los contratos a enteros.
-Si el resultado es cero, se indica que no cabe ni el mínimo con ese límite.
-Las unidades sin identificar se muestran con dos decimales. El nuevo umbral
-de variación es percentil 90 del volumen mayor que tres veces la mediana:
-se avisa que el tamaño no fue fijo y que la cifra usa la mediana. Una señal
-existente `MARTINGALE_SIZING` deja las cantidades sin medir, incluido el
-tamaño del reto; no se presenta una cantidad fija para ese patrón.
+Lots round down to 0.01 steps and contracts to whole contracts. Unnamed file
+units round down to 0.01, or to two significant digits of the median when it
+is under 0.1 (0.002 BTC shows as 0.0020). The step count is read to nine
+decimals first, so a float quotient just under a step is that step. When the
+result is zero the report says the minimum does not fit that limit. Above a
+10x size share (`MAX_SIZE_SHARE`), where the share prints as "more than
+10x", the quantity is only a lower bound ("more than 10.00 lots"). The size
+is variable when the 90th percentile of the volumes is more than three times
+the median: the report says the size was not fixed and the figure uses the
+median. When instruments carry different typical sizes (one ES contract
+against ten MNQ), one median applies to none of them and no quantity is
+measured. An existing `MARTINGALE_SIZING` flag leaves the quantities
+unmeasured, the challenge size included: a fixed quantity is not given for
+that pattern.
 
-La tabla de copia usa caída de referencia en dinero por multiplicador,
-dividida entre el balance inicial, a 0.5x, 1x, 2x y 3x. Desde el 100 % añade
-el aviso de pérdida de la cuenta entera. Es una escala lineal del historial:
-supone el mismo balance inicial del proveedor, tamaños fijos y ausencia de
-cierres por margen. Un balance supuesto por el importador no se convierte
-en evidencia del balance del proveedor; sin balance conocido, no se miden
-los porcentajes ni las cantidades relativas. No describe un resultado futuro.
+The copy table divides the reference fall in money times the multiplier
+(0.5x, 1x, 2x and 3x) by the starting balance. Percentages are rounded down
+to a tenth, so 99.985 % never reads as 100.0 %; from 100 % on the row says
+the entire account is lost. It is a linear scale of the history: same
+starting balance as the provider, fixed sizes and no margin closeouts (with
+a martingale the line says the multiplier scales each of the provider's
+trades and that size was not fixed). A balance the reader assumed is not
+evidence of the provider's, also beside an uploaded curve: without a known
+balance the percentages and quantities are not measured, and the table is
+replaced by one line with the reason. It does not describe a future result.
 
-El máximo diario del reto (`audit/challenge_sizing.py`) usa cierres diarios
-UTC de una curva en dinero y el balance del historial. El primer día parte
-del balance inicial, para incluir también su pérdida; los siguientes parten
-del cierre anterior. Para una regla sobre
-balance inicial, la cota es límite por balance inicial entre la peor pérdida
-diaria en dinero. Para una regla sobre balance al inicio del día, evalúa
-todos los días con el saldo inicial más el resultado acumulado escalado y
-toma la cota más restrictiva. El tamaño típico por esa cota se redondea
-estrictamente hacia abajo: una cantidad justo en la frontera toca el límite
-y se reduce un paso. La operación protege también la frontera numérica del
-cociente. La nota visible excluye pérdidas intradía y la regla de pérdida
-total. Flujos posteriores al inicio, curvas sin evidencia monetaria suficiente,
-reglas sin límite diario, ausencia de días perdedores o una cota no finita
-dejan este máximo sin medir y muestran el motivo.
+The challenge's daily maximum (`audit/challenge_sizing.py`) uses UTC daily
+closes of a money curve. The money the rule allows is the daily limit times
+the account a program states its dollar limits on (`ACCOUNT_SIZES`) or,
+otherwise, the history's starting balance;
+the card names which. The first day opens at the starting balance, so its
+loss counts too; the others open at the previous close. For an
+initial-balance rule the bound is limit x that balance / worst daily money
+loss. For a start-of-day rule each day is checked with that balance plus the
+scaled cumulative result, and the tightest bound wins. The typical size at
+that bound is rounded strictly down: a quantity exactly at the boundary
+touches the limit and drops one step. A worst day under half a percent of
+the starting balance is too small to size against, and a share above 10x
+the history's own size on its balance gives only a lower bound. The visible
+note excludes intraday losses and the total-loss rule. Flows after the
+start, curves without enough money evidence, a tiny worst day, no losing day
+or a bound that is not finite leave this maximum unmeasured with the reason;
+rules without a daily limit show no block, since the rule list says so.
 
-Todas las cifras nuevas conservan etiquetas de evidencia en tarjetas o
-tablas. Los textos están en español, inglés y portugués. La vista previa
-gratis conserva su contenido y no muestra estos bloques. No se añaden
-campos al formulario ni conexiones a un intermediario.
+Every new figure keeps its evidence label on a card or in a table. The text
+is in Spanish, English and Portuguese. The free preview keeps its content
+and shows none of these blocks. No form fields or broker connections are
+added.
 
 ### What data the test ran on (`audit/testdata.py`)
 

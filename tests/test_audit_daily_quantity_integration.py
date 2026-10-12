@@ -5,7 +5,9 @@ from __future__ import annotations
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 
+import pandas as pd
 import pytest
+from audit_fixtures import csv_bytes
 
 from quant_trade.audit.engine import LADDER_FLOWS, LADDER_NOT_SHOWN_WHY, run_audit
 from quant_trade.audit.sample import _sample_report, synthetic_live_statement
@@ -74,7 +76,7 @@ def test_reconstructed_money_curve_retains_its_original_lot_measurement() -> Non
     assert daily["quantity"]["evidence"] == "MEASURED"
 
 
-def test_assumed_balance_cannot_measure_copy_fall_or_capital_quantity() -> None:
+def _unknown_balance_report() -> bytes:
     lines = ["Symbol,Side,Lots,Entry Time,Exit Time,Entry Price,Exit Price,Profit"]
     for index in range(60):
         day = datetime(2024, 1, 1) + timedelta(days=2 * index)
@@ -83,13 +85,40 @@ def test_assumed_balance_cannot_measure_copy_fall_or_capital_quantity() -> None:
             f"EURUSD,Buy,2,{day:%Y-%m-%d} 09:00,{day:%Y-%m-%d} 10:00,"
             f"100,{100 + profit / 2},{profit}"
         )
-    inputs = _inputs(("\n".join(lines) + "\n").encode(), "UnknownBalance.csv")
+    return ("\n".join(lines) + "\n").encode()
+
+
+def test_assumed_balance_cannot_measure_copy_fall_or_capital_quantity() -> None:
+    inputs = _inputs(_unknown_balance_report(), "UnknownBalance.csv")
     assert inputs.initial_balance == 10_000
     assert any("starting balance; 10,000 was assumed" in note for note in inputs.warnings)
     result = _audit(inputs)
     assert result.capital is not None
     assert result.capital["status"] == "MEASURED"
     assert result.capital["fall_reference"]["evidence"] == "MEASURED"
+    assert result.capital["starting_balance"]["evidence"] == "NOT_MEASURED"
+    assert all(row["quantity"]["evidence"] == "NOT_MEASURED" for row in result.capital["rows"])
+    assert all(row["fall_pct"]["evidence"] == "NOT_MEASURED" for row in result.capital["copy_rows"])
+
+
+def test_assumed_report_balance_beside_an_uploaded_curve_is_not_the_provider_balance() -> None:
+    # The curve starts at 50 000; the report states no balance and 10 000 is
+    # assumed. Neither reaches the capital section's percentages as evidence.
+    days = pd.date_range("2024-01-01", "2024-05-01", freq="D", tz="UTC")
+    curve = pd.DataFrame(
+        {"timestamp": days, "equity": [50_000.0 + 10 * index for index in range(len(days))]}
+    )
+    inputs = build_inputs(
+        csv_bytes(curve),
+        DeclaredMetadata(challenge=KEY),
+        report_bytes=_unknown_balance_report(),
+        report_filename="UnknownBalance.csv",
+        now=NOW,
+    )
+    assert inputs.initial_balance == 10_000
+    assert inputs.equity.frame["equity"].iloc[0] == pytest.approx(50_000)
+    result = _audit(inputs)
+    assert result.capital is not None and result.capital["status"] == "MEASURED"
     assert result.capital["starting_balance"]["evidence"] == "NOT_MEASURED"
     assert all(row["quantity"]["evidence"] == "NOT_MEASURED" for row in result.capital["rows"])
     assert all(row["fall_pct"]["evidence"] == "NOT_MEASURED" for row in result.capital["copy_rows"])

@@ -25,6 +25,7 @@ from quant_trade.audit import charts, ownership, paid_offer, psr_names, report_p
 from quant_trade.audit.account import FLOATING_NOTE as ACCOUNT_FLOATING_NOTE
 from quant_trade.audit.account import is_account_history
 from quant_trade.audit.analytics import question_now
+from quant_trade.audit.challenge_sizing import NO_LIMIT as DAILY_NO_LIMIT
 from quant_trade.audit.crises import (
     MARKET,
     MARKET_AS_OF,
@@ -77,7 +78,7 @@ from quant_trade.audit.seo import (
 )
 from quant_trade.audit.series_ui import series_report
 from quant_trade.audit.sharing import public_report_url, share_block
-from quant_trade.audit.sizing import copy_fall_text, quantity_text
+from quant_trade.audit.sizing import copy_fall_text, quantity_parts, quantity_text
 from quant_trade.audit.sizing import scale_text as sizing_scale_text
 from quant_trade.audit.streaks import CLUSTERED
 from quant_trade.audit.theme import (
@@ -779,16 +780,39 @@ LABELS: dict[str, dict[str, str]] = {
         "capital_scale": "Tamaño sobre el balance inicial del archivo ({balance})",
         "capital_scale_plain": "Tamaño sobre el balance inicial",
         "capital_quantity": "Tamaño en las unidades del archivo",
+        "capital_quantity_help_lot": (
+            "Lotes = mediana del historial × esa fracción, redondeada hacia abajo al paso de "
+            "0.01 lotes."
+        ),
+        "capital_quantity_help_contract": (
+            "Contratos = mediana del historial × esa fracción, redondeada hacia abajo al "
+            "contrato entero."
+        ),
+        "capital_quantity_help_file": (
+            "Cantidad = mediana del historial × esa fracción, redondeada hacia abajo en las "
+            "unidades del archivo."
+        ),
         "capital_median": "Tamaño típico del historial (mediana)",
-        "ch_daily_size": "Máximo por la pérdida diaria",
+        "ch_daily_size": "Tamaño máximo por el límite de pérdida diaria",
+        "ch_daily_on_account": (
+            "Tamaño en las unidades del archivo, en la cuenta del programa de {size} USD"
+        ),
+        "ch_daily_on_history": (
+            "Tamaño en las unidades del archivo, sobre el balance inicial del historial ({balance})"
+        ),
         "capital_variable": (
             "El tamaño no fue fijo: varió mucho entre operaciones. Esta cifra usa la mediana."
         ),
         "copy_title": "Si copias con multiplicador",
-        "copy_fall": "Caída sobre tu balance inicial",
+        "copy_fall": "Caída de referencia sobre tu balance inicial",
         "copy_assumption": (
             "Mismo balance inicial que el proveedor, tamaños fijos y caída lineal en dinero, "
             "sin cierres por margen."
+        ),
+        "copy_assumption_martingale": (
+            "Mismo balance inicial que el proveedor y caída lineal en dinero, sin cierres por "
+            "margen. El multiplicador escala cada operación del proveedor; el tamaño del "
+            "proveedor no fue fijo."
         ),
         "capital_scale_help": (
             "1x es el tamaño de posición del backtest; 0.50x es la mitad. Por encima de 1x la "
@@ -2585,16 +2609,34 @@ LABELS: dict[str, dict[str, str]] = {
         "capital_scale": "Size on the file's starting balance ({balance})",
         "capital_scale_plain": "Size on the starting balance",
         "capital_quantity": "Size in the file's units",
+        "capital_quantity_help_lot": (
+            "Lots = the history's median × that share, rounded down to the 0.01-lot step."
+        ),
+        "capital_quantity_help_contract": (
+            "Contracts = the history's median × that share, rounded down to a whole contract."
+        ),
+        "capital_quantity_help_file": (
+            "Quantity = the history's median × that share, rounded down in the file's units."
+        ),
         "capital_median": "Typical size in the history (median)",
         "ch_daily_size": "Maximum size for the daily loss limit",
+        "ch_daily_on_account": "Size in the file's units, on the program's {size} USD account",
+        "ch_daily_on_history": (
+            "Size in the file's units, on the history's starting balance ({balance})"
+        ),
         "capital_variable": (
             "The size was not fixed: it varied widely across trades. This figure uses the median."
         ),
         "copy_title": "If you copy with a multiplier",
-        "copy_fall": "Fall as a share of your starting balance",
+        "copy_fall": "Reference fall as a share of your starting balance",
         "copy_assumption": (
             "Same starting balance as the provider, fixed sizes and a linear fall in money, "
             "with no margin closeouts."
+        ),
+        "copy_assumption_martingale": (
+            "Same starting balance as the provider and a linear fall in money, with no margin "
+            "closeouts. The multiplier scales each of the provider's trades; the provider's "
+            "size was not fixed."
         ),
         "capital_scale_help": (
             "1x is the backtest's position size; 0.50x is half of it. Above 1x the fall in money "
@@ -6787,10 +6829,7 @@ def _challenge_sizing_html(
     title = f"<h3>{_e(labels['ch_size_title'])}</h3>"
     if sizing.get("status") != "MEASURED" or not sizing.get("rows"):
         reason = localize(str(sizing.get("reason") or ""), locale)
-        return (
-            f"{title}<p>{_badge('NOT_MEASURED')} <span class='muted'>{_e(reason)}</span></p>"
-            + _challenge_daily_size_html(sizing.get("daily_limit"), locale, labels)
-        )
+        return f"{title}<p>{_badge('NOT_MEASURED')} <span class='muted'>{_e(reason)}</span></p>"
     program = sizing.get("program") or {}
     phases = int(program.get("phases") or 1)
     scope = _program_name(program, locale)
@@ -6919,22 +6958,41 @@ def _challenge_sizing_html(
     return out + _challenge_daily_size_html(sizing.get("daily_limit"), locale, labels)
 
 
+def _not_measured_line(reason: str, locale: str, head: str = "") -> str:
+    """A NOT_MEASURED badge and its reason as one sentence, after ``head``."""
+    lead = f"{_e(head)}: " if head else ""
+    text = _sentence(localize(reason, locale))
+    return f"<p>{lead}{_badge('NOT_MEASURED')} <span class='muted'>{_e(text)}</span></p>"
+
+
 def _challenge_daily_size_html(
     daily: dict[str, Any] | None, locale: str, labels: dict[str, str]
 ) -> str:
-    """A rounded size below the daily rule, on the history's own starting balance."""
-    if not daily:
+    """A rounded size below the daily rule, on the program's account when it
+    names one (``basis`` ``account``) and on the history's balance otherwise.
+    Nothing for rules without a daily limit: the rule list already says so."""
+    if not daily or daily.get("reason") == DAILY_NO_LIMIT:
         return ""
     title = f"<h3>{_e(labels['ch_daily_size'])}</h3>"
     quantity = daily.get("quantity") or {}
     if daily.get("status") != "MEASURED" or not quantity:
-        reason = localize(str(daily.get("reason") or ""), locale)
-        return title + f"<p class='muted'>{_e(reason)}</p>"
+        return title + _not_measured_line(str(daily.get("reason") or ""), locale)
     unit = str(daily.get("unit") or "file")
+    sized_on = (daily.get("sized_on") or daily.get("starting_balance") or {}).get("value")
+    if daily.get("basis") == "account" and sized_on:
+        where = labels["ch_daily_on_account"].format(size=f"{float(sized_on):,.0f}")
+    elif sized_on:
+        where = labels["ch_daily_on_history"].format(
+            balance=_fmt(float(sized_on), key="starting_balance")
+        )
+    else:
+        where = labels["capital_quantity"]
+    head, remark = quantity_parts(quantity, unit, locale)
     out = (
-        title + "<div class='facts'><div class='fact'>"
-        f"<b>{_e(quantity_text(quantity, unit, locale))}</b>"
-        f"<p>{_e(labels['capital_quantity'])} {_badge(quantity['evidence'])}</p></div></div>"
+        title + "<div class='facts'><div class='fact qty'>"
+        f"<b>{_e(head)}</b>"
+        f"<p>{_e(where)}{_e(f' ({remark})' if remark else '')} "
+        f"{_badge(quantity['evidence'])}</p></div></div>"
     )
     if (daily.get("quantity_profile") or {}).get("variable"):
         out += f"<p class='muted'>{_e(labels['capital_variable'])}</p>"
@@ -8852,14 +8910,14 @@ def _capital_html(
     profile = capital.get("quantity_profile") or {}
     unit = str(profile.get("unit") or "file")
     median = profile.get("median") or {}
-    if median:
+    if median.get("evidence") == "NOT_MEASURED":
+        out += _not_measured_line(str(median.get("note") or ""), locale, labels["capital_median"])
+    elif median:
         out += (
-            "<div class='facts'><div class='fact'>"
+            "<div class='facts'><div class='fact qty'>"
             f"<b>{_e(quantity_text(median, unit, locale))}</b>"
             f"<p>{_e(labels['capital_median'])} {_badge(median['evidence'])}</p></div></div>"
         )
-        if median.get("evidence") == "NOT_MEASURED" and median.get("note"):
-            out += f"<p class='muted'>{_e(localize(str(median['note']), locale))}</p>"
     if profile.get("variable"):
         out += f"<p class='muted'>{_e(labels['capital_variable'])}</p>"
     balance = capital["starting_balance"]["value"]
@@ -8874,13 +8932,14 @@ def _capital_html(
         return sizing_scale_text(float(share), locale) if share is not None else "—"
 
     def quantity_html(row: dict[str, Any]) -> str:
-        quantity = row.get("quantity")
-        if not quantity:
+        # Not measured: the median line above already says why, once.
+        quantity = row.get("quantity") or {}
+        if quantity.get("evidence") != "MEASURED":
             return ""
+        head, remark = quantity_parts(quantity, unit, locale)
         return (
-            f"<span class='cap-size'>{_e(labels['capital_quantity'])}: "
-            f"<b>{_e(quantity_text(quantity, unit, locale))}</b> "
-            f"{_badge(quantity['evidence'])}</span>"
+            f"<span class='cap-size'><b>{_e(head)}</b> {_e(labels['capital_quantity'])}"
+            f"{_e(f' ({remark})' if remark else '')} {_badge(quantity['evidence'])}</span>"
         )
 
     # One card per loss limit: a reader compares four numbers, not a table.
@@ -8895,6 +8954,9 @@ def _capital_html(
         for row in capital["rows"]
     )
     out += f"<ol class='caps'>{tiles}</ol><p class='muted'>{_e(label('capital_scale_help'))}</p>"
+    if any((row.get("quantity") or {}).get("evidence") == "MEASURED" for row in capital["rows"]):
+        help_key = f"capital_quantity_help_{unit if unit in ('lot', 'contract') else 'file'}"
+        out += f"<p class='muted'>{_e(labels[help_key])}</p>"
     if platform_dd is not None and closed_dd is not None and platform_dd < closed_dd - 0.005:
         key = "capital_open_loss_floored" if platform is not None else "capital_open_loss"
         text = labels[key].format(
@@ -8906,21 +8968,34 @@ def _capital_html(
         )
     elif closed_only:
         out += f"<p class='muted'>{_e(labels['capital_closed_only'])}</p>"
-    if capital.get("copy_rows"):
+    copy_measured = [
+        row
+        for row in capital.get("copy_rows") or []
+        if (row.get("fall_pct") or {}).get("evidence") == "MEASURED"
+    ]
+    if copy_measured:
         copy_rows = "".join(
             f"<tr><td>{float(row['multiplier']):g}x</td>"
             f"<td class='val'>{_e(copy_fall_text(row, locale))} "
             f"{_badge(row['fall_pct']['evidence'])}</td></tr>"
-            for row in capital["copy_rows"]
+            for row in copy_measured
         )
+        # A martingale's size was not fixed: the copy still scales each trade.
+        assumption = labels[
+            "copy_assumption_martingale" if profile.get("martingale") else "copy_assumption"
+        ]
         out += (
             "<div class='copy-sizing-block'>"
             f"<h3>{_e(labels['copy_title'])}</h3>"
-            f"<p class='muted'>{_e(labels['copy_assumption'])}</p>"
+            f"<p class='muted'>{_e(assumption)}</p>"
             f"<table class='copy-sizing'><thead><tr><th>{_e(labels['multiplier'])}</th>"
             f"<th class='val'>{_e(labels['copy_fall'])}</th></tr></thead>"
             f"<tbody>{copy_rows}</tbody></table></div>"
         )
+    elif capital.get("copy_rows"):
+        # One line instead of four empty rows when no fall share is measured.
+        note = str((capital["copy_rows"][0].get("fall_pct") or {}).get("note") or "")
+        out += _not_measured_line(note, locale, labels["copy_title"])
     return out + _assumptions(capital.get("assumptions"), locale, labels)
 
 

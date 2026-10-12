@@ -80,16 +80,6 @@ _TRIAL_SOURCES: dict[str, str] = {
 _RULES_SOURCE: tuple[tuple[str, str], ...] = (
     *DAILY_SIZE_TRANSLATIONS["es"].items(),
     *((note["en"], note["es"]) for note in QUANTITY_NOTES.values()),
-    (
-        "The size was not fixed: it varied widely across trades. This figure uses the median.",
-        "El tamaño no fue fijo: varió mucho entre operaciones. Esta cifra usa la mediana.",
-    ),
-    (
-        "Same starting balance as the provider, fixed sizes and a linear fall in money, "
-        "with no margin closeouts.",
-        "Mismo balance inicial que el proveedor, tamaños fijos y caída lineal en dinero, "
-        "sin cierres por margen.",
-    ),
     # Public tool share-card notices (tool_cards); no results or affiliation.
     (
         "Research tool · Not a forecast",

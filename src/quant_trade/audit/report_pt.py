@@ -274,16 +274,39 @@ REPORT: dict[str, Any] = {
         "capital_scale": "Tamanho sobre o saldo inicial do arquivo ({balance})",
         "capital_scale_plain": "Tamanho sobre o saldo inicial",
         "capital_quantity": "Tamanho nas unidades do arquivo",
+        "capital_quantity_help_lot": (
+            "Lotes = mediana do histórico × essa fração, arredondada para baixo ao passo de "
+            "0.01 lote."
+        ),
+        "capital_quantity_help_contract": (
+            "Contratos = mediana do histórico × essa fração, arredondada para baixo ao "
+            "contrato inteiro."
+        ),
+        "capital_quantity_help_file": (
+            "Quantidade = mediana do histórico × essa fração, arredondada para baixo nas "
+            "unidades do arquivo."
+        ),
         "capital_median": "Tamanho típico do histórico (mediana)",
         "ch_daily_size": "Tamanho máximo pelo limite diário de perda",
+        "ch_daily_on_account": (
+            "Tamanho nas unidades do arquivo, na conta do programa de {size} USD"
+        ),
+        "ch_daily_on_history": (
+            "Tamanho nas unidades do arquivo, sobre o saldo inicial do histórico ({balance})"
+        ),
         "capital_variable": (
             "O tamanho não foi fixo: variou muito entre operações. Esta cifra usa a mediana."
         ),
         "copy_title": "Se você copiar com multiplicador",
-        "copy_fall": "Queda sobre seu saldo inicial",
+        "copy_fall": "Queda de referência sobre seu saldo inicial",
         "copy_assumption": (
             "Mesmo saldo inicial do provedor, tamanhos fixos e queda linear em dinheiro, "
             "sem encerramentos por margem."
+        ),
+        "copy_assumption_martingale": (
+            "Mesmo saldo inicial do provedor e queda linear em dinheiro, sem encerramentos por "
+            "margem. O multiplicador escala cada operação do provedor; o tamanho do provedor "
+            "não foi fixo."
         ),
         "capital_scale_help": (
             "1x é o tamanho de posição do backtest; 0.50x é a metade. Acima de 1x, a queda em "

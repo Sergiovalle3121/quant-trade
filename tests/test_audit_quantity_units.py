@@ -6,9 +6,11 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
+from test_audit_tracking_exports import MQL5_HISTORY, _fxblue, _myfxbook
 
 from quant_trade.audit.importers import import_report
 from quant_trade.audit.schema import DeclaredMetadata, build_inputs
+from quant_trade.audit.universal import _contract, instrument_key
 
 FIXTURES = Path(__file__).parent / "fixtures" / "audit_imports"
 
@@ -96,3 +98,75 @@ def test_build_inputs_preserves_original_quantities_and_unit() -> None:
     assert inputs.trade_lots is None
     assert inputs.trades is not None
     assert [trade.quantity for trade in inputs.trades.trades] == [4.0, 2.0, 50.0]
+
+
+def _ctrader(quantities: tuple[bytes, bytes]) -> bytes:
+    data = (FIXTURES / "ctrader_history_columns.csv").read_bytes()
+    data = data.replace(b"Gross (currency)", b"profit", 1)
+    return data.replace(b",0.25,", b"," + quantities[0] + b",").replace(
+        b",0.10,", b"," + quantities[1] + b","
+    )
+
+
+def test_ctrader_quantities_in_units_stay_in_file_units() -> None:
+    # 25 000 EUR is a volume in units: each euro moves one euro, not a lot.
+    report = import_report(_ctrader((b"25000", b"10000")), "history.csv")
+    assert report.quantity_unit == "file"
+    assert report.trade_quantities == [25_000.0, 25_000.0, 10_000.0]
+
+
+def test_ctrader_quantities_with_a_lot_suffix_are_lots() -> None:
+    report = import_report(_ctrader((b"0.25 Lots", b"0.10 Lots")), "history.csv")
+    assert report.quantity_unit == "lot"
+    assert report.trade_quantities == [0.25, 0.25, 0.1]
+
+
+@pytest.mark.parametrize(
+    ("column", "unit"),
+    [
+        ("Volume (lots)", "lot"),
+        ("Size (lots)", "lot"),
+        ("Lotes", "lot"),
+        ("Quantity (units/lots)", "file"),
+    ],
+)
+def test_a_header_naming_lots_identifies_them_and_two_units_do_not(column: str, unit: str) -> None:
+    report = import_report(_generic_trades(("EURUSD",), column), "trades.csv")
+    assert report.quantity_unit == unit
+
+
+def test_account_tracking_exports_keep_their_lots() -> None:
+    mql5 = import_report(MQL5_HISTORY, "signal_history.csv")
+    assert mql5.quantity_unit == "lot"
+    assert mql5.trade_quantities == [0.1, 0.1, 0.2]
+    assert import_report(_fxblue(), "fxblue.csv").quantity_unit == "lot"
+    # Myfxbook's "Units/Lots" holds either; a plain "Lots" column is lots.
+    assert import_report(_myfxbook(), "statement.csv").quantity_unit == "file"
+    lots = _myfxbook().replace(b",Units/Lots,", b",Lots,", 1)
+    assert import_report(lots, "statement.csv").quantity_unit == "lot"
+
+
+@pytest.mark.parametrize(
+    ("symbol", "root"),
+    [
+        ("ESZ25-CME", "ES"),
+        ("ESZ25_FUT_CME", "ES"),
+        ("MESZ25-CME", "MES"),
+        ("/ESZ6", "ES"),
+        ("F.US.EPZ25", "ES"),
+        ("F.US.ENQZ25", "NQ"),
+        ("CON.F.US.MNQ.Z26", "MNQ"),
+        ("CON.F.US.EP.Z25", "ES"),
+        ("ESZ5.CME", "ES"),
+    ],
+)
+def test_futures_codes_from_other_feeds_are_contracts(symbol: str, root: str) -> None:
+    contract = _contract(symbol)
+    assert contract is not None and contract[0] == root
+    assert instrument_key(symbol) == root
+
+
+@pytest.mark.parametrize("symbol", ["ES", "/ES", "EURUSD", "BTC-USD", "AAPL"])
+def test_bare_roots_and_other_symbols_are_not_contracts(symbol: str) -> None:
+    assert _contract(symbol) is None
+    assert instrument_key(symbol) == symbol.upper()

@@ -23,6 +23,7 @@ from quant_trade.audit.challenge_sizing import (
     NO_CURVE,
     NO_LIMIT,
     NO_LOSS,
+    TINY_LOSS,
     TRANSLATIONS,
     daily_limit_review,
 )
@@ -843,9 +844,11 @@ def test_daily_limit_size_rounds_strictly_below_the_money_limit(
     assert review["quantity"]["value"] == expected
     assert review["quantity"]["evidence"] == "MEASURED"
     assert expected / median * loss < 500
-    assert review["worst_day_loss"]["value"] == loss
-    assert review["daily_limit"]["value"] == 0.05
+    assert review["worst_day_loss"]["value"] == pytest.approx(loss)
+    assert review["daily_limit"]["value"] == pytest.approx(0.05)
     assert review["daily_limit"]["evidence"] == "DECLARED"
+    assert review["basis"] == "history"
+    assert review["sized_on"]["value"] == pytest.approx(10_000)
 
 
 @pytest.mark.parametrize("unit,median", [("lot", 0.01), ("contract", 1.0)])
@@ -912,12 +915,70 @@ def test_daily_limit_does_not_invent_a_size_when_evidence_is_missing() -> None:
 
 def test_daily_limit_reports_when_a_start_of_day_rule_has_no_finite_bound() -> None:
     rules = replace(get_preset(KEY), daily_loss_basis="start_of_day")
-    # Loss 10 after a gain 1000 stays under 5% of the enlarged day's opening
+    # Loss 60 after a gain 2000 stays under 5% of the enlarged day's opening
     # balance at every multiplier; the daily rule supplies no maximum.
     review = daily_limit_review(
-        _daily_curve([10_000, 11_000, 10_990]), rules, _quantity(0.5), measured(10_000)
+        _daily_curve([10_000, 12_000, 11_940]), rules, _quantity(0.5), measured(10_000)
     )
     assert review["status"] == "NOT_MEASURED" and review["reason"] == NO_BOUND
+
+
+def test_daily_limit_does_not_size_against_an_almost_flat_worst_day() -> None:
+    # A worst day of 1 on 10 000 would print a size of hundreds of times the history.
+    review = daily_limit_review(
+        _daily_curve([10_000, 9_999, 10_100]), get_preset(KEY), _quantity(0.5), measured(10_000)
+    )
+    assert review["status"] == "NOT_MEASURED" and review["reason"] == TINY_LOSS
+    assert "quantity" not in review
+
+
+def test_daily_limit_above_ten_times_the_history_is_only_a_lower_bound() -> None:
+    rules = replace(get_preset(KEY), daily_loss_basis="start_of_day")
+    # Loss 140 after a gain 2000: 140x < 0.05 * (10000 + 2000x) gives x < 12.5.
+    review = daily_limit_review(
+        _daily_curve([10_000, 12_000, 11_860]), rules, _quantity(1), measured(10_000)
+    )
+    assert review["size_share"]["value"] == pytest.approx(12.5)
+    quantity = review["quantity"]
+    assert quantity["above"] is True and quantity["value"] == 10.0
+    assert quantity_text(quantity, "lot", "es") == "más de 10.00 lotes"
+    assert quantity_text(quantity, "lot", "en") == "more than 10.00 lots"
+
+
+def test_daily_limit_on_a_dollar_program_uses_its_account() -> None:
+    # Two contracts lost 1 500 on a 150 000 history: 750 a contract. The
+    # program allows 1 000 a day on its 50 000 account, so one contract fits;
+    # on the history's balance the same 2 % would allow three.
+    key = "myfundedfutures-builder-50k"
+    rules = get_preset(key)
+    curve = _daily_curve([150_000, 150_500, 149_000, 149_700])
+    profile = _quantity(2.0, "contract")
+    history = daily_limit_review(curve, rules, profile, declared(150_000))
+    assert history["basis"] == "history" and history["quantity"]["value"] == 3.0
+    account = declared(ACCOUNT_SIZES[key], "account")
+    review = daily_limit_review(curve, rules, profile, declared(150_000), account=account)
+    assert review["basis"] == "account" and review["sized_on"] == account
+    assert review["size_share"]["value"] == pytest.approx(1_000 / 1_500)
+    assert review["quantity"]["value"] == 1.0
+    assert 2 * 750 >= 1_000 > 1 * 750
+
+
+def test_engine_gives_the_daily_size_on_the_program_account() -> None:
+    key = "myfundedfutures-builder-50k"
+    inputs = _inputs(challenge=key)
+    challenge = engine._challenge(inputs, samples=100, seed=1, money_curve=True)
+    sizing = challenge["sizing"]
+    assert sizing["status"] == "MEASURED"
+    daily = sizing["daily_limit"]
+    assert daily["status"] == "MEASURED" and daily["basis"] == "account"
+    assert daily["sized_on"]["value"] == pytest.approx(ACCOUNT_SIZES[key])
+    assert daily == daily_limit_review(
+        inputs.equity.frame,
+        get_preset(key),
+        daily["quantity_profile"],
+        sizing["starting_balance"],
+        account=sizing["account_size"],
+    )
 
 
 def test_daily_limit_uses_daily_closes_and_keeps_the_intraday_caveat() -> None:
@@ -930,9 +991,9 @@ def test_daily_limit_uses_daily_closes_and_keeps_the_intraday_caveat() -> None:
         }
     )
     review = daily_limit_review(curve, get_preset(KEY), _quantity(1), measured(10_000))
-    assert review["worst_day_loss"]["value"] == 100
+    assert review["worst_day_loss"]["value"] == pytest.approx(100)
     assert review["quantity"]["value"] == 4.99
-    assert review["note"] == DAILY_NOTE and "intraday losses" in DAILY_NOTE
+    assert review["note"] == DAILY_NOTE and "Intraday losses" in DAILY_NOTE
 
 
 @pytest.mark.parametrize("initial_row", [True, False])
@@ -952,8 +1013,8 @@ def test_daily_limit_counts_the_first_day_from_the_starting_balance(
     balance = measured(10_000) if initial_row else declared(10_000)
     review = daily_limit_review(curve, rules, _quantity(1), balance)
     assert review["status"] == "MEASURED"
-    assert review["worst_day_loss"]["value"] == 1_000
-    assert review["size_share"]["value"] == 0.5
+    assert review["worst_day_loss"]["value"] == pytest.approx(1_000)
+    assert review["size_share"]["value"] == pytest.approx(0.5)
     assert review["quantity"]["value"] == 0.49
 
 
@@ -971,7 +1032,8 @@ def test_audited_challenge_includes_daily_limit_in_file_units(
     sizing = _sizing(result)
     daily = sizing["daily_limit"]
     assert daily["status"] == "MEASURED" and daily["unit"] == "lot"
-    assert daily["quantity_profile"]["median"]["value"] == 0.5
+    assert daily["basis"] == "history"
+    assert daily["quantity_profile"]["median"]["value"] == pytest.approx(0.5)
     assert daily == daily_limit_review(
         inputs.equity.frame, get_preset(KEY), daily["quantity_profile"], sizing["starting_balance"]
     )
