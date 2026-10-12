@@ -1295,6 +1295,13 @@
       "expected_at": "../qa-extended/ (local, outside the checkout)",
       "why_not_committed": "Generated synthetic QA output stays outside source control under the report policy",
       "consequence": "The local snapshot records one generated report. CI repeats byte-for-byte restore comparison with new synthetic identifiers, so it cannot recreate these exact HTML bytes."
+    },
+    {
+      "sha256": "2b9ebc56a359a91f4d0b75ed137404639c8f34e8f56513d8ff2c9549453012c2",
+      "names": "cairo-windows-1.17.2.zip (preshing/cairo-windows release 1.17.2), the portable Cairo that docs/CODEX-24-NOTAS.md used to validate the OG cards locally",
+      "expected_at": "%TEMP%\\codex24-cairo (local, outside the checkout)",
+      "why_not_committed": "a 2.2 MB third-party native binary (Cairo DLLs); the repository commits no native binaries, and the GitHub release publishes no digest for the asset",
+      "consequence": "the digest names the one download that session validated with; it can be checked only by downloading that release asset again and hashing it, and nothing in the repository reads the ZIP"
     }
   ]
 }

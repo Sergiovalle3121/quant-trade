@@ -20,6 +20,7 @@ from fastapi.testclient import TestClient  # noqa: E402
 from httpx import Response  # noqa: E402
 
 from quant_trade.audit.guard import find_claims  # noqa: E402
+from quant_trade.audit.guides import guide_url, guides_index_url  # noqa: E402
 from quant_trade.audit.institutional import REVIEW_PATHS  # noqa: E402
 from quant_trade.audit.pages import CONTACT_PATHS  # noqa: E402
 from quant_trade.audit.seo import BRAND, LOCALES, PUBLIC_PAGES  # noqa: E402
@@ -166,6 +167,15 @@ def public_site(tmp_path_factory: pytest.TempPathFactory) -> Iterator[PublicSite
 def test_public_response_and_language(public_site: PublicSite, locale: str, path: str) -> None:
     assert public_site.get(path).status_code == 200
     assert public_site.pages[path].languages == [locale]
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+def test_ctrader_is_reachable_from_the_guides_index(public_site: PublicSite, locale: str) -> None:
+    path = guide_url("ctrader", locale)
+    assert (locale, path) in PUBLIC_URLS
+    assert path in public_site.pages[guides_index_url(locale)].hrefs
+    assert public_site.get(path).status_code == 200
+    assert find_claims(html.unescape(public_site.get(path).text)) == []
 
 
 @pytest.mark.parametrize(("locale", "path"), PAGE_CASES)
