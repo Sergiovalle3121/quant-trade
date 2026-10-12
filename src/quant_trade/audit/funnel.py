@@ -23,6 +23,7 @@ import logging
 import re
 import threading
 from collections import Counter
+from collections.abc import Collection
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -35,6 +36,10 @@ REF_DAYS = 30
 SEEN_COOKIE = "rigor_seen"
 #: How often the in-memory visit counters are written to the database.
 FLUSH_SECONDS = 60.0
+#: The privacy text describes day/language/ref counts, deduplicated with a cookie.
+#: Cookieless widget views per firm need a separate disclosure before activation.
+#: Keep them off: the embed routes must never join the normal visit counter.
+CHALLENGE_EMBED_VIEWS_ENABLED = False
 DIRECT = "directo"
 #: How far back /panel looks.
 FUNNEL_DAYS = 30
@@ -103,6 +108,7 @@ REF_TAGS: dict[str, str] = {
     "calculadora": "Calculadora de suerte compartida",
     "aciertos": "Calculadora de % de aciertos compartida",
     "reto": "Calculadora de reto compartida",
+    "embed": "Atribución de la calculadora insertada",
     "ruina": "Calculadora de riesgo de ruina compartida",
     "instagram": "Instagram",
     "facebook": "Facebook",
@@ -333,13 +339,16 @@ class VisitCounter:
         failed: Counter[tuple[str, str, str]] = Counter()
         for (day, locale, ref), amount in batch.items():
             try:
-                self._store.count_visit(day=day, locale=locale, ref=ref, amount=amount)
+                self._write(day=day, locale=locale, ref=ref, amount=amount)
             except Exception:  # noqa: BLE001 - kept for the next flush
                 failed[(day, locale, ref)] += amount
         if failed:
             logger.warning("could not write %d visit counters; kept for later", len(failed))
             with self._lock:
                 self._pending.update(failed)
+
+    def _write(self, *, day: str, locale: str, ref: str, amount: int) -> None:
+        self._store.count_visit(day=day, locale=locale, ref=ref, amount=amount)
 
     def _loop(self) -> None:
         while not self._stop.wait(self._interval):
@@ -359,9 +368,41 @@ class VisitCounter:
         self.flush()
 
 
+class ChallengeEmbedViewCounter(VisitCounter):
+    """Cookieless page loads per day/firm, separate from the visitor funnel.
+
+    Disabled until the privacy disclosure covers this counting method. No
+    request object, address, referring domain or browser identifier enters it.
+    """
+
+    def __init__(
+        self,
+        store: Any,
+        *,
+        firms: Collection[str],
+        interval_seconds: float = FLUSH_SECONDS,
+    ) -> None:
+        super().__init__(store, interval_seconds=interval_seconds)
+        self._firms = frozenset(firms) | {""}
+
+    def add_view(self, *, day: str, firm: str) -> None:
+        if not CHALLENGE_EMBED_VIEWS_ENABLED or firm not in self._firms:
+            return
+        with self._lock:
+            self._pending[(day, "", firm)] += 1
+
+    def add(self, *, day: str, locale: str, ref: str) -> None:
+        self.add_view(day=day, firm=ref)
+
+    def _write(self, *, day: str, locale: str, ref: str, amount: int) -> None:
+        self._store.count_challenge_embed_view(day=day, firm=ref, amount=amount)
+
+
 __all__ = [
     "DIRECT",
     "FLUSH_SECONDS",
+    "CHALLENGE_EMBED_VIEWS_ENABLED",
+    "ChallengeEmbedViewCounter",
     "FUNNEL_DAYS",
     "MAX_REF_CHARS",
     "REF_COOKIE",

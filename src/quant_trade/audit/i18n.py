@@ -76,6 +76,27 @@ _TRIAL_SOURCES: dict[str, str] = {
 }
 
 _RULES_SOURCE: tuple[tuple[str, str], ...] = (
+    # Embedded calculator notices also have native ES/PT copy (challenge_embed).
+    (
+        "Readers can explore a challenge's targets and limits with their own figures without "
+        "leaving your page. The calculator uses synthetic paths and each firm's published "
+        "rules, with a source and date. Results depend on declared figures and model "
+        "assumptions; they are not a forecast. Choose a firm and language, then paste the code"
+        " into your page's HTML, keeping the “Made with Rigor” link.",
+        "Tus lectores pueden explorar objetivos y límites de un reto con sus propias cifras, "
+        "sin salir de tu página. La calculadora usa trayectorias sintéticas y las reglas "
+        "publicadas por cada firma, con fuente y fecha. El resultado depende de las cifras "
+        "declaradas y de los supuestos del modelo; no es una previsión. Elige firma e idioma y"
+        " pega el código en el HTML de tu página, manteniendo el enlace «Hecho con Rigor».",
+    ),
+    (
+        "You can adjust the iframe height; its content scrolls inside it.",
+        "Puedes ajustar la altura del iframe; el contenido se desplaza dentro de él.",
+    ),
+    (
+        "rules published by the firm, with a source and date",
+        "reglas publicadas por la firma, con fuente y fecha",
+    ),
     # Public tool share-card notices (tool_cards); no results or affiliation.
     (
         "Research tool · Not a forecast",

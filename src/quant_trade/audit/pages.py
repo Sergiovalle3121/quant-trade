@@ -4891,6 +4891,9 @@ def examples_page(*, locale: str = "es", base_url: str = "") -> str:
 
 def tools_page(*, locale: str = "es", base_url: str = "") -> str:
     """The free tools, with declared examples computed by each destination tool."""
+    from quant_trade.audit.challenge_embed import COPY as EMBED_COPY
+    from quant_trade.audit.challenge_embed import HELP_PATHS as EMBED_HELP_PATHS
+
     locale = _locale(locale)
     words = TOOLS_COPY[locale]
     title = f"{words['seo_title']} · {BRAND}"
@@ -4956,6 +4959,8 @@ def tools_page(*, locale: str = "es", base_url: str = "") -> str:
                 f"{_e(RULES_COPY[locale]['nav'])}{icon('arrow')}</a></h3>"
                 f"{example_line('rules_table')}"
                 f"<div class='back-row'>{example_link('rules_table')}</div>"
+                f"<p><a class='link-more' href='{_e(EMBED_HELP_PATHS[locale])}' "
+                f"data-embed-calculator>{_e(EMBED_COPY[locale]['link'])}{icon('arrow')}</a></p>"
             )
         tools += (
             f"<section class='article-cta'><h2 id='tool-{key}'>{_e(_tool_name(key, locale))}</h2>"
