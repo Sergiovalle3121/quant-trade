@@ -355,7 +355,7 @@ def test_preview_sign_up_locked_report_purchase_and_unlock(tmp_path: Path) -> No
     order_id = _pay(app, visitor, settings, audit_id, token)
     assert store.get_audit(audit_id).paid
     acceptance = store.final_sale_acceptance(order_id)
-    assert acceptance is not None and acceptance[0] == LEGAL_UPDATED == "2026-10-09"
+    assert acceptance is not None and acceptance[0] == LEGAL_UPDATED == "2026-10-12"
     opened = visitor.get(f"/audits/{audit_id}?token={token}&lang=es").text
     assert "class='lockbox'" not in opened
 
@@ -674,7 +674,7 @@ def test_the_terms_say_what_the_code_does_in_each_offer(tmp_path: Path, locale: 
             else:
                 assert _promises(whole, locale) == [], _promises(whole, locale)
             assert find_claims(whole) == []
-            assert text.updated == "2026-10-09"
+            assert text.updated == "2026-10-12"
             privacy = privacy_text(ctx, locale)
             assert find_claims(" ".join(" ".join(lines) for _, lines in privacy.sections)) == []
 
