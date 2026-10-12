@@ -3166,7 +3166,8 @@ def account_page(
     locale = _locale(locale)
     copy = COPY[locale]
     paid = offer == "paid"
-    if paid and flash == "email_verified":
+    if paid and flash in ("email_verified", "email_verified_report"):
+        # Confirming opens no report under the paid offer, whatever the link says.
         flash = "email_verified_paid"
     from quant_trade.audit.pages import AUDIT_PATHS
 
