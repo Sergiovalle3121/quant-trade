@@ -1527,9 +1527,10 @@ AUDIENCE_PAGES: tuple[Audience, ...] = (
                         "missing evidence.",
                     ),
                 ),
-                seo_title="How do I pick a signal provider to copy without getting wiped out?",
+                # Short enough for the site's title cap with the brand.
+                seo_title="How to pick a signal to copy without getting wiped out",
                 seo_description=(
-                    "How do I pick a signal provider to copy without getting wiped out? "
+                    "How to pick a signal to copy without getting wiped out. "
                     "7 checks with numbers and free tools: history, win rate and ruin."
                 ),
             ),

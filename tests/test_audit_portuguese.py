@@ -197,8 +197,10 @@ def test_every_case_page_exists_in_portuguese(tmp_path: Path, page) -> None:
     for lang in ("es", "en"):
         assert f"href='{audience_url(page.slug, lang)}' hreflang='{lang}'" in response.text
     assert "href='/pt" in response.text
+    # An attribute holds the address escaped («&amp;» between query fields): the
+    # browser requests it decoded, so the test does too.
     links = {
-        href.split("#", 1)[0]
+        html.unescape(href).split("#", 1)[0]
         for href in HREF.findall(response.text)
         if href.startswith("/") and not href.startswith("//")
     }

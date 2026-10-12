@@ -6,8 +6,11 @@ thresholds come from the report rules; this page introduces no new rule.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from html import escape
+from urllib.parse import urlencode
 
+from quant_trade.audit import reading, ruin_calc
 from quant_trade.audit.audience_numbers import (
     reader_values,
     signal_copier_example,
@@ -15,8 +18,7 @@ from quant_trade.audit.audience_numbers import (
 )
 from quant_trade.audit.calculator import calculator_url
 from quant_trade.audit.guides import guide_url
-from quant_trade.audit.reading import reading_url
-from quant_trade.audit.ruin_calc import share_url
+from quant_trade.audit.paid_offer import COPY as OFFER_COPY
 from quant_trade.audit.seller_message import COPY as SELLER_COPY
 from quant_trade.audit.winrate import winrate_url
 
@@ -252,13 +254,15 @@ COPY: dict[str, dict[str, str]] = {
             "faltan. Ninguna lista elimina la posibilidad de perder la cuenta. Los umbrales "
             "del informe indican qué revisar; no son límites de seguridad."
         ),
+        # The offer's own sentence follows (``offer_note``): it comes from the
+        # settings, like the upload form's note, never from this page.
         "free": (
             "Calculadoras, lector y ejemplo: gratis sin registro. Para calcular las banderas "
-            "sobre tu archivo, el primer informe completo es gratis al crear tu cuenta."
+            "sobre tu archivo, súbelo."
         ),
         "luck": "Calculadora de suerte gratis",
         "winrate": "Calculadora de aciertos gratis",
-        "audit": "Primer informe gratis con cuenta",
+        "audit": OFFER_COPY["es"]["upload"],
         "ruin": "Calculadora de ruina gratis",
         "sample": "Ejemplo de señal y mensaje para el vendedor",
         "example_title": "Ejemplo: aciertos, ganancia declarada y tamaño de copia",
@@ -312,11 +316,11 @@ COPY: dict[str, dict[str, str]] = {
         ),
         "free": (
             "Calculators, reader and sample: free without signup. To compute flags on your "
-            "file, your first full report is free when you create an account."
+            "file, upload it."
         ),
         "luck": "Free luck calculator",
         "winrate": "Free win-rate calculator",
-        "audit": "First report free with an account",
+        "audit": OFFER_COPY["en"]["upload"],
         "ruin": "Free risk-of-ruin calculator",
         "sample": "Signal sample and message for the seller",
         "example_title": "Example: win rate, declared gain and copy size",
@@ -370,11 +374,11 @@ COPY: dict[str, dict[str, str]] = {
         ),
         "free": (
             "Calculadoras, leitor e exemplo: grátis sem cadastro. Para calcular as bandeiras "
-            "no seu arquivo, o primeiro relatório completo é grátis ao criar sua conta."
+            "no seu arquivo, envie-o."
         ),
         "luck": "Calculadora de sorte grátis",
         "winrate": "Calculadora de acertos grátis",
-        "audit": "Primeiro relatório grátis com conta",
+        "audit": OFFER_COPY["pt"]["upload"],
         "ruin": "Calculadora de ruína grátis",
         "sample": "Exemplo de sinal e mensagem para o vendedor",
         "example_title": "Exemplo: acertos, ganho declarado e tamanho de cópia",
@@ -423,10 +427,21 @@ COPY: dict[str, dict[str, str]] = {
 }
 
 
+def _link(path: str, values: Mapping[str, str]) -> str:
+    """``path`` pre-filled with ``values`` and no ``ref`` tag: the tools'
+    ``share_url`` tag their links so /panel counts real shares, and a click
+    inside the site is not one."""
+    return path + "?" + urlencode(values)
+
+
 def checklist_sections(
-    locale: str, question: str, *, audit_url: str, sample_url: str
+    locale: str, question: str, *, audit_url: str, sample_url: str, offer_note: str
 ) -> list[tuple[str, str]]:
-    """Two normal audience sections, escaped like the surrounding document."""
+    """Two normal audience sections, escaped like the surrounding document.
+
+    ``offer_note`` is the offer as the settings make it, the sentence the upload
+    form shows (``pages.audience_page`` picks it): the paid offer's free preview,
+    price and refund, the free first report, or free mode."""
     words = COPY[locale]
     figures = signal_copier_values(locale)
     # The sample's own section title, so the check names what the visitor will find.
@@ -436,16 +451,23 @@ def checklist_sections(
         "winrate": winrate_url(locale),
         "audit": audit_url,
         # Pre-filled with the example, so the page opens on Wilson's lower-end twin.
-        "ruin": share_url(locale, signal_copier_example().ruin_input),
+        "ruin": _link(
+            ruin_calc.ruin_url(locale), ruin_calc.share_values(signal_copier_example().ruin_input)
+        ),
         "sample": sample_url,
     }
+    # The reader's fields in the order of its own share link, without the tag.
+    values = reader_values()
+    reader_link = _link(
+        reading.READING_PATH[locale], {name: values.get(name, "") for name in reading.FIELDS}
+    )
     checks = "".join(
         f"<li><h3>{escape(title)}</h3><p>{escape(body.format(**figures, seller=seller))} "
         f"<a href='{escape(urls[tool], quote=True)}'>{escape(words[tool])}</a>.</p></li>"
         for title, body, tool in CHECKS[locale]
     )
     checklist = (
-        f"<p>{escape(words['intro'])}</p><p>{escape(words['free'])}</p>"
+        f"<p>{escape(words['intro'])}</p><p>{escape(words['free'])} {escape(offer_note)}</p>"
         f"<ol data-signal-checklist>{checks}</ol>"
     )
     example = (
@@ -456,7 +478,7 @@ def checklist_sections(
             for key in ("inputs", "wilson", "ruin_result", "breakeven", "model", "reader")
         )
         # The reader opens on the example's own fields, as the paragraph describes.
-        + f"<p><a href='{escape(reading_url(locale, reader_values()), quote=True)}'>"
+        + f"<p><a href='{escape(reader_link, quote=True)}'>"
         f"{escape(words['reading'])}</a>.</p>"
         + f"<p>{escape(words['guides'])} "
         + " · ".join(

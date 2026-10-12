@@ -5134,8 +5134,12 @@ def audience_page(
     free_mode: bool = False,
     price_usd: float = 0.0,
     pack_price_usd: float = 0.0,
+    offer: paid_offer.Offer | None = None,
 ) -> str:
-    """One visitor's case: the problem, what to upload, what Rigor checks."""
+    """One visitor's case: the problem, what to upload, what Rigor checks.
+
+    ``offer`` words the signal checklist's note as the upload form does; the
+    rest of the page is worded by ``paid_offer.rewrite_html`` in the web layer."""
     locale = _locale(locale)
     copy = _COPY[locale]
     words = AUDIENCE_COPY[locale]
@@ -5248,7 +5252,19 @@ def audience_page(
     )
     checklist = []
     if audience.slug == "copiar-senales":
-        checklist = checklist_sections(locale, text.seo_title, audit_url=start, sample_url=sample)
+        # The offer in the upload form's own words: the paid offer's preview, price
+        # and refund from the settings, else the free first report or free mode.
+        terms = _landing_offer(free_mode, offer)
+        offer_note = (
+            copy["free_note"]
+            if free_mode
+            else paid_offer.paid_text(locale, terms)
+            if terms.paid
+            else copy["paid_note"].format(price=price_usd)
+        )
+        checklist = checklist_sections(
+            locale, text.seo_title, audit_url=start, sample_url=sample, offer_note=offer_note
+        )
         meta += faq_structured_data(text.faq)
     body = (
         _page_hero(words["eyebrow"], text.title, summary, crumbs)

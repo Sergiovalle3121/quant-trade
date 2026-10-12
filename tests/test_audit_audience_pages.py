@@ -16,11 +16,14 @@ pytest.importorskip("sqlalchemy")
 
 from fastapi.testclient import TestClient  # noqa: E402
 
+from quant_trade.audit import paid_offer  # noqa: E402
 from quant_trade.audit.audience_numbers import signal_copier_values  # noqa: E402
 from quant_trade.audit.audiences import AUDIENCE_COPY, AUDIENCE_PAGES, audience_url  # noqa: E402
 from quant_trade.audit.challenge_calc import CHALLENGE_PATH  # noqa: E402
+from quant_trade.audit.funnel import REF_COOKIE  # noqa: E402
 from quant_trade.audit.guard import find_claims  # noqa: E402
 from quant_trade.audit.guides import GUIDES_BY_SLUG, guide_url  # noqa: E402
+from quant_trade.audit.pages import _COPY  # noqa: E402
 from quant_trade.audit.reading import READING_PATH  # noqa: E402
 from quant_trade.audit.report import SIGNAL_SAMPLE_PATHS  # noqa: E402
 from quant_trade.audit.ruin_calc import RUIN_PATH  # noqa: E402
@@ -32,7 +35,7 @@ from quant_trade.audit.winrate import WINRATE_PATH  # noqa: E402
 
 SIGNAL_QUESTIONS = {
     "es": "¿Cómo elijo un proveedor de señales sin que me barran?",
-    "en": "How do I pick a signal provider to copy without getting wiped out?",
+    "en": "How to pick a signal to copy without getting wiped out",
     "pt": "Como escolher fornecedor de sinais sem quebrar a conta?",
 }
 
@@ -274,6 +277,50 @@ def test_signal_copiers_link_free_tools_sample_and_export_guides(
             assert values[key] in response.text, (locale, key, href)
         query = parse_qs(urlsplit(href).query)
         assert query["trades"] == ["40"] and query["win_rate"] == ["80"], href
+        # A click inside the site is not a share: no tag, so /panel does not count it.
+        assert "ref" not in query, href
+        assert REF_COOKIE not in client.cookies, href
+
+
+@pytest.mark.parametrize("locale", ("es", "en", "pt"))
+def test_signal_copiers_checklist_words_the_configured_offer(tmp_path: Path, locale: str) -> None:
+    """Under the paid offer (production since 9-oct) the checklist says the free
+    preview, the price from the settings and the refund, like the upload form;
+    with the free first report on, the form's own note. Its report links say
+    "upload", never a free report."""
+    paid_dir, welcome_dir = tmp_path / "paid", tmp_path / "welcome"
+    paid_dir.mkdir()
+    welcome_dir.mkdir()
+    paid_settings = {
+        "free_mode": False,
+        "welcome_full_report": False,
+        "anon_preview": True,
+        "price_usd_cents": 3100,
+    }
+    welcome_settings = {"free_mode": False, "welcome_full_report": True, "price_usd_cents": 3100}
+    offer = paid_offer.offer_of(
+        AuditSettings(database_url=f"sqlite:///{paid_dir}/x.db", **paid_settings)
+    )
+    assert offer.paid and offer.anon_preview
+    pattern = re.compile(r"<p>([^<]*)</p><ol\b[^>]*\bdata-signal-checklist", re.S)
+    notes = {}
+    for name, folder, overrides in (
+        ("paid", paid_dir, paid_settings),
+        ("welcome", welcome_dir, welcome_settings),
+    ):
+        page = _client(folder, **overrides).get(audience_url("copiar-senales", locale)).text
+        found = pattern.search(page)
+        assert found is not None, name
+        notes[name] = html.unescape(found.group(1))
+        upload = paid_offer.words(locale)["upload"]
+        checklist = page.split("data-signal-checklist", 1)[1].split("</ol>", 1)[0]
+        assert checklist.count(f">{html.escape(upload)}</a>") == 3, (name, locale)
+    paid = notes["paid"]
+    assert paid.endswith(paid_offer.paid_text(locale, offer)), paid
+    assert "USD 31" in paid
+    first = {"es": "primer informe", "en": "first full report", "pt": "primeiro relatório"}
+    assert first[locale] not in paid.lower()
+    assert notes["welcome"].endswith(_COPY[locale]["paid_note"].format(price=31.0))
 
 
 @pytest.mark.parametrize("locale", ("es", "en", "pt"))

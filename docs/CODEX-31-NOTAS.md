@@ -43,20 +43,23 @@ queda `NOT_MEASURED` porque falta el número de búsquedas; tampoco se infiere
 un Sharpe de ganancia/drawdown. La página explica esta limitación y pide
 el historial para revisar depósitos, flotante y patrones de tamaño.
 
-La pregunta completa en inglés más la marca supera los 65 caracteres del
-control general de títulos; es la consulta literal de Search Console y se
-conserva. `public_hygiene` mantiene ese control para todas las demás páginas
-y exige el título exacto solo para `/for/signal-copiers`. Las preguntas en
-español y portugués no son consultas reales: se acortaron («¿Cómo elijo un
-proveedor de señales sin que me barran?», «Como escolher fornecedor de
-sinais sem quebrar a conta?») para caber en el tope con la marca, y el H2 y
-la meta description llevan la misma pregunta corta. Las meta descriptions
-mantienen el límite de 160 caracteres.
+Los tres títulos caben en el tope de 65 caracteres con la marca, sin
+excepciones en `public_hygiene`. El inglés es «How to pick a signal to copy
+without getting wiped out» (62 con « · Rigor»); la consulta literal de 66
+caracteres no cabía. El español y el portugués («¿Cómo elijo un proveedor de
+señales sin que me barran?», «Como escolher fornecedor de sinais sem quebrar
+a conta?») ya cabían y no cambian. El H2 y la meta description llevan el
+mismo texto que el título; las meta descriptions mantienen el límite de 160
+caracteres.
 
 Las traducciones nuevas son contenido editorial explícito es/en/pt, no
 notas nuevas del motor de informes; no cambian las reglas de `i18n.py`.
-Los enlaces de informe explican que el primero es gratis con cuenta; las
-calculadoras, el lector y el ejemplo son gratuitos sin registro.
+Las calculadoras, el lector y el ejemplo son gratuitos sin registro. La
+oferta del informe sale de la configuración, con la frase del formulario de
+subida: con la oferta de pago (producción desde el 9-oct,
+`AUDIT_WELCOME_FULL_REPORT=false`), `paid_offer.paid_text`: vista previa
+gratis, precio de los ajustes y devolución en 7 días. Los enlaces al informe
+dicen «Subir mi archivo» (`paid_offer.COPY[locale]["upload"]`).
 
 ## Validación
 
@@ -96,8 +99,8 @@ datos de clientes, cachés, conexiones a proveedores ni ejecución de operacione
 ## Revisión posterior (hallazgos aplicados)
 
 - Los enlaces al lector y a la calculadora de ruina van prellenados con el
-  ejemplo (`reading_url(locale, reader_values())` y
-  `ruin_calc.share_url(locale, ruin_input)`), para que el visitante vea el
+  ejemplo (los campos de `reader_values()` y `ruin_calc.share_values(ruin_input)`,
+  sin `ref`; ver abajo), para que el visitante vea el
   intervalo Wilson y el gemelo al extremo inferior que la página describe;
   la comprobación 6 pide el acierto con sus operaciones, sin las cuales la
   calculadora no muestra ese gemelo. El test de enlaces abre ambos href y
@@ -120,3 +123,18 @@ datos de clientes, cachés, conexiones a proveedores ni ejecución de operacione
 - La comprobación 6 pide «el acierto declarado» con sus operaciones, no
   «tu acierto»: quien copia no tiene acierto propio; introduce el del
   proveedor junto a su propio tamaño de copia.
+
+## Revisión del verificador
+
+- `test_no_page_promises_a_free_full_report` fallaba: el checklist prometía
+  el primer informe gratis con cuenta. Ahora `pages.audience_page` recibe la
+  oferta (`offer=_offer_terms()` en `web.py`) y elige la nota como
+  `upload_page`: modo gratuito, `paid_offer.paid_text` con la oferta de pago
+  o la nota de la bienvenida. El precio sale siempre de los ajustes.
+- Los enlaces prellenados al lector y a la calculadora de ruina ya no llevan
+  `ref=lectura` ni `ref=ruina`: un clic dentro del sitio no es un compartido
+  en /panel (como el artículo de ruina y los ejemplos del hub). El test abre
+  ambos y exige que no quede la cookie `rigor_ref`.
+- `test_audit_portuguese` decodifica cada `href` con `html.unescape` antes de
+  pedirlo: el atributo lleva `&amp;` entre campos y el navegador pide `&`.
+- El título inglés se acortó y `public_hygiene` vuelve a no tener excepciones.
