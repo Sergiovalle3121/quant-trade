@@ -63,14 +63,13 @@ def sizing_values() -> dict[str, str]:
 
 
 def _signed_pct(value: float, locale: str) -> str:
-    """A share of the balance as a signed percentage with two decimals, as the
-    ruin page writes expectancy: the sign follows the rounded value, so one that
-    rounds to zero shows none; the minus is typographic, like the page's losses."""
-    text = f"{_num(value * 100, locale, 2)} %"
-    rounded = round(value * 100, 2)
-    if rounded == 0:
-        return text.lstrip("-")
-    return "+" + text if rounded > 0 else "−" + text.lstrip("-")
+    """A share of the balance as a signed percentage with two decimals, with the
+    ruin page's own sign rule (``ruin_calc._signed``: the sign follows the
+    rounded value, so one that rounds to zero shows none); the minus is
+    typographic, like this page's losses."""
+    percent = value * 100
+    text = ruin_calc._signed(percent, f"{_num(percent, locale, 2)} %")
+    return "−" + text[1:] if text.startswith("-") else text
 
 
 @dataclass(frozen=True)

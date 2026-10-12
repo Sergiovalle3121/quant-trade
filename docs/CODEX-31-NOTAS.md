@@ -138,3 +138,6 @@ datos de clientes, cachés, conexiones a proveedores ni ejecución de operacione
 - `test_audit_portuguese` decodifica cada `href` con `html.unescape` antes de
   pedirlo: el atributo lleva `&amp;` entre campos y el navegador pide `&`.
 - El título inglés se acortó y `public_hygiene` vuelve a no tener excepciones.
+- Tras mezclar `origin/main`, `audience_numbers._signed_pct` usa la regla de
+  signo de main (`ruin_calc._signed`) y solo cambia el guion por el signo
+  menos tipográfico; la salida es la misma (comprobado con 120.000 valores).
