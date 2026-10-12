@@ -1257,6 +1257,10 @@ class AuditInputs:
     #: The volume of each trade in the platform's lots, when the format prints
     #: lots (``importers.LOT_FORMATS``); ``None`` otherwise.
     trade_lots: list[float] | None = None
+    #: Source volumes before the importer's money-per-point normalization.
+    trade_quantities: list[float] | None = None
+    #: ``lot``, ``contract`` or ``file`` when the source unit is not established.
+    quantity_unit: str = "file"
     #: Signed cost totals a platform report itemises (negative is a cost).
     reported_fees: dict[str, float] = field(default_factory=dict)
     #: The platform's descriptive fields and own summary figures (DECLARED).
@@ -1428,6 +1432,10 @@ def build_inputs(
             "source_format": imported.source_format,
             "trade_symbols": list(imported.symbols) or None,
             "trade_lots": list(imported.lots) if imported.lots else None,
+            "trade_quantities": (
+                list(imported.trade_quantities) if imported.trade_quantities else None
+            ),
+            "quantity_unit": imported.quantity_unit,
             "reported_fees": dict(imported.fees),
             "report_metadata": dict(imported.metadata),
             "initial_balance": imported.initial_balance,
