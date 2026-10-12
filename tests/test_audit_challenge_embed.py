@@ -41,6 +41,11 @@ FIGURES = {
     "program": "ftmo-2step-phase1",
     "fee": "155",
 }
+NOT_AFFILIATED = {
+    "es": "Rigor no está afiliado a FTMO.",
+    "en": "Rigor is not affiliated with FTMO.",
+    "pt": "O Rigor não é afiliado à FTMO.",
+}
 FORBIDDEN = re.compile(
     r"\b(verific\w*|certific\w*|garantiza\w*|rentables?|aprobar\w*|pasar|"
     r"pass|passed|passes|passing|approved|profitable|guarantee\w*|aprovar\w*)\b",
@@ -106,6 +111,10 @@ def test_widgets_allow_framing_are_noindex_and_canonical_to_the_normal_page(
     policy = response.headers["content-security-policy"]
     assert "frame-ancestors *" in policy
     assert "frame-ancestors 'none'" not in policy
+    # The frameable document runs no script and its forms only reach itself.
+    assert "script-src 'none'" in policy
+    assert "form-action 'self';" in policy
+    assert "checkout.stripe.com" not in policy and "sha256-" not in policy
     assert "x-frame-options" not in response.headers
     assert "noindex" in response.headers["x-robots-tag"]
     assert "set-cookie" not in response.headers
@@ -124,7 +133,9 @@ def test_widgets_allow_framing_are_noindex_and_canonical_to_the_normal_page(
     assert not markup.all("nav") and not markup.all("header")
     assert markup.all("form")
     assert all(form.get("method") == "get" for form in markup.all("form"))
-    assert any(form.get("action") == path for form in markup.all("form"))
+    anchored = f"{path}#{challenge_embed.RESULT_ANCHOR[locale]}"
+    assert any(form.get("action") == anchored for form in markup.all("form"))
+    assert not markup.all("script") and len(markup.all("iframe")) == 0
     assert find_claims(_visible(response.text)) == []
     assert not FORBIDDEN.findall(_visible(response.text))
     assert "Declarado ·" not in _visible(response.text)
@@ -161,9 +172,54 @@ def test_widget_is_get_only_and_never_sets_a_cookie_with_existing_browser_cookie
         assert response.status_code == 200
         assert "set-cookie" not in response.headers
         assert all(form.get("method") == "get" for form in _Markup(response.text).all("form"))
-    refused = client.post(path, data=FIGURES)
-    assert refused.status_code == 405
-    assert "set-cookie" not in refused.headers
+    for method in ("POST", "PUT", "PATCH", "DELETE", "OPTIONS"):
+        refused = client.request(method, path, data=FIGURES)
+        assert refused.status_code == 405, method
+        assert "set-cookie" not in refused.headers
+        # The site's error page on a widget path is not the widget: never framed.
+        assert "frame-ancestors 'none'" in refused.headers["content-security-policy"], method
+        assert refused.headers["x-frame-options"] == "DENY", method
+
+
+def test_a_server_error_on_a_widget_path_cannot_be_framed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    settings = AuditSettings(database_url=f"sqlite:///{tmp_path}/audit.db", base_url=BASE)
+    client = TestClient(
+        create_app(settings, make_store(settings.database_url)),
+        headers=BROWSER,
+        raise_server_exceptions=False,
+    )
+
+    def broken(**kwargs: object) -> str:
+        raise RuntimeError("render failed")
+
+    monkeypatch.setattr(challenge_embed, "widget_page", broken)
+    response = client.get(challenge_embed.PATHS["en"] + "/ftmo")
+    assert response.status_code == 500
+    assert "frame-ancestors 'none'" in response.headers["content-security-policy"]
+    assert response.headers["x-frame-options"] == "DENY"
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+def test_firm_widget_shows_its_lead_with_the_non_affiliation_line(
+    site: TestClient, locale: str
+) -> None:
+    page = site.get(challenge_embed.PATHS[locale] + "/ftmo").text
+    # Visible without opening anything: review sites are often a firm's affiliates.
+    outside = _visible(re.sub(r"<details>.*?</details>", "", page, flags=re.S))
+    assert calc.firm_copy("ftmo", locale)["lead"] in outside
+    assert NOT_AFFILIATED[locale] in outside
+    rules = calc.COPY[locale]["firm_rules_title"].format(firm=calc.FIRMS["ftmo"])
+    assert f"<summary>{html.escape(rules)}</summary>" in page
+    general = site.get(challenge_embed.PATHS[locale]).text
+    assert f"<summary>{html.escape(calc.COPY[locale]['rules_title'])}</summary>" in general
+
+
+def test_portuguese_embed_copy_says_empresa_like_the_calculator() -> None:
+    words = " ".join(challenge_embed.COPY["pt"].values())
+    assert not re.search(r"firmas?", words, re.IGNORECASE)
+    assert "empresa" in challenge_embed.COPY["pt"]["credit_note"]
 
 
 @pytest.mark.parametrize("locale", LOCALES)
@@ -237,9 +293,14 @@ def test_auxiliary_links_open_outside_the_widget_while_the_form_stays_inside(
         assert len(re.findall(r"\srel=", tag)) == 1
         assert len(re.findall(r"\starget=", tag)) == 1
     form = markup.all("form")[0]
-    assert form["action"] == path
+    anchor = challenge_embed.RESULT_ANCHOR[locale]
+    # After «Calcular» the iframe opens on the result, not on the form again.
+    assert form["action"] == f"{path}#{anchor}"
     assert form["method"] == "get"
     assert form.get("target") in (None, "_self")
+    result = re.search(rf"<section id='{anchor}'>(.*?)</section>", response.text, re.S)
+    assert result is not None and "data-challenge-result" in result.group(1)
+    assert response.text.count(f"id='{anchor}'") == 1
 
 
 @pytest.mark.parametrize("locale", LOCALES)
@@ -263,12 +324,23 @@ def test_installation_page_has_a_live_preview_copyable_code_and_no_script_depend
     assert snippet[0]["width"] == "100%"
     assert int(snippet[0]["height"] or "0") >= 600
     assert snippet[0]["loading"] == "lazy"
+    assert snippet[0].get("style") == "border:0"
     assert snippet[0].get("title")
+    # One accessible name for the code: the heading, not a repeated label.
+    assert "for='embed-code'" not in response.text
+    textarea = next(item for item in markup.all("textarea") if item.get("id") == "embed-code")
+    labelled = textarea.get("aria-labelledby")
+    assert labelled and f"<h2 id='{labelled}'>" in response.text
     assert any(form.get("method") == "get" for form in markup.all("form"))
     assert {select.get("name") for select in markup.all("select")} >= {"firm", "locale"}
     assert find_claims(_visible(response.text)) == []
-    tool_links = _Markup(site.get(TOOLS_PATH[locale]).text).all("a")
+    tools = site.get(TOOLS_PATH[locale]).text
+    tool_links = _Markup(tools).all("a")
     assert any(link.get("href") == challenge_embed.HELP_PATHS[locale] for link in tool_links)
+    # The link sits with the challenge calculator's own links, before the rules table.
+    challenge = tools.split("id='tool-challenge'", 1)[1].split("id='tool-rules_table'", 1)[0]
+    assert f"href='{challenge_embed.HELP_PATHS[locale]}'" in challenge
+    assert challenge_embed.COPY[locale]["link"] in html.unescape(challenge)
 
 
 def test_sitemap_includes_instructions_but_no_embedded_calculators(site: TestClient) -> None:
@@ -293,6 +365,29 @@ def test_installation_get_selects_the_widgets_language_and_firm(site: TestClient
     assert markup.all("iframe")[0]["src"] == BASE + challenge_embed.PATHS["pt"] + "/topstep"
     for params in ({"firm": "unknown"}, {"locale": "unknown"}, [("firm", "ftmo")] * 2):
         assert site.get(challenge_embed.HELP_PATHS["es"], params=params).status_code == 400
+
+
+def test_installation_language_links_keep_the_chosen_firm_and_widget_language(
+    site: TestClient,
+) -> None:
+    def language_links(page: str) -> dict[str, str]:
+        return {
+            str(link["hreflang"]): str(link["href"])
+            for link in _Markup(page).all("a")
+            if link.get("hreflang")
+            and urlsplit(link.get("href") or "").path in challenge_embed.HELP_PATHS.values()
+        }
+
+    chosen = site.get(challenge_embed.HELP_PATHS["es"], params={"locale": "pt", "firm": "topstep"})
+    links = language_links(chosen.text)
+    assert set(links) == {"en", "pt"}
+    for lang, href in links.items():
+        target = urlsplit(href)
+        assert target.path == challenge_embed.HELP_PATHS[lang]
+        assert parse_qs(target.query) == {"firm": ["topstep"], "locale": ["pt"]}
+    # By default the widget follows the page: plain links to the other languages.
+    plain = language_links(site.get(challenge_embed.HELP_PATHS["en"]).text)
+    assert plain == {lang: challenge_embed.HELP_PATHS[lang] for lang in ("es", "pt")}
 
 
 def test_widget_views_stay_off_until_privacy_disclosure_covers_them(

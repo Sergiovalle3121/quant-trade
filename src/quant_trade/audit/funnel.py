@@ -339,16 +339,13 @@ class VisitCounter:
         failed: Counter[tuple[str, str, str]] = Counter()
         for (day, locale, ref), amount in batch.items():
             try:
-                self._write(day=day, locale=locale, ref=ref, amount=amount)
+                self._store.count_visit(day=day, locale=locale, ref=ref, amount=amount)
             except Exception:  # noqa: BLE001 - kept for the next flush
                 failed[(day, locale, ref)] += amount
         if failed:
             logger.warning("could not write %d visit counters; kept for later", len(failed))
             with self._lock:
                 self._pending.update(failed)
-
-    def _write(self, *, day: str, locale: str, ref: str, amount: int) -> None:
-        self._store.count_visit(day=day, locale=locale, ref=ref, amount=amount)
 
     def _loop(self) -> None:
         while not self._stop.wait(self._interval):
@@ -368,11 +365,15 @@ class VisitCounter:
         self.flush()
 
 
-class ChallengeEmbedViewCounter(VisitCounter):
+class ChallengeEmbedViewCounter:
     """Cookieless page loads per day/firm, separate from the visitor funnel.
 
     Disabled until the privacy disclosure covers this counting method. No
     request object, address, referring domain or browser identifier enters it.
+    It shares nothing with :class:`VisitCounter` (buffer, tags, lock or table):
+    a firm is never a campaign tag and a load is never a visit. Like it, a
+    request only adds under a lock; a daemon thread writes the totals every
+    :data:`FLUSH_SECONDS` and counts that fail to write wait for the next flush.
     """
 
     def __init__(
@@ -382,20 +383,50 @@ class ChallengeEmbedViewCounter(VisitCounter):
         firms: Collection[str],
         interval_seconds: float = FLUSH_SECONDS,
     ) -> None:
-        super().__init__(store, interval_seconds=interval_seconds)
+        self._store = store
+        self._interval = interval_seconds
         self._firms = frozenset(firms) | {""}
+        self._lock = threading.Lock()
+        self._pending: Counter[tuple[str, str]] = Counter()
+        self._stop = threading.Event()
+        self._thread: threading.Thread | None = None
 
     def add_view(self, *, day: str, firm: str) -> None:
         if not CHALLENGE_EMBED_VIEWS_ENABLED or firm not in self._firms:
             return
         with self._lock:
-            self._pending[(day, "", firm)] += 1
+            self._pending[(day, firm)] += 1
 
-    def add(self, *, day: str, locale: str, ref: str) -> None:
-        self.add_view(day=day, firm=ref)
+    def flush(self) -> None:
+        with self._lock:
+            batch, self._pending = self._pending, Counter()
+        failed: Counter[tuple[str, str]] = Counter()
+        for (day, firm), amount in batch.items():
+            try:
+                self._store.count_challenge_embed_view(day=day, firm=firm, amount=amount)
+            except Exception:  # noqa: BLE001 - kept for the next flush
+                failed[(day, firm)] += amount
+        if failed:
+            logger.warning("could not write %d widget view counters; kept for later", len(failed))
+            with self._lock:
+                self._pending.update(failed)
 
-    def _write(self, *, day: str, locale: str, ref: str, amount: int) -> None:
-        self._store.count_challenge_embed_view(day=day, firm=ref, amount=amount)
+    def _loop(self) -> None:
+        while not self._stop.wait(self._interval):
+            self.flush()
+
+    def start(self) -> None:
+        if self._thread is not None:
+            return
+        self._thread = threading.Thread(target=self._loop, name="audit-embed-views", daemon=True)
+        self._thread.start()
+
+    def stop(self, timeout: float = 5.0) -> None:
+        self._stop.set()
+        if self._thread is not None:
+            self._thread.join(timeout)
+            self._thread = None
+        self.flush()
 
 
 __all__ = [

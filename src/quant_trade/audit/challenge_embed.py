@@ -9,6 +9,7 @@ from __future__ import annotations
 import re
 from collections.abc import Mapping
 from html import escape
+from urllib.parse import urlencode
 
 from quant_trade.audit import challenge_calc as calc
 
@@ -24,6 +25,9 @@ HELP_PATHS: dict[str, str] = {
 }
 PUBLISHED = "2026-10-11"
 IFRAME_HEIGHT = 1000
+#: The result section's id: the widget form submits to it, so after
+#: «Calcular» the iframe opens on the result instead of the form again.
+RESULT_ANCHOR: dict[str, str] = {"es": "resultado", "en": "result", "pt": "resultado"}
 
 
 def widget_url(locale: str, firm: str = "") -> str:
@@ -41,7 +45,7 @@ PAGES: dict[str, tuple[str, str]] = {
 COPY: dict[str, dict[str, str]] = {
     "es": {
         "title": "Inserta la calculadora de reto en tu web",
-        "link": "Insertar esta calculadora en tu web",
+        "link": "Insertar la calculadora de reto en tu web",
         "summary": (
             "Calculadora de reto para insertar en tu web: elige firma e idioma y copia el iframe "
             "con reglas publicadas, fuente y fecha."
@@ -65,7 +69,7 @@ COPY: dict[str, dict[str, str]] = {
     },
     "en": {
         "title": "Embed the challenge calculator on your site",
-        "link": "Embed this calculator on your site",
+        "link": "Embed the challenge calculator on your site",
         "summary": (
             "Embed the challenge calculator on your site. Choose a firm and language, then copy "
             "the iframe with published rules, sources and dates."
@@ -89,26 +93,26 @@ COPY: dict[str, dict[str, str]] = {
     },
     "pt": {
         "title": "Incorpore a calculadora de desafio no seu site",
-        "link": "Incorporar esta calculadora no seu site",
+        "link": "Incorporar a calculadora de desafio no seu site",
         "summary": (
-            "Calculadora de desafio para incorporar no seu site: escolha firma e idioma e copie "
-            "o iframe com regras publicadas, fonte e data."
+            "Calculadora de desafio para incorporar no seu site: escolha a empresa e o idioma e "
+            "copie o iframe com regras publicadas, fonte e data."
         ),
         "intro": (
             "Seus leitores podem explorar metas e limites de um desafio com seus próprios "
             "números, sem sair da página. A calculadora usa trajetórias sintéticas e as regras "
-            "publicadas por cada firma, com fonte e data. O resultado depende dos números "
-            "declarados e das hipóteses do modelo; não é uma previsão. Escolha firma e idioma "
-            "e cole o código no HTML da sua página, mantendo o link «Feito com Rigor»."
+            "publicadas por cada empresa, com fonte e data. O resultado depende dos números "
+            "declarados e das hipóteses do modelo; não é uma previsão. Escolha a empresa e o "
+            "idioma e cole o código no HTML da sua página, mantendo o link «Feito com Rigor»."
         ),
-        "firm": "Firma",
-        "all": "Todas as firmas",
+        "firm": "Empresa",
+        "all": "Todas as empresas",
         "language": "Idioma da calculadora",
         "update": "Atualizar prévia e código",
         "preview": "Prévia",
         "code": "Código para copiar",
         "credit": "Feito com Rigor",
-        "credit_note": "regras publicadas pela firma, com fonte e data",
+        "credit_note": "regras publicadas pela empresa, com fonte e data",
         "height": "Você pode ajustar a altura do iframe; o conteúdo rola dentro dele.",
     },
 }
@@ -184,16 +188,25 @@ def widget_page(
         values=values,
         duplicate=duplicate,
         limited=limited,
-        action=widget_url(locale, firm),
+        action=f"{widget_url(locale, firm)}#{RESULT_ANCHOR[locale]}",
     )
-    title = calc.firm_copy(firm, locale)["title"] if firm else words["nav"]
+    # A firm's widget keeps its page's lead, with the visible non-affiliation line.
+    own = calc.firm_copy(firm, locale) if firm else None
+    title = own["title"] if own else words["nav"]
+    lead = own["lead"] if own else words["lead"]
     canonical = base_url.rstrip("/") + calc.challenge_url(locale, firm)
-    body = "".join(
-        f"<section><h2>{escape(title_)}</h2>{html}</section>" for title_, html in sections
-    )
+
+    def section(heading: str, html: str) -> str:
+        anchor = f" id='{RESULT_ANCHOR[locale]}'" if heading == words["result_title"] else ""
+        return f"<section{anchor}><h2>{escape(heading)}</h2>{html}</section>"
+
+    body = "".join(section(heading, html) for heading, html in sections)
     programs = calc.firm_programs(firm) if firm else (value.program if value else calc.PROGRAMS[0],)
+    rules_title = (
+        words["firm_rules_title"].format(firm=calc.FIRMS[firm]) if firm else words["rules_title"]
+    )
     body += (
-        f"<details><summary>{escape(words['rules_title'])}</summary>"
+        f"<details><summary>{escape(rules_title)}</summary>"
         f"{_rules(programs, locale, firm=firm)}</details>"
         f"<details><summary>{escape(words['how_title'])}</summary><ul>"
         + "".join(f"<li>{escape(item)}</li>" for item in words["how"])
@@ -205,7 +218,7 @@ def widget_page(
         "<meta name='viewport' content='width=device-width, initial-scale=1'>"
         f"<title>{escape(title)} · Rigor</title><meta name='robots' content='noindex'>"
         f"<link rel='canonical' href='{escape(canonical)}'><style>{WIDGET_CSS}</style></head>"
-        f"<body><main><h1>{escape(title)}</h1><p class='help'>{escape(words['lead'])}</p>"
+        f"<body><main><h1>{escape(title)}</h1><p class='help'>{escape(lead)}</p>"
         f"{body}</main><footer class='embed-credit'><p>"
         f"<a href='{escape(canonical)}?ref=embed' target='_blank' rel='noopener'>"
         f"{escape(credit['credit'])}</a> · {escape(credit['credit_note'])}</p>"
@@ -235,7 +248,7 @@ def instructions_page(
     src = base_url.rstrip("/") + widget_url(widget_locale, firm)
     code = (
         f"<iframe src='{escape(src)}' width='100%' height='{IFRAME_HEIGHT}' "
-        f"loading='lazy' title='{escape(iframe_title)}'></iframe>"
+        f"style='border:0' loading='lazy' title='{escape(iframe_title)}'></iframe>"
     )
 
     def select(name: str, options: Mapping[str, str], chosen: str, label: str) -> str:
@@ -266,17 +279,23 @@ def instructions_page(
         PageMeta(title=title, description=words["summary"], locale=locale, paths=HELP_PATHS),
         base_url=base_url,
     )
+    # The other languages keep the chosen firm, and the widget's language when
+    # it is not this page's own (by default the widget follows the page).
+    chosen = {"firm": firm} if firm else {}
+    if widget_locale != locale:
+        chosen["locale"] = widget_locale
+    query = f"?{urlencode(chosen)}" if chosen else ""
     crumbs = (
         f"<a href='{tools_url(locale)}'>{escape(TOOLS_COPY[locale]['nav'])}</a>"
-        + _language_crumbs(HELP_PATHS, locale)
+        + _language_crumbs({lang: path + query for lang, path in HELP_PATHS.items()}, locale)
     )
     body = (
         _page_hero(TOOLS_COPY[locale]["eyebrow"], words["title"], words["intro"], crumbs)
         + "<div class='paper page-main'><div class='wrap wrap-mid'>"
         + form
-        + f"<section><h2>{escape(words['code'])}</h2>"
-        f"<label for='embed-code'>{escape(words['code'])}</label>"
-        f"<textarea id='embed-code' readonly rows='5' spellcheck='false' "
+        + f"<section><h2 id='embed-code-title'>{escape(words['code'])}</h2>"
+        "<textarea id='embed-code' aria-labelledby='embed-code-title' readonly rows='5' "
+        "spellcheck='false' "
         f"style='width:100%;font-family:monospace'>{escape(code)}</textarea>"
         f"<p class='help'>{escape(words['height'])}</p></section>"
         f"<section><h2>{escape(words['preview'])}</h2>{code}</section></div></div>"

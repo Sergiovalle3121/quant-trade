@@ -161,7 +161,6 @@ def test_embed_views_are_disabled_pending_a_privacy_disclosure(tmp_path: Path) -
     store = make_store(f"sqlite:///{tmp_path}/embed.db")
     counter = funnel.ChallengeEmbedViewCounter(store, firms=("ftmo",))
     counter.add_view(day="2026-10-11", firm="ftmo")
-    counter.add(day="2026-10-11", locale="es", ref="ftmo")
     counter.flush()
     assert store.challenge_embed_view_rows("2026-10-01") == []
 
@@ -210,6 +209,13 @@ def test_embed_counter_retries_failed_flush_without_losing_loads(
     monkeypatch.setattr(store, "count_challenge_embed_view", original)
     counter.flush()
     assert store.challenge_embed_view_rows("2026-10-11") == [("2026-10-11", "ftmo", 1)]
+    assert store.funnel_events("2026-10-01")["visits"] == []
+
+
+def test_embed_counter_is_not_a_visit_counter() -> None:
+    # Its own buffer and table: a firm never becomes a campaign tag or a visit.
+    assert not issubclass(funnel.ChallengeEmbedViewCounter, funnel.VisitCounter)
+    assert not hasattr(funnel.ChallengeEmbedViewCounter, "add")
 
 
 def test_embed_panel_explains_disabled_count_and_separate_aggregates() -> None:

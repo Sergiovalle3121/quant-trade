@@ -504,8 +504,9 @@ _PRINT_HANDLER_HASH = base64.b64encode(hashlib.sha256(PRINT_HANDLER.encode()).di
 #: no inline script and nothing from a third party. Fonts are self-hosted, so
 #: no visitor request leaves for a font service. Inline styles are the other
 #: relaxation (the report's CSS and chart colours are inline); forms post
-#: here, or leave for Stripe Checkout through a redirect. Only the challenge
-#: widget's exact routes can be framed. A script may only call this same origin
+#: here, or leave for Stripe Checkout through a redirect. Only a rendered
+#: challenge widget, on its exact routes, can be framed (with its own narrower
+#: policy, ``EMBED_CONTENT_SECURITY_POLICY``). A script may only call this same origin
 #: (``connect-src 'self'``: the upload form answers in place, keeping the chosen
 #: file); no third party is ever contacted.
 CONTENT_SECURITY_POLICY = (
@@ -522,13 +523,20 @@ SECURITY_HEADERS: dict[str, str] = {
     "Permissions-Policy": "camera=(), microphone=(), geolocation=(), payment=()",
     "Cross-Origin-Opener-Policy": "same-origin",
 }
-#: Embedding is an explicit allow-list; a prefix must never relax another page.
-EMBED_CONTENT_SECURITY_POLICY = CONTENT_SECURITY_POLICY.replace(
-    "frame-ancestors 'none'", "frame-ancestors *"
+#: The one document any site may frame: the challenge widget a route rendered
+#: (an error on the same path keeps ``frame-ancestors 'none'``). It runs no
+#: script and its forms only reach itself, so its policy is narrower than the
+#: site's: nothing injected into a frameable page could run or post elsewhere.
+EMBED_CONTENT_SECURITY_POLICY = (
+    "default-src 'none'; script-src 'none'; style-src 'unsafe-inline'; "
+    "img-src 'self' data:; font-src 'self'; connect-src 'self'; form-action 'self'; "
+    "frame-ancestors *; base-uri 'none'"
 )
 #: The instructions can load their preview, but cannot themselves be framed.
 EMBED_HELP_CONTENT_SECURITY_POLICY = CONTENT_SECURITY_POLICY + "; frame-src 'self'"
 HSTS = "max-age=31536000"
+#: ``request.state`` flag ``public_challenge`` sets on a rendered widget.
+CHALLENGE_EMBED_STATE = "challenge_embed_widget"
 
 #: Every upload attempt counts, whether or not it becomes an audit, up to
 #: this multiple of the hourly upload limit: a customer can retry a file that
@@ -1348,11 +1356,15 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     report_upload_bytes = cfg.max_upload_bytes * REPORT_SIZE_FACTOR
     body_limit = request_body_limit(cfg.max_upload_bytes)
 
-    def _secure(response: Any, *, path: str = "") -> Any:
-        """The headers every response carries, errors included."""
+    def _secure(response: Any, *, path: str = "", framed: bool = False) -> Any:
+        """The headers every response carries, errors included.
+
+        ``framed`` is set only for a widget ``public_challenge`` rendered: a
+        405, 404 or 500 on the same path is the site's page and stays unframed.
+        """
         for name, value in SECURITY_HEADERS.items():
             response.headers[name] = value
-        if path in challenge_embed.PAGES:
+        if framed and path in challenge_embed.PAGES:
             response.headers["Content-Security-Policy"] = EMBED_CONTENT_SECURITY_POLICY
             del response.headers["X-Frame-Options"]
             response.headers["X-Robots-Tag"] = "noindex"
@@ -1599,7 +1611,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 and "set-cookie" not in response.headers
             )
             response.headers["Cache-Control"] = PUBLIC_CACHE_CONTROL if public else "no-store"
-        return _secure(response, path=request.url.path)
+        framed = getattr(request.state, CHALLENGE_EMBED_STATE, False) is True
+        return _secure(response, path=request.url.path, framed=framed)
 
     def _site_url(request: Request) -> str:
         """The public address for absolute links (canonical, previews, sitemap).
@@ -7356,11 +7369,15 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             duplicate=duplicate,
             limited=limited,
         )
-        return HTMLResponse(
+        response = HTMLResponse(
             guard_page(page if embedded else _offered(page, locale)),
             status_code=status,
             headers={"Retry-After": "3600"} if limited else None,
         )
+        if embedded:
+            # Only this rendered widget may be framed (see ``_secure``).
+            setattr(request.state, CHALLENGE_EMBED_STATE, True)
+        return response
 
     for challenge_path in (*challenge_calc.PAGES, *challenge_embed.PAGES):
         app.add_api_route(
