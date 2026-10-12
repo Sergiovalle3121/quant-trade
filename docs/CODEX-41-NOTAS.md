@@ -30,6 +30,26 @@ el código; no despliega ni modifica la configuración de producción.
 No se consulta ni se cobra a Stripe: las pruebas usan sesiones simuladas
 y webhooks firmados localmente. No se añaden conexiones de trading.
 
+Reversión: con los 31 países en producción, el código anterior a este cambio
+no arranca, porque rechaza con `ValueError` los países que no conoce. Antes
+de volver a un despliegue anterior, primero se pone
+`AUDIT_APPROVED_MARKETS=MX,US,BR,ES` y después se revierte el código.
+
+## Correcciones tras la revisión
+
+- `settings.py`: la comprobación de países vuelve a aceptar cualquier
+  iterable (tupla o lista) al construir `AuditSettings` a mano, como en
+  `main`; `from_env` ya daba un `frozenset`, así que producción no cambia.
+- `card_markets.py`: Chequia en portugués es «Tchéquia», la forma de Brasil
+  que el sitio ya usa en `method.py` y `report_pt.py`.
+- `pages.card_markets_line`: en español la última unión es «e» ante el
+  sonido /i/ («España e Irlanda», «México e Italia»); «hie»/«hia» y demás
+  diptongos mantienen «y». Con los 31 países no cambia la frase.
+- `.github/launch-python-files.txt` registra `card_markets.py` y
+  `tests/test_audit_market_selectors.py`, para que CI revise su formato.
+- `test_audit_faq.py` y `test_audit_pricing.py` prueban también el catálogo
+  completo y una UE parcial con GB (`DE,FR,GB`).
+
 ## Validación
 
 El Python solicitado no puede arrancar dentro del sandbox; se usa el mismo

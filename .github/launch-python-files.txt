@@ -4,6 +4,7 @@ src/quant_trade/audit/accounts.py
 src/quant_trade/audit/articles.py
 src/quant_trade/audit/audiences.py
 src/quant_trade/audit/calculator.py
+src/quant_trade/audit/card_markets.py
 src/quant_trade/audit/compare.py
 src/quant_trade/audit/completed_count.py
 src/quant_trade/audit/engine.py
@@ -62,6 +63,7 @@ tests/test_audit_launch_playbook.py
 tests/test_audit_legal.py
 tests/test_audit_luck_ride.py
 tests/test_audit_mail_recovery.py
+tests/test_audit_market_selectors.py
 tests/test_audit_monetary_integrity.py
 tests/test_audit_money_web.py
 tests/test_audit_ops.py

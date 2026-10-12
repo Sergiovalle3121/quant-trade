@@ -52,7 +52,7 @@ MARKET_NAMES: dict[str, dict[str, str]] = {
     "BG": {"es": "Bulgaria", "en": "Bulgaria", "pt": "Bulgária"},
     "HR": {"es": "Croacia", "en": "Croatia", "pt": "Croácia"},
     "CY": {"es": "Chipre", "en": "Cyprus", "pt": "Chipre"},
-    "CZ": {"es": "Chequia", "en": "Czechia", "pt": "Chéquia"},
+    "CZ": {"es": "Chequia", "en": "Czechia", "pt": "Tchéquia"},
     "DK": {"es": "Dinamarca", "en": "Denmark", "pt": "Dinamarca"},
     "EE": {"es": "Estonia", "en": "Estonia", "pt": "Estônia"},
     "FI": {"es": "Finlandia", "en": "Finland", "pt": "Finlândia"},
@@ -99,19 +99,38 @@ CARD_MARKET_WORDS: dict[str, dict[str, str]] = {
 }
 
 
-def ordered_markets(markets: Iterable[str], locale: str) -> tuple[str, ...]:
-    """Reviewed choices: MX/US/BR first, then names ignoring case and accents.
+def _folded(text: str) -> str:
+    """``text`` casefolded and without accents.
 
     Unicode normalization avoids process-wide locale state in concurrent pages.
     """
+    return "".join(
+        char
+        for char in unicodedata.normalize("NFKD", text.casefold())
+        if not unicodedata.combining(char)
+    )
+
+
+def ordered_markets(markets: Iterable[str], locale: str) -> tuple[str, ...]:
+    """Reviewed choices: MX/US/BR first, then names ignoring case and accents."""
     approved = set(markets) & REVIEWED_MARKETS
-
-    def name_key(country: str) -> str:
-        return "".join(
-            char
-            for char in unicodedata.normalize("NFKD", MARKET_NAMES[country][locale].casefold())
-            if not unicodedata.combining(char)
-        )
-
     priority = tuple(country for country in PRIORITY_MARKETS if country in approved)
-    return priority + tuple(sorted(approved.difference(priority), key=name_key))
+    rest = sorted(
+        approved.difference(priority), key=lambda country: _folded(MARKET_NAMES[country][locale])
+    )
+    return priority + tuple(rest)
+
+
+def spanish_and(next_words: str) -> str:
+    """Spanish «y», or «e» before the sound /i/: «España e Irlanda», «México e Italia».
+
+    «i»/«hi» followed by a vowel starts a diphthong and keeps «y» («cobre y hierro»).
+    """
+    folded = _folded(next_words)
+    if folded.startswith("hi"):
+        after = folded[2:3]
+    elif folded.startswith("i"):
+        after = folded[1:2]
+    else:
+        return " y "
+    return " y " if after in {"a", "e", "o", "u"} else " e "

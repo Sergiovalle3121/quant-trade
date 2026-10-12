@@ -89,7 +89,12 @@ from quant_trade.audit.calculator import (
 from quant_trade.audit.calculator import COPY as CALCULATOR_COPY
 from quant_trade.audit.calculator import REASONS as CALCULATOR_REASONS
 from quant_trade.audit.calculator_card import count_text, result_figures, what_if_figures
-from quant_trade.audit.card_markets import CARD_MARKET_WORDS, EU_MARKETS, ordered_markets
+from quant_trade.audit.card_markets import (
+    CARD_MARKET_WORDS,
+    EU_MARKETS,
+    ordered_markets,
+    spanish_and,
+)
 from quant_trade.audit.completed_count import completed_count_html
 from quant_trade.audit.examples import (
     EXAMPLES_COPY,
@@ -2243,6 +2248,8 @@ def card_markets_line(markets: Iterable[str], locale: str) -> str:
     if not words:
         return ""
     joiner, template = _CARD_MARKETS_LINE[locale]
+    if locale == "es":
+        joiner = spanish_and(words[-1])
     places = words[0] if len(words) == 1 else ", ".join(words[:-1]) + joiner + words[-1]
     return template.format(places=places)
 

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import pytest
 
 from quant_trade.audit.card_markets import EU_MARKETS, MARKET_NAMES, REVIEWED_MARKETS
@@ -34,6 +36,17 @@ def test_reviewed_billing_markets_accept_the_exact_country_list() -> None:
         {"AUDIT_APPROVED_MARKETS": " gr, gb, de "}
     ).approved_markets == frozenset({"GR", "GB", "DE"})
     assert AuditSettings.from_env({}).approved_markets == frozenset()
+
+
+@pytest.mark.parametrize("container", [tuple, list])
+def test_approved_markets_built_directly_accept_any_iterable(container: Any) -> None:
+    """Built directly, a tuple or a list is checked like a frozenset, not a TypeError."""
+    reviewed = container(["MX", "GB"])
+    assert AuditSettings(approved_markets=reviewed).approved_markets == reviewed
+    with pytest.raises(ValueError, match="reviewed ISO countries"):
+        AuditSettings(approved_markets=container(["MX", "UK"]))
+    with pytest.raises(ValueError, match="reviewed ISO countries"):
+        AuditSettings(approved_markets=container(["EL"]))
 
 
 @pytest.mark.parametrize("country", ["UK", "EL", "CA"])

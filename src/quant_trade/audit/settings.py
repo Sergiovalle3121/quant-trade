@@ -288,7 +288,7 @@ class AuditSettings:
             raise ValueError("smtp_port must be between 1 and 65535")
         if self.smtp_security not in ("starttls", "ssl"):
             raise ValueError("smtp_security must be starttls or ssl")
-        if not self.approved_markets <= REVIEWED_MARKETS:
+        if any(country not in REVIEWED_MARKETS for country in self.approved_markets):
             raise ValueError(
                 "approved_markets must use reviewed ISO countries: "
                 + ", ".join(sorted(REVIEWED_MARKETS))

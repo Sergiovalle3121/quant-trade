@@ -5,7 +5,13 @@ from __future__ import annotations
 
 import pytest
 
-from quant_trade.audit.card_markets import CARD_MARKET_WORDS, EU_MARKETS, REVIEWED_MARKETS
+from quant_trade.audit.card_markets import (
+    CARD_MARKET_WORDS,
+    EU_MARKETS,
+    MARKET_NAMES,
+    REVIEWED_MARKETS,
+    spanish_and,
+)
 from quant_trade.audit.guard import find_claims
 from quant_trade.audit.pages import card_markets_line, landing
 
@@ -41,6 +47,46 @@ def test_line_names_the_approved_countries_in_a_fixed_order() -> None:
         == "Por enquanto, só no México, nos Estados Unidos, no Brasil e na Espanha."
     )
     assert card_markets_line(("BR",), "pt") == "Por enquanto, só no Brasil."
+
+
+def test_spanish_joins_ireland_and_italy_with_e() -> None:
+    assert card_markets_line(("MX", "IT"), "es") == "Por ahora solo en México e Italia."
+    assert card_markets_line(("ES", "IE"), "es") == "Por ahora solo en España e Irlanda."
+    assert card_markets_line(("DE", "IT"), "es") == "Por ahora solo en Alemania e Italia."
+    assert (
+        card_markets_line(("MX", "US", "BR", "ES", "IT"), "es")
+        == "Por ahora solo en México, Estados Unidos, Brasil, España e Italia."
+    )
+    # Only the last joint changes; other countries and languages keep their word.
+    assert card_markets_line(("IT", "SE"), "es") == "Por ahora solo en Italia y Suecia."
+    assert card_markets_line(("DE", "HU"), "es") == "Por ahora solo en Alemania y Hungría."
+    assert card_markets_line(("IE", "GB"), "es") == "Por ahora solo en Irlanda y el Reino Unido."
+    assert card_markets_line(("MX", "IT"), "en") == "For now, in Mexico and Italy only."
+    assert card_markets_line(("MX", "IT"), "pt") == "Por enquanto, só no México e na Itália."
+    assert find_claims(card_markets_line(("ES", "IE"), "es")) == []
+
+
+@pytest.mark.parametrize(
+    ("word", "joiner"),
+    [
+        ("Irlanda", " e "),
+        ("Italia", " e "),
+        ("Ítaca", " e "),
+        ("Hispania", " e "),
+        ("hielo", " y "),
+        ("hierro", " y "),
+        ("Hungría", " y "),
+        ("la Unión Europea", " y "),
+        ("el Reino Unido", " y "),
+    ],
+)
+def test_spanish_and_follows_the_sound_of_the_next_word(word: str, joiner: str) -> None:
+    assert spanish_and(word) == joiner
+
+
+def test_czechia_uses_the_brazilian_name_in_portuguese() -> None:
+    assert MARKET_NAMES["CZ"]["pt"] == "Tchéquia"
+    assert card_markets_line(("CZ",), "pt") == "Por enquanto, só na Tchéquia."
 
 
 def test_line_is_empty_without_approved_countries() -> None:
