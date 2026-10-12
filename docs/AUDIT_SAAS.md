@@ -6600,6 +6600,7 @@ unmeasured (trial count missing) and asks for the file. The reader and ruin
 links open pre-filled with the example, the example states the break-even win
 rate and the expectancy at the declared rate and at Wilson's lower end, and
 evidence codes stay in attributes (inside a sentence the localizer would print
-them capitalised). Only the English title keeps the full search query above the
-65-character cap. Assumptions, precision and checks are recorded in
+them capitalised); the checks say "declared" in plain words instead. Every
+title fits the 65-character cap, with no exception in the hygiene test.
+Assumptions, precision and checks are recorded in
 `docs/CODEX-31-NOTAS.md`.

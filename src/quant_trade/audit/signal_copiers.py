@@ -41,8 +41,9 @@ CHECKS: dict[str, tuple[tuple[str, str, str], ...]] = {
         ),
         (
             "Aciertos con intervalo y número de operaciones",
-            "DECLARED: {rate} en {trades} operaciones da un intervalo Wilson al 95 % de "
-            "{wilson_low} a {wilson_high}. Compara su extremo inferior con el acierto de "
+            "Un acierto declarado de {rate} en {trades} operaciones da un intervalo Wilson "
+            "al 95 % de {wilson_low} a {wilson_high}. Compara su extremo inferior con el "
+            "acierto de "
             "equilibrio según ganancia y pérdida medias, antes de costos; revisa los "
             "costos aparte. El porcentaje solo "
             "no dice cuánto se pierde al fallar.",
@@ -50,7 +51,7 @@ CHECKS: dict[str, tuple[tuple[str, str, str], ...]] = {
         ),
         (
             "Drawdown y flotante oculto",
-            "DECLARED: un drawdown de {drawdown} no incluye necesariamente pérdidas "
+            "Un drawdown declarado de {drawdown} no incluye necesariamente pérdidas "
             "abiertas. Compara saldo y equity y pide el flotante. El informe muestra la "
             "bandera de drawdown flotante oculto si la curva solo recoge cierres y hubo "
             "posiciones solapadas en el mismo instrumento; su regla de pérdida flotante "
@@ -113,8 +114,9 @@ CHECKS: dict[str, tuple[tuple[str, str, str], ...]] = {
         ),
         (
             "Win rate with its interval and trade count",
-            "DECLARED: {rate} across {trades} trades gives a 95 % Wilson interval of "
-            "{wilson_low} to {wilson_high}. Compare its lower end with the break-even "
+            "A declared {rate} win rate across {trades} trades gives a 95 % Wilson "
+            "interval of {wilson_low} to {wilson_high}. Compare its lower end with the "
+            "break-even "
             "win rate for the average win and loss, before costs; review costs separately. "
             "The percentage alone "
             "does not tell you how much a losing trade costs.",
@@ -122,7 +124,7 @@ CHECKS: dict[str, tuple[tuple[str, str, str], ...]] = {
         ),
         (
             "Drawdown and hidden floating losses",
-            "DECLARED: {drawdown} drawdown need not include open losses. Compare balance "
+            "A declared {drawdown} drawdown need not include open losses. Compare balance "
             "and equity and ask for floating P&L. The report flags hidden floating drawdown "
             "when the curve records only closed trades and positions on the same "
             "instrument overlapped; its "
@@ -185,8 +187,9 @@ CHECKS: dict[str, tuple[tuple[str, str, str], ...]] = {
         ),
         (
             "Acertos com intervalo e número de operações",
-            "DECLARED: {rate} em {trades} operações dá um intervalo Wilson de 95 % de "
-            "{wilson_low} a {wilson_high}. Compare o extremo inferior com a taxa de "
+            "Um acerto declarado de {rate} em {trades} operações dá um intervalo Wilson "
+            "de 95 % de {wilson_low} a {wilson_high}. Compare o extremo inferior com a "
+            "taxa de "
             "equilíbrio para ganho e perda médios, antes dos custos; revise os custos "
             "separadamente. A porcentagem sozinha "
             "não diz quanto custa errar.",
@@ -194,7 +197,7 @@ CHECKS: dict[str, tuple[tuple[str, str, str], ...]] = {
         ),
         (
             "Drawdown e perdas flutuantes ocultas",
-            "DECLARED: um drawdown de {drawdown} não inclui necessariamente perdas "
+            "Um drawdown declarado de {drawdown} não inclui necessariamente perdas "
             "abertas. Compare saldo e equity e peça o resultado flutuante. O relatório "
             "sinaliza drawdown flutuante oculto quando a curva só registra operações "
             "fechadas e houve posições sobrepostas no mesmo instrumento; sua regra de "

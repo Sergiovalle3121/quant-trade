@@ -141,3 +141,12 @@ datos de clientes, cachés, conexiones a proveedores ni ejecución de operacione
 - Tras mezclar `origin/main`, `audience_numbers._signed_pct` usa la regla de
   signo de main (`ruin_calc._signed`) y solo cambia el guion por el signo
   menos tipográfico; la salida es la misma (comprobado con 120.000 valores).
+
+## Ajuste final (sesión, 11-oct)
+
+- Las comprobaciones 2 y 3 ya no abren con el código DECLARED: dicen «un acierto
+  declarado» / «un drawdown declarado» (en: «a declared … win rate», «a declared …
+  drawdown»; pt: «um acerto declarado», «um drawdown declarado»). Los códigos de
+  evidencia quedan solo en atributos y en el bloque del ejemplo.
+- docs/AUDIT_SAAS.md ya no dice que el título en inglés pase del tope de 65
+  caracteres: mide 62 y public_hygiene no tiene excepción.
