@@ -50,6 +50,28 @@ de volver a un despliegue anterior, primero se pone
 - `test_audit_faq.py` y `test_audit_pricing.py` prueban también el catálogo
   completo y una UE parcial con GB (`DE,FR,GB`).
 
+Después se fusionó `origin/main` (`77b386f`, contador de visitas por página)
+sin conflictos y se repitieron las pruebas en serie, de una o dos por tanda:
+
+| Tanda | Archivos en `tests/` | Resultado |
+|---|---|---|
+| 1 | `test_audit_reading_rules.py`, `test_provenance_guard.py` | 111 pasan |
+| 2 | `test_audit_site_copy_trust.py`, `test_audit_i18n.py` | 106 pasan |
+| 3 | `test_audit_public_hygiene.py` | 2227 pasan |
+| 4 | `test_audit_oferta_pago.py`, `test_audit_portuguese.py` | 73 pasan |
+| 5 | `test_audit_guides_seo.py`, `test_audit_card_payments.py` | 83 pasan |
+| 6 | `test_audit_card_check.py`, `test_audit_account_credit_purchase.py` | 34 pasan |
+| 7 | `test_audit_faq.py`, `test_audit_checkout_language.py` | 45 pasan |
+| 8 | `test_audit_email_delivery.py`, `test_audit_pricing.py` | 47 pasan |
+| 9 | `test_audit_card_markets_line.py`, `test_audit_market_selectors.py` | 31 pasan |
+| 10 | `test_audit_settings.py`, `test_audit_refunds.py` | 15 pasan |
+| 11 | `test_audit_money_web.py`, `test_audit_purchase_mail.py` | 17 pasan |
+| 12 | `test_audit_page_visits.py`, `test_audit_page_visit_panel.py` | 223 pasan |
+
+`ruff check .`, `ruff format --check` (lista de CI y archivos cambiados),
+`mypy --follow-imports=silent` sobre los módulos cambiados y fusionados, y
+`git diff --check` terminan sin errores.
+
 ## Validación
 
 El Python solicitado no puede arrancar dentro del sandbox; se usa el mismo
