@@ -21,13 +21,15 @@ from quant_trade.audit.public_card import _num, _pct, _readings
 
 CALCULATOR_INPUT = calculator.CalculatorInput(sharpe=1.8, years=3.0, trials=100)
 WINRATE_VALUES = {"trades": "40", "win_rate": "60", "target_r": "1.5", "stop_r": "1"}
+# Not a saturated case: at 0.5 % risk every path reaches the target, which reads
+# like a promise; at 1 % risk and 2 trades a day the losses show up as well.
 CHALLENGE_INPUT = challenge_calc.ChallengeInput(
-    win_rate_pct=50.0,
+    win_rate_pct=45.0,
     unit="r",
     avg_win=1.5,
     avg_loss=1.0,
-    risk=0.5,
-    per_day=3.0,
+    risk=1.0,
+    per_day=2.0,
     program="ftmo-2step-phase1",
 )
 RUIN_INPUT = ruin_calc.RuinInput(

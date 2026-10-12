@@ -334,7 +334,9 @@ def test_tools_examples_have_declared_evidence_and_localized_links(
         paragraph = _example_paragraph(main, key)
         visible = _visible_text(paragraph)
         assert example.evidence == "DECLARED"
-        assert "badge DECLARED" in paragraph
+        assert f"data-tool-example='{key}' data-evidence='DECLARED'" in main
+        # Made-up inputs carry no evidence badge in prose; the note says how it is computed.
+        assert "badge DECLARED" not in paragraph
         assert example.text in visible
         assert COPY[locale]["example"] in visible
         if key == "check":
