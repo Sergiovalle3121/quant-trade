@@ -7608,6 +7608,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             free_mode=cfg.free_mode,
             price_usd=cfg.price_usd,
             pack_price_usd=cfg.pack_price_usd,
+            offer=_offer_terms(),
         )
         return HTMLResponse(_offered(html_page, locale))
 
