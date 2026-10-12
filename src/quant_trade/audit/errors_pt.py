@@ -210,6 +210,11 @@ RULES: tuple[tuple[str, str], ...] = (
     ("no closed trade has positive prices and volume",
      "nenhuma operação fechada tem preços e volume positivos"),
     ("the file has no closed trades", "o arquivo não tem operações fechadas"),
+    # universal.py: every cTrader deal row carries a documented non-execution status.
+    ("every deal row has a status with no execution ({statuses}): the statement has no "
+     "filled or partially filled deal to read",
+     "toda linha de operações tem um estado sem execução ({statuses}): o extrato não tem "
+     "nenhuma operação executada total ou parcialmente para ler"),
     ("the page has more than {limit} table cells; export a shorter period and upload that file",
      "a página tem mais de {limit} células de tabela; exporte um período mais curto e envie "
      "esse arquivo"),

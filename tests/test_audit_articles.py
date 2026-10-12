@@ -103,6 +103,7 @@ def test_the_data_has_the_shape_the_writer_pastes() -> None:
         "rachas-perdedoras",
         "regla-de-consistencia-prop-firm",
         "riesgo-de-ruina-intervalo-de-confianza",
+        "drawdown-trailing-eod-intradia",
     ]
     for entry in ARTICLES_DATA:
         assert DATA_KEYS <= set(entry) <= DATA_KEYS | {"seo_title"}, entry["key"]
@@ -217,6 +218,11 @@ def test_every_article_exists_in_every_language_and_passes_the_guard() -> None:
             "es": "riesgo-de-ruina-intervalo-de-confianza",
             "en": "risk-of-ruin-confidence-interval",
             "pt": "risco-de-ruina-intervalo-de-confianca",
+        },
+        "drawdown-trailing-eod-intradia": {
+            "es": "drawdown-trailing-eod-intradia",
+            "en": "trailing-drawdown-eod-vs-intraday",
+            "pt": "drawdown-trailing-eod-intradiario",
         },
     }
     for article in ARTICLES:

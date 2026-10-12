@@ -87,7 +87,10 @@ en el extra `web` del proyecto). Para la validación local se extrajo
 [Cairo portátil 1.17.2](https://github.com/preshing/cairo-windows/releases/tag/1.17.2)
 en `%TEMP%\codex24-cairo`, sin instalar componentes del sistema ni incorporar
 binarios al repositorio. El ZIP utilizado tiene SHA256
-`2b9ebc56a359a91f4d0b75ed137404639c8f34e8f56513d8ff2c9549453012c2`.
+`2b9ebc56a359a91f4d0b75ed137404639c8f34e8f56513d8ff2c9549453012c2`; como el
+ZIP no se incorpora al repositorio, ese digest está registrado en
+`configs/provenance/unverifiable_digests.json` (regla R2 del guardián de
+procedencia, `tests/test_provenance_guard.py`).
 
 Los procesos de pruebas y render usan estas variables (no son cambios
 permanentes del entorno):
