@@ -3122,6 +3122,7 @@ Routes:
 | `GET /herramientas` | The free tools page (`/en/tools`, `/pt/ferramentas`; `/tools` and `/pt/tools` redirect there): luck calculator, win-rate calculator, challenge calculator, risk-of-ruin calculator, figure reader and report check. |
 | `GET /calculadora-ruina`, `/en/risk-of-ruin-calculator`, `/pt/calculadora-risco-de-ruina` | The free risk-of-ruin and expectancy calculator (`audit/ruin_calc.py`, `audit/ruin_pages.py`): declared figures, fixed-size paths, the engine's streak function and the win rate's Wilson interval. |
 | `GET /reglas-prop-firm`, `/en/prop-firm-rules`, `/pt/regras-prop-firm` | The public table of every published prop-firm preset with source and date (`audit/rules_table.py`); `?firma=`, `?perdida=` and `?mercado=` filter it by links, an unknown value shows the whole table. |
+| `GET /guias`, `/guides`, `/pt/guias` | Export guides in Spanish, English and Portuguese, with each guide under its index path. The `ctrader` guide (2026-10-11, same slug in all three languages) covers Desktop, Web and Mac `History > Statement > Save`, the universal CSV mapping and the undocumented limits of the exported file; it links the challenge calculator and the rules table. |
 | `GET /en/calculator`, `/reading`, `/en/methodology`, `/en/articles`, `/en/guides`, `/en/sample`, `/en/check`, `/faq`, `/examples` | 301 to the page people meant (`/calculator`, `/en/reading`, `/methodology`, `/articles`, `/guides`, `/sample`, `/check`, `/en/faq`, `/en/examples`). The first two keep the query string. |
 | `POST /webhooks/stripe`, `POST /waitlist`, `GET /health` | Payment confirmation, waiting list, health check. |
 
@@ -4375,10 +4376,11 @@ link to the page is added by the report's owner later.
 
 ### Export guides, search engines and link previews
 
-Every platform the importers read has a short export guide in Spanish and
-English (`audit/guides.py`), written from
-`docs/research/audit_iteration4/formats_*.json`: `/guias` and `/guides` list
-them, and each lives at `/guias/<slug>` and `/guides/<slug>` (`mt5`,
+Every platform the importers read has a short export guide in Spanish,
+English and Portuguese (`audit/guides.py`), written from
+`docs/research/audit_iteration4/formats_*.json` and the official sources
+listed below: `/guias`, `/guides` and `/pt/guias` list them, and each lives
+under its index path with a language-specific slug (`mt5`,
 `mt5-optimization`, `mt4`, `tradingview`, `ninjatrader`, `quantconnect`,
 `backtesting-py`, `vectorbt`). The upload form links the right guide under
 the report and optimisation fields, the landing page links the list, and
@@ -4398,10 +4400,11 @@ Performance report as a trade list and its Orders report as a fill list,
 TopstepX's Trades tab as a trade list (a file with a single time column is
 refused, as the guide warns, and the column mapping does not fix that:
 `mapping.MAPPABLE_CODES`), Sierra Chart's Trade Activity tab (tab-delimited
-text, Fills rows kept) as a fill list and its Trades tab as a trade list once
-`Trade Quantity` is named as the quantity on the form and the default BP/EP
-position markers are turned off (Edit >> Include Begin/End Indicators in Trades
-List), which the importer otherwise refuses. The guides say only what those
+text, Fills rows kept) as a fill list and its Trades tab as a trade list
+(`Trade Quantity` is a quantity name the importer knows, so the form needs no
+mapping) once the default BP/EP position markers are turned off (Edit >>
+Include Begin/End Indicators in Trades List), which the importer otherwise
+refuses. The guides say only what those
 pages say: Tradovate's time-zone article covers the Notification Ticker alone,
 its Account Reports article names Live and Demo accounts and lists no fields,
 Topstep calls the file a CSV only for the Orders export, and Sierra Chart's
@@ -4416,6 +4419,71 @@ guide is not written from third-party help. Synthetic fixtures:
 `tests/fixtures/audit_imports/tradovate_performance.csv`, `tradovate_orders.csv`,
 `topstepx_trades.csv`, `sierra_chart_trade_activity.txt` and
 `sierra_chart_trades.txt` (`tests/test_audit_guides_futures.py`).
+
+The cTrader guide (`ctrader` in es/en/pt, published 2026-10-11) follows the
+supplied official research from `help.ctrader.com`, with a source beside
+each step (`Guide.step_sources`). The documented path is Trade Watch >
+History > Statement > Save: [Desktop History](https://help.ctrader.com/ctrader/trading/history/)
+describes an HTML or `.xlsx` statement and CSV saving;
+[Web History](https://help.ctrader.com/ctrader-web/trading/history/) and
+[Mac Trade Watch](https://help.ctrader.com/ctrader-mac/trade/trade-watch/)
+describe an HTML statement saved as CSV. The
+[FAQ](https://help.ctrader.com/ctrader/faq/) locates History at the bottom of
+cTrader and Statement at the upper right of History. The
+[Mobile History documentation](https://help.ctrader.com/ctrader-mobile/trading/history/)
+describes viewing, filtering and sharing a deal card, with no export route;
+the guide directs file export to Desktop, Web or Mac.
+
+The official pages document the History table's columns, not the exact
+statement CSV headers. They do not establish whether the statement follows
+the selected period, whether visible columns control the statement, or the
+exported file's time zone. The
+[user time offset page](https://help.ctrader.com/ctrader/interface/user-time-offset/)
+only describes the displayed chart and trade-detail times, so the guide
+asks the reader to set and record the offset and check the saved file.
+There is no documented separate export route for a prop-firm evaluation.
+The guide does not attribute restrictions to an individual firm, and states
+"Rigor no está afiliado a cTrader ni a Spotware" with translations.
+
+There is no dedicated cTrader importer: the guide uses the universal closed
+trade CSV reader (`GUIDE_FORMATS["ctrader"] = {UNIVERSAL_TRADES_CSV}`). The
+synthetic `tests/fixtures/audit_imports/ctrader_history_columns.csv` uses
+documented History names, without claiming to be a real Statement header.
+In a working copy, map `Gross (currency)` to `profit`, retaining `Commissions`
+and `Swap` separately and using the same currency throughout; the original
+names do not give the universal reader the monetary result, and without the
+mapping it works the result out as price move times lots with no contract
+size (a warning says so), which the guide calls unusable rather than optional.
+`Net (currency)` already includes costs and must not be treated as gross with
+those costs deducted again. The Desktop column list is Desktop's; the
+[Mac Trade Watch page](https://help.ctrader.com/ctrader-mac/trade/trade-watch/)
+(read 2026-10-11) names `Swaps`, `Broker commission`, `Conversion fee`, `Gross
+(currency)`, `Net (currency)`, `Gross USD` and `Net USD`. The universal reader
+knows `broker commission` and `conversion fee` as cost columns (added up as
+commissions, `universal.SYNONYMS["commission"]`) and `swaps` as the swap; the
+only result name it knows unmapped is `Net USD`, so the guide says to drop the
+USD copies. The guide links the challenge calculator and the complete rules
+table, with no futures filter. The guide and updated index carry 2026-10-11 in
+the sitemap (`seo.GUIDES_PUBLISHED`). Tests cover the mapping, the documented
+limits, the three translations, the links and the claim guard.
+
+The universal reader's gross/net interpretation is heuristic; compare the
+prepared copy's values and totals with the original statement. The
+[Desktop History page](https://help.ctrader.com/ctrader/trading/history/)
+(read 2026-10-11, "Deal information") documents the deal statuses `Filled`,
+`Partially filled`, `Rejected`, `Error`, `Missed` and `Internally rejected`.
+With the distinctive History columns and an optional `Status` column, the
+reader leaves out the four documented non-executions
+(`universal.UNEXECUTED_DEAL_STATUSES`) before choosing the busiest account and
+keeps every other value, empty or undocumented included: an unknown vocabulary
+says nothing about execution and must not delete deals. This adds an exclusion
+warning (translated in es/en/pt) and `excluded_unfilled_deals` metadata; it
+does not add a report dimension or red flag. When every row is left out the
+refusal `deals_without_execution` names the statuses seen (es/en/pt) instead
+of the generic "no closed trades". Totals rows and repeated headers are not
+counted as deals. `Status` is not asserted to be a CSV header. Tests add it to
+the synthetic fixture, retain partial closes and losses, and check that
+unrelated platforms' status columns are unchanged.
 
 `audit/seo.py` gives every public page (landing, sample, guides, terms,
 privacy, in both languages) a title, a meta description, a canonical URL,
@@ -5418,6 +5486,84 @@ commit SHA.
 
 ## Operator probes and incident admission
 
+After deployment, check the public site with:
+
+```sh
+quant-trade audit smoke --site https://rigorscore.com --concurrency 4 --timeout 20 --only all
+quant-trade audit smoke --site https://rigorscore.com --json outputs/smoke.json
+quant-trade audit smoke --site https://rigorscore.com --verbose --pdf-timeout 90
+quant-trade audit smoke --site http://127.0.0.1:8000 --only links
+```
+
+For a local server, set its `AUDIT_BASE_URL=http://127.0.0.1:8000` so its
+canonical, hreflang and card-image URLs point to the local site. The smoke
+command requests the site's `/sitemap.xml`, follows same-origin sitemap
+indexes, and checks the union of sitemap page URLs and `seo.PUBLIC_PAGES`.
+HTML pages also supply links to crawl recursively. All requests use GET,
+`User-Agent: RigorSmoke/1.0` and no retries. The concurrency default and
+maximum are 4 (minimum 1); requests run from a work queue, so a page's links
+start as soon as it arrives instead of waiting for the slowest request in
+flight. `--timeout` defaults to 20 seconds and must be finite and positive.
+
+A redirect to the same origin is followed for up to three hops and judged by
+its final status: `/cuenta`, `/account` and `/pt/conta` answer 303 to the
+sign-in screen without a session, and `/ejemplo/` answers 307 to `/ejemplo`;
+both pass, are counted as redirects, and the report records the first
+`location`, the `final_url` and every hop (`redirect_chain`). A redirect to
+another origin is listed as external and never requested; it fails, as do a
+redirect loop, more than three hops, a malformed `Location` and a final
+status other than 200. A redirect target is parsed for links only when it is
+not crawled under its own URL; error pages (any status other than 200) are
+never parsed.
+
+`.pdf` URLs (the sample reports, rendered on first request and then cached)
+get their own timeout, `--pdf-timeout`, which defaults to the larger of
+`--timeout` and 90 seconds (`web.PDF_WAIT_SECONDS`, 60 s for a free render
+slot, plus 30 s for the render). Their status and headers are read and the
+connection is closed without downloading the body; their size comes from
+`Content-Length` (0 when absent). Slow PDFs are listed apart from slow pages.
+
+`--only sitemap` checks the sitemap and its pages, plus `PUBLIC_PAGES`.
+`--only links` additionally checks HTML anchor links, canonical URLs and
+hreflang URLs; `--only images` instead checks `og:image` and `twitter:image`;
+`--only all` (the default) checks both groups. Requests are cached by URL:
+fragments are removed, query strings are retained, and a URL is requested
+only once even when several pages reference it (a redirect hop to a URL that
+is also crawled directly may be requested again). Only the exact site origin
+(scheme, host and port) is requested. External references are counted and
+left unchecked; `mailto:`, `tel:`, `javascript:` and other non-HTTP links are
+neither requested nor reported as external (the JSON only counts them). The
+crawl stops admitting new URLs at 10,000 unique internal URLs and reports one
+incomplete-check failure naming how many URLs were left out (exit 1), so
+endless query-string pagination cannot keep the command running indefinitely.
+
+Every response records its status, elapsed time and size. Card images must
+return 200 with `image/png` or `image/svg+xml`; this checks the response MIME
+type, without decoding or validating the image bytes. Malformed or empty
+sitemaps and unparseable HTML also fail. Each failing URL is reported once,
+with every page that references it (`sources`, `source_count`). The console
+prints, in order: the failures (`FALLO [a] URL: reason — en N páginas (p. ej.
+/, /a, /b, …)`), slow pages and slow PDFs (over 3 seconds, slowest first;
+timeouts are failures, not slow responses), one line counting external URLs
+and links, the summary (total, 200, non-200, redirects, slow, slow PDFs,
+timeouts, broken images and links) and a last line naming the exit status.
+`--verbose` also lists followed redirects and each external URL with its page
+count. Followed same-origin redirects and slow responses are informational.
+Exit status is 0 when checks pass, 1 when a real check fails, or 2 for
+invalid arguments or an unwritable JSON report destination.
+
+`--json <path>` is optional and writes the report to that one file; its
+parent directory must already exist. The JSON lists each referenced and
+external URL once with its page count; `--json-full` adds every referring
+page to those entries (failures always carry them). The command does not
+import the web app, access its database, load credentials or write other
+artifacts. Remote GET requests can still cause the service's ordinary
+request logging or other GET-side effects, such as rendering and caching a
+sample PDF. It does not execute JavaScript, render a browser, or validate
+fragment targets. This is an availability and metadata check for the
+research/backtesting site; passing it does not establish readiness for
+real-money trading. Tests use offline HTTP transports.
+
 `GET /live` checks only that the web process can answer. The legacy `GET
 /health` exposes non-secret configuration and also remains a liveness probe;
 it does **not** query storage. Route new traffic using `GET /ready`: it runs
@@ -6156,7 +6302,12 @@ account, payment, credit, e-mail, legal or engine rule changed.
   `bot-ia-backtest-suerte`: the luck calculator opened with
   `LUCK_EXAMPLE_INPUT`, the example both articles print.
   `auditoria-independiente-backtest`, `que-hacer-despues-del-backtest` and
-  `auditar-cartera-modelo-senales`: form and sample report. `Article.from_dict`
+  `auditar-cartera-modelo-senales`: form and sample report.
+  `regla-de-consistencia-prop-firm` and `drawdown-trailing-eod-intradia`:
+  `/para/retos-prop-firm`, like the other challenge article.
+  `riesgo-de-ruina-intervalo-de-confianza`: the risk-of-ruin calculator opened
+  with the article's first declared case (`article_numbers.RUIN_INPUTS[0]`,
+  without the share tag). `Article.from_dict`
   refuses an unknown kind, guide, audience page or example at import.
 
 `tests/test_audit_conversion.py` reads every page over HTTP with

@@ -21,17 +21,35 @@ from urllib.parse import quote, urlencode
 from quant_trade.audit import accounts, institutional, paid_offer, reading, ruin_calc, winrate
 from quant_trade.audit import challenge_calc as challenge
 from quant_trade.audit.accounts import FREE_PREVIEWS_PER_MONTH as _FREE
-from quant_trade.audit.article_numbers import STREAK_ROWS
+from quant_trade.audit.article_numbers import (
+    RUIN_INPUTS,
+    RUIN_READINGS,
+    STREAK_ROWS,
+    ConsistencyExample,
+    consistency_examples,
+    consistency_rules,
+    consistency_variations,
+    trailing_caveats,
+    trailing_examples,
+    trailing_rules,
+)
 from quant_trade.audit.articles import (
     ARTICLES,
     ARTICLES_BY_KEY,
     ARTICLES_COPY,
+    CONSISTENCY_ARTICLE_KEY,
+    CONSISTENCY_TABLE_COPY,
     INDEPENDENT_LUCK_EXAMPLE,
     LUCK_TABLE_COPY,
     LUCK_TABLE_INPUTS,
+    RUIN_ARTICLE_KEY,
+    RUIN_TABLE_AFTER,
+    RUIN_TABLE_COPY,
     STREAK_ARTICLE_KEY,
     STREAK_TABLE_AFTER,
     STREAK_TABLE_COPY,
+    TRAILING_ARTICLE_KEY,
+    TRAILING_TABLE_COPY,
     WIN_RATE_RATES,
     WIN_RATE_TABLE_COPY,
     WIN_RATE_TRADE_COUNTS,
@@ -40,9 +58,13 @@ from quant_trade.audit.articles import (
     article_url,
     articles_index_faq,
     articles_index_url,
+    consistency_programs_note,
+    consistency_sensitivity_note,
+    consistency_worked_example,
     next_step_call,
     next_step_links,
     related_links,
+    trailing_outcome_note,
     win_rate_interval,
 )
 from quant_trade.audit.audiences import (
@@ -83,6 +105,7 @@ from quant_trade.audit.guides import (
     guide_url,
     guides_index_url,
 )
+from quant_trade.audit.i18n import localize
 from quant_trade.audit.legal import LegalText, legal_url
 from quant_trade.audit.method import CHALLENGE_SECTION, dimension_rows, method_url, references
 from quant_trade.audit.method import COPY as METHOD_COPY
@@ -122,7 +145,7 @@ from quant_trade.audit.report import (
 )
 from quant_trade.audit.report import LABELS as REPORT_LABELS
 from quant_trade.audit.rules_table import COPY as RULES_COPY
-from quant_trade.audit.rules_table import FILTER_MARKET, rules_table_url
+from quant_trade.audit.rules_table import FILTER_LOSS, FILTER_MARKET, loss_names, rules_table_url
 from quant_trade.audit.sample_publication import SamplePage, public_pages_line
 from quant_trade.audit.schema import MAX_UPLOAD_BYTES
 from quant_trade.audit.seo import (
@@ -156,6 +179,7 @@ from quant_trade.audit.theme import (
     logo,
     static_ready,
 )
+from quant_trade.audit.tools_examples import examples as tool_examples
 from quant_trade.audit.tools_hub import COPY as TOOLS_COPY
 from quant_trade.audit.tools_hub import TOOL_KEYS, TOOLS_PATH, tools_url
 from quant_trade.audit.upload_limits import guide_limit_text, upload_limit_text
@@ -4648,8 +4672,9 @@ def _guide_offer(
     """ "What you get" on a guide: the report's contents and the free report as the
     sign-up panel and /precios word them, the upload button, the sample report
     and the free tool that fits the guide (``guide_capabilities.GUIDE_TOOL``);
-    when that tool is the challenge calculator, also the rules table and its
-    futures firms.
+    when that tool is the challenge calculator, also the rules table, plus its
+    futures firms for the futures platforms' guides (not cTrader, whose
+    statement is not futures-only).
 
     ``offer`` is the service's (``free``, ``welcome`` or ``paid``). The free first
     report comes with the limits the upload applies to it (``web._first_look``:
@@ -4702,13 +4727,18 @@ def _guide_offer(
     )
     rules = ""
     if tool == "challenge":
-        # The rules behind that tool: every firm on one page with source and
-        # date, and the same table narrowed to the futures firms.
+        # The rules behind that tool, with each source and date. The cTrader
+        # guide covers its statement export, without a futures-only scope.
         futures = f"{rules_table_url(locale)}?{FILTER_MARKET}=futures"
+        futures_link = (
+            f" · <a href='{_e(futures)}'>{_e(words['futures_firms'])}</a>"
+            if guide.slug != "ctrader"
+            else ""
+        )
         rules = (
             f"<p data-guide-rules>{_e(RULES_COPY[locale]['audience_line'])} "
-            f"<a href='{_e(rules_table_url(locale))}'>{_e(RULES_COPY[locale]['nav'])}</a> · "
-            f"<a href='{_e(futures)}'>{_e(words['futures_firms'])}</a></p>"
+            f"<a href='{_e(rules_table_url(locale))}'>{_e(RULES_COPY[locale]['nav'])}</a>"
+            f"{futures_link}</p>"
         )
     return (
         "".join(f"<p>{_e(line)}</p>" for line in lines)
@@ -4750,7 +4780,17 @@ def guide_page(
     meta = _public_meta(
         title, text.seo_description or text.summary, locale, guide_url(guide.slug, locale), base_url
     )
-    items = "".join(f"<li>{_e(step)}</li>" for step in text.steps)
+    items = ""
+    step_sources = guide.step_sources or (("", ""),) * len(text.steps)
+    for step, (source_title, source_url) in zip(text.steps, step_sources, strict=True):
+        source = (
+            f" <span class='muted guide-step-source'>{_e(words['source'])} "
+            f"<a href='{_e(source_url)}' rel='noopener noreferrer'>"
+            f"{_e(source_title)}</a></span>"
+            if source_url
+            else ""
+        )
+        items += f"<li>{_e(step)}{source}</li>"
     steps = f"<ol class='list-steps steps-guide'>{items}</ol>"
     if guide.sources:
         # The platform's own pages the steps were read from, and the day.
@@ -4852,7 +4892,7 @@ def examples_page(*, locale: str = "es", base_url: str = "") -> str:
 
 
 def tools_page(*, locale: str = "es", base_url: str = "") -> str:
-    """The free tools that need no file: what each one asks for and what it gives."""
+    """The free tools, with declared examples computed by each destination tool."""
     locale = _locale(locale)
     words = TOOLS_COPY[locale]
     title = f"{words['seo_title']} · {BRAND}"
@@ -4865,6 +4905,39 @@ def tools_page(*, locale: str = "es", base_url: str = "") -> str:
         ],
         locale,
     )
+    examples = tool_examples(locale)
+
+    def example_line(key: str) -> str:
+        example = examples[key]
+        # No badge here: evidence labels belong to tables, cards and /ejemplos, and
+        # these inputs are made up for the example; the note says how it was worked out.
+        if key == "check":
+            note = ""  # No figure: the card points to the sample PDF the check recognises.
+        elif key == "rules_table":
+            note = _e(words["example_count"])  # Counts over the preset rows.
+        else:
+            note = _e(words["example_evidence"])
+        download = ""
+        if example.download:
+            download = (
+                f" <a href='{_e(example.download)}' download data-tool-example-file='{key}'>"
+                f"{_e(words['example_file'])}</a>"
+            )
+        muted = f" <span class='muted'>{note}</span>" if note else ""
+        # Inline like the list above it: .article-cta p resets margins to 0.
+        return (
+            f"<p data-tool-example='{key}' data-evidence='{_e(example.evidence)}' "
+            f"style='margin-top:16px'>"
+            f"<strong>{_e(words['example'])}</strong> {_e(example.text)}{download}{muted}</p>"
+        )
+
+    def example_link(key: str) -> str:
+        return (
+            f"<a class='btn btn-dark' href='{_e(examples[key].url)}' "
+            f"data-tool-example-link='{key}' aria-describedby='tool-{key}'>"
+            f"{_e(words['example_open'])}<span class='go'>{icon('arrow')}</span></a>"
+        )
+
     tools = ""
     for key in TOOL_KEYS:
         tool = words[key]
@@ -4880,16 +4953,21 @@ def tools_page(*, locale: str = "es", base_url: str = "") -> str:
         if key == "challenge":
             # The rules the calculator uses, every firm on one page with source and date.
             more = (
-                f"<a class='link-more' href='{_e(rules_table_url(locale))}' data-rules-table>"
-                f"{_e(RULES_COPY[locale]['nav'])}{icon('arrow')}</a>"
+                f"<h3 id='tool-rules_table'><a class='link-more' "
+                f"href='{_e(rules_table_url(locale))}' data-rules-table>"
+                f"{_e(RULES_COPY[locale]['nav'])}{icon('arrow')}</a></h3>"
+                f"{example_line('rules_table')}"
+                f"<div class='back-row'>{example_link('rules_table')}</div>"
             )
         tools += (
             f"<section class='article-cta'><h2 id='tool-{key}'>{_e(_tool_name(key, locale))}</h2>"
             f"<p>{_e(tool['question'])}</p>"
             f"<ul class='checks' style='margin-top:16px'>{points}</ul>"
-            f"<div class='back-row'><a class='btn btn-dark' href='{_e(_tool_url(key, locale))}' "
+            f"{example_line(key)}"
+            f"<div class='back-row'>{example_link(key)}"
+            f"<a class='link-more' href='{_e(_tool_url(key, locale))}' "
             f"aria-describedby='tool-{key}'>{_e(words['open'])}"
-            f"<span class='go'>{icon('arrow')}</span></a>{more}</div></section>"
+            f"{icon('arrow')}</a></div>{more}</section>"
         )
     report = (
         f"<section class='article-cta'><h2>{_e(words['report_title'])}</h2>"
@@ -4947,6 +5025,172 @@ def articles_index_page(*, locale: str = "es", base_url: str = "") -> str:
     return _page(title, locale, body, meta_html=meta, alternates=alternates, solid_nav=True)
 
 
+def _consistency_article_tables(locale: str) -> dict[str, str]:
+    """Tables from the declared calculator examples and the published preset rows."""
+    words = CONSISTENCY_TABLE_COPY[locale]
+
+    def declared(value: str) -> str:
+        return _e(f"DECLARED · {value}")
+
+    def table(name: str, columns: tuple[str, ...], rows: str, note: str) -> str:
+        headers = "".join(f"<th scope='col'>{_e(words[key])}</th>" for key in columns)
+        return (
+            f"<table class='article-consistency-{name}'><caption>{_e(words[note])}</caption>"
+            f"<thead><tr>{headers}</tr></thead><tbody>{rows}</tbody></table>"
+        )
+
+    def share(value: float) -> str:
+        # Two decimals: every share is a multiple of 100 / challenge.SAMPLES percent
+        # (0.05 % with 2,000 paths), so the printed rows add up to 100 % exactly.
+        return declared(f"{_num(value * 100, locale, 2)} %")
+
+    def outcomes(row: ConsistencyExample) -> str:
+        within = _e(words["no_rule"]) if row.within_best_day is None else share(row.within_best_day)
+        days = (
+            "NOT_MEASURED"
+            if row.median_days is None
+            else declared(_num(row.median_days, locale, 0))
+        )
+        cells = (
+            share(row.target),
+            within,
+            share(row.daily_limit + row.total_limit),
+            share(row.unfinished),
+            days,
+        )
+        return "".join(f"<td>{cell}</td>" for cell in cells)
+
+    columns = ("target", "within", "loss", "unfinished", "days")
+    case_rows = "".join(
+        f"<tr data-case='{_e(row.inputs.program)}'><th scope='row'>"
+        f"{_e(PRESETS[row.inputs.program].firm)} · {_e(PRESETS[row.inputs.program].program)}"
+        f"</th>{outcomes(row)}</tr>"
+        for row in consistency_examples()
+    )
+    variation_rows = "".join(
+        f"<tr data-case='{index}'><th scope='row'>"
+        f"{declared(_num(row.inputs.per_day, locale, 0))}</th>"
+        f"<td>{declared(_num(row.inputs.risk or 0, locale, 2) + ' %')}</td>"
+        f"<td>{share(row.maximum_initial_day_gain)}</td>"
+        f"{outcomes(row)}</tr>"
+        for index, row in enumerate(consistency_variations())
+    )
+    # The firm's own page, named as the calculator names it, and the reading date
+    # beside the link: a date is not a declared figure.
+    source_link = challenge.COPY[locale]["source_link"]
+    rule_rows = "".join(
+        f"<tr data-preset='{_e(row.key)}'><th scope='row'>"
+        f"{_e(row.firm)} · {_e(row.program)}</th>"
+        f"<td>{declared(_num(row.limit * 100, locale, 0) + ' %')}</td>"
+        f"<td>{_e(words[row.basis])}</td>"
+        f"<td><a href='{_e(row.source_url)}' rel='noopener nofollow'>"
+        f"{_e(source_link.format(firm=row.firm))}</a> · "
+        f"<time datetime='{_e(row.as_of)}'>{_e(row.as_of)}</time></td></tr>"
+        for row in consistency_rules()
+    )
+    return {
+        words["rules"]: table(
+            "rules", ("program", "limit", "basis", "source"), rule_rows, "rules_note"
+        ),
+        words["cases"]: f"<p>{_e(consistency_worked_example(locale))}</p>"
+        f"<p>{_e(consistency_programs_note(locale))}</p>"
+        + table("cases", ("program", *columns), case_rows, "outcome_note"),
+        words["sensitivity"]: f"<p>{_e(consistency_sensitivity_note(locale))}</p>"
+        + table(
+            "sensitivity",
+            ("per_day", "risk", "max_day", *columns),
+            variation_rows,
+            "sensitivity_note",
+        ),
+    }
+
+
+def _trailing_article_tables(locale: str) -> dict[str, str]:
+    """Source-dated preset rules and declared calculator outcomes, rendered together."""
+    words = TRAILING_TABLE_COPY[locale]
+    type_names = loss_names(locale)
+    source_label = challenge.COPY[locale]["source_link"]
+
+    def share(value: float) -> str:
+        # At 2,000 paths each outcome is a multiple of 0.05 %, so two decimals
+        # keep the mutually exclusive stopping outcomes adding up to 100 %.
+        return _e(f"DECLARED · {_num(value * 100, locale, 2)} %")
+
+    def loss_link(loss_type: str) -> str:
+        href = f"{rules_table_url(locale)}?{FILTER_LOSS}={loss_type}"
+        return f"<a href='{_e(href)}'>{_e(type_names[loss_type])}</a>"
+
+    def source(firm: str, url: str, as_of: str) -> str:
+        return (
+            f"<a href='{_e(url)}' rel='noopener nofollow'>"
+            f"{_e(source_label.format(firm=firm))}</a> · "
+            f"<time datetime='{_e(as_of)}'>{_e(as_of)}</time>"
+        )
+
+    def table(name: str, columns: tuple[str, ...], rows: str, note: str) -> str:
+        headers = "".join(f"<th scope='col'>{_e(words[key])}</th>" for key in columns)
+        # The note stays outside the scrolling region, where a phone shows it
+        # whole: a <caption> is as wide as the table and scrolls away with it.
+        # Outside the table it is prose, so it carries no evidence label; the
+        # cells do.
+        return (
+            f"<p>{_e(note)}</p>"
+            f"<div class='tscroll ruin-scroll' role='region' tabindex='0' "
+            f"aria-label='{_e(words[name])}'><table class='article-trailing-{name}'>"
+            f"<thead><tr>{headers}</tr></thead><tbody>{rows}</tbody></table></div>"
+        )
+
+    rule_rows = "".join(
+        f"<tr data-preset='{_e(row.key)}'><th scope='row'>"
+        f"{_e(row.firm)} · {_e(row.program)}</th>"
+        f"<td>{loss_link(row.loss_type)}</td><td>{share(row.limit)}</td>"
+        f"<td>{source(row.firm, row.source_url, row.as_of)}</td></tr>"
+        for row in trailing_rules()
+    )
+    case_rows: list[str] = []
+    for row in trailing_examples():
+        rules = PRESETS[row.inputs.program]
+        # A program whose daily limit is not simulated has no daily outcome: a
+        # zero there would present an unmodelled rule as a simulated result.
+        daily = _e(words["no_daily"]) if rules.max_daily_loss is None else share(row.daily_limit)
+        cells = (
+            share(rules.profit_target),
+            share(row.target),
+            share(row.total_limit),
+            daily,
+            share(row.unfinished),
+        )
+        case_rows.append(
+            f"<tr data-case='{_e(row.inputs.program)}'><th scope='row'>"
+            f"{_e(rules.firm)} · {_e(rules.program)}</th>"
+            f"<td>{loss_link(rules.total_loss_type)}</td>"
+            + "".join(f"<td>{cell}</td>" for cell in cells)
+            + "</tr>"
+        )
+    # The quotes are prose outside the tables: no evidence label on them; the
+    # footer names the firm, the program, the source and its reading date.
+    notes = "".join(
+        f"<blockquote data-preset='{_e(row.key)}'><p>"
+        f"{_e(localize(row.note, locale))}</p>"
+        f"<footer>{_e(row.firm)} · {_e(row.program)} · "
+        f"{source(row.firm, row.source_url, row.as_of)}</footer></blockquote>"
+        for row in trailing_caveats()
+    )
+    return {
+        words["rules"]: table(
+            "rules", ("program", "type", "limit", "source"), rule_rows, words["rules_note"]
+        ),
+        words["cases"]: table(
+            "cases",
+            ("program", "type", "target_rule", "target", "total", "daily", "unfinished"),
+            "".join(case_rows),
+            trailing_outcome_note(locale),
+        ),
+        words["notes"]: f"<p>{_e(words['notes_note'])}</p>"
+        f"<div class='article-trailing-notes'>{notes}</div>",
+    }
+
+
 def article_page(article: Article, *, locale: str = "es", base_url: str = "") -> str:
     """One article: its sections, questions, related pages and a closing call."""
     locale = _locale(locale)
@@ -4960,6 +5204,12 @@ def article_page(article: Article, *, locale: str = "es", base_url: str = "") ->
         (section.heading, "".join(f"<p>{_e(paragraph)}</p>" for paragraph in section.paragraphs))
         for section in text.sections
     ]
+    if article.key == CONSISTENCY_ARTICLE_KEY:
+        tables = _consistency_article_tables(locale)
+        sections = [(heading, body + tables.get(heading, "")) for heading, body in sections]
+    if article.key == TRAILING_ARTICLE_KEY:
+        tables = _trailing_article_tables(locale)
+        sections = [(heading, body + tables.get(heading, "")) for heading, body in sections]
     if article.key in {"sharpe-deflactado-track-record", "bot-ia-backtest-suerte"}:
         heading, trials, years, luck, note = LUCK_TABLE_COPY[locale]
         rows = "".join(
@@ -5022,6 +5272,50 @@ def article_page(article: Article, *, locale: str = "es", base_url: str = "") ->
         )
         # Right after the section that explains the calculation, found by its title.
         after = [name for name, _body in sections].index(STREAK_TABLE_AFTER[locale])
+        sections.insert(after + 1, (heading, table))
+    if article.key == RUIN_ARTICLE_KEY:
+        heading, *ruin_columns, note = RUIN_TABLE_COPY[locale]
+        ruin_rows: list[str] = []
+        for value, result in zip(RUIN_INPUTS, RUIN_READINGS, strict=True):
+            lower = result.lower
+            if lower is None:
+                raise ValueError("the ruin article requires a Wilson lower-bound scenario")
+            # The linked calculator's own rounding (one decimal, a signed
+            # expectancy at two), so a reader who follows the link meets the same
+            # figures; 4 000 paths resolve no finer than one decimal anyway.
+            r_unit = str(ruin_calc.COPY[locale]["r_unit"])
+            cells = (
+                ruin_calc._percent(value.win_rate, locale),
+                _num(value.trades or 0, locale, 0),
+                f"{_num(value.avg_win, locale, 1)}R/{_num(value.avg_loss, locale, 1)}R",
+                ruin_calc._signed(
+                    result.declared.expectancy_r,
+                    r_unit.format(n=_num(result.declared.expectancy_r, locale, 2)),
+                ),
+                ruin_calc._percent(result.declared.ruin, locale),
+                ruin_calc._percent(lower.win_rate, locale),
+                ruin_calc._signed(
+                    lower.expectancy_r, r_unit.format(n=_num(lower.expectancy_r, locale, 2))
+                ),
+                ruin_calc._percent(lower.ruin, locale),
+            )
+            ruin_rows.append(
+                f"<tr><th scope='row'>DECLARED · {_e(cells[0])}</th>"
+                + "".join(f"<td>DECLARED · {_e(cell)}</td>" for cell in cells[1:])
+                + "</tr>"
+            )
+        # The note stays outside the scrolling region, where a phone shows it
+        # whole; the first column sticks so a scrolled row keeps its win rate.
+        table = (
+            f"<p>{_e(note)}</p>"
+            f"<div class='tscroll ruin-scroll' role='region' tabindex='0' "
+            f"aria-label='{_e(heading)}'><table class='article-ruin'><thead><tr>"
+            + "".join(f"<th scope='col'>{_e(column)}</th>" for column in ruin_columns)
+            + "</tr></thead><tbody>"
+            + "".join(ruin_rows)
+            + "</tbody></table></div>"
+        )
+        after = [name for name, _body in sections].index(RUIN_TABLE_AFTER[locale])
         sections.insert(after + 1, (heading, table))
     if text.faq:
         faq = "".join(f"<h3>{_e(q)}</h3><p>{_e(a)}</p>" for q, a in text.faq)
@@ -5120,7 +5414,11 @@ AUDIENCE_RUIN_COPY: dict[str, str] = {
 
 #: Articles each case page lists before the other cases (article keys, in order).
 AUDIENCE_ARTICLES: dict[str, tuple[str, ...]] = {
-    "retos-prop-firm": ("cuantos-intentos-reto-prop-firm", "rachas-perdedoras"),
+    "retos-prop-firm": (
+        "cuantos-intentos-reto-prop-firm",
+        "rachas-perdedoras",
+        "regla-de-consistencia-prop-firm",
+    ),
     "compradores-de-robots": ("ea-sobreoptimizado", "lo-eligio-el-optimizador"),
     "copiar-senales": ("copiar-senales-mql5-myfxbook",),
 }
