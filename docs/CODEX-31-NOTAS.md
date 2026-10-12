@@ -117,3 +117,6 @@ datos de clientes, cachés, conexiones a proveedores ni ejecución de operacione
 - La comprobación 7 nombra la sección del ejemplo tal cual
   (`seller_message.COPY[locale]["title"]`: «Mensaje para el vendedor»,
   «Message for the seller», «Mensagem para o vendedor»).
+- La comprobación 6 pide «el acierto declarado» con sus operaciones, no
+  «tu acierto»: quien copia no tiene acierto propio; introduce el del
+  proveedor junto a su propio tamaño de copia.

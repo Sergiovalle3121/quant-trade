@@ -21,8 +21,8 @@ from quant_trade.audit.seller_message import COPY as SELLER_COPY
 from quant_trade.audit.winrate import winrate_url
 
 # Each check names a numeric comparison and the existing tool that supplies it.
-# Evidence codes appear only in attributes: inside a sentence the report's
-# localizer would print them capitalised and without agreement.
+# Evidence codes only open a sentence or stay in attributes: inside a sentence
+# the report's localizer would print them capitalised and without agreement.
 CHECKS: dict[str, tuple[tuple[str, str, str], ...]] = {
     "es": (
         (
@@ -78,8 +78,8 @@ CHECKS: dict[str, tuple[tuple[str, str, str], ...]] = {
         ),
         (
             "Ruina al tamaño que copiarías",
-            "Introduce tu acierto con sus {trades} operaciones, tu ganancia y pérdida "
-            "medias al tamaño de copia, el horizonte y el límite que quieres estudiar: "
+            "Introduce el acierto declarado con sus {trades} operaciones, tu ganancia y "
+            "pérdida medias al tamaño de copia, el horizonte y el límite que quieres estudiar: "
             "perder {ruin_limit} del saldo inicial en este ejemplo declarado. El enlace "
             "abre la calculadora con estas cifras y muestra tanto el cálculo con {rate} "
             "como el del extremo inferior de Wilson, {wilson_low}; sin las operaciones no "
@@ -150,7 +150,7 @@ CHECKS: dict[str, tuple[tuple[str, str, str], ...]] = {
         ),
         (
             "Ruin at the size you would copy",
-            "Enter your win rate with its {trades} trades, your average win and loss at "
+            "Enter the declared win rate with its {trades} trades, your average win and loss at "
             "the copy size, the horizon and the limit you want to study: losing "
             "{ruin_limit} of initial balance in this declared example. The link opens the "
             "calculator with these figures and shows both the calculation at {rate} and "
@@ -224,8 +224,8 @@ CHECKS: dict[str, tuple[tuple[str, str, str], ...]] = {
         ),
         (
             "Ruína no tamanho que você copiaria",
-            "Informe sua taxa de acerto com as {trades} operações, ganho e perda médios "
-            "no tamanho de cópia, horizonte e limite que quer estudar: perder "
+            "Informe a taxa de acerto declarada com as {trades} operações, seu ganho e "
+            "perda médios no tamanho de cópia, horizonte e limite que quer estudar: perder "
             "{ruin_limit} do saldo inicial neste exemplo declarado. O link abre a "
             "calculadora com esses números e mostra tanto o cálculo com {rate} quanto o "
             "do extremo inferior de Wilson, {wilson_low}; sem as operações não há "
