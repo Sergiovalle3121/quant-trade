@@ -88,6 +88,9 @@ def test_active_verification_counts_share_like_x_in_each_language(
     assert _visits(client) == {
         (locale, tag): 1 for locale in ("es", "en", "pt") for tag in ("share", "x")
     }
+    rows = client.app.state.store.page_visit_rows(funnel.day_of(datetime.now(UTC)))
+    assert {group for _, _, _, group, _ in rows} == {"v/publicacion"}
+    assert public_id not in repr(rows)
 
 
 def test_public_share_keeps_first_touch_and_counts_browser_once_a_day(
