@@ -5423,6 +5423,7 @@ After deployment, check the public site with:
 ```sh
 quant-trade audit smoke --site https://rigorscore.com --concurrency 4 --timeout 20 --only all
 quant-trade audit smoke --site https://rigorscore.com --json outputs/smoke.json
+quant-trade audit smoke --site https://rigorscore.com --verbose --pdf-timeout 90
 quant-trade audit smoke --site http://127.0.0.1:8000 --only links
 ```
 
@@ -5431,43 +5432,69 @@ canonical, hreflang and card-image URLs point to the local site. The smoke
 command requests the site's `/sitemap.xml`, follows same-origin sitemap
 indexes, and checks the union of sitemap page URLs and `seo.PUBLIC_PAGES`.
 HTML pages also supply links to crawl recursively. All requests use GET,
-`User-Agent: RigorSmoke/1.0`, no retries, and no redirect following. The
-concurrency default and maximum are 4 (minimum 1); `--timeout` defaults to
-20 seconds and must be finite and positive for each request.
+`User-Agent: RigorSmoke/1.0` and no retries. The concurrency default and
+maximum are 4 (minimum 1); requests run from a work queue, so a page's links
+start as soon as it arrives instead of waiting for the slowest request in
+flight. `--timeout` defaults to 20 seconds and must be finite and positive.
+
+A redirect to the same origin is followed for up to three hops and judged by
+its final status: `/cuenta`, `/account` and `/pt/conta` answer 303 to the
+sign-in screen without a session, and `/ejemplo/` answers 307 to `/ejemplo`;
+both pass, are counted as redirects, and the report records the first
+`location`, the `final_url` and every hop (`redirect_chain`). A redirect to
+another origin is listed as external and never requested; it fails, as do a
+redirect loop, more than three hops, a malformed `Location` and a final
+status other than 200. A redirect target is parsed for links only when it is
+not crawled under its own URL; error pages (any status other than 200) are
+never parsed.
+
+`.pdf` URLs (the sample reports, rendered on first request and then cached)
+get their own timeout, `--pdf-timeout`, which defaults to the larger of
+`--timeout` and 90 seconds (`web.PDF_WAIT_SECONDS`, 60 s for a free render
+slot, plus 30 s for the render). Their status and headers are read and the
+connection is closed without downloading the body; their size comes from
+`Content-Length` (0 when absent). Slow PDFs are listed apart from slow pages.
 
 `--only sitemap` checks the sitemap and its pages, plus `PUBLIC_PAGES`.
 `--only links` additionally checks HTML anchor links, canonical URLs and
 hreflang URLs; `--only images` instead checks `og:image` and `twitter:image`;
 `--only all` (the default) checks both groups. Requests are cached by URL:
 fragments are removed, query strings are retained, and a URL is requested
-only once even when several pages reference it. Only the exact site origin
-(scheme, host and port) is requested. External references are listed as
-external and unchecked; `mailto:`, `tel:` and other non-HTTP schemes are
-also left unchecked. Redirects, including same-origin redirects, fail the
-strict 200 check rather than expanding the crawl.
-The crawl stops admitting new URLs at 10,000 unique internal URLs and reports
-an incomplete-check failure (exit 1), so endless query-string pagination
-cannot keep the command running indefinitely.
+only once even when several pages reference it (a redirect hop to a URL that
+is also crawled directly may be requested again). Only the exact site origin
+(scheme, host and port) is requested. External references are counted and
+left unchecked; `mailto:`, `tel:`, `javascript:` and other non-HTTP links are
+neither requested nor reported as external (the JSON only counts them). The
+crawl stops admitting new URLs at 10,000 unique internal URLs and reports one
+incomplete-check failure naming how many URLs were left out (exit 1), so
+endless query-string pagination cannot keep the command running indefinitely.
 
 Every response records its status, elapsed time and size. Card images must
 return 200 with `image/png` or `image/svg+xml`; this checks the response MIME
-type, without decoding or validating the image bytes. The summary counts
-unique requests (including sitemap requests), 200 responses, non-200 or
-missing responses, requests slower than 3 seconds, and unique broken
-images and links. Malformed or empty sitemaps and unparseable HTML also fail.
-Slow responses alone are informational. Failures include
-the page or sitemap that referenced the URL. Exit status is 0 when checks
-pass, 1 when checks fail, or 2 for invalid arguments or an unwritable JSON
-report destination.
+type, without decoding or validating the image bytes. Malformed or empty
+sitemaps and unparseable HTML also fail. Each failing URL is reported once,
+with every page that references it (`sources`, `source_count`). The console
+prints, in order: the failures (`FALLO [a] URL: reason — en N páginas (p. ej.
+/, /a, /b, …)`), slow pages and slow PDFs (over 3 seconds, slowest first;
+timeouts are failures, not slow responses), one line counting external URLs
+and links, the summary (total, 200, non-200, redirects, slow, slow PDFs,
+timeouts, broken images and links) and a last line naming the exit status.
+`--verbose` also lists followed redirects and each external URL with its page
+count. Followed same-origin redirects and slow responses are informational.
+Exit status is 0 when checks pass, 1 when a real check fails, or 2 for
+invalid arguments or an unwritable JSON report destination.
 
-`--json <path>` is optional and writes the same report to that one file;
-its parent directory must already exist. The command does not import the
-web app, access its database, load credentials or write other artifacts.
-Remote GET requests can still cause the service's ordinary request logging
-or other GET-side effects. It does not execute JavaScript, render a browser,
-or validate fragment targets. This is an availability and metadata check
-for the research/backtesting site; passing it does not establish readiness
-for real-money trading. Tests use offline HTTP transports.
+`--json <path>` is optional and writes the report to that one file; its
+parent directory must already exist. The JSON lists each referenced and
+external URL once with its page count; `--json-full` adds every referring
+page to those entries (failures always carry them). The command does not
+import the web app, access its database, load credentials or write other
+artifacts. Remote GET requests can still cause the service's ordinary
+request logging or other GET-side effects, such as rendering and caching a
+sample PDF. It does not execute JavaScript, render a browser, or validate
+fragment targets. This is an availability and metadata check for the
+research/backtesting site; passing it does not establish readiness for
+real-money trading. Tests use offline HTTP transports.
 
 `GET /live` checks only that the web process can answer. The legacy `GET
 /health` exposes non-secret configuration and also remains a liveness probe;

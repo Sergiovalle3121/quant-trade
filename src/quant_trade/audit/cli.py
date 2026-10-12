@@ -234,50 +234,53 @@ def smoke(
     timeout: Annotated[
         float, typer.Option("--timeout", help="HTTP timeout in seconds; finite and positive")
     ] = 20.0,
+    pdf_timeout: Annotated[
+        float | None,
+        typer.Option(
+            "--pdf-timeout",
+            help="Timeout for .pdf URLs, rendered on first request; default max(--timeout, 90)",
+        ),
+    ] = None,
     only: Annotated[
         str, typer.Option("--only", help="Checks: sitemap, links, images or all")
     ] = "all",
+    verbose: Annotated[
+        bool, typer.Option("--verbose", help="Also list followed redirects and external URLs")
+    ] = False,
     json_path: Annotated[
         Path | None, typer.Option("--json", help="Write the JSON report here; parent must exist")
     ] = None,
+    json_full: Annotated[
+        bool, typer.Option("--json-full", help="In --json, list every page behind each link")
+    ] = False,
 ) -> None:
     """Check public pages, internal links and share images using GET, without retries."""
-    from quant_trade.audit.smoke import run_smoke
+    from quant_trade.audit.smoke import exit_line, format_report, run_smoke
 
     if json_path is not None and (not json_path.parent.is_dir() or json_path.is_dir()):
         raise typer.BadParameter("--json needs a file path with an existing parent directory")
     try:
-        report = run_smoke(site, concurrency=concurrency, timeout=timeout, only=only)
+        report = run_smoke(
+            site, concurrency=concurrency, timeout=timeout, pdf_timeout=pdf_timeout, only=only
+        )
     except ValueError as exc:
         raise typer.BadParameter(str(exc)) from exc
-    counts = report.summary
-    typer.echo(
-        f"RigorSmoke: total={counts['total']}, 200={counts['ok']}, "
-        f"no-200={counts['non_200']}, lentas > 3 s={counts['slow']}, "
-        f"imágenes rotas={counts['broken_images']}, enlaces rotos={counts['broken_links']}"
-    )
-    for request in report.requests:
-        if request.elapsed_seconds > 3.0:
-            typer.echo(f"Lenta: {request.url} ({request.elapsed_seconds:.3f} s)")
-    for failure in report.failures:
-        typer.echo(
-            f"FALLO [{failure.kind}] {failure.url}: {failure.reason}\n"
-            f"  origen: {failure.source}"
-        )
-    for reference in report.external:
-        typer.echo(
-            f"Externo, no comprobado [{reference.kind}]: {reference.url}\n"
-            f"  origen: {reference.source}"
-        )
+    # Failures first and the summary last, so it stays on screen.
+    for line in format_report(report, verbose=verbose):
+        typer.echo(line)
     if json_path is not None:
         try:
             json_path.write_text(
-                json.dumps(report.to_dict(), ensure_ascii=False, indent=2, allow_nan=False) + "\n",
+                json.dumps(
+                    report.to_dict(full=json_full), ensure_ascii=False, indent=2, allow_nan=False
+                )
+                + "\n",
                 encoding="utf-8",
                 newline="\n",
             )
         except OSError as exc:
             raise typer.BadParameter("cannot write the --json report") from exc
+    typer.echo(exit_line(report))
     if not report.ok:
         raise typer.Exit(code=1)
 
