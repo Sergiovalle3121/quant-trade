@@ -38,6 +38,16 @@ from quant_trade.audit.web import create_app  # noqa: E402
 
 BASE = "https://audit.example"
 LOCALES = ("es", "en", "pt")
+#: AUDIT_APPROVED_MARKETS as production will set it: MX, US, BR, the 27 EU members and GB.
+FULL_CATALOGUE = (
+    "MX,US,BR,AT,BE,BG,HR,CY,CZ,DK,EE,FI,FR,DE,GR,HU,IE,IT,LV,LT,LU,MT,NL,PL,PT,RO,SK,SI,ES,SE,GB"
+)
+#: How the full catalogue ends in each language: the EU grouped, the UK named apart.
+EU_AND_UK = {
+    "es": "la Unión Europea y el Reino Unido.",
+    "en": "the European Union and the United Kingdom only.",
+    "pt": "na União Europeia e no Reino Unido.",
+}
 #: Eleven questions of this page, plus the landing's questions it does not show
 #: (five; six in Portuguese, which also answers the report's language).
 COUNT = {"es": 16, "en": 16, "pt": 17}
@@ -104,7 +114,7 @@ def test_prices_follow_settings_and_free_mode(locale: str) -> None:
 
 @pytest.mark.parametrize("locale", LOCALES)
 def test_card_countries_come_only_from_active_runtime_markets(locale: str) -> None:
-    for countries in ("MX", "BR,ES", "US,MX", "BR,ES,MX,US"):
+    for countries in ("MX", "BR,ES", "US,MX", "BR,ES,MX,US", "DE,FR,GB", FULL_CATALOGUE):
         settings = _card_settings(AUDIT_APPROVED_MARKETS=countries)
         assert settings.card_public
         answer = faq_items(settings, locale)[1][1]
@@ -112,6 +122,8 @@ def test_card_countries_come_only_from_active_runtime_markets(locale: str) -> No
         assert answer.startswith(expected)
         assert evidence_label("DECLARED", locale) not in answer
         assert find_claims(answer) == []
+    full = faq_items(_card_settings(AUDIT_APPROVED_MARKETS=FULL_CATALOGUE), locale)[1][1]
+    assert EU_AND_UK[locale] in full
     active = _card_settings(AUDIT_APPROVED_MARKETS="MX")
     empty = _card_settings(AUDIT_APPROVED_MARKETS="")
     # Configuring a country alone must not advertise unavailable card payment.

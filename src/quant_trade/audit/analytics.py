@@ -720,15 +720,21 @@ def shuffled_drawdown(
 # ---------------------------------------------------------------------------
 
 
+def daily_closes(frame: pd.DataFrame) -> pd.Series:
+    """The last equity value of each UTC calendar day of a
+    ``timestamp``/``equity`` frame; days without a row are skipped."""
+    stamps = pd.to_datetime(frame["timestamp"], utc=True)
+    equity = pd.Series(frame["equity"].to_numpy(dtype=float), index=stamps)
+    return equity.groupby(stamps.dt.floor("D").to_numpy()).last()
+
+
 def daily_returns_from_equity(frame: pd.DataFrame) -> pd.Series:
     """Close-to-close daily returns from a ``timestamp``/``equity`` frame.
 
-    The last equity value of each UTC calendar day is its close; days
-    without a row are skipped, not filled.
+    The last equity value of each UTC calendar day is its close
+    (:func:`daily_closes`); days without a row are skipped, not filled.
     """
-    stamps = pd.to_datetime(frame["timestamp"], utc=True)
-    equity = pd.Series(frame["equity"].to_numpy(dtype=float), index=stamps)
-    closes = equity.groupby(stamps.dt.floor("D").to_numpy()).last()
+    closes = daily_closes(frame)
     return closes.pct_change().replace([np.inf, -np.inf], np.nan).dropna()
 
 
@@ -1272,6 +1278,7 @@ __all__ = [
     "MAX_FAN_POINTS",
     "REWORDED_QUESTIONS",
     "RISK_ASSUMPTIONS",
+    "daily_closes",
     "daily_returns_from_equity",
     "drawdown_risk",
     "question_now",

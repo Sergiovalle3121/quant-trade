@@ -138,6 +138,15 @@ Titular previsto: **Sergio o la entidad comercial que él confirme**, con acceso
 
 ## 7. Mercados e idiomas: matriz de habilitación
 
+**Actualización del 2026-10-11 (Codex 41):** según la autorización de Sergio
+comunicada para esta tarea, el catálogo revisado admite MX, US, BR, los 27 países
+de la Unión Europea y GB: 31 países en total. La lista ISO completa está en la
+fila `AUDIT_APPROVED_MARKETS` de `docs/AUDIT_SAAS.md`; Grecia usa GR y Reino Unido
+GB, sin alias EL/UK. **El valor de producción se cambia después de desplegar.**
+La matriz siguiente conserva la evidencia histórica de lanzamiento y no es la
+lista actual del catálogo. Esta ampliación no aporta mediciones de producción
+ni modifica la política de reembolso.
+
 «Puede visitar la web» no significa «mercado habilitado». La revisión fiscal/consumidor y elegibilidad del proveedor se hacen para cada país; un español genérico no sustituye condiciones locales.
 
 **Admisión preparada:** `AUDIT_APPROVED_MARKETS` está vacío por defecto y cierra Checkout live. Cuando Sergio registre únicamente los mercados aprobados, el comprador declara país de facturación antes de reservar orden; se congela con el importe y Stripe exige dirección. El webhook/retorno verifica el país facturado: una discrepancia o ausencia deja el cargo registrado para revisión y sin entrega. La declaración puede ser falsa y sólo se comprueba **después** del cargo; por eso no sustituye elegibilidad del proveedor, condiciones locales ni soporte; el cargo retenido sin entrega es uno de los dos casos que se devuelven a mano (el otro es un cobro duplicado), porque las ventas son finales. Los Payment Links antiguos en Stripe evaden este formulario y deben desactivarse allí antes de abrir live. Visitas y registros por país siguen `NOT_MEASURED`; el panel agrupa compras nuevas por país facturado y separa las antiguas sin dato.

@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import pytest
 
+from quant_trade.audit.card_markets import EU_MARKETS, MARKET_NAMES, REVIEWED_MARKETS
 from quant_trade.audit.settings import AuditSettings, normalise_database_url
 
 STRIPE = {
@@ -11,6 +14,47 @@ STRIPE = {
     "STRIPE_WEBHOOK_SECRET": "whsec_x",
     "STRIPE_PRICE_ID": "price_x",
 }
+
+
+def test_reviewed_billing_markets_accept_the_exact_country_list() -> None:
+    countries = (
+        "MX,US,BR,AT,BE,BG,HR,CY,CZ,DK,EE,FI,FR,DE,GR,HU,IE,IT,LV,LT,LU,MT,NL,PL,PT,"
+        "RO,SK,SI,ES,SE,GB"
+    )
+    expected = frozenset(countries.split(","))
+    assert len(EU_MARKETS) == 27
+    assert len(expected) == 31
+    assert expected == REVIEWED_MARKETS
+    assert set(MARKET_NAMES) == expected
+    assert all(set(names) == {"es", "en", "pt"} for names in MARKET_NAMES.values())
+    assert AuditSettings(approved_markets=expected).approved_markets == expected
+    assert (
+        AuditSettings.from_env({"AUDIT_APPROVED_MARKETS": countries}).approved_markets == expected
+    )
+    # Environment normalization still accepts whitespace/lowercase, not aliases.
+    assert AuditSettings.from_env(
+        {"AUDIT_APPROVED_MARKETS": " gr, gb, de "}
+    ).approved_markets == frozenset({"GR", "GB", "DE"})
+    assert AuditSettings.from_env({}).approved_markets == frozenset()
+
+
+@pytest.mark.parametrize("container", [tuple, list])
+def test_approved_markets_built_directly_accept_any_iterable(container: Any) -> None:
+    """Built directly, a tuple or a list is checked like a frozenset, not a TypeError."""
+    reviewed = container(["MX", "GB"])
+    assert AuditSettings(approved_markets=reviewed).approved_markets == reviewed
+    with pytest.raises(ValueError, match="reviewed ISO countries"):
+        AuditSettings(approved_markets=container(["MX", "UK"]))
+    with pytest.raises(ValueError, match="reviewed ISO countries"):
+        AuditSettings(approved_markets=container(["EL"]))
+
+
+@pytest.mark.parametrize("country", ["UK", "EL", "CA"])
+def test_unreviewed_billing_countries_and_non_iso_aliases_are_rejected(country: str) -> None:
+    with pytest.raises(ValueError, match="reviewed ISO countries"):
+        AuditSettings(approved_markets=frozenset({"MX", country}))
+    with pytest.raises(ValueError, match="reviewed ISO countries"):
+        AuditSettings.from_env({"AUDIT_APPROVED_MARKETS": f"MX,{country}"})
 
 
 def test_defaults_are_free_sqlite_and_secretless() -> None:

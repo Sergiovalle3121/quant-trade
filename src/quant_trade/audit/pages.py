@@ -13,7 +13,7 @@ from __future__ import annotations
 import html
 import re
 import textwrap
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from datetime import datetime
 from typing import Any
 from urllib.parse import quote, urlencode
@@ -89,6 +89,12 @@ from quant_trade.audit.calculator import (
 from quant_trade.audit.calculator import COPY as CALCULATOR_COPY
 from quant_trade.audit.calculator import REASONS as CALCULATOR_REASONS
 from quant_trade.audit.calculator_card import count_text, result_figures, what_if_figures
+from quant_trade.audit.card_markets import (
+    CARD_MARKET_WORDS,
+    EU_MARKETS,
+    ordered_markets,
+    spanish_and,
+)
 from quant_trade.audit.completed_count import completed_count_html
 from quant_trade.audit.examples import (
     EXAMPLES_COPY,
@@ -156,6 +162,7 @@ from quant_trade.audit.seo import (
     PageMeta,
     article_structured_data,
     articles_faq_structured_data,
+    faq_structured_data,
     head_meta,
     page_paths,
     private_meta,
@@ -166,6 +173,7 @@ from quant_trade.audit.series_ui import series_fields
 from quant_trade.audit.settings import PACK_CREDITS
 from quant_trade.audit.sharing import COPY as SHARING_COPY
 from quant_trade.audit.sharing import share_block
+from quant_trade.audit.signal_copiers import checklist_sections
 from quant_trade.audit.theme import (
     CLASS_COLOURS,
     SCRIPT_TAG,
@@ -2215,14 +2223,6 @@ def _checks(items: list[str]) -> str:
     )
 
 
-#: Billing countries as the card-payment line names them, in the order they are listed.
-#: Portuguese carries its preposition and article ("no México", "na Espanha").
-_CARD_MARKET_WORDS: dict[str, dict[str, str]] = {
-    "MX": {"es": "México", "en": "Mexico", "pt": "no México"},
-    "US": {"es": "Estados Unidos", "en": "the United States", "pt": "nos Estados Unidos"},
-    "BR": {"es": "Brasil", "en": "Brazil", "pt": "no Brasil"},
-    "ES": {"es": "España", "en": "Spain", "pt": "na Espanha"},
-}
 _CARD_MARKETS_LINE: dict[str, tuple[str, str]] = {
     "es": (" y ", "Por ahora solo en {places}."),
     "en": (" and ", "For now, in {places} only."),
@@ -2230,15 +2230,28 @@ _CARD_MARKETS_LINE: dict[str, tuple[str, str]] = {
 }
 
 
-def card_markets_line(markets: Sequence[str], locale: str) -> str:
+def card_markets_line(markets: Iterable[str], locale: str) -> str:
     """The sentence naming the countries where card payment is open, or "" for none.
 
     Only the countries the owner approved (``AUDIT_APPROVED_MARKETS``) are named, so
     the landing never offers card payment where Checkout would refuse it."""
-    words = [_CARD_MARKET_WORDS[m][locale] for m in ("MX", "US", "BR", "ES") if m in set(markets)]
+    approved = set(markets)
+    whole_eu = approved >= EU_MARKETS
+    individual = approved - {"GB"} - (EU_MARKETS if whole_eu else set())
+    words = [CARD_MARKET_WORDS[country][locale] for country in ordered_markets(individual, locale)]
+    if whole_eu:
+        words.append(
+            {"es": "la Unión Europea", "en": "the European Union", "pt": "na União Europeia"}[
+                locale
+            ]
+        )
+    if "GB" in approved:
+        words.append(CARD_MARKET_WORDS["GB"][locale])
     if not words:
         return ""
     joiner, template = _CARD_MARKETS_LINE[locale]
+    if locale == "es":
+        joiner = spanish_and(words[-1])
     places = words[0] if len(words) == 1 else ", ".join(words[:-1]) + joiner + words[-1]
     return template.format(places=places)
 
@@ -5438,8 +5451,12 @@ def audience_page(
     free_mode: bool = False,
     price_usd: float = 0.0,
     pack_price_usd: float = 0.0,
+    offer: paid_offer.Offer | None = None,
 ) -> str:
-    """One visitor's case: the problem, what to upload, what Rigor checks."""
+    """One visitor's case: the problem, what to upload, what Rigor checks.
+
+    ``offer`` words the signal checklist's note as the upload form does; the
+    rest of the page is worded by ``paid_offer.rewrite_html`` in the web layer."""
     locale = _locale(locale)
     copy = _COPY[locale]
     words = AUDIENCE_COPY[locale]
@@ -5550,11 +5567,28 @@ def audience_page(
     crumbs = f"<a href='{_e(_home(locale))}'>{_e(words['home'])}</a>" + _language_crumbs(
         alternates, locale
     )
+    checklist = []
+    if audience.slug == "copiar-senales":
+        # The offer in the upload form's own words: the paid offer's preview, price
+        # and refund from the settings, else the free first report or free mode.
+        terms = _landing_offer(free_mode, offer)
+        offer_note = (
+            copy["free_note"]
+            if free_mode
+            else paid_offer.paid_text(locale, terms)
+            if terms.paid
+            else copy["paid_note"].format(price=price_usd)
+        )
+        checklist = checklist_sections(
+            locale, text.seo_title, audit_url=start, sample_url=sample, offer_note=offer_note
+        )
+        meta += faq_structured_data(text.faq)
     body = (
         _page_hero(words["eyebrow"], text.title, summary, crumbs)
         + "<div class='paper page-main'><div class='wrap'>"
         + _doc(
             [
+                *checklist,
                 (words["pains"], f"<ul class='checks aud-pains'>{pains}</ul>"),
                 (words["uploads"], f"<ul class='checks'>{uploads}</ul>"),
                 (words["checks"], f"<ul class='checks aud-checks'>{checks}</ul>"),

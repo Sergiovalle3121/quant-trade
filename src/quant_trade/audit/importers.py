@@ -53,6 +53,7 @@ import io
 import math
 import re
 import statistics
+import unicodedata
 import zipfile
 import zlib
 from collections import deque
@@ -218,6 +219,10 @@ class ImportedReport:
     #: The volume of each trade in ``trades`` in the platform's lots, as the
     #: file prints it; ``None`` unless the format is one of ``LOT_FORMATS``.
     lots: list[float] | None = None
+    #: Source volumes before the money-per-point multiplier in Trade.quantity.
+    trade_quantities: list[float] | None = None
+    #: ``lot``, ``contract`` or ``file`` when the source unit is not established.
+    quantity_unit: str = "file"
 
 
 def is_return_series(data: bytes) -> bool:
@@ -629,6 +634,10 @@ class _Draft:
     #: Contract sizes the file states (an option's 100 shares), used as they
     #: are instead of being inferred from each trade's profit.
     known_sizes: dict[str, float] = field(default_factory=dict)
+    #: The volume's unit when the format or its cells name it (``lot``: an
+    #: MQL5 signal or FX Blue export, a Myfxbook "Lots" column, cells that
+    #: end in "Lots"); ``None`` leaves it to ``_quantity_unit``.
+    volume_unit: str | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -3936,7 +3945,52 @@ def _assemble(draft: _Draft, fallback_initial: float | None) -> ImportedReport:
             (item.time, item.amount) for item in draft.cash or [] if item.is_flow and item.amount
         ),
         lots=trade_lots if draft.source_format in LOT_FORMATS else None,
+        trade_quantities=trade_lots,
+        quantity_unit=_quantity_unit(draft, sizes),
     )
+
+
+#: A column header that names lots (``Volume (lots)``, ``Lotes``, ``Lotti``).
+_LOT_HEADER = re.compile(r"\b(?:lots?|lotes?|lotti)\b")
+
+
+def _quantity_unit(draft: _Draft, sizes: dict[str, float]) -> str:
+    """Identify source units without treating economic quantity as lots.
+
+    An ambiguous ticker or a mix of futures and other instruments retains
+    the file's unnamed units. A bare futures root may also be a share ticker.
+    A header such as ``Units/Lots`` names two units and stays the file's.
+    cTrader's ``Closing quantity`` may be lots (0.25) or units (25 000 EUR):
+    lots only when its cells say so or when every symbol's money per price
+    unit (``sizes``, inferred from the profits) is not 1, as units would be.
+    """
+    if draft.source_format in LOT_FORMATS:
+        return "lot"
+    if draft.volume_unit:
+        return draft.volume_unit
+    from quant_trade.audit.universal import _contract, normalise
+
+    header = unicodedata.normalize("NFKD", draft.metadata.get("column_quantity", ""))
+    header = "".join(char for char in header if not unicodedata.combining(char)).casefold()
+    if _LOT_HEADER.search(header) and not re.search(r"unit|unidad", header):
+        return "lot"
+    ctrader_columns = {
+        "quantity": "closingquantity",
+        "side": "openingdirection",
+        "entry_time": "openingtime",
+        "exit_time": "closingtime",
+    }
+    if all(
+        normalise(draft.metadata.get(f"column_{role}", "")) == name
+        for role, name in ctrader_columns.items()
+    ):
+        symbols = {trip.symbol for trip in draft.trips}
+        if symbols and all(abs(sizes.get(symbol, 1.0) - 1) > 0.005 for symbol in symbols):
+            return "lot"
+        return "file"
+    if draft.trips and all(_contract(trip.symbol) is not None for trip in draft.trips):
+        return "contract"
+    return "file"
 
 
 # ---------------------------------------------------------------------------
@@ -3970,6 +4024,8 @@ def _parse_myfxbook(header: list[str], rows: list[list[str]]) -> _Draft:
     columns = _index(header)
     lots = "units/lots" if "units/lots" in columns else "lots"
     draft = _Draft(MYFXBOOK_CSV, [])
+    # "Units/Lots" holds either; only a plain "Lots" column names the unit.
+    draft.volume_unit = "lot" if lots == "lots" else None
     kept: list[list[str]] = []
     open_rows: list[list[str]] = []
     for position, row in enumerate(rows):
@@ -4081,6 +4137,8 @@ def _parse_mql5_signal(header: list[str], rows: list[list[str]]) -> _Draft:
     }
     draft = _Draft(MQL5_SIGNAL_CSV, [])
     draft.itemised = {"commission", "swap"}
+    # An MQL5 signal is a MetaTrader account: its Volume is in lots.
+    draft.volume_unit = "lot"
 
     def cell(row: list[str], at: int) -> str:
         return row[at] if at < len(row) else ""
@@ -4147,6 +4205,7 @@ def _parse_fxblue(header: list[str], rows: list[list[str]]) -> _Draft:
     columns = _index(header)
     draft = _Draft(FXBLUE_CSV, [])
     draft.itemised = {"commission", "swap"}
+    draft.volume_unit = "lot"  # its "Lots" column
     if "account" in columns:
         counts: dict[str, int] = {}
         for row in rows:

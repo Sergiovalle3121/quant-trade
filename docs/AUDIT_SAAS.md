@@ -2843,6 +2843,72 @@ weekly sample cannot stand in for the whole history. The reason tells the client
 whose closed trades end with a net loss after fees gets no capital figures
 (NOT_MEASURED): a size at which a losing history may be run is not given.
 
+### File sizes and the copy multiplier
+
+The complete HTML report and its PDF show the median of the file's original
+trade volumes and that median times each loss limit's size share. Importers
+keep those volumes before `Trade.quantity` is turned into economic units
+(`ImportedReport.trade_quantities`, `quantity_unit`). MetaTrader reports,
+MQL5 signal and FX Blue exports, a Myfxbook "Lots" column, a column whose
+header names lots ("Lots", "Volume (lots)", "Lotes") and quantity cells that
+end in "Lots" are in lots; a cTrader "Closing quantity" without that suffix
+counts as lots only when every symbol's money per price unit is not 1 (units
+such as 25 000 EUR leave it at 1). A header naming two units ("Units/Lots")
+stays in the file's units. Recognised futures codes are in contracts,
+including `ESZ25-CME`, `ESZ25_FUT_CME`, `/ESZ6`, the ProjectX ids
+`CON.F.US.MNQ.Z26` and the CQG codes `F.US.EPZ25` (EP is ES, ENQ is NQ).
+Ambiguous symbols or a mix of futures and other instruments stay in the
+file's units, with no economic contract attributed to them.
+
+Lots round down to 0.01 steps and contracts to whole contracts. Unnamed file
+units round down to 0.01, or to two significant digits of the median when it
+is under 0.1 (0.002 BTC shows as 0.0020). The step count is read to nine
+decimals first, so a float quotient just under a step is that step. When the
+result is zero the report says the minimum does not fit that limit. Above a
+10x size share (`MAX_SIZE_SHARE`), where the share prints as "more than
+10x", the quantity is only a lower bound ("more than 10.00 lots"). The size
+is variable when the 90th percentile of the volumes is more than three times
+the median: the report says the size was not fixed and the figure uses the
+median. When instruments carry different typical sizes (one ES contract
+against ten MNQ), one median applies to none of them and no quantity is
+measured. An existing `MARTINGALE_SIZING` flag leaves the quantities
+unmeasured, the challenge size included: a fixed quantity is not given for
+that pattern.
+
+The copy table divides the reference fall in money times the multiplier
+(0.5x, 1x, 2x and 3x) by the starting balance. Percentages are rounded down
+to a tenth, so 99.985 % never reads as 100.0 %; from 100 % on the row says
+the entire account is lost. It is a linear scale of the history: same
+starting balance as the provider, fixed sizes and no margin closeouts (with
+a martingale the line says the multiplier scales each of the provider's
+trades and that size was not fixed). A balance the reader assumed is not
+evidence of the provider's, also beside an uploaded curve: without a known
+balance the percentages and quantities are not measured, and the table is
+replaced by one line with the reason. It does not describe a future result.
+
+The challenge's daily maximum (`audit/challenge_sizing.py`) uses UTC daily
+closes of a money curve. The money the rule allows is the daily limit times
+the account a program states its dollar limits on (`ACCOUNT_SIZES`) or,
+otherwise, the history's starting balance;
+the card names which. The first day opens at the starting balance, so its
+loss counts too; the others open at the previous close. For an
+initial-balance rule the bound is limit x that balance / worst daily money
+loss. For a start-of-day rule each day is checked with that balance plus the
+scaled cumulative result, and the tightest bound wins. The typical size at
+that bound is rounded strictly down: a quantity exactly at the boundary
+touches the limit and drops one step. A worst day under half a percent of
+the starting balance is too small to size against, and a share above 10x
+the history's own size on its balance gives only a lower bound. The visible
+note excludes intraday losses and the total-loss rule. Flows after the
+start, curves without enough money evidence, a tiny worst day, no losing day
+or a bound that is not finite leave this maximum unmeasured with the reason;
+rules without a daily limit show no block, since the rule list says so.
+
+Every new figure keeps its evidence label on a card or in a table. The text
+is in Spanish, English and Portuguese. The free preview keeps its content
+and shows none of these blocks. No form fields or broker connections are
+added.
+
 ### What data the test ran on (`audit/testdata.py`)
 
 For buyers of a robot. Only for MetaTrader tester reports (MT4 HTML, MT5
@@ -3157,7 +3223,7 @@ with an empty value):
 | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` | empty | Both are needed for card payments: a secret (`sk_…`) or restricted (`rk_…`) key and the webhook signing secret (`whsec_…`). A publishable key (`pk_…`) leaves card payments off. `/health` shows `card_mode` (`off`, `test`, `live`) from the key's prefix, never the key. |
 | `STRIPE_PAYMENT_LINK_SINGLE`, `STRIPE_PAYMENT_LINK_PACK` | empty | Historical Payment Links (`https://buy.stripe.com/…`) for one audit and the pack. They do not create a frozen database order before payment. This branch no longer presents live links as a new buying path because they bypass country admission; signed webhooks for historical paid links remain accepted. |
 | `AUDIT_LEGACY_PAYMENT_LINKS_ENABLED` | `false` | Compatibility switch for old link configuration; it does **not** deactivate externally accessible links in Stripe. Disable those links in Stripe Dashboard before opening live charges, then reconcile delayed historical paid sessions. |
-| `AUDIT_APPROVED_MARKETS` | empty | Comma-separated reviewed ISO buyer countries among `MX,US,BR,ES`. Empty keeps live Checkout closed. The landing's card-payment line names exactly these countries in ES/EN/PT. The buyer selects a billing country before an order is reserved; it is frozen with the order in additive table `checkout_order_markets`. Checkout requires a billing address. A paid session with missing, unsupported or different Stripe billing country is recorded as `paid_review`/`manual_refund_review`, shown to the owner and **does not deliver**. This is a best-effort precharge gate: a false declaration can still result in a charge before Stripe reveals the billing country, so support/refund handling remains mandatory. Do not infer country from IP or language. |
+| `AUDIT_APPROVED_MARKETS` | empty | Comma-separated reviewed ISO buyer countries among `MX,US,BR,AT,BE,BG,HR,CY,CZ,DK,EE,FI,FR,DE,GR,HU,IE,IT,LV,LT,LU,MT,NL,PL,PT,RO,SK,SI,ES,SE,GB`: MX, US, BR, the 27 EU members and the UK (31 countries). Use `GR` and `GB`, never `EL` or `UK`. **El valor de producción se cambia después de desplegar.** Before rolling back to code older than this catalogue, set the value back to `MX,US,BR,ES` first: older code refuses the new countries at startup. Empty keeps live Checkout closed. The landing, pricing and FAQ name only enabled countries in ES/EN/PT, grouping the EU only when all 27 members are enabled and naming the UK separately. Billing selectors keep MX, US and BR first, then sort by localized country name. The buyer selects a billing country before an order is reserved; it is frozen with the order in additive table `checkout_order_markets`. Checkout requires a billing address. A paid session with missing, unsupported or different Stripe billing country is recorded as `paid_review`/`manual_refund_review`, shown to the owner and **does not deliver**. This is a best-effort precharge gate: a false declaration can still result in a charge before Stripe reveals the billing country, so support/refund handling remains mandatory. Do not infer country from IP or language. |
 | `AUDIT_STRIPE_TEST_AUDITS` | empty | Comma-separated audit ids that a test-mode payment may unlock. In test mode the card button shows only on these audits, and a test payment for any other audit is ignored, so Stripe's public test card never unlocks a real report. Leave empty in normal operation. |
 | `STRIPE_PRICE_ID` | empty | Legacy direct-call option. The web Checkout now freezes the configured amount on a persisted order and sends an inline USD price, so this id cannot silently override the amount the buyer saw. |
 | `AUDIT_ACCESS_CODES` | `false` | Offer manual access-code sales and typed-code redemption. With `AUDIT_FREE_MODE=false` it turns on paid mode without Stripe. Credits already on an account remain spendable when this is `false`. |
@@ -4236,8 +4302,13 @@ reports (by code and by card). It answers "which of my posts brings
 customers" without any third-party analytics.
 
 - **Tags.** A link carries `?ref=<tag>`. Only tags listed in
-  `funnel.REF_TAGS` count (the playbook template ids and a few channels);
-  anything missing, malformed or unlisted is "directo". The first listed tag
+  `funnel.REF_TAGS` (the playbook template ids and a few channels) or shaped
+  like a per-community campaign tag (`funnel.CAMPAIGN_TAG`, e.g. `dc-us-103`)
+  count; anything missing, malformed or unlisted is "directo". One flush batch
+  keeps at most `funnel.MAX_PENDING_CAMPAIGN_REFS` (200) distinct unlisted
+  campaign tags; past that, new tags count as "directo" with a warning, so
+  invented tags cannot grow the in-memory counter or the visit tables (the
+  campaign tags of a real batch are far fewer). The first listed tag
   a browser arrives with is kept for 30 days in the `rigor_ref` cookie, which
   holds only the tag, and stored in `account_refs` when an account is created.
   The row goes with `delete_account`.
@@ -4251,6 +4322,27 @@ customers" without any third-party analytics.
   it reads, and shutdown flushes the rest, so a slow or failing database
   never holds up a page. Counts that fail to write are kept for the next
   flush.
+- **Entry pages.** The same visit also increments `funnel_page_visits`, keyed
+  only by day, language, tag and an allow-listed page group. The original
+  and page counters update atomically. The additive table is created on
+  startup on SQLite and PostgreSQL; existing totals remain unchanged and
+  their historical page group is `NOT_MEASURED`. Groups cover the landing,
+  free tools, firm challenge pages, published guide/article/audience slugs,
+  institutional review and public verification. The existing examples index
+  remains counted as `ejemplos`. Translations share canonical Spanish groups;
+  query parameters and report identifiers never form part of a group. Both
+  synthetic verification samples count as `v/ejemplo`; real publications
+  count as `v/publicacion`. Guide/article indexes remain outside the visit
+  paths. The owner's **Páginas** table uses the last 7 and 28 UTC days,
+  including today, ordered by the 28-day count, then the 7-day count and name.
+  Firm subtotals are included in `calculadora-reto`, never added twice.
+  The ref table shows the most frequent measured entry group in its existing
+  30-day window, with alphabetical tie-breaking. The daily cookie is unchanged:
+  these are first counted entries per browser/day, not all page views or people.
+  A group outside the catalogue is refused by the counter and by `count_visit`;
+  the request path logs it and still serves the page. `/panel` reads stored
+  groups by shape (lowercase slug segments, at most two), so a renamed article
+  or a firm that left the calculator keeps its history in the totals.
 - **The other stages** are read from the tables the service already keeps
   (`accounts`, `welcome_reports`, `free_previews`, and paid `audits` with
   their payment reference), with the language and tag of the account
@@ -6586,3 +6678,21 @@ summary (`tests/test_audit_informe_fondo_coherente.py`, es/en/pt, every voice).
 - **Unchanged.** A backtest, `/ejemplo`, `/sample` and `/pt/exemplo` included,
   and an account or signal read word for word as before this branch: their
   served pages and every voice of both samples are byte-identical.
+
+### Signal-copier checklist (11 October 2026)
+
+The three signal-copier audience translations now answer the search question
+with seven numbered checks, the existing free calculators and export guides,
+and three visible questions serialized as `FAQPage`. `audience_numbers.py`
+reuses Wilson, fixed-size ruin and history-versus-luck calculations; all example
+inputs and derived outputs are DECLARED. It imports the existing account and
+trade-pattern thresholds, adding no flag or criterion. Gain and drawdown are
+not inputs of the current figure reader, so the page leaves the luck Sharpe
+unmeasured (trial count missing) and asks for the file. The reader and ruin
+links open pre-filled with the example, the example states the break-even win
+rate and the expectancy at the declared rate and at Wilson's lower end, and
+evidence codes stay in attributes (inside a sentence the localizer would print
+them capitalised); the checks say "declared" in plain words instead. Every
+title fits the 65-character cap, with no exception in the hygiene test.
+Assumptions, precision and checks are recorded in
+`docs/CODEX-31-NOTAS.md`.

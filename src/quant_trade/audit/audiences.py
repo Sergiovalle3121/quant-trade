@@ -1366,8 +1366,7 @@ AUDIENCE_PAGES: tuple[Audience, ...] = (
                         "cuenta-proveedor",
                     ),
                     (
-                        "O el historial de operaciones de su bróker en CSV o Excel, por ejemplo "
-                        "el de eToro.",
+                        "O el historial de operaciones de su bróker en CSV o Excel.",
                         "csv-universal",
                     ),
                 ),
@@ -1410,16 +1409,35 @@ AUDIENCE_PAGES: tuple[Audience, ...] = (
                 ),
                 faq=(
                     (
-                        "¿Y si la señal solo enseña capturas en Telegram?",
-                        "Una captura no se puede auditar. Pide el historial exportado de la "
-                        "cuenta (MetaTrader, Myfxbook, FX Blue o señal de MQL5); quien no puede "
-                        "darlo ya te está dando una respuesta.",
+                        "«Me barrieron» copiando una señal: ¿cómo ocurre con tantos aciertos?",
+                        "La tasa de acierto cuenta operaciones, no el tamaño de cada pérdida. "
+                        "Las pérdidas grandes, el aumento de tamaño tras perder y los costos "
+                        "pueden consumir muchos aciertos pequeños. Wilson mide la incertidumbre "
+                        "de la tasa; la calculadora de ruina añade tamaño y relación entre "
+                        "ganancias y pérdidas bajo supuestos declarados.",
                     ),
                     (
-                        "¿Un historial sin banderas rojas es seguro de copiar?",
-                        "No. El informe dice qué riesgos se ven en el pasado de esa cuenta. El "
-                        "futuro depende del mercado, del tamaño que uses y de cómo lo copies.",
+                        "¿Una cuenta quemada puede tener un drawdown publicado pequeño?",
+                        "Sí: el drawdown del saldo excluye pérdidas abiertas. El patrimonio "
+                        "incluye ese flotante, y el tamaño de la copia cambia la pérdida de tu "
+                        "cuenta. Sin la curva de patrimonio y las posiciones abiertas, el "
+                        "drawdown publicado no describe toda la exposición.",
                     ),
+                    (
+                        "¿Qué demuestra una señal de Telegram con capturas?",
+                        "La captura muestra una declaración del proveedor, pero no permite "
+                        "reconstruir operaciones, depósitos ni pérdidas abiertas. El lector "
+                        "de cifras analiza lo declarado; para revisar el historial, pide la "
+                        "exportación completa, los movimientos de efectivo y el patrimonio. "
+                        "El informe incluye un mensaje para pedir la evidencia que falta.",
+                    ),
+                ),
+                # Shorter than the English query so the title fits the site's cap.
+                seo_title="¿Cómo elijo un proveedor de señales sin que me barran?",
+                seo_description=(
+                    "¿Cómo elijo un proveedor de señales sin que me barran? "
+                    "7 comprobaciones con cifras y herramientas gratis: historial, "
+                    "aciertos y ruina."
                 ),
             ),
             "en": AudienceText(
@@ -1444,7 +1462,7 @@ AUDIENCE_PAGES: tuple[Audience, ...] = (
                         "cuenta-proveedor",
                     ),
                     (
-                        "Or the broker's trade history in CSV or Excel, for example eToro's.",
+                        "Or the broker's trade history in CSV or Excel.",
                         "csv-universal",
                     ),
                 ),
@@ -1487,16 +1505,33 @@ AUDIENCE_PAGES: tuple[Audience, ...] = (
                 ),
                 faq=(
                     (
-                        "What if the signal only shows screenshots on Telegram?",
-                        "A screenshot cannot be audited. Ask for the account's exported history "
-                        "(MetaTrader, Myfxbook, FX Blue or MQL5 signal); a provider who cannot "
-                        "give it is already giving you an answer.",
+                        "I got wiped out copying a signal: how can that happen with so many wins?",
+                        "Win rate counts trades, not the size of each loss. Large losses, "
+                        "increasing size after losses and costs can consume many small wins. "
+                        "Wilson measures uncertainty in the rate; the ruin calculator adds "
+                        "position size and the ratio of wins to losses under declared assumptions.",
                     ),
                     (
-                        "Is a history without red flags safe to copy?",
-                        "No. The report says which risks show in that account's past. The "
-                        "future depends on the market, the size you use and how you copy it.",
+                        "Can a blown account have a small published drawdown?",
+                        "Yes: balance drawdown excludes open losses. Equity includes those "
+                        "floating losses, and your copying size changes your account's loss. "
+                        "Without the equity curve and open positions, published drawdown "
+                        "does not describe the full exposure.",
                     ),
+                    (
+                        "What does a Telegram signal with screenshots demonstrate?",
+                        "A screenshot shows the provider's declaration but cannot reconstruct "
+                        "trades, deposits or open losses. The public figures reader analyses "
+                        "what is declared; to review the history, request the full export, cash "
+                        "movements and equity. The report includes a message requesting the "
+                        "missing evidence.",
+                    ),
+                ),
+                # Short enough for the site's title cap with the brand.
+                seo_title="How to pick a signal to copy without getting wiped out",
+                seo_description=(
+                    "How to pick a signal to copy without getting wiped out. "
+                    "7 checks with numbers and free tools: history, win rate and ruin."
                 ),
             ),
             "pt": AudienceText(
@@ -1521,8 +1556,7 @@ AUDIENCE_PAGES: tuple[Audience, ...] = (
                         "cuenta-proveedor",
                     ),
                     (
-                        "Ou o histórico de operações da corretora em CSV ou Excel, por exemplo o "
-                        "do eToro.",
+                        "Ou o histórico de operações da corretora em CSV ou Excel.",
                         "csv-universal",
                     ),
                 ),
@@ -1565,17 +1599,34 @@ AUDIENCE_PAGES: tuple[Audience, ...] = (
                 ),
                 faq=(
                     (
-                        "E se o sinal só mostra prints no Telegram?",
-                        "Um print não pode ser auditado. Peça o histórico exportado da conta "
-                        "(MetaTrader, Myfxbook, FX Blue ou sinal da MQL5); um fornecedor que não "
-                        "pode dá-lo já está dando uma resposta.",
+                        "Fui liquidado copiando um sinal: como isso ocorre com tantos acertos?",
+                        "A taxa de acerto conta operações, não o tamanho de cada perda. Perdas "
+                        "grandes, aumento de tamanho depois de perder e custos podem consumir "
+                        "muitos acertos pequenos. Wilson mede a incerteza da taxa; a calculadora "
+                        "de ruína acrescenta tamanho e relação entre ganhos e perdas sob "
+                        "premissas declaradas.",
                     ),
                     (
-                        "Um histórico sem bandeiras vermelhas é seguro para copiar?",
-                        "Não. O relatório diz quais riscos aparecem no passado dessa conta. O "
-                        "futuro depende do mercado, do tamanho que você usa e de como você "
-                        "copia.",
+                        "Uma conta quebrada pode ter um drawdown publicado pequeno?",
+                        "Sim: o drawdown do saldo exclui perdas abertas. O patrimônio inclui "
+                        "essas perdas flutuantes, e o tamanho da cópia altera a perda da sua "
+                        "conta. Sem a curva de patrimônio e as posições abertas, o drawdown "
+                        "publicado não descreve toda a exposição.",
                     ),
+                    (
+                        "O que demonstra um sinal de Telegram com prints?",
+                        "Um print mostra uma declaração do fornecedor, mas não permite "
+                        "reconstruir operações, depósitos nem perdas abertas. O leitor de "
+                        "números analisa o declarado; para revisar o histórico, peça a "
+                        "exportação completa, os movimentos de caixa e o patrimônio. O "
+                        "relatório inclui uma mensagem para pedir a evidência que falta.",
+                    ),
+                ),
+                # Shorter than the English query so the title fits the site's cap.
+                seo_title="Como escolher fornecedor de sinais sem quebrar a conta?",
+                seo_description=(
+                    "Como escolher fornecedor de sinais sem quebrar a conta? "
+                    "7 checagens com números e ferramentas grátis: histórico, acertos e ruína."
                 ),
             ),
         },

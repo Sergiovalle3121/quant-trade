@@ -12,10 +12,12 @@ so it is in Spanish.
 from __future__ import annotations
 
 from collections.abc import Sequence
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from quant_trade.audit.funnel import DIRECT, REF_DAYS, REF_TAGS, ref_label
 from quant_trade.audit.guard import find_claims
+from quant_trade.audit.ops_panel import PageVisitRow, page_visits_section, top_entry_pages
 from quant_trade.audit.pages import _e, _field, _page, _page_hero
 from quant_trade.audit.settings import DEFAULT_PANEL_PATH
 
@@ -153,7 +155,8 @@ TEXT: dict[str, str] = {
         "Compras confirmadas|Cuentas con primera compra|Más compras de la cuenta|"
         "Compras live entregadas|Derechos vendidos|"
         "Créditos regalados|Créditos canjeados|Cobro bruto USD|Devoluciones USD registradas|"
-        "Saldo de cobros USD tras devoluciones registradas|Contribución USD"
+        "Saldo de cobros USD tras devoluciones registradas|Contribución USD|"
+        "Página de entrada más frecuente · MEASURED"
     ),
     "funnel_day_cols": (
         "Día|Idioma|Visitas estimadas|Cuentas|Correos confirmados|Cargas guardadas|"
@@ -185,8 +188,9 @@ TEXT: dict[str, str] = {
     "funnel_direct": "sin etiqueta",
     "funnel_tags": "Etiquetas que cuentan",
     "funnel_limits": (
-        "Las visitas son de la página principal y de las páginas de cada caso, sin robots ni "
-        "vistas previas de enlaces; solo se guarda un contador por día, idioma y etiqueta, sin "
+        "Las visitas son de las páginas públicas incluidas en la medición, sin robots ni "
+        "vistas previas de enlaces; solo se guardan contadores por día, idioma, etiqueta y "
+        "grupo de página, sin "
         "dirección ni identificador de navegador en la base de visitas. La etiqueta se recuerda "
         "{ref_days} días en el navegador y queda "
         "en la cuenta si se crea. Los pagos e informes se cuentan por el idioma de la cuenta; "
@@ -529,6 +533,8 @@ def funnel_section(
     example: str,
     country_rows: Sequence[tuple[str, int, int, int]] = (),
     anon_previews: bool = False,
+    page_rows: Sequence[PageVisitRow] = (),
+    at: datetime | None = None,
 ) -> str:
     """Visits, accounts, free reports, previews and payments by tag and by day.
 
@@ -537,6 +543,8 @@ def funnel_section(
     """
     title = TEXT["funnel_title"].format(days=days)
     lead = TEXT["funnel_lead"].format(example=example)
+    now = at if at is not None else datetime.now(UTC)
+    entry_pages = top_entry_pages(page_rows, at=now, days=days)
     out = f"<h2 style='margin-top:40px'>{_e(title)}</h2><p>{_e(lead)}</p>"
     if not funnel.by_ref:
         out += f"<p class='muted'>{_e(TEXT['funnel_empty'])}</p>"
@@ -555,10 +563,11 @@ def funnel_section(
                 TEXT["funnel_direct"] if ref == DIRECT else ref,
                 ref_label(ref),
                 *_counts_cells(counts),
+                entry_pages.get(ref, "NOT_MEASURED"),
             ]
             for ref, counts in ordered
         ]
-        ref_rows.append([TEXT["funnel_total"], "", *_counts_cells(funnel.total)])
+        ref_rows.append([TEXT["funnel_total"], "", *_counts_cells(funnel.total), "—"])
         ref_locale_rows = [
             [
                 TEXT["funnel_direct"] if ref == DIRECT else ref,
@@ -589,6 +598,11 @@ def funnel_section(
             + f"<h3>{_e(TEXT['funnel_by_day'])}</h3>"
             + _table(TEXT["funnel_day_cols"], day_rows)
         )
+    out += (
+        f"<p class='muted'>La página de entrada más frecuente usa los últimos {days} días "
+        "UTC con grupo registrado; los empates se resuelven por nombre. "
+        "Sin grupo registrado: NOT_MEASURED.</p>" + page_visits_section(page_rows, at=now)
+    )
     tags = ", ".join(f"{tag} ({label})" for tag, label in REF_TAGS.items()) + (
         ". Además, cualquier etiqueta de campaña por comunidad: plataforma (dc, tg, rd, fo,"
         " fb, yt, nl, ev, x, tv, li, dir, ph, hn), mercado opcional de dos letras y número"

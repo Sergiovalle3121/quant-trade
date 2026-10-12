@@ -1062,6 +1062,10 @@ def whole_lot_tickers(
     return kept
 
 
+#: A quantity cell that names lots after its number: ``0.25 Lots``.
+_LOT_CELL = re.compile(r"\d\s*lots?\s*$", re.IGNORECASE)
+
+
 def _amount(value: str, decimal: str) -> float | None:
     """A number, also when a unit follows it (``0.0015 BTC``, ``12.5USDT``)."""
     value = re.sub(r"^([-+]?)\s*[$€£¥]\s*", r"\1", (value or "").strip())
@@ -1564,6 +1568,13 @@ def parse(
         draft.warnings.append(REPEATED_ROWS_WARNING.format(n=repeated))
     rows = only_fills(header, rows)
     rows = whole_lot_tickers(header, rows, mapping.columns)
+    if "quantity" in mapping.columns:
+        # cTrader prints "0.25 Lots" when its volume is in lots; units read
+        # "25 000 EUR". Only cells that all say lots name the unit.
+        cells = [_cell(row, mapping.columns, "quantity").strip() for row in rows]
+        cells = [cell for cell in cells if cell]
+        if cells and all(_LOT_CELL.search(cell) for cell in cells):
+            draft.volume_unit = "lot"
     if mapping.shape == UNIVERSAL_TRADES_CSV:
         other_coin = _trades(draft, mapping, rows, decimal, serial_dates)
     else:
@@ -1868,11 +1879,37 @@ def _profit_is_net(items: list[tuple[str, float, float | None, float]], column_n
     return named_net
 
 
+#: An exchange after a futures code: ``ESZ25-CME`` (Sierra Chart's Denali
+#: feed) or ``ESZ25_FUT_CME``.
+_EXCHANGE_SUFFIX = re.compile(
+    r"(?:_FUT)?[-_](?:CME|CBOT|CBT|NYMEX|NYM|COMEX|CMX|GLOBEX|ECBOT|EUREX|ICEUS|ICEEU|ICE)$"
+)
+#: ProjectX contract ids (TopstepX) ``CON.F.US.MNQ.Z26`` and CQG codes
+#: ``F.US.EPZ25``. CQG names two roots its own way: EP is ES, ENQ is NQ.
+_PROJECTX_CODE = re.compile(r"CON\.F\.US\.([A-Z0-9]+)\.([FGHJKMNQUVXZ]\d{1,2})")
+_CQG_CODE = re.compile(r"F\.US\.([A-Z0-9]+?)([FGHJKMNQUVXZ]\d{1,2})")
+_CQG_ROOTS = {"EP": "ES", "ENQ": "NQ"}
+
+
+def _futures_code(symbol: str) -> str:
+    """A futures code as ``importers._futures_root`` reads it: ``/ESZ6`` ->
+    ``ESZ6``, ``MESZ25-CME`` -> ``MESZ25``, ``CON.F.US.MNQ.Z26`` ->
+    ``MNQZ26``, ``F.US.EPZ25`` -> ``ESZ25``; ``ESZ5.CME`` keeps what comes
+    before the dot."""
+    code = symbol.strip().upper().lstrip("/")
+    match = _PROJECTX_CODE.fullmatch(code) or _CQG_CODE.fullmatch(code)
+    if match:
+        root = match.group(1)
+        return _CQG_ROOTS.get(root, root) + match.group(2)
+    return _EXCHANGE_SUFFIX.sub("", code).split(".")[0]
+
+
 def _contract(symbol: str) -> tuple[str, float, str] | None:
     """The root, value per point and currency of a futures contract code
-    (``MNQZ6``, ``ES DEC26``, ``FDAX 12-26``, ``FGBLZ6``); a bare root is not
-    enough, since ``CL`` or ``GC`` alone may be a share ticker."""
-    code = symbol.strip().upper().split(".")[0]
+    (``MNQZ6``, ``ES DEC26``, ``FDAX 12-26``, ``FGBLZ6``, and the forms
+    :func:`_futures_code` reads); a bare root is not enough, since ``CL``
+    or ``GC`` alone may be a share ticker."""
+    code = _futures_code(symbol)
     root = imp._futures_root(code)
     found = imp.futures_point_value(root)
     if found is None or code == root:
@@ -1883,6 +1920,13 @@ def _contract(symbol: str) -> tuple[str, float, str] | None:
 def _point_value(symbol: str) -> float | None:
     contract = _contract(symbol)
     return contract[1] if contract else None
+
+
+def instrument_key(symbol: str) -> str:
+    """One key per instrument: a futures contract's root (``ESZ5`` and
+    ``ESH6`` are one), otherwise the symbol without case or extra spaces."""
+    contract = _contract(symbol)
+    return contract[0] if contract else " ".join(symbol.split()).upper()
 
 
 def _price_futures(draft: imp._Draft, trips: list[imp._Trip]) -> bool:
@@ -2107,6 +2151,7 @@ __all__ = [
     "UNIVERSAL_FILLS_CSV",
     "UNIVERSAL_TRADES_CSV",
     "guess_columns",
+    "instrument_key",
     "looks_like_trades",
     "missing_columns",
     "normalise",
