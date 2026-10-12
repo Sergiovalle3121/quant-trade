@@ -3776,6 +3776,14 @@ an account never changes what a report says.
     before and after confirming and the refused payment with the paid offer
     and finds no promise of a free full report
     (`tests/test_audit_oferta_pago.py`).
+  - Old links say nothing of it either: a sign-in or "My account" link with
+    `done=email_verified_welcome` or `done=email_verified_report` shows the
+    plain "e-mail confirmed" (`web._flash_for_offer`), a report's
+    `card=checked|skipped|failed` is neither looked up at Stripe nor
+    answered, and an upload the free first report left waiting for the
+    e-mail gets no `welcome_pending_*` notice (`_pending_notice` answers
+    nothing). A test walks sign-up (with an invite too), every such link,
+    the confirmation and the e-mails sent, in es/en/pt.
   - The privacy policy and "What we keep" say what the free first report,
     its card check and the invites kept only of the accounts that had them,
     in the past ("cuando lo ofrecíamos", "when we offered it", "quando o

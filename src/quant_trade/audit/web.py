@@ -2847,6 +2847,18 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         report it says what confirming opens; without it, only the link."""
         return "welcome_confirm" if cfg.welcome_full_report else "welcome_confirm_paid"
 
+    def _welcome_offer() -> bool:
+        """The free first full report is on: only then may a notice name it."""
+        return _offer_terms().kind == "welcome"
+
+    def _flash_for_offer(done: str) -> str:
+        """``done`` as the offer may say it: under any offer but the free first
+        report, an old link's "confirmed, use your free report" or "confirmed,
+        your report is complete" is the plain "e-mail confirmed"."""
+        if done in ("email_verified_welcome", "email_verified_report") and not _welcome_offer():
+            return "email_verified"
+        return done
+
     def _referrals_on() -> bool:
         # The reward is paid when the invitee's free first report exists and
         # both addresses are confirmed, so without mail nothing is offered.
@@ -2986,6 +2998,10 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         ``_grantable_pending`` would open. Otherwise the rule is told with its
         conditions, or, once confirmed, that the upload stays a preview.
         """
+        if not _welcome_offer():
+            # Under the paid offer confirming opens nothing: an upload left
+            # waiting by the free first report gets no notice about it.
+            return None
         copy = account_pages.COPY[ui]
         owner = db.account_for_audit(audit_id)
         if owner is None:
@@ -3489,7 +3505,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             page = account_pages.signin_page(
                 locale=locale,
                 csrf=csrf,
-                flash=done if done in signin_flashes else "",
+                flash=_flash_for_offer(done) if done in signin_flashes else "",
                 next_path=next_path,
                 passkeys=_rp(request) is not None,
             )
@@ -4050,6 +4066,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             request: Request, lang: str | None = None, done: str = "", error: str = ""
         ) -> Response:
             locale = _account_locale(path_locale, lang)
+            done = _flash_for_offer(done)
             session = _session(request)
             if session is None:
                 flash = (
@@ -6405,7 +6422,14 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         ui = locale
         # Only known values are shown, so the query cannot inject text.
         notice = None
-        if card in ("checked", "skipped", "failed") and cfg.stripe_enabled and not record.paid:
+        if (
+            card in ("checked", "skipped", "failed")
+            and cfg.stripe_enabled
+            and not record.paid
+            and _welcome_offer()
+        ):
+            # The card check exists for the free first report: under the paid
+            # offer an old return link is not looked up and says nothing.
             outcome = card
             if card == "checked":
                 outcome = _card_check_return(request, setup_session or "")

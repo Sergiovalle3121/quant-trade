@@ -17,6 +17,7 @@ import re
 import time
 from dataclasses import replace
 from datetime import UTC, datetime
+from email.message import EmailMessage
 from pathlib import Path
 from typing import Any
 
@@ -887,3 +888,190 @@ def test_old_free_report_notices_stay_quiet_under_the_paid_offer(tmp_path: Path,
     for key in ("welcome_notice", "welcome_refused_network", "welcome_refused_device"):
         assert _escaped(account_pages.COPY["es"][key].split("{")[0][:40]) not in page.text, key
     assert _promises(text, "es") == []
+
+
+# -- 7. Sign-up, the notices after it and the e-mails ---------------------------------------
+#: The "done" a link to sign-in or "My account" may carry about the account and its
+#: e-mail, the free first report's included: no paid-offer flow sends those, but a
+#: bookmark or an old e-mail may.
+ACCOUNT_DONE = (
+    "welcome",
+    "welcome_confirm",
+    "email_verification_sent",
+    "email_verified",
+    "email_verified_welcome",
+    "email_verified_report",
+    "card_paid",
+    "signed_out",
+)
+#: Every ``acct`` a report link may carry.
+REPORT_ACCT = (
+    "anon_preview",
+    "welcome",
+    "welcome_confirm",
+    "upload_credit",
+    "credit",
+    "saved",
+    "nocredit",
+    "preview_file",
+    "preview_device",
+    "preview_network",
+    "preview_email",
+    "preview_unverified",
+)
+#: The notices only the free first report says (each names it or what it opened).
+WELCOME_ONLY = (
+    "email_verified_welcome_signin",
+    "email_verified_report",
+    "card_check_ok",
+    "card_check_taken",
+    "welcome_confirm",
+    "welcome_notice",
+    "welcome_pending_other",
+    "welcome_refused_unverified",
+    "invited_banner",
+)
+
+
+def _mail_text(message: EmailMessage) -> str:
+    return f"{message['Subject']} {message.get_content()}"
+
+
+def _strings(value: Any) -> list[str]:
+    if isinstance(value, str):
+        return [value]
+    return [part for item in value for part in _strings(item)]
+
+
+def test_no_notice_or_e_mail_of_sign_up_promises_a_free_full_report(tmp_path: Path) -> None:
+    """Sign-up (with a real and a made-up invite), the notices after it and after
+    confirming the e-mail, sign-in and "My account" with every "done" an old link
+    may carry, an account's report with every old notice (an upload waiting for the
+    e-mail and a card checked while the free first report was on included) and the
+    e-mails sent: in es/en/pt, none promises a free full report, and no card check
+    is looked up at Stripe, under the paid offer."""
+    app, store, settings = _app(tmp_path)
+    lookups: list[str] = []
+
+    def no_lookup(_cfg: AuditSettings, session_id: str) -> dict[str, Any]:
+        lookups.append(session_id)
+        raise RuntimeError("no card check under the paid offer")
+
+    app.state.session_lookup = no_lookup
+    sent: list[EmailMessage] = []
+
+    def deliver() -> None:
+        mail.deliver_pending(store, settings, sender=lambda message, _cfg: sent.append(message))
+
+    inviter = _browser(app, "203.0.113.40")
+    assert _signup(inviter, "anfitriona@example.com").status_code == 303
+    host = store.find_account("anfitriona@example.com")
+    assert host is not None
+    invite = store.invite_token(host.id, at=datetime.now(UTC))
+    seen: list[tuple[str, str, str]] = []
+
+    def keep(locale: str, client: TestClient, path: str, **params: str) -> None:
+        answer = client.get(path, params=params or None)
+        assert answer.status_code == 200, (path, params, answer.status_code)
+        seen.append((locale, f"{path} {params}", answer.text))
+
+    for index, locale in enumerate(LOCALES):
+        signin = account_pages.path("signin", locale)
+        account = account_pages.path("account", locale)
+        reader = _browser(app, f"203.0.113.{41 + index}")
+        for query in ({}, {"next": FORMS[locale]}, {"invita": invite}, {"invita": "x" * 32}):
+            keep(locale, reader, SIGNUP[locale], **query)
+        # Signed out, "My account" sends an old link on to sign-in with its "done".
+        for done in ACCOUNT_DONE:
+            keep(locale, reader, signin, done=done)
+            keep(locale, reader, account, done=done)
+        client = _browser(app, f"203.0.113.{51 + index}")
+        made = _signup(client, f"nueva-{locale}@example.com", locale=locale)
+        assert made.status_code == 303
+        keep(locale, client, made.headers["location"])
+        owner = store.find_account(f"nueva-{locale}@example.com")
+        assert owner is not None
+        keep(locale, client, FORMS[locale], done="welcome_confirm")
+        # A report on the account, left as the free first report left it: an upload
+        # waiting for the e-mail, a card check back from Stripe, then a card checked.
+        audit_id, token = _location(_upload(client, 90 + index))
+        assert store.account_for_audit(audit_id) == owner.id
+        store.record_welcome_pending(
+            audit_id,
+            owner.id,
+            device_sha256="d" * 64,
+            file_sha256="f" * 64,
+            client_ip="203.0.113.0",
+            at=datetime.now(UTC),
+        )
+        report = f"/audits/{audit_id}"
+        here = {"token": token, "lang": locale}
+        keep(locale, client, report, **here, card="checked", setup_session=f"cs_live_{locale}")
+        store.record_card_check(owner.id, str(index) * 64, at=datetime.now(UTC))
+        for extra in (
+            {"card": "checked"},
+            {"card": "skipped"},
+            {"card": "failed"},
+            *({"acct": notice} for notice in REPORT_ACCT),
+        ):
+            keep(locale, client, report, **here, **extra)
+        for done in ACCOUNT_DONE:
+            keep(locale, client, account, done=done)
+        # The e-mail goes out; its link is opened on this same browser.
+        deliver()
+        verify = mail.PATHS[locale]["verify"]
+        link = mail.token_for(_outbox_id(store, owner.id, "verify"), SECRET)
+        page = client.get(verify, params={"token": link})
+        assert page.status_code == 200
+        seen.append((locale, verify, page.text))
+        confirmed = client.post(
+            verify, data={"token": link, "csrf": _csrf(page.text)}, follow_redirects=True
+        )
+        assert confirmed.status_code == 200
+        seen.append((locale, f"{verify} confirmed", confirmed.text))
+        assert store.email_verified(owner.id)
+        for done in ACCOUNT_DONE:
+            keep(locale, client, account, done=done)
+        for notice in REPORT_ACCT:
+            keep(locale, client, report, **here, acct=notice)
+    # The host's link, opened on another device: signed out, it ends on sign-in.
+    _confirm(app, store, host.id)
+    deliver()
+
+    assert {locale for locale, _, _ in seen} == set(LOCALES)
+    found = [
+        (label, sentence)
+        for locale, label, page in seen
+        for sentence in _offered(_visible(page), locale)
+    ]
+    found += [
+        (label, key)
+        for locale, label, page in seen
+        for key in WELCOME_ONLY
+        if _escaped(account_pages.COPY[locale][key].split("{")[0][:60]) in page
+    ]
+    assert found == []
+    assert lookups == []
+    assert len(sent) >= len(LOCALES) + 1
+    for message in sent:
+        for locale in LOCALES:
+            assert _promises(_mail_text(message), locale) == [], message["Subject"]
+    # Every e-mail the service writes, sign-up or not, in every language.
+    for locale in LOCALES:
+        for words in mail.WORDS[locale].values():
+            assert _promises(" ".join(words), locale) == [], words
+        flat = _strings(list(mail.PURCHASE_WORDS[locale].values()))
+        assert _promises(" ".join(flat), locale) == [], locale
+
+
+def test_the_free_first_report_notices_stay_with_the_welcome_offer(tmp_path: Path) -> None:
+    """With the free first report on, an old confirmation link still says it."""
+    app, _store, _ = _app(tmp_path, welcome_full_report=True)
+    reader = _browser(app)
+    for locale in LOCALES:
+        signin = account_pages.path("signin", locale)
+        copy = account_pages.COPY[locale]
+        page = reader.get(signin, params={"done": "email_verified_welcome"}).text
+        assert _escaped(copy["email_verified_welcome_signin"]) in page, locale
+        page = reader.get(signin, params={"done": "email_verified_report"}).text
+        assert _escaped(copy["email_verified_report"]) in page, locale
