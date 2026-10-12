@@ -118,6 +118,15 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
             ),
         )
     ),
+    # Tools hub example notes (tools_hub.COPY) also have native ES/PT page copy.
+    ("Computed from declared figures", "Calculado a partir de lo declarado"),
+    ("Counted from the published rules", "Contado en las reglas publicadas"),
+    (
+        "Rigor's sample PDF → choose it in the form and the check answers that it is the "
+        "sample report, unchanged.",
+        "PDF de ejemplo de Rigor → al elegirlo en el formulario, la comprobación responde "
+        "que es el informe de ejemplo, sin cambios.",
+    ),
     # Public figure reader notes (reading.COPY); keep the Spanish rules explicit.
     (
         "The PNG image is temporarily unavailable.",
@@ -555,6 +564,10 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
     (
         "{n} repeated row(s) (the same position listed twice) counted once",
         "{n} fila(s) repetida(s) (la misma posición listada dos veces) se contaron una sola vez",
+    ),
+    (
+        "{n} deal row(s) without a filled status excluded",
+        "se excluyeron {n} fila(s) de operaciones sin estado de ejecución total o parcial",
     ),
     (
         "{n} credit row(s) excluded: broker credit is not the trader's balance",
@@ -3524,6 +3537,10 @@ _SINGULAR: dict[str, tuple[str, str]] = {
     "{n} repeated row(s) (the same position listed twice) counted once": (
         "{n} repeated row (the same position listed twice) counted once",
         "{n} fila repetida (la misma posición listada dos veces) se contó una sola vez",
+    ),
+    "{n} deal row(s) without a filled status excluded": (
+        "{n} deal row without a filled status excluded",
+        "se excluyó {n} fila de operaciones sin estado de ejecución total o parcial",
     ),
     "{n} position(s) opened in the report were not closed; excluded": (
         "{n} position opened in the report was not closed; excluded",

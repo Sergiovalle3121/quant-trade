@@ -43,6 +43,7 @@ from quant_trade.audit import accounts, decay, paid_offer  # noqa: E402
 from quant_trade.audit.account import ACCOUNT_FORMATS, account_review  # noqa: E402
 from quant_trade.audit.account_pages import COPY as ACCOUNT_COPY  # noqa: E402
 from quant_trade.audit.account_pages import report_contents  # noqa: E402
+from quant_trade.audit.challenge_calc import challenge_url  # noqa: E402
 from quant_trade.audit.engine import (  # noqa: E402
     _NO_PRINTED_BALANCE_REASON,
     _SUMMARY_BALANCE_FORMATS,
@@ -72,6 +73,7 @@ from quant_trade.audit.importers import (  # noqa: E402
     MYFXBOOK_CSV,
     REPORT_FORMATS,
     UNIVERSAL_FILLS_CSV,
+    UNIVERSAL_TRADES_CSV,
     OptimizationSummary,
     ReportFormatError,
     _capital_from_percent,
@@ -89,6 +91,7 @@ from quant_trade.audit.pages import (  # noqa: E402
 from quant_trade.audit.plateau import FORWARD_EXPORT, METRICS, parameter_stability  # noqa: E402
 from quant_trade.audit.pricing import PRICING_COPY, PRICING_PATH, offer_text  # noqa: E402
 from quant_trade.audit.report import localize_tags  # noqa: E402
+from quant_trade.audit.rules_table import FILTER_MARKET, rules_table_url  # noqa: E402
 from quant_trade.audit.sample import synthetic_live_statement  # noqa: E402
 from quant_trade.audit.schema import DeclaredMetadata, build_inputs, parse_equity_csv  # noqa: E402
 from quant_trade.audit.settings import AuditSettings  # noqa: E402
@@ -342,7 +345,7 @@ def test_the_tool_fits_the_guide(tmp_path: Path) -> None:
         assert GUIDE_TOOL[slug] == "winrate", slug
     for slug in ("mt5", "mt5-optimization", "tradingview"):
         assert GUIDE_TOOL[slug] == "calculator", slug
-    for slug in ("tradovate", "topstepx", "sierra-chart"):
+    for slug in ("tradovate", "topstepx", "sierra-chart", "ctrader"):
         assert GUIDE_TOOL[slug] == "challenge", slug
     client = _client(tmp_path)
     for slug, locale, page in (
@@ -357,6 +360,23 @@ def test_the_tool_fits_the_guide(tmp_path: Path) -> None:
             "challenge": "/en/challenge-calculator",
         }[GUIDE_TOOL[slug]]
         assert f"href='{wanted}'" in get, slug
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+def test_ctrader_entry_uses_universal_trades_and_links_challenge_rules(
+    tmp_path: Path, locale: str
+) -> None:
+    assert GUIDE_FORMATS["ctrader"] == frozenset({UNIVERSAL_TRADES_CSV})
+    assert GUIDE_TOOL["ctrader"] == "challenge"
+    client = _client(tmp_path)
+    response = client.get(guide_url("ctrader", locale))
+    assert response.status_code == 200
+    get = _section(response.text, GUIDES_COPY[locale]["get"])
+    for link in (challenge_url(locale), rules_table_url(locale)):
+        assert f"href='{link}'" in get
+        assert client.get(link).status_code == 200
+    assert f"{FILTER_MARKET}=futures" not in get
+    assert find_claims(_visible(response.text)) == []
 
 
 #: What a search engine reads from a guide's head. The rest of the head is the

@@ -1,4 +1,4 @@
-"""Declared teaching figures for the resampling, streak, consistency and ruin articles.
+"""Declared figures for the resampling, streak, consistency, trailing and ruin articles.
 
 Every figure here comes from the engine's own functions on inputs fixed in
 this module: ``streaks.longest_run_tail`` for the losing-streak table and
@@ -6,8 +6,8 @@ this module: ``streaks.longest_run_tail`` for the losing-streak table and
 resampling example. The synthetic series are drawn with NumPy from the seeds
 below, and both resampling functions take an explicit seed, so running this
 module again gives the same numbers byte for byte (the tests do exactly that).
-The best-day examples use ``challenge_calc.compute`` with declared inputs;
-their source-dated rule rows come directly from ``prop_presets.PRESETS``.
+The best-day and trailing examples use ``challenge_calc.compute`` with declared
+inputs; their source-dated rule rows come directly from ``prop_presets.PRESETS``.
 The ruin examples use ``ruin_calc.compute`` unchanged, and their sample-size
 comparison uses the same ``winrate.read`` as the win-rate calculator.
 
@@ -33,7 +33,7 @@ from quant_trade.audit.analytics import (
     shuffled_drawdown,
 )
 from quant_trade.audit.challenge_calc import ChallengeInput, compute
-from quant_trade.audit.prop_presets import PRESETS, BestDayBasis
+from quant_trade.audit.prop_presets import PRESETS, BestDayBasis, TotalLossType
 from quant_trade.audit.public_card import PublicClaim
 from quant_trade.audit.streaks import RARE, longest_run_tail
 
@@ -325,7 +325,7 @@ def consistency_example(inputs: ChallengeInput) -> ConsistencyExample:
 
     Trading days compound the balance. Synthetic trades use a fixed win rate
     and fixed win/loss sizes, without separately modelled fees or slippage.
-    The two selected programs have other rule differences, so their comparison
+    The selected programs have other rule differences, so their comparison
     is descriptive; it does not isolate the effect of removing one rule.
     """
     reading = compute(inputs)
@@ -368,6 +368,143 @@ def consistency_examples() -> tuple[ConsistencyExample, ...]:
 
 def consistency_variations() -> tuple[ConsistencyExample, ...]:
     return tuple(consistency_example(inputs) for inputs in CONSISTENCY_VARIATION_INPUTS)
+
+
+# ---------------------------------------------------------------------------
+# Maximum loss: the same declared history under three existing program types
+# ---------------------------------------------------------------------------
+
+#: One single-phase program per supported loss type. Targets, loss allowances,
+#: minimum days and best-day rules also differ: this is not a controlled test
+#: of the loss type alone. No intraday-high program is represented as an EOD one.
+TRAILING_INPUTS: tuple[ChallengeInput, ...] = tuple(
+    ChallengeInput(
+        win_rate_pct=50.0,
+        unit="r",
+        avg_win=1.5,
+        avg_loss=1.0,
+        risk=0.5,
+        per_day=3.0,
+        program=key,
+    )
+    for key in ("fundednext-stellar-1step", "ftmo-1step", "topstep-50k-combine")
+)
+
+#: An editorial selection only; every amount, type, source and date is read
+#: from PRESETS. There are no intraday-high evaluation presets in that catalog.
+TRAILING_RULE_KEYS: tuple[str, ...] = (
+    "ftmo-2step-phase1",
+    "fundednext-stellar-1step",
+    "fundingpips-1step-flex",
+    "ftmo-1step",
+    "e8-zero-100k",
+    "myfundedfutures-rapid-50k",
+    "topstep-50k-combine",
+    "e8-signature-100k",
+    "take-profit-trader-test-50k",
+)
+
+
+@dataclass(frozen=True)
+class TrailingRuleRow:
+    """A preset's modelled maximum-loss rule, with its original caveats.
+
+    ``limit`` is a share of the initial balance. ``loss_type`` describes the
+    simulator's rule; notes preserve any difference from the firm's wording.
+    """
+
+    key: str
+    firm: str
+    program: str
+    limit: float
+    loss_type: TotalLossType
+    source_url: str
+    as_of: str
+    notes: tuple[str, ...]
+
+
+def trailing_rules() -> tuple[TrailingRuleRow, ...]:
+    """Three source-dated examples per supported loss type, without new rules."""
+    return tuple(
+        TrailingRuleRow(
+            key=key,
+            firm=rules.firm,
+            program=rules.program,
+            limit=rules.max_total_loss,
+            loss_type=rules.total_loss_type,
+            source_url=rules.source_url,
+            as_of=rules.as_of,
+            notes=rules.notes,
+        )
+        for key in TRAILING_RULE_KEYS
+        for rules in (PRESETS[key],)
+    )
+
+
+@dataclass(frozen=True)
+class TrailingCaveatRow:
+    """An unchanged preset note on approximation, monitoring or another stage."""
+
+    key: str
+    firm: str
+    program: str
+    note: str
+    source_url: str
+    as_of: str
+
+
+#: Prefixes select complete existing notes; they do not recreate their copy.
+#: A changed note fails visibly instead of silently removing a limitation.
+#: Every quoted program is in TRAILING_RULE_KEYS, and no two notes repeat the
+#: same wording with another URL (Earn2Trade's copies Take Profit Trader's).
+_TRAILING_CAVEATS: tuple[tuple[str, str], ...] = (
+    ("ftmo-1step", "Maximum loss is an end-of-day trailing limit;"),
+    ("e8-zero-100k", "The maximum loss trails the highest end-of-day balance;"),
+    (
+        "myfundedfutures-rapid-50k",
+        "The maximum loss trails the highest end-of-day balance and locks",
+    ),
+    ("myfundedfutures-rapid-50k", "Only the evaluation is simulated;"),
+    ("topstep-50k-combine", "Maximum loss trails the highest end-of-day balance"),
+    ("take-profit-trader-test-50k", "The maximum-loss floor moves only at the day's close,"),
+)
+
+
+def trailing_caveats() -> tuple[TrailingCaveatRow, ...]:
+    """Quote the catalog without confusing an EOD floor with EOD-only monitoring.
+
+    The Rapid note names intraday trailing in the Sim Funded stage, which the
+    evaluation preset does not simulate. Its evaluation amount must not be
+    presented as the amount of that other stage.
+    """
+    return tuple(
+        TrailingCaveatRow(
+            key=key,
+            firm=rules.firm,
+            program=rules.program,
+            note=next(note for note in rules.notes if note.startswith(prefix)),
+            source_url=rules.source_url,
+            as_of=rules.as_of,
+        )
+        for key, prefix in _TRAILING_CAVEATS
+        for rules in (PRESETS[key],)
+    )
+
+
+@lru_cache(maxsize=3)
+def trailing_example(inputs: ChallengeInput) -> ConsistencyExample:
+    """Use the same calculator reader, including raw target and total-loss outcomes.
+
+    Target-reaching frequency is distinct from the best-day-rule subset. All
+    inputs and outputs are declared model examples, not client measurements.
+    The simulator checks closes and a strict breach below the loss floor; it
+    cannot reconstruct an intraday touch or a high between daily observations.
+    """
+    return consistency_example(inputs)
+
+
+def trailing_examples() -> tuple[ConsistencyExample, ...]:
+    return tuple(trailing_example(inputs) for inputs in TRAILING_INPUTS)
 
 
 # ---------------------------------------------------------------------------
@@ -450,11 +587,15 @@ __all__ = [
     "RUIN_THRESHOLD_PCT",
     "RUIN_WINRATE_READING",
     "STREAK_ROWS",
+    "TRAILING_INPUTS",
+    "TRAILING_RULE_KEYS",
     "ConsistencyExample",
     "ConsistencyRuleRow",
     "RiskSummary",
     "ShuffleSummary",
     "StreakRow",
+    "TrailingCaveatRow",
+    "TrailingRuleRow",
     "consistency_example",
     "consistency_examples",
     "consistency_rules",
@@ -467,4 +608,8 @@ __all__ = [
     "streak_for",
     "streak_row",
     "synthetic_series",
+    "trailing_caveats",
+    "trailing_example",
+    "trailing_examples",
+    "trailing_rules",
 ]
