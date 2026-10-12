@@ -84,11 +84,12 @@ CHALLENGE_PUBLISHED = "2026-10-10"
 #: The day the risk-of-ruin calculator was published.
 RUIN_PUBLISHED = "2026-10-10"
 #: The day each export guide added after ``SITE_UPDATED`` was published, by its
-#: Spanish slug: the futures platforms' guides (``guides.GUIDES``).
+#: Spanish slug (``guides.GUIDES``).
 GUIDES_PUBLISHED: dict[str, str] = {
     "tradovate": "2026-10-10",
     "topstepx": "2026-10-10",
     "sierra-chart": "2026-10-10",
+    "ctrader": "2026-10-11",
 }
 
 #: Each public page as its path per language. The sitemap lists exactly these.
@@ -161,6 +162,8 @@ def _page_dates() -> dict[str, str]:
     dates.update(
         {guide_url(slug, lang): date for slug, date in GUIDES_PUBLISHED.items() for lang in LOCALES}
     )
+    # The guides index includes each addition in every language.
+    dates.update({guides_index_url(lang): max(GUIDES_PUBLISHED.values()) for lang in LOCALES})
     # The rules table: its publication, or a later reading of a preset (the same
     # date its ``Dataset`` names as ``dateModified``).
     dates.update({path: rules_table_lastmod() for path in rules_table_paths().values()})

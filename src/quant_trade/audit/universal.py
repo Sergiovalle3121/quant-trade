@@ -568,6 +568,9 @@ SYNONYMS: dict[str, tuple[str, ...]] = {
         "taxa autofx",
         "frais conversion autofx",
         "currency conversion fee",
+        # cTrader Mac's History names (help.ctrader.com/ctrader-mac/trade/trade-watch/).
+        "broker commission",
+        "conversion fee",
     ),
     "swap": _names(
         "swap",
@@ -989,6 +992,46 @@ def only_fills(header: Sequence[str], rows: list[list[str]]) -> list[list[str]]:
     if not kinds:
         return rows
     return [row for row in rows if "fill" in (row[kinds[0]] if kinds[0] < len(row) else "").lower()]
+
+
+UNFILLED_DEALS_WARNING = "{n} deal row(s) without a filled status excluded"
+#: The deal statuses cTrader's History page documents under "Deal information"
+#: that record no execution (Rejected, Error, Missed, Internally rejected); the
+#: other two it documents, Filled and Partially filled, are executions.
+UNEXECUTED_DEAL_STATUSES = frozenset({"rejected", "error", "missed", "internallyrejected"})
+
+
+def _closed_deal_rows(
+    header: Sequence[str], rows: list[list[str]]
+) -> tuple[list[list[str]], list[str]]:
+    """The rows minus the deals an optional cTrader ``Status`` column marks as
+    not executed, and the statuses of the rows left out, as the file writes them.
+
+    The Statement CSV header is undocumented; this checks column semantics,
+    not a native export signature. Other platforms' Status columns are untouched.
+    A partial fill can close its actual quantity and must remain in the list.
+    Only the documented non-executions (``UNEXECUTED_DEAL_STATUSES``) are left
+    out: a status the page does not document, or an empty one, says nothing
+    about execution and excludes nothing, so a file in another vocabulary keeps
+    every deal. Totals rows and repeated headers have no such status either; they
+    stay here and go through ``without_totals`` and ``drop_repeated_rows``.
+    Source: https://help.ctrader.com/ctrader/trading/history/ (Deal information).
+    """
+    names = [normalise(str(name)) for name in header]
+    if not {"openingdirection", "closingquantity", "openingtime", "closingtime", "status"} <= set(
+        names
+    ):
+        return rows, []
+    status_at = names.index("status")
+    kept: list[list[str]] = []
+    unexecuted: list[str] = []
+    for row in rows:
+        status = row[status_at].strip() if status_at < len(row) else ""
+        if normalise(status) in UNEXECUTED_DEAL_STATUSES:
+            unexecuted.append(status)
+        else:
+            kept.append(row)
+    return kept, unexecuted
 
 
 #: Time columns whose dates are always day first: B3 writes Brazilian dates.
@@ -1495,6 +1538,21 @@ def parse(
             draft.metadata["column_commission"] = imp._clip(listed, 120)
         elif role in mapping.names:
             draft.metadata[f"column_{role}"] = imp._clip(mapping.names[role], 60)
+    # Leave out the deals a cTrader Status marks as not executed before choosing
+    # the busiest account, so rejected attempts never outnumber executions.
+    rows, unexecuted = _closed_deal_rows(header, rows)
+    if unexecuted:
+        draft.warnings.append(UNFILLED_DEALS_WARNING.format(n=len(unexecuted)))
+        draft.metadata["excluded_unfilled_deals"] = str(len(unexecuted))
+        if not rows:
+            seen = imp._clip(", ".join(dict.fromkeys(unexecuted)), 80)
+            raise imp.ReportFormatError(
+                "deals_without_execution",
+                f"every deal row has a status with no execution ({seen}): the statement has "
+                "no filled or partially filled deal to read",
+                f"todas las filas de operaciones tienen un estado sin ejecución ({seen}): el "
+                "extracto no tiene ninguna operación ejecutada total o parcialmente que leer",
+            )
     accounts = [_cell(row, mapping.columns, "account").strip() for row in rows]
     if len(set(accounts)) > 1 and mapping.shape == UNIVERSAL_TRADES_CSV:
         closed: dict[str, int] = {}

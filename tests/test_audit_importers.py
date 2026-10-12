@@ -36,6 +36,7 @@ from quant_trade.audit.importers import (
     QUANTCONNECT_TRADES_CSV,
     TRADINGVIEW_CSV,
     TRADINGVIEW_XLSX,
+    UNIVERSAL_TRADES_CSV,
     VECTORBT_CSV,
     ImportedReport,
     ReportFormatError,
@@ -106,6 +107,32 @@ def test_unknown_files_are_not_detected() -> None:
     assert detect_format(b"timestamp,equity\n2024-01-01,100\n") is None
     assert detect_format(b"<html><body><p>hello</p></body></html>") is None
     assert detect_format(b"") is None
+
+
+def test_ctrader_documented_history_columns_import_with_gross_mapping() -> None:
+    # Synthetic History column names, not a captured Statement CSV: the
+    # official documentation does not publish the exported file's header.
+    data = fixture("ctrader_history_columns.csv")
+    assert detect_format(data) == UNIVERSAL_TRADES_CSV
+    report = import_report(
+        data,
+        "ctrader_history_columns.csv",
+        initial_balance=10_000,
+        columns={"profit": "Gross (currency)"},
+    )
+    assert report.source_format == UNIVERSAL_TRADES_CSV
+    assert report.trades.sides == ["long", "long", "short"]
+    # The two distinct deals with Order ID 51 remain separate partial closes.
+    assert [trade.quantity for trade in report.trades.trades] == [25_000, 25_000, 10_000]
+    assert report.metadata["column_quantity"] == "Closing quantity"
+    assert gross(report) == [50.0, -50.0, -10.0]
+    assert report.fees == {"commission": -3.0, "swap": -0.25}
+    assert report.trades.fees == [1.5, 1.25, 0.5]
+    assert report.metadata["column_profit"] == "Gross (currency)"
+    assert report.metadata["column_commission"] == "Commissions"
+    assert report.metadata["column_swap"] == "Swap"
+    assert equity_rows(report)[-1][1] == pytest.approx(9_986.75)
+    assert_recomputed_matches(report)
 
 
 # ---------------------------------------------------------------------------
@@ -816,11 +843,16 @@ def test_optimisation_refuses_doctypes_and_other_files() -> None:
 
 def test_every_warning_and_error_message_passes_the_profit_claim_guard() -> None:
     texts: list[str] = []
+    # Some documented table columns need the same explicit mapping as the guides.
+    mappings = {
+        "sierra_chart_trades.txt": {"quantity": "Trade Quantity"},
+        "ctrader_history_columns.csv": {"profit": "Gross (currency)"},
+    }
     for path in sorted(FIXTURES.iterdir()):
         if path.suffix == ".xml":
             texts.extend(parse_optimization(path.read_bytes()).warnings)
             continue
-        report = import_report(path.read_bytes())
+        report = import_report(path.read_bytes(), columns=mappings.get(path.name))
         texts.extend(report.warnings)
         texts.extend(report.metadata.values())
     for data in (b"nope,nope\n1,2\n", fixture("mt5_optimization.xml"), b"x" * 10):

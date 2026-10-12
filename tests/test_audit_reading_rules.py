@@ -539,6 +539,12 @@ FROZEN: dict[str, tuple[Any, ...]] = {
         "WK/WK/PS/ND/FL/ND",
         "FORENSIC_BALANCE_CHAIN_SIGNAL,HIDDEN_FLOATING_DRAWDOWN,IMPLAUSIBLE_SHARPE,"
         "MONETARY_RECONCILIATION_MISMATCH,TOO_FEW_OBSERVATIONS"),
+    # The cTrader guide's synthetic file, frozen as read on 2026-10-11. The tool
+    # maps no column, so the History columns are read as the guide warns: a
+    # result of price move times lots, with no contract size.
+    "fixtures/ctrader_history_columns.csv": (
+        "D", "2026-08-31", "2026-09-03", 4, -0.000325, -0.000325, -39.806045, 0.000994,
+        "FL/FL/FL/ND/FL/ND", "HIDDEN_FLOATING_DRAWDOWN,TOO_FEW_OBSERVATIONS"),
 }  # fmt: skip
 
 CASES = {

@@ -1,4 +1,4 @@
-"""The futures platforms' export guides: Tradovate, TopstepX and Sierra Chart.
+"""Documented export guides: Tradovate, TopstepX, Sierra Chart and cTrader.
 
 Each guide's steps come from the platform's own help pages, named on the page
 under the steps with the day they were read (``Guide.sources``,
@@ -6,10 +6,11 @@ under the steps with the day they were read (``Guide.sources``,
 file is read by its column names (``audit/universal.py``): a synthetic fixture
 per file shape goes through the importer here, and the shapes the importer
 refuses (a single time column, the Trades tab with its default BP/EP markers)
-are refused the way the guide warns. The pages link
-the challenge calculator, the rules table and its futures firms, carry their
-publication date in the sitemap, and promise nothing. Rithmic's R | Trader Pro has no guide: its
-official pages describe no export (``docs/AUDIT_SAAS.md``).
+are refused the way the guide warns. The pages link the challenge calculator
+and the rules table (plus its futures firms for the three futures guides),
+carry their publication date in the sitemap, and promise nothing. Rithmic's
+R | Trader Pro has no guide: its official pages describe no export
+(``docs/AUDIT_SAAS.md``).
 """
 
 from __future__ import annotations
@@ -54,11 +55,13 @@ LOCALES = ("es", "en", "pt")
 SITEMAP_NS = {"s": "http://www.sitemaps.org/schemas/sitemap/0.9"}
 FIXTURES = Path(__file__).parent / "fixtures" / "audit_imports"
 FUTURES_GUIDES = ("tradovate", "topstepx", "sierra-chart")
+SOURCED_GUIDES = (*FUTURES_GUIDES, "ctrader")
 #: The official host each guide's sources live on: the platform's own help.
 OFFICIAL_HOSTS = {
     "tradovate": "support.tradovate.com",
     "topstepx": "help.topstep.com",
     "sierra-chart": "www.sierrachart.com",
+    "ctrader": "help.ctrader.com",
 }
 NOT_AFFILIATED = {
     "es": "Rigor no está afiliado",
@@ -72,6 +75,15 @@ FORBIDDEN_STEMS = ("verific", "certific", "aprob", "aprov", "garant", "rentab", 
 #: has the columns the guide names, the mapping the guide says the form needs
 #: (``None`` when the file is read as it is) and what the importer reads.
 FILE_SHAPES = [
+    pytest.param(
+        "ctrader",
+        "ctrader_history_columns.csv",
+        {"profit": "Gross (currency)"},
+        UNIVERSAL_TRADES_CSV,
+        ["long", "long", "short"],
+        [50.0, -50.0, -10.0],
+        id="ctrader-history-columns-synthetic",
+    ),
     pytest.param(
         "tradovate",
         "tradovate_performance.csv",
@@ -147,29 +159,29 @@ def _texts(slug: str, locale: str) -> list[str]:
     ]
 
 
-def test_every_futures_guide_names_its_official_sources_and_promises_nothing() -> None:
-    for slug in FUTURES_GUIDES:
-        guide = GUIDES_BY_SLUG[slug]
-        assert set(guide.text) == set(LOCALES)
-        assert guide.field == "report" and GUIDE_TOOL[slug] == "challenge"
-        # One address in every language: the platform's name is the slug.
-        assert all(guide.slug_for(locale) == slug for locale in LOCALES)
-        assert guide.sources, slug
-        for title, url in guide.sources:
-            assert title.strip(), slug
-            assert url.startswith(f"https://{OFFICIAL_HOSTS[slug]}/"), (slug, url)
-        assert date.fromisoformat(guide.read_on).isoformat() == guide.read_on
-        for locale in LOCALES:
-            tips = " ".join(guide.text[locale].tips)
-            assert NOT_AFFILIATED[locale] in tips, (slug, locale)
-            # The index card prints the summary: no longer than the other guides'.
-            assert len(guide.text[locale].summary) <= 130, (slug, locale)
-            for piece in _texts(slug, locale):
-                assert find_claims(piece) == [], (slug, locale, piece)
-                lowered = piece.lower()
-                for stem in FORBIDDEN_STEMS:
-                    assert stem not in lowered, (slug, locale, stem, piece)
-                assert not re.search(r"\bpass(?:ed|es|ing)?\b", lowered), (slug, locale, piece)
+@pytest.mark.parametrize("slug", SOURCED_GUIDES)
+def test_every_sourced_guide_names_its_official_sources_and_promises_nothing(slug: str) -> None:
+    guide = GUIDES_BY_SLUG[slug]
+    assert set(guide.text) == set(LOCALES)
+    assert guide.field == "report" and GUIDE_TOOL[slug] == "challenge"
+    # One address in every language: the platform's name is the slug.
+    assert all(guide.slug_for(locale) == slug for locale in LOCALES)
+    assert guide.sources, slug
+    for title, url in guide.sources:
+        assert title.strip(), slug
+        assert url.startswith(f"https://{OFFICIAL_HOSTS[slug]}/"), (slug, url)
+    assert date.fromisoformat(guide.read_on).isoformat() == guide.read_on
+    for locale in LOCALES:
+        tips = " ".join(guide.text[locale].tips)
+        assert NOT_AFFILIATED[locale] in tips, (slug, locale)
+        # The index card prints the summary: no longer than the other guides'.
+        assert len(guide.text[locale].summary) <= 130, (slug, locale)
+        for piece in _texts(slug, locale):
+            assert find_claims(piece) == [], (slug, locale, piece)
+            lowered = piece.lower()
+            for stem in FORBIDDEN_STEMS:
+                assert stem not in lowered, (slug, locale, stem, piece)
+            assert not re.search(r"\bpass(?:ed|es|ing)?\b", lowered), (slug, locale, piece)
 
 
 @pytest.mark.parametrize(("slug", "name", "columns", "expected", "sides", "pnls"), FILE_SHAPES)
@@ -342,7 +354,7 @@ def test_the_pages_link_the_calculator_the_rules_table_and_the_futures_firms(
 
 
 def test_the_sitemap_dates_the_futures_guides_on_their_publication(tmp_path: Path) -> None:
-    assert set(GUIDES_PUBLISHED) == set(FUTURES_GUIDES)
+    assert set(GUIDES_PUBLISHED) == set(SOURCED_GUIDES)
     for slug, published in GUIDES_PUBLISHED.items():
         assert date.fromisoformat(published).isoformat() == published
         assert published >= SITE_UPDATED
@@ -361,3 +373,80 @@ def test_the_sitemap_dates_the_futures_guides_on_their_publication(tmp_path: Pat
     for slug, published in GUIDES_PUBLISHED.items():
         for locale in LOCALES:
             assert lastmod[BASE + guide_url(slug, locale)] == published, (slug, locale)
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+def test_ctrader_each_step_links_its_official_source(tmp_path: Path, locale: str) -> None:
+    guide = GUIDES_BY_SLUG["ctrader"]
+    assert guide.read_on == "2026-10-11"
+    assert len(guide.step_sources) == len(guide.text[locale].steps) == 8
+    assert all(source in guide.sources for source in guide.step_sources)
+    page = _client(tmp_path).get(guide_url("ctrader", locale)).text
+    steps = _section(page, GUIDES_COPY[locale]["steps"])
+    items = re.findall(r"<li>(.*?)</li>", steps, flags=re.S)
+    assert len(items) == len(guide.step_sources)
+    for item, step, (title, url) in zip(
+        items, guide.text[locale].steps, guide.step_sources, strict=True
+    ):
+        assert html.escape(step, quote=True) in item
+        assert "class='muted guide-step-source'" in item
+        assert (
+            f"<a href='{url}' rel='noopener noreferrer'>{html.escape(title, quote=True)}</a>"
+            in item
+        )
+    assert find_claims(page) == []
+
+
+@pytest.mark.parametrize(
+    ("locale", "csv_gap", "filter_gap", "zone_gap", "mobile_gap", "affiliation"),
+    (
+        (
+            "es",
+            "no la cabecera exacta del CSV",
+            "no dice si Statement respeta",
+            "no especifica la zona horaria",
+            "no documenta exportación",
+            "Rigor no está afiliado a cTrader ni a Spotware",
+        ),
+        (
+            "en",
+            "not the exact CSV headers",
+            "does not say whether Statement follows",
+            "does not specify the exported file's time zone",
+            "does not document export",
+            "Rigor is not affiliated with cTrader or Spotware",
+        ),
+        (
+            "pt",
+            "não o cabeçalho exato do CSV",
+            "não diz se Statement respeita",
+            "não especifica o fuso horário",
+            "não documenta exportação",
+            "O Rigor não é afiliado ao cTrader nem à Spotware",
+        ),
+    ),
+)
+def test_ctrader_distinguishes_documented_export_from_its_unknowns(
+    locale: str, csv_gap: str, filter_gap: str, zone_gap: str, mobile_gap: str, affiliation: str
+) -> None:
+    text = GUIDES_BY_SLUG["ctrader"].text[locale]
+    steps = " ".join(text.steps)
+    tips = " ".join(text.tips)
+    assert csv_gap in text.file
+    assert filter_gap in steps and zone_gap in steps
+    assert mobile_gap in tips and affiliation in tips
+    assert all(name in text.file for name in ("Desktop", "Web", "Mac", "HTML", ".xlsx"))
+    assert "Mobile" in tips and "Current time" in steps
+    assert "prop firm" in tips or "prop-firm" in tips
+    assert "NOT_MEASURED" in tips
+    # These are History labels in a synthetic fixture, not a promised CSV header.
+    report = import_report(
+        (FIXTURES / "ctrader_history_columns.csv").read_bytes(),
+        "ctrader_history_columns.csv",
+        columns={"profit": "Gross (currency)"},
+    )
+    read = {value for key, value in report.metadata.items() if key.startswith("column_")}
+    assert read
+    for column in read:
+        assert column in text.upload
+    assert "profit" in text.upload and "Net" in text.upload and "Pips" in text.upload
