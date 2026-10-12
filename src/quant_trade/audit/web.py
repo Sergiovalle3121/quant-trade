@@ -2425,6 +2425,18 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             response_class=HTMLResponse,
         )
 
+    @app.get(institutional.TEMPLATE_PATH)
+    def institutional_template() -> Response:
+        return Response(
+            content=institutional.TEMPLATE_CSV,
+            media_type="text/csv",
+            headers={
+                "Content-Disposition": f'attachment; filename="{institutional.TEMPLATE_FILENAME}"',
+                "Cache-Control": "public, max-age=3600",
+                "X-Robots-Tag": "noindex",
+            },
+        )
+
     def _contact(request: Request, locale: str) -> HTMLResponse:
         return HTMLResponse(
             contact_page(
