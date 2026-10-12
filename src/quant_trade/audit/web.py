@@ -87,6 +87,7 @@ from quant_trade.audit.calculator import (
     share_values,
 )
 from quant_trade.audit.calculator_card import calculator_card_svg
+from quant_trade.audit.card_markets import ordered_markets
 from quant_trade.audit.challenge_pages import challenge_page, rules_table_page
 from quant_trade.audit.compare import (
     COMPARE_PATH,
@@ -4049,7 +4050,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                     access_codes=cfg.access_codes_enabled,
                     card_payments=cfg.stripe_enabled,
                     card_markets=(
-                        [m for m in ("MX", "US", "BR", "ES") if m in cfg.approved_markets]
+                        ordered_markets(cfg.approved_markets, locale)
                         if cfg.card_public and not pause_new_checkout
                         else []
                     ),
@@ -6239,7 +6240,9 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             free_mode=cfg.free_mode,
             price_usd=cfg.price_usd,
             checkout_url=f"{base}/checkout{query}" if unlockable else None,
-            market_choices=(tuple(sorted(cfg.approved_markets)) if cfg.card_public else ()),
+            market_choices=(
+                ordered_markets(cfg.approved_markets, locale) if cfg.card_public else ()
+            ),
             pay_links=(link_single, link_pack, f"{base}{query}&pay=done") if link_single else None,
             redeem_url=f"{base}/redeem{query}" if redeemable else None,
             publish_url=f"{base}/publish{query}" if publishable else None,

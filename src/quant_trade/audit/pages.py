@@ -13,7 +13,7 @@ from __future__ import annotations
 import html
 import re
 import textwrap
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from datetime import datetime
 from typing import Any
 from urllib.parse import quote, urlencode
@@ -89,6 +89,12 @@ from quant_trade.audit.calculator import (
 from quant_trade.audit.calculator import COPY as CALCULATOR_COPY
 from quant_trade.audit.calculator import REASONS as CALCULATOR_REASONS
 from quant_trade.audit.calculator_card import count_text, result_figures, what_if_figures
+from quant_trade.audit.card_markets import (
+    CARD_MARKET_WORDS,
+    EU_MARKETS,
+    ordered_markets,
+    spanish_and,
+)
 from quant_trade.audit.completed_count import completed_count_html
 from quant_trade.audit.examples import (
     EXAMPLES_COPY,
@@ -2217,14 +2223,6 @@ def _checks(items: list[str]) -> str:
     )
 
 
-#: Billing countries as the card-payment line names them, in the order they are listed.
-#: Portuguese carries its preposition and article ("no México", "na Espanha").
-_CARD_MARKET_WORDS: dict[str, dict[str, str]] = {
-    "MX": {"es": "México", "en": "Mexico", "pt": "no México"},
-    "US": {"es": "Estados Unidos", "en": "the United States", "pt": "nos Estados Unidos"},
-    "BR": {"es": "Brasil", "en": "Brazil", "pt": "no Brasil"},
-    "ES": {"es": "España", "en": "Spain", "pt": "na Espanha"},
-}
 _CARD_MARKETS_LINE: dict[str, tuple[str, str]] = {
     "es": (" y ", "Por ahora solo en {places}."),
     "en": (" and ", "For now, in {places} only."),
@@ -2232,15 +2230,28 @@ _CARD_MARKETS_LINE: dict[str, tuple[str, str]] = {
 }
 
 
-def card_markets_line(markets: Sequence[str], locale: str) -> str:
+def card_markets_line(markets: Iterable[str], locale: str) -> str:
     """The sentence naming the countries where card payment is open, or "" for none.
 
     Only the countries the owner approved (``AUDIT_APPROVED_MARKETS``) are named, so
     the landing never offers card payment where Checkout would refuse it."""
-    words = [_CARD_MARKET_WORDS[m][locale] for m in ("MX", "US", "BR", "ES") if m in set(markets)]
+    approved = set(markets)
+    whole_eu = approved >= EU_MARKETS
+    individual = approved - {"GB"} - (EU_MARKETS if whole_eu else set())
+    words = [CARD_MARKET_WORDS[country][locale] for country in ordered_markets(individual, locale)]
+    if whole_eu:
+        words.append(
+            {"es": "la Unión Europea", "en": "the European Union", "pt": "na União Europeia"}[
+                locale
+            ]
+        )
+    if "GB" in approved:
+        words.append(CARD_MARKET_WORDS["GB"][locale])
     if not words:
         return ""
     joiner, template = _CARD_MARKETS_LINE[locale]
+    if locale == "es":
+        joiner = spanish_and(words[-1])
     places = words[0] if len(words) == 1 else ", ".join(words[:-1]) + joiner + words[-1]
     return template.format(places=places)
 

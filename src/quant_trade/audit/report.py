@@ -25,6 +25,7 @@ from quant_trade.audit import charts, ownership, paid_offer, psr_names, report_p
 from quant_trade.audit.account import FLOATING_NOTE as ACCOUNT_FLOATING_NOTE
 from quant_trade.audit.account import is_account_history
 from quant_trade.audit.analytics import question_now
+from quant_trade.audit.card_markets import MARKET_NAMES, ordered_markets
 from quant_trade.audit.challenge_sizing import NO_LIMIT as DAILY_NO_LIMIT
 from quant_trade.audit.crises import (
     MARKET,
@@ -11144,20 +11145,14 @@ def render_html(
             "en": "Choose your country",
             "pt": "Escolha seu país",
         }
-        market_names = {
-            "MX": {"es": "México", "en": "Mexico", "pt": "México"},
-            "US": {"es": "Estados Unidos", "en": "United States", "pt": "Estados Unidos"},
-            "BR": {"es": "Brasil", "en": "Brazil", "pt": "Brasil"},
-            "ES": {"es": "España", "en": "Spain", "pt": "Espanha"},
-        }
         market_select = (
             "<label for='billing-country'>"
             f"{_e(market_caption[locale])}</label>"
             "<select id='billing-country' name='billing_country' required>"
             f"<option value='' selected disabled>{_e(market_prompt[locale])}</option>"
             + "".join(
-                f"<option value='{country}'>{_e(market_names[country][locale])}</option>"
-                for country in market_choices
+                f"<option value='{country}'>{_e(MARKET_NAMES[country][locale])}</option>"
+                for country in ordered_markets(market_choices, locale)
             )
             + "</select>"
             if market_choices

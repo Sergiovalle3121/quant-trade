@@ -18,6 +18,7 @@ from collections.abc import Collection, Mapping
 from dataclasses import dataclass, field
 
 from quant_trade.audit.accounts import WELCOME_FULL_REPORT
+from quant_trade.audit.card_markets import REVIEWED_MARKETS
 from quant_trade.audit.indexnow import INDEXNOW_KEY, clean_key
 from quant_trade.audit.schema import MAX_UPLOAD_BYTES
 
@@ -287,8 +288,11 @@ class AuditSettings:
             raise ValueError("smtp_port must be between 1 and 65535")
         if self.smtp_security not in ("starttls", "ssl"):
             raise ValueError("smtp_security must be starttls or ssl")
-        if any(country not in {"MX", "US", "BR", "ES"} for country in self.approved_markets):
-            raise ValueError("approved_markets must use reviewed ISO countries MX, US, BR or ES")
+        if any(country not in REVIEWED_MARKETS for country in self.approved_markets):
+            raise ValueError(
+                "approved_markets must use reviewed ISO countries: "
+                + ", ".join(sorted(REVIEWED_MARKETS))
+            )
 
     @property
     def email_delivery_ready(self) -> bool:

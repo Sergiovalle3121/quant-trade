@@ -34,6 +34,16 @@ from quant_trade.audit.web import create_app  # noqa: E402
 
 BASE = "https://audit.example"
 LOCALES = ("es", "en", "pt")
+#: AUDIT_APPROVED_MARKETS as production will set it: MX, US, BR, the 27 EU members and GB.
+FULL_CATALOGUE = (
+    "MX,US,BR,AT,BE,BG,HR,CY,CZ,DK,EE,FI,FR,DE,GR,HU,IE,IT,LV,LT,LU,MT,NL,PL,PT,RO,SK,SI,ES,SE,GB"
+)
+#: How the full catalogue ends in each language: the EU grouped, the UK named apart.
+EU_AND_UK = {
+    "es": "la Unión Europea y el Reino Unido.",
+    "en": "the European Union and the United Kingdom only.",
+    "pt": "na União Europeia e no Reino Unido.",
+}
 
 
 def _settings(**environ: str) -> AuditSettings:
@@ -185,12 +195,15 @@ def test_pack_quantity_uses_the_settings_constant(
 
 @pytest.mark.parametrize("locale", LOCALES)
 def test_card_countries_only_come_from_public_runtime_markets(locale: str) -> None:
-    for countries in ("MX", "BR,ES", "US,MX", "BR,ES,MX,US"):
+    for countries in ("MX", "BR,ES", "US,MX", "BR,ES,MX,US", "DE,FR,GB", FULL_CATALOGUE):
         settings = _card_settings(AUDIT_APPROVED_MARKETS=countries)
         assert settings.card_public
         page = pricing_page(settings, locale=locale)
         expected = card_markets_line(tuple(settings.approved_markets), locale)
         assert expected in html.unescape(page)
+        assert find_claims(expected) == []
+    full = pricing_page(_card_settings(AUDIT_APPROVED_MARKETS=FULL_CATALOGUE), locale=locale)
+    assert EU_AND_UK[locale] in html.unescape(full)
     active = _card_settings(AUDIT_APPROVED_MARKETS="MX")
     unavailable = (
         _card_settings(AUDIT_APPROVED_MARKETS=""),
