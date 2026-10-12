@@ -18,6 +18,7 @@ from audit_fixtures import signed_in  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 
 from quant_trade.audit import account_pages, account_pt  # noqa: E402
+from quant_trade.audit.card_markets import REVIEWED_MARKETS  # noqa: E402
 from quant_trade.audit.guard import find_claims  # noqa: E402
 from quant_trade.audit.payments import (  # noqa: E402
     ACCOUNT_PATHS,
@@ -182,11 +183,12 @@ def test_buying_needs_the_box_a_country_and_a_session(tmp_path: Path) -> None:
     assert anonymous.headers["location"].startswith("/entrar")
 
 
-def test_a_paid_single_puts_one_credit_on_the_account_once(tmp_path: Path) -> None:
-    client, calls = _client(tmp_path)
+@pytest.mark.parametrize("country", ["MX", "DE", "FR", "GB"])
+def test_a_paid_single_puts_one_credit_on_the_account_once(tmp_path: Path, country: str) -> None:
+    client, calls = _client(tmp_path, approved_markets=REVIEWED_MARKETS)
     account_id = _account_id(client)
     before = _credits(client, account_id)
-    response = _buy(client)
+    response = _buy(client, billing_country=country)
     assert response.headers["location"] == "https://checkout.stripe.test/1"
     (call,) = calls
     assert call["account_id"] == account_id and call["plan"] == PLAN_SINGLE
@@ -197,18 +199,42 @@ def test_a_paid_single_puts_one_credit_on_the_account_once(tmp_path: Path) -> No
     assert order.audit_id == account_order_ref(account_id)
     assert store.final_sale_acceptance(order_id) is not None
     # A second click reuses the open Checkout session.
-    assert _buy(client).headers["location"] == "https://checkout.stripe.test/1"
+    assert _buy(client, billing_country=country).headers["location"] == (
+        "https://checkout.stripe.test/1"
+    )
     assert len(calls) == 1
 
-    session = _session(account_id, order_id)
+    session = _session(account_id, order_id, customer_details={"address": {"country": country}})
     assert _webhook(client, session) == 200
     assert _credits(client, account_id) == before + 1
     # Stripe retries the event: still one credit.
     assert _webhook(client, session) == 200
     assert _credits(client, account_id) == before + 1
     assert store.get_checkout_order(order_id).status == "delivered"
+    assert store.checkout_market(order_id) == (country, country)
     # The code is linked to the account; nobody has to type it.
     assert store.code_id(credit_code(WEBHOOK_SECRET, "cs_live_1")) is not None
+
+
+@pytest.mark.parametrize("billing_country", ["CA", "FR", "GB"])
+def test_new_market_credit_purchase_holds_unapproved_or_mismatched_country(
+    tmp_path: Path, billing_country: str
+) -> None:
+    client, calls = _client(tmp_path, approved_markets=frozenset({"DE", "GB"}))
+    account_id = _account_id(client)
+    before = _credits(client, account_id)
+    response = _buy(client, billing_country="DE")
+    assert response.headers["location"] == "https://checkout.stripe.test/1"
+    order_id = calls[0]["order_id"]
+    session = _session(
+        account_id, order_id, customer_details={"address": {"country": billing_country}}
+    )
+    assert _webhook(client, session) == 200
+    store = client.app.state.store
+    assert store.get_checkout_order(order_id).status == "paid_review"
+    assert store.checkout_market(order_id) == ("DE", billing_country)
+    assert _credits(client, account_id) == before
+    assert store.code_id(credit_code(WEBHOOK_SECRET, "cs_live_1")) is None
 
 
 def test_a_paid_pack_puts_three_credits_on_the_account(tmp_path: Path) -> None:

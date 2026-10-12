@@ -20,6 +20,7 @@ from quant_trade.audit.accounts import (
     MIN_PASSWORD_CHARS,
     WELCOME_PENDING_DAYS,
 )
+from quant_trade.audit.card_markets import MARKET_NAMES, ordered_markets
 from quant_trade.audit.compare import guard_page
 from quant_trade.audit.engine import _safe_text
 from quant_trade.audit.pages import _disclaimer, _e, _field, _home, _page, _page_hero
@@ -56,14 +57,6 @@ PATHS: dict[str, dict[str, str]] = {
         "forgot": "/forgot",
         "reset": "/reset",
     },
-}
-
-#: Billing countries as the credit form names them.
-MARKET_NAMES: dict[str, dict[str, str]] = {
-    "MX": {"es": "México", "en": "Mexico", "pt": "México"},
-    "US": {"es": "Estados Unidos", "en": "United States", "pt": "Estados Unidos"},
-    "BR": {"es": "Brasil", "en": "Brazil", "pt": "Brasil"},
-    "ES": {"es": "España", "en": "Spain", "pt": "Espanha"},
 }
 
 COPY: dict[str, dict[str, str]] = {
@@ -3269,9 +3262,8 @@ def account_page(
             lines += f"<p>{_e(prices)}</p>"
         if card_buy:
             options = "".join(
-                f"<option value='{_e(country)}'>"
-                f"{_e(MARKET_NAMES.get(country, {}).get(locale, country))}</option>"
-                for country in card_markets
+                f"<option value='{_e(country)}'>{_e(MARKET_NAMES[country][locale])}</option>"
+                for country in ordered_markets(card_markets, locale)
             )
             pack_button = (
                 "<button class='btn btn-ghost' type='submit' name='plan' value='pack'>"

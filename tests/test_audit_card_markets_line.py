@@ -3,6 +3,9 @@
 
 from __future__ import annotations
 
+import pytest
+
+from quant_trade.audit.card_markets import CARD_MARKET_WORDS, EU_MARKETS, REVIEWED_MARKETS
 from quant_trade.audit.guard import find_claims
 from quant_trade.audit.pages import card_markets_line, landing
 
@@ -43,6 +46,105 @@ def test_line_names_the_approved_countries_in_a_fixed_order() -> None:
 def test_line_is_empty_without_approved_countries() -> None:
     for locale in ("es", "en", "pt"):
         assert card_markets_line((), locale) == ""
+
+
+@pytest.mark.parametrize(
+    ("locale", "expected"),
+    [
+        (
+            "es",
+            "Por ahora solo en México, Estados Unidos, Brasil, la Unión Europea y el Reino Unido.",
+        ),
+        (
+            "en",
+            "For now, in Mexico, the United States, Brazil, "
+            "the European Union and the United Kingdom only.",
+        ),
+        (
+            "pt",
+            "Por enquanto, só no México, nos Estados Unidos, no Brasil, "
+            "na União Europeia e no Reino Unido.",
+        ),
+    ],
+)
+def test_complete_eu_is_grouped_before_the_united_kingdom(locale: str, expected: str) -> None:
+    line = card_markets_line(REVIEWED_MARKETS, locale)
+    assert line == expected
+    assert find_claims(line) == []
+    page = _card_landing(locale, tuple(REVIEWED_MARKETS))
+    assert line in page
+    assert "Declarado ·" not in page
+    assert find_claims(page) == []
+
+
+@pytest.mark.parametrize(
+    ("locale", "expected"),
+    [
+        (
+            "es",
+            "Por ahora solo en México, Estados Unidos, Brasil, "
+            "Alemania, Francia, Suecia y el Reino Unido.",
+        ),
+        (
+            "en",
+            "For now, in Mexico, the United States, Brazil, "
+            "France, Germany, Sweden and the United Kingdom only.",
+        ),
+        (
+            "pt",
+            "Por enquanto, só no México, nos Estados Unidos, no Brasil, "
+            "na Alemanha, na França, na Suécia e no Reino Unido.",
+        ),
+    ],
+)
+def test_partial_eu_names_each_country_and_keeps_the_uk_last(locale: str, expected: str) -> None:
+    line = card_markets_line(("SE", "GB", "MX", "DE", "FR", "BR", "US"), locale)
+    assert line == expected
+    assert find_claims(line) == []
+
+
+@pytest.mark.parametrize(
+    ("locale", "eu_only", "uk_only"),
+    [
+        ("es", "Por ahora solo en la Unión Europea.", "Por ahora solo en el Reino Unido."),
+        ("en", "For now, in the European Union only.", "For now, in the United Kingdom only."),
+        ("pt", "Por enquanto, só na União Europeia.", "Por enquanto, só no Reino Unido."),
+    ],
+)
+def test_eu_and_uk_can_each_be_the_only_approved_region(
+    locale: str, eu_only: str, uk_only: str
+) -> None:
+    assert card_markets_line(EU_MARKETS, locale) == eu_only
+    assert card_markets_line(("GB",), locale) == uk_only
+    assert find_claims(eu_only) == find_claims(uk_only) == []
+
+
+@pytest.mark.parametrize(
+    ("locale", "eu_name"),
+    [("es", "Unión Europea"), ("en", "European Union"), ("pt", "União Europeia")],
+)
+def test_even_one_missing_eu_country_prevents_grouping(locale: str, eu_name: str) -> None:
+    approved = EU_MARKETS - {"MT"}
+    line = card_markets_line(approved, locale)
+    assert eu_name not in line
+    assert "Malta" not in line
+    assert all(CARD_MARKET_WORDS[country][locale] in line for country in approved)
+    assert "Declarado ·" not in line
+    assert find_claims(line) == []
+
+
+@pytest.mark.parametrize(
+    ("locale", "expected"),
+    [
+        ("es", "Por ahora solo en Grecia, los Países Bajos y el Reino Unido."),
+        ("en", "For now, in Greece, the Netherlands and the United Kingdom only."),
+        ("pt", "Por enquanto, só na Grécia, nos Países Baixos e no Reino Unido."),
+    ],
+)
+def test_greece_netherlands_and_uk_use_natural_articles(locale: str, expected: str) -> None:
+    line = card_markets_line(("NL", "GB", "GR"), locale)
+    assert line == expected
+    assert find_claims(line) == []
 
 
 def test_landing_shows_the_approved_countries_and_passes_the_guard() -> None:

@@ -19,6 +19,7 @@ from audit_fixtures import csv_bytes, positive_drift, signed_in  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 
 from quant_trade.audit import accounts, funnel  # noqa: E402
+from quant_trade.audit.card_markets import REVIEWED_MARKETS  # noqa: E402
 from quant_trade.audit.guard import find_claims  # noqa: E402
 from quant_trade.audit.payments import (  # noqa: E402
     PLAN_PACK,
@@ -344,7 +345,7 @@ def test_live_checkout_needs_approved_country_and_freezes_it(tmp_path: Path) -> 
     path = f"/audits/{audit_id}/checkout?token={token}"
     page = client.get(f"/audits/{audit_id}?token={token}").text
     assert "name='billing_country'" in page and "País de facturación" in page
-    for value in ("", "BR", "ZZ"):
+    for value in ("", "BR", "DE", "GB", "CA", "UK", "EL", "ZZ"):
         denied = client.post(path, data={"billing_country": value}, follow_redirects=False)
         assert denied.status_code == 403
     assert client.app.state.store.list_checkout_orders() == []
@@ -459,8 +460,11 @@ def test_market_mismatch_records_charge_without_delivery(tmp_path: Path) -> None
     assert len(store.list_refused_payments()) == 1
 
 
-def test_matching_stripe_billing_country_delivers_and_is_recorded(tmp_path: Path) -> None:
-    client = _client(tmp_path)
+@pytest.mark.parametrize("country", ["MX", "DE", "FR", "GB"])
+def test_matching_stripe_billing_country_delivers_and_is_recorded(
+    tmp_path: Path, country: str
+) -> None:
+    client = _client(tmp_path, approved_markets=REVIEWED_MARKETS)
     audit_id, token = _upload(client)
     client.app.state.checkout_factory = lambda *_args, **_kwargs: {
         "id": "cs_market_good",
@@ -469,7 +473,9 @@ def test_matching_stripe_billing_country_delivers_and_is_recorded(tmp_path: Path
     path = f"/audits/{audit_id}/checkout?token={token}"
     assert (
         client.post(
-            path, data={"billing_country": "MX", "final_sale": "yes"}, follow_redirects=False
+            path,
+            data={"billing_country": country, "final_sale": "yes"},
+            follow_redirects=False,
         ).status_code
         == 303
     )
@@ -479,11 +485,74 @@ def test_matching_stripe_billing_country_delivers_and_is_recorded(tmp_path: Path
         audit_id,
         sid="cs_market_good",
         metadata={"audit_id": audit_id, "plan": PLAN_SINGLE, "app": "rigor", "order_id": order.id},
+        customer_details={"address": {"country": country}},
     )
     assert _webhook(client, paid) == 200
     assert store.get_audit(audit_id).paid
-    assert store.checkout_market(order.id) == ("MX", "MX")
-    assert store.funnel_country_events("2000-01-01") == [("MX", 1, 1, 2900)]
+    assert store.get_checkout_order(order.id).status == "delivered"
+    assert store.checkout_market(order.id) == (country, country)
+    assert store.funnel_country_events("2000-01-01") == [(country, 1, 1, 2900)]
+
+
+@pytest.mark.parametrize("billing_country", ["CA", "FR", "GB"])
+def test_new_market_checkout_holds_unapproved_or_mismatched_country(
+    tmp_path: Path, billing_country: str
+) -> None:
+    client = _client(tmp_path, approved_markets=frozenset({"DE", "GB"}))
+    audit_id, token = _upload(client)
+    client.app.state.checkout_factory = lambda *_args, **_kwargs: {
+        "id": "cs_europe_review",
+        "url": "https://checkout.stripe.test/europe-review",
+    }
+    response = client.post(
+        f"/audits/{audit_id}/checkout?token={token}",
+        data={"billing_country": "DE", "final_sale": "yes"},
+        follow_redirects=False,
+    )
+    assert response.status_code == 303
+    store = client.app.state.store
+    (order,) = store.list_checkout_orders()
+    session = _session(
+        audit_id,
+        sid="cs_europe_review",
+        metadata={"audit_id": audit_id, "plan": PLAN_SINGLE, "app": "rigor", "order_id": order.id},
+        customer_details={"address": {"country": billing_country}},
+    )
+    assert _webhook(client, session) == 200
+    assert store.get_checkout_order(order.id).status == "paid_review"
+    assert store.checkout_market(order.id) == ("DE", billing_country)
+    assert not store.get_audit(audit_id).paid
+    assert store.list_access_codes() == []
+
+
+def test_matching_new_market_is_held_if_approval_is_removed_before_payment(
+    tmp_path: Path,
+) -> None:
+    client = _client(tmp_path, approved_markets=frozenset({"DE", "GB"}))
+    audit_id, token = _upload(client)
+    client.app.state.checkout_factory = lambda *_args, **_kwargs: {
+        "id": "cs_removed_market",
+        "url": "https://checkout.stripe.test/removed-market",
+    }
+    response = client.post(
+        f"/audits/{audit_id}/checkout?token={token}",
+        data={"billing_country": "DE", "final_sale": "yes"},
+        follow_redirects=False,
+    )
+    assert response.status_code == 303
+    (order,) = client.app.state.store.list_checkout_orders()
+    session = _session(
+        audit_id,
+        sid="cs_removed_market",
+        metadata={"audit_id": audit_id, "plan": PLAN_SINGLE, "app": "rigor", "order_id": order.id},
+        customer_details={"address": {"country": "DE"}},
+    )
+    restarted = _client(tmp_path, approved_markets=frozenset({"GB"}))
+    assert _webhook(restarted, session) == 200
+    store = restarted.app.state.store
+    assert store.get_checkout_order(order.id).status == "paid_review"
+    assert store.checkout_market(order.id) == ("DE", "DE")
+    assert not store.get_audit(audit_id).paid
 
 
 @pytest.mark.parametrize(("first_country", "second_country"), [("MX", "US"), ("US", "MX")])
