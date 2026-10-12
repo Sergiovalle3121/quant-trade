@@ -172,6 +172,10 @@ def test_widget_is_get_only_and_never_sets_a_cookie_with_existing_browser_cookie
         assert response.status_code == 200
         assert "set-cookie" not in response.headers
         assert all(form.get("method") == "get" for form in _Markup(response.text).all("form"))
+    head = client.head(path, params={"ref": "embed"})
+    assert head.status_code == 200 and "set-cookie" not in head.headers
+    assert "frame-ancestors *" in head.headers["content-security-policy"]
+    assert "x-frame-options" not in head.headers
     for method in ("POST", "PUT", "PATCH", "DELETE", "OPTIONS"):
         refused = client.request(method, path, data=FIGURES)
         assert refused.status_code == 405, method

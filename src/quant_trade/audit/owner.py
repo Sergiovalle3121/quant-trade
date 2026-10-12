@@ -661,7 +661,8 @@ def challenge_embed_section(
     if not enabled:
         return title + (
             "<p class='muted'>NOT_MEASURED · Conteo desactivado: la política actual "
-            "describe visitas por día, idioma y etiqueta con una cookie diaria. "
+            "describe visitas por día, idioma, etiqueta y grupo de página, con una cookie "
+            "diaria. "
             "El conteo por firma sin cookies queda pendiente de esa descripción.</p>"
         )
     return (

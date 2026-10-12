@@ -39,8 +39,9 @@ REF_DAYS = 30
 SEEN_COOKIE = "rigor_seen"
 #: How often the in-memory visit counters are written to the database.
 FLUSH_SECONDS = 60.0
-#: The privacy text describes day/language/ref counts, deduplicated with a cookie.
-#: Cookieless widget views per firm need a separate disclosure before activation.
+#: The privacy text describes visits counted by day, language, tag and page group,
+#: once a day per browser with a cookie. Cookieless widget loads per firm need a
+#: separate disclosure before activation.
 #: Keep them off: the embed routes must never join the normal visit counter.
 CHALLENGE_EMBED_VIEWS_ENABLED = False
 DIRECT = "directo"
