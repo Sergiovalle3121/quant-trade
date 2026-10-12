@@ -61,3 +61,41 @@ runtime PDF, de la configuración local de fuentes. No se omite la validación
 PDF por falta de Pango. Los límites restantes son del método y se muestran
 en el informe: escala lineal histórica, cierre diario UTC y ausencia de
 simulación de margen o de la pérdida total dentro del máximo diario.
+
+## Revisión del 11 de octubre
+
+Tres revisiones encontraron fallos que se corrigieron en esta rama:
+
+- Máximo diario del reto: en los programas con límites en dólares
+  (`ACCOUNT_SIZES`) se calcula sobre la cuenta del programa; en los demás,
+  sobre el balance del historial, y la tarjeta dice cuál. Un peor día menor
+  que el 0.5 % del balance no se mide; por encima de 10 veces el tamaño del
+  historial sobre su balance solo se da un mínimo («más de»). Sin límite
+  diario no se muestra el bloque.
+- Capital: por encima de 10x la cantidad es un mínimo; si los instrumentos
+  tienen medianas distintas no se mide una sola; el número de pasos se lee a
+  nueve decimales antes de redondear; las unidades del archivo menores de 0.1
+  conservan dos cifras significativas. La caída de copia se redondea hacia
+  abajo a una décima («99.9%», no «100.0%») y sin balance queda una sola
+  línea con el motivo. Un balance supuesto junto a una curva subida no llega
+  al capital.
+- Importadores: cTrader solo da lotes con el sufijo «Lots» o con un tamaño
+  de contrato distinto de 1; MQL5, FX Blue y la columna «Lots» de Myfxbook
+  son lotes; se leen cabeceras como «Volume (lots)» y códigos de futuros con
+  bolsa, «/», ProjectX y CQG (EP es ES, ENQ es NQ).
+- Textos: motivos con insignia y frase completa, línea de método para las
+  cantidades, supuesto propio con martingala, titular corto en la tarjeta y
+  CSS que permite el salto de línea; documentación en inglés.
+
+Validación tras integrar `origin/main`, con `.venv-pp`, `PYTHONPATH=src`,
+Pango en `WEASYPRINT_DLL_DIRECTORIES` y tandas de uno a tres archivos:
+site_copy_trust y procedencia 99; i18n 27; reading_rules 91; oferta_pago
+33; portugués 57; sizing y unidades 72; reto, escalera e integración 103;
+importadores y renderizado 127; importación universal, columnas y
+NinjaTrader 80; exportaciones de seguimiento, mensajes y capital 63;
+informe y presentación 79; PDF, origen y cifras 45; vista previa anónima y
+firmas 125; extractos PDF y robustez 72; hub de herramientas y calculadora
+373; public_hygiene una vez: 2.227. Ninguna falla. Ruff, formato, mypy
+`--follow-imports=silent`, `git diff --check` y LF correctos. Los PDF en
+es/en/pt no tienen caracteres fuera del margen y la tarjeta diaria cabe a
+700 y 740 px.
