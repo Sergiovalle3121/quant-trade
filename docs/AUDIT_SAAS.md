@@ -2843,6 +2843,72 @@ weekly sample cannot stand in for the whole history. The reason tells the client
 whose closed trades end with a net loss after fees gets no capital figures
 (NOT_MEASURED): a size at which a losing history may be run is not given.
 
+### File sizes and the copy multiplier
+
+The complete HTML report and its PDF show the median of the file's original
+trade volumes and that median times each loss limit's size share. Importers
+keep those volumes before `Trade.quantity` is turned into economic units
+(`ImportedReport.trade_quantities`, `quantity_unit`). MetaTrader reports,
+MQL5 signal and FX Blue exports, a Myfxbook "Lots" column, a column whose
+header names lots ("Lots", "Volume (lots)", "Lotes") and quantity cells that
+end in "Lots" are in lots; a cTrader "Closing quantity" without that suffix
+counts as lots only when every symbol's money per price unit is not 1 (units
+such as 25 000 EUR leave it at 1). A header naming two units ("Units/Lots")
+stays in the file's units. Recognised futures codes are in contracts,
+including `ESZ25-CME`, `ESZ25_FUT_CME`, `/ESZ6`, the ProjectX ids
+`CON.F.US.MNQ.Z26` and the CQG codes `F.US.EPZ25` (EP is ES, ENQ is NQ).
+Ambiguous symbols or a mix of futures and other instruments stay in the
+file's units, with no economic contract attributed to them.
+
+Lots round down to 0.01 steps and contracts to whole contracts. Unnamed file
+units round down to 0.01, or to two significant digits of the median when it
+is under 0.1 (0.002 BTC shows as 0.0020). The step count is read to nine
+decimals first, so a float quotient just under a step is that step. When the
+result is zero the report says the minimum does not fit that limit. Above a
+10x size share (`MAX_SIZE_SHARE`), where the share prints as "more than
+10x", the quantity is only a lower bound ("more than 10.00 lots"). The size
+is variable when the 90th percentile of the volumes is more than three times
+the median: the report says the size was not fixed and the figure uses the
+median. When instruments carry different typical sizes (one ES contract
+against ten MNQ), one median applies to none of them and no quantity is
+measured. An existing `MARTINGALE_SIZING` flag leaves the quantities
+unmeasured, the challenge size included: a fixed quantity is not given for
+that pattern.
+
+The copy table divides the reference fall in money times the multiplier
+(0.5x, 1x, 2x and 3x) by the starting balance. Percentages are rounded down
+to a tenth, so 99.985 % never reads as 100.0 %; from 100 % on the row says
+the entire account is lost. It is a linear scale of the history: same
+starting balance as the provider, fixed sizes and no margin closeouts (with
+a martingale the line says the multiplier scales each of the provider's
+trades and that size was not fixed). A balance the reader assumed is not
+evidence of the provider's, also beside an uploaded curve: without a known
+balance the percentages and quantities are not measured, and the table is
+replaced by one line with the reason. It does not describe a future result.
+
+The challenge's daily maximum (`audit/challenge_sizing.py`) uses UTC daily
+closes of a money curve. The money the rule allows is the daily limit times
+the account a program states its dollar limits on (`ACCOUNT_SIZES`) or,
+otherwise, the history's starting balance;
+the card names which. The first day opens at the starting balance, so its
+loss counts too; the others open at the previous close. For an
+initial-balance rule the bound is limit x that balance / worst daily money
+loss. For a start-of-day rule each day is checked with that balance plus the
+scaled cumulative result, and the tightest bound wins. The typical size at
+that bound is rounded strictly down: a quantity exactly at the boundary
+touches the limit and drops one step. A worst day under half a percent of
+the starting balance is too small to size against, and a share above 10x
+the history's own size on its balance gives only a lower bound. The visible
+note excludes intraday losses and the total-loss rule. Flows after the
+start, curves without enough money evidence, a tiny worst day, no losing day
+or a bound that is not finite leave this maximum unmeasured with the reason;
+rules without a daily limit show no block, since the rule list says so.
+
+Every new figure keeps its evidence label on a card or in a table. The text
+is in Spanish, English and Portuguese. The free preview keeps its content
+and shows none of these blocks. No form fields or broker connections are
+added.
+
 ### What data the test ran on (`audit/testdata.py`)
 
 For buyers of a robot. Only for MetaTrader tester reports (MT4 HTML, MT5
@@ -6612,3 +6678,21 @@ summary (`tests/test_audit_informe_fondo_coherente.py`, es/en/pt, every voice).
 - **Unchanged.** A backtest, `/ejemplo`, `/sample` and `/pt/exemplo` included,
   and an account or signal read word for word as before this branch: their
   served pages and every voice of both samples are byte-identical.
+
+### Signal-copier checklist (11 October 2026)
+
+The three signal-copier audience translations now answer the search question
+with seven numbered checks, the existing free calculators and export guides,
+and three visible questions serialized as `FAQPage`. `audience_numbers.py`
+reuses Wilson, fixed-size ruin and history-versus-luck calculations; all example
+inputs and derived outputs are DECLARED. It imports the existing account and
+trade-pattern thresholds, adding no flag or criterion. Gain and drawdown are
+not inputs of the current figure reader, so the page leaves the luck Sharpe
+unmeasured (trial count missing) and asks for the file. The reader and ruin
+links open pre-filled with the example, the example states the break-even win
+rate and the expectancy at the declared rate and at Wilson's lower end, and
+evidence codes stay in attributes (inside a sentence the localizer would print
+them capitalised); the checks say "declared" in plain words instead. Every
+title fits the 65-character cap, with no exception in the hygiene test.
+Assumptions, precision and checks are recorded in
+`docs/CODEX-31-NOTAS.md`.

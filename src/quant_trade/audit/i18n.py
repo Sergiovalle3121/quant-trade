@@ -22,7 +22,9 @@ from collections.abc import Iterable
 from typing import Any
 
 from quant_trade.audit import report_pt
+from quant_trade.audit.challenge_sizing import TRANSLATIONS as DAILY_SIZE_TRANSLATIONS
 from quant_trade.audit.redflags import FLAG_TITLES
+from quant_trade.audit.sizing import QUANTITY_NOTES
 from quant_trade.audit.upload_rejections import REJECTION_CATEGORIES, REJECTION_COPY
 from quant_trade.audit.verdict import NOT_MEASURED_ES
 
@@ -76,6 +78,8 @@ _TRIAL_SOURCES: dict[str, str] = {
 }
 
 _RULES_SOURCE: tuple[tuple[str, str], ...] = (
+    *DAILY_SIZE_TRANSLATIONS["es"].items(),
+    *((note["en"], note["es"]) for note in QUANTITY_NOTES.values()),
     # Public tool share-card notices (tool_cards); no results or affiliation.
     (
         "Research tool · Not a forecast",
@@ -155,11 +159,44 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
     ),
     # Institutional intake: the same notices also have native ES/PT page copy.
     (
+        "The template uses date,gross_return,net_return,benchmark: gross, net and "
+        "benchmark returns; variants go in the separate CSV. All four rows are entirely "
+        "fictional and only show the format: replace them with your complete history. "
+        "Use YYYY-MM-DD dates and fractional returns (0.01 = 1 %), with a decimal point. "
+        "Remove the net_return or benchmark columns if you do not have those series.",
+        "La plantilla usa date,gross_return,net_return,benchmark: bruto, neto e índice "
+        "de referencia; las variantes van en el CSV aparte. Las cuatro filas son "
+        "totalmente ficticias y solo muestran el formato: sustitúyelas por tu historial "
+        "completo. Usa fechas AAAA-MM-DD y retornos en fracciones (0.01 = 1 %), con punto "
+        "decimal. Quita las columnas net_return o benchmark si no tienes esas series.",
+    ),
+    (
+        "We sign a mutual NDA before you send anything; you are welcome to send your own.",
+        "Firmamos un NDA mutuo antes de que nos mandes nada; puedes mandar el tuyo.",
+    ),
+    (
+        "Without your written permission, no report is published, the first one included, "
+        "and the company is not named.",
+        "Ningún informe, tampoco el primero, se publica ni se menciona a la empresa sin "
+        "permiso escrito.",
+    ),
+    (
+        "The review does not reconcile the figures with your broker or fund administrator, "
+        "is not operational due diligence and is not a GIPS presentation.",
+        "La revisión no concilia las cifras con el bróker ni con el administrador, no es "
+        "diligencia operativa y no es una presentación GIPS.",
+    ),
+    (
+        "We will write within 1 business day. We sign the mutual NDA before receiving your files.",
+        "Te escribimos en 1 día hábil. Firmamos el NDA mutuo antes de recibir tus archivos.",
+    ),
+    (
         "These details carry the DECLARED label: they are supplied by the person requesting "
-        "the review. This form has no attachments; upload the series later through the usual "
-        "flow.",
+        "the review. This form has no attachments and needs no confidential data: the series "
+        "and the details come after the NDA, through the usual flow.",
         "Estos datos llevan la etiqueta «DECLARED»: los aporta quien solicita la "
-        "revisión. Aquí no se adjuntan archivos; la serie se sube después por el flujo habitual.",
+        "revisión. Aquí no se adjuntan archivos ni hace falta escribir datos confidenciales: la "
+        "serie y los detalles van después del NDA, por el flujo habitual.",
     ),
     (
         "Check the fields. Use text without HTML and a valid email address.",
@@ -3791,6 +3828,11 @@ def _render(text: str, locale: str) -> str | None:
     singular sentence.
     """
     if locale == "pt":
+        if text in DAILY_SIZE_TRANSLATIONS["pt"]:
+            return DAILY_SIZE_TRANSLATIONS["pt"][text]
+        for note in QUANTITY_NOTES.values():
+            if text == note["en"]:
+                return note["pt"]
         return _render_portuguese(text) or _period_translation(text, locale)
     head, sep, rest = text.partition(": ")
     if sep and head in _PREFIXES:
