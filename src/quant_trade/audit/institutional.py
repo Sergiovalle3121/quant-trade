@@ -16,6 +16,17 @@ REVIEW_PATHS = {
     "en": "/en/institutional-review",
     "pt": "/pt/revisao-institucional",
 }
+#: One shared, fictional return-table download in the site's accepted format.
+#: Variants use a separate CSV: extra columns here would not ingest as variants.
+TEMPLATE_PATH = "/revision-institucional/plantilla.csv"
+TEMPLATE_FILENAME = "institutional-fictional-template.csv"
+TEMPLATE_CSV = (
+    b"date,gross_return,net_return,benchmark\n"
+    b"2000-01-31,0.010,0.009,0.005\n"
+    b"2000-02-29,-0.020,-0.021,-0.010\n"
+    b"2000-03-31,0.000,-0.001,0.000\n"
+    b"2000-04-30,0.020,0.019,0.010\n"
+)
 #: The sample institutional review (``institutional_sample``): its public page with
 #: the methodology notes, the full report with the notes on top, and its PDF.
 SAMPLE_PATHS = {
@@ -50,7 +61,7 @@ RERUN_DAYS = 30
 DELETE_DAYS = 30
 DEPOSIT_PERCENT = 50
 #: The day the offer's copy last changed (the sitemap's ``lastmod`` of its pages).
-OFFER_UPDATED = "2026-10-10"
+OFFER_UPDATED = "2026-10-11"
 FORM_FIELDS = frozenset(
     {
         "name",
@@ -94,7 +105,7 @@ COPY: dict[str, dict[str, Any]] = {
         "revisión. Aquí no se adjuntan archivos; la serie se sube después por el flujo habitual.",
         "privacy": "Privacidad",
         "received": "Solicitud recibida",
-        "next": "Te escribimos en 1 día hábil. Prepara la serie bruta y neta y tu benchmark.",
+        "next": "Te escribimos en 1 día hábil. Firmo el NDA mutuo antes de recibir tus archivos.",
         "back": "Volver al inicio",
         "invalid": "Revisa los campos. Usa texto sin HTML y un correo válido.",
         "limited": "Se alcanzó el límite de solicitudes. Inténtalo dentro de una hora.",
@@ -129,7 +140,8 @@ COPY: dict[str, dict[str, Any]] = {
         "privacy": "Privacy",
         "received": "Request received",
         "next": (
-            "We will write within 1 business day. Prepare your gross and net series and benchmark."
+            "We will write within 1 business day. "
+            "I sign the mutual NDA before receiving your files."
         ),
         "back": "Back to home",
         "invalid": "Check the fields. Use text without HTML and a valid email address.",
@@ -164,7 +176,7 @@ COPY: dict[str, dict[str, Any]] = {
         "habitual.",
         "privacy": "Privacidade",
         "received": "Solicitação recebida",
-        "next": "Escrevemos em 1 dia útil. Prepare a série bruta e líquida e seu benchmark.",
+        "next": "Escrevemos em 1 dia útil. Assino o NDA mútuo antes de receber seus arquivos.",
         "back": "Voltar ao início",
         "invalid": "Revise os campos. Use texto sem HTML e um e-mail válido.",
         "limited": "O limite de solicitações foi atingido. Tente novamente em uma hora.",
@@ -343,6 +355,38 @@ OFFER_COPY: dict[str, dict[str, Any]] = {
             "/comprobar mientras la auditoría no se borre.",
             "La llamada y las re-ejecuciones de tu alcance.",
         ),
+        "send_title": "Qué mandar",
+        "send_items": (
+            "Retornos de la cartera modelo, mensuales o diarios, en un CSV de dos columnas "
+            "(date,return), o una serie de NAV (date,nav). Bruto y neto de costos si tienes "
+            "ambos; si no, bruto más el supuesto de costos.",
+            "Índice de referencia: su serie en el mismo formato, o solo su nombre si es un "
+            "índice estándar.",
+            "Cuántas variantes probaste antes de fijar las reglas. Si tienes sus series, "
+            "envíalas en un CSV aparte con una columna de fecha y una por variante "
+            "(date,variant_1,variant_2), con las mismas fechas que la cartera. Si no, basta "
+            "el número y el informe lo marca como declarado.",
+            "Periodo reservado: la fecha desde la que las reglas quedaron fijas y si la "
+            "serie anterior se usó para elegirlas.",
+            "Supuestos de costos: rotación de la cartera y costo por rebalanceo expresado en "
+            "puntos básicos (pb).",
+        ),
+        "template_link": "Descargar plantilla CSV con datos ficticios",
+        "template_note": (
+            "La plantilla usa date,gross_return,net_return,benchmark: bruto, neto e índice "
+            "de referencia; las variantes van en el CSV aparte. Las cuatro filas son "
+            "totalmente ficticias y solo muestran el formato: sustitúyelas por tu historial "
+            "completo. Usa fechas AAAA-MM-DD y retornos en fracciones (0.01 = 1 %), con punto "
+            "decimal. Quita las columnas net_return o benchmark si no tienes esas series."
+        ),
+        "nda": "Firmo un NDA mutuo antes de que manden nada; pueden mandar el suyo.",
+        "publication_note": (
+            "El primer informe no se publica ni se menciona a la empresa sin permiso escrito."
+        ),
+        "scope_limit": (
+            "No concilia las cifras con el bróker ni con el administrador, no es diligencia "
+            "operativa y no es una presentación GIPS."
+        ),
         "timeline_title": "Plazos",
         "timeline": (
             "Respondemos tu solicitud en 1 día hábil.",
@@ -367,7 +411,6 @@ OFFER_COPY: dict[str, dict[str, Any]] = {
             "así la auditoría queda como pagada y la limpieza de las auditorías no pagadas no la "
             "borra antes de ese plazo.",
             "Pago: {deposit} % al aceptar la cotización y {rest} % al entregar.",
-            "Ofrecemos un acuerdo de confidencialidad (NDA) mutuo.",
             "Es una lectura estadística independiente de la serie que aportas, no una "
             "verificación de cómo se construyó la señal.",
         ),
@@ -430,6 +473,38 @@ OFFER_COPY: dict[str, dict[str, Any]] = {
             "until the audit is deleted.",
             "The call and the re-runs of your scope.",
         ),
+        "send_title": "What to send",
+        "send_items": (
+            "Monthly or daily model portfolio returns in a two-column CSV (date,return), "
+            "or a NAV series (date,nav). Gross and net of costs if you have both; otherwise, "
+            "gross returns plus the cost assumption.",
+            "Benchmark: its series in the same format, or just its name if it is a standard index.",
+            "How many variants you tested before fixing the rules. If you have their series, "
+            "send them in a separate CSV with a date column and one column per variant "
+            "(date,variant_1,variant_2), using the same dates as the portfolio. Otherwise, "
+            "the count is enough and the report marks it as declared.",
+            "Reserved period: the date from which the rules were fixed, and whether the "
+            "earlier series was used to choose them.",
+            "Cost assumptions: portfolio turnover and cost per rebalance expressed in "
+            "basis points (bps).",
+        ),
+        "template_link": "Download CSV template with fictional data",
+        "template_note": (
+            "The template uses date,gross_return,net_return,benchmark: gross, net and "
+            "benchmark returns; variants go in the separate CSV. All four rows are entirely "
+            "fictional and only show the format: replace them with your complete history. "
+            "Use YYYY-MM-DD dates and fractional returns (0.01 = 1 %), with a decimal point. "
+            "Remove the net_return or benchmark columns if you do not have those series."
+        ),
+        "nda": "I sign a mutual NDA before you send anything; you can send yours.",
+        "publication_note": (
+            "The first report is not published and the company is not mentioned without "
+            "written permission."
+        ),
+        "scope_limit": (
+            "It does not reconcile figures with the broker or administrator, is not "
+            "operational due diligence and is not a GIPS presentation."
+        ),
         "timeline_title": "Timeline",
         "timeline": (
             "We answer your request within 1 business day.",
@@ -453,7 +528,6 @@ OFFER_COPY: dict[str, dict[str, Any]] = {
             "the audit then counts as paid, and the clean-up of unpaid audits does not delete it "
             "before that date.",
             "Payment: {deposit} % on accepting the quote and {rest} % on delivery.",
-            "We offer a mutual non-disclosure agreement (NDA).",
             "It is an independent statistical reading of the series you supply, not a "
             "verification of how the signal was built.",
         ),
@@ -516,6 +590,39 @@ OFFER_COPY: dict[str, dict[str, Any]] = {
             "/pt/comprovar enquanto a auditoria não for excluída.",
             "A chamada e as novas execuções do seu escopo.",
         ),
+        "send_title": "O que enviar",
+        "send_items": (
+            "Retornos mensais ou diários da carteira modelo em um CSV de duas colunas "
+            "(date,return), ou uma série de NAV (date,nav). Brutos e líquidos de custos se "
+            "tiver ambos; caso contrário, brutos mais a premissa de custos.",
+            "Índice de referência: sua série no mesmo formato, ou apenas o nome se for um "
+            "índice padrão.",
+            "Quantas variantes você testou antes de fixar as regras. Se tiver suas séries, "
+            "envie-as em um CSV separado com uma coluna de data e uma por variante "
+            "(date,variant_1,variant_2), com as mesmas datas da carteira. Caso contrário, "
+            "basta o número e o relatório o marca como declarado.",
+            "Período reservado: a data a partir da qual as regras ficaram fixas e se a "
+            "série anterior foi usada para escolhê-las.",
+            "Premissas de custos: giro da carteira e custo por rebalanceamento expresso em "
+            "pontos-base (bps).",
+        ),
+        "template_link": "Baixar modelo CSV com dados fictícios",
+        "template_note": (
+            "O modelo usa date,gross_return,net_return,benchmark: retornos brutos, líquidos "
+            "e do índice de referência; as variantes vão no CSV separado. As quatro linhas "
+            "são totalmente fictícias e só mostram o formato: substitua-as pelo histórico "
+            "completo. Use datas AAAA-MM-DD e retornos em frações (0.01 = 1 %), com ponto "
+            "decimal. Remova as colunas net_return ou benchmark se não tiver essas séries."
+        ),
+        "nda": "Assino um NDA mútuo antes de vocês enviarem qualquer dado; podem enviar o seu.",
+        "publication_note": (
+            "O primeiro relatório não é publicado nem a empresa é mencionada sem permissão "
+            "por escrito."
+        ),
+        "scope_limit": (
+            "Não concilia os números com a corretora nem com o administrador, não é "
+            "diligência operacional e não é uma apresentação GIPS."
+        ),
         "timeline_title": "Prazos",
         "timeline": (
             "Respondemos à sua solicitação em 1 dia útil.",
@@ -539,7 +646,6 @@ OFFER_COPY: dict[str, dict[str, Any]] = {
             "assim a auditoria fica como paga e a limpeza das auditorias não pagas não a exclui "
             "antes desse prazo.",
             "Pagamento: {deposit} % ao aceitar a cotação e {rest} % na entrega.",
-            "Oferecemos um acordo de confidencialidade (NDA) mútuo.",
             "É uma leitura estatística independente da série que você fornece, não uma "
             "verificação de como o sinal foi construído.",
         ),
@@ -632,7 +738,7 @@ def offer_structured_data(locale: str, url: str) -> dict[str, Any]:
 
 def offer_html(locale: str, *, privacy_url: str) -> str:
     """The review page's description of the offer: the two scopes with their prices,
-    what the client receives, the timeline, the terms and the sample review."""
+    what the client receives and sends, the timeline, terms and sample review."""
     # Imported here: ``theme`` imports ``seo``, which reads this module's paths.
     from quant_trade.audit.theme import icon
 
@@ -675,12 +781,28 @@ def offer_html(locale: str, *, privacy_url: str) -> str:
         f"<p><a class='link-more' href='{SAMPLE_PATHS[locale]}'>"
         f"{e(offer_text(locale, 'sample_link'))}{icon('arrow')}</a></p>"
     )
+    send = (
+        "<ol>"
+        + "".join(f"<li>{e(line)}</li>" for line in offer_lines(locale, "send_items"))
+        + "</ol>"
+        + f"<p><a class='link-more' href='{TEMPLATE_PATH}' download>"
+        f"{e(offer_text(locale, 'template_link'))}</a></p>"
+        f"<p>{e(offer_text(locale, 'template_note'))}</p>"
+        f"<p>{e(offer_text(locale, 'nda'))}</p>"
+        f"<p>{e(offer_text(locale, 'publication_note'))}</p>"
+    )
     return (
         # The cards' names are the section's headings, as on the pricing page.
         f"<section class='rsec' aria-label='{e(offer_text(locale, 'plans_title'))}'>"
         f"<div class='plan-cards'>{plans}</div></section>"
         + section("deliverables_title", checks(offer_lines(locale, "deliverables")))
+        + section("send_title", send)
         + section("timeline_title", checks(offer_lines(locale, "timeline")))
-        + section("terms_title", checks(offer_lines(locale, "terms")) + privacy)
+        + section(
+            "terms_title",
+            checks(offer_lines(locale, "terms"))
+            + f"<p>{e(offer_text(locale, 'scope_limit'))}</p>"
+            + privacy,
+        )
         + section("sample_title", sample)
     )

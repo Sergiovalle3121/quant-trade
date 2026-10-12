@@ -146,6 +146,37 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
     ),
     # Institutional intake: the same notices also have native ES/PT page copy.
     (
+        "The template uses date,gross_return,net_return,benchmark: gross, net and "
+        "benchmark returns; variants go in the separate CSV. All four rows are entirely "
+        "fictional and only show the format: replace them with your complete history. "
+        "Use YYYY-MM-DD dates and fractional returns (0.01 = 1 %), with a decimal point. "
+        "Remove the net_return or benchmark columns if you do not have those series.",
+        "La plantilla usa date,gross_return,net_return,benchmark: bruto, neto e índice "
+        "de referencia; las variantes van en el CSV aparte. Las cuatro filas son "
+        "totalmente ficticias y solo muestran el formato: sustitúyelas por tu historial "
+        "completo. Usa fechas AAAA-MM-DD y retornos en fracciones (0.01 = 1 %), con punto "
+        "decimal. Quita las columnas net_return o benchmark si no tienes esas series.",
+    ),
+    (
+        "I sign a mutual NDA before you send anything; you can send yours.",
+        "Firmo un NDA mutuo antes de que manden nada; pueden mandar el suyo.",
+    ),
+    (
+        "The first report is not published and the company is not mentioned without "
+        "written permission.",
+        "El primer informe no se publica ni se menciona a la empresa sin permiso escrito.",
+    ),
+    (
+        "It does not reconcile figures with the broker or administrator, is not "
+        "operational due diligence and is not a GIPS presentation.",
+        "No concilia las cifras con el bróker ni con el administrador, no es diligencia "
+        "operativa y no es una presentación GIPS.",
+    ),
+    (
+        "We will write within 1 business day. I sign the mutual NDA before receiving your files.",
+        "Te escribimos en 1 día hábil. Firmo el NDA mutuo antes de recibir tus archivos.",
+    ),
+    (
         "These details carry the DECLARED label: they are supplied by the person requesting "
         "the review. This form has no attachments; upload the series later through the usual "
         "flow.",
