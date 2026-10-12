@@ -218,6 +218,10 @@ class ImportedReport:
     #: The volume of each trade in ``trades`` in the platform's lots, as the
     #: file prints it; ``None`` unless the format is one of ``LOT_FORMATS``.
     lots: list[float] | None = None
+    #: Source volumes before the money-per-point multiplier in Trade.quantity.
+    trade_quantities: list[float] | None = None
+    #: ``lot``, ``contract`` or ``file`` when the source unit is not established.
+    quantity_unit: str = "file"
 
 
 def is_return_series(data: bytes) -> bool:
@@ -3936,7 +3940,38 @@ def _assemble(draft: _Draft, fallback_initial: float | None) -> ImportedReport:
             (item.time, item.amount) for item in draft.cash or [] if item.is_flow and item.amount
         ),
         lots=trade_lots if draft.source_format in LOT_FORMATS else None,
+        trade_quantities=trade_lots,
+        quantity_unit=_quantity_unit(draft),
     )
+
+
+def _quantity_unit(draft: _Draft) -> str:
+    """Identify source units without treating economic quantity as lots.
+
+    An ambiguous ticker or a mix of futures and other instruments retains
+    the file's unnamed units. A bare futures root may also be a share ticker.
+    """
+    if draft.source_format in LOT_FORMATS:
+        return "lot"
+    from quant_trade.audit.universal import _contract, normalise
+
+    quantity = normalise(draft.metadata.get("column_quantity", ""))
+    if quantity in {"lot", "lots", "lote", "lotes", "volumelots"}:
+        return "lot"
+    ctrader_columns = {
+        "quantity": "closingquantity",
+        "side": "openingdirection",
+        "entry_time": "openingtime",
+        "exit_time": "closingtime",
+    }
+    if all(
+        normalise(draft.metadata.get(f"column_{role}", "")) == name
+        for role, name in ctrader_columns.items()
+    ):
+        return "lot"
+    if draft.trips and all(_contract(trip.symbol) is not None for trip in draft.trips):
+        return "contract"
+    return "file"
 
 
 # ---------------------------------------------------------------------------

@@ -36,6 +36,7 @@ from quant_trade.audit import analytics, charts, redflags, verdict
 from quant_trade.audit import behaviour as behaviour_lib
 from quant_trade.audit import breaks as breaks_lib
 from quant_trade.audit import cashrate as cashrate_lib
+from quant_trade.audit import challenge_sizing as challenge_sizing_lib
 from quant_trade.audit import costs as cost_lib
 from quant_trade.audit import crises as crises_lib
 from quant_trade.audit import currency as currency_lib
@@ -1822,6 +1823,7 @@ def _challenge(
     luck: dict[str, Any] | None = None,
     reconciliation: dict[str, Any] | None = None,
     per_lot: dict[str, Any] | None = None,
+    martingale: bool = False,
 ) -> dict[str, Any]:
     key = inputs.declared.challenge or DEFAULT_PRESET
     rules = get_preset(key)
@@ -1892,6 +1894,9 @@ def _challenge(
             samples=samples,
             seed=seed,
             per_lot=per_lot,
+            martingale=martingale,
+            money_curve=money_curve,
+            reconciliation=reconciliation,
         )
     return out
 
@@ -2086,6 +2091,9 @@ def _challenge_sizing(
     samples: int,
     seed: int,
     per_lot: dict[str, Any] | None = None,
+    martingale: bool = False,
+    money_curve: bool = False,
+    reconciliation: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """The chosen program at 0.5x, 1x, 1.5x and 2x the history's size.
 
@@ -2109,7 +2117,11 @@ def _challenge_sizing(
         return {"status": "NOT_MEASURED", "reason": str(figure.get("note") or "not measured")}
     if inputs.equity.source != "equity":
         return {"status": "NOT_MEASURED", "reason": RETURNS_NOT_MONEY}
-    lot = _average_lot(inputs, per_lot)
+    lot = (
+        not_measured(sizing_lib.QUANTITY_NOTES["martingale"]["en"])
+        if martingale
+        else _average_lot(inputs, per_lot)
+    )
     balance = _sizing_balance(inputs)
     account = ACCOUNT_SIZES.get(key)
     on_account = _account_lot(lot, balance, account)
@@ -2154,6 +2166,29 @@ def _challenge_sizing(
     }
     if on_account is not None:
         out["size_per_trade_account"] = on_account
+    profile = sizing_lib.quantity_profile(
+        inputs.trades.trades if inputs.trades is not None else [],
+        quantities=inputs.trade_quantities,
+        unit=inputs.quantity_unit,
+        martingale=martingale,
+    )
+    if money_curve:
+        out["daily_limit"] = challenge_sizing_lib.daily_limit_review(
+            inputs.equity.frame, get_preset(key), profile, balance
+        )
+    else:
+        # A flow-adjusted index, or a separate curve not reconciled to the
+        # trades, cannot price the source quantities through money losses.
+        out["daily_limit"] = {
+            "status": "NOT_MEASURED",
+            "reason": (
+                _not_money_reason(inputs, reconciliation)
+                if inputs.trades is not None and inputs.trades.trades
+                else "no trades uploaded"
+            ),
+            "unit": profile["unit"],
+            "quantity_profile": profile,
+        }
     return out
 
 
@@ -2567,10 +2602,17 @@ def run_audit(
         sizing_lib.capital_review(
             inputs.trades.trades,
             fees=inputs.trades.fees,
-            starting_balance=inputs.initial_balance or inputs.declared.initial_balance,
+            starting_balance=(
+                None
+                if _sizing_balance(inputs)["evidence"] == NOT_MEASURED
+                else inputs.initial_balance or inputs.declared.initial_balance
+            ),
             platform_fall=_platform_fall(inputs.report_metadata),
             curve_fall=_curve_fall(inputs),
             hidden_open_losses=bool(HIDDEN_LOSS_FLAGS & {flag.code for flag in flags}),
+            quantities=inputs.trade_quantities,
+            quantity_unit=inputs.quantity_unit,
+            martingale=any(flag.code == "MARTINGALE_SIZING" for flag in flags),
             samples=risk_samples,
             seed=seed,
         )
@@ -2657,6 +2699,7 @@ def run_audit(
             luck=luck,
             reconciliation=reconciliation,
             per_lot=costs.get("break_even_per_lot"),
+            martingale=any(flag.code == "MARTINGALE_SIZING" for flag in flags),
         )
     )
 

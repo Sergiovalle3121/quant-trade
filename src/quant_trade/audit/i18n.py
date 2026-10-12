@@ -22,7 +22,9 @@ from collections.abc import Iterable
 from typing import Any
 
 from quant_trade.audit import report_pt
+from quant_trade.audit.challenge_sizing import TRANSLATIONS as DAILY_SIZE_TRANSLATIONS
 from quant_trade.audit.redflags import FLAG_TITLES
+from quant_trade.audit.sizing import QUANTITY_NOTES
 from quant_trade.audit.upload_rejections import REJECTION_CATEGORIES, REJECTION_COPY
 from quant_trade.audit.verdict import NOT_MEASURED_ES
 
@@ -76,6 +78,18 @@ _TRIAL_SOURCES: dict[str, str] = {
 }
 
 _RULES_SOURCE: tuple[tuple[str, str], ...] = (
+    *DAILY_SIZE_TRANSLATIONS["es"].items(),
+    *((note["en"], note["es"]) for note in QUANTITY_NOTES.values()),
+    (
+        "The size was not fixed: it varied widely across trades. This figure uses the median.",
+        "El tamaño no fue fijo: varió mucho entre operaciones. Esta cifra usa la mediana.",
+    ),
+    (
+        "Same starting balance as the provider, fixed sizes and a linear fall in money, "
+        "with no margin closeouts.",
+        "Mismo balance inicial que el proveedor, tamaños fijos y caída lineal en dinero, "
+        "sin cierres por margen.",
+    ),
     # Public tool share-card notices (tool_cards); no results or affiliation.
     (
         "Research tool · Not a forecast",
@@ -3782,6 +3796,11 @@ def _render(text: str, locale: str) -> str | None:
     singular sentence.
     """
     if locale == "pt":
+        if text in DAILY_SIZE_TRANSLATIONS["pt"]:
+            return DAILY_SIZE_TRANSLATIONS["pt"][text]
+        for note in QUANTITY_NOTES.values():
+            if text == note["en"]:
+                return note["pt"]
         return _render_portuguese(text) or _period_translation(text, locale)
     head, sep, rest = text.partition(": ")
     if sep and head in _PREFIXES:

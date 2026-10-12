@@ -2843,6 +2843,52 @@ weekly sample cannot stand in for the whole history. The reason tells the client
 whose closed trades end with a net loss after fees gets no capital figures
 (NOT_MEASURED): a size at which a losing history may be run is not given.
 
+### Tamaños del archivo y multiplicador de copia
+
+El informe completo HTML y su PDF muestran la mediana de los volúmenes
+originales del archivo, multiplicada por la fracción de tamaño de cada límite
+de pérdida. Los importadores conservan ese volumen antes de convertir
+`Trade.quantity` a unidades económicas. MetaTrader y columnas de lotes
+reconocidas, incluidas las de cTrader, usan lotes; los símbolos de futuros
+reconocidos usan contratos. Símbolos ambiguos o mezclas de instrumentos se
+mantienen como unidades del archivo, sin atribuirles un contrato económico.
+
+Los lotes se redondean hacia abajo en pasos de 0.01 y los contratos a enteros.
+Si el resultado es cero, se indica que no cabe ni el mínimo con ese límite.
+Las unidades sin identificar se muestran con dos decimales. El nuevo umbral
+de variación es percentil 90 del volumen mayor que tres veces la mediana:
+se avisa que el tamaño no fue fijo y que la cifra usa la mediana. Una señal
+existente `MARTINGALE_SIZING` deja las cantidades sin medir, incluido el
+tamaño del reto; no se presenta una cantidad fija para ese patrón.
+
+La tabla de copia usa caída de referencia en dinero por multiplicador,
+dividida entre el balance inicial, a 0.5x, 1x, 2x y 3x. Desde el 100 % añade
+el aviso de pérdida de la cuenta entera. Es una escala lineal del historial:
+supone el mismo balance inicial del proveedor, tamaños fijos y ausencia de
+cierres por margen. Un balance supuesto por el importador no se convierte
+en evidencia del balance del proveedor; sin balance conocido, no se miden
+los porcentajes ni las cantidades relativas. No describe un resultado futuro.
+
+El máximo diario del reto (`audit/challenge_sizing.py`) usa cierres diarios
+UTC de una curva en dinero y el balance del historial. El primer día parte
+del balance inicial, para incluir también su pérdida; los siguientes parten
+del cierre anterior. Para una regla sobre
+balance inicial, la cota es límite por balance inicial entre la peor pérdida
+diaria en dinero. Para una regla sobre balance al inicio del día, evalúa
+todos los días con el saldo inicial más el resultado acumulado escalado y
+toma la cota más restrictiva. El tamaño típico por esa cota se redondea
+estrictamente hacia abajo: una cantidad justo en la frontera toca el límite
+y se reduce un paso. La operación protege también la frontera numérica del
+cociente. La nota visible excluye pérdidas intradía y la regla de pérdida
+total. Flujos posteriores al inicio, curvas sin evidencia monetaria suficiente,
+reglas sin límite diario, ausencia de días perdedores o una cota no finita
+dejan este máximo sin medir y muestran el motivo.
+
+Todas las cifras nuevas conservan etiquetas de evidencia en tarjetas o
+tablas. Los textos están en español, inglés y portugués. La vista previa
+gratis conserva su contenido y no muestra estos bloques. No se añaden
+campos al formulario ni conexiones a un intermediario.
+
 ### What data the test ran on (`audit/testdata.py`)
 
 For buyers of a robot. Only for MetaTrader tester reports (MT4 HTML, MT5

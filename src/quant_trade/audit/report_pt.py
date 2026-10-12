@@ -273,14 +273,26 @@ REPORT: dict[str, Any] = {
         "capital_needed": "Capital necessário no tamanho do backtest",
         "capital_scale": "Tamanho sobre o saldo inicial do arquivo ({balance})",
         "capital_scale_plain": "Tamanho sobre o saldo inicial",
+        "capital_quantity": "Tamanho nas unidades do arquivo",
+        "capital_median": "Tamanho típico do histórico (mediana)",
+        "ch_daily_size": "Tamanho máximo pelo limite diário de perda",
+        "capital_variable": (
+            "O tamanho não foi fixo: variou muito entre operações. Esta cifra usa a mediana."
+        ),
+        "copy_title": "Se você copiar com multiplicador",
+        "copy_fall": "Queda sobre seu saldo inicial",
+        "copy_assumption": (
+            "Mesmo saldo inicial do provedor, tamanhos fixos e queda linear em dinheiro, "
+            "sem encerramentos por margem."
+        ),
         "capital_scale_help": (
-            "1x é o tamanho de lote do backtest; 0.50x é a metade. Acima de 1x, a queda em "
+            "1x é o tamanho de posição do backtest; 0.50x é a metade. Acima de 1x, a queda em "
             "dinheiro cresce na mesma proporção."
         ),
         "capital_fall_account": "Queda de referência em dinheiro, no tamanho que a conta usou.",
         "capital_needed_account": "Capital necessário no tamanho que a conta usou",
         "capital_scale_help_account": (
-            "1x é o tamanho de lote que a conta usou; 0.50x é a metade. Acima de 1x, a queda em "
+            "1x é o tamanho de posição que a conta usou; 0.50x é a metade. Acima de 1x, a queda em "
             "dinheiro cresce na mesma proporção."
         ),
         "capital_open_loss": (
