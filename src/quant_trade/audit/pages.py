@@ -177,6 +177,7 @@ from quant_trade.audit.theme import (
     logo,
     static_ready,
 )
+from quant_trade.audit.tools_examples import examples as tool_examples
 from quant_trade.audit.tools_hub import COPY as TOOLS_COPY
 from quant_trade.audit.tools_hub import TOOL_KEYS, TOOLS_PATH, tools_url
 from quant_trade.audit.upload_limits import guide_limit_text, upload_limit_text
@@ -4889,7 +4890,7 @@ def examples_page(*, locale: str = "es", base_url: str = "") -> str:
 
 
 def tools_page(*, locale: str = "es", base_url: str = "") -> str:
-    """The free tools that need no file: what each one asks for and what it gives."""
+    """The free tools, with declared examples computed by each destination tool."""
     locale = _locale(locale)
     words = TOOLS_COPY[locale]
     title = f"{words['seo_title']} · {BRAND}"
@@ -4902,6 +4903,39 @@ def tools_page(*, locale: str = "es", base_url: str = "") -> str:
         ],
         locale,
     )
+    examples = tool_examples(locale)
+
+    def example_line(key: str) -> str:
+        example = examples[key]
+        # No badge here: evidence labels belong to tables, cards and /ejemplos, and
+        # these inputs are made up for the example; the note says how it was worked out.
+        if key == "check":
+            note = ""  # No figure: the card points to the sample PDF the check recognises.
+        elif key == "rules_table":
+            note = _e(words["example_count"])  # Counts over the preset rows.
+        else:
+            note = _e(words["example_evidence"])
+        download = ""
+        if example.download:
+            download = (
+                f" <a href='{_e(example.download)}' download data-tool-example-file='{key}'>"
+                f"{_e(words['example_file'])}</a>"
+            )
+        muted = f" <span class='muted'>{note}</span>" if note else ""
+        # Inline like the list above it: .article-cta p resets margins to 0.
+        return (
+            f"<p data-tool-example='{key}' data-evidence='{_e(example.evidence)}' "
+            f"style='margin-top:16px'>"
+            f"<strong>{_e(words['example'])}</strong> {_e(example.text)}{download}{muted}</p>"
+        )
+
+    def example_link(key: str) -> str:
+        return (
+            f"<a class='btn btn-dark' href='{_e(examples[key].url)}' "
+            f"data-tool-example-link='{key}' aria-describedby='tool-{key}'>"
+            f"{_e(words['example_open'])}<span class='go'>{icon('arrow')}</span></a>"
+        )
+
     tools = ""
     for key in TOOL_KEYS:
         tool = words[key]
@@ -4917,16 +4951,21 @@ def tools_page(*, locale: str = "es", base_url: str = "") -> str:
         if key == "challenge":
             # The rules the calculator uses, every firm on one page with source and date.
             more = (
-                f"<a class='link-more' href='{_e(rules_table_url(locale))}' data-rules-table>"
-                f"{_e(RULES_COPY[locale]['nav'])}{icon('arrow')}</a>"
+                f"<h3 id='tool-rules_table'><a class='link-more' "
+                f"href='{_e(rules_table_url(locale))}' data-rules-table>"
+                f"{_e(RULES_COPY[locale]['nav'])}{icon('arrow')}</a></h3>"
+                f"{example_line('rules_table')}"
+                f"<div class='back-row'>{example_link('rules_table')}</div>"
             )
         tools += (
             f"<section class='article-cta'><h2 id='tool-{key}'>{_e(_tool_name(key, locale))}</h2>"
             f"<p>{_e(tool['question'])}</p>"
             f"<ul class='checks' style='margin-top:16px'>{points}</ul>"
-            f"<div class='back-row'><a class='btn btn-dark' href='{_e(_tool_url(key, locale))}' "
+            f"{example_line(key)}"
+            f"<div class='back-row'>{example_link(key)}"
+            f"<a class='link-more' href='{_e(_tool_url(key, locale))}' "
             f"aria-describedby='tool-{key}'>{_e(words['open'])}"
-            f"<span class='go'>{icon('arrow')}</span></a>{more}</div></section>"
+            f"{icon('arrow')}</a></div>{more}</section>"
         )
     report = (
         f"<section class='article-cta'><h2>{_e(words['report_title'])}</h2>"

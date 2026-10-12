@@ -118,6 +118,15 @@ _RULES_SOURCE: tuple[tuple[str, str], ...] = (
             ),
         )
     ),
+    # Tools hub example notes (tools_hub.COPY) also have native ES/PT page copy.
+    ("Computed from declared figures", "Calculado a partir de lo declarado"),
+    ("Counted from the published rules", "Contado en las reglas publicadas"),
+    (
+        "Rigor's sample PDF → choose it in the form and the check answers that it is the "
+        "sample report, unchanged.",
+        "PDF de ejemplo de Rigor → al elegirlo en el formulario, la comprobación responde "
+        "que es el informe de ejemplo, sin cambios.",
+    ),
     # Public figure reader notes (reading.COPY); keep the Spanish rules explicit.
     (
         "The PNG image is temporarily unavailable.",
