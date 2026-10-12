@@ -1991,9 +1991,8 @@ GUIDES: tuple[Guide, ...] = (
                     "cambia, manda lo que veas en pantalla.",
                     "La pestaña Trade Activity se lee tal cual: Rigor se queda con las filas "
                     "Fills y empareja compras y ventas por símbolo en orden de llegada. La "
-                    "pestaña Trades se lee, sin los sufijos BP y EP, si en el formulario indicas "
-                    "que Trade Quantity es la cantidad; las demás columnas se reconocen por su "
-                    "nombre.",
+                    "pestaña Trades también se lee tal cual una vez quitados los sufijos BP y "
+                    "EP: Trade Quantity y las demás columnas se reconocen por su nombre.",
                     "No uses File >> Export para subir: está pensado para reimportar en Sierra "
                     "Chart, con fechas en UTC y precios sin ajustar (el formato nativo del "
                     "exchange, por ejemplo con Teton o Rithmic).",
@@ -2060,9 +2059,8 @@ GUIDES: tuple[Guide, ...] = (
                     "changes, go by what you see on screen.",
                     "The Trade Activity tab is read as it is: Rigor keeps the Fills rows and "
                     "pairs buys and sells per symbol in the order they happened. The Trades tab "
-                    "is read, without the BP and EP suffixes, once you say on the form that "
-                    "Trade Quantity is the quantity; the other columns are recognised by their "
-                    "names.",
+                    "is read as it is too, once the BP and EP suffixes are off: Trade Quantity "
+                    "and the other columns are recognised by their names.",
                     "Do not use File >> Export for the upload: it is meant for importing back "
                     "into Sierra Chart, with dates in UTC and unadjusted prices (the exchange's "
                     "native format, with Teton or Rithmic for example).",
@@ -2131,9 +2129,9 @@ GUIDES: tuple[Guide, ...] = (
                     "oficial do Trade Activity Log, lida em outubro de 2026; se a janela mudar, "
                     "siga o que aparece na tela.",
                     "A aba Trade Activity é lida como está: o Rigor fica com as linhas Fills e "
-                    "pareia compras e vendas por símbolo na ordem de chegada. A aba Trades é "
-                    "lida, sem os sufixos BP e EP, quando você indica no formulário que Trade "
-                    "Quantity é a quantidade; as outras colunas são reconhecidas pelo nome.",
+                    "pareia compras e vendas por símbolo na ordem de chegada. A aba Trades "
+                    "também é lida como está, uma vez retirados os sufixos BP e EP: Trade "
+                    "Quantity e as outras colunas são reconhecidas pelo nome.",
                     "Não use File >> Export para enviar: ele serve para reimportar no Sierra "
                     "Chart, com datas em UTC e preços sem ajuste (o formato nativo da bolsa, por "
                     "exemplo com Teton ou Rithmic).",

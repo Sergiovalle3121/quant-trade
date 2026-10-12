@@ -252,6 +252,7 @@ def test_every_sitemap_url_has_an_iso_lastmod_from_the_code(tmp_path: Path) -> N
         rules_table_lastmod,
     )
 
+    assert ARTICLE_PUBLICATION_DATES["regla-de-consistencia-prop-firm"] == "2026-10-11"
     response = _client(tmp_path).get("/sitemap.xml")
     assert response.status_code == 200
     root = ElementTree.fromstring(response.content)
@@ -266,6 +267,9 @@ def test_every_sitemap_url_has_an_iso_lastmod_from_the_code(tmp_path: Path) -> N
         *ARTICLE_PUBLICATION_DATES.values(),
         *GUIDES_PUBLISHED.values(),
     }
+    assert ARTICLE_PUBLICATION_DATES["riesgo-de-ruina-intervalo-de-confianza"] == "2026-10-11"
+    assert ARTICLE_PUBLICATION_DATES["drawdown-trailing-eod-intradia"] == "2026-10-11"
+    assert "2026-10-11" in known
     for url in root.findall("s:url", SITEMAP_NS):
         children = [child.tag.rsplit("}", 1)[-1] for child in url]
         # The schema's order: <loc>, then <lastmod>, then the xhtml alternates.

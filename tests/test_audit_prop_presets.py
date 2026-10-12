@@ -61,6 +61,47 @@ def test_invalid_rules_are_refused() -> None:
             ChallengeRules(**{**base, **change})
 
 
+def test_best_day_rules_read_elsewhere_name_their_page() -> None:
+    from quant_trade.audit.prop_presets import (
+        E2T_CONSISTENCY_URL,
+        MFF_CONSISTENCY_URL,
+        TOPSTEP_CONSISTENCY_URL,
+        TPT_CONSISTENCY_URL,
+    )
+
+    expected = {
+        "topstep-50k-combine": TOPSTEP_CONSISTENCY_URL,
+        "topstep-100k-combine": TOPSTEP_CONSISTENCY_URL,
+        "topstep-150k-combine": TOPSTEP_CONSISTENCY_URL,
+        "take-profit-trader-test-50k": TPT_CONSISTENCY_URL,
+        "myfundedfutures-rapid-eod-50k": MFF_CONSISTENCY_URL,
+        "myfundedfutures-rapid-50k": MFF_CONSISTENCY_URL,
+        "myfundedfutures-pro-50k": MFF_CONSISTENCY_URL,
+        "earn2trade-tcp-25k": E2T_CONSISTENCY_URL,
+        "earn2trade-gauntlet-mini-50k": E2T_CONSISTENCY_URL,
+    }
+    for key, rules in PRESETS.items():
+        assert rules.best_day_source_url == expected.get(key), key
+        if rules.best_day_source_url is not None:
+            # Another page than the program's source, already cited in the notes.
+            assert rules.best_day_limit is not None
+            assert rules.best_day_source_url != rules.source_url
+            assert any(rules.best_day_source_url in note for note in rules.notes), key
+    base = get_preset(DEFAULT_PRESET).to_dict()
+    base["notes"] = tuple(base["notes"])
+    assert base["best_day_limit"] is None
+    for change in (
+        {"best_day_source_url": "https://example.com/rule"},
+        {
+            "best_day_limit": 0.5,
+            "best_day_basis": "profit_target",
+            "best_day_source_url": "http://insecure.example/rule",
+        },
+    ):
+        with pytest.raises(ValueError):
+            ChallengeRules(**{**base, **change})
+
+
 def test_upload_form_shows_when_the_rules_were_read() -> None:
     from quant_trade.audit.guard import find_claims
     from quant_trade.audit.pages import _plain_date, upload_page

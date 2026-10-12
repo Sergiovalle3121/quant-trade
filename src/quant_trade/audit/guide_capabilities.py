@@ -87,7 +87,7 @@ GUIDE_FORMATS: dict[str, frozenset[str]] = {
     # The futures platforms' exports, read by their column names: Tradovate's
     # Performance report is a trade list and its Orders report a fill list;
     # TopstepX's Trades tab a trade list; Sierra Chart's Trade Activity tab a
-    # fill list and its Trades tab a trade list once the quantity column is named.
+    # fill list and its Trades tab a trade list ("Trade Quantity" is its size).
     "tradovate": _UNIVERSAL,
     "topstepx": frozenset({UNIVERSAL_TRADES_CSV}),
     "sierra-chart": _UNIVERSAL,

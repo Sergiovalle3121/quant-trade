@@ -4400,10 +4400,11 @@ Performance report as a trade list and its Orders report as a fill list,
 TopstepX's Trades tab as a trade list (a file with a single time column is
 refused, as the guide warns, and the column mapping does not fix that:
 `mapping.MAPPABLE_CODES`), Sierra Chart's Trade Activity tab (tab-delimited
-text, Fills rows kept) as a fill list and its Trades tab as a trade list once
-`Trade Quantity` is named as the quantity on the form and the default BP/EP
-position markers are turned off (Edit >> Include Begin/End Indicators in Trades
-List), which the importer otherwise refuses. The guides say only what those
+text, Fills rows kept) as a fill list and its Trades tab as a trade list
+(`Trade Quantity` is a quantity name the importer knows, so the form needs no
+mapping) once the default BP/EP position markers are turned off (Edit >>
+Include Begin/End Indicators in Trades List), which the importer otherwise
+refuses. The guides say only what those
 pages say: Tradovate's time-zone article covers the Notification Ticker alone,
 its Account Reports article names Live and Demo accounts and lists no fields,
 Topstep calls the file a CSV only for the Orders export, and Sierra Chart's
@@ -6223,7 +6224,12 @@ account, payment, credit, e-mail, legal or engine rule changed.
   `bot-ia-backtest-suerte`: the luck calculator opened with
   `LUCK_EXAMPLE_INPUT`, the example both articles print.
   `auditoria-independiente-backtest`, `que-hacer-despues-del-backtest` and
-  `auditar-cartera-modelo-senales`: form and sample report. `Article.from_dict`
+  `auditar-cartera-modelo-senales`: form and sample report.
+  `regla-de-consistencia-prop-firm` and `drawdown-trailing-eod-intradia`:
+  `/para/retos-prop-firm`, like the other challenge article.
+  `riesgo-de-ruina-intervalo-de-confianza`: the risk-of-ruin calculator opened
+  with the article's first declared case (`article_numbers.RUIN_INPUTS[0]`,
+  without the share tag). `Article.from_dict`
   refuses an unknown kind, guide, audience page or example at import.
 
 `tests/test_audit_conversion.py` reads every page over HTTP with

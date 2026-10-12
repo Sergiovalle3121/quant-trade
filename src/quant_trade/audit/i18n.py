@@ -76,6 +76,13 @@ _TRIAL_SOURCES: dict[str, str] = {
 }
 
 _RULES_SOURCE: tuple[tuple[str, str], ...] = (
+    # Public tool share-card notices (tool_cards); no results or affiliation.
+    (
+        "Research tool · Not a forecast",
+        "Herramienta de investigación · No es una predicción",
+    ),
+    ("Consult each firm's current rules", "Consulta las reglas vigentes de cada firma"),
+    ("Rigor is not affiliated", "Rigor no está afiliado"),
     # Upload guidance keeps its native copy together; every new English note
     # also belongs to the central Spanish translation rules.
     *(
