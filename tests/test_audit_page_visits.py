@@ -198,15 +198,8 @@ LEGAL_NAMES: dict[str, tuple[str, str, str]] = {
     "lectura": ("tarjeta de cifras", "figures card", "cartão de números"),
     "ejemplos": ("ejemplos", "examples", "exemplos"),
     "herramientas": ("página de herramientas", "tools page", "página de ferramentas"),
-}
-#: Families the counter records that the privacy text does not name yet, and the
-#: page-group dimension it persists: ``legal.py`` catches up in its own change
-#: (docs/CODEX-33-NOTAS.md, «Texto de privacidad»). Once the text names one of
-#: these, this test fails until the entry moves up to LEGAL_NAMES: the promise
-#: and the counter can drift apart only on purpose.
-LEGAL_TEXT_PENDING: dict[str, tuple[str, str, str]] = {
-    "reglas-prop-firm": ("reglas", "rules", "regras"),  # counted before this branch
-    "v": ("verificación", "verification", "verificação"),  # counted before this branch
+    "reglas-prop-firm": ("tabla de reglas", "rules table", "tabela de regras"),
+    "v": ("verificación", "verification", "verificação"),
     "guias": ("guías", "guides", "guias"),
     "articulos": ("artículos", "articles", "artigos"),
     "revision-institucional": (
@@ -214,7 +207,11 @@ LEGAL_TEXT_PENDING: dict[str, tuple[str, str, str]] = {
         "institutional review",
         "revisão institucional",
     ),
-    "dimension:page-group": ("grupo de página", "page group", "grupo de página"),
+}
+#: The dimensions the counter persists besides day, language and tag, as the
+#: privacy text names them (es, en, pt).
+LEGAL_DIMENSIONS: dict[str, tuple[str, str, str]] = {
+    "page-group": ("grupo de página", "page group", "grupo de página"),
 }
 
 
@@ -228,16 +225,13 @@ def _counting_paragraph(locale: str) -> str:
 
 def test_privacy_text_names_every_counted_page_family() -> None:
     families = {group.split("/", 1)[0] for group in funnel.page_groups()}
-    pending = {key for key in LEGAL_TEXT_PENDING if not key.startswith("dimension:")}
-    assert families == set(LEGAL_NAMES) | pending, "a new family needs its legal name"
+    assert families == set(LEGAL_NAMES), "a new family needs its legal name"
     for index, locale in enumerate(("es", "en", "pt")):
         paragraph = _counting_paragraph(locale)
         for family, names in LEGAL_NAMES.items():
             assert names[index] in paragraph, f"{locale}: privacy text no longer names {family}"
-        for key, names in LEGAL_TEXT_PENDING.items():
-            assert names[index] not in paragraph, (
-                f"{locale} now names {key}: move it to LEGAL_NAMES"
-            )
+        for dimension, names in LEGAL_DIMENSIONS.items():
+            assert names[index] in paragraph, f"{locale}: privacy text no longer names {dimension}"
 
 
 def test_unlisted_campaign_tags_are_capped_per_flush_batch(
