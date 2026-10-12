@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 from collections import Counter, defaultdict
+from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
+from quant_trade.audit.funnel import DIRECT, clean_ref, shaped_page_group, since_day
 from quant_trade.audit.ops import percentile_bucket, retention_status
 from quant_trade.audit.pages import _e
 from quant_trade.audit.store_ops import COST_CATEGORIES, OUTCOMES
@@ -18,6 +20,8 @@ COST_LABELS = {
     "acquisition": "Adquisición / campaña",
     "support": "Soporte observado",
 }
+
+PageVisitRow = tuple[str, str, str, str, int]
 
 
 def amount_cents(text: str) -> int:
@@ -43,6 +47,74 @@ def table(headers: list[str], rows: list[list[str]]) -> str:
         + "</tr></thead><tbody>"
         + "".join("<tr>" + "".join(f"<td>{_e(c)}</td>" for c in r) + "</tr>" for r in rows)
         + "</tbody></table></div>"
+    )
+
+
+def top_entry_pages(rows: Sequence[PageVisitRow], *, at: datetime, days: int) -> dict[str, str]:
+    """Most frequent measured entry group per ref; ties use the group name.
+
+    Stored groups are read by shape, not by the current catalogue, so a
+    retired slug or firm keeps its history.
+    """
+    first, last = since_day(at, days), since_day(at, 1)
+    counts: dict[str, Counter[str]] = defaultdict(Counter)
+    for day, _locale, ref, raw_group, visits in rows:
+        group = shaped_page_group(raw_group)
+        if first <= day <= last and group and visits > 0:
+            counts[clean_ref(ref) or DIRECT][group] += visits
+    return {
+        ref: min(groups, key=lambda group: (-groups[group], group))
+        for ref, groups in counts.items()
+    }
+
+
+def page_visits_section(rows: Sequence[PageVisitRow], *, at: datetime) -> str:
+    """UTC entry counters; firm rows are contained in their calculator subtotal."""
+    first_28, first_7, last = since_day(at, 28), since_day(at, 7), since_day(at, 1)
+    counts_28: Counter[str] = Counter()
+    counts_7: Counter[str] = Counter()
+    for day, _locale, _ref, raw_group, visits in rows:
+        group = shaped_page_group(raw_group)
+        if first_28 <= day <= last and group and visits > 0:
+            counts_28[group] += visits
+            if day >= first_7:
+                counts_7[group] += visits
+    parent = "calculadora-reto"
+    firms = [group for group in counts_28 if group.startswith(parent + "/")]
+    totals_28, totals_7 = counts_28.copy(), counts_7.copy()
+    for group in firms:
+        totals_28[parent] += totals_28.pop(group)
+        totals_7[parent] += totals_7.pop(group, 0)
+    ordered = sorted(totals_28, key=lambda group: (-totals_28[group], -totals_7[group], group))
+    cells: list[list[str]] = []
+    for group in ordered:
+        cells.append([group, str(totals_7[group]), str(totals_28[group])])
+        if group == parent:
+            for firm in sorted(firms, key=lambda name: (-counts_28[name], -counts_7[name], name)):
+                cells.append([f"↳ {firm}", str(counts_7[firm]), str(counts_28[firm])])
+            if firms and counts_28[parent]:
+                cells.append(
+                    [f"↳ {parent} (sin firma)", str(counts_7[parent]), str(counts_28[parent])]
+                )
+    return (
+        "<section id='page-visits'><h3>Páginas</h3>"
+        "<p>MEASURED · visitas por grupo de página, sumadas entre idiomas y etiquetas. "
+        "Ventanas de días UTC, incluido hoy. El desglose por firma está incluido en "
+        "calculadora-reto; no se suma otra vez.</p>"
+        + table(
+            ["Grupo de página", "Últimos 7 días · MEASURED", "Últimos 28 días · MEASURED"],
+            cells,
+        )
+        + (
+            ""
+            if cells
+            else "<p>NOT_MEASURED · sin visitas por página registradas en este período.</p>"
+        )
+        + "<p class='muted'>Contadores agregados por día, idioma, etiqueta y grupo; "
+        "sin datos por persona, IP ni user agent. La cookie diaria cuenta solo la primera "
+        "página registrada del día por navegador, no todas las páginas vistas. "
+        "El grupo de las visitas anteriores a esta medición es NOT_MEASURED; "
+        "no se reconstruye a partir de otros datos.</p></section>"
     )
 
 

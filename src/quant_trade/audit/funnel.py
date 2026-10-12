@@ -7,9 +7,11 @@ account if one is created, so ``/panel`` can show, per day, language and tag:
 visits, accounts, verified email, stored uploads, referrals, Checkout sessions,
 free reports and paid orders. A tag is an attribution estimate, not a person.
 
-Only tags listed in :data:`REF_TAGS` count; anything else is "directo", so a
-stranger cannot fill the table with made-up tags. Visits are aggregate
-counters (day, language, tag, count): no address and no user agent is
+Only tags listed in :data:`REF_TAGS`, or shaped like a per-community campaign
+tag (:data:`CAMPAIGN_TAG`), count; anything else is "directo", and one flush
+batch keeps at most :data:`MAX_PENDING_CAMPAIGN_REFS` distinct unlisted tags, so
+a stranger cannot fill the tables with made-up tags. Visits are aggregate
+counters (day, language, tag, page group, count): no address and no user agent is
 stored, and link previews and known robots are not counted. A browser counts
 once a day (a ``rigor_seen`` cookie holds only the date), and the counters are
 written by a background thread, never during a request. Everything
@@ -25,6 +27,7 @@ import threading
 from collections import Counter
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
+from functools import lru_cache
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -44,6 +47,9 @@ REF_PATTERN = re.compile(r"[a-z0-9][a-z0-9-]{0,23}")
 #: prefix, an optional two-letter market and a 2-3 digit number. They count without a
 #: redeploy, so a new batch of community posts is measured from its first visit.
 CAMPAIGN_TAG = re.compile(r"(dc|tg|rd|fo|fb|yt|nl|ev|x|tv|li|dir|ph|hn)(-[a-z]{2})?-\d{2,3}")
+#: Distinct unlisted campaign tags one flush batch may hold. Past it a new tag
+#: counts as direct: invented tags cannot grow the memory or the visit tables.
+MAX_PENDING_CAMPAIGN_REFS = 200
 #: What each campaign prefix stands for, shown next to the tag in /panel.
 CAMPAIGN_PLATFORMS: dict[str, str] = {
     "dc": "Discord",
@@ -209,6 +215,54 @@ def is_person(user_agent: str | None) -> bool:
     return bool(agent) and not _ROBOT.search(agent)
 
 
+@lru_cache(maxsize=1)
+def page_groups() -> frozenset[str]:
+    """Finite public content taxonomy; no user-supplied slug, URL or report id."""
+    from quant_trade.audit.articles import ARTICLES
+    from quant_trade.audit.audiences import AUDIENCE_PAGES
+    from quant_trade.audit.challenge_calc import FIRMS
+    from quant_trade.audit.guides import GUIDES
+
+    return frozenset(
+        {
+            "landing",
+            "calculadora-suerte",
+            "calculadora-aciertos",
+            "calculadora-reto",
+            "calculadora-ruina",
+            "reglas-prop-firm",
+            "lectura",
+            "herramientas",
+            "ejemplos",  # Already counted before page groups were introduced.
+            "revision-institucional",
+            "v/ejemplo",
+            "v/publicacion",
+            *(f"calculadora-reto/{firm}" for firm in FIRMS),
+            *(f"guias/{guide.slug}" for guide in GUIDES),
+            *(f"articulos/{article.slug_for('es')}" for article in ARTICLES),
+            *(f"audiencia/{page.slug}" for page in AUDIENCE_PAGES),
+        }
+    )
+
+
+def clean_page_group(value: str) -> str:
+    """Accept only a listed short group, never query parameters or arbitrary paths."""
+    return value if len(value) <= 96 and value in page_groups() else ""
+
+
+_PAGE_GROUP_SHAPE = re.compile(r"[a-z0-9-]+(/[a-z0-9-]+)?")
+
+
+def shaped_page_group(value: str) -> str:
+    """A stored group that still looks like one, even if its slug or firm was retired.
+
+    Writes go through :func:`clean_page_group`, so the table never holds a URL,
+    a query string or a report id; reading by shape keeps a renamed article or
+    a firm that left the calculator in the owner's totals instead of dropping it.
+    """
+    return value if len(value) <= 96 and _PAGE_GROUP_SHAPE.fullmatch(value) else ""
+
+
 def day_of(value: str | datetime) -> str:
     """``YYYY-MM-DD`` of an ISO timestamp or a datetime, in UTC."""
     if isinstance(value, datetime):
@@ -319,27 +373,50 @@ class VisitCounter:
         self._store = store
         self._interval = interval_seconds
         self._lock = threading.Lock()
-        self._pending: Counter[tuple[str, str, str]] = Counter()
+        self._pending: Counter[tuple[str, str, str, str]] = Counter()
+        #: Unlisted campaign tags in the pending batch, capped per flush.
+        self._campaign_refs: set[str] = set()
+        self._campaign_overflow = False
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
 
-    def add(self, *, day: str, locale: str, ref: str) -> None:
+    def add(self, *, day: str, locale: str, ref: str, page_group: str = "") -> None:
+        if page_group and clean_page_group(page_group) != page_group:
+            raise ValueError("invalid visit page group")
+        ref = ref[:MAX_REF_CHARS]
         with self._lock:
-            self._pending[(day, locale[:8], ref[:MAX_REF_CHARS])] += 1
+            if ref and ref not in REF_TAGS and ref not in self._campaign_refs:
+                if len(self._campaign_refs) < MAX_PENDING_CAMPAIGN_REFS:
+                    self._campaign_refs.add(ref)
+                else:
+                    if not self._campaign_overflow:
+                        logger.warning(
+                            "over %d unlisted campaign tags pending; new ones count as direct",
+                            MAX_PENDING_CAMPAIGN_REFS,
+                        )
+                    self._campaign_overflow = True
+                    ref = ""
+            self._pending[(day, locale[:8], ref, page_group)] += 1
 
     def flush(self) -> None:
         with self._lock:
             batch, self._pending = self._pending, Counter()
-        failed: Counter[tuple[str, str, str]] = Counter()
-        for (day, locale, ref), amount in batch.items():
+            self._campaign_refs, self._campaign_overflow = set(), False
+        failed: Counter[tuple[str, str, str, str]] = Counter()
+        for (day, locale, ref, page_group), amount in batch.items():
             try:
-                self._store.count_visit(day=day, locale=locale, ref=ref, amount=amount)
+                self._store.count_visit(
+                    day=day, locale=locale, ref=ref, page_group=page_group, amount=amount
+                )
             except Exception:  # noqa: BLE001 - kept for the next flush
-                failed[(day, locale, ref)] += amount
+                failed[(day, locale, ref, page_group)] += amount
         if failed:
             logger.warning("could not write %d visit counters; kept for later", len(failed))
             with self._lock:
                 self._pending.update(failed)
+                self._campaign_refs.update(
+                    ref for _day, _locale, ref, _group in failed if ref and ref not in REF_TAGS
+                )
 
     def _loop(self) -> None:
         while not self._stop.wait(self._interval):
@@ -363,6 +440,7 @@ __all__ = [
     "DIRECT",
     "FLUSH_SECONDS",
     "FUNNEL_DAYS",
+    "MAX_PENDING_CAMPAIGN_REFS",
     "MAX_REF_CHARS",
     "REF_COOKIE",
     "REF_DAYS",
@@ -378,6 +456,9 @@ __all__ = [
     "FunnelCounts",
     "build",
     "clean_ref",
+    "clean_page_group",
+    "page_groups",
+    "shaped_page_group",
     "day_of",
     "is_person",
     "since_day",
