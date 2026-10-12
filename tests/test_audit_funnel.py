@@ -143,6 +143,96 @@ def test_calculator_visits_count_with_their_tag(tmp_path: Path) -> None:
     assert _visits(client) == {("es", "f6"): 1, ("en", ""): 1, ("pt", ""): 1}
 
 
+def test_embed_attribution_counts_on_normal_calculator_and_owner_panel(tmp_path: Path) -> None:
+    from quant_trade.audit.challenge_calc import challenge_url
+
+    client, _ = _client(tmp_path)
+    response = client.get(challenge_url("es", "ftmo") + "?ref=embed")
+    assert response.status_code == 200
+    assert response.cookies.get(funnel.REF_COOKIE) == "embed"
+    assert _visits(client) == {("es", "embed"): 1}
+    panel = client.post("/panel", data={"key": KEY}).text
+    assert "<td>embed</td>" in panel
+    assert funnel.ref_label("embed") in panel
+
+
+def test_embed_views_are_disabled_pending_a_privacy_disclosure(tmp_path: Path) -> None:
+    assert funnel.CHALLENGE_EMBED_VIEWS_ENABLED is False
+    store = make_store(f"sqlite:///{tmp_path}/embed.db")
+    counter = funnel.ChallengeEmbedViewCounter(store, firms=("ftmo",))
+    counter.add_view(day="2026-10-11", firm="ftmo")
+    counter.flush()
+    assert store.challenge_embed_view_rows("2026-10-01") == []
+
+
+def test_embed_counter_keeps_only_aggregate_day_firm_views(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(funnel, "CHALLENGE_EMBED_VIEWS_ENABLED", True)
+    store = make_store(f"sqlite:///{tmp_path}/embed.db")
+    counter = funnel.ChallengeEmbedViewCounter(store, firms=("ftmo", "topstep"))
+    counter.add_view(day="2026-10-10", firm="ftmo")
+    for firm in ("ftmo", "ftmo", "topstep", "", "visitor@example.test", "other-site.test"):
+        counter.add_view(day="2026-10-11", firm=firm)
+    assert store.challenge_embed_view_rows("2026-10-01") == []
+    counter.flush()
+    counter.add_view(day="2026-10-11", firm="ftmo")
+    counter.stop()
+    assert store.challenge_embed_view_rows("2026-10-11") == [
+        ("2026-10-11", "", 1),
+        ("2026-10-11", "ftmo", 3),
+        ("2026-10-11", "topstep", 1),
+    ]
+    assert len(store.challenge_embed_view_rows("2026-10-10")) == 4
+    assert store.funnel_events("2026-10-01")["visits"] == []
+    assert {column.name for column in store.challenge_embed_views.columns} == {
+        "day",
+        "firm",
+        "views",
+    }
+
+
+def test_embed_counter_retries_failed_flush_without_losing_loads(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(funnel, "CHALLENGE_EMBED_VIEWS_ENABLED", True)
+    store = make_store(f"sqlite:///{tmp_path}/embed.db")
+    counter = funnel.ChallengeEmbedViewCounter(store, firms=("ftmo",))
+    counter.add_view(day="2026-10-11", firm="ftmo")
+    original = store.count_challenge_embed_view
+
+    def unavailable(**kwargs: object) -> None:
+        raise RuntimeError("database unavailable")
+
+    monkeypatch.setattr(store, "count_challenge_embed_view", unavailable)
+    counter.flush()
+    monkeypatch.setattr(store, "count_challenge_embed_view", original)
+    counter.flush()
+    assert store.challenge_embed_view_rows("2026-10-11") == [("2026-10-11", "ftmo", 1)]
+    assert store.funnel_events("2026-10-01")["visits"] == []
+
+
+def test_embed_counter_is_not_a_visit_counter() -> None:
+    # Its own buffer and table: a firm never becomes a campaign tag or a visit.
+    assert not issubclass(funnel.ChallengeEmbedViewCounter, funnel.VisitCounter)
+    assert not hasattr(funnel.ChallengeEmbedViewCounter, "add")
+
+
+def test_embed_panel_explains_disabled_count_and_separate_aggregates() -> None:
+    from quant_trade.audit.owner import challenge_embed_section
+
+    rows = [("2026-10-11", "ftmo", 2)]
+    disabled = challenge_embed_section(rows)
+    assert "NOT_MEASURED" in disabled
+    assert "Conteo desactivado" in disabled
+    assert "ftmo" not in disabled
+    enabled = challenge_embed_section(rows, enabled=True)
+    assert "2026-10-11" in enabled and "ftmo" in enabled
+    assert "Cargas · MEASURED" in enabled
+    assert "no mide personas ni sitios" in enabled
+    assert find_claims(disabled) == find_claims(enabled) == []
+
+
 def test_reader_and_tools_visits_count_with_their_tag(tmp_path: Path) -> None:
     from quant_trade.audit.reading import READING_PATH
     from quant_trade.audit.tools_hub import TOOLS_PATH

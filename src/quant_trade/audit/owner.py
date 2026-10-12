@@ -653,6 +653,32 @@ def funnel_section(
     return out
 
 
+def challenge_embed_section(
+    rows: Sequence[tuple[str, str, int]] = (), *, enabled: bool = False
+) -> str:
+    """Widget loads have their own totals; they are never counted as people."""
+    title = "<h2 style='margin-top:40px'>Vistas de la calculadora insertada</h2>"
+    if not enabled:
+        return title + (
+            "<p class='muted'>NOT_MEASURED · Conteo desactivado: la política actual "
+            "describe visitas por día, idioma, etiqueta y grupo de página, con una cookie "
+            "diaria. "
+            "El conteo por firma sin cookies queda pendiente de esa descripción.</p>"
+        )
+    return (
+        title + "<p class='muted'>Cada carga cuenta, incluidas las repeticiones; "
+        "no mide personas ni sitios. Solo se conservan día, firma y total de cargas.</p>"
+        + (
+            _table(
+                "Día UTC|Firma|Cargas · MEASURED",
+                [[day, firm or "General", str(views)] for day, firm, views in rows],
+            )
+            if rows
+            else "<p class='muted'>Todavía no hay cargas registradas en estos días.</p>"
+        )
+    )
+
+
 def panel_page(
     *,
     key: str,
@@ -752,6 +778,7 @@ __all__ = [
     "LOCALE_NAMES",
     "TEXT",
     "funnel_section",
+    "challenge_embed_section",
     "login_page",
     "panel_page",
 ]

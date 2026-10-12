@@ -477,7 +477,13 @@ def _rules(programs: Sequence[str], locale: str, *, firm: str = "") -> str:
 
 
 def _form(
-    locale: str, firm: str, shown: Mapping[str, str], errors: Sequence[str], limited: bool
+    locale: str,
+    firm: str,
+    shown: Mapping[str, str],
+    errors: Sequence[str],
+    limited: bool,
+    *,
+    action: str | None = None,
 ) -> str:
     words = calc.COPY[locale]
     form = ""
@@ -513,7 +519,8 @@ def _form(
     units = [(unit, words["unit_options"][unit]) for unit in calc.UNITS]
     form += (
         f"<p>{_e(words['optional'])}</p>"
-        f"<form method='get' action='{_e(calc.challenge_url(locale, firm))}' class='calc-form'>"
+        f"<form method='get' action='{_e(action or calc.challenge_url(locale, firm))}' "
+        "class='calc-form'>"
         "<div class='form-grid'>"
         + select(
             "program",
@@ -564,6 +571,43 @@ def _further(locale: str, firm: str) -> str:
     )
 
 
+def calculator_sections(
+    *,
+    locale: str = "es",
+    firm: str = "",
+    values: Mapping[str, str] | None = None,
+    duplicate: bool = False,
+    limited: bool = False,
+    action: str | None = None,
+) -> tuple[list[tuple[str, str]], calc.ChallengeInput | None]:
+    """Shared GET form and computed sections for the full page and iframe.
+
+    Duplicate fields and rate-limited requests produce the same messages in
+    either rendering; only ``compute`` supplies the results.
+    """
+    locale = calc._locale(locale)
+    if firm and firm not in calc.FIRMS:
+        raise KeyError(firm)
+    words = calc.COPY[locale]
+    raw = dict(values or {})
+    parsed = calc.parse(raw, firm) if calc.submitted(raw) and not duplicate else None
+    errors: tuple[str, ...] = ("invalid",) if duplicate else ()
+    shown: Mapping[str, str] = {}
+    value = None
+    if parsed is not None:
+        errors, shown, value = parsed.errors, parsed.shown, parsed.value
+    sections: list[tuple[str, str]] = [
+        (words["form_title"], _form(locale, firm, shown, errors, limited, action=action))
+    ]
+    if value is not None and not limited:
+        figures = calc.compute(value)
+        sections.append((words["result_title"], _result(value, figures, locale)))
+        sections.append((words["lower_title"], _lower(value, figures, locale)))
+        if figures.sizes:
+            sections.append((words["size_title"], _sizes(value, figures, locale)))
+    return sections, value
+
+
 def challenge_page(
     *,
     locale: str = "es",
@@ -580,25 +624,11 @@ def challenge_page(
     ``limited`` that this address is past ``REQUESTS_PER_HOUR``: then the
     page shows the form and the message, and nothing is computed."""
     locale = calc._locale(locale)
-    if firm and firm not in calc.FIRMS:
-        raise KeyError(firm)
     words = calc.COPY[locale]
-    raw = dict(values or {})
-    parsed = calc.parse(raw, firm) if calc.submitted(raw) and not duplicate else None
-    errors: tuple[str, ...] = ("invalid",) if duplicate else ()
-    shown: Mapping[str, str] = {}
-    value = None
-    if parsed is not None:
-        errors, shown, value = parsed.errors, parsed.shown, parsed.value
-    sections: list[tuple[str, str]] = [
-        (words["form_title"], _form(locale, firm, shown, errors, limited))
-    ]
+    sections, value = calculator_sections(
+        locale=locale, firm=firm, values=values, duplicate=duplicate, limited=limited
+    )
     if value is not None and not limited:
-        figures = calc.compute(value)
-        sections.append((words["result_title"], _result(value, figures, locale)))
-        sections.append((words["lower_title"], _lower(value, figures, locale)))
-        if figures.sizes:
-            sections.append((words["size_title"], _sizes(value, figures, locale)))
         sections.append((words["share_title"], _share(value, locale, firm, base_url)))
     programs = calc.firm_programs(firm) if firm else (value.program if value else calc.PROGRAMS[0],)
     rules_title = (

@@ -1041,6 +1041,15 @@ class Store(OpsStoreMixin):
             sa.Column("page_group", sa.String(96), primary_key=True),
             sa.Column("visits", sa.Integer, nullable=False, default=0),
         )
+        #: Cookieless widget page loads, separate from the visitor funnel.
+        #: Recording stays disabled in funnel.CHALLENGE_EMBED_VIEWS_ENABLED.
+        self.challenge_embed_views = sa.Table(
+            "challenge_embed_views",
+            self.metadata,
+            sa.Column("day", sa.String(10), primary_key=True),
+            sa.Column("firm", sa.String(64), primary_key=True),
+            sa.Column("views", sa.Integer, nullable=False, default=0),
+        )
         #: The listed tag of the link that brought an account, if any; it
         #: goes with ``delete_account``.
         self.account_refs = sa.Table(
@@ -5990,6 +5999,39 @@ class Store(OpsStoreMixin):
             (str(day), str(locale), str(ref), str(group), int(count))
             for day, locale, ref, group, count in rows
         ]
+
+    def count_challenge_embed_view(self, *, day: str, firm: str, amount: int = 1) -> None:
+        """Add widget page loads to a bare ``(day, firm)`` counter."""
+        sa = self._sa
+        table = self.challenge_embed_views
+        key = (table.c.day == day) & (table.c.firm == firm)
+        for _ in range(2):
+            with self.engine.begin() as conn:
+                bumped = conn.execute(
+                    table.update().where(key).values(views=table.c.views + amount)
+                ).rowcount
+                if bumped:
+                    return
+            try:
+                with self.engine.begin() as conn:
+                    conn.execute(table.insert().values(day=day, firm=firm, views=amount))
+                return
+            except sa.exc.IntegrityError:  # pragma: no cover - another process inserted it
+                continue
+
+    def challenge_embed_view_rows(self, since_day: str) -> list[tuple[str, str, int]]:
+        """Widget loads by day/firm, with no visitor or embedding-site data."""
+        sa = self._sa
+        table = self.challenge_embed_views
+        with self.engine.connect() as conn:
+            return [
+                (str(row[0]), str(row[1]), int(row[2]))
+                for row in conn.execute(
+                    sa.select(table.c.day, table.c.firm, table.c.views)
+                    .where(table.c.day >= since_day)
+                    .order_by(table.c.day.desc(), table.c.firm)
+                ).all()
+            ]
 
     def set_account_ref(self, account_id: str, ref: str, *, at: datetime) -> None:
         """Keep the tag that brought a new account; the first one stays."""

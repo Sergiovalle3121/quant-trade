@@ -33,6 +33,7 @@ from quant_trade.audit.audiences import AUDIENCE_PAGES, audience_url
 from quant_trade.audit.calculator import CALCULATOR_PATH
 from quant_trade.audit.challenge_calc import FIRMS as CHALLENGE_FIRMS
 from quant_trade.audit.challenge_calc import page_paths as challenge_paths
+from quant_trade.audit.challenge_embed import HELP_PATHS as EMBED_HELP_PATHS
 from quant_trade.audit.examples import EXAMPLES_PATH
 from quant_trade.audit.faq import FAQ_PATH
 from quant_trade.audit.guides import GUIDES, guide_url, guides_index_url
@@ -81,6 +82,8 @@ SIGNAL_SAMPLE_PATHS: dict[str, str] = {
 SIGNAL_SAMPLE_PUBLISHED = "2026-10-09"
 #: The day the challenge calculator and its firm pages were published.
 CHALLENGE_PUBLISHED = "2026-10-10"
+#: Only the instructions are indexed; their iframe points at the normal canonical.
+EMBED_HELP_PUBLISHED = "2026-10-11"
 #: The day the risk-of-ruin calculator was published.
 RUIN_PUBLISHED = "2026-10-10"
 #: The day each export guide added after ``SITE_UPDATED`` was published, by its
@@ -110,6 +113,7 @@ PUBLIC_PAGES: tuple[dict[str, str], ...] = (
     # The challenge calculator and one page per firm with a published preset.
     challenge_paths(),
     *(challenge_paths(firm) for firm in CHALLENGE_FIRMS),
+    dict(EMBED_HELP_PATHS),
     # The risk-of-ruin calculator, the third of the declared-figure calculators.
     dict(RUIN_PATH),
     # The public table of every firm's rules, from the same presets (``rules_table``).
@@ -158,6 +162,8 @@ def _page_dates() -> dict[str, str]:
         }
     )
     dates.update({path: RUIN_PUBLISHED for path in RUIN_PATH.values()})
+    dates.update({path: EMBED_HELP_PUBLISHED for path in EMBED_HELP_PATHS.values()})
+    dates.update({path: EMBED_HELP_PUBLISHED for path in TOOLS_PATH.values()})
     # A guide published after the site's date carries its own, in every language.
     dates.update(
         {guide_url(slug, lang): date for slug, date in GUIDES_PUBLISHED.items() for lang in LOCALES}

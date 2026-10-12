@@ -45,6 +45,7 @@ from pydantic import ValidationError
 from quant_trade.audit import (
     account_pages,
     challenge_calc,
+    challenge_embed,
     forensics_web,
     funnel,
     inbox,
@@ -127,6 +128,7 @@ from quant_trade.audit.owner import (
     MAX_EXPIRES_DAYS,
     MAX_FAILED_LOGINS_PER_HOUR,
     MAX_NOTE_CHARS,
+    challenge_embed_section,
     funnel_section,
     login_page,
     panel_page,
@@ -503,10 +505,11 @@ _PRINT_HANDLER_HASH = base64.b64encode(hashlib.sha256(PRINT_HANDLER.encode()).di
 #: no inline script and nothing from a third party. Fonts are self-hosted, so
 #: no visitor request leaves for a font service. Inline styles are the other
 #: relaxation (the report's CSS and chart colours are inline); forms post
-#: here, or leave for Stripe Checkout through a redirect, and no page can be
-#: framed. A script may only call this same origin (``connect-src 'self'``:
-#: the upload form answers in place, keeping the chosen file); no third party
-#: is ever contacted.
+#: here, or leave for Stripe Checkout through a redirect. Only a rendered
+#: challenge widget, on its exact routes, can be framed (with its own narrower
+#: policy, ``EMBED_CONTENT_SECURITY_POLICY``). A script may only call this same origin
+#: (``connect-src 'self'``: the upload form answers in place, keeping the chosen
+#: file); no third party is ever contacted.
 CONTENT_SECURITY_POLICY = (
     f"default-src 'none'; script-src 'self' 'unsafe-hashes' 'sha256-{_PRINT_HANDLER_HASH}'; "
     "style-src 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; "
@@ -521,7 +524,20 @@ SECURITY_HEADERS: dict[str, str] = {
     "Permissions-Policy": "camera=(), microphone=(), geolocation=(), payment=()",
     "Cross-Origin-Opener-Policy": "same-origin",
 }
+#: The one document any site may frame: the challenge widget a route rendered
+#: (an error on the same path keeps ``frame-ancestors 'none'``). It runs no
+#: script and its forms only reach itself, so its policy is narrower than the
+#: site's: nothing injected into a frameable page could run or post elsewhere.
+EMBED_CONTENT_SECURITY_POLICY = (
+    "default-src 'none'; script-src 'none'; style-src 'unsafe-inline'; "
+    "img-src 'self' data:; font-src 'self'; connect-src 'self'; form-action 'self'; "
+    "frame-ancestors *; base-uri 'none'"
+)
+#: The instructions can load their preview, but cannot themselves be framed.
+EMBED_HELP_CONTENT_SECURITY_POLICY = CONTENT_SECURITY_POLICY + "; frame-src 'self'"
 HSTS = "max-age=31536000"
+#: ``request.state`` flag ``public_challenge`` sets on a rendered widget.
+CHALLENGE_EMBED_STATE = "challenge_embed_widget"
 
 #: Every upload attempt counts, whether or not it becomes an audit, up to
 #: this multiple of the hourly upload limit: a customer can retry a file that
@@ -1191,6 +1207,7 @@ def _route_roots(locale: str) -> frozenset[str]:
     paths += account_pages.PATHS[locale].values()
     paths += mail_lib.PATHS[locale].values()
     paths += [COMPARE_PATH[locale], SAMPLE_PDF_PATHS[locale], SIGNAL_SAMPLE_PDF_PATHS[locale]]
+    paths += [challenge_embed.PATHS[locale]]
     return frozenset(path.split("/")[1] for path in paths)
 
 
@@ -1248,6 +1265,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     completed_counter = CompletedAuditCounter(db, excluded_ids=cfg.stripe_test_audits)
     retention = RetentionWorker(db, retention_days=cfg.retention_days)
     visits = funnel.VisitCounter(db)
+    challenge_embed_views = funnel.ChallengeEmbedViewCounter(db, firms=challenge_calc.FIRMS)
     operations = OpsCounter(db)
     mail_worker = mail_lib.MailWorker(db, cfg)
 
@@ -1256,6 +1274,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         if cfg.auto_purge:
             retention.start()
         visits.start()
+        if funnel.CHALLENGE_EMBED_VIEWS_ENABLED:
+            challenge_embed_views.start()
         operations.start()
         mail_worker.start()
         try:
@@ -1263,6 +1283,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         finally:
             retention.stop()
             visits.stop()
+            challenge_embed_views.stop()
             operations.stop()
             mail_worker.stop()
 
@@ -1278,6 +1299,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     app.state.completed_counter = completed_counter
     app.state.retention = retention
     app.state.visits = visits
+    app.state.challenge_embed_views = challenge_embed_views
     app.state.operations = operations
     # From here a daily purge is expected: no success after 36 h is overdue.
     app.state.started_at = datetime.now(UTC)
@@ -1335,10 +1357,20 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
     report_upload_bytes = cfg.max_upload_bytes * REPORT_SIZE_FACTOR
     body_limit = request_body_limit(cfg.max_upload_bytes)
 
-    def _secure(response: Any, *, path: str = "") -> Any:
-        """The headers every response carries, errors included."""
+    def _secure(response: Any, *, path: str = "", framed: bool = False) -> Any:
+        """The headers every response carries, errors included.
+
+        ``framed`` is set only for a widget ``public_challenge`` rendered: a
+        405, 404 or 500 on the same path is the site's page and stays unframed.
+        """
         for name, value in SECURITY_HEADERS.items():
             response.headers[name] = value
+        if framed and path in challenge_embed.PAGES:
+            response.headers["Content-Security-Policy"] = EMBED_CONTENT_SECURITY_POLICY
+            del response.headers["X-Frame-Options"]
+            response.headers["X-Robots-Tag"] = "noindex"
+        elif path in challenge_embed.HELP_PATHS.values():
+            response.headers["Content-Security-Policy"] = EMBED_HELP_CONTENT_SECURITY_POLICY
         if cfg.base_url.startswith("https://"):
             response.headers["Strict-Transport-Security"] = HSTS
         if "Cache-Control" not in response.headers:
@@ -1493,6 +1525,17 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         if request.method != "GET" or response.status_code != 200:
             return
         path = request.url.path
+        if path in challenge_embed.PAGES:
+            if (
+                funnel.CHALLENGE_EMBED_VIEWS_ENABLED
+                and funnel.is_person(request.headers.get("user-agent"))
+                and not request.headers.get("sec-purpose")
+                and not request.headers.get("purpose")
+            ):
+                challenge_embed_views.add_view(
+                    day=funnel.day_of(datetime.now(UTC)), firm=challenge_embed.PAGES[path][1]
+                )
+            return  # Widgets never read or set attribution/session cookies.
         if path in reading_png_paths or path in calculator_png_paths or path in tool_png_paths:
             return  # Public image responses never carry a visitor's referral cookie.
         kept = funnel.clean_ref(request.cookies.get(funnel.REF_COOKIE))
@@ -1595,7 +1638,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 and "set-cookie" not in response.headers
             )
             response.headers["Cache-Control"] = PUBLIC_CACHE_CONTROL if public else "no-store"
-        return _secure(response, path=request.url.path)
+        framed = getattr(request.state, CHALLENGE_EMBED_STATE, False) is True
+        return _secure(response, path=request.url.path, framed=framed)
 
     def _site_url(request: Request) -> str:
         """The public address for absolute links (canonical, previews, sitemap).
@@ -1951,6 +1995,7 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 reset_path = account_pages.path("reset", account.locale)
                 reset_link = f"{_site_url(request)}{reset_path}?token={secret}"
         visits.flush()
+        challenge_embed_views.flush()
         start_day = funnel.since_day(now)
         end_day = funnel.day_of(now)
         x_start = funnel.since_day(now, days=14)
@@ -2026,7 +2071,13 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                     page_rows=db.page_visit_rows(start_day),
                     at=now,
                 )
-                + attempts_html,
+                + attempts_html
+                + challenge_embed_section(
+                    db.challenge_embed_view_rows(start_day)
+                    if funnel.CHALLENGE_EMBED_VIEWS_ENABLED
+                    else (),
+                    enabled=funnel.CHALLENGE_EMBED_VIEWS_ENABLED,
+                ),
                 panel_path=app.state.panel_path,
                 observability=private_ops,
             )
@@ -7333,7 +7384,10 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
         synthetic days from the declared figures. Nothing is stored; each address
         gets ``REQUESTS_PER_HOUR`` computations a sliding hour, past which the
         page keeps the form and says so (the result is cached per input)."""
-        locale, firm = challenge_calc.PAGES[request.url.path]
+        embedded = request.url.path in challenge_embed.PAGES
+        locale, firm = (challenge_embed.PAGES if embedded else challenge_calc.PAGES)[
+            request.url.path
+        ]
         query = request.query_params
         duplicate = any(len(query.getlist(name)) > 1 for name in challenge_calc.FIELDS)
         values = {name: query.get(name, "") for name in challenge_calc.FIELDS}
@@ -7349,7 +7403,8 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
                 seen = challenge_attempts.hit(ip, datetime.now(UTC))
                 if seen >= challenge_calc.REQUESTS_PER_HOUR:
                     status, limited = 429, True
-        page = challenge_page(
+        render = challenge_embed.widget_page if embedded else challenge_page
+        page = render(
             locale=locale,
             firm=firm,
             base_url=_site_url(request),
@@ -7357,15 +7412,48 @@ def create_app(settings: AuditSettings | None = None, store: Store | None = None
             duplicate=duplicate,
             limited=limited,
         )
-        return HTMLResponse(
-            guard_page(_offered(page, locale)),
+        response = HTMLResponse(
+            guard_page(page if embedded else _offered(page, locale)),
             status_code=status,
             headers={"Retry-After": "3600"} if limited else None,
         )
+        if embedded:
+            # Only this rendered widget may be framed (see ``_secure``).
+            setattr(request.state, CHALLENGE_EMBED_STATE, True)
+        return response
 
-    for challenge_path in challenge_calc.PAGES:
+    for challenge_path in (*challenge_calc.PAGES, *challenge_embed.PAGES):
         app.add_api_route(
             challenge_path, public_challenge, methods=["GET"], response_class=HTMLResponse
+        )
+
+    def challenge_embed_instructions(request: Request) -> Response:
+        locale = next(
+            lang for lang, path in challenge_embed.HELP_PATHS.items() if path == request.url.path
+        )
+        query = request.query_params
+        firm = query.get("firm", "")
+        widget_locale = query.get("locale", locale)
+        if (
+            (firm and firm not in challenge_calc.FIRMS)
+            or widget_locale not in challenge_embed.PATHS
+            or any(len(query.getlist(field)) > 1 for field in ("firm", "locale"))
+        ):
+            return HTMLResponse(
+                guard_page(error_page(message("invalid_form", locale), locale=locale)),
+                status_code=400,
+            )
+        page = challenge_embed.instructions_page(
+            locale=locale, firm=firm, widget_locale=widget_locale, base_url=_site_url(request)
+        )
+        return HTMLResponse(guard_page(_offered(page, locale)))
+
+    for embed_help_path in challenge_embed.HELP_PATHS.values():
+        app.add_api_route(
+            embed_help_path,
+            challenge_embed_instructions,
+            methods=["GET"],
+            response_class=HTMLResponse,
         )
 
     def public_ruin(request: Request) -> Response:

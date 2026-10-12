@@ -4904,6 +4904,9 @@ def examples_page(*, locale: str = "es", base_url: str = "") -> str:
 
 def tools_page(*, locale: str = "es", base_url: str = "") -> str:
     """The free tools, with declared examples computed by each destination tool."""
+    from quant_trade.audit.challenge_embed import COPY as EMBED_COPY
+    from quant_trade.audit.challenge_embed import HELP_PATHS as EMBED_HELP_PATHS
+
     locale = _locale(locale)
     words = TOOLS_COPY[locale]
     title = f"{words['seo_title']} · {BRAND}"
@@ -4960,8 +4963,13 @@ def tools_page(*, locale: str = "es", base_url: str = "") -> str:
                 _e(words["no_account"]),
             )
         )
-        more = ""
+        more = embed = ""
         if key == "challenge":
+            # The embed instructions belong to the calculator, not to the rules table.
+            embed = (
+                f"<a class='link-more' href='{_e(EMBED_HELP_PATHS[locale])}' "
+                f"data-embed-calculator>{_e(EMBED_COPY[locale]['link'])}{icon('arrow')}</a>"
+            )
             # The rules the calculator uses, every firm on one page with source and date.
             more = (
                 f"<h3 id='tool-rules_table'><a class='link-more' "
@@ -4978,7 +4986,7 @@ def tools_page(*, locale: str = "es", base_url: str = "") -> str:
             f"<div class='back-row'>{example_link(key)}"
             f"<a class='link-more' href='{_e(_tool_url(key, locale))}' "
             f"aria-describedby='tool-{key}'>{_e(words['open'])}"
-            f"{icon('arrow')}</a></div>{more}</section>"
+            f"{icon('arrow')}</a>{embed}</div>{more}</section>"
         )
     report = (
         f"<section class='article-cta'><h2>{_e(words['report_title'])}</h2>"
