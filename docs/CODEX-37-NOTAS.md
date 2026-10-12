@@ -139,3 +139,25 @@ una advertencia preexistente de Starlette sobre `httpx` en `TestClient`.
 - `mypy --follow-imports=silent --platform linux src`: sin errores en 445 archivos.
   Esta comprobación no sustituye el resultado con destino Windows.
 - Archivos modificados con LF; `git diff --check` sin incidencias.
+
+### Validación de la revisión del 11 de octubre
+
+Sobre `06c5f92` (los cambios de la sección anterior), mismo intérprete y
+`PYTHONPATH`, temporales `bt-rc37-10` a `bt-rc37-15` (borrados al terminar):
+
+| Archivos | Resultado |
+| --- | --- |
+| tools_hub, winrate, challenge_calculator | 400 correctas |
+| ruin_calculator, calculator, guides_seo | 71 correctas (incluido el presupuesto de tiempo) |
+| public_hygiene `-k herramientas` | 9 correctas, 2161 no seleccionadas |
+| i18n, site_copy_trust | 102 correctas, 3 fallos preexistentes |
+
+Los tres fallos (`test_every_importer_fixture_is_fully_translated[sierra_chart_trades.txt]`,
+`test_no_article_paragraph_starts_with_an_evidence_label` y
+`test_no_sitemap_page_shows_internal_paths_labels_or_raw_sizes`, ambos sobre el
+artículo `regla-de-consistencia-prop-firm`) se reproducen idénticos en `c94c895`
+desde un worktree desprendido; la rama no toca artículos ni importadores y en
+`main` ya existen `fix/ci-sierra-fixture` y `fix/ci-copy-trust-provenance` para
+ellos. `ruff check` y `ruff format --check` sobre los cinco archivos Python:
+limpios; `mypy --follow-imports=silent` sobre ellos: sin errores; LF y
+`git diff --check` sin incidencias.
