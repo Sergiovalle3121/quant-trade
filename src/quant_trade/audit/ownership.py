@@ -886,6 +886,32 @@ class Voiced(dict[str, str]):
 # each voice but the buyer's, whose wording names the account or signal.
 LABELS["next_intro_account"] = LABELS["next_intro"]
 
+# The copy table measures a copier's fall on the history's starting balance:
+# the buyer's wording calls it the provider's, every other voice the history's.
+LABELS["copy_assumption"] = dict.fromkeys(
+    (OWN, PROVIDER, NEUTRAL),
+    _say(
+        "Mismo balance inicial que el historial, tamaños fijos y caída lineal en dinero, sin "
+        "cierres por margen.",
+        "Same starting balance as the history, fixed sizes and a linear fall in money, with no "
+        "margin closeouts.",
+        "Mesmo saldo inicial do histórico, tamanhos fixos e queda linear em dinheiro, sem "
+        "encerramentos por margem.",
+    ),
+)
+LABELS["copy_assumption_martingale"] = dict.fromkeys(
+    (OWN, PROVIDER, NEUTRAL),
+    _say(
+        "Mismo balance inicial que el historial y caída lineal en dinero, sin cierres por "
+        "margen. El multiplicador escala cada operación del historial, cuyo tamaño no fue fijo.",
+        "Same starting balance as the history and a linear fall in money, with no margin "
+        "closeouts. The multiplier scales each of the history's trades, whose size was not "
+        "fixed.",
+        "Mesmo saldo inicial do histórico e queda linear em dinheiro, sem encerramentos por "
+        "margem. O multiplicador escala cada operação do histórico, cujo tamanho não foi fixo.",
+    ),
+)
+
 
 def labels_for(base: dict[str, str], locale: str, role: str) -> dict[str, str]:
     """``base`` (``report.LABELS[locale]``) in ``role``'s voice.
