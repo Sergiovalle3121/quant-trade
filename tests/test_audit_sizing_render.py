@@ -11,7 +11,7 @@ from typing import Any
 import pytest
 from audit_fixtures import csv_bytes, positive_drift, trades_following
 
-from quant_trade.audit import pdf
+from quant_trade.audit import ownership, pdf
 from quant_trade.audit.challenge_sizing import DAILY_NOTE, NO_BALANCE, NO_LIMIT
 from quant_trade.audit.engine import run_audit
 from quant_trade.audit.guard import find_claims
@@ -23,7 +23,13 @@ from quant_trade.audit.report import (
     render_html,
     result_sha256,
 )
-from quant_trade.audit.schema import AuditResult, DeclaredMetadata, build_inputs, measured
+from quant_trade.audit.schema import (
+    AuditResult,
+    DeclaredMetadata,
+    build_inputs,
+    declared,
+    measured,
+)
 from quant_trade.audit.sizing import capital_review
 from quant_trade.audit.theme import STYLE
 from quant_trade.core.models import Trade
@@ -69,6 +75,12 @@ def _capital(
     )
 
 
+def _voiced(result: AuditResult, locale: str) -> dict[str, str]:
+    """The labels in the voice the report speaks: no answer is the neutral one."""
+    role = ownership.role_of(result.model_dump(mode="json"))
+    return ownership.labels_for(LABELS[locale], locale, role)
+
+
 @pytest.fixture(scope="module")
 def report_result() -> AuditResult:
     curve = positive_drift(300)
@@ -96,7 +108,7 @@ def test_complete_report_shows_file_sizes_and_copy_falls(
     result = report_result.model_copy(update={"capital": capital})
     page = render_html(result, watermark=False, locale=locale)
     text = _text(page)
-    labels = LABELS[locale]
+    labels = _voiced(result, locale)
     assert labels["capital_median"] in text
     assert labels["capital_quantity"] in text
     assert labels["copy_title"] in text
@@ -124,6 +136,21 @@ def test_complete_report_shows_file_sizes_and_copy_falls(
     }[unit]
     assert size in text
     assert find_claims(page) == []
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+def test_only_the_buyer_reads_the_copy_balance_as_the_providers(
+    report_result: AuditResult, locale: str
+) -> None:
+    for role in (*ownership.ROLES, None):
+        stated = {key: value for key, value in report_result.declared.items() if key != "ownership"}
+        if role:
+            stated["ownership"] = declared(role)
+        result = report_result.model_copy(update={"capital": _capital(), "declared": stated})
+        text = _text(render_html(result, watermark=False, locale=locale))
+        assert _voiced(result, locale)["copy_assumption"] in text, role
+        named = LABELS[locale]["copy_assumption"] in text
+        assert named == (role == ownership.BUYER), role
 
 
 @pytest.mark.parametrize("locale", LOCALES)
@@ -189,22 +216,26 @@ def test_preview_does_not_show_new_sizes_or_multiplier_table(
     assert result.challenge is not None and result.challenge["status"] == "MEASURED"
     result.challenge["sizing"]["daily_limit"] = _daily("contract")
     full = render_html(result, watermark=False, locale=locale)
+    voiced = _voiced(result, locale)
     assert LABELS[locale]["ch_daily_size"] in full
     assert LABELS[locale]["copy_title"] in full
+    assert voiced["copy_assumption"] in _text(full)
     page = render_html(result, watermark=True, free_mode=False, locale=locale)
-    for key in (
-        "capital_median",
-        "capital_quantity",
-        "capital_variable",
-        "copy_title",
-        "copy_assumption",
-        "ch_daily_size",
-    ):
-        assert LABELS[locale][key] not in page
+    shown = _text(page)
+    for labels in (LABELS[locale], voiced):
+        for key in (
+            "capital_median",
+            "capital_quantity",
+            "capital_variable",
+            "copy_title",
+            "copy_assumption",
+            "copy_fall",
+            "capital_quantity_help_lot",
+            "copy_assumption_martingale",
+            "ch_daily_size",
+        ):
+            assert labels[key] not in page and labels[key] not in shown, key
     assert "copy-sizing" not in page
-    assert LABELS[locale]["copy_fall"] not in page
-    for key in ("capital_quantity_help_lot", "copy_assumption_martingale"):
-        assert LABELS[locale][key] not in page
     legacy = result.model_copy(deep=True)
     assert legacy.capital is not None and legacy.challenge is not None
     legacy.capital.pop("copy_rows")

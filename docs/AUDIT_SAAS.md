@@ -2881,10 +2881,13 @@ to a tenth, so 99.985 % never reads as 100.0 %; from 100 % on the row says
 the entire account is lost. It is a linear scale of the history: same
 starting balance as the provider, fixed sizes and no margin closeouts (with
 a martingale the line says the multiplier scales each of the provider's
-trades and that size was not fixed). A balance the reader assumed is not
-evidence of the provider's, also beside an uploaded curve: without a known
-balance the percentages and quantities are not measured, and the table is
-replaced by one line with the reason. It does not describe a future result.
+trades and that size was not fixed). Only the buyer's report names the
+provider there: the developer's, the provider's and the neutral one say the
+history's starting balance and trades (`ownership.LABELS`). A balance the
+reader assumed is not evidence of the provider's, also beside an uploaded
+curve: without a known balance the percentages and quantities are not
+measured, and the table is replaced by one line with the reason. It does not
+describe a future result.
 
 The challenge's daily maximum (`audit/challenge_sizing.py`) uses UTC daily
 closes of a money curve. The money the rule allows is the daily limit times
@@ -5640,7 +5643,10 @@ endless query-string pagination cannot keep the command running indefinitely.
 Every response records its status, elapsed time and size. Card images must
 return 200 with `image/png` or `image/svg+xml`; this checks the response MIME
 type, without decoding or validating the image bytes. Malformed or empty
-sitemaps and unparseable HTML also fail. Each failing URL is reported once,
+sitemaps and unparseable HTML also fail; a marked section other than CDATA or
+Office's `<![if]>`/`<![endif]>` (`<![broken]>`) is unparseable on every
+Python, also on the patch releases whose parser no longer raises on it
+(`smoke.MARKED_SECTIONS`). Each failing URL is reported once,
 with every page that references it (`sources`, `source_count`). The console
 prints, in order: the failures (`FALLO [a] URL: reason — en N páginas (p. ej.
 /, /a, /b, …)`), slow pages and slow PDFs (over 3 seconds, slowest first;

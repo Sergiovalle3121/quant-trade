@@ -344,6 +344,24 @@ def test_invalid_html_is_reported_and_other_pages_are_still_parsed() -> None:
     assert failure.kind == "html" and failure.reason
 
 
+def test_cdata_and_conditional_sections_are_not_invalid_html() -> None:
+    # Python's parser reads ``<![...]>`` differently across patch releases; these stay valid.
+    site = Site(
+        {
+            "/sitemap.xml": sitemap("/svg"),
+            "/svg": html(
+                "<svg><text><![CDATA[a < b]]></text></svg>"
+                "<![if !IE]><a href='/next'>next page</a><![endif]>"
+            ),
+            "/next": html(),
+        }
+    )
+    with site.client() as client:
+        report = smoke.run_smoke(SITE, client=client)
+    assert report.ok and not report.failures
+    assert site.counts()[SITE + "/next"] == 1
+
+
 def result_for(report: smoke.SmokeReport, path: str) -> smoke.RequestResult:
     return next(item for item in report.requests if item.url == SITE + path)
 

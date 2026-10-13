@@ -98,6 +98,7 @@ _CODES: dict[str, tuple[str, ...]] = {
     "too_few_rows": (
         "no_trades",
         "no_closed_trades",
+        "deals_without_execution",
         "flex_no_trades",
         "optimization_empty",
         "too_few_variants",

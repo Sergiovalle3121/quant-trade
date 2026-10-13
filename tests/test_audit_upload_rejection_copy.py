@@ -218,6 +218,7 @@ def test_allowlisted_values_survive_normalization() -> None:
         ("file_too_large", "too_large"),
         ("too_many_rows", "too_large"),
         ("no_closed_trades", "too_few_rows"),
+        ("deals_without_execution", "too_few_rows"),
         ("ambiguous_dates", "dates_unreadable"),
         ("mixed_date_order", "dates_unreadable"),
         ("grid_no_year", "dates_unreadable"),

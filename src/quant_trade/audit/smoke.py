@@ -11,6 +11,7 @@ No database, app startup or filesystem writes live here.
 from __future__ import annotations
 
 import math
+import re
 import time
 import xml.etree.ElementTree as ET
 from collections import deque
@@ -48,6 +49,12 @@ REDIRECT_LOOP = "RedirectLoop"
 TOO_MANY_REDIRECTS = "TooManyRedirects"
 INVALID_REDIRECT = "InvalidRedirect"
 INVALID_URL = "[invalid URL]"
+#: Marked sections a page may carry: CDATA (inline SVG) and Office's conditional
+#: sections. Python's parser raised on any other ``<![...]>`` until its patch
+#: releases began to read them as HTML5 does (3.11.17 and 3.12.15 on CI hand
+#: them to ``unknown_decl``), so the page parser refuses them itself.
+MARKED_SECTIONS = frozenset({"temp", "cdata", "ignore", "include", "rcdata", "if", "else", "endif"})
+_MARKED_SECTION_NAME = re.compile(r"[a-zA-Z][-_.a-zA-Z0-9]*")
 
 
 def _normalize(url: str) -> str:
@@ -304,6 +311,12 @@ class _PageParser(HTMLParser):
             name = (values.get("property") or values.get("name") or "").lower()
             if name in IMAGE_KINDS:
                 self.references.append((name, values.get("content") or ""))
+
+    def unknown_decl(self, data: str) -> None:
+        """Refuse ``<![broken]>`` on every Python, as older parsers did."""
+        name = _MARKED_SECTION_NAME.match(data)
+        if name is None or name.group(0).lower() not in MARKED_SECTIONS:
+            raise ValueError(f"unknown marked section {data[:40]!r}")
 
 
 @dataclass
